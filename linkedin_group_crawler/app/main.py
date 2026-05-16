@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.routes import linkedin_app_router, router
+from app.api.zalo_routes import zalo_router
 from app.config import settings
 from app.utils.file_utils import ensure_directory
 from app.utils.logger import setup_logging
@@ -57,3 +58,4 @@ async def request_validation_exception_handler(_, exc: RequestValidationError) -
 
 app.include_router(router)
 app.include_router(linkedin_app_router)
+app.include_router(zalo_router)

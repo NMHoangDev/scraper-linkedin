@@ -1,0 +1,102 @@
+[
+  {
+    "sender": "Mylife",
+    "time_text": null,
+    "content": "Mylife\n@Nguyễn Văn Thương trao đổi vs a.H giúp a để đưa các bạn triển khai giúp a cái Tools làm sao central, monitor,log,... được việc dùng AI của mọi người và từ đó có thể share Skill + SOP,... giữa mọi ng vơi snhau nhé",
+    "raw": "Mylife\n@Nguyễn Văn Thương trao đổi vs a.H giúp a để đưa các bạn triển khai giúp a cái Tools làm sao central, monitor,log,... được việc dùng AI của mọi người và từ đó có thể share Skill + SOP,... giữa mọi ng vơi snhau nhé",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1621.68994140625
+  },
+  {
+    "sender": "Mylife",
+    "time_text": null,
+    "content": "qua a có trao đổi vs a.H sơ qua và a.Hiệp đang triển khai chỗ này",
+    "raw": "qua a có trao đổi vs a.H sơ qua và a.Hiệp đang triển khai chỗ này",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1523.773193359375
+  },
+  {
+    "sender": "Mylife",
+    "time_text": "15:23",
+    "content": "có gì e add thêm bạn làm chỗ này nhen",
+    "raw": "có gì e add thêm bạn làm chỗ này nhen\n15:23",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1471.8287353515625
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "15:26",
+    "content": "Nguyễn Văn Thương\nDạ,có gì anh @Trần Hoàng Hiệp cho em ý kiến chỗ này để em cho các bạn triển khai cái tools này nha",
+    "raw": "Nguyễn Văn Thương\nDạ,có gì anh @Trần Hoàng Hiệp cho em ý kiến chỗ này để em cho các bạn triển khai cái tools này nha\n15:26",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1393.888916015625
+  },
+  {
+    "sender": "Mylife",
+    "time_text": null,
+    "content": "a\nMylife",
+    "raw": "a\nMylife\n/-strong\n/-heart\n:>\n:o\n:-((\n:-h",
+    "image_urls": [
+      "blob:https://chat.zalo.me/5aa187d7-c7d8-4aa8-a62a-06ac37586a8a"
+    ],
+    "is_sent": false,
+    "top": -1243.9931640625,
+    "image_files": [
+      "msg0004_00.jpg"
+    ]
+  },
+  {
+    "sender": "Mylife",
+    "time_text": null,
+    "content": "@Trần Hoàng Hiệp tư vấn thêm cho @Nguyễn Văn Thương để triển khai vụ central AI giúp nhé",
+    "raw": "@Trần Hoàng Hiệp tư vấn thêm cho @Nguyễn Văn Thương để triển khai vụ central AI giúp nhé",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -835.0463256835938
+  },
+  {
+    "sender": "Mylife",
+    "time_text": "09:04",
+    "content": "Vấn đề cốt lõi là hiện tại mỗi người đang dùng AI như một \"hòn đảo riêng\" — không có gì kết nối, không ai biết ai đang làm gì hiệu quả, token thừa ở chỗ này trong khi chỗ khác lại thiếu.\nHệ thống Markee AI Ops Center sẽ giải quyết theo 4 tầng như trong sơ đồ:\nTầng 1 — Thu thập: Mỗi thành viên khi dùng AI (dù là Claude, ChatGPT, hay bất kỳ tool nào) đều ghi lại qua một lightweight logger — có thể là browser extension, hoặc một form submit đơn giản sau khi hoàn thành task.\nTầng 2 — Xử lý trung tâm: Hệ thống tự động tổng hợp token đã dùng, prompt nào hiệu quả cao, tool nào đang được dùng nhiều nhất, và ai đang \"under-utilise\" quota của mình.\nTầng 3 — Thông minh hoá: Đây là phần tạo giá trị lớn nhất — một Skill Library nội bộ (như app store prompt), Token Pool Manager để phân bổ lại token dư, và Cost Optimizer tự động gợi ý \"bài toán này dùng Claude Haiku thay vì Opus sẽ rẻ hơn 10x\".\nTầng 4 — Dashboard: CEO thấy tổng chi phí AI vs output, Manager thấy ai cần training thêm, và mỗi nhân viên có \"tài khoản AI\" cá nhân của mình.",
+    "raw": "Vấn đề cốt lõi là hiện tại mỗi người đang dùng AI như một \"hòn đảo riêng\" — không có gì kết nối, không ai biết ai đang làm gì hiệu quả, token thừa ở chỗ này trong khi chỗ khác lại thiếu.\nHệ thống Markee AI Ops Center sẽ giải quyết theo 4 tầng như trong sơ đồ:\nTầng 1 — Thu thập: Mỗi thành viên khi dùng AI (dù là Claude, ChatGPT, hay bất kỳ tool nào) đều ghi lại qua một lightweight logger — có thể là browser extension, hoặc một form submit đơn giản sau khi hoàn thành task.\nTầng 2 — Xử lý trung tâm: Hệ thống tự động tổng hợp token đã dùng, prompt nào hiệu quả cao, tool nào đang được dùng nhiều nhất, và ai đang \"under-utilise\" quota của mình.\nTầng 3 — Thông minh hoá: Đây là phần tạo giá trị lớn nhất — một Skill Library nội bộ (như app store prompt), Token Pool Manager để phân bổ lại token dư, và Cost Optimizer tự động gợi ý \"bài toán này dùng Claude Haiku thay vì Opus sẽ rẻ hơn 10x\".\nTầng 4 — Dashboard: CEO thấy tổng chi phí AI vs output, Manager thấy ai cần training thêm, và mỗi nhân viên có \"tài khoản AI\" cá nhân của mình.\n09:04",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -783.1018676757812
+  },
+  {
+    "sender": "Mylife",
+    "time_text": null,
+    "content": "Mylife\n1\n​\n2\n<!DOCTYPE html>\n3\n<html lang=\"vi\">\n4\n<head>\n5\n<meta charset=\"UTF-8\"/>\n6\n<style>\n7\n* { box-sizing: border-box; margin: 0; padding: 0; }\n8\nbody { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f1a; color: #e2e8f0; }\n9\n​\n10\n.header { background: #1a1a2e; border-bottom: 1px solid #2d2d4e; padding: 14px 20px; display: flex; align-items: center; gap: 12px; }\n11\n.header-title { font-size: 15px; font-weight: 700; color: #fff; }\n12\n.header-sub { font-size: 11px; color: #64748b; margin-top: 2px; }\n13\n.badge-phase { font-size: 10px; padding: 3px 10px; border-radius: 20px; font-weight: 600; margin-left: 8px; }\n14\n.p1 { background: #052e16; color: #4ade80; }\n15\n.p2 { background: #0c1a3e; color: #60a5fa; }\n16\n.p3 { background: #2e1065; color: #c084fc; }\n17\n​\n18\n.tabs { display: flex; background: #1a1a2e; border-bottom: 1px solid #2d2d4e; padding: 0 20px; }\n19\n.tab { font-size: 12px; padding: 10px 16px; cursor: pointer; color: #64748b; border-bottom: 2px solid transparent; transition: all .2s; white-space: nowrap; }\nmarkee_ai_ops_integration_architect\nure.html\n44.51 KB\nTải về để xem lâu dài",
+    "raw": "Mylife\n1\n​\n2\n<!DOCTYPE html>\n3\n<html lang=\"vi\">\n4\n<head>\n5\n<meta charset=\"UTF-8\"/>\n6\n<style>\n7\n* { box-sizing: border-box; margin: 0; padding: 0; }\n8\nbody { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f1a; color: #e2e8f0; }\n9\n​\n10\n.header { background: #1a1a2e; border-bottom: 1px solid #2d2d4e; padding: 14px 20px; display: flex; align-items: center; gap: 12px; }\n11\n.header-title { font-size: 15px; font-weight: 700; color: #fff; }\n12\n.header-sub { font-size: 11px; color: #64748b; margin-top: 2px; }\n13\n.badge-phase { font-size: 10px; padding: 3px 10px; border-radius: 20px; font-weight: 600; margin-left: 8px; }\n14\n.p1 { background: #052e16; color: #4ade80; }\n15\n.p2 { background: #0c1a3e; color: #60a5fa; }\n16\n.p3 { background: #2e1065; color: #c084fc; }\n17\n​\n18\n.tabs { display: flex; background: #1a1a2e; border-bottom: 1px solid #2d2d4e; padding: 0 20px; }\n19\n.tab { font-size: 12px; padding: 10px 16px; cursor: pointer; color: #64748b; border-bottom: 2px solid transparent; transition: all .2s; white-space: nowrap; }\nmarkee_ai_ops_integration_architect\nure.html\n44.51 KB\nTải về để xem lâu dài\n/-strong\n/-heart\n:>\n:o\n:-((\n:-h",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -415.1504821777344
+  },
+  {
+    "sender": "Mylife",
+    "time_text": "09:36",
+    "content": "1\n​\n2\n<!DOCTYPE html>\n3\n<html lang=\"vi\">\n4\n<head>\n5\n<meta charset=\"UTF-8\"/>\n6\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"/>\n7\n<h2 class=\"sr-only\">Markee AI Ops — CEO Dashboard: tổng quan chi phí, token và năng suất AI toàn team</h2>\n8\n<style>\n9\n  * { box-sizing: border-box; margin: 0; padding: 0; }\n10\n  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f1a; color: #e2e8f0; min-height: 100vh; }\n11\n​\n12\n  /* HEADER */\n13\n  .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #2d2d4e; }\n14\n  .header-left { display: flex; align-items: center; gap: 12px; }\n15\n  .logo { width: 36px; height: 36px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }\n16\n  .header-title { font-size: 16px; font-weight: 700; color: #fff; }\n17\n  .header-sub { font-size: \nmarkee_ceo_ai_dashbo\nard.html\n27.62 KB\nTải về để xem lâu dài",
+    "raw": "1\n​\n2\n<!DOCTYPE html>\n3\n<html lang=\"vi\">\n4\n<head>\n5\n<meta charset=\"UTF-8\"/>\n6\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"/>\n7\n<h2 class=\"sr-only\">Markee AI Ops — CEO Dashboard: tổng quan chi phí, token và năng suất AI toàn team</h2>\n8\n<style>\n9\n  * { box-sizing: border-box; margin: 0; padding: 0; }\n10\n  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f1a; color: #e2e8f0; min-height: 100vh; }\n11\n​\n12\n  /* HEADER */\n13\n  .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #2d2d4e; }\n14\n  .header-left { display: flex; align-items: center; gap: 12px; }\n15\n  .logo { width: 36px; height: 36px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }\n16\n  .header-title { font-size: 16px; font-weight: 700; color: #fff; }\n17\n  .header-sub { font-size: \nmarkee_ceo_ai_dashbo\nard.html\n27.62 KB\nTải về để xem lâu dài\n09:36\n/-strong\n/-heart\n:>\n:o\n:-((\n:-h",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -87.65046691894531
+  },
+  {
+    "sender": "Mylife",
+    "time_text": "14:20",
+    "content": "Mylife\nhttps://www.facebook.com/share/r/18JuFUaJnv/?mibextid=wwXIfr\n83K views · 949 reactions | Reel by Technology News - Công nghệ mỗi ngày\nwww.facebook.com",
+    "raw": "Mylife\nhttps://www.facebook.com/share/r/18JuFUaJnv/?mibextid=wwXIfr\n83K views · 949 reactions | Reel by Technology News - Công nghệ mỗi ngày\nwww.facebook.com\n14:20\n/-strong\n/-heart\n:>\n:o\n:-((\n:-h",
+    "image_urls": [
+      "blob:https://chat.zalo.me/cc5973fd-4030-4426-aa57-f0fae564c972"
+    ],
+    "is_sent": false,
+    "top": 288.8426208496094,
+    "image_files": [
+      "msg0009_00.jpg"
+    ]
+  }
+]

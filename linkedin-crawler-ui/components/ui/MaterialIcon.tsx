@@ -58,7 +58,23 @@ export type MaterialSymbolName =
   | "article"
   | "more_vert"
   | "chat_bubble"
-  | "history";
+  | "history"
+  | "upload_file"
+  | "cloud_upload"
+  | "hourglass_top"
+  | "chat"
+  | "image"
+  | "visibility_off"
+  | "arrow_back"
+  | "arrow_forward"
+  | "touch_app"
+  | "search_off"
+  | "home"
+  | "delete_sweep"
+  | "upload"
+  | "border_color"
+  | "filter_alt"
+  | "groups";
 
 export interface MaterialIconProps {
   name: MaterialSymbolName;

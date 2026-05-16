@@ -1,0 +1,840 @@
+[
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "12:00",
+    "content": "a\nNguyễn Văn Thương\n@Phạm Quốc Việt @Nguyễn Minh Hoàng @Phạm Thanh Sang @Văn Nguyên Các bạn tải Forticlient bản VPN-only nhé rồi setting như hình,username password anh gửi qua tin nhắn nhé",
+    "raw": "a\nNguyễn Văn Thương\n@Phạm Quốc Việt @Nguyễn Minh Hoàng @Phạm Thanh Sang @Văn Nguyên Các bạn tải Forticlient bản VPN-only nhé rồi setting như hình,username password anh gửi qua tin nhắn nhé\n12:00\n/-strong\n/-heart\n:>\n:o\n:-((\n:-h",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -3300.301025390625
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": null,
+    "content": "Nguyễn Văn Thương\nThông tin VM 10.30.50.29 vmadmin | Poptech@123!",
+    "raw": "Nguyễn Văn Thương\nThông tin VM 10.30.50.29 vmadmin | Poptech@123!",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -2719.4560546875
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": null,
+    "content": "@Nguyễn Minh Hoàng @Văn Nguyên @Phạm Thanh Sang @Phạm Quốc Việt Anh gửi thông tin vps nhé,tuần này các bạn convert hết workflow của mn sang ngôn ngữ python nhé và làm giao diện,public lên domain để mn sử dụng.",
+    "raw": "@Nguyễn Minh Hoàng @Văn Nguyên @Phạm Thanh Sang @Phạm Quốc Việt Anh gửi thông tin vps nhé,tuần này các bạn convert hết workflow của mn sang ngôn ngữ python nhé và làm giao diện,public lên domain để mn sử dụng.",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -2644.02783203125
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": null,
+    "content": "Mọi người có thắc mắc gì cứ nhắn lên đây nha",
+    "raw": "Mọi người có thắc mắc gì cứ nhắn lên đây nha",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -2569.594970703125
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "13:55",
+    "content": "Giao diện thì mn code bằng Next.js (TypeScript) nha",
+    "raw": "Giao diện thì mn code bằng Next.js (TypeScript) nha\n13:55",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -2517.650634765625
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "08:57",
+    "content": "a\nNguyễn Văn Thương\n@Phạm Quốc Việt @Phạm Thanh Sang Làm thêm task này giúp a nhé,ai làm list các group vô sheet này nha\n\nhttps://docs.google.com/spreadsheets/d/1Xxm2wHFMt1mEdAIzZzx7_lZ3spnK49TgHegZ9Kq0Osw/edit?gid=1404090582#gid=1404090582",
+    "raw": "a\nNguyễn Văn Thương\n@Phạm Quốc Việt @Phạm Thanh Sang Làm thêm task này giúp a nhé,ai làm list các group vô sheet này nha\n\nhttps://docs.google.com/spreadsheets/d/1Xxm2wHFMt1mEdAIzZzx7_lZ3spnK49TgHegZ9Kq0Osw/edit?gid=1404090582#gid=1404090582\n08:57\n/-strong\n/-heart\n:>\n:o\n:-((\n:-h",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -2391.238525390625
+  },
+  {
+    "sender": "Phạm Thanh Sang",
+    "time_text": "09:38",
+    "content": "Phạm Thanh Sang\nNguyễn Văn Thương\n[Hình ảnh] @Phạm Quốc Việt @Phạm Thanh Sang Làm thêm task này giúp a nhé,ai làm list các group vô sheet này nha https://docs.google.com/spreadsheets/d/1Xxm2wHFMt1mEdAIzZzx7_lZ3spnK49TgHegZ9Kq0Osw/edit?gid=1404090582#gid=1404090582\ndạ a",
+    "raw": "Phạm Thanh Sang\nNguyễn Văn Thương\n[Hình ảnh] @Phạm Quốc Việt @Phạm Thanh Sang Làm thêm task này giúp a nhé,ai làm list các group vô sheet này nha https://docs.google.com/spreadsheets/d/1Xxm2wHFMt1mEdAIzZzx7_lZ3spnK49TgHegZ9Kq0Osw/edit?gid=1404090582#gid=1404090582\ndạ a\n09:38",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -2034.907470703125
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "15:58",
+    "content": "Nguyễn Văn Thương\n@All bạn nào ssh vô vm 10.30.50.29 ko dc thì báo lên đây để @Nguyễn Văn Huấn xem cho nha,có gì Huấn xem check giúp a nha",
+    "raw": "Nguyễn Văn Thương\n@All bạn nào ssh vô vm 10.30.50.29 ko dc thì báo lên đây để @Nguyễn Văn Huấn xem cho nha,có gì Huấn xem check giúp a nha\n15:58",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1822.0487060546875
+  },
+  {
+    "sender": "Nguyễn Minh Hoàng",
+    "time_text": "16:03",
+    "content": "a\nNguyễn Minh Hoàng\nDạ anh @Nguyễn Văn Huấn ơi, em ssh vào 10.30.50.29 bị timedout á anh, anh check giúp em với ạ",
+    "raw": "a\nNguyễn Minh Hoàng\nDạ anh @Nguyễn Văn Huấn ơi, em ssh vào 10.30.50.29 bị timedout á anh, anh check giúp em với ạ\n16:03\n/-strong\n/-heart\n:>\n:o\n:-((\n:-h",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1698.1365966796875
+  },
+  {
+    "sender": "Nguyễn Văn Huấn",
+    "time_text": "16:03",
+    "content": "Nguyễn Văn Huấn\nNguyễn Minh Hoàng\n[Hình ảnh] Dạ anh @Nguyễn Văn Huấn ơi, em ssh vào 10.30.50.29 bị timedout á anh, anh check giúp em với ạ\n@Nguyễn Minh Hoàng em ping tới địa chỉ trên dc ko?",
+    "raw": "Nguyễn Văn Huấn\nNguyễn Minh Hoàng\n[Hình ảnh] Dạ anh @Nguyễn Văn Huấn ơi, em ssh vào 10.30.50.29 bị timedout á anh, anh check giúp em với ạ\n@Nguyễn Minh Hoàng em ping tới địa chỉ trên dc ko?\n16:03",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1210.7408447265625
+  },
+  {
+    "sender": "Nguyễn Minh Hoàng",
+    "time_text": "16:04",
+    "content": "a\nNguyễn Minh Hoàng\nDạ  timedout hết á anh @Nguyễn Văn Huấn",
+    "raw": "a\nNguyễn Minh Hoàng\nDạ  timedout hết á anh @Nguyễn Văn Huấn\n16:04\n/-strong\n/-heart\n:>\n:o\n:-((\n:-h",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1046.354248046875
+  },
+  {
+    "sender": "Nguyễn Văn Huấn",
+    "time_text": "16:06",
+    "content": "Nguyễn Văn Huấn\nlog out cái VPN rồi vào lại, check giúp anh nha @Nguyễn Minh Hoàng",
+    "raw": "Nguyễn Văn Huấn\nlog out cái VPN rồi vào lại, check giúp anh nha @Nguyễn Minh Hoàng\n16:06",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -681.9676513671875
+  },
+  {
+    "sender": "Nguyễn Minh Hoàng",
+    "time_text": null,
+    "content": "Nguyễn Minh Hoàng\nDạ anh",
+    "raw": "Nguyễn Minh Hoàng\nDạ anh",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -580.5440063476562
+  },
+  {
+    "sender": "Nguyễn Minh Hoàng",
+    "time_text": "16:12",
+    "content": "Nguyễn Văn Huấn\nlog out cái VPN rồi vào lại, check giúp anh nha @Nguyễn Minh Hoàng\nDạ em ssh vào được rồi ạ",
+    "raw": "Nguyễn Văn Huấn\nlog out cái VPN rồi vào lại, check giúp anh nha @Nguyễn Minh Hoàng\nDạ em ssh vào được rồi ạ\n16:12",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -505.1157531738281
+  },
+  {
+    "sender": "Châu Hoàng Thúc",
+    "time_text": "21:40",
+    "content": "a\nChâu Hoàng Thúc\n@Nguyễn Văn Huấn dạ anh ơi sao em vpn rồi vẫn không vào được",
+    "raw": "a\nChâu Hoàng Thúc\n@Nguyễn Văn Huấn dạ anh ơi sao em vpn rồi vẫn không vào được\n21:40\n/-strong\n/-heart\n:>\n:o\n:-((\n:-h",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -315.7407531738281
+  },
+  {
+    "sender": "Nguyễn Văn Huấn",
+    "time_text": "08:33",
+    "content": "Nguyễn Văn Huấn\nChâu Hoàng Thúc\n[Hình ảnh] @Nguyễn Văn Huấn dạ anh ơi sao em vpn rồi vẫn không vào được\n@Châu Hoàng Thúc anh xin username của account VPN nha",
+    "raw": "Nguyễn Văn Huấn\nChâu Hoàng Thúc\n[Hình ảnh] @Nguyễn Văn Huấn dạ anh ơi sao em vpn rồi vẫn không vào được\n@Châu Hoàng Thúc anh xin username của account VPN nha\n08:33",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1966.2269287109375
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "08:34",
+    "content": "Nguyễn Văn Thương\nNguyễn Văn Huấn\n@Châu Hoàng Thúc anh xin username của account VPN nha\n@Nguyễn Văn Huấn tạo luôn cho bạn 1 tk vpn mới giúp a nha Huấn,qua a đưa tạm vpn của bạn kia chưa dùng",
+    "raw": "Nguyễn Văn Thương\nNguyễn Văn Huấn\n@Châu Hoàng Thúc anh xin username của account VPN nha\n@Nguyễn Văn Huấn tạo luôn cho bạn 1 tk vpn mới giúp a nha Huấn,qua a đưa tạm vpn của bạn kia chưa dùng\n08:34",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1801.84033203125
+  },
+  {
+    "sender": "Nguyễn Văn Huấn",
+    "time_text": "08:35",
+    "content": "Nguyễn Văn Huấn\nok a",
+    "raw": "Nguyễn Văn Huấn\nok a\n08:35",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1637.4537353515625
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "08:35",
+    "content": "Nguyễn Văn Thương\nNguyễn Văn Huấn\nok a\n@Nguyễn Văn Huấn tên bạn là Châu Hoàng Thúc luôn á",
+    "raw": "Nguyễn Văn Thương\nNguyễn Văn Huấn\nok a\n@Nguyễn Văn Huấn tên bạn là Châu Hoàng Thúc luôn á\n08:35",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1536.0301513671875
+  },
+  {
+    "sender": "Văn Nguyên",
+    "time_text": null,
+    "content": "Văn Nguyên\n@Nguyễn Văn Huấn e cũng bị như vậy nữa a",
+    "raw": "Văn Nguyên\n@Nguyễn Văn Huấn e cũng bị như vậy nữa a",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1371.6435546875
+  },
+  {
+    "sender": "Nguyễn Văn Huấn",
+    "time_text": "08:40",
+    "content": "Nguyễn Văn Huấn\nVăn Nguyên\n@Nguyễn Văn Huấn e cũng bị như vậy nữa a\n@Văn Nguyên anh xin username account của em với",
+    "raw": "Nguyễn Văn Huấn\nVăn Nguyên\n@Nguyễn Văn Huấn e cũng bị như vậy nữa a\n@Văn Nguyên anh xin username account của em với\n08:40",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1077.7431640625
+  },
+  {
+    "sender": "Văn Nguyên",
+    "time_text": "08:40",
+    "content": "Văn Nguyên\nnguyennv",
+    "raw": "Văn Nguyên\nnguyennv\n08:40",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -913.3565063476562
+  },
+  {
+    "sender": "Nguyễn Văn Huấn",
+    "time_text": "08:44",
+    "content": "Nguyễn Văn Huấn\nlog out rồi check lại giúp a nha",
+    "raw": "Nguyễn Văn Huấn\nlog out rồi check lại giúp a nha\n08:44",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -811.9329223632812
+  },
+  {
+    "sender": "Phạm Quốc Việt",
+    "time_text": "08:53",
+    "content": "a\nPhạm Quốc Việt\ndạ em cũng bị anh ơi @Nguyễn Văn Huấn. username của em là vietpq",
+    "raw": "a\nPhạm Quốc Việt\ndạ em cũng bị anh ơi @Nguyễn Văn Huấn. username của em là vietpq\n08:53\n/-strong\n/-heart\n:>\n:o\n:-((\n:-h",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -710.50927734375
+  },
+  {
+    "sender": "Nguyễn Văn Huấn",
+    "time_text": "08:54",
+    "content": "Nguyễn Văn Huấn\nPhạm Quốc Việt\n[Hình ảnh] dạ em cũng bị anh ơi @Nguyễn Văn Huấn. username của em là vietpq\n@Phạm Quốc Việt check lại giúp a",
+    "raw": "Nguyễn Văn Huấn\nPhạm Quốc Việt\n[Hình ảnh] dạ em cũng bị anh ơi @Nguyễn Văn Huấn. username của em là vietpq\n@Phạm Quốc Việt check lại giúp a\n08:54",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -347.1180725097656
+  },
+  {
+    "sender": "Phạm Quốc Việt",
+    "time_text": "08:54",
+    "content": "Phạm Quốc Việt\ndạ anh",
+    "raw": "Phạm Quốc Việt\ndạ anh\n08:54",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -182.7314910888672
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "10:43",
+    "content": "Nguyễn Văn Thương\n@All n8n lên lại rồi nhé mn",
+    "raw": "Nguyễn Văn Thương\n@All n8n lên lại rồi nhé mn\n10:43",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -32.83565139770508
+  },
+  {
+    "sender": "Mylife",
+    "time_text": null,
+    "content": "Mylife\ntrang tuyển dụng thế nào rùi các bạn nhỉ",
+    "raw": "Mylife\ntrang tuyển dụng thế nào rùi các bạn nhỉ",
+    "image_urls": [],
+    "is_sent": false,
+    "top": 117.06018829345703
+  },
+  {
+    "sender": "Mylife",
+    "time_text": null,
+    "content": "có bản demo ko",
+    "raw": "có bản demo ko",
+    "image_urls": [],
+    "is_sent": false,
+    "top": 192.48843383789062
+  },
+  {
+    "sender": "Mylife",
+    "time_text": "20:31",
+    "content": "các bạn upload sản phẩm của mình lên nhé",
+    "raw": "các bạn upload sản phẩm của mình lên nhé\n20:31",
+    "image_urls": [],
+    "is_sent": false,
+    "top": 244.43287658691406
+  },
+  {
+    "sender": "Mylife",
+    "time_text": "20:31",
+    "content": "Mylife\ncác bạn upload sản phẩm của mình lên nhé",
+    "raw": "Mylife\ncác bạn upload sản phẩm của mình lên nhé\n20:31",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1836.5972900390625
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": null,
+    "content": "Nguyễn Văn Thương\nMylife\ntrang tuyển dụng thế nào rùi các bạn nhỉ\n@Mylife Trang tuyển dụng bản web thì bạn Thanh đang sửa lại rồi anh,còn mấy bạn này đang đẩy phần crawl data lên giao diện",
+    "raw": "Nguyễn Văn Thương\nMylife\ntrang tuyển dụng thế nào rùi các bạn nhỉ\n@Mylife Trang tuyển dụng bản web thì bạn Thanh đang sửa lại rồi anh,còn mấy bạn này đang đẩy phần crawl data lên giao diện",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1735.1737060546875
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "20:33",
+    "content": "@Nguyễn Minh Hoàng em gửi bản giao diện của em lên nha",
+    "raw": "@Nguyễn Minh Hoàng em gửi bản giao diện của em lên nha\n20:33",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1574.2940673828125
+  },
+  {
+    "sender": "Mylife",
+    "time_text": "20:33",
+    "content": "Mylife\ncác bạn cứ cho sản phẩm lên để review nhen",
+    "raw": "Mylife\ncác bạn cứ cho sản phẩm lên để review nhen\n20:33",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1496.354248046875
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "20:35",
+    "content": "Nguyễn Văn Thương\nHiện tại con nginx em đang deploy lại để public lên domain nên a vô đỡ VPN để sử dụng nha",
+    "raw": "Nguyễn Văn Thương\nHiện tại con nginx em đang deploy lại để public lên domain nên a vô đỡ VPN để sử dụng nha\n20:35",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1394.9306640625
+  },
+  {
+    "sender": "Nguyễn Minh Hoàng",
+    "time_text": null,
+    "content": "Nguyễn Minh Hoàng\nhttp://10.30.50.29:18080/minhhoang-scraper\nDạ đây là bản giao diện cào dữ liệu từ các nhóm linkedln về ạ.",
+    "raw": "Nguyễn Minh Hoàng\nhttp://10.30.50.29:18080/minhhoang-scraper\nDạ đây là bản giao diện cào dữ liệu từ các nhóm linkedln về ạ.",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1293.5069580078125
+  },
+  {
+    "sender": "Nguyễn Minh Hoàng",
+    "time_text": "20:41",
+    "content": "Khi vào app thì cần nhập chính xác email và mật khẩu tài khoản linkedin, vào page chính nhấn button tài khoản( ở góc dưới trái ở sidebar) xác nhận lại tài khoản để lấy session và sử dụng được như bình thường ạ, trong lúc xác nhận tài khoản chú ý gmail hoạt thông báo trên app điện thoại để nhập mã otp(nếu lần đầu dùng sẽ mất tầm 1 2 phút để hiện input nhập mã), xác nhận xong dùng như bình thường ạ.",
+    "raw": "Khi vào app thì cần nhập chính xác email và mật khẩu tài khoản linkedin, vào page chính nhấn button tài khoản( ở góc dưới trái ở sidebar) xác nhận lại tài khoản để lấy session và sử dụng được như bình thường ạ, trong lúc xác nhận tài khoản chú ý gmail hoạt thông báo trên app điện thoại để nhập mã otp(nếu lần đầu dùng sẽ mất tầm 1 2 phút để hiện input nhập mã), xác nhận xong dùng như bình thường ạ.\n20:41",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1195.59033203125
+  },
+  {
+    "sender": "Mylife",
+    "time_text": null,
+    "content": "Mylife\nỔn đoá mai demo dc chưa e nhỉ",
+    "raw": "Mylife\nỔn đoá mai demo dc chưa e nhỉ",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1050.1851806640625
+  },
+  {
+    "sender": "Mylife",
+    "time_text": null,
+    "content": "Coá gì @Nguyễn Văn Thương mai review 1 lượt các bạn có sản phẩm demo nhen",
+    "raw": "Coá gì @Nguyễn Văn Thương mai review 1 lượt các bạn có sản phẩm demo nhen",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -974.7570190429688
+  },
+  {
+    "sender": "Mylife",
+    "time_text": "21:04",
+    "content": "Bạn nào sản phẩm oki nhất thì thưởng nóng nhen 🤗🤑",
+    "raw": "Bạn nào sản phẩm oki nhất thì thưởng nóng nhen 🤗🤑\n21:04",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -922.8125610351562
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "21:05",
+    "content": "Nguyễn Văn Thương\nMylife\nCoá gì @Nguyễn Văn Thương mai review 1 lượt các bạn có sản phẩm demo nhen\n@Mylife Dạ anh",
+    "raw": "Nguyễn Văn Thương\nMylife\nCoá gì @Nguyễn Văn Thương mai review 1 lượt các bạn có sản phẩm demo nhen\n@Mylife Dạ anh\n21:05",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -842.9166870117188
+  },
+  {
+    "sender": "Mylife",
+    "time_text": null,
+    "content": "Mylife\nPhần linkedin mình có cái quản lý tập trung tất cả tài khoản linked lại và thống kê xem mỗi ngày mỗi acc linkedin tăng bao nhiêu follow và có bao nhiu bài post 1 ngày dc ko",
+    "raw": "Mylife\nPhần linkedin mình có cái quản lý tập trung tất cả tài khoản linked lại và thống kê xem mỗi ngày mỗi acc linkedin tăng bao nhiêu follow và có bao nhiu bài post 1 ngày dc ko",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -678.5301513671875
+  },
+  {
+    "sender": "Mylife",
+    "time_text": "21:13",
+    "content": "Kiến trúc tối ưu sẽ là:\n\n* 10 account LinkedIn cá nhân\n* Mỗi bạn vẫn tự quản lý account riêng\n* Nhưng dữ liệu được kéo về 1 dashboard tập trung:\n    * Follower tăng mỗi ngày\n    * Số post/ngày\n    * Impression / engagement\n    * Comment / reaction\n    * AI score chất lượng content\n    * Tracking consistency",
+    "raw": "Kiến trúc tối ưu sẽ là:\n\n* 10 account LinkedIn cá nhân\n* Mỗi bạn vẫn tự quản lý account riêng\n* Nhưng dữ liệu được kéo về 1 dashboard tập trung:\n    * Follower tăng mỗi ngày\n    * Số post/ngày\n    * Impression / engagement\n    * Comment / reaction\n    * AI score chất lượng content\n    * Tracking consistency\n21:13",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -580.6134643554688
+  },
+  {
+    "sender": "Châu Hoàng Thúc",
+    "time_text": "08:49",
+    "content": "a\nChâu Hoàng Thúc\n@Nguyễn Văn Huấn anh ơi s em vô không được",
+    "raw": "a\nChâu Hoàng Thúc\n@Nguyễn Văn Huấn anh ơi s em vô không được\n08:49\n/-strong\n/-heart\n:>\n:o\n:-((\n:-h",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -229.317138671875
+  },
+  {
+    "sender": "Mylife",
+    "time_text": "09:38",
+    "content": "Mylife\nlên kết quả nha @Nguyễn Văn Thương",
+    "raw": "Mylife\nlên kết quả nha @Nguyễn Văn Thương\n09:38",
+    "image_urls": [],
+    "is_sent": false,
+    "top": 118.54167175292969
+  },
+  {
+    "sender": "Mylife",
+    "time_text": null,
+    "content": "Mylife\noki",
+    "raw": "Mylife\noki\n/-strong\n/-heart\n:>\n:o\n:-((\n:-h",
+    "image_urls": [],
+    "is_sent": false,
+    "top": 452.69677734375
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "09:43",
+    "content": "Nguyễn Văn Thương\n@Minh Khai @Nguyễn Minh Hoàng @Phạm Quốc Việt @Phạm Thanh Sang @Trần Đình Thọ @Văn Nguyên Các bạn gửi sản phẩm demo lên anh review chút nha",
+    "raw": "Nguyễn Văn Thương\n@Minh Khai @Nguyễn Minh Hoàng @Phạm Quốc Việt @Phạm Thanh Sang @Trần Đình Thọ @Văn Nguyên Các bạn gửi sản phẩm demo lên anh review chút nha\n09:43",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -2081.782470703125
+  },
+  {
+    "sender": "Minh Khai",
+    "time_text": null,
+    "content": "Minh Khai\nhttps://utmmanager-kappa.vercel.app/\nUTM Manager — Markee AI\nTạo, quản lý và theo dõi UTM links thông minh cho chiến dịch marketing.\nutmmanager-kappa.vercel.app",
+    "raw": "Minh Khai\nhttps://utmmanager-kappa.vercel.app/\nUTM Manager — Markee AI\nTạo, quản lý và theo dõi UTM links thông minh cho chiến dịch marketing.\nutmmanager-kappa.vercel.app",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1909.398193359375
+  },
+  {
+    "sender": "Minh Khai",
+    "time_text": "10:44",
+    "content": "em gửi sản phẩm demo UTM builder",
+    "raw": "em gửi sản phẩm demo UTM builder\n10:44",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1741.979248046875
+  },
+  {
+    "sender": "Nguyễn Văn Huấn",
+    "time_text": null,
+    "content": "Nguyễn Văn Huấn\nChâu Hoàng Thúc\n[Hình ảnh] @Nguyễn Văn Huấn anh ơi s em vô không được\n@Châu Hoàng Thúc check lại xem thử em",
+    "raw": "Nguyễn Văn Huấn\nChâu Hoàng Thúc\n[Hình ảnh] @Nguyễn Văn Huấn anh ơi s em vô không được\n@Châu Hoàng Thúc check lại xem thử em",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1664.0394287109375
+  },
+  {
+    "sender": "Nguyễn Văn Huấn",
+    "time_text": "11:03",
+    "content": "em ping đến được ko?",
+    "raw": "em ping đến được ko?\n11:03",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1525.648193359375
+  },
+  {
+    "sender": "Châu Hoàng Thúc",
+    "time_text": "11:04",
+    "content": "a\nChâu Hoàng Thúc",
+    "raw": "a\nChâu Hoàng Thúc\n/-strong\n/-heart\n:>\n:o\n:-((\n:-h\n11:04",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1447.7083740234375
+  },
+  {
+    "sender": "Nguyễn Văn Huấn",
+    "time_text": "11:07",
+    "content": "Nguyễn Văn Huấn\nem đang VPN bằng tài khoản nào ấy?",
+    "raw": "Nguyễn Văn Huấn\nem đang VPN bằng tài khoản nào ấy?\n11:07",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1176.75927734375
+  },
+  {
+    "sender": "Châu Hoàng Thúc",
+    "time_text": "11:12",
+    "content": "Châu Hoàng Thúc\nNguyễn Văn Huấn\nem đang VPN bằng tài khoản nào ấy?\n@Nguyễn Văn Huấn dạ em vào được rồi",
+    "raw": "Châu Hoàng Thúc\nNguyễn Văn Huấn\nem đang VPN bằng tài khoản nào ấy?\n@Nguyễn Văn Huấn dạ em vào được rồi\n11:12",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1075.335693359375
+  },
+  {
+    "sender": "Phạm Quốc Việt",
+    "time_text": "12:20",
+    "content": "Phạm Quốc Việt\nNguyễn Văn Thương\n@Minh Khai @Nguyễn Minh Hoàng @Phạm Quốc Việt @Phạm Thanh Sang @Trần Đình Thọ @Văn Nguyên Các bạn gửi sản phẩm demo lên anh review chút nha\n@Nguyễn Văn Thương http://10.30.50.29:3001/ em gửi ạ",
+    "raw": "Phạm Quốc Việt\nNguyễn Văn Thương\n@Minh Khai @Nguyễn Minh Hoàng @Phạm Quốc Việt @Phạm Thanh Sang @Trần Đình Thọ @Văn Nguyên Các bạn gửi sản phẩm demo lên anh review chút nha\n@Nguyễn Văn Thương http://10.30.50.29:3001/ em gửi ạ\n12:20",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -862.4768676757812
+  },
+  {
+    "sender": "Nguyễn Minh Hoàng",
+    "time_text": "12:33",
+    "content": "Nguyễn Minh Hoàng\nNguyễn Văn Thương\n@Minh Khai @Nguyễn Minh Hoàng @Phạm Quốc Việt @Phạm Thanh Sang @Trần Đình Thọ @Văn Nguyên Các bạn gửi sản phẩm demo lên anh review chút nha\n@http://10.30.50.29:18080/minhhoang-scraper em gửi ạ",
+    "raw": "Nguyễn Minh Hoàng\nNguyễn Văn Thương\n@Minh Khai @Nguyễn Minh Hoàng @Phạm Quốc Việt @Phạm Thanh Sang @Trần Đình Thọ @Văn Nguyên Các bạn gửi sản phẩm demo lên anh review chút nha\n@http://10.30.50.29:18080/minhhoang-scraper em gửi ạ\n12:33",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -698.09033203125
+  },
+  {
+    "sender": "Văn Nguyên",
+    "time_text": "13:31",
+    "content": "Văn Nguyên\n@Nguyễn Văn Thương  http://10.30.50.29:3234/ crawlFb",
+    "raw": "Văn Nguyên\n@Nguyễn Văn Thương  http://10.30.50.29:3234/ crawlFb\n13:31",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -485.23150634765625
+  },
+  {
+    "sender": "Mylife",
+    "time_text": "14:51",
+    "content": "Mylife\nkhi noà meeting xem demo dc @Nguyễn Văn Thương nhỉ",
+    "raw": "Mylife\nkhi noà meeting xem demo dc @Nguyễn Văn Thương nhỉ\n14:51",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -335.3356628417969
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "14:52",
+    "content": "Nguyễn Văn Thương\nĐể em hẹn các bạn luôn nhe,em cũng sử dụng thử cái các bạn gửi rùi",
+    "raw": "Nguyễn Văn Thương\nĐể em hẹn các bạn luôn nhe,em cũng sử dụng thử cái các bạn gửi rùi\n14:52",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -233.91204833984375
+  },
+  {
+    "sender": "Mylife",
+    "time_text": null,
+    "content": "Mylife\noki",
+    "raw": "Mylife\noki",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -132.48843383789062
+  },
+  {
+    "sender": "Mylife",
+    "time_text": "14:52",
+    "content": "vậy 15h vào demo luôn xem sao nha",
+    "raw": "vậy 15h vào demo luôn xem sao nha\n14:52",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -57.06018829345703
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "14:56",
+    "content": "Nguyễn Văn Thương\nNguyễn Văn Thương\n@Minh Khai @Nguyễn Minh Hoàng @Phạm Quốc Việt @Phạm Thanh Sang @Văn Nguyên @Trần Đình Thọ\nVô nhé mn https://meet.google.com/cpo-jzyg-vmj",
+    "raw": "Nguyễn Văn Thương\nNguyễn Văn Thương\n@Minh Khai @Nguyễn Minh Hoàng @Phạm Quốc Việt @Phạm Thanh Sang @Văn Nguyên @Trần Đình Thọ\nVô nhé mn https://meet.google.com/cpo-jzyg-vmj\n14:56\n/-strong\n/-heart\n:>\n:o\n:-((\n:-h",
+    "image_urls": [],
+    "is_sent": false,
+    "top": 338.63427734375
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": null,
+    "content": "Nguyễn Văn Thương\nNguyễn Văn Thương\n@Minh Khai @Nguyễn Minh Hoàng @Phạm Quốc Việt @Phạm Thanh Sang @Trần Đình Thọ @Văn Nguyên Các bạn gửi sản phẩm demo lên anh review chút nha\n3h mình meeting xíu nha các bạn",
+    "raw": "Nguyễn Văn Thương\nNguyễn Văn Thương\n@Minh Khai @Nguyễn Minh Hoàng @Phạm Quốc Việt @Phạm Thanh Sang @Trần Đình Thọ @Văn Nguyên Các bạn gửi sản phẩm demo lên anh review chút nha\n3h mình meeting xíu nha các bạn",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -2902.523193359375
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "14:53",
+    "content": "@Minh Khai @Nguyễn Minh Hoàng @Phạm Quốc Việt @Phạm Thanh Sang @Văn Nguyên @Trần Đình Thọ",
+    "raw": "@Minh Khai @Nguyễn Minh Hoàng @Phạm Quốc Việt @Phạm Thanh Sang @Văn Nguyên @Trần Đình Thọ\n14:53",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -2764.132080078125
+  },
+  {
+    "sender": "Mylife",
+    "time_text": "14:55",
+    "content": "Mylife\ngui link giúp a nhen",
+    "raw": "Mylife\ngui link giúp a nhen\n14:55",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -2686.192138671875
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "14:56",
+    "content": "Nguyễn Văn Thương\nNguyễn Văn Thương\n@Minh Khai @Nguyễn Minh Hoàng @Phạm Quốc Việt @Phạm Thanh Sang @Văn Nguyên @Trần Đình Thọ\nVô nhé mn https://meet.google.com/cpo-jzyg-vmj",
+    "raw": "Nguyễn Văn Thương\nNguyễn Văn Thương\n@Minh Khai @Nguyễn Minh Hoàng @Phạm Quốc Việt @Phạm Thanh Sang @Văn Nguyên @Trần Đình Thọ\nVô nhé mn https://meet.google.com/cpo-jzyg-vmj\n14:56",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -2584.7685546875
+  },
+  {
+    "sender": "Phạm Thanh Sang",
+    "time_text": "15:11",
+    "content": "Phạm Thanh Sang\nhttps://build-phd-heavy-promote.trycloudflare.com/\nCreate Next App\nGenerated by create next app\nbuild-phd-heavy-promote.trycloudflare.com",
+    "raw": "Phạm Thanh Sang\nhttps://build-phd-heavy-promote.trycloudflare.com/\nCreate Next App\nGenerated by create next app\nbuild-phd-heavy-promote.trycloudflare.com\n15:11",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -2420.382080078125
+  },
+  {
+    "sender": "Mylife",
+    "time_text": "15:49",
+    "content": "Mylife\n1\n<!DOCTYPE html>\n2\n<html lang=\"vi\">\n3\n<head>\n4\n<meta charset=\"UTF-8\">\n5\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n6\n<title>Social Growth Dashboard</title>\n7\n<style>\n8\n:root { color-scheme: light; }\n9\n* { box-sizing: border-box; margin: 0; padding: 0; }\n10\nbody { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f4f0; color: #1a1a18; font-size: 14px; line-height: 1.5; }\n11\n.sr-only { position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0); }\n12\n​\n13\n.header { background: #fff; border-bottom: 0.5px solid #e0dfd8; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }\n14\n.header-title { font-size: 15px; font-weight: 500; color: #1a1a18; }\n15\n.header-date { font-size: 11px; color: #888780; margin-top: 1px; }\n16\n.active-badge { font-size: 11px; color: #3B6D11; background: #EAF3DE; padding: 3px 9px; border-radius: 20px; }\n17\n​\n18\n.tabs { background: #fff; border-bottom: 0.5px solid #e0dfd8; display: flex; padding: 0 12px; overflow-x: auto; }\n19\n.t\nSocial_Growth_Dashbo\nard.html\n32.39 KB\nTải về để xem lâu dài",
+    "raw": "Mylife\n1\n<!DOCTYPE html>\n2\n<html lang=\"vi\">\n3\n<head>\n4\n<meta charset=\"UTF-8\">\n5\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n6\n<title>Social Growth Dashboard</title>\n7\n<style>\n8\n:root { color-scheme: light; }\n9\n* { box-sizing: border-box; margin: 0; padding: 0; }\n10\nbody { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f4f0; color: #1a1a18; font-size: 14px; line-height: 1.5; }\n11\n.sr-only { position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0); }\n12\n​\n13\n.header { background: #fff; border-bottom: 0.5px solid #e0dfd8; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }\n14\n.header-title { font-size: 15px; font-weight: 500; color: #1a1a18; }\n15\n.header-date { font-size: 11px; color: #888780; margin-top: 1px; }\n16\n.active-badge { font-size: 11px; color: #3B6D11; background: #EAF3DE; padding: 3px 9px; border-radius: 20px; }\n17\n​\n18\n.tabs { background: #fff; border-bottom: 0.5px solid #e0dfd8; display: flex; padding: 0 12px; overflow-x: auto; }\n19\n.t\nSocial_Growth_Dashbo\nard.html\n32.39 KB\nTải về để xem lâu dài\n15:49\n/-strong\n/-heart\n:>\n:o\n:-((\n:-h",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -2198.495361328125
+  },
+  {
+    "sender": "Phạm Quốc Việt",
+    "time_text": "15:58",
+    "content": "Phạm Quốc Việt\n@Nguyễn Văn Thương anh cho em xin video record meeting với được không ạ",
+    "raw": "Phạm Quốc Việt\n@Nguyễn Văn Thương anh cho em xin video record meeting với được không ạ\n15:58",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1846.9908447265625
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "15:58",
+    "content": "Nguyễn Văn Thương\nXíu gg nó trả video về a gửi cho nha",
+    "raw": "Nguyễn Văn Thương\nXíu gg nó trả video về a gửi cho nha\n15:58",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1745.5672607421875
+  },
+  {
+    "sender": "Mylife",
+    "time_text": "16:55",
+    "content": "Mylife\n1\n<!DOCTYPE html>\n2\n<html lang=\"vi\">\n3\n<head>\n4\n<meta charset=\"UTF-8\">\n5\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n6\n<title>Markee — Crawl Data Module</title>\n7\n<style>\n8\n  /* ── RESET & BASE ── */\n9\n  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }\n10\n  html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif; font-size: 14px; background: #F4F5F7; color: #1A1D23; }\n11\n​\n12\n  /* ── LAYOUT ── */\n13\n  .app { display: flex; height: 100vh; overflow: hidden; }\n14\n​\n15\n  /* ── SIDEBAR ── */\n16\n  .sidebar {\n17\n    width: 220px; min-width: 220px; background: #0F1117; color: #fff;\n18\n    display: flex; flex-direction: column; height: 100vh; overflow-y: auto;\n19\n  }\ncrawl-data-mod\nule.html\n65.36 KB\nTải về để xem lâu dài",
+    "raw": "Mylife\n1\n<!DOCTYPE html>\n2\n<html lang=\"vi\">\n3\n<head>\n4\n<meta charset=\"UTF-8\">\n5\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n6\n<title>Markee — Crawl Data Module</title>\n7\n<style>\n8\n  /* ── RESET & BASE ── */\n9\n  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }\n10\n  html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif; font-size: 14px; background: #F4F5F7; color: #1A1D23; }\n11\n​\n12\n  /* ── LAYOUT ── */\n13\n  .app { display: flex; height: 100vh; overflow: hidden; }\n14\n​\n15\n  /* ── SIDEBAR ── */\n16\n  .sidebar {\n17\n    width: 220px; min-width: 220px; background: #0F1117; color: #fff;\n18\n    display: flex; flex-direction: column; height: 100vh; overflow-y: auto;\n19\n  }\ncrawl-data-mod\nule.html\n65.36 KB\nTải về để xem lâu dài\n16:55\n/-strong\n/-heart\n:>\n:o\n:-((\n:-h",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1595.67138671875
+  },
+  {
+    "sender": "Mylife",
+    "time_text": "20:38",
+    "content": "Mylife\nhttps://youtube.com/shorts/Y2tzQWgZMAI?si=SJMk-RRtBSxjyQw0\n61K Sao GitHub Trong 83 Ngày Chỉ Với 1 File Text\nThưởng thức video và nhạc bạn yêu thích, tải nội dung do bạn sáng tạo lên và chia sẻ nội dung đó với gia đình, bạn bè cũng như mọi người trên YouTube.\nwww.youtube.com",
+    "raw": "Mylife\nhttps://youtube.com/shorts/Y2tzQWgZMAI?si=SJMk-RRtBSxjyQw0\n61K Sao GitHub Trong 83 Ngày Chỉ Với 1 File Text\nThưởng thức video và nhạc bạn yêu thích, tải nội dung do bạn sáng tạo lên và chia sẻ nội dung đó với gia đình, bạn bè cũng như mọi người trên YouTube.\nwww.youtube.com\n20:38",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1195.6944580078125
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": null,
+    "content": "Nguyễn Văn Thương\nVideo record lúc chiều nhé mn,\nhttps://drive.google.com/file/d/17hSQCNdzal3wDYeX210AfeOqqudcDZet/view?usp=drive_link\ncpo-jzyg-vmj (2026-05-08 07:56 GMT)\ndrive.google.com",
+    "raw": "Nguyễn Văn Thương\nVideo record lúc chiều nhé mn,\nhttps://drive.google.com/file/d/17hSQCNdzal3wDYeX210AfeOqqudcDZet/view?usp=drive_link\ncpo-jzyg-vmj (2026-05-08 07:56 GMT)\ndrive.google.com",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -712.6620483398438
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": null,
+    "content": "@Nguyễn Minh Hoàng @Phạm Quốc Việt @Phạm Thanh Sang @Văn Nguyên @Trần Đình Thọ Các bạn dồn phần thông báo của bot về tele này của bạn Nguyên luôn nhé,mỗi bạn sẽ tạo 1 topic riêng cho mình nha,cú pháp sẽ là Tên task chi tiết + Tên người thực hiện.\nNhờ Nguyên cấp quyền admin luôn cho tiện nhé.\nCác bạn gửi link gg sheet ở chat chung luôn để a tổng hợp lại.\nhttps://t.me/+pZMJVPLbMiozNTll\nCrawl bài viết tuyển dụng trên Facebook Group\nt.me",
+    "raw": "@Nguyễn Minh Hoàng @Phạm Quốc Việt @Phạm Thanh Sang @Văn Nguyên @Trần Đình Thọ Các bạn dồn phần thông báo của bot về tele này của bạn Nguyên luôn nhé,mỗi bạn sẽ tạo 1 topic riêng cho mình nha,cú pháp sẽ là Tên task chi tiết + Tên người thực hiện.\nNhờ Nguyên cấp quyền admin luôn cho tiện nhé.\nCác bạn gửi link gg sheet ở chat chung luôn để a tổng hợp lại.\nhttps://t.me/+pZMJVPLbMiozNTll\nCrawl bài viết tuyển dụng trên Facebook Group\nt.me",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -543.263916015625
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "22:48",
+    "content": "Anh đã chuyển lương theo KPI cho các bạn có KPI ở tháng 4(từ ngày 20/4 trở về trước).\n- KPI thì a.Minh nói từ tháng này team dev do anh quyết và ck nên các bạn lưu ý follow tiến độ mà anh đưa ra nha.\n- Các bạn làm có sản phẩm ok thì present showup cho a.Minh và team mkt sử dụng sẽ có thưởng.\n- Và sẽ xét lên level dựa trên sản phẩm + KPI nha.",
+    "raw": "Anh đã chuyển lương theo KPI cho các bạn có KPI ở tháng 4(từ ngày 20/4 trở về trước).\n- KPI thì a.Minh nói từ tháng này team dev do anh quyết và ck nên các bạn lưu ý follow tiến độ mà anh đưa ra nha.\n- Các bạn làm có sản phẩm ok thì present showup cho a.Minh và team mkt sử dụng sẽ có thưởng.\n- Và sẽ xét lên level dựa trên sản phẩm + KPI nha.\n22:48",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -239.93057250976562
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "09:01",
+    "content": "Nguyễn Văn Thương\nNguyễn Văn Thương\n[Link] @Nguyễn Minh Hoàng @Phạm Quốc Việt @Phạm Thanh Sang @Văn Nguyên @Trần Đình Thọ Các bạn dồn phần thông báo của bot về tele này của bạn Nguyên luôn nhé,mỗi bạn sẽ tạo 1 topic riêng cho mình nha,cú pháp sẽ là Tên task chi tiết + Tên người thực hiện. Nhờ Nguyên cấp quyền admin luôn cho tiện nhé. Các bạn gửi link gg sheet ở chat chung luôn để a tổng hợp lại. https://t.me/+pZMJVPLbMiozNTll\nMấy bạn làm chỗ này đi nha,task high 1day,để tên topic như trên nhé",
+    "raw": "Nguyễn Văn Thương\nNguyễn Văn Thương\n[Link] @Nguyễn Minh Hoàng @Phạm Quốc Việt @Phạm Thanh Sang @Văn Nguyên @Trần Đình Thọ Các bạn dồn phần thông báo của bot về tele này của bạn Nguyên luôn nhé,mỗi bạn sẽ tạo 1 topic riêng cho mình nha,cú pháp sẽ là Tên task chi tiết + Tên người thực hiện. Nhờ Nguyên cấp quyền admin luôn cho tiện nhé. Các bạn gửi link gg sheet ở chat chung luôn để a tổng hợp lại. https://t.me/+pZMJVPLbMiozNTll\nMấy bạn làm chỗ này đi nha,task high 1day,để tên topic như trên nhé\n09:01",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -46.05324172973633
+  },
+  {
+    "sender": "Phạm Quốc Việt",
+    "time_text": "09:02",
+    "content": "Phạm Quốc Việt\nEm có làm để sẵn 10 group trong sheets rồi ạ, giờ có cần up qua đâu không anh",
+    "raw": "Phạm Quốc Việt\nEm có làm để sẵn 10 group trong sheets rồi ạ, giờ có cần up qua đâu không anh\n09:02",
+    "image_urls": [],
+    "is_sent": false,
+    "top": 118.33333587646484
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": null,
+    "content": "Nguyễn Văn Thương\nem tạo topic của em trong tele đó chưa á",
+    "raw": "Nguyễn Văn Thương\nem tạo topic của em trong tele đó chưa á",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1779.560302734375
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "09:03",
+    "content": "tất cả các bạn sẽ thông báo về chung 1 tele",
+    "raw": "tất cả các bạn sẽ thông báo về chung 1 tele\n09:03",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1704.132080078125
+  },
+  {
+    "sender": "Phạm Quốc Việt",
+    "time_text": "09:04",
+    "content": "Phạm Quốc Việt\nDạ",
+    "raw": "Phạm Quốc Việt\nDạ\n09:04",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1626.1922607421875
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": null,
+    "content": "Nguyễn Văn Thương\nMylife\n[File] crawl-data-module.html\n@Nguyễn Minh Hoàng @Văn Nguyên Tuần này 2 em sẽ làm phần Group và Post Feed trong file này nha,phần Group thì thêm giúp anh thêm phần intent nữa,để có thể lọc các group theo intent.Phần Post feed hiển thị các bài viết crawl về.Các bạn tự chia task với nhau rồi làm nhé.Làm chung 1 source thôi nha,Hoàng chia sẻ cho Nguyên.",
+    "raw": "Nguyễn Văn Thương\nMylife\n[File] crawl-data-module.html\n@Nguyễn Minh Hoàng @Văn Nguyên Tuần này 2 em sẽ làm phần Group và Post Feed trong file này nha,phần Group thì thêm giúp anh thêm phần intent nữa,để có thể lọc các group theo intent.Phần Post feed hiển thị các bài viết crawl về.Các bạn tự chia task với nhau rồi làm nhé.Làm chung 1 source thôi nha,Hoàng chia sẻ cho Nguyên.",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1524.7685546875
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "09:25",
+    "content": "@Phạm Quốc Việt @Phạm Thanh Sang Tuần này 2 bạn sẽ viết actor apify cho phần crawl của mỗi bạn nha",
+    "raw": "@Phạm Quốc Việt @Phạm Thanh Sang Tuần này 2 bạn sẽ viết actor apify cho phần crawl của mỗi bạn nha\n09:25",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1341.4005126953125
+  },
+  {
+    "sender": "Mylife",
+    "time_text": null,
+    "content": "Mylife\ncho deadline + manday luôn nhé @Nguyễn Văn Thương",
+    "raw": "Mylife\ncho deadline + manday luôn nhé @Nguyễn Văn Thương",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1263.460693359375
+  },
+  {
+    "sender": "Mylife",
+    "time_text": "09:25",
+    "content": "để các bạn write tasks vào PM cho chính xác",
+    "raw": "để các bạn write tasks vào PM cho chính xác\n09:25",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1188.032470703125
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "09:26",
+    "content": "Nguyễn Văn Thương\nDeadline t6 nha các bạn,task high 5 ngày",
+    "raw": "Nguyễn Văn Thương\nDeadline t6 nha các bạn,task high 5 ngày\n09:26",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -1110.0926513671875
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "09:31",
+    "content": "Nguyễn Văn Thương\n1\n<!DOCTYPE html>\n2\n<html lang=\"vi\">\n3\n<head>\n4\n<meta charset=\"UTF-8\">\n5\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n6\n<title>Markee — Hệ thống Seeding Tổng hợp</title>\n7\n<script src=\"https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js\" crossorigin=\"anonymous\"></script>\n8\n<style>\n9\n*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}\n10\nhtml,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Inter',sans-serif;font-size:14px;background:#F4F5F7;color:#1A1D23}\n11\n.app{display:flex;height:100vh;overflow:hidden}\n12\n​\n13\n/* SIDEBAR */\n14\n.sidebar{width:224px;min-width:224px;background:#0F1117;color:#fff;display:flex;flex-direction:column;height:100vh;overflow-y:auto;transition:width .2s}\n15\n.sidebar-logo{padding:18px 16px 12px;font-size:15px;font-weight:800;letter-spacing:-.5px;border-bottom:1px solid #1e2130;display:flex;align-items:center;gap:8px}\n16\n.logo-badge{width:28px;height:28px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:7px;display:flex;align-ite\nmarkee-unif\nied.html\n106.36 KB\nTải về để xem lâu dài",
+    "raw": "Nguyễn Văn Thương\n1\n<!DOCTYPE html>\n2\n<html lang=\"vi\">\n3\n<head>\n4\n<meta charset=\"UTF-8\">\n5\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n6\n<title>Markee — Hệ thống Seeding Tổng hợp</title>\n7\n<script src=\"https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js\" crossorigin=\"anonymous\"></script>\n8\n<style>\n9\n*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}\n10\nhtml,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Inter',sans-serif;font-size:14px;background:#F4F5F7;color:#1A1D23}\n11\n.app{display:flex;height:100vh;overflow:hidden}\n12\n​\n13\n/* SIDEBAR */\n14\n.sidebar{width:224px;min-width:224px;background:#0F1117;color:#fff;display:flex;flex-direction:column;height:100vh;overflow-y:auto;transition:width .2s}\n15\n.sidebar-logo{padding:18px 16px 12px;font-size:15px;font-weight:800;letter-spacing:-.5px;border-bottom:1px solid #1e2130;display:flex;align-items:center;gap:8px}\n16\n.logo-badge{width:28px;height:28px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:7px;display:flex;align-ite\nmarkee-unif\nied.html\n106.36 KB\nTải về để xem lâu dài\n09:31\n/-strong\n/-heart\n:>\n:o\n:-((\n:-h",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -960.19677734375
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": null,
+    "content": "a\nNguyễn Văn Thương\n@All Chào các bạn, tất cả các bạn thực tập sinh đang thực tập hiện tại vui lòng dành ít thời gian truy cập link GG Form thông qua QR Code trên để cung cấp các thông tin cá nhân cho công ty nha.\n/-heart\n1",
+    "raw": "a\nNguyễn Văn Thương\n@All Chào các bạn, tất cả các bạn thực tập sinh đang thực tập hiện tại vui lòng dành ít thời gian truy cập link GG Form thông qua QR Code trên để cung cấp các thông tin cá nhân cho công ty nha.\n/-heart\n1\n/-strong\n/-heart\n:>\n:o\n:-((\n:-h",
+    "image_urls": [
+      "blob:https://chat.zalo.me/2252f7c7-1e2e-4e12-99ef-1345a684c36a"
+    ],
+    "is_sent": false,
+    "top": -560.2199096679688,
+    "image_files": [
+      "msg0086_00.jpg"
+    ]
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "11:09",
+    "content": "Hạn chót là 17h thứ 6 tuần này\n11:09\n/-heart\n1",
+    "raw": "Hạn chót là 17h thứ 6 tuần này\n11:09\n/-heart\n1\n/-strong\n/-heart\n:>\n:o\n:-((\n:-h",
+    "image_urls": [],
+    "is_sent": false,
+    "top": -39.35185241699219
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "07:59",
+    "content": "Nguyễn Văn Thương\n@All Mọi người báo cáo tiến độ task 1 chút nha,rồi có gì chiều mai mình meeting demo thử",
+    "raw": "Nguyễn Văn Thương\n@All Mọi người báo cáo tiến độ task 1 chút nha,rồi có gì chiều mai mình meeting demo thử\n07:59",
+    "image_urls": [],
+    "is_sent": false,
+    "top": 99.05093383789062
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "08:08",
+    "content": "Nguyễn Văn Thương\n@Châu Hoàng Thúc @Minh Khai @Nguyễn Minh Hoàng @Phạm Quốc Việt @Phạm Thanh Sang @Trần Đình Thọ @Văn Nguyên @Thu Huyền Chiều 4h meeting demo xíu nha mn\n08:08\n/-heart\n1",
+    "raw": "Nguyễn Văn Thương\n@Châu Hoàng Thúc @Minh Khai @Nguyễn Minh Hoàng @Phạm Quốc Việt @Phạm Thanh Sang @Trần Đình Thọ @Văn Nguyên @Thu Huyền Chiều 4h meeting demo xíu nha mn\n08:08\n/-heart\n1\n/-strong\n/-heart\n:>\n:o\n:-((\n:-h",
+    "image_urls": [],
+    "is_sent": false,
+    "top": 248.94677734375
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": null,
+    "content": "Nguyễn Văn Thương\nhttps://meet.google.com/iij-wmeu-gzq\nVô nhé mn\nMeet\nCuộc gọi trong thời gian thực của Google. Chia sẻ video, màn hình và bản trình bày với bạn cùng lớp và khách hàng bằng trình duyệt của bạn.\nmeet.google.com",
+    "raw": "Nguyễn Văn Thương\nhttps://meet.google.com/iij-wmeu-gzq\nVô nhé mn\nMeet\nCuộc gọi trong thời gian thực của Google. Chia sẻ video, màn hình và bản trình bày với bạn cùng lớp và khách hàng bằng trình duyệt của bạn.\nmeet.google.com",
+    "image_urls": [
+      "blob:https://chat.zalo.me/81593de6-d05b-459d-9139-f81d18b71fbe"
+    ],
+    "is_sent": false,
+    "top": 433.32177734375,
+    "image_files": [
+      "msg0090_00.jpg"
+    ]
+  },
+  {
+    "sender": "Nguyễn Văn Thương",
+    "time_text": "16:01",
+    "content": "@Mylife vô nha anh",
+    "raw": "@Mylife vô nha anh\n16:01\n/-strong\n/-heart\n:>\n:o\n:-((\n:-h",
+    "image_urls": [],
+    "is_sent": false,
+    "top": 603.2291870117188
+  }
+]
