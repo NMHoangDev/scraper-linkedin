@@ -180,7 +180,7 @@ export default function ZaloDashboardPage() {
                       )}
                     </div>
                     <Link
-                      href={`/zalo/group/${g.id}?user_id=${encodeURIComponent(userId)}`}
+                      href={`/zalo/group?id=${g.id}&user_id=${encodeURIComponent(userId)}`}
                       className="bg-primary text-on-primary hover:bg-primary/90 flex items-center justify-center gap-2 rounded-lg px-md py-sm text-sm font-semibold transition-colors"
                     >
                       <MaterialIcon name="visibility" className="text-base" />

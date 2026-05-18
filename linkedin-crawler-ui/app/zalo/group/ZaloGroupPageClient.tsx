@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { MaterialIcon } from "@/components/ui";
 import { useZaloCrawler } from "@/hooks/useZaloCrawler";
@@ -18,11 +18,10 @@ import type { ZaloMessage } from "@/types/zalo";
 type DataSource = "api" | "local" | "none";
 
 export default function ZaloGroupPageClient() {
-  const params = useParams<{ groupId: string }>();
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const groupId = params.groupId ?? "";
+  const groupId = searchParams.get("id") ?? "";
   const groupName = decodeURIComponent(groupId);
 
   const urlUserId = searchParams.get("user_id") ?? "";
@@ -57,7 +56,7 @@ export default function ZaloGroupPageClient() {
   const [loadingApi, setLoadingApi] = useState(!!urlUserId);
 
   const loadFromApi = useCallback(async () => {
-    if (!userId) return;
+    if (!userId || !groupId) return;
     setLoadingApi(true);
     try {
       const result = await fetchZaloMessages(userId, groupId, 0, 2000);

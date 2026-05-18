@@ -48,7 +48,7 @@ export function ZaloGroupCard({ group, onRemove }: ZaloGroupCardProps) {
       </div>
 
       <Link
-        href={`/zalo/group/${group.id}`}
+        href={`/zalo/group?id=${group.id}`}
         className="bg-primary text-on-primary hover:bg-primary/90 flex items-center justify-center gap-2 rounded-lg px-md py-sm text-sm font-semibold transition-colors"
       >
         <MaterialIcon name="visibility" className="text-base" />
