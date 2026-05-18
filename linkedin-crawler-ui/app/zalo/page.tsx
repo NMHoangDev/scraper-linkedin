@@ -14,65 +14,116 @@ import {
 } from "@/services/zaloCrawlerService";
 import type { ZaloGroupMeta } from "@/types/zalo";
 
+const ZALO_USER_KEY = "zalo_user_id";
+
+function resolveUserId(): string {
+  try {
+    const email = localStorage.getItem("linkedin_crawler_email") ?? "";
+    if (email) return email;
+    const stored = localStorage.getItem(ZALO_USER_KEY) ?? "";
+    if (stored) return stored;
+    const generated = "user_" + Math.random().toString(36).slice(2, 10);
+    localStorage.setItem(ZALO_USER_KEY, generated);
+    return generated;
+  } catch {
+    return "default";
+  }
+}
+
 function apiGroupToMeta(g: ZaloApiGroup): ZaloGroupMeta {
-  return {
-    id: g.id,
-    name: g.name,
-    messageCount: g.messageCount,
-    senderCount: 0,
-    mediaCount: 0,
-  };
+  return { id: g.id, name: g.name, messageCount: g.messageCount, senderCount: 0, mediaCount: 0 };
 }
 
 export default function ZaloDashboardPage() {
   const { groupMetas } = useZaloCrawler();
+
+  const [userId, setUserId] = useState<string>("");
+  const [editingUser, setEditingUser] = useState(false);
+  const [userInput, setUserInput] = useState("");
+
+  // Resolve userId on mount — never blocks render
+  useEffect(() => {
+    const uid = resolveUserId();
+    setUserId(uid);
+    setUserInput(uid);
+  }, []);
+
+  const saveUserId = () => {
+    const trimmed = userInput.trim();
+    if (!trimmed) return;
+    setUserId(trimmed);
+    setEditingUser(false);
+    try { localStorage.setItem(ZALO_USER_KEY, trimmed); } catch { /* ignore */ }
+  };
 
   const [apiGroups, setApiGroups] = useState<ZaloApiGroup[]>([]);
   const [apiStatus, setApiStatus] = useState<ZaloApiStatus | null>(null);
   const [apiError, setApiError] = useState(false);
 
   const loadApiData = useCallback(() => {
-    Promise.all([fetchZaloGroups(), fetchZaloStatus()])
+    if (!userId) return;
+    Promise.all([fetchZaloGroups(userId), fetchZaloStatus(userId)])
       .then(([groups, status]) => {
         setApiGroups(groups);
         setApiStatus(status);
         setApiError(false);
       })
       .catch(() => setApiError(true));
-  }, []);
+  }, [userId]);
 
-  useEffect(() => {
-    loadApiData();
-  }, [loadApiData]);
+  useEffect(() => { loadApiData(); }, [loadApiData]);
 
   const apiGroupIds = new Set(apiGroups.map((g) => g.id));
   const localOnlyMetas = groupMetas.filter((m) => !apiGroupIds.has(m.id));
-  const allGroupMetas: ZaloGroupMeta[] = [
-    ...apiGroups.map(apiGroupToMeta),
-    ...localOnlyMetas,
-  ];
+  const allGroupMetas: ZaloGroupMeta[] = [...apiGroups.map(apiGroupToMeta), ...localOnlyMetas];
 
-  const backendReady = apiStatus?.ready === true;
+  // Show controls whenever backend responded — even if user profile dir doesn't exist yet
+  const backendReachable = apiStatus !== null;
+  const backendMisconfigured = apiStatus !== null && !apiStatus.outputConfigured;
 
   return (
     <div className="space-y-lg">
-      <div>
-        <h1 className="text-on-surface text-2xl font-black">Zalo Crawler</h1>
-        <p className="text-on-surface-variant mt-1 text-sm">
-          Crawl và xem dữ liệu tin nhắn các nhóm Zalo.
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-on-surface text-2xl font-black">Zalo Crawler</h1>
+          <p className="text-on-surface-variant mt-1 text-sm">
+            Crawl và xem dữ liệu tin nhắn các nhóm Zalo.
+          </p>
+        </div>
+
+        {/* User identity chip */}
+        <div className="border-outline-variant bg-surface-container-low flex items-center gap-2 rounded-lg border px-sm py-1.5 text-xs">
+          <MaterialIcon name="person" className="text-primary text-sm" />
+          {editingUser ? (
+            <>
+              <input
+                className="border-outline-variant bg-surface text-on-surface w-40 rounded border px-2 py-0.5 text-xs focus:outline-none"
+                value={userInput}
+                onChange={(e) => setUserInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") saveUserId(); if (e.key === "Escape") setEditingUser(false); }}
+                autoFocus
+              />
+              <button type="button" onClick={saveUserId} className="text-primary font-bold">Lưu</button>
+              <button type="button" onClick={() => setEditingUser(false)} className="text-on-surface-variant">×</button>
+            </>
+          ) : (
+            <>
+              <span className="text-on-surface-variant max-w-[140px] truncate">{userId || "..."}</span>
+              <button type="button" onClick={() => setEditingUser(true)} className="text-on-surface-variant hover:text-on-surface">
+                <MaterialIcon name="edit" className="text-sm" />
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
-      {!apiError && apiStatus && !backendReady && (
+      {backendMisconfigured && (
         <div className="border-outline-variant bg-surface-container-low flex items-start gap-3 rounded-xl border px-md py-sm text-sm">
           <MaterialIcon name="info" className="text-primary mt-0.5 shrink-0" />
           <p className="text-on-surface-variant">
-            Backend chưa cấu hình đầy đủ. Thiếu{" "}
-            {!apiStatus.profileConfigured && (
-              <code className="bg-surface-container rounded px-1">ZALO_PROFILE_DIR</code>
-            )}
-            {!apiStatus.outputConfigured && (
-              <code className="bg-surface-container ml-1 rounded px-1">ZALO_OUTPUT_DIR</code>
+            Backend thiếu{" "}
+            {!apiStatus!.outputConfigured && (
+              <code className="bg-surface-container rounded px-1">ZALO_OUTPUT_DIR</code>
             )}{" "}
             trong <code className="bg-surface-container rounded px-1">.env</code>.
           </p>
@@ -98,7 +149,7 @@ export default function ZaloDashboardPage() {
               <p className="text-sm">
                 {apiError
                   ? "Không kết nối được backend."
-                  : "Chưa có dữ liệu. Nhấn Bắt đầu crawl để thu thập tin nhắn."}
+                  : "Chưa có dữ liệu. Đăng nhập Zalo và bắt đầu crawl để thu thập tin nhắn."}
               </p>
             </div>
           ) : (
@@ -116,7 +167,6 @@ export default function ZaloDashboardPage() {
                         {g.name}
                       </h3>
                     </div>
-
                     <div className="flex flex-wrap gap-md text-xs text-on-surface-variant">
                       <span className="flex items-center gap-1">
                         <MaterialIcon name="chat" className="text-sm" />
@@ -129,9 +179,8 @@ export default function ZaloDashboardPage() {
                         </span>
                       )}
                     </div>
-
                     <Link
-                      href={`/zalo/group/${g.id}`}
+                      href={`/zalo/group/${g.id}?user_id=${encodeURIComponent(userId)}`}
                       className="bg-primary text-on-primary hover:bg-primary/90 flex items-center justify-center gap-2 rounded-lg px-md py-sm text-sm font-semibold transition-colors"
                     >
                       <MaterialIcon name="visibility" className="text-base" />
@@ -145,13 +194,15 @@ export default function ZaloDashboardPage() {
         </section>
 
         <aside aria-label="Crawl">
-          {backendReady ? (
-            <ZaloCrawlControls groups={apiGroups} onCrawlDone={loadApiData} />
+          {backendReachable ? (
+            <ZaloCrawlControls userId={userId} groups={apiGroups} onCrawlDone={loadApiData} />
           ) : (
             <div className="border-outline-variant bg-surface-container-low rounded-xl border p-lg text-center">
               <MaterialIcon name="radar" className="text-on-surface-variant mx-auto mb-sm text-4xl opacity-40" />
               <p className="text-on-surface-variant text-sm">
-                Cấu hình backend để bật tính năng crawl tự động.
+                {apiError
+                  ? "Không kết nối được backend. Kiểm tra API URL và API key."
+                  : "Đang kết nối..."}
               </p>
             </div>
           )}

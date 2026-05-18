@@ -11,6 +11,7 @@ interface ZaloMessageItemProps {
   index: number;
   selected: boolean;
   groupId: string;
+  userId: string;
   onSelect: (index: number) => void;
 }
 
@@ -21,6 +22,7 @@ export function ZaloMessageItem({
   index,
   selected,
   groupId,
+  userId,
   onSelect,
 }: ZaloMessageItemProps) {
   const [showRaw, setShowRaw] = useState(false);
@@ -31,7 +33,7 @@ export function ZaloMessageItem({
   );
   const allThumbs = [
     ...viewableImages,
-    ...imageFiles.map((f) => zaloImageUrl(groupId, f)),
+    ...imageFiles.map((f) => zaloImageUrl(userId, groupId, f)),
   ];
   const blobCount = message.image_urls.length - viewableImages.length - imageFiles.length;
 

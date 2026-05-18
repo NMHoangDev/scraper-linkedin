@@ -1,4 +1,4 @@
-"""Zalo crawler service — wraps Playwright crawl logic for the FastAPI backend."""
+"""Zalo crawler service — per-user login via QR screenshot + Playwright crawl."""
 from __future__ import annotations
 
 import base64 as _b64
@@ -22,7 +22,6 @@ PROFILE_DIR: str = os.getenv("ZALO_PROFILE_DIR", "")
 OUTPUT_DIR: str = os.getenv("ZALO_OUTPUT_DIR", "")
 GSHEET_KEY_FILE: str = os.getenv("ZALO_GSHEET_KEY_FILE", "")
 GSHEET_ID: str = os.getenv("ZALO_GSHEET_ID", "")
-# headless=false by default — Zalo blocks headless Chrome
 _HEADLESS: bool = os.getenv("ZALO_HEADLESS", "false").strip().lower() in ("1", "true", "yes")
 
 
@@ -31,60 +30,57 @@ def _get_target_groups() -> List[str]:
     return [g.strip() for g in raw.split(",") if g.strip()]
 
 
-# ── Job state ─────────────────────────────────────────────────────────────────
-
-@dataclass
-class ZaloCrawlJob:
-    job_id: str
-    groups: List[str]
-    status: str = "pending"
-    logs: List[str] = field(default_factory=list)
-    started_at: Optional[datetime] = None
-    finished_at: Optional[datetime] = None
-    results: Dict[str, Any] = field(default_factory=dict)
-    error: Optional[str] = None
+def _sanitize_user_id(user_id: str) -> str:
+    """Sanitize user_id to be safe as a directory name."""
+    return re.sub(r"[^\w@.-]", "_", user_id.strip())[:64]
 
 
-_crawl_lock = threading.Lock()
-_job_lock = threading.Lock()
-_current_job: Optional[ZaloCrawlJob] = None
-
-
-# ── Login browser session ─────────────────────────────────────────────────────
+# ── Per-user login sessions ───────────────────────────────────────────────────
 
 @dataclass
 class _LoginSession:
-    status: str = "opening"   # "opening" | "waiting" | "logged_in" | "closed"
+    user_id: str
+    status: str = "opening"   # opening | waiting | logged_in | closed
     logged_in: bool = False
     error: Optional[str] = None
-    sidebar_groups: List[str] = field(default_factory=list)
-    refresh_requested: bool = False
+    latest_screenshot: Optional[str] = None  # base64 PNG, updated by login thread
+    close_evt: threading.Event = field(default_factory=threading.Event)
 
 
-_login_session: Optional[_LoginSession] = None
-_login_session_lock = threading.Lock()
-_login_close_evt = threading.Event()
+_login_sessions: Dict[str, _LoginSession] = {}
+_login_sessions_lock = threading.Lock()
 
 
-def _run_login_browser() -> None:
-    """Background thread: opens Chrome so the user can log in to Zalo."""
-    global _login_session
-    _login_close_evt.clear()
+def _run_login_browser(user_id: str) -> None:
+    """Background thread: opens Chrome for one user to log in, takes screenshots for QR display."""
+    with _login_sessions_lock:
+        session = _login_sessions.get(user_id)
+    if not session:
+        return
+
+    profile_dir = str(Path(PROFILE_DIR) / user_id) if PROFILE_DIR else ""
+    if profile_dir:
+        Path(profile_dir).mkdir(parents=True, exist_ok=True)
+
+    close_evt = session.close_evt
+    close_evt.clear()
+
     try:
         with sync_playwright() as p:
             try:
                 ctx = p.chromium.launch_persistent_context(
-                    user_data_dir=PROFILE_DIR,
+                    user_data_dir=profile_dir,
                     channel="chrome",
                     headless=False,
                     args=_ARGS,
                     locale="vi-VN",
                 )
             except Exception as ex:
-                with _login_session_lock:
-                    if _login_session:
-                        _login_session.status = "closed"
-                        _login_session.error = str(ex)
+                with _login_sessions_lock:
+                    s = _login_sessions.get(user_id)
+                    if s:
+                        s.status = "closed"
+                        s.error = str(ex)
                 return
 
             ctx.add_init_script(_STEALTH)
@@ -95,21 +91,31 @@ def _run_login_browser() -> None:
             except Exception:
                 pass
 
-            with _login_session_lock:
-                if _login_session:
-                    _login_session.status = "waiting"
+            with _login_sessions_lock:
+                s = _login_sessions.get(user_id)
+                if s:
+                    s.status = "waiting"
 
-            # Poll login state every 3 s until closed or logged in
-            while not _login_close_evt.wait(timeout=3):
+            # Poll every 3 s: check login state + capture screenshot for QR display
+            while not close_evt.wait(timeout=3):
                 try:
                     logged = _is_logged_in(page)
                 except Exception:
                     logged = False
-                with _login_session_lock:
-                    if _login_session:
-                        _login_session.logged_in = logged
+
+                try:
+                    shot = _b64.b64encode(page.screenshot(timeout=5000)).decode()
+                except Exception:
+                    shot = None
+
+                with _login_sessions_lock:
+                    s = _login_sessions.get(user_id)
+                    if s:
+                        s.logged_in = logged
+                        if shot:
+                            s.latest_screenshot = shot
                         if logged:
-                            _login_session.status = "logged_in"
+                            s.status = "logged_in"
 
             try:
                 ctx.close()
@@ -118,53 +124,102 @@ def _run_login_browser() -> None:
     except Exception:
         pass
     finally:
-        with _login_session_lock:
-            if _login_session:
-                _login_session.status = "closed"
+        with _login_sessions_lock:
+            s = _login_sessions.get(user_id)
+            if s:
+                s.status = "closed"
 
 
-def open_browser_for_login() -> Dict[str, Any]:
-    """Open Chrome for the user to log in. Non-blocking — returns immediately."""
-    global _login_session
-    with _login_session_lock:
-        if _login_session and _login_session.status in ("opening", "waiting", "logged_in"):
-            return {
-                "already_open": True,
-                "status": _login_session.status,
-                "logged_in": _login_session.logged_in,
-            }
-        _login_session = _LoginSession(status="opening")
-    _login_close_evt.clear()
-    threading.Thread(target=_run_login_browser, daemon=True).start()
+def open_browser_for_login(user_id: str) -> Dict[str, Any]:
+    """Open Chrome for a user to log in. Non-blocking."""
+    uid = _sanitize_user_id(user_id)
+    with _login_sessions_lock:
+        existing = _login_sessions.get(uid)
+        if existing and existing.status in ("opening", "waiting", "logged_in"):
+            return {"already_open": True, "status": existing.status, "logged_in": existing.logged_in}
+        session = _LoginSession(user_id=uid)
+        _login_sessions[uid] = session
+    threading.Thread(target=_run_login_browser, args=(uid,), daemon=True).start()
     return {"already_open": False, "status": "opening", "logged_in": False}
 
 
-def get_login_status() -> Dict[str, Any]:
-    with _login_session_lock:
-        if _login_session is None or _login_session.status == "closed":
-            return {"browser_open": False, "logged_in": False, "status": "closed", "error": None}
-        return {
-            "browser_open": _login_session.status in ("waiting", "logged_in"),
-            "logged_in": _login_session.logged_in,
-            "status": _login_session.status,
-            "error": _login_session.error,
-        }
+def get_login_screenshot(user_id: str) -> Optional[str]:
+    """Return the latest base64 PNG screenshot from the user's login browser (shows QR code)."""
+    uid = _sanitize_user_id(user_id)
+    with _login_sessions_lock:
+        session = _login_sessions.get(uid)
+    return session.latest_screenshot if session else None
 
 
-# ── File helpers ──────────────────────────────────────────────────────────────
+def get_login_status(user_id: str) -> Dict[str, Any]:
+    uid = _sanitize_user_id(user_id)
+    with _login_sessions_lock:
+        session = _login_sessions.get(uid)
+    if session is None or session.status == "closed":
+        # Profile dir with files means previously logged in
+        profile_path = (Path(PROFILE_DIR) / uid) if PROFILE_DIR else None
+        already = bool(profile_path and profile_path.exists() and any(profile_path.iterdir()))
+        return {"browser_open": False, "logged_in": already, "status": "logged_in" if already else "closed", "error": None}
+    return {
+        "browser_open": session.status in ("waiting", "logged_in"),
+        "logged_in": session.logged_in,
+        "status": session.status,
+        "error": session.error,
+    }
+
+
+def close_login_browser(user_id: str) -> None:
+    uid = _sanitize_user_id(user_id)
+    with _login_sessions_lock:
+        session = _login_sessions.get(uid)
+    if session:
+        session.close_evt.set()
+
+
+# ── Per-user crawl jobs ───────────────────────────────────────────────────────
+
+@dataclass
+class ZaloCrawlJob:
+    job_id: str
+    user_id: str
+    groups: List[str]
+    status: str = "pending"
+    phase: str = "login"          # "login" | "crawling"
+    screenshot: Optional[str] = None  # base64 PNG while waiting for QR scan
+    logs: List[str] = field(default_factory=list)
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+    results: Dict[str, Any] = field(default_factory=dict)
+    error: Optional[str] = None
+    stop_evt: threading.Event = field(default_factory=threading.Event)
+
+
+_job_lock = threading.Lock()
+_user_jobs: Dict[str, ZaloCrawlJob] = {}       # user_id -> current job
+_user_crawl_locks: Dict[str, threading.Lock] = {}  # user_id -> lock
+
+
+def _get_crawl_lock(user_id: str) -> threading.Lock:
+    with _job_lock:
+        if user_id not in _user_crawl_locks:
+            _user_crawl_locks[user_id] = threading.Lock()
+        return _user_crawl_locks[user_id]
+
+
+# ── File helpers (per-user) ───────────────────────────────────────────────────
 
 def _group_dir_name(title: str) -> str:
     return re.sub(r'[\\/:*?"<>|]', '_', title).strip()
 
 
-def _group_output_dir(group_name: str) -> Optional[Path]:
+def _group_output_dir(group_name: str, user_id: str) -> Optional[Path]:
     if not OUTPUT_DIR:
         return None
-    return Path(OUTPUT_DIR) / _group_dir_name(group_name)
+    return Path(OUTPUT_DIR) / user_id / _group_dir_name(group_name)
 
 
-def load_group_messages(group_name: str) -> Optional[List[Dict[str, Any]]]:
-    out = _group_output_dir(group_name)
+def load_group_messages(group_name: str, user_id: str) -> Optional[List[Dict[str, Any]]]:
+    out = _group_output_dir(group_name, user_id)
     if out is None:
         return None
     path = out / "messages.json"
@@ -185,27 +240,28 @@ def _save_messages(messages: List[Dict[str, Any]], path: Path) -> None:
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
-def get_zalo_status() -> Dict[str, Any]:
-    profile_ok = bool(PROFILE_DIR) and Path(PROFILE_DIR).exists()
+def get_zalo_status(user_id: str) -> Dict[str, Any]:
+    uid = _sanitize_user_id(user_id)
     output_ok = bool(OUTPUT_DIR)
     gsheet_ok = bool(GSHEET_KEY_FILE) and Path(GSHEET_KEY_FILE).exists() and bool(GSHEET_ID)
     with _job_lock:
-        job = _current_job
+        job = _user_jobs.get(uid)
     return {
-        "profileConfigured": profile_ok,
+        "profileConfigured": True,  # no longer needed — session is per-crawl
         "outputConfigured": output_ok,
         "gsheetConfigured": gsheet_ok,
-        "ready": profile_ok and output_ok,
+        "ready": output_ok,
         "groupCount": len(_get_target_groups()),
         "currentJob": _job_to_dict(job),
     }
 
 
-def get_configured_groups() -> List[Dict[str, Any]]:
+def get_configured_groups(user_id: str) -> List[Dict[str, Any]]:
+    uid = _sanitize_user_id(user_id)
     result = []
     for name in _get_target_groups():
-        messages = load_group_messages(name)
-        out_dir = _group_output_dir(name)
+        messages = load_group_messages(name, uid)
+        out_dir = _group_output_dir(name, uid)
         last_crawl = None
         if out_dir:
             msg_path = out_dir / "messages.json"
@@ -227,8 +283,10 @@ def _job_to_dict(job: Optional[ZaloCrawlJob]) -> Optional[Dict[str, Any]]:
         return None
     return {
         "jobId": job.job_id,
+        "userId": job.user_id,
         "groups": job.groups,
         "status": job.status,
+        "phase": job.phase,
         "logs": job.logs[-100:],
         "startedAt": job.started_at.isoformat() if job.started_at else None,
         "finishedAt": job.finished_at.isoformat() if job.finished_at else None,
@@ -237,26 +295,51 @@ def _job_to_dict(job: Optional[ZaloCrawlJob]) -> Optional[Dict[str, Any]]:
     }
 
 
-def get_crawl_status() -> Optional[Dict[str, Any]]:
+def get_crawl_screenshot(user_id: str) -> Optional[str]:
+    """Return the stored screenshot for the current login phase (on-demand only)."""
+    uid = _sanitize_user_id(user_id)
     with _job_lock:
-        return _job_to_dict(_current_job)
+        job = _user_jobs.get(uid)
+    if job is None or job.phase != "login":
+        return None
+    return job.screenshot  # written by crawl thread; safe string read under CPython GIL
 
 
-def start_crawl(groups: List[str]) -> Optional[ZaloCrawlJob]:
-    global _current_job
+def get_crawl_status(user_id: str) -> Optional[Dict[str, Any]]:
+    uid = _sanitize_user_id(user_id)
     with _job_lock:
-        if _current_job and _current_job.status in ("pending", "running"):
+        return _job_to_dict(_user_jobs.get(uid))
+
+
+def start_crawl(user_id: str, groups: List[str]) -> Optional[ZaloCrawlJob]:
+    uid = _sanitize_user_id(user_id)
+    with _job_lock:
+        existing = _user_jobs.get(uid)
+        if existing and existing.status in ("pending", "running"):
             return None
         job_id = datetime.now(tz=timezone.utc).strftime("%Y%m%d_%H%M%S")
-        job = ZaloCrawlJob(job_id=job_id, groups=groups)
-        _current_job = job
-    thread = threading.Thread(target=_run_crawl, args=(job,), daemon=True)
-    thread.start()
+        job = ZaloCrawlJob(job_id=job_id, user_id=uid, groups=groups)
+        _user_jobs[uid] = job
+    threading.Thread(target=_run_crawl, args=(job,), daemon=True).start()
     return job
 
 
-def export_group(group_name: str) -> Dict[str, Any]:
-    messages = load_group_messages(group_name)
+def stop_crawl(user_id: str) -> Dict[str, Any]:
+    uid = _sanitize_user_id(user_id)
+    with _job_lock:
+        job = _user_jobs.get(uid)
+    if job:
+        job.stop_evt.set()
+        if job.status in ("pending", "running"):
+            job.status = "stopped"
+            job.logs.append("Stopped by user.")
+            job.finished_at = datetime.now(tz=timezone.utc)
+    return {"stopped": True}
+
+
+def export_group(group_name: str, user_id: str) -> Dict[str, Any]:
+    uid = _sanitize_user_id(user_id)
+    messages = load_group_messages(group_name, uid)
     if messages is None:
         return {"success": False, "error": "No crawled data found for this group"}
     log: List[str] = []
@@ -322,13 +405,11 @@ _DATE_SEP_RE = re.compile(
     r'^(Hôm nay|Hôm qua|Yesterday|Today|\d{1,2}\s+tháng\s+\d{1,2}|\d{1,2}/\d{1,2}/\d{2,4}|Thứ\s+\w+)',
     re.IGNORECASE | re.UNICODE,
 )
-# Zalo renders file attachments as an HTML preview with this footer text
 _FILE_ATTACH_RE = re.compile(r'Tải về để xem lâu dài', re.IGNORECASE)
 _DOCTYPE_RE = re.compile(r'<\s*!DOCTYPE', re.IGNORECASE)
 
 
 def _clean(text: str) -> str:
-    # Zalo file attachment: HTML blob with "Tải về để xem lâu dài" watermark
     if _FILE_ATTACH_RE.search(text):
         first_line = _DOCTYPE_RE.split(text.split('\n')[0])[0].strip()
         name = first_line if first_line else "file đính kèm"
@@ -436,12 +517,10 @@ def _find_root(page: Any) -> Any:
 
 
 def _is_logged_in(page: Any) -> bool:
-    """Return True if the Zalo chat UI is visible (not the login screen)."""
     try:
         url = page.url
         if "accounts.zalo.me" in url or "login" in url.lower():
             return False
-        # Look for the conversation list — only present when logged in
         count = page.locator(
             "[class*='conversation'], [class*='contact-list'], [class*='sidebar'], [class*='chat-list']"
         ).count()
@@ -451,10 +530,8 @@ def _is_logged_in(page: Any) -> bool:
 
 
 def _open_group(page: Any, title: str, log: List[str]) -> bool:
-    """Try sidebar first, then fall back to Zalo's search box."""
     norm = " ".join(title.replace("\xa0", " ").split())
 
-    # ── 1. Direct sidebar click ───────────────────────────────────────
     for exact in (True, False):
         for t in (title, norm):
             try:
@@ -468,7 +545,6 @@ def _open_group(page: Any, title: str, log: List[str]) -> bool:
             except Exception:
                 pass
 
-    # ── 2. Zalo search box fallback ───────────────────────────────────
     log.append(f"Sidebar lookup failed — trying search box for '{title}'")
     search_selectors = [
         "input[placeholder*='Tìm']",
@@ -488,7 +564,6 @@ def _open_group(page: Any, title: str, log: List[str]) -> bool:
             pass
 
     if search_input is None:
-        # Try clicking a search icon first
         try:
             page.locator("[class*='search-icon'], [class*='btn-search']").first.click(timeout=3000)
             page.wait_for_timeout(800)
@@ -513,7 +588,6 @@ def _open_group(page: Any, title: str, log: List[str]) -> bool:
         search_input.fill(norm)
         page.wait_for_timeout(2000)
 
-        # Click the first result that matches
         for exact in (True, False):
             for t in (title, norm):
                 try:
@@ -521,7 +595,6 @@ def _open_group(page: Any, title: str, log: List[str]) -> bool:
                     if result.count() > 0:
                         result.first.click(timeout=8000)
                         page.wait_for_timeout(1500)
-                        # Clear search
                         try:
                             search_input.fill("")
                         except Exception:
@@ -554,7 +627,6 @@ _BLOB_FETCH_JS = """async (url) => {
 
 
 def _download_images(page: Any, messages: List[Dict[str, Any]], out_dir: Path, log: List[str]) -> None:
-    """Download blob: image URLs while the Playwright session is alive and save them as files."""
     img_dir = out_dir / "images"
     img_dir.mkdir(parents=True, exist_ok=True)
     downloaded = 0
@@ -586,12 +658,17 @@ def _download_images(page: Any, messages: List[Dict[str, Any]], out_dir: Path, l
         log.append(f"Downloaded {downloaded} images to {img_dir}.")
 
 
-def _crawl_all_messages(page: Any, root: Any, log: List[str]) -> List[Dict[str, Any]]:
+def _crawl_all_messages(
+    page: Any, root: Any, log: List[str], stop_evt: Optional[threading.Event] = None
+) -> List[Dict[str, Any]]:
     _scroll_bottom(root)
     page.wait_for_timeout(2000)
     all_msgs: Dict[Tuple[Any, Any, str], Tuple[int, int, Dict[str, Any]]] = {}
     stagnant = 0
     for round_idx in range(1, 200):
+        if stop_evt and stop_evt.is_set():
+            log.append("Crawl stopped by user.")
+            break
         batch = _extract(root)
         new_count = 0
         for pos, msg in enumerate(batch):
@@ -645,46 +722,83 @@ def _export_to_gsheet(messages: List[Dict[str, Any]], group_name: str, log: List
 
 def _run_crawl(job: ZaloCrawlJob) -> None:
     log = job.logs
-    # Close login browser if open — can't run two Playwright contexts on the same profile dir
-    _login_close_evt.set()
-    time.sleep(2)
+    uid = job.user_id
+    stop_evt = job.stop_evt  # per-job — no cross-job interference
 
-    with _crawl_lock:
+    crawl_lock = _get_crawl_lock(uid)
+    with crawl_lock:
+        # If caller already cancelled before we got the lock, bail immediately
+        if stop_evt.is_set():
+            job.status = "stopped"
+            job.finished_at = datetime.now(tz=timezone.utc)
+            return
         job.status = "running"
         job.started_at = datetime.now(tz=timezone.utc)
         try:
             with sync_playwright() as p:
-                browser = None
-                try:
-                    ctx = p.chromium.launch_persistent_context(
-                        user_data_dir=PROFILE_DIR,
-                        channel="chrome",
-                        headless=_HEADLESS,
-                        args=_ARGS,
-                        locale="vi-VN",
-                    )
-                except Exception as ex:
-                    log.append(f"Persistent context failed: {ex}. Using fresh context.")
-                    browser = p.chromium.launch(headless=_HEADLESS, args=_ARGS)
-                    ctx = browser.new_context(locale="vi-VN")
-
+                # Fresh browser — no persistent profile, no saved session
+                browser = p.chromium.launch(headless=_HEADLESS, args=_ARGS)
+                ctx = browser.new_context(locale="vi-VN")
                 ctx.add_init_script(_STEALTH)
                 page = ctx.new_page()
+
+                # Auto-stop when user closes the browser window
+                page.on("close", lambda: stop_evt.set())
+
                 log.append("Opening chat.zalo.me ...")
-                page.goto("https://chat.zalo.me", wait_until="domcontentloaded")
+                try:
+                    page.goto("https://chat.zalo.me", wait_until="domcontentloaded")
+                    page.wait_for_timeout(3000)
+                except Exception:
+                    if stop_evt.is_set():
+                        log.append("Browser closed by user.")
+                        return
+                    raise
 
-                # Wait for the UI to fully render (sidebar, conversation list)
-                log.append("Waiting for Zalo to load ...")
-                page.wait_for_timeout(8000)
-
+                # ── Wait for QR scan ────────────────────────────────────────
                 if not _is_logged_in(page):
-                    raise RuntimeError(
-                        "Zalo session expired or login required. "
-                        "Re-login with the profile then restart the backend."
-                    )
-                log.append("Logged in — sidebar detected.")
+                    log.append("Waiting for QR scan...")
+                    try:
+                        job.screenshot = _b64.b64encode(page.screenshot(timeout=5000)).decode()
+                    except Exception:
+                        pass
+                    deadline = time.time() + 300  # 5-minute timeout
+                    while not stop_evt.is_set() and time.time() < deadline:
+                        try:
+                            if _is_logged_in(page):
+                                break
+                        except Exception:
+                            # Page threw — browser was closed
+                            stop_evt.set()
+                            break
+                        stop_evt.wait(timeout=3)
+                    job.screenshot = None
 
+                    if stop_evt.is_set():
+                        log.append("Browser closed or cancelled during login.")
+                        return
+
+                    if not _is_logged_in(page):
+                        raise RuntimeError("Login timeout (5 min). Please try again.")
+
+                # ── Wait for Zalo to sync messages ──────────────────────────
+                job.phase = "crawling"
+                log.append("Logged in. Waiting for Zalo to sync messages...")
+                for _ in range(5):  # 10 s total, interruptible
+                    if stop_evt.is_set():
+                        break
+                    page.wait_for_timeout(2000)
+
+                if stop_evt.is_set():
+                    log.append("Stopped while waiting for sync.")
+                    return
+
+                # ── Crawl groups ────────────────────────────────────────────
+                log.append("Starting crawl.")
                 for group_name in job.groups:
+                    if stop_evt.is_set():
+                        log.append("Crawl stopped.")
+                        break
                     log.append(f"\n=== {group_name} ===")
                     try:
                         if not _open_group(page, group_name, log):
@@ -693,25 +807,34 @@ def _run_crawl(job: ZaloCrawlJob) -> None:
                             continue
                         page.wait_for_timeout(3000)
                         root = _find_root(page)
-                        messages = _crawl_all_messages(page, root, log)
-                        out_dir = Path(OUTPUT_DIR) / _group_dir_name(group_name)
-                        _download_images(page, messages, out_dir, log)
-                        _save_messages(messages, out_dir / "messages.json")
+                        messages = _crawl_all_messages(page, root, log, stop_evt)
+                        if OUTPUT_DIR:
+                            out_dir = Path(OUTPUT_DIR) / uid / _group_dir_name(group_name)
+                            _download_images(page, messages, out_dir, log)
+                            _save_messages(messages, out_dir / "messages.json")
                         _export_to_gsheet(messages, group_name, log)
                         job.results[group_name] = {"success": True, "messageCount": len(messages)}
                         page.wait_for_timeout(1500)
                     except Exception as ex:
                         log.append(f"Error: {ex}")
                         job.results[group_name] = {"success": False, "error": str(ex)}
+                        if stop_evt.is_set():
+                            break
 
-                ctx.close()
-                if browser is not None:
+                try:
+                    ctx.close()
+                except Exception:
+                    pass
+                try:
                     browser.close()
+                except Exception:
+                    pass
 
-            job.status = "done"
+            job.status = "stopped" if stop_evt.is_set() else "done"
         except Exception as ex:
             job.status = "error"
             job.error = str(ex)
             log.append(f"Fatal: {ex}")
         finally:
+            job.screenshot = None
             job.finished_at = datetime.now(tz=timezone.utc)

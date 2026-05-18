@@ -74,7 +74,10 @@ export type MaterialSymbolName =
   | "upload"
   | "border_color"
   | "filter_alt"
-  | "groups";
+  | "groups"
+  | "qr_code_2"
+  | "phone_android"
+  | "lock_open";
 
 export interface MaterialIconProps {
   name: MaterialSymbolName;

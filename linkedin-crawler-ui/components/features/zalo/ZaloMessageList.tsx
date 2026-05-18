@@ -12,6 +12,7 @@ interface ZaloMessageListProps {
   messages: ZaloMessage[];
   selectedIndex: number | null;
   groupId: string;
+  userId: string;
   onSelect: (index: number) => void;
 }
 
@@ -19,6 +20,7 @@ export function ZaloMessageList({
   messages,
   selectedIndex,
   groupId,
+  userId,
   onSelect,
 }: ZaloMessageListProps) {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -65,6 +67,7 @@ export function ZaloMessageList({
                 index={i}
                 selected={selectedIndex === i}
                 groupId={groupId}
+                userId={userId}
                 onSelect={onSelect}
               />
             </div>

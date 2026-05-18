@@ -22,8 +22,10 @@ export interface ZaloApiStatus {
 
 export interface ZaloCrawlJob {
   jobId: string;
+  userId: string;
   groups: string[];
-  status: "pending" | "running" | "done" | "error";
+  status: "pending" | "running" | "done" | "error" | "stopped";
+  phase: "login" | "crawling";
   logs: string[];
   startedAt: string | null;
   finishedAt: string | null;
@@ -48,7 +50,9 @@ export interface ZaloMessagesPage {
 // ── HTTP helper ───────────────────────────────────────────────────────────────
 
 function headers(): HeadersInit {
-  return API_KEY ? { "Content-Type": "application/json", "x-api-key": API_KEY } : { "Content-Type": "application/json" };
+  return API_KEY
+    ? { "Content-Type": "application/json", "x-api-key": API_KEY }
+    : { "Content-Type": "application/json" };
 }
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -56,57 +60,91 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: { ...headers(), ...init?.headers },
   });
-  const payload = (await res.json()) as { success: boolean; data: T; message?: string };
-  if (!res.ok) throw new Error(payload.message ?? `API ${res.status}`);
+  const payload = (await res.json()) as { success: boolean; data: T; message?: string; detail?: string };
+  if (!res.ok) throw new Error(payload.message ?? payload.detail ?? `API ${res.status}`);
   return payload.data;
 }
 
-// ── API calls ─────────────────────────────────────────────────────────────────
-
-export function fetchZaloStatus(): Promise<ZaloApiStatus> {
-  return api<ZaloApiStatus>("/zalo/status");
+function qs(userId: string, extra?: Record<string, string | number>): string {
+  const params = new URLSearchParams({ user_id: userId });
+  if (extra) Object.entries(extra).forEach(([k, v]) => params.set(k, String(v)));
+  return `?${params.toString()}`;
 }
 
-export function fetchZaloGroups(): Promise<ZaloApiGroup[]> {
-  return api<ZaloApiGroup[]>("/zalo/groups");
+// ── Login API ─────────────────────────────────────────────────────────────────
+
+export function openZaloBrowser(
+  userId: string,
+): Promise<{ already_open: boolean; status: string; logged_in: boolean }> {
+  return api(`/zalo/login/open${qs(userId)}`, { method: "POST" });
+}
+
+export function fetchZaloLoginStatus(userId: string): Promise<ZaloLoginStatus> {
+  return api<ZaloLoginStatus>(`/zalo/login/status${qs(userId)}`);
+}
+
+export function fetchZaloLoginScreenshot(userId: string): Promise<{ screenshot: string }> {
+  return api<{ screenshot: string }>(`/zalo/login/screenshot${qs(userId)}`);
+}
+
+export function closeZaloLoginBrowser(userId: string): Promise<void> {
+  return api(`/zalo/login/close${qs(userId)}`, { method: "POST" });
+}
+
+// ── Status & groups ───────────────────────────────────────────────────────────
+
+export function fetchZaloStatus(userId: string): Promise<ZaloApiStatus> {
+  return api<ZaloApiStatus>(`/zalo/status${qs(userId)}`);
+}
+
+export function fetchZaloGroups(userId: string): Promise<ZaloApiGroup[]> {
+  return api<ZaloApiGroup[]>(`/zalo/groups${qs(userId)}`);
 }
 
 export function fetchZaloMessages(
+  userId: string,
   groupId: string,
   offset = 0,
   limit = 200,
 ): Promise<ZaloMessagesPage> {
   return api<ZaloMessagesPage>(
-    `/zalo/groups/${encodeURIComponent(groupId)}/messages?offset=${offset}&limit=${limit}`,
+    `/zalo/groups/${encodeURIComponent(groupId)}/messages${qs(userId, { offset, limit })}`,
   );
 }
 
-export function startZaloCrawl(groups?: string[]): Promise<ZaloCrawlJob> {
+// ── Crawl API ─────────────────────────────────────────────────────────────────
+
+export function startZaloCrawl(userId: string, groups?: string[]): Promise<ZaloCrawlJob> {
   return api<ZaloCrawlJob>("/zalo/crawl", {
     method: "POST",
-    body: JSON.stringify({ groups: groups ?? null }),
+    body: JSON.stringify({ user_id: userId, groups: groups ?? null }),
   });
 }
 
-export function fetchZaloCrawlStatus(): Promise<ZaloCrawlJob | null> {
-  return api<ZaloCrawlJob | null>("/zalo/crawl/status");
+export function fetchZaloCrawlStatus(userId: string): Promise<ZaloCrawlJob | null> {
+  return api<ZaloCrawlJob | null>(`/zalo/crawl/status${qs(userId)}`);
 }
 
-export function openZaloBrowser(): Promise<{ already_open: boolean; status: string; logged_in: boolean }> {
-  return api("/zalo/login/open", { method: "POST" });
+export function fetchZaloCrawlScreenshot(userId: string): Promise<{ screenshot: string }> {
+  return api<{ screenshot: string }>(`/zalo/crawl/screenshot${qs(userId)}`);
 }
 
-export function fetchZaloLoginStatus(): Promise<ZaloLoginStatus> {
-  return api<ZaloLoginStatus>("/zalo/login/status");
+export function stopZaloCrawl(userId: string): Promise<{ stopped: boolean }> {
+  return api<{ stopped: boolean }>(`/zalo/crawl/stop${qs(userId)}`, { method: "POST" });
 }
 
-export function zaloImageUrl(groupId: string, filename: string): string {
-  const headers = API_KEY ? `?x-api-key=${encodeURIComponent(API_KEY)}` : "";
-  return `${API_BASE_URL}/zalo/groups/${encodeURIComponent(groupId)}/images/${encodeURIComponent(filename)}${headers}`;
+// ── Image & export ────────────────────────────────────────────────────────────
+
+export function zaloImageUrl(userId: string, groupId: string, filename: string): string {
+  const keyParam = API_KEY ? `&x-api-key=${encodeURIComponent(API_KEY)}` : "";
+  return `${API_BASE_URL}/zalo/groups/${encodeURIComponent(groupId)}/images/${encodeURIComponent(filename)}?user_id=${encodeURIComponent(userId)}${keyParam}`;
 }
 
-export function exportZaloGroup(groupId: string): Promise<{ logs: string[]; messageCount: number }> {
-  return api(`/zalo/groups/${encodeURIComponent(groupId)}/export`, { method: "POST" });
+export function exportZaloGroup(
+  userId: string,
+  groupId: string,
+): Promise<{ logs: string[]; messageCount: number }> {
+  return api(`/zalo/groups/${encodeURIComponent(groupId)}/export${qs(userId)}`, { method: "POST" });
 }
 
 // ── Local storage (file-upload fallback) ─────────────────────────────────────
@@ -130,9 +168,7 @@ export function loadGroupsFromStorage(): Record<string, ZaloMessage[]> {
   }
 }
 
-export function buildGroupMetas(
-  groups: Record<string, ZaloMessage[]>,
-): ZaloGroupMeta[] {
+export function buildGroupMetas(groups: Record<string, ZaloMessage[]>): ZaloGroupMeta[] {
   return Object.entries(groups).map(([name, messages]) => ({
     id: encodeURIComponent(name),
     name,

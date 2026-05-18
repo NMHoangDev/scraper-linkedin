@@ -6,72 +6,183 @@ import { MaterialIcon } from "@/components/ui";
 import {
   startZaloCrawl,
   fetchZaloCrawlStatus,
-  openZaloBrowser,
-  fetchZaloLoginStatus,
+  fetchZaloCrawlScreenshot,
+  stopZaloCrawl,
   type ZaloCrawlJob,
   type ZaloApiGroup,
 } from "@/services/zaloCrawlerService";
 
+function parseJobProgress(job: ZaloCrawlJob): { currentGroup: string | null; round: number | null } {
+  let currentGroup: string | null = null;
+  let round: number | null = null;
+  for (const line of job.logs) {
+    const groupMatch = /===\s*(.+?)\s*===/.exec(line);
+    if (groupMatch) currentGroup = groupMatch[1];
+    const roundMatch = /Round\s+(\d+)/i.exec(line);
+    if (roundMatch) round = parseInt(roundMatch[1], 10);
+  }
+  return { currentGroup, round };
+}
+
+function ZaloJobProgress({ job }: { job: ZaloCrawlJob }) {
+  const [showLogs, setShowLogs] = useState(false);
+  const totalGroups = job.groups.length;
+  const doneGroups = Object.keys(job.results).length;
+  const pct = totalGroups > 0 ? Math.round((doneGroups / totalGroups) * 100) : 0;
+  const { currentGroup, round } = parseJobProgress(job);
+
+  const statusColor =
+    job.status === "done"
+      ? "text-green-700"
+      : job.status === "error"
+        ? "text-red-600"
+        : job.status === "stopped"
+          ? "text-orange-600"
+          : "text-primary";
+
+  const barColor =
+    job.status === "done"
+      ? "bg-green-500"
+      : job.status === "error"
+        ? "bg-red-500"
+        : job.status === "stopped"
+          ? "bg-orange-400"
+          : "bg-primary";
+
+  const statusLabel: Record<ZaloCrawlJob["status"], string> = {
+    pending: "Đang chuẩn bị...",
+    running: "Đang crawl...",
+    done: "Hoàn thành",
+    error: "Lỗi",
+    stopped: "Đã dừng",
+  };
+
+  return (
+    <div className="border-outline-variant rounded-xl border p-md space-y-sm">
+      <div className="flex items-center justify-between">
+        <span className={`text-sm font-semibold ${statusColor}`}>{statusLabel[job.status]}</span>
+        <span className="text-on-surface-variant text-xs">
+          {doneGroups}/{totalGroups} nhóm
+        </span>
+      </div>
+
+      <div className="h-2 w-full rounded-full bg-surface-container overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+          style={{ width: `${job.status === "done" ? 100 : pct}%` }}
+        />
+      </div>
+
+      {(job.status === "running" || job.status === "pending") && (
+        <div className="text-on-surface-variant text-xs space-y-0.5">
+          {currentGroup && (
+            <p className="truncate">
+              <span className="font-medium">Nhóm:</span> {currentGroup}
+            </p>
+          )}
+          {round !== null && (
+            <p>
+              <span className="font-medium">Lượt cuộn:</span> {round}
+            </p>
+          )}
+        </div>
+      )}
+
+      {job.status === "done" && doneGroups > 0 && (
+        <div className="text-xs text-on-surface-variant space-y-0.5">
+          {Object.entries(job.results).map(([grp, res]) => (
+            <div key={grp} className="flex items-center gap-1.5 truncate">
+              <MaterialIcon
+                name={res.success ? "check_circle" : "error"}
+                className={`shrink-0 text-sm ${res.success ? "text-green-600" : "text-red-500"}`}
+              />
+              <span className="truncate">{grp}</span>
+              {res.success && res.messageCount !== undefined && (
+                <span className="ml-auto shrink-0">({res.messageCount.toLocaleString()} tin)</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {job.logs.length > 0 && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowLogs((v) => !v)}
+            className="text-on-surface-variant hover:text-on-surface text-xs underline"
+          >
+            {showLogs ? "Ẩn chi tiết" : "Xem chi tiết"}
+          </button>
+          {showLogs && (
+            <div className="mt-xs bg-surface-container max-h-32 overflow-y-auto rounded-lg px-sm py-xs font-mono text-[10px] text-on-surface-variant">
+              {job.logs.map((line, i) => (
+                <p key={i} className="whitespace-pre-wrap">{line}</p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface ZaloCrawlControlsProps {
+  userId: string;
   groups: ZaloApiGroup[];
   onCrawlDone: () => void;
 }
 
-type LoginStep = "idle" | "opening" | "waiting_login" | "ready";
-
-export function ZaloCrawlControls({ groups, onCrawlDone }: ZaloCrawlControlsProps) {
+export function ZaloCrawlControls({ userId, groups, onCrawlDone }: ZaloCrawlControlsProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [job, setJob] = useState<ZaloCrawlJob | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [loginStep, setLoginStep] = useState<LoginStep>("idle");
+  const [stopping, setStopping] = useState(false);
+  // true once the QR image has been fetched at least once
+  const [hasQr, setHasQr] = useState(false);
+
   const crawlPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const loginPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const qrFetchRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const qrImgRef = useRef<HTMLImageElement>(null);
 
   const isRunning = job?.status === "pending" || job?.status === "running";
+  const isLoginPhase = isRunning && (job?.phase === "login" || !job?.phase);
+  const isCrawlingPhase = isRunning && job?.phase === "crawling";
 
-  // Poll crawl job status while running
+  // Poll crawl status — status only, no screenshot
   useEffect(() => {
-    if (isRunning) {
-      crawlPollRef.current = setInterval(() => {
-        fetchZaloCrawlStatus()
-          .then((j) => {
-            if (j) setJob(j);
-            if (j?.status === "done" || j?.status === "error") {
-              clearInterval(crawlPollRef.current!);
-              if (j.status === "done") onCrawlDone();
-            }
-          })
-          .catch(() => clearInterval(crawlPollRef.current!));
-      }, 3000);
-    }
-    return () => {
-      if (crawlPollRef.current) clearInterval(crawlPollRef.current);
-    };
-  }, [isRunning, onCrawlDone]);
-
-  // Poll login status while browser is opening or waiting for user to login
-  useEffect(() => {
-    if (loginStep !== "opening" && loginStep !== "waiting_login") return;
-    loginPollRef.current = setInterval(() => {
-      fetchZaloLoginStatus()
-        .then((s) => {
-          if (s.logged_in) {
-            setLoginStep("ready");
-            clearInterval(loginPollRef.current!);
-          } else if (s.status === "closed") {
-            setLoginStep("idle");
-            clearInterval(loginPollRef.current!);
-          } else if (s.status === "waiting" && loginStep === "opening") {
-            setLoginStep("waiting_login");
+    if (!isRunning) return;
+    crawlPollRef.current = setInterval(() => {
+      fetchZaloCrawlStatus(userId)
+        .then((j) => {
+          if (j) setJob(j);
+          if (j?.status === "done" || j?.status === "error" || j?.status === "stopped") {
+            clearInterval(crawlPollRef.current!);
+            if (j.status === "done") onCrawlDone();
           }
         })
-        .catch(() => {});
+        .catch(() => clearInterval(crawlPollRef.current!));
     }, 3000);
-    return () => {
-      if (loginPollRef.current) clearInterval(loginPollRef.current);
-    };
-  }, [loginStep]);
+    return () => { if (crawlPollRef.current) clearInterval(crawlPollRef.current); };
+  }, [isRunning, userId, onCrawlDone]);
+
+  // Fetch QR screenshot exactly once when login phase starts — no auto-repeat
+  useEffect(() => {
+    if (!isLoginPhase || hasQr) return;
+    qrFetchRef.current = setInterval(() => {
+      fetchZaloCrawlScreenshot(userId)
+        .then((r) => {
+          if (qrImgRef.current) {
+            qrImgRef.current.src = `data:image/png;base64,${r.screenshot}`;
+          }
+          setHasQr(true);
+          clearInterval(qrFetchRef.current!);
+        })
+        .catch(() => {}); // 404 while browser is still launching — keep retrying
+    }, 2000);
+    return () => { if (qrFetchRef.current) clearInterval(qrFetchRef.current); };
+  }, [isLoginPhase, hasQr, userId]);
 
   const toggleGroup = (name: string) => {
     setSelected((prev) => {
@@ -81,35 +192,36 @@ export function ZaloCrawlControls({ groups, onCrawlDone }: ZaloCrawlControlsProp
     });
   };
 
-  const handleOpenBrowser = async () => {
-    setError(null);
-    setBusy(true);
-    setLoginStep("opening");
-    try {
-      const result = await openZaloBrowser();
-      // If already open and already logged in, skip straight to ready
-      if (result.logged_in) setLoginStep("ready");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Không thể mở trình duyệt");
-      setLoginStep("idle");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const handleCrawl = async () => {
     setError(null);
     setBusy(true);
+    setHasQr(false);
     try {
       const crawlGroups = selected.size > 0 ? [...selected] : groups.map((g) => g.name);
-      const j = await startZaloCrawl(crawlGroups);
+      const j = await startZaloCrawl(userId, crawlGroups);
       setJob(j);
-      setLoginStep("idle");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không thể bắt đầu crawl");
     } finally {
       setBusy(false);
     }
+  };
+
+  const handleRefreshQr = () => {
+    fetchZaloCrawlScreenshot(userId)
+      .then((r) => {
+        if (qrImgRef.current) {
+          qrImgRef.current.src = `data:image/png;base64,${r.screenshot}`;
+        }
+        if (!hasQr) setHasQr(true);
+      })
+      .catch(() => {});
+  };
+
+  const handleStop = async () => {
+    setStopping(true);
+    try { await stopZaloCrawl(userId); } catch { /* ignore */ }
+    finally { setStopping(false); }
   };
 
   return (
@@ -119,7 +231,8 @@ export function ZaloCrawlControls({ groups, onCrawlDone }: ZaloCrawlControlsProp
         <h3 className="text-on-surface font-semibold">Crawl nhóm</h3>
       </div>
 
-      {groups.length > 0 && (
+      {/* Group selection — only when idle */}
+      {groups.length > 0 && !isRunning && (
         <div className="space-y-xs">
           <p className="text-on-surface-variant text-xs font-semibold uppercase tracking-wide">
             Chọn nhóm (để trống = tất cả)
@@ -131,7 +244,6 @@ export function ZaloCrawlControls({ groups, onCrawlDone }: ZaloCrawlControlsProp
                 className="accent-primary h-4 w-4"
                 checked={selected.has(g.name)}
                 onChange={() => toggleGroup(g.name)}
-                disabled={isRunning}
               />
               <span className="text-on-surface">{g.name}</span>
               {g.hasCrawledData && (
@@ -144,56 +256,78 @@ export function ZaloCrawlControls({ groups, onCrawlDone }: ZaloCrawlControlsProp
         </div>
       )}
 
-      {/* ── Login / crawl flow ── */}
-      {isRunning ? (
+      {/* ── Main flow ── */}
+      {isLoginPhase ? (
+        <div className="space-y-sm">
+          {!hasQr ? (
+            <div className="flex items-center justify-center gap-2 py-sm text-sm text-on-surface-variant">
+              <MaterialIcon name="hourglass_top" className="animate-pulse text-primary" />
+              Đang mở trình duyệt...
+            </div>
+          ) : (
+            <div className="space-y-xs">
+              <p className="text-on-surface-variant text-xs text-center">
+                Quét mã QR bằng ứng dụng Zalo trên điện thoại
+              </p>
+              <div className="rounded-lg overflow-hidden border border-outline-variant">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img ref={qrImgRef} alt="Zalo QR code" className="w-full" />
+              </div>
+              <button
+                type="button"
+                onClick={handleRefreshQr}
+                className="flex w-full items-center justify-center gap-1.5 text-on-surface-variant hover:text-on-surface text-xs underline"
+              >
+                <MaterialIcon name="refresh" className="text-sm" />
+                Làm mới ảnh
+              </button>
+              <p className="text-on-surface-variant animate-pulse text-center text-xs">
+                Đang chờ đăng nhập...
+              </p>
+            </div>
+          )}
+          <button
+            type="button"
+            disabled={stopping}
+            onClick={() => void handleStop()}
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-300 bg-red-50 px-md py-sm text-sm font-semibold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-60"
+          >
+            <MaterialIcon name="close" className="text-base" />
+            {stopping ? "Đang hủy..." : "Hủy"}
+          </button>
+        </div>
+
+      ) : isCrawlingPhase ? (
+        <div className="space-y-sm">
+          <ZaloJobProgress job={job!} />
+          <button
+            type="button"
+            disabled={stopping}
+            onClick={() => void handleStop()}
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-300 bg-red-50 px-md py-sm text-sm font-semibold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-60"
+          >
+            <MaterialIcon name="close" className="text-base" />
+            {stopping ? "Đang dừng..." : "Dừng crawl"}
+          </button>
+        </div>
+
+      ) : isRunning ? (
         <div className="flex items-center justify-center gap-2 py-sm text-sm text-on-surface-variant">
           <MaterialIcon name="hourglass_top" className="animate-pulse text-primary" />
-          Đang crawl...
+          Đang chuẩn bị...
         </div>
-      ) : loginStep === "idle" ? (
+
+      ) : (
         <button
           type="button"
-          onClick={() => void handleOpenBrowser()}
+          onClick={() => void handleCrawl()}
           disabled={busy}
           className="bg-primary text-on-primary hover:bg-primary/90 flex w-full items-center justify-center gap-2 rounded-lg px-md py-sm font-semibold transition-colors disabled:opacity-60"
         >
-          <MaterialIcon name="open_in_new" className="text-base" />
-          Mở Zalo để đăng nhập
+          <MaterialIcon name="radar" className="text-base" />
+          {busy ? "Đang khởi động..." : "Bắt đầu crawl"}
         </button>
-      ) : loginStep === "opening" ? (
-        <div className="flex items-center justify-center gap-2 py-sm text-sm text-on-surface-variant">
-          <MaterialIcon name="hourglass_top" className="animate-pulse text-primary" />
-          Đang mở Chrome...
-        </div>
-      ) : loginStep === "waiting_login" ? (
-        <div className="border-outline-variant bg-surface-container-low space-y-sm rounded-xl border p-md">
-          <div className="flex items-start gap-2">
-            <MaterialIcon name="info" className="text-primary mt-0.5 shrink-0" />
-            <p className="text-on-surface-variant text-sm">
-              Chrome đã mở. Vui lòng đăng nhập Zalo trong cửa sổ Chrome vừa mở, sau đó quay lại đây.
-            </p>
-          </div>
-          <p className="text-on-surface-variant animate-pulse text-center text-xs">
-            Đang chờ đăng nhập...
-          </p>
-        </div>
-      ) : loginStep === "ready" ? (
-        <div className="space-y-sm">
-          <div className="flex items-center gap-2 rounded-lg bg-green-50 px-md py-sm text-sm text-green-700">
-            <MaterialIcon name="check_circle" className="shrink-0 text-base" />
-            Đã đăng nhập Zalo thành công!
-          </div>
-          <button
-            type="button"
-            onClick={() => void handleCrawl()}
-            disabled={busy}
-            className="bg-primary text-on-primary hover:bg-primary/90 flex w-full items-center justify-center gap-2 rounded-lg px-md py-sm font-semibold transition-colors disabled:opacity-60"
-          >
-            <MaterialIcon name="radar" className="text-base" />
-            Bắt đầu crawl
-          </button>
-        </div>
-      ) : null}
+      )}
 
       {error && (
         <p className="border-error-container bg-error-container/30 text-error rounded-lg border px-md py-sm text-sm">
@@ -201,35 +335,8 @@ export function ZaloCrawlControls({ groups, onCrawlDone }: ZaloCrawlControlsProp
         </p>
       )}
 
-      {job && (
-        <div className="border-outline-variant rounded-lg border">
-          <div className="border-outline-variant flex items-center justify-between border-b px-md py-sm">
-            <span className="text-on-surface text-sm font-semibold">Job {job.jobId}</span>
-            <span
-              className={[
-                "rounded px-2 py-0.5 text-[10px] font-bold uppercase",
-                job.status === "done"
-                  ? "bg-green-100 text-green-700"
-                  : job.status === "error"
-                    ? "bg-red-100 text-red-700"
-                    : "bg-blue-100 text-blue-700",
-              ].join(" ")}
-            >
-              {job.status}
-            </span>
-          </div>
-          <div
-            className="bg-surface-container max-h-40 overflow-y-auto px-md py-sm font-mono text-xs"
-            aria-label="Crawl logs"
-          >
-            {job.logs.map((line, i) => (
-              <p key={i} className="text-on-surface-variant whitespace-pre-wrap">
-                {line}
-              </p>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Summary after completion */}
+      {job && !isRunning && <ZaloJobProgress job={job} />}
     </div>
   );
 }

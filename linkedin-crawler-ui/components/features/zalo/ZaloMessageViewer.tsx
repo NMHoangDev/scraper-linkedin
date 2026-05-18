@@ -14,6 +14,7 @@ interface ZaloMessageViewerProps {
   index: number | null;
   total: number;
   groupId: string;
+  userId: string;
   onPrev: () => void;
   onNext: () => void;
   onClose: () => void;
@@ -24,6 +25,7 @@ export function ZaloMessageViewer({
   index,
   total,
   groupId,
+  userId,
   onPrev,
   onNext,
   onClose,
@@ -119,14 +121,14 @@ export function ZaloMessageViewer({
                 isImageFile(f) ? (
                   <a
                     key={i}
-                    href={zaloImageUrl(groupId, f)}
+                    href={zaloImageUrl(userId, groupId, f)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="border-outline-variant block overflow-hidden rounded-lg border"
                     aria-label={`Xem ảnh ${i + 1}`}
                   >
                     <img
-                      src={zaloImageUrl(groupId, f)}
+                      src={zaloImageUrl(userId, groupId, f)}
                       alt={`Ảnh ${i + 1}`}
                       className="h-32 w-full object-cover transition-opacity hover:opacity-80"
                       onError={(e) => {

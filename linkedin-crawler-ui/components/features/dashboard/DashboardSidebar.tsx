@@ -28,6 +28,7 @@ export function DashboardSidebar() {
   const isTeamAdmin = pathname === "/admin/team";
   const isCrawlFb = pathname === "/crawl-data";
   const isInteraction = pathname === "/Interaction";
+  const isZalo = pathname.startsWith("/zalo");
   /** Leader LinkedIn: chỉ dùng màn quản lý đội, không dùng Post Feed / Groups. */
   const isLeaderLinkedInWorkspace = platform === "linkedin" && d.role === "leader";
   const [accountOpen, setAccountOpen] = useState(false);
@@ -223,6 +224,13 @@ export function DashboardSidebar() {
                 <span className="min-w-0 leading-snug">Quản lý đội ngũ</span>
               </Link>
             )}
+
+            <div className="border-outline-variant my-1 border-t" />
+
+            <Link href="/zalo" className={cn(isZalo ? sideActive : sideIdle)}>
+              <MaterialIcon name="chat_bubble" className="shrink-0" />
+              <span className="min-w-0 leading-snug">Zalo Crawler</span>
+            </Link>
           </>
         )}
       </nav>
