@@ -1,4 +1,4 @@
-import { API_BASE_URL, API_KEY } from "@/lib/env";
+import { ZALO_API_BASE_URL as API_BASE_URL, API_KEY } from "@/lib/env";
 import type { ZaloMessage, ZaloGroupMeta } from "@/types/zalo";
 
 // ── API types ─────────────────────────────────────────────────────────────────
