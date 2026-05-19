@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -22,6 +23,7 @@ _SHEETS_SCOPES = ("https://www.googleapis.com/auth/spreadsheets",)
 
 # Map header (trimmed) → giá trị ô (theo ngữ nghĩa khi append bài mới)
 _TOP_POST_HEADER_ALIASES: dict[str, tuple[str, ...]] = {
+    "id_session_crawl": ("id_session_crawl", "id session crawl"),
     "email_crawl": ("email_crawl", "email crawl"),
     "ngày": ("ngay", "ngày", "date"),
     "tên nhóm": ("ten nhom", "tên nhóm", "group_name", "group name"),
@@ -39,11 +41,20 @@ _TOP_POST_HEADER_ALIASES: dict[str, tuple[str, ...]] = {
         "tổng số bài lấy được mỗi lần sao",
         "total_posts",
     ),
+    "so_luong_bao_cao": ("so luong bao cao", "reposts", "shares"),
+    "tong_so_bai_lay_duoc_moi_lan_cao": ("tong so bai lay duoc moi lan cao", "total posts", "total_posts"),
+    "comments_cell": ("comments", "app_comments", "app comments"),
+    "reaction": ("reaction", "reactions", "app_reaction", "app reaction"),
 }
 
 
 def _normalize_header_cell(value: str) -> str:
     text = (value or "").strip().lower()
+    text = "".join(
+        ch for ch in unicodedata.normalize("NFD", text) if unicodedata.category(ch) != "Mn"
+    )
+    text = text.replace("đ", "d")
+    text = text.replace("đ", "d").replace("Đ", "d")
     text = text.replace("_", " ")
     text = re.sub(r"\s+", " ", text)
     return text
@@ -201,6 +212,40 @@ def _read_values(*, spreadsheet_id: str, range_a1: str) -> list[list[Any]]:
     return list(resp.get("values") or [])
 
 
+def get_settings_value(name: str) -> str:
+    """Read a key/value from the optional Google Sheet tab named Settings."""
+
+    sid = (settings.google_spreadsheet_id or "").strip()
+    key = (name or "").strip()
+    if not sid or not key or not spreadsheet_configured():
+        return ""
+
+    try:
+        titles = get_spreadsheet_sheet_titles(sid)
+        tab = _match_configured_tab_title(titles, "Settings")
+        if not tab:
+            return ""
+        rows = _read_values(spreadsheet_id=sid, range_a1=_sheet_a1(sid, tab, "A:B"))
+    except Exception:
+        logger.warning("Could not read Settings tab from Google Sheet.", exc_info=True)
+        return ""
+
+    want = key.strip().lower()
+    for row in rows:
+        if len(row) < 2:
+            continue
+        row_key = str(row[0] or "").strip().lower()
+        if row_key == want:
+            return str(row[1] or "").strip()
+    return ""
+
+
+def get_apify_token_from_settings_sheet() -> str:
+    """Convenience wrapper for the common Settings!A:B key APIFY_TOKEN."""
+
+    return get_settings_value("APIFY_TOKEN")
+
+
 def _headers_to_unique_keys(headers: list[str]) -> list[str]:
     counts: dict[str, int] = {}
     keys: list[str] = []
@@ -339,6 +384,26 @@ def _hyperlink_formula(url: str, label: str | None = None) -> str:
 
 def _header_semantic_key(header: str) -> str | None:
     norm = _normalize_header_cell(header)
+    exact_map = {
+        "ngay": "ngay",
+        "ten nhom": "ten_nhom",
+        "url nhom": "url_nhom",
+        "url bai viet": "url_bai_viet",
+        "tac gia": "tac_gia",
+        "noi dung": "noi_dung",
+        "so like": "so_like",
+        "so comment": "so_comment",
+        "so luong bao cao": "so_luong_bao_cao",
+        "diem": "diem",
+        "dang vao": "dang_vao",
+        "tong so bai lay duoc moi lan cao": "tong_so_bai_lay_duoc_moi_lan_cao",
+    }
+    if norm in exact_map:
+        return exact_map[norm]
+    if norm == "comments":
+        return "comments_cell"
+    if norm == "reaction":
+        return "reaction"
     for canonical, aliases in _TOP_POST_HEADER_ALIASES.items():
         if norm == _normalize_header_cell(canonical):
             return canonical
@@ -357,14 +422,50 @@ def build_top_post_row_values(
     group_url: str,
     total_posts_in_run: int,
     post: dict[str, Any],
+    id_session_crawl: str = "",
 ) -> list[str]:
     """Tạo một dòng theo đúng thứ tự cột của header dòng 1 trong Sheet."""
 
     row: list[str] = []
     for header in headers:
         sem = _header_semantic_key(header)
-        if sem == "email_crawl":
+        if sem == "so_luong_bao_cao":
+            row.append(str(int(post.get("reposts") or 0)))
+            continue
+        if sem == "tong_so_bai_lay_duoc_moi_lan_cao":
+            row.append(str(int(total_posts_in_run)))
+            continue
+        if sem == "comments_cell":
+            row.append(str(post.get("app_comments") or ""))
+            continue
+        if sem == "reaction":
+            row.append(str(post.get("reaction") or ""))
+            continue
+        if sem == "id_session_crawl":
+            row.append(id_session_crawl)
+        elif sem == "email_crawl":
             row.append(email_crawl)
+        elif sem == "ngay":
+            row.append(crawl_date)
+        elif sem == "ten_nhom":
+            row.append(group_name)
+        elif sem == "url_nhom":
+            row.append(_hyperlink_formula(group_url, group_url) if group_url else "")
+        elif sem == "url_bai_viet":
+            pu = str(post.get("post_url") or "")
+            row.append(_hyperlink_formula(pu, pu) if pu else "")
+        elif sem == "tac_gia":
+            row.append(str(post.get("author") or ""))
+        elif sem == "noi_dung":
+            row.append(str(post.get("content") or ""))
+        elif sem == "so_like":
+            row.append(str(int(post.get("likes") or 0)))
+        elif sem == "so_comment":
+            row.append(str(int(post.get("comments") or 0)))
+        elif sem == "diem":
+            row.append(str(int(post.get("score") or 0)))
+        elif sem == "dang_vao":
+            row.append(str(post.get("posted_at") or ""))
         elif sem == "ngày":
             row.append(crawl_date)
         elif sem == "tên nhóm":
@@ -472,7 +573,8 @@ def update_group_status_by_url(target_url: str, status: str = "done") -> bool:
             if _normalize_header_cell(h) in {_normalize_header_cell("Trạng thái"), _normalize_header_cell("trang thai")}
         )
     except StopIteration:
-        status_col_index = 2
+        logger.info("Tab URL nhom khong co cot Trang thai; bo qua cap nhat done cho %s", target_url)
+        return False
 
     want = _normalize_group_url(target_url)
     row_number: int | None = None

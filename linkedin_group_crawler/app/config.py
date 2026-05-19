@@ -124,6 +124,21 @@ def _n8n_webhook_add_list_group_from_env() -> str:
     ).strip()
 
 
+def _apify_actor_id_from_env() -> str:
+    """Apify Actor ID for the in-house LinkedIn group crawler."""
+
+    return (os.getenv("APIFY_ACTOR_ID") or "").strip()
+
+
+def _apify_3rd_party_actor_id_from_env() -> str:
+    """Emergency fallback Actor ID from a third-party provider."""
+
+    return (
+        os.getenv("APIFY_3RD_PARTY_ACTOR_ID")
+        or "scraping_solutions~linkedin-posts-scraper-users-groups-schools-no-cookies"
+    ).strip()
+
+
 def _n8n_webhook_add_list_group_timeout_sec_from_env() -> float:
     """Ưu tiên timeout key mới; fallback key cũ; mặc định 300s."""
 
@@ -386,6 +401,28 @@ class Settings:
     )
     crawl_batch_group_delay_min_sec: float = float(os.getenv("CRAWL_BATCH_GROUP_DELAY_MIN_SEC", "3"))
     crawl_batch_group_delay_max_sec: float = float(os.getenv("CRAWL_BATCH_GROUP_DELAY_MAX_SEC", "12"))
+
+    # Apify fallback crawler. Runtime order is Playwright -> own Actor -> third-party Actor.
+    apify_token: str = os.getenv("APIFY_TOKEN", "")
+    apify_own_token: str = os.getenv("APIFY_OWN_TOKEN", "")
+    apify_3rd_party_token: str = os.getenv("APIFY_3RD_PARTY_TOKEN", "")
+    apify_actor_id: str = field(default_factory=_apify_actor_id_from_env)
+    apify_3rd_party_actor_id: str = field(default_factory=_apify_3rd_party_actor_id_from_env)
+    apify_own_actor_enabled: bool = _parse_bool(os.getenv("APIFY_OWN_ACTOR_ENABLED"), default=True)
+    apify_3rd_party_fallback_enabled: bool = _parse_bool(
+        os.getenv("APIFY_3RD_PARTY_FALLBACK_ENABLED"),
+        default=False,
+    )
+    apify_default_max_items: int = int(os.getenv("APIFY_DEFAULT_MAX_ITEMS", "20"))
+    apify_default_scroll_times: int = int(os.getenv("APIFY_DEFAULT_SCROLL_TIMES", "3"))
+    apify_delay_min_ms: int = int(os.getenv("APIFY_DELAY_MIN_MS", "5000"))
+    apify_delay_max_ms: int = int(os.getenv("APIFY_DELAY_MAX_MS", "12000"))
+    apify_group_delay_min_sec: float = float(os.getenv("APIFY_GROUP_DELAY_MIN_SEC", "5"))
+    apify_group_delay_max_sec: float = float(os.getenv("APIFY_GROUP_DELAY_MAX_SEC", "15"))
+    apify_proxy_groups: list[str] = field(
+        default_factory=lambda: _parse_csv(os.getenv("APIFY_PROXY_GROUPS"), default=("RESIDENTIAL",)),
+    )
+    apify_proxy_country_code: str = (os.getenv("APIFY_PROXY_COUNTRY_CODE") or "VN").strip()
 
     def __post_init__(self) -> None:
         if self.cors_origins is None:
