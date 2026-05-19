@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import date, datetime, timedelta, timezone
 import json
 import random
@@ -111,6 +112,7 @@ from app.services.auth_service import (
     login_and_save_session,
     verify_pending_login_otp,
 )
+from app.services.crawl_orchestrator_service import crawl_group_with_tiers
 from app.services.crawler_service import open_group_and_collect_posts
 from app.services.group_bulk_import_service import bulk_scrape_groups
 from app.services.profile_slug_sheet_service import (
@@ -1237,31 +1239,38 @@ def linkedin_me_ensure_profile_slug(payload: EnsureProfileSlugRequest) -> Ensure
 
 
 @router.post("/crawl-linkedin-group", response_model=CrawlResponse, dependencies=[Depends(verify_api_key)])
-def crawl_linkedin_group(payload: CrawlGroupRequest) -> CrawlResponse:
+async def crawl_linkedin_group(payload: CrawlGroupRequest) -> CrawlResponse:
     """Crawl một nhóm: trả **toàn bộ** bài đúng ngày mục tiêu; không có thì **N** bài gần nhất (cho n8n)."""
 
     try:
-        if not payload.session_id and not payload.email:
-            return CrawlResponse(
-                success=False,
-                message="Provide either session_id or email so the API can resolve the saved LinkedIn session.",
-                data=None,
-            )
-
-        crawl_result = open_group_and_collect_posts(
+        tiered = await crawl_group_with_tiers(
+            mode="auto",
             session_id=payload.session_id,
             email=payload.email,
             group_url=payload.group_url,
             max_items=payload.max_items,
-        )
-        filtered_posts, target_day = enrich_and_filter_posts(
-            posts=crawl_result["posts"],
             target_date=payload.target_date,
-            crawl_time=crawl_result["crawl_time"],
         )
+        if not tiered.success or not tiered.group_item:
+            return CrawlResponse(
+                success=False,
+                message=tiered.error_summary or "All crawler tiers failed or returned no target-day posts",
+                data=None,
+            )
 
-        if crawl_result["total_posts_scraped"] == 0:
-            return CrawlResponse(success=False, message="No posts found on the LinkedIn group page", data=None)
+        crawl_result = tiered.group_item
+        raw_posts = list(crawl_result.get("posts") or [])
+        filtered_posts = list(crawl_result.get("target_posts") or [])
+        target_day_raw = str(crawl_result.get("target_day") or "")
+        target_day = date.fromisoformat(target_day_raw) if target_day_raw else datetime.now().date()
+
+        total_scraped = int(
+            crawl_result.get("total_posts_scraped")
+            or crawl_result.get("raw_posts_count")
+            or len(raw_posts)
+        )
+        if total_scraped == 0:
+            return CrawlResponse(success=False, message=f"No posts found via {tiered.source}", data=None)
 
         if filtered_posts:
             posts_out = filtered_posts
@@ -1270,7 +1279,7 @@ def crawl_linkedin_group(payload: CrawlGroupRequest) -> CrawlResponse:
             msg = f"Crawl OK — {len(posts_out)} bài trong ngày {target_day.isoformat()}"
         else:
             posts_out = select_most_recent_posts(
-                list(crawl_result["posts"]),
+                raw_posts,
                 limit=payload.fallback_recent_count,
             )
             selection_mode = "fallback_recent"
@@ -1281,18 +1290,18 @@ def crawl_linkedin_group(payload: CrawlGroupRequest) -> CrawlResponse:
             )
 
         response_data = CrawlDataResponse(
-            session_id=crawl_result["session_id"],
+            session_id=str(crawl_result.get("session_id") or payload.session_id or tiered.source),
             group_url=payload.group_url,
             group_name=crawl_result.get("group_name", ""),
             target_date=target_day.isoformat(),
             email=payload.email,
-            total_posts_scraped=crawl_result["total_posts_scraped"],
+            total_posts_scraped=total_scraped,
             total_posts_in_target_date=len(filtered_posts),
             top_post=TopPostResponse.from_post_dict(top_post) if top_post else None,
             posts=[TopPostResponse.from_post_dict(p) for p in posts_out],
             selection_mode=selection_mode,
         )
-        return CrawlResponse(success=True, message=msg, data=response_data)
+        return CrawlResponse(success=True, message=f"{msg} via {tiered.source}", data=response_data)
     except Exception as exc:
         logger.exception("Crawl endpoint failed")
         return CrawlResponse(success=False, message=str(exc), data=None)
@@ -2357,15 +2366,8 @@ def linkedin_app_sheet_get_all_groups() -> LinkedinSheetGroupsResponse:
 
 
 @linkedin_app_router.post("/crawl-linkedin-app", response_model=LinkedinAppCrawlBatchResponse)
-def linkedin_app_crawl_batch(payload: LinkedinAppCrawlBatchRequest) -> LinkedinAppCrawlBatchResponse:
+async def linkedin_app_crawl_batch(payload: LinkedinAppCrawlBatchRequest) -> LinkedinAppCrawlBatchResponse:
     """Lặp crawl nhiều nhóm LinkedIn và append bài vào tab ``top_posts``; có nghỉ ngẫu nhiên giữa các nhóm."""
-
-    if not payload.session_id and not payload.email:
-        return LinkedinAppCrawlBatchResponse(
-            success=False,
-            message="Cần ``email`` hoặc ``session_id`` để dùng session LinkedIn đã lưu (POST /login).",
-            data=None,
-        )
 
     if not gsheet.spreadsheet_configured():
         return LinkedinAppCrawlBatchResponse(
@@ -2401,31 +2403,41 @@ def linkedin_app_crawl_batch(payload: LinkedinAppCrawlBatchRequest) -> LinkedinA
     )
 
     results: list[LinkedinAppCrawlGroupResult] = []
+    id_prefix = _crawl_id_session_prefix(payload.email_crawl, payload.session_id, "")
+    id_session_crawl = f"{id_prefix}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{random.randint(1000, 9999)}"
 
     for index, url in enumerate(payload.group_urls):
         if index > 0 and gmax_f > 0:
             delay_sec = random.uniform(gmin_f, gmax_f)
             logger.info("linkedin-app crawl: chờ %.2fs trước khi sang nhóm tiếp theo", delay_sec)
-            time.sleep(delay_sec)
+            await asyncio.sleep(delay_sec)
 
         try:
-            crawl_result = open_group_and_collect_posts(
+            tiered = await crawl_group_with_tiers(
+                mode="auto",
                 session_id=payload.session_id,
                 email=payload.email,
                 group_url=url,
                 max_items=payload.max_items,
-                scroll_times_override=payload.scroll_times,
+                target_date=payload.target_date,
+                scroll_times=payload.scroll_times,
                 scroll_delay_min_ms=scroll_min_ms,
                 scroll_delay_max_ms=scroll_max_ms,
             )
+            if not tiered.success or not tiered.group_item:
+                raise RuntimeError(tiered.error_summary or "All crawler tiers failed")
+
+            crawl_result = tiered.group_item
+            raw_posts = list(crawl_result.get("posts") or [])
+            crawl_time = crawl_result.get("crawl_time") or datetime.now()
 
             filtered_posts, target_day_resolved = enrich_and_filter_posts(
-                posts=list(crawl_result["posts"]),
+                posts=raw_posts,
                 target_date=payload.target_date,
-                crawl_time=crawl_result["crawl_time"],
+                crawl_time=crawl_time,
             )
 
-            crawl_day_label = crawl_result["crawl_time"].strftime("%Y-%m-%d")
+            crawl_day_label = crawl_time.strftime("%Y-%m-%d")
 
             if filtered_posts:
                 top_one = pick_top_post(filtered_posts)
@@ -2437,7 +2449,7 @@ def linkedin_app_crawl_batch(payload: LinkedinAppCrawlBatchRequest) -> LinkedinA
                 )
             else:
                 posts_to_write = select_most_recent_posts(
-                    list(crawl_result["posts"]),
+                    raw_posts,
                     limit=payload.fallback_recent_count,
                 )
                 detail_msg = (
@@ -2448,11 +2460,16 @@ def linkedin_app_crawl_batch(payload: LinkedinAppCrawlBatchRequest) -> LinkedinA
             batch_rows = [
                 gsheet.build_top_post_row_values(
                     headers,
+                    id_session_crawl=id_session_crawl,
                     email_crawl=payload.email_crawl,
                     crawl_date=crawl_day_label,
                     group_name=str(crawl_result.get("group_name") or ""),
                     group_url=str(crawl_result.get("group_url") or url),
-                    total_posts_in_run=int(crawl_result.get("total_posts_scraped") or 0),
+                    total_posts_in_run=int(
+                        crawl_result.get("total_posts_scraped")
+                        or crawl_result.get("raw_posts_count")
+                        or len(raw_posts)
+                    ),
                     post=post_item,
                 )
                 for post_item in posts_to_write

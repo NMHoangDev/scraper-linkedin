@@ -14,6 +14,20 @@ def compute_score(post: dict[str, Any]) -> int:
     return int(post.get("likes", 0)) + int(post.get("comments", 0)) + int(post.get("reposts", 0))
 
 
+def _parse_absolute_post_time(value: Any) -> datetime | None:
+    """Parse ISO-like absolute post timestamps emitted by Apify actors."""
+
+    if not isinstance(value, str) or not value.strip():
+        return None
+    text = value.strip()
+    try:
+        if text.endswith("Z"):
+            text = text[:-1] + "+00:00"
+        return datetime.fromisoformat(text)
+    except ValueError:
+        return None
+
+
 def enrich_and_filter_posts(
     posts: list[dict[str, Any]],
     target_date: str | None,
@@ -26,6 +40,8 @@ def enrich_and_filter_posts(
 
     for post in posts:
         normalized_dt = normalize_relative_time(post.get("posted_at_raw", ""), crawl_time)
+        if normalized_dt is None:
+            normalized_dt = _parse_absolute_post_time(post.get("posted_at"))
         post["posted_at"] = normalized_dt.isoformat() if normalized_dt else None
         post["score"] = compute_score(post)
         if normalized_dt and is_same_day(normalized_dt, target_day):
