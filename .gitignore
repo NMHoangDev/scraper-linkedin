@@ -45,3 +45,5 @@ linkedin_group_crawler/*.session-journal
 # BE raw debug artifacts
 linkedin_group_crawler/data/raw/*.png
 linkedin_group_crawler/data/raw/*.html
+
+linkedin-apify-actor/node_modules/
