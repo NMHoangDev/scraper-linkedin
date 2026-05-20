@@ -255,6 +255,13 @@ class FacebookInteractor:
                 page.mouse.wheel(0, random.randint(300, 600))
                 page.wait_for_timeout(random.randint(1500, 3000))
                 
+                if used_cookie_path:
+                    try:
+                        context.storage_state(path=str(used_cookie_path))
+                        # logger.info(f"🔄 Đã cập nhật/gia hạn Cookie thành công vào: {used_cookie_path}")
+                    except Exception as e:
+                        # logger.warning(f"⚠️ Lỗi khi cập nhật cookie: {e}")
+                        pass
                 browser.close()
                 return InteractionResult(target.id, True, "SUCCESS", "Tương tác thành công.")
 

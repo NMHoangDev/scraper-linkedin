@@ -287,6 +287,11 @@ class FacebookScraper:
                 except Exception as e:
                     #logger.error(f"❌ Lỗi group {group.name}: {e}")
                     results.append(GroupSummary(group_name=group.name, total_posts_24h=0,Intent=group.Intent, hot_post=None))
-
+            try:
+                context.storage_state(path=str(cookie_path))
+                # logger.info(f"🔄 Đã cập nhật/gia hạn Cookie thành công vào: {cookie_path} trước khi đóng")
+            except Exception as e:
+                # logger.error(f"⚠️ Lỗi khi cập nhật cookie trước khi đóng: {e}")
+                pass
             browser.close()
             return results
