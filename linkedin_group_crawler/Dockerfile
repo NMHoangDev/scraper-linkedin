@@ -12,6 +12,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     HOST=0.0.0.0 \
     PORT=8000 \
+    TMPDIR=/tmp \
+    TEMP=/tmp \
+    TMP=/tmp \
     HEADLESS=true \
     STATE_PATH=/app/storage/linkedin_state.json \
     PLAYWRIGHT_CHROMIUM_LAUNCH_ARGS="--disable-gpu --disable-web-resources --disable-dev-shm-usage --no-sandbox --disable-setuid-sandbox --disable-infobars --disable-crash-reporter" \
@@ -26,16 +29,17 @@ RUN pip install --upgrade pip setuptools wheel \
 
 COPY . .
 
-RUN mkdir -p /app/storage/session /app/storage/runtime /app/data/raw /app/data/output \
+RUN mkdir -p /app/storage/session /app/storage/runtime /app/data/raw /app/data/output /tmp \
+    && chmod +x /app/scripts/start_render.sh \
     && chown -R pwuser:pwuser /app
 
 USER pwuser
 
-EXPOSE 8000
+EXPOSE 8000 8111
 
 VOLUME ["/app/storage", "/app/data"]
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()"
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/app/scripts/start_render.sh"]
