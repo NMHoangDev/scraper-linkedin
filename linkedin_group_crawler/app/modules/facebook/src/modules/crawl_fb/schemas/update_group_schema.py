@@ -1,6 +1,6 @@
 # src/schemas/update_group_schema.py
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Any
 
 class UpdateGroupRequest(BaseModel):
     """Schema để cập nhật thông tin Group Facebook"""
@@ -16,4 +16,4 @@ class UpdateGroupResponse(BaseModel):
     """Response sau khi cập nhật Group"""
     success: bool
     message: str
-    data: Optional[dict] = None
+    data: Optional[Any] = None
