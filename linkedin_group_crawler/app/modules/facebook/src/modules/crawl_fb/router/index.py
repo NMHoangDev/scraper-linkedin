@@ -1,6 +1,7 @@
 # src/modules/crawl/route/crawl_route.py
 import json
 import asyncio
+import logging
 from pathlib import Path
 from fastapi import APIRouter, Depends, status, BackgroundTasks, WebSocket, WebSocketDisconnect
 from typing import List, Optional, Dict
@@ -9,6 +10,7 @@ import uuid
 # Imports từ project của bạn
 from app.modules.facebook.src.modules.facebook.services.facebook_auth import FacebookAuth
 from app.modules.facebook.src.modules.crawl_fb.schemas.crawl_schema import CrawlPayload
+from app.modules.facebook.src.modules.crawl_fb.schemas.update_group_schema import UpdateGroupRequest, UpdateGroupResponse
 from app.modules.facebook.src.modules.crawl_fb.services.index import CrawlService
 from app.modules.facebook.src.modules.facebook.services.facebook_scraper import FacebookScraper, cancel_registry
 from app.modules.facebook.src.modules.telegram.services.telegram_service import TelegramService
@@ -21,6 +23,8 @@ from app.modules.facebook.src.core.config.env import Config
 
 from fastapi.encoders import jsonable_encoder
 import traceback
+
+logger = logging.getLogger(__name__)
 
 crawl_fb_router = APIRouter(tags=["Crawler Management FB"])
 
@@ -425,6 +429,63 @@ async def submit_auth_otp_api(payload: SubmitOTPPayload):
 
     except Exception as e:
         return {"status": "error", "message": f"Lỗi xử lý nạp OTP: {str(e)}"}
+
+
+# ── ENDPOINT CẬP NHẬT GROUP ─────────────────────────────────────────────────
+
+@crawl_fb_router.put("/groups/update", status_code=status.HTTP_200_OK, response_model=UpdateGroupResponse)
+async def update_group_api(
+    group_url: str,
+    request: UpdateGroupRequest,
+    service: CrawlService = Depends(get_crawl_service)
+):
+    """
+    Endpoint cập nhật thông tin Group Facebook
+    
+    Parameters:
+    - group_url: URL của group cần cập nhật
+    - request: UpdateGroupRequest chứa các trường cần cập nhật
+    
+    Returns:
+    - UpdateGroupResponse với status, message và dữ liệu được cập nhật
+    """
+    try:
+        # Map tên trường từ frontend sang Google Sheets
+        update_data = {}
+        
+        if request.group_name:
+            update_data[Config.NAME_GROUP_GG_SHEET] = request.group_name
+        if request.url:
+            update_data[Config.NAME_URL_GG_SHEET] = request.url
+        if request.intent:
+            update_data[Config.INTENT_GG_SHEET] = request.intent
+        if request.members is not None:
+            update_data[Config.MEMBERS_GG_SHEET] = request.members
+        if request.posts_per_week is not None:
+            update_data[Config.POSTS_PER_WEEK_GG_SHEET] = request.posts_per_week
+        if request.health_score is not None:
+            update_data[Config.HEALTH_SCORE_GG_SHEET] = request.health_score
+        if request.status:
+            # Nếu trường status tồn tại, lưu nó (tùy thuộc vào Config)
+            update_data["status"] = request.status
+        
+        result = await service.update_group(group_url=group_url, update_data=update_data)
+        
+        return UpdateGroupResponse(
+            success=True,
+            message=result.get("message", "Cập nhật thành công"),
+            data=result.get("data")
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Lỗi cập nhật group: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi cập nhật group: {str(e)}"
+        )
+
 
 
 

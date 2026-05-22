@@ -8,6 +8,8 @@ export const metadata: Metadata = {
 };
 import { Toaster } from "sonner"
 import { AuthProvider } from "@/components/nguyen/shared/components/contexts/AuthContext";
+import { QueryProvider } from "@/components/providers/QueryProvider";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -24,9 +26,11 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full">
-        <AuthProvider>
-          {children}
-        </AuthProvider>
+        <QueryProvider>
+          <AuthProvider>
+            {children}
+          </AuthProvider>
+        </QueryProvider>
      
         <Toaster
             position="top-right"

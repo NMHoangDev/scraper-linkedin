@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useAuthHook } from "../hooks/useLogin";
+import { MaterialIcon } from "@/components/ui";
 
 export default function LoginPage() {
   const [isEye, setIsEye] = useState<boolean>(false);
@@ -27,54 +28,84 @@ export default function LoginPage() {
   });
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-slate-100 p-6 relative">
-      <div className="w-130 bg-white rounded-3xl shadow-xl border border-slate-200 p-8">
-        <div className="flex flex-col items-center text-center mb-8">
-          <div className="w-40 h-16 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg text-white text-3xl font-bold">
-            CrawlFB
+    <div className="min-h-screen w-full min-w-[100vw] flex items-center justify-center bg-surface-container-lowest p-lg relative">
+      <div className="w-full max-w-sm min-w-[320px] sm:w-[384px] shrink-0 bg-surface rounded-xl border border-outline-variant shadow-xl p-lg">
+
+        {/* Logo/Brand */}
+        <div className="flex flex-col items-center text-center mb-lg">
+          <div className="w-16 h-16 rounded-xl bg-primary flex items-center justify-center shadow-lg mb-md">
+            <MaterialIcon name="radar" className="text-on-primary text-[32px]" />
           </div>
-          <p className="text-slate-500 text-sm mt-2">Hệ thống tự động hóa thu thập dữ liệu</p>
+          <h1 className="text-h2 text-on-surface font-black">CrawlFB</h1>
+          <p className="text-body-sm text-on-surface-variant mt-xs">Hệ thống tự động hóa thu thập dữ liệu</p>
         </div>
 
-        {/* Hiển thị thông báo chung */}
-        {errorMessage && <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-xl border border-red-200">{errorMessage}</div>}
-        {successMessage && <div className="mb-4 p-3 bg-green-50 text-green-600 text-sm rounded-xl border border-green-200">{successMessage}</div>}
+        {/* Thông báo */}
+        {errorMessage && (
+          <div className="mb-md p-sm bg-error-container/40 text-error text-body-sm rounded-lg border border-error-container">
+            {errorMessage}
+          </div>
+        )}
+        {successMessage && (
+          <div className="mb-md p-sm bg-secondary-container/20 text-on-secondary-container text-body-sm rounded-lg border border-secondary-container">
+            {successMessage}
+          </div>
+        )}
 
-        <form onSubmit={handleSubmit(handleLogin)} className="space-y-5">
-          <div>
-            <label htmlFor="userName" className="block text-sm font-semibold mb-2 text-slate-900">Email đăng nhập</label>
+        <form onSubmit={handleSubmit(handleLogin)} className="flex flex-col gap-md">
+          {/* Email */}
+          <div className="flex flex-col gap-base">
+            <label htmlFor="userName" className="text-label-md text-on-surface-variant font-semibold uppercase">
+              Email đăng nhập
+            </label>
             <input
               id="userName"
               placeholder="email or phone"
-              className="w-full border-2 border-dashed rounded-xl px-4 py-3 outline-none transition-all duration-300 bg-white text-slate-900 border-slate-300 focus:border-indigo-600"
+              className="w-full border border-outline-variant rounded-lg px-md py-sm outline-none transition-colors bg-surface text-on-surface focus:border-primary"
               {...register("email")}
             />
-            {errors.email && <span className="text-xs text-red-500 mt-1 block">{errors.email.message}</span>}
+            {errors.email && (
+              <span className="text-xs text-error font-medium">{errors.email.message}</span>
+            )}
           </div>
 
-          <div>
-            <label htmlFor="password" className="block text-sm font-semibold text-slate-700 mb-2">Mật khẩu</label>
-            <div className="w-full relative flex items-center">
+          {/* Mật khẩu */}
+          <div className="flex flex-col gap-base">
+            <label htmlFor="password" className="text-label-md text-on-surface-variant font-semibold uppercase">
+              Mật khẩu
+            </label>
+            <div className="relative">
               <input
                 id="password"
                 type={isEye ? "text" : "password"}
                 placeholder={isEye ? "Nhập mật khẩu" : "••••••••"}
-                className="w-full border-2 border-dashed rounded-xl px-4 py-3 outline-none transition-all duration-300 bg-white text-slate-900 border-slate-300 focus:border-indigo-600"
+                className="w-full border border-outline-variant rounded-lg px-md py-sm pr-12 outline-none transition-colors bg-surface text-on-surface focus:border-primary"
                 {...register("password")}
               />
-              <button type="button" className="absolute right-3 text-gray-500 hover:text-indigo-600" onClick={() => setIsEye(!isEye)}>
-                {isEye ? <FaEye className="text-xl" /> : <FaEyeSlash className="text-xl" />}
+              <button
+                type="button"
+                className="absolute right-md top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary transition-colors text-xs font-bold uppercase"
+                onClick={() => setIsEye(!isEye)}
+                aria-label={isEye ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+              >
+                {isEye ? <FaEye className="text-lg" /> : <FaEyeSlash className="text-lg" />}
               </button>
             </div>
-            {errors.password && <span className="text-xs text-red-500 mt-1 block">{errors.password.message}</span>}
+            {errors.password && (
+              <span className="text-xs text-error font-medium">{errors.password.message}</span>
+            )}
           </div>
 
-          <div>
-            <label htmlFor="secret_2fa" className="block text-xs font-semibold text-slate-500 mb-1">Mã Secret 2FA (Tùy chọn - Tự động giải)</label>
+          {/* Secret 2FA */}
+          <div className="flex flex-col gap-base">
+            <label htmlFor="secret_2fa" className="text-label-md text-on-surface-variant font-semibold uppercase">
+              Mã Secret 2FA{" "}
+              <span className="normal-case font-normal text-on-surface-variant/60">(Tùy chọn)</span>
+            </label>
             <input
               id="secret_2fa"
               placeholder="JBSWY3DPEHPK3PXP..."
-              className="w-full border rounded-lg px-3 py-2 text-sm outline-none bg-slate-50 border-slate-200"
+              className="w-full border border-outline-variant rounded-lg px-md py-sm outline-none transition-colors bg-surface-container-low text-on-surface focus:border-primary text-sm"
               {...register("secret_2fa")}
             />
           </div>
@@ -82,35 +113,48 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className={`w-full bg-indigo-700 hover:bg-indigo-800 transition text-white font-semibold py-3 rounded-xl shadow-md ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+            className="w-full bg-primary text-on-primary hover:bg-primary/90 font-bold py-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wide text-sm mt-xs"
           >
             {isLoading ? "Đang xử lý..." : "Đăng nhập"}
           </button>
         </form>
       </div>
 
-      {/* MODAL / POPUP NHẬP MÃ OTP */}
+      {/* MODAL OTP */}
       {isOtpModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
-          <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl border border-slate-100 flex flex-col items-center">
-            <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 mb-4 text-xl font-bold">!</div>
-            <h3 className="text-lg font-bold text-slate-900 mb-1">Yêu cầu xác thực OTP</h3>
-            <p className="text-xs text-slate-500 text-center mb-4">Facebook đang yêu cầu nhập mã gửi về điện thoại/email của bạn.</p>
-            
+        <div
+          className="fixed inset-0 bg-black/45 backdrop-blur-[1px] flex items-center justify-center z-50 p-md"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="otp-modal-title"
+        >
+          <div className="border-outline-variant bg-surface w-full max-w-sm rounded-xl border p-lg shadow-xl flex flex-col items-center">
+            {/* Icon cảnh báo */}
+            <div className="w-12 h-12 rounded-full bg-secondary-container/30 flex items-center justify-center text-secondary mb-md">
+              <MaterialIcon name="lock" className="text-[24px]" />
+            </div>
+
+            <h3 id="otp-modal-title" className="text-h3 text-on-surface font-semibold mb-xs">
+              Yêu cầu xác thực OTP
+            </h3>
+            <p className="text-body-sm text-on-surface-variant text-center mb-md">
+              Facebook đang yêu cầu nhập mã gửi về điện thoại/email của bạn.
+            </p>
+
             <input
               type="text"
               maxLength={8}
-              placeholder="Nhập mã 6-8 số"
+              placeholder="Nhập mã 6–8 số"
               value={otpInput}
               onChange={(e) => setOtpInput(e.target.value)}
-              className="w-full border-2 border-indigo-200 rounded-xl px-4 py-3 text-center text-lg font-bold tracking-widest outline-none focus:border-indigo-600 mb-4"
+              className="w-full border border-outline-variant focus:border-primary rounded-lg px-md py-sm text-center text-lg font-bold tracking-widest outline-none transition-colors bg-surface mb-md"
             />
 
-            <div className="flex w-full space-x-3">
+            <div className="flex w-full gap-sm">
               <button
                 type="button"
                 onClick={() => setIsOtpModalOpen(false)}
-                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 rounded-xl text-sm transition"
+                className="flex-1 rounded-lg px-md py-sm text-sm font-bold uppercase text-on-surface-variant border border-outline-variant hover:bg-surface-container transition-colors"
               >
                 Hủy
               </button>
@@ -118,7 +162,7 @@ export default function LoginPage() {
                 type="button"
                 disabled={isLoading}
                 onClick={() => handleVerifyOtp(otpInput, getValues())}
-                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 rounded-xl text-sm shadow transition"
+                className="flex-1 bg-primary text-on-primary hover:bg-primary/90 rounded-lg px-md py-sm text-sm font-bold uppercase transition-colors disabled:opacity-50"
               >
                 {isLoading ? "Đang gửi..." : "Xác nhận"}
               </button>

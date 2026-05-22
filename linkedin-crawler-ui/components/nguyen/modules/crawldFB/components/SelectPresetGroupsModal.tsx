@@ -2,11 +2,11 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { AiOutlineClose } from "react-icons/ai";
 import { FaFacebook } from "react-icons/fa";
 import { FacebookGroupDTO } from "../types/dataFb.type";
 import { useGetIntents } from "../hooks/useGetIntents";
 import { useGetPresetGroups } from "../hooks/useGetPresetGroups";
+import { MaterialIcon } from "@/components/ui";
 
 interface SelectPresetGroupsModalProps {
     isOpen: boolean;
@@ -14,6 +14,7 @@ interface SelectPresetGroupsModalProps {
     onSelectGroups: (selectedGroups: { name: string; url: string; intent: string }[]) => void;
 }
 type GroupStatus = "ACTIVE" | "IDLE" | "DEAD" | null | undefined;
+
 export function SelectPresetGroupsModal({ isOpen, onClose, onSelectGroups }: SelectPresetGroupsModalProps) {
     const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
     const [searchTerm, setSearchTerm] = useState<string>("");
@@ -25,7 +26,7 @@ export function SelectPresetGroupsModal({ isOpen, onClose, onSelectGroups }: Sel
         if (isOpen) {
             fetchIntents();
             fetchPresetGroups();
-            setSelectedIndices([]); 
+            setSelectedIndices([]);
         }
     }, [isOpen, fetchIntents, fetchPresetGroups]);
 
@@ -55,7 +56,7 @@ export function SelectPresetGroupsModal({ isOpen, onClose, onSelectGroups }: Sel
             const matchedIntent = intents.find((item) => item.name === originalGroup.intent);
 
             return {
-                name: originalGroup.group_name, 
+                name: originalGroup.group_name,
                 url: originalGroup.url,
                 intent: matchedIntent ? matchedIntent.value : originalGroup.intent,
             };
@@ -66,7 +67,7 @@ export function SelectPresetGroupsModal({ isOpen, onClose, onSelectGroups }: Sel
         onClose();
     };
 
-    // Helpers UI
+    // Helpers UI — giữ nguyên logic, đồng bộ màu token
     const renderHealthScore = (score: number, status: GroupStatus) => {
         let bgColor = "bg-rose-500";
         let textColor = "text-rose-600";
@@ -79,15 +80,14 @@ export function SelectPresetGroupsModal({ isOpen, onClose, onSelectGroups }: Sel
             textColor = "text-amber-600";
         }
 
-        // Đảm bảo % width không vượt quá 100% nếu điểm API trả về bị lố
         const progressWidth = Math.min(Math.max(score, 0), 100);
 
         return (
             <div className="flex items-center gap-2">
-                <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div 
-                        className={`h-full ${bgColor} transition-all duration-300`} 
-                        style={{ width: `${progressWidth}%` }} 
+                <div className="w-16 h-1.5 bg-surface-container rounded-full overflow-hidden">
+                    <div
+                        className={`h-full ${bgColor} transition-all duration-300`}
+                        style={{ width: `${progressWidth}%` }}
                     />
                 </div>
                 <span className={`text-xs font-bold ${textColor}`}>
@@ -98,119 +98,124 @@ export function SelectPresetGroupsModal({ isOpen, onClose, onSelectGroups }: Sel
     };
 
     const renderStatusBadge = (status?: "ACTIVE" | "IDLE" | "DEAD" | null) => {
-    // Luôn có trường hợp fallback mặc định nếu API văng lỗi thiếu trường
-    if (!status) return <span className="text-slate-400 italic text-xs">Chưa rõ</span>;
+        if (!status) return <span className="text-on-surface-variant italic text-xs">Chưa rõ</span>;
 
-    switch (status) {
-        case "ACTIVE":
-            // < 24h: Màu xanh lá + Hiệu ứng chấm tròn nhấp nháy (Sống)
-            return (
-                <span className="px-2.5 py-1 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full text-xs font-medium flex items-center gap-1 w-max">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> 
-                    Sống
-                </span>
-            );
-        case "IDLE":
-            // <= 3 ngày: Màu vàng cam (Ít hoạt động)
-            return (
-                <span className="px-2.5 py-1 bg-amber-50 text-amber-600 border border-amber-100 rounded-full text-xs font-medium flex items-center gap-1 w-max">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> 
-                    Ít HĐ
-                </span>
-            );
-        case "DEAD":
-            // > 3 ngày: Màu đỏ (Chết)
-            return (
-                <span className="px-2.5 py-1 bg-rose-50 text-rose-600 border border-rose-100 rounded-full text-xs font-medium flex items-center gap-1 w-max">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> 
-                    Chết
-                </span>
-            );
-    }
-};
+        switch (status) {
+            case "ACTIVE":
+                return (
+                    <span className="px-2.5 py-1 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full text-xs font-medium flex items-center gap-1 w-max">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Sống
+                    </span>
+                );
+            case "IDLE":
+                return (
+                    <span className="px-2.5 py-1 bg-amber-50 text-amber-600 border border-amber-100 rounded-full text-xs font-medium flex items-center gap-1 w-max">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                        Ít HĐ
+                    </span>
+                );
+            case "DEAD":
+                return (
+                    <span className="px-2.5 py-1 bg-rose-50 text-rose-600 border border-rose-100 rounded-full text-xs font-medium flex items-center gap-1 w-max">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                        Chết
+                    </span>
+                );
+        }
+    };
 
-    // ✅ Helper format ngày tháng: Giúp chuỗi ngày in ra gọn đẹp, tránh TH chuỗi ISO quá dài
     const formatCrawlDate = (dateStr?: string | null) => {
-        if (!dateStr) return <span className="text-slate-400 italic">Chưa crawl</span>;
-        // Nếu Backend đã trả về chuỗi đẹp sẵn (vd: "2g trước" hoặc "12/05/2026") thì hiển thị luôn
-        return <span className="text-slate-600 font-medium">{dateStr}</span>;
+        if (!dateStr) return <span className="text-on-surface-variant italic">Chưa crawl</span>;
+        return <span className="text-on-surface font-medium">{dateStr}</span>;
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-            <div className="w-full max-w-6xl bg-white rounded-2xl shadow-2xl border border-slate-100 flex flex-col max-h-[85vh] overflow-hidden animate-in fade-in duration-200">
-
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-[1px] p-md">
+            <div
+                className="border-outline-variant bg-surface w-full max-w-6xl rounded-xl border shadow-xl flex flex-col max-h-[85vh] overflow-hidden"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="preset-groups-modal-title"
+            >
                 {/* HEADER */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+                <div className="flex items-center justify-between px-lg py-md border-b border-outline-variant bg-surface-container-low">
                     <div>
-                        <h2 className="text-xl font-bold text-slate-800">Chọn Facebook Groups có sẵn</h2>
-                        <p className="text-xs text-slate-500 mt-0.5">Hệ thống tự động đồng bộ các group đã được theo dõi</p>
+                        <h2 id="preset-groups-modal-title" className="text-h3 text-on-surface font-semibold">
+                            Chọn Facebook Groups có sẵn
+                        </h2>
+                        <p className="text-body-sm text-on-surface-variant mt-xs">
+                            Hệ thống tự động đồng bộ các group đã được theo dõi
+                        </p>
                     </div>
-                    <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition">
-                        <AiOutlineClose className="text-xl" />
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="p-1.5 text-on-surface-variant hover:text-error hover:bg-surface-container rounded-lg transition-colors"
+                        aria-label="Đóng"
+                    >
+                        <MaterialIcon name="close" className="text-[20px]" />
                     </button>
                 </div>
 
                 {/* TOOLBAR TÌM KIẾM */}
-                <div className="p-4 border-b border-slate-100 bg-white">
+                <div className="px-lg py-sm border-b border-outline-variant bg-surface">
                     <input
                         type="text"
                         disabled={isLoadingGroups}
                         placeholder="🔍 Tìm kiếm theo tên hoặc URL group..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full max-w-md bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-violet-500 transition disabled:bg-slate-100"
+                        className="w-full max-w-md bg-surface-container-low border border-outline-variant rounded-lg px-md py-1.5 text-sm text-on-surface outline-none focus:border-primary transition-colors disabled:opacity-60"
                     />
                 </div>
 
                 {/* BẢNG DỮ LIỆU CHÍNH */}
                 <div className="flex-1 overflow-auto relative">
-                    
+
                     {errorGroups && (
-                        <div className="m-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-medium">
+                        <div className="m-md p-sm bg-error-container/40 border border-error-container text-error rounded-lg text-xs font-medium">
                             {errorGroups}
                         </div>
                     )}
 
                     <table className="w-full border-collapse text-left">
-                        <thead className="bg-slate-50 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider sticky top-0 z-10">
+                        <thead className="bg-surface-container-low border-b border-outline-variant text-table-header font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 z-10">
                             <tr>
-                                <th className="py-3 px-4 w-12">
+                                <th className="py-md px-md w-12">
                                     <input
                                         type="checkbox"
                                         disabled={isLoadingGroups || presetGroups.length === 0}
                                         checked={presetGroups.length > 0 && selectedIndices.length === presetGroups.length}
                                         onChange={handleToggleSelectAll}
-                                        className="w-4 h-4 rounded border-slate-300 accent-violet-600 cursor-pointer"
+                                        className="w-4 h-4 rounded border-outline-variant accent-primary cursor-pointer"
                                     />
                                 </th>
-                                <th className="py-3 px-4">Tên Group</th>
-                                <th className="py-3 px-4">Intent</th>
-                                <th className="py-3 px-4">Thành viên</th>
-                                <th className="py-3 px-4">Health Score</th>
-                                <th className="py-3 px-4">Trạng thái</th>
-                                
-                                {/* ✅ BỔ SUNG TIÊU ĐỀ CỘT CRAWL GẦN NHẤT */}
-                                <th className="py-3 px-4">Crawl gần nhất</th>
-                                
-                                <th className="py-3 px-4 text-center">Chạy 24h</th>
+                                <th className="py-md px-md">Tên Group</th>
+                                <th className="py-md px-md">Intent</th>
+                                <th className="py-md px-md">Thành viên</th>
+                                <th className="py-md px-md">Health Score</th>
+                                <th className="py-md px-md">Trạng thái</th>
+                                <th className="py-md px-md">Crawl gần nhất</th>
+                                <th className="py-md px-md text-center">Chạy 24h</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100 text-xs text-slate-600">
-                            
+                        <tbody className="divide-y divide-outline-variant text-xs text-on-surface-variant">
+
                             {isLoadingGroups ? (
                                 <tr>
-                                    <td colSpan={8} className="py-12 text-center text-slate-400 font-medium">
+                                    <td colSpan={8} className="py-12 text-center text-on-surface-variant">
                                         <div className="flex flex-col items-center justify-center gap-2">
-                                            <div className="w-6 h-6 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+                                            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                                             <span>Đang kết nối tải dữ liệu từ hệ thống...</span>
                                         </div>
                                     </td>
                                 </tr>
                             ) : (
                                 presetGroups.map((group, index) => {
-                                    const isMatchSearch = (group.group_name || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
-                                                          (group.url || "").toLowerCase().includes(searchTerm.toLowerCase());
+                                    const isMatchSearch =
+                                        (group.group_name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                        (group.url || "").toLowerCase().includes(searchTerm.toLowerCase());
                                     if (!isMatchSearch) return null;
 
                                     const isSelected = selectedIndices.includes(index);
@@ -219,49 +224,60 @@ export function SelectPresetGroupsModal({ isOpen, onClose, onSelectGroups }: Sel
                                         <tr
                                             key={index}
                                             onClick={() => handleToggleSelect(index)}
-                                            className={`hover:bg-slate-50/80 cursor-pointer transition ${isSelected ? 'bg-violet-50/50' : ''}`}
+                                            className={`cursor-pointer transition-colors ${
+                                                isSelected
+                                                    ? "bg-primary/5"
+                                                    : "hover:bg-surface-container/50"
+                                            }`}
                                         >
-                                            <td className="py-3.5 px-4" onClick={(e) => e.stopPropagation()}>
+                                            <td className="py-md px-md" onClick={(e) => e.stopPropagation()}>
                                                 <input
                                                     type="checkbox"
                                                     checked={isSelected}
                                                     onChange={() => handleToggleSelect(index)}
-                                                    className="w-4 h-4 rounded border-slate-300 accent-violet-600 cursor-pointer"
+                                                    className="w-4 h-4 rounded border-outline-variant accent-primary cursor-pointer"
                                                 />
                                             </td>
 
-                                            <td className="py-3.5 px-4">
-                                                <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                                            <td className="py-md px-md">
+                                                <div className="font-bold text-on-surface text-sm flex items-center gap-1.5">
                                                     <FaFacebook className="text-blue-600 shrink-0" />
                                                     <span className="line-clamp-1">{group.group_name}</span>
                                                 </div>
-                                                <div className="text-[11px] text-slate-400 mt-0.5">{group.url}</div>
+                                                <div className="text-[11px] text-on-surface-variant mt-0.5">{group.url}</div>
                                             </td>
 
-                                            <td className="py-3.5 px-4">
+                                            <td className="py-md px-md">
                                                 {group.intent ? (
-                                                    <p className="w-max px-2.5 py-1 bg-slate-100 text-slate-700 font-medium rounded-lg text-xs border border-slate-200/60">
+                                                    <p className="w-max px-2.5 py-1 bg-surface-container-low text-on-surface-variant font-medium rounded-lg text-xs border border-outline-variant">
                                                         {group.intent}
                                                     </p>
                                                 ) : (
-                                                    <p className="text-xs text-slate-400 italic">Mặc định</p>
+                                                    <p className="text-xs text-on-surface-variant italic">Mặc định</p>
                                                 )}
                                             </td>
 
-                                            <td className="py-3.5 px-4 font-medium text-slate-700">{group.members?.toLocaleString() || 0}</td>
-                                            <td className="py-3.5 px-4">{renderHealthScore(group.health_score || 0, group.status)}</td>
-                                            <td className="py-3.5 px-4">{renderStatusBadge(group.status)}</td>
-                                            
-                                            {/* ✅ RENDER DỮ LIỆU CỘT CRAWL GẦN NHẤT TRỎ VÀO Carawl_date */}
-                                            <td className="py-3.5 px-4">
-                                                {group.last_crawl ? formatCrawlDate(group.last_crawl) : <span className="text-slate-400 italic">Chưa crawl</span>}
+                                            <td className="py-md px-md font-medium text-on-surface tabular-nums">
+                                                {group.members?.toLocaleString() || 0}
+                                            </td>
+                                            <td className="py-md px-md">
+                                                {renderHealthScore(group.health_score || 0, group.status)}
+                                            </td>
+                                            <td className="py-md px-md">
+                                                {renderStatusBadge(group.status)}
+                                            </td>
+                                            <td className="py-md px-md">
+                                                {group.last_crawl
+                                                    ? formatCrawlDate(group.last_crawl)
+                                                    : <span className="text-on-surface-variant italic">Chưa crawl</span>
+                                                }
                                             </td>
 
-                                            <td className="py-3.5 px-4 text-center">
+                                            <td className="py-md px-md text-center">
                                                 {group.chay_24h ? (
-                                                    <span className="px-2 py-0.5 bg-violet-100 text-violet-700 font-bold rounded text-[10px]">TRUE</span>
+                                                    <span className="px-2 py-0.5 bg-primary/10 text-primary font-bold rounded text-[10px] uppercase">TRUE</span>
                                                 ) : (
-                                                    <span className="px-2 py-0.5 bg-slate-100 text-slate-400 font-bold rounded text-[10px]">FALSE</span>
+                                                    <span className="px-2 py-0.5 bg-surface-container text-on-surface-variant font-bold rounded text-[10px] uppercase">FALSE</span>
                                                 )}
                                             </td>
                                         </tr>
@@ -271,7 +287,7 @@ export function SelectPresetGroupsModal({ isOpen, onClose, onSelectGroups }: Sel
 
                             {!isLoadingGroups && presetGroups.length === 0 && !errorGroups && (
                                 <tr>
-                                    <td colSpan={8} className="py-12 text-center text-slate-400 italic">
+                                    <td colSpan={8} className="py-12 text-center text-on-surface-variant italic">
                                         Chưa có Facebook Group nào được lưu trữ trên hệ thống.
                                     </td>
                                 </tr>
@@ -281,21 +297,30 @@ export function SelectPresetGroupsModal({ isOpen, onClose, onSelectGroups }: Sel
                 </div>
 
                 {/* FOOTER */}
-                <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                    <div className="text-xs text-slate-500">
-                        Đã chọn: <span className="font-bold text-violet-600">{selectedIndices.length}</span> group
+                <div className="px-lg py-md border-t border-outline-variant bg-surface-container-low flex items-center justify-between">
+                    <div className="text-body-sm text-on-surface-variant">
+                        Đã chọn:{" "}
+                        <span className="font-bold text-primary">{selectedIndices.length}</span> group
                     </div>
 
-                    <div className="flex gap-3">
-                        <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-200/60 rounded-xl border border-slate-200 transition">
+                    <div className="flex gap-sm">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="rounded-lg px-md py-sm text-sm font-bold uppercase text-on-surface-variant border border-outline-variant hover:bg-surface-container transition-colors"
+                        >
                             Hủy
                         </button>
-                        <button type="button" disabled={selectedIndices.length === 0 || isLoadingGroups} onClick={handleConfirmSelection} className="px-6 py-2.5 text-sm font-medium text-white bg-violet-600 hover:bg-violet-700 rounded-xl transition disabled:opacity-50 shadow-md shadow-violet-100">
+                        <button
+                            type="button"
+                            disabled={selectedIndices.length === 0 || isLoadingGroups}
+                            onClick={handleConfirmSelection}
+                            className="bg-primary text-on-primary hover:bg-primary/90 rounded-lg px-lg py-sm text-sm font-bold uppercase transition-colors disabled:opacity-50"
+                        >
                             Nhập vào Form
                         </button>
                     </div>
                 </div>
-
             </div>
         </div>
     );

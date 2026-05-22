@@ -19,8 +19,6 @@ export function PlatformGroupManagementContent() {
     }
   }, [platform, d.role, router]);
 
-  if (platform === "facebook") return <FacebookGroupManagementPlaceholder />;
-
   if (platform === "linkedin" && d.role === "leader") {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-md text-on-surface-variant">
@@ -29,6 +27,8 @@ export function PlatformGroupManagementContent() {
       </div>
     );
   }
+
+  if (platform === "facebook") return <FacebookGroupManagementPlaceholder />;
 
   return <LinkedInGroupManagementPageContent />;
 }

@@ -5,7 +5,6 @@
 ```bash
 cd linkedin_group_crawler
 py -3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
 
 API docs: `http://127.0.0.1:8000/docs` — header `x-api-key` = gia tri `API_KEY` trong `.env`.
 
