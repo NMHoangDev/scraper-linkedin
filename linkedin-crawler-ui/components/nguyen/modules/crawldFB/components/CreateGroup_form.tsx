@@ -1,14 +1,15 @@
 "use client";
 
 import React, { useEffect } from "react";
-import { FaFacebook, FaLinkedin, FaLink, FaUsers, FaTags, FaInfoCircle, FaTimes } from "react-icons/fa";
+import { FaFacebook, FaLinkedin, FaLink, FaUsers, FaTags, FaInfoCircle } from "react-icons/fa";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { CreateGroupSchema, CreateGroupPayload, initialCreateGroupData } from "../schemas/create_groups_shemas";
 import { useCreateGroup } from "../hooks/useCreateGroups";
 import { useGetIntents } from "../hooks/useGetIntents";
-import FullScreenLoading from "../../../shared/components/layout/FullScreenLoading"; 
+import FullScreenLoading from "../../../shared/components/layout/FullScreenLoading";
+import { MaterialIcon } from "@/components/ui";
 
 // 1. Định nghĩa Props để nhận tín hiệu từ component cha
 interface CreateGroupModalProps {
@@ -19,7 +20,7 @@ interface CreateGroupModalProps {
 export default function CreateGroupModal({ isOpen, onClose }: CreateGroupModalProps) {
     // Hooks
     const { intents, fetchIntents } = useGetIntents();
-    const { isLoading, submitGroupData } = useCreateGroup(); // Đã bỏ handleCancel vì giờ sẽ dùng onClose
+    const { isLoading, submitGroupData } = useCreateGroup();
 
     // Khởi tạo React Hook Form
     const {
@@ -43,7 +44,7 @@ export default function CreateGroupModal({ isOpen, onClose }: CreateGroupModalPr
     // Xử lý logic submit
     const handleOnSubmit = async (data: CreateGroupPayload) => {
         const responseData = await submitGroupData(data);
-        
+
         // Nếu API trả về dữ liệu thành công -> Reset form và đóng Modal
         if (responseData) {
             reset();
@@ -81,138 +82,158 @@ export default function CreateGroupModal({ isOpen, onClose }: CreateGroupModalPr
                 />
             )}
 
-            {/* 3. Lớp Overlay mờ (Fixed Background) */}
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
-                
-                {/* 4. Container của Form */}
-                <div className="relative w-full max-w-4xl mx-auto bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden font-sans my-auto">
-                    
-                    {/* Nút X góc trên cùng bên phải */}
-                    <button 
+            {/* Overlay */}
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-[1px] p-md overflow-y-auto">
+
+                {/* Dialog container — khớp style LinkedIn modals */}
+                <div
+                    className="border-outline-variant bg-surface relative z-10 w-full max-w-4xl mx-auto rounded-xl border p-lg shadow-xl my-auto overflow-hidden"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="create-group-modal-title"
+                >
+                    {/* Nút đóng */}
+                    <button
+                        type="button"
                         onClick={onClose}
-                        className="absolute top-6 right-6 text-slate-400 hover:text-rose-500 transition-colors z-10"
+                        className="absolute top-lg right-lg text-on-surface-variant hover:text-error rounded p-1 transition-colors z-10"
+                        aria-label="Đóng"
                     >
-                        <FaTimes className="text-xl" />
+                        <MaterialIcon name="close" className="text-[22px]" />
                     </button>
 
                     {/* Header */}
-                    <div className="w-full border-b bg-slate-50 px-8 py-6 pr-16">
-                        <h1 className="text-2xl sm:text-3xl font-bold text-slate-800">Thêm Group Mới</h1>
-                        <p className="text-sm text-slate-500 mt-1">Đăng ký các nhóm Facebook hoặc LinkedIn vào hệ thống</p>
+                    <div className="mb-lg border-b border-outline-variant pb-md pr-10">
+                        <h3 id="create-group-modal-title" className="text-h3 text-on-surface font-semibold">
+                            Thêm Group Mới
+                        </h3>
+                        <p className="text-body-sm text-on-surface-variant mt-xs">
+                            Đăng ký các nhóm Facebook hoặc LinkedIn vào hệ thống
+                        </p>
                     </div>
 
                     <form onSubmit={handleSubmit(handleOnSubmit)}>
-                        <div className="p-6 sm:p-8 space-y-8 max-h-[65vh] overflow-y-auto">
-                            <div className="grid md:grid-cols-3 gap-6">
-                                
+                        <div className="space-y-base max-h-[60vh] overflow-y-auto py-base">
+                            <div className="grid md:grid-cols-3 gap-lg">
+
                                 {/* CỘT TRÁI: THÔNG TIN CHÍNH */}
-                                <div className="md:col-span-2 space-y-6">
-                                    <div className="space-y-4">
-                                        
-                                        {/* URL Group */}
+                                <div className="md:col-span-2 flex flex-col gap-base">
+
+                                    {/* URL Group */}
+                                    <div>
+                                        <label className="text-label-md text-on-surface-variant font-semibold uppercase">
+                                            Link URL Group <span className="text-error">*</span>
+                                        </label>
+                                        <div className="relative mt-1">
+                                            <div className="absolute left-md top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">
+                                                {currentUrl ? (
+                                                    platform === "LinkedIn"
+                                                        ? <FaLinkedin className="text-blue-700 text-base" />
+                                                        : <FaFacebook className="text-blue-600 text-base" />
+                                                ) : <FaLink className="text-base" />}
+                                            </div>
+                                            <input
+                                                placeholder="https://www.facebook.com/groups/..."
+                                                className={`w-full pl-9 pr-md py-sm bg-surface border rounded-lg text-sm outline-none transition-colors ${
+                                                    errors.link_group
+                                                        ? "border-error text-error focus:border-error"
+                                                        : "border-outline-variant text-on-surface focus:border-primary"
+                                                }`}
+                                                {...register("link_group")}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Tên Group */}
+                                    <div>
+                                        <label className="text-label-md text-on-surface-variant font-semibold uppercase">
+                                            Tên hiển thị Group <span className="text-error">*</span>
+                                        </label>
+                                        <div className="relative mt-1">
+                                            <div className="absolute left-md top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">
+                                                <FaUsers className="text-base" />
+                                            </div>
+                                            <input
+                                                placeholder="Ví dụ: Cộng đồng Frontend Việt Nam"
+                                                className={`w-full pl-9 pr-md py-sm bg-surface border rounded-lg text-sm outline-none transition-colors ${
+                                                    errors.group_name
+                                                        ? "border-error text-error focus:border-error"
+                                                        : "border-outline-variant text-on-surface focus:border-primary"
+                                                }`}
+                                                {...register("group_name")}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Intent & Thành viên */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-base">
                                         <div>
-                                            <label className="block text-sm font-semibold mb-2 text-slate-900">
-                                                Link URL Group <span className="text-rose-500">*</span>
+                                            <label className="text-label-md text-on-surface-variant font-semibold uppercase">
+                                                Mục đích (Intent) <span className="text-error">*</span>
                                             </label>
-                                            <div className="relative">
-                                                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                                                    {currentUrl ? (
-                                                        platform === "LinkedIn" ? <FaLinkedin className="text-blue-700 text-lg" /> : <FaFacebook className="text-blue-600 text-lg" />
-                                                    ) : <FaLink className="text-lg" />}
+                                            <div className="relative mt-1">
+                                                <div className="absolute left-md top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">
+                                                    <FaTags className="text-base" />
                                                 </div>
-                                                <input
-                                                    placeholder="https://www.facebook.com/groups/..."
-                                                    className={`w-full pl-10 pr-4 py-3 bg-white border-2 rounded-xl text-sm outline-none transition-all duration-300
-                                                        ${errors.link_group ? 'border-rose-500 text-rose-600' : 'border-slate-300 text-slate-900 focus:border-indigo-500'}`}
-                                                    {...register("link_group")}
-                                                />
+                                                <select
+                                                    className={`w-full pl-9 pr-md py-sm bg-surface border rounded-lg text-sm outline-none transition-colors appearance-none cursor-pointer ${
+                                                        errors.intent
+                                                            ? "border-error text-error focus:border-error"
+                                                            : "border-outline-variant text-on-surface focus:border-primary"
+                                                    }`}
+                                                    {...register("intent")}
+                                                >
+                                                    <option value="" disabled>-- Chọn kịch bản --</option>
+                                                    {intents?.map((item: any, index: number) => (
+                                                        <option key={index} value={item.value}>{item.name}</option>
+                                                    ))}
+                                                </select>
                                             </div>
                                         </div>
 
-                                        {/* Tên Group */}
                                         <div>
-                                            <label className="block text-sm font-semibold mb-2 text-slate-900">
-                                                Tên hiển thị Group <span className="text-rose-500">*</span>
+                                            <label className="text-label-md text-on-surface-variant font-semibold uppercase">
+                                                Số lượng thành viên
                                             </label>
-                                            <div className="relative">
-                                                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                                                    <FaUsers className="text-lg" />
-                                                </div>
-                                                <input
-                                                    placeholder="Ví dụ: Cộng đồng Frontend Việt Nam"
-                                                    className={`w-full pl-10 pr-4 py-3 bg-white border-2 rounded-xl text-sm outline-none transition-all duration-300
-                                                        ${errors.group_name ? 'border-rose-500 text-rose-600' : 'border-slate-300 text-slate-900 focus:border-indigo-500'}`}
-                                                    {...register("group_name")}
-                                                />
-                                            </div>
-                                        </div>
-
-                                        {/* Intent & Thành viên */}
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-sm font-semibold mb-2 text-slate-900">
-                                                    Mục đích (Intent) <span className="text-rose-500">*</span>
-                                                </label>
-                                                <div className="relative">
-                                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-                                                        <FaTags className="text-lg" />
-                                                    </div>
-                                                    <select
-                                                        className={`w-full pl-10 pr-4 py-3 bg-white border-2 rounded-xl text-sm outline-none transition-all duration-300 appearance-none cursor-pointer
-                                                            ${errors.intent ? 'border-rose-500 text-rose-600' : 'border-slate-300 text-slate-900 focus:border-indigo-500'}`}
-                                                        {...register("intent")}
-                                                    >
-                                                        <option value="" disabled>-- Chọn kịch bản --</option>
-                                                        {intents?.map((item: any, index: number) => (
-                                                            <option key={index} value={item.value}>{item.name}</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-sm font-semibold mb-2 text-slate-900">
-                                                    Số lượng thành viên
-                                                </label>
-                                                <input
-                                                    type="number"
-                                                    placeholder="Vd: 5000"
-                                                    className="w-full px-4 py-3 bg-white border-2 border-slate-300 text-slate-900 rounded-xl text-sm outline-none transition-all duration-300 focus:border-indigo-500"
-                                                    {...register("members")}
-                                                />
-                                            </div>
+                                            <input
+                                                type="number"
+                                                placeholder="Vd: 5000"
+                                                className="mt-1 w-full px-md py-sm bg-surface border border-outline-variant text-on-surface rounded-lg text-sm outline-none transition-colors focus:border-primary"
+                                                {...register("members")}
+                                            />
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* CỘT PHẢI: THIẾT LẬP PHỤ */}
-                                <div className="space-y-6">
-                                    <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
-                                        <h2 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                            <FaInfoCircle className="text-indigo-500 text-lg" /> Cấu hình bổ sung
-                                        </h2>
-                                        
-                                        <div className="space-y-5">
+                                <div>
+                                    <div className="bg-surface-container-low p-md rounded-xl border border-outline-variant">
+                                        <h4 className="text-label-md text-on-surface font-bold uppercase flex items-center gap-2 mb-md">
+                                            <FaInfoCircle className="text-primary text-base" />
+                                            Cấu hình bổ sung
+                                        </h4>
+
+                                        <div className="flex flex-col gap-base">
                                             <div>
-                                                <label className="block text-sm font-semibold mb-2 text-slate-900">
+                                                <label className="text-label-md text-on-surface-variant font-semibold uppercase">
                                                     Ước tính Post/Tuần
                                                 </label>
                                                 <input
                                                     type="number"
-                                                    className="w-full px-4 py-3 bg-white border-2 border-slate-300 text-slate-900 rounded-xl text-sm outline-none transition-all duration-300 focus:border-indigo-500"
+                                                    className="mt-1 w-full px-md py-sm bg-surface border border-outline-variant text-on-surface rounded-lg text-sm outline-none transition-colors focus:border-primary"
                                                     {...register("posts_per_week")}
                                                 />
                                             </div>
 
-                                            <div className="flex items-center justify-between pt-2">
-                                                <span className="text-sm font-semibold text-slate-900">Quét liên tục 24h</span>
+                                            <div className="flex items-center justify-between pt-xs border-t border-outline-variant">
+                                                <span className="text-body-sm text-on-surface font-semibold">Quét liên tục 24h</span>
                                                 <label className="relative inline-flex items-center cursor-pointer">
-                                                    <input 
-                                                        type="checkbox" 
-                                                        className="sr-only peer" 
+                                                    <input
+                                                        type="checkbox"
+                                                        className="sr-only peer"
                                                         {...register("chay_24h")}
                                                     />
-                                                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                                                    <div className="w-11 h-6 bg-surface-container peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-outline-variant after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
                                                 </label>
                                             </div>
                                         </div>
@@ -221,25 +242,26 @@ export default function CreateGroupModal({ isOpen, onClose }: CreateGroupModalPr
                             </div>
                         </div>
 
-                        {/* Footer / Nút Hành động */}
-                        <div className="px-6 sm:px-8 py-5 bg-slate-50 border-t flex flex-col sm:flex-row justify-between items-center gap-4 sm:gap-0">
-                            <p className={`text-sm transition-colors duration-300  ${firstErrorMsg ? 'text-red-500 font-medium' : 'text-slate-500'}`}>
+                        {/* Footer */}
+                        <div className="mt-lg pt-md border-t border-outline-variant flex flex-col sm:flex-row justify-between items-center gap-md">
+                            <p className={`text-body-sm transition-colors ${firstErrorMsg ? "text-error font-medium" : "text-on-surface-variant"}`}>
                                 {firstErrorMsg || "Vui lòng điền đầy đủ các thông tin bắt buộc (*) trước khi lưu."}
                             </p>
-                            
-                            <div className="flex gap-3 w-full sm:w-auto">
+
+                            <div className="flex gap-sm w-full sm:w-auto">
                                 <button
                                     type="button"
                                     onClick={onClose}
-                                    className="flex-1 sm:flex-none px-6 py-3 border border-slate-300 bg-white text-slate-700 rounded-xl font-semibold hover:bg-slate-100 transition"
+                                    className="flex-1 sm:flex-none rounded-lg px-md py-sm text-sm font-bold uppercase text-on-surface-variant border border-outline-variant hover:bg-surface-container transition-colors"
                                 >
                                     Hủy bỏ
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex-1 sm:flex-none bg-violet-600 hover:bg-violet-700 text-white px-6 py-3 rounded-xl font-semibold transition shadow-md shadow-violet-200"
+                                    disabled={isLoading}
+                                    className="flex-1 sm:flex-none bg-primary text-on-primary hover:bg-primary/90 rounded-lg px-lg py-sm text-sm font-bold uppercase transition-colors disabled:opacity-50"
                                 >
-                                    Lưu Group
+                                    {isLoading ? "Đang lưu…" : "Lưu Group"}
                                 </button>
                             </div>
                         </div>

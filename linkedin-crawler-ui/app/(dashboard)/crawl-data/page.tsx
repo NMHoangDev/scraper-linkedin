@@ -1,8 +1,8 @@
-import CrawlFB_Form from "@/components/nguyen/modules/crawldFB/components/crawlFB_form";
+import CombinedCrawlForm from "@/components/nguyen/modules/crawldFB/components/CombinedCrawlForm";
 export default function CrawlFacebookPage() {
     return (
-        <div className="min-h-screen w-full flex items-center justify-center bg-slate-100 p-6 relative">
-            <CrawlFB_Form/>
-      </div>
+        <div className="min-h-screen w-full flex items-center justify-center bg-surface p-6 relative">
+            <CombinedCrawlForm />
+        </div>
     );
-}
+}

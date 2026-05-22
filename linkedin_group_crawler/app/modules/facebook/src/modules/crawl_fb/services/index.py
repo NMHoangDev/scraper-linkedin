@@ -119,4 +119,36 @@ class CrawlService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Không thể đọc dữ liệu từ Google Sheets: {str(e)}"
             )
+
+    async def update_group(self, group_url: str, update_data: dict):
+        """
+        Cập nhật thông tin Group Facebook trong Google Sheets
+        
+        Args:
+            group_url: URL của group cần cập nhật
+            update_data: Dict chứa các trường cần cập nhật
+        
+        Returns:
+            Dict với status và message
+        """
+        try:
+            # Cập nhật group trong Google Sheets
+            result = await run_in_threadpool(
+                self.group_sheet.update_group_metrics, 
+                group_url=group_url, 
+                update_data=update_data
+            )
+            
+            return {
+                "status": "success",
+                "message": "Cập nhật group thành công.",
+                "data": result
+            }
+        
+        except Exception as e:
+            logger.error(f"Lỗi khi cập nhật group: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Không thể cập nhật group: {str(e)}"
+            )
         

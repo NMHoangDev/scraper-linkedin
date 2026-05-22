@@ -191,140 +191,148 @@ export function SessionPostDetailModal({
     <Fragment>
       <ModalOverlay onClose={onClose}>
         <div
-          className="border-outline-variant bg-surface relative z-10 flex max-h-[min(92vh,800px)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border shadow-2xl"
+          className="border-outline-variant bg-surface relative z-10 flex max-h-[min(92vh,800px)] w-full max-w-2xl flex-col rounded-2xl border shadow-2xl overflow-hidden"
           role="dialog"
           aria-modal="true"
           aria-labelledby="post-detail-title"
         >
-          <header className="border-outline-variant shrink-0 border-b px-lg pb-md pt-lg">
-            <div className="flex items-start justify-between gap-md">
-              <div className="min-w-0 flex-1">
-                <span className="bg-primary/10 text-primary inline-flex rounded-full px-sm py-0.5 text-[11px] font-bold uppercase tracking-wide">
-                  Chi tiết bài viết
-                </span>
-                <h3
-                  id="post-detail-title"
-                  className="text-h3 text-on-surface mt-2 font-semibold leading-snug"
-                >
-                  {title}
-                </h3>
-                {author ? (
-                  <p className="text-body-sm text-on-surface-variant mt-1">
-                    <span className="text-on-surface font-medium">{author}</span>
-                    {groupName ? (
-                      <>
-                        <span className="mx-1">·</span>
-                        <span>{groupName}</span>
-                      </>
-                    ) : null}
-                  </p>
-                ) : null}
-                <div className="mt-3 flex flex-wrap gap-sm">
-                  <span className="border-outline-variant bg-surface-container-low inline-flex min-h-[28px] items-center rounded-full border px-md py-1 text-xs font-semibold">
-                    <SheetInteractionStatus post={post} variant="chip" />
-                  </span>
-                  <span className="border-outline-variant bg-surface-container-low inline-flex min-h-[28px] items-center rounded-full border px-md py-1 text-xs font-semibold">
-                    <SheetCommentStatus post={post} variant="chip" />
-                  </span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="text-on-surface-variant hover:text-on-surface hover:bg-surface-container shrink-0 rounded-lg p-2 transition-colors"
-                aria-label="Đóng"
-              >
-                <MaterialIcon name="close" className="text-[22px]" />
-              </button>
-            </div>
+          {/* Nút đóng cố định góc trên phải — luôn hiển thị dù scroll */}
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-on-surface-variant hover:text-on-surface hover:bg-surface-container absolute top-md right-md z-10 shrink-0 rounded-lg p-2 transition-colors"
+            aria-label="Đóng"
+          >
+            <MaterialIcon name="close" className="text-[22px]" />
+          </button>
 
-            <div className="border-outline-variant bg-surface-container-low/60 mt-md grid grid-cols-2 gap-sm rounded-xl border p-md sm:grid-cols-4">
-              <StatPill icon="thumb_up" value={likes} label="thích" />
-              <StatPill icon="comment" value={comments} label="bình luận" />
-              <StatPill icon="trending_up" value={score} label="điểm" />
-              <DateStatCell dayRaw={dayRaw} postedAt={postedAt} />
-            </div>
-
-            <div className="mt-md flex flex-wrap gap-sm">
-              {groupUrl && /^https?:\/\//i.test(groupUrl) ? (
-                <ExternalActionLink href={groupUrl} icon="group">
-                  Nhóm LinkedIn
-                </ExternalActionLink>
-              ) : null}
-              {canOpenPost ? (
-                <ExternalActionLink href={postUrl} icon="visibility">
-                  Xem bài
-                </ExternalActionLink>
-              ) : null}
-              <button
-                type="button"
-                className="bg-primary text-on-primary hover:bg-primary/90 inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-md py-sm text-sm font-bold disabled:opacity-50 sm:flex-none"
-                onClick={() => void runSyncProgress()}
-                disabled={syncBusy || !canOpenPost}
-              >
-                <MaterialIcon
-                  name="sync"
-                  className={`text-[20px] ${syncBusy ? "animate-spin" : ""}`}
-                />
-                {syncBusy ? "Đang làm mới…" : "Làm mới tiến độ"}
-              </button>
-            </div>
-
-            {syncErr ? (
-              <p className="text-error mt-3 text-xs font-medium">{syncErr}</p>
-            ) : null}
-          </header>
-
-          <div className="min-h-0 flex-1 overflow-y-auto px-lg py-md">
-            <section className="border-outline-variant/80 bg-surface-container-low/40 rounded-xl border p-md">
-              <h4 className="text-label-md text-on-surface-variant mb-2 font-semibold uppercase tracking-wide">
-                Nội dung
-              </h4>
-              {content ? (
-                <p className="text-body-md text-on-surface leading-relaxed whitespace-pre-wrap">
-                  {content}
-                </p>
-              ) : (
-                <p className="text-body-sm text-on-surface-variant italic">
-                  Không có nội dung văn bản trong dữ liệu crawl.
-                </p>
-              )}
-            </section>
-
-            {existingComments.length > 0 ? (
-              <section className="border-outline-variant/80 bg-surface-container-low/40 mt-md rounded-xl border p-md">
-                <h4 className="text-label-md text-on-surface-variant mb-3 flex items-center gap-2 font-semibold uppercase tracking-wide">
-                  <MaterialIcon name="comment" className="text-[16px]" />
-                  Bình luận đã ghi nhận ({existingComments.length})
-                </h4>
-                <ul className="max-h-48 space-y-2 overflow-y-auto">
-                  {existingComments.map((c, i) => (
-                    <li
-                      key={`${appCommentDay(c)}-${i}`}
-                      className="border-outline-variant/50 rounded-lg border bg-black/[0.02] px-md py-sm dark:bg-white/[0.03]"
-                    >
-                      <span className="text-on-surface-variant font-mono text-[10px]">
-                        {formatDayVi(appCommentDay(c))}
-                      </span>
-                      <p className="text-on-surface text-body-sm mt-1 whitespace-pre-wrap">
-                        {appCommentContent(c)}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-                <p className="text-on-surface-variant mt-3 text-[11px]">
-                  Chỉ xem — tương tác trên app đã tắt. Dùng «Làm mới tiến độ» để cập nhật từ LinkedIn.
-                </p>
-              </section>
-            ) : null}
-
-            <p className="text-on-surface-variant mt-lg text-center text-[11px]">
-              Phiên{" "}
-              <span className="font-mono" title={session.id_session_crawl}>
-                {shortenSessionId(session.id_session_crawl)}
+          {/* Toàn bộ nội dung scroll chung một vùng */}
+          <div className="overflow-y-auto flex-1 min-h-0">
+            {/* Header info */}
+            <div className="px-lg pb-md pt-lg pr-14">
+              <span className="bg-primary/10 text-primary inline-flex rounded-full px-sm py-0.5 text-[11px] font-bold uppercase tracking-wide">
+                Chi tiết bài viết
               </span>
-              {session.email_crawl ? <> · {session.email_crawl}</> : null}
-            </p>
+              <h3
+                id="post-detail-title"
+                className="text-h3 text-on-surface mt-2 font-semibold leading-snug"
+              >
+                {title}
+              </h3>
+              {author ? (
+                <p className="text-body-sm text-on-surface-variant mt-1">
+                  <span className="text-on-surface font-medium">{author}</span>
+                  {groupName ? (
+                    <>
+                      <span className="mx-1">·</span>
+                      <span>{groupName}</span>
+                    </>
+                  ) : null}
+                </p>
+              ) : null}
+              <div className="mt-3 flex flex-wrap gap-sm">
+                <span className="border-outline-variant bg-surface-container-low inline-flex min-h-[28px] items-center rounded-full border px-md py-1 text-xs font-semibold">
+                  <SheetInteractionStatus post={post} variant="chip" />
+                </span>
+                <span className="border-outline-variant bg-surface-container-low inline-flex min-h-[28px] items-center rounded-full border px-md py-1 text-xs font-semibold">
+                  <SheetCommentStatus post={post} variant="chip" />
+                </span>
+              </div>
+
+              {/* Stats grid */}
+              <div className="border-outline-variant bg-surface-container-low/60 mt-md grid grid-cols-2 gap-sm rounded-xl border p-md sm:grid-cols-4">
+                <StatPill icon="thumb_up" value={likes} label="thích" />
+                <StatPill icon="comment" value={comments} label="bình luận" />
+                <StatPill icon="trending_up" value={score} label="điểm" />
+                <DateStatCell dayRaw={dayRaw} postedAt={postedAt} />
+              </div>
+
+              {/* Action buttons */}
+              <div className="mt-md flex flex-wrap gap-sm">
+                {groupUrl && /^https?:\/\//i.test(groupUrl) ? (
+                  <ExternalActionLink href={groupUrl} icon="group">
+                    Nhóm LinkedIn
+                  </ExternalActionLink>
+                ) : null}
+                {canOpenPost ? (
+                  <ExternalActionLink href={postUrl} icon="visibility">
+                    Xem bài
+                  </ExternalActionLink>
+                ) : null}
+                <button
+                  type="button"
+                  className="bg-primary text-on-primary hover:bg-primary/90 inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-md py-sm text-sm font-bold disabled:opacity-50 sm:flex-none"
+                  onClick={() => void runSyncProgress()}
+                  disabled={syncBusy || !canOpenPost}
+                >
+                  <MaterialIcon
+                    name="sync"
+                    className={`text-[20px] ${syncBusy ? "animate-spin" : ""}`}
+                  />
+                  {syncBusy ? "Đang làm mới…" : "Làm mới tiến độ"}
+                </button>
+              </div>
+
+              {syncErr ? (
+                <p className="text-error mt-3 text-xs font-medium">{syncErr}</p>
+              ) : null}
+            </div>
+
+            {/* Divider */}
+            <div className="border-outline-variant border-t mx-lg" />
+
+            {/* Body: nội dung + bình luận */}
+            <div className="px-lg py-md">
+              <section className="border-outline-variant/80 bg-surface-container-low/40 rounded-xl border p-md">
+                <h4 className="text-label-md text-on-surface-variant mb-2 font-semibold uppercase tracking-wide">
+                  Nội dung
+                </h4>
+                {content ? (
+                  <p className="text-body-md text-on-surface leading-relaxed whitespace-pre-wrap">
+                    {content}
+                  </p>
+                ) : (
+                  <p className="text-body-sm text-on-surface-variant italic">
+                    Không có nội dung văn bản trong dữ liệu crawl.
+                  </p>
+                )}
+              </section>
+
+              {existingComments.length > 0 ? (
+                <section className="border-outline-variant/80 bg-surface-container-low/40 mt-md rounded-xl border p-md">
+                  <h4 className="text-label-md text-on-surface-variant mb-3 flex items-center gap-2 font-semibold uppercase tracking-wide">
+                    <MaterialIcon name="comment" className="text-[16px]" />
+                    Bình luận đã ghi nhận ({existingComments.length})
+                  </h4>
+                  <ul className="space-y-2">
+                    {existingComments.map((c, i) => (
+                      <li
+                        key={`${appCommentDay(c)}-${i}`}
+                        className="border-outline-variant/50 rounded-lg border bg-black/[0.02] px-md py-sm dark:bg-white/[0.03]"
+                      >
+                        <span className="text-on-surface-variant font-mono text-[10px]">
+                          {formatDayVi(appCommentDay(c))}
+                        </span>
+                        <p className="text-on-surface text-body-sm mt-1 whitespace-pre-wrap">
+                          {appCommentContent(c)}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-on-surface-variant mt-3 text-[11px]">
+                    Chỉ xem — tương tác trên app đã tắt. Dùng «Làm mới tiến độ» để cập nhật từ LinkedIn.
+                  </p>
+                </section>
+              ) : null}
+
+              <p className="text-on-surface-variant mt-lg text-center text-[11px]">
+                Phiên{" "}
+                <span className="font-mono" title={session.id_session_crawl}>
+                  {shortenSessionId(session.id_session_crawl)}
+                </span>
+                {session.email_crawl ? <> · {session.email_crawl}</> : null}
+              </p>
+            </div>
           </div>
         </div>
       </ModalOverlay>
