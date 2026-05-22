@@ -486,6 +486,30 @@ async def update_group_api(
             detail=f"Lỗi cập nhật group: {str(e)}"
         )
 
+@crawl_fb_router.delete("/groups/delete", status_code=status.HTTP_200_OK)
+async def delete_group_api(
+    group_url: str,
+    service: CrawlService = Depends(get_crawl_service)
+):
+    """
+    Endpoint xóa Group Facebook
+    """
+    try:
+        result = await service.delete_group(group_url=group_url)
+        return {
+            "success": True,
+            "message": result.get("message", "Xóa thành công"),
+            "data": result.get("data")
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Lỗi xóa group: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi xóa group: {str(e)}"
+        )
+
 
 
 
