@@ -31,7 +31,7 @@ export function useUpdateGroup(
 
       try {
         const response = await axiosClient.put(
-          `/api/v1/CrawlDataGroupFB/groups/update?group_url=${encodeURIComponent(group_url)}`,
+          `/api/v1/groups/update?group_url=${encodeURIComponent(group_url)}`,
           updateData,
         );
         return response.data;
