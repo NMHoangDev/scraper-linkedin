@@ -6,6 +6,7 @@ import { FaFacebook, FaLinkedin } from "react-icons/fa";
 import { useGetPresetGroups } from "../hooks/useGetPresetGroups";
 import CreateGroupModal from "./CreateGroup_form";
 import { UpdateGroupModal } from "./UpdateGroupModal";
+import { useDeleteGroup } from "../hooks/useDeleteGroup";
 
 import { FacebookGroupDTO } from "../types/dataFb.type";
 
@@ -49,6 +50,23 @@ export function DashboardGroups() {
 
   const { presetGroups, isLoadingGroups, errorGroups, fetchPresetGroups } =
     useGetPresetGroups();
+
+  const { deleteGroup, isDeleting } = useDeleteGroup({
+    onSuccess: () => {
+      fetchPresetGroups();
+    }
+  });
+
+  const handleDelete = async (url: string) => {
+    if (window.confirm("Bạn có chắc chắn muốn xóa group này? Hành động này không thể hoàn tác.")) {
+      try {
+        await deleteGroup({ group_url: url });
+        alert("Xóa group thành công");
+      } catch (err) {
+        alert("Có lỗi xảy ra khi xóa group");
+      }
+    }
+  };
 
   useEffect(() => {
     fetchPresetGroups();
@@ -444,8 +462,16 @@ export function DashboardGroups() {
                                 setIsUpdateModalOpen(true);
                               }}
                               className="px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 font-medium rounded-lg text-xs border border-blue-200 transition"
+                              disabled={isDeleting}
                             >
                               ✏️ Sửa
+                            </button>
+                            <button
+                              onClick={() => handleDelete(group.url)}
+                              className="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 font-medium rounded-lg text-xs border border-red-200 transition"
+                              disabled={isDeleting}
+                            >
+                              🗑️ Xóa
                             </button>
                             <button
                               onClick={() => window.open(group.url, "_blank")}
