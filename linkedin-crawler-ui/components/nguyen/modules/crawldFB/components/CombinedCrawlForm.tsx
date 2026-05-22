@@ -445,7 +445,7 @@ function FacebookForm() {
 export default function CombinedCrawlForm() {
   const [activeTab, setActiveTab] = useState<Tab>("facebook");
 
-  const tabs: { key: Tab; label: string; icon: string }[] = [
+  const tabs: { key: Tab; label: string; icon: any }[] = [
     { key: "facebook", label: "Facebook", icon: "groups" },
     { key: "linkedin", label: "LinkedIn", icon: "business_center" },
   ];
@@ -455,7 +455,7 @@ export default function CombinedCrawlForm() {
       <div className="border-outline-variant bg-surface-container-lowest flex flex-col gap-md rounded-xl border p-lg shadow-sm">
         {/* Header */}
         <div className="border-surface-variant mb-sm flex items-center gap-2 border-b pb-md">
-          <MaterialIcon name="cloud_download" className="shrink-0 text-primary" />
+          <MaterialIcon name={"cloud_download" as any} className="shrink-0 text-primary" />
           <h2 className="text-h3 font-semibold">Thu thập dữ liệu</h2>
           <span className="text-body-sm text-on-surface-variant ml-1">— LinkedIn &amp; Facebook</span>
         </div>
