@@ -268,6 +268,11 @@ class CrawlGroupRequest(BaseModel):
         description="Target date in YYYY-MM-DD format.",
         validation_alias=AliasChoices("target_date", "targetDate"),
     )
+    crawler_type: Literal["auto", "playwright", "apify"] = Field(
+        default="auto",
+        description="Crawler tier mode. Use 'apify' to test Apify only and skip Playwright.",
+        validation_alias=AliasChoices("crawler_type", "crawlerType", "mode"),
+    )
     fallback_recent_count: int = Field(
         default=20,
         ge=1,

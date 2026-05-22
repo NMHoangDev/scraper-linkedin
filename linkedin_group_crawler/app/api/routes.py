@@ -1244,7 +1244,7 @@ async def crawl_linkedin_group(payload: CrawlGroupRequest) -> CrawlResponse:
 
     try:
         tiered = await crawl_group_with_tiers(
-            mode="auto",
+            mode=payload.crawler_type,
             session_id=payload.session_id,
             email=payload.email,
             group_url=payload.group_url,
