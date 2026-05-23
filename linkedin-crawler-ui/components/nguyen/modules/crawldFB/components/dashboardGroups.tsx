@@ -6,8 +6,34 @@ import { FaFacebook, FaLinkedin } from "react-icons/fa";
 import { useGetPresetGroups } from "../hooks/useGetPresetGroups";
 import CreateGroupModal from "./CreateGroup_form";
 import { UpdateGroupModal } from "./UpdateGroupModal";
+import { useAppPlatform } from "@/components/providers/AppPlatformProvider";
+import { useDashboard } from "@/components/features/dashboard/dashboard-context";
+import { submitSharedDeleteGroup } from "@/lib/group-platform-api";
+import {
+  PlatformStatCard,
+  PlatformStatsRow,
+} from "@/components/features/shared/PlatformStatCard";
+import { FilterChipBar } from "@/components/features/shared/FilterChipBar";
+import { MaterialIcon } from "@/components/ui";
+import {
+  INDUSTRY_OPTIONS,
+  TEAM_OPTIONS,
+  TIER_OPTIONS,
+  detectPlatformFromUrl,
+  formatRelativeCrawl,
+} from "@/lib/group-taxonomy";
+import type { AppPlatform } from "@/lib/app-platform";
 
 import { FacebookGroupDTO } from "../types/dataFb.type";
+
+function teamOrIcpToArray(value?: string[] | string): string[] {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  return value
+    .split(/[,;]/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+}
 
 const parseBackendDate = (dateInput?: string | Date | null): Date | null => {
   if (!dateInput) return null;
@@ -32,11 +58,20 @@ const isWithinLastWeek = (dateInput?: string | Date | null) => {
   return diffDays <= 7; // Trong vòng 1 tuần
 };
 
-export function DashboardGroups() {
+export function DashboardGroups({
+  forcedPlatform = null,
+}: {
+  forcedPlatform?: AppPlatform | null;
+}) {
+  const { platform } = useAppPlatform();
+  const d = useDashboard();
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [platformFilter, setPlatformFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [intentFilter, setIntentFilter] = useState<string>("all");
+  const [industryFilter, setIndustryFilter] = useState<string>("all");
+  const [teamFilter, setTeamFilter] = useState<string>("all");
+  const [tierFilter, setTierFilter] = useState<string>("all");
 
   // State phân trang
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -50,36 +85,151 @@ export function DashboardGroups() {
   const { presetGroups, isLoadingGroups, errorGroups, fetchPresetGroups } =
     useGetPresetGroups();
 
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async (group: FacebookGroupDTO) => {
+    if (
+      !window.confirm(
+        "Bạn có chắc chắn muốn xóa group này? Hành động này không thể hoàn tác.",
+      )
+    ) {
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      const res = await submitSharedDeleteGroup(group, d.email);
+      if (res.ok) {
+        alert(res.message || "Xóa group thành công");
+        void fetchPresetGroups(d.email);
+      } else {
+        alert(res.message || "Có lỗi xảy ra khi xóa group");
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Có lỗi xảy ra khi xóa group");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   useEffect(() => {
-    fetchPresetGroups();
-  }, [fetchPresetGroups]);
+    void fetchPresetGroups(d.email);
+  }, [fetchPresetGroups, d.email, d.dashboardReloadToken]);
+
+  // Tự động set platformFilter theo platform của workspace khi mount / thay đổi workspace
+  useEffect(() => {
+    if (forcedPlatform === "facebook" || forcedPlatform === "linkedin") {
+      setPlatformFilter(forcedPlatform);
+      return;
+    }
+    if (platform === "facebook") setPlatformFilter("facebook");
+    else if (platform === "linkedin") setPlatformFilter("linkedin");
+    else setPlatformFilter("all");
+  }, [platform, forcedPlatform]);
 
   // Reset về trang 1 khi các tiêu chí lọc thay đổi
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, platformFilter, statusFilter, intentFilter]);
+  }, [
+    searchTerm,
+    platformFilter,
+    statusFilter,
+    intentFilter,
+    industryFilter,
+    teamFilter,
+    tierFilter,
+  ]);
 
   // ==========================================
   // 1. TÍNH TOÁN CÁC CHỈ SỐ THỐNG KÊ (SUMMARY CARDS)
   // ==========================================
-  const totalPostsIn3Weeks = presetGroups
-    .filter((g) => isWithinLastWeek(g.date_crawl))
-    .reduce((sum, g) => sum + (g.posts_per_week || 0), 0);
-  const activeGroups = presetGroups.filter((g) => g.status === "ACTIVE").length;
-  const totalPostsPerWeek = presetGroups.reduce(
+  const scopeGroups = presetGroups.filter((g) => {
+    const p = g.platform || detectPlatformFromUrl(g.url);
+    if (forcedPlatform && p !== forcedPlatform) return false;
+    if (platformFilter !== "all" && p !== platformFilter) return false;
+    return true;
+  });
+
+  const totalGroups = scopeGroups.length;
+  const activeGroups = scopeGroups.filter((g) => g.status === "ACTIVE").length;
+  const totalPostsPerWeek = scopeGroups.reduce(
     (sum, g) => sum + (g.posts_per_week || 0),
     0,
   );
-  const deadGroupsCount = presetGroups.filter(
-    (g) => g.status === "DEAD",
+  const needCheckCount = scopeGroups.filter(
+    (g) =>
+      g.status === "DEAD" ||
+      teamOrIcpToArray(g.team).length === 0 ||
+      !g.industry,
   ).length;
 
   // ==========================================
   // 2. HELPERS RENDER GIAO DIỆN
   // ==========================================
   const detectPlatform = (url: string) => {
-    if (url.includes("linkedin.com")) return "LinkedIn";
-    return "Facebook";
+    const p = detectPlatformFromUrl(url);
+    return p === "linkedin" ? "LinkedIn" : "Facebook";
+  };
+
+  const renderTaxonomyTags = (group: FacebookGroupDTO) => {
+    const tags: React.ReactNode[] = [];
+    if (group.industry) {
+      tags.push(
+        <span
+          key="ind"
+          className="rounded bg-blue-100 px-1.5 py-0.5 text-[9px] font-bold text-blue-800"
+        >
+          {group.industry}
+        </span>,
+      );
+    }
+    teamOrIcpToArray(group.team).forEach((t) =>
+      tags.push(
+        <span
+          key={`team-${t}`}
+          className="rounded bg-green-100 px-1.5 py-0.5 text-[9px] font-bold text-green-800"
+        >
+          {t}
+        </span>,
+      ),
+    );
+    if (group.tier === 1)
+      tags.push(
+        <span key="tier-1" className="rounded bg-red-100 px-1.5 py-0.5 text-[9px] font-bold text-red-800">
+          🔥 Tier 1
+        </span>,
+      );
+    else if (group.tier === 2)
+      tags.push(
+        <span key="tier-2" className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-900">
+          ⚡ Tier 2
+        </span>,
+      );
+    else if (group.tier === 3)
+      tags.push(
+        <span key="tier-3" className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-600">
+          Tier 3
+        </span>,
+      );
+    teamOrIcpToArray(group.icp)
+      .slice(0, 2)
+      .forEach((t) =>
+        tags.push(
+          <span
+            key={`icp-${t}`}
+            className="rounded bg-violet-100 px-1.5 py-0.5 text-[9px] font-bold text-violet-800"
+          >
+            {t}
+          </span>,
+        ),
+      );
+    if (tags.length === 0) {
+      return (
+        <span className="text-on-surface-variant text-[10px] italic">
+          Chưa phân loại
+        </span>
+      );
+    }
+    return <div className="flex max-w-[180px] flex-wrap gap-1">{tags}</div>;
   };
 
   const renderPlatformIcon = (platform: string) => {
@@ -176,8 +326,26 @@ export function DashboardGroups() {
     const matchIntent =
       intentFilter === "all" ||
       (group.intent || "").toLowerCase() === intentFilter.toLowerCase();
+    const matchIndustry =
+      industryFilter === "all" ||
+      (group.industry || "").toLowerCase() === industryFilter.toLowerCase();
+    const matchTeam =
+      teamFilter === "all" ||
+      teamOrIcpToArray(group.team).some(
+        (t) => t.toLowerCase() === teamFilter.toLowerCase(),
+      );
+    const matchTier =
+      tierFilter === "all" || String(group.tier ?? "") === tierFilter;
 
-    return matchSearch && matchPlatform && matchStatus && matchIntent;
+    return (
+      matchSearch &&
+      matchPlatform &&
+      matchStatus &&
+      matchIntent &&
+      matchIndustry &&
+      matchTeam &&
+      matchTier
+    );
   });
 
   // Tính toán tổng số trang
@@ -225,87 +393,119 @@ export function DashboardGroups() {
     end: endPage,
   } = getPaginationNumbers();
 
-  return (
-    <div className="w-full max-w-7xl mx-auto p-6 bg-slate-50/50 min-h-screen font-sans">
-      {/* THỐNG KÊ TỔNG QUAN */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 border-l-4 border-l-violet-500">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-            Tổng Groups
-          </p>
-          <h3 className="text-3xl font-black text-slate-800 mt-1">
-            {totalPostsIn3Weeks}
-          </h3>
-          <p className="text-xs text-emerald-600 font-medium mt-2">
-            ↑ tuần này
-          </p>
-        </div>
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 border-l-4 border-l-emerald-500">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-            Đang Sống
-          </p>
-          <h3 className="text-3xl font-black text-slate-800 mt-1">
-            {activeGroups}
-          </h3>
-          <p className="text-xs text-emerald-600 font-medium mt-2">
-            ↑ 2 tuần trước
-          </p>
-        </div>
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 border-l-4 border-l-amber-500">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-            Post mới / Tuần
-          </p>
-          <h3 className="text-3xl font-black text-slate-800 mt-1">
-            {totalPostsPerWeek}
-          </h3>
-          <p className="text-xs text-emerald-600 font-medium mt-2">↑ </p>
-        </div>
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-100 border-l-4 border-l-rose-500">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-            Cần Check
-          </p>
-          <h3 className="text-3xl font-black text-slate-800 mt-1">
-            {deadGroupsCount}
-          </h3>
-          <p className="text-xs text-rose-500 font-medium mt-2">↑ 1 hôm nay</p>
-        </div>
-      </div>
+  const industryChips = [
+    { id: "all", label: "Tất cả" },
+    ...INDUSTRY_OPTIONS.map((o) => ({
+      id: o.value.toLowerCase(),
+      label: o.label,
+    })),
+  ];
+  const teamChips = [
+    { id: "all", label: "Tất cả" },
+    ...TEAM_OPTIONS.map((t) => ({ id: t.toLowerCase(), label: t })),
+  ];
+  const tierChips = [
+    { id: "all", label: "Tất cả" },
+    ...TIER_OPTIONS.map((t) => ({
+      id: String(t.tier),
+      label: `${t.icon} ${t.title}`,
+    })),
+  ];
 
-      {/* BẢNG DANH SÁCH GROUPS */}
-      <div className="flex items-center justify-end mb-4">
+  return (
+    <div className="flex w-full flex-col gap-lg font-sans">
+      <PlatformStatsRow>
+        <PlatformStatCard
+          label="Tổng Groups"
+          value={totalGroups}
+          hint="Trong phạm vi lọc"
+          accent="primary"
+        />
+        <PlatformStatCard
+          label="Đang sống"
+          value={activeGroups}
+          hintTone="up"
+          accent="success"
+        />
+        <PlatformStatCard
+          label="Post mới / tuần"
+          value={totalPostsPerWeek}
+          accent="warning"
+        />
+        <PlatformStatCard
+          label="Cần check"
+          value={needCheckCount}
+          hint="Thiếu taxonomy hoặc DEAD"
+          hintTone="down"
+          accent="error"
+        />
+      </PlatformStatsRow>
+
+      <div className="flex items-center justify-end">
         <button
-          className="bg-violet-500 hover:bg-violet-600 text-white py-2 px-4 rounded-lg text-sm font-medium transition"
+          type="button"
+          className="bg-primary text-on-primary hover:bg-primary/90 inline-flex items-center gap-2 rounded-lg px-md py-sm text-sm font-bold transition"
           onClick={() => setIsCreateOpen(true)}
         >
-          + Thêm Group Mới
+          <MaterialIcon name="add" className="text-[18px]" />
+          Thêm Group Mới
         </button>
       </div>
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">
+
+      <div className="border-outline-variant bg-surface flex flex-col overflow-hidden rounded-xl border">
+        <div className="border-outline-variant bg-surface-container-low/50 space-y-sm border-b p-md">
+          <p className="text-on-surface-variant text-[10px] font-bold tracking-wide uppercase">
+            Lọc theo taxonomy
+          </p>
+          <FilterChipBar
+            label="Ngành"
+            options={industryChips}
+            activeId={industryFilter}
+            onChange={setIndustryFilter}
+          />
+          <FilterChipBar
+            label="Team"
+            options={teamChips}
+            activeId={teamFilter}
+            onChange={setTeamFilter}
+          />
+          <FilterChipBar
+            label="Tier"
+            options={tierChips}
+            activeId={tierFilter}
+            onChange={setTierFilter}
+          />
+          <p className="text-on-surface-variant text-[11px] pl-[78px]">
+            Hiển thị {filteredGroups.length} / {scopeGroups.length} groups
+          </p>
+        </div>
         {/* THANH TÌM KIẾM & BỘ LỌC */}
-        <div className="p-5 border-b border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4 bg-white">
-          <h2 className="text-base font-bold text-slate-800 self-start md:self-center">
+        <div className="border-outline-variant flex flex-col items-center justify-between gap-md border-b p-md md:flex-row">
+          <h2 className="text-label-md text-on-surface self-start font-bold md:self-center">
             Danh sách Groups
           </h2>
 
-          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            <div className="relative flex-1 md:w-60">
+          <div className="flex w-full flex-wrap items-center gap-sm md:w-auto">
+            <div className="relative min-w-[200px] flex-1 md:w-60">
               <input
                 type="text"
-                placeholder="🔍 Tìm group..."
+                placeholder="Tìm group..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-violet-500 transition"
+                className="border-outline-variant bg-surface-container-low focus:border-primary w-full rounded-lg border px-md py-sm text-xs outline-none"
               />
             </div>
-            <select
-              value={platformFilter}
-              onChange={(e) => setPlatformFilter(e.target.value)}
-              className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-600 outline-none focus:border-violet-500 cursor-pointer"
-            >
-              <option value="all">Tất cả platform</option>
-              <option value="facebook">Facebook</option>
-              <option value="linkedin">LinkedIn</option>
-            </select>
+            {!forcedPlatform ? (
+              <select
+                value={platformFilter}
+                onChange={(e) => setPlatformFilter(e.target.value)}
+                className="border-outline-variant bg-surface-container-low focus:border-primary rounded-lg border px-md py-sm text-xs outline-none"
+              >
+                <option value="all">Tất cả platform</option>
+                <option value="facebook">Facebook</option>
+                <option value="linkedin">LinkedIn</option>
+              </select>
+            ) : null}
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -345,11 +545,10 @@ export function DashboardGroups() {
               <tr>
                 <th className="py-3 px-5">Tên Group</th>
                 <th className="py-3 px-4">Platform</th>
+                <th className="py-3 px-4">Taxonomy</th>
                 <th className="py-3 px-4">Thành viên</th>
-                <th className="py-3 px-4">Post/Tuần</th>
-                <th className="py-3 px-4">Health Score</th>
                 <th className="py-3 px-4">Trạng thái</th>
-                <th className="py-3 px-4">Crawl gần nhất</th>
+                <th className="py-3 px-4">Intent</th>
                 <th className="py-3 px-5 text-center">Hành động</th>
               </tr>
             </thead>
@@ -374,13 +573,13 @@ export function DashboardGroups() {
                   </td>
                 </tr>
               ) : (
-                paginatedGroups.map((group, index) => {
+                paginatedGroups.map((group) => {
                   const platform = detectPlatform(group.url);
                   const isDead = group.status === "DEAD";
 
                   return (
                     <tr
-                      key={index}
+                      key={group.url}
                       className="hover:bg-slate-50/50 transition duration-150"
                     >
                       <td className="py-4 px-5 max-w-[250px]">
@@ -406,52 +605,62 @@ export function DashboardGroups() {
                           <span>{platform}</span>
                         </div>
                       </td>
+                      <td className="py-4 px-4">{renderTaxonomyTags(group)}</td>
                       <td className="py-4 px-4 font-medium text-slate-700">
                         {group.members?.toLocaleString() || "0"}
-                      </td>
-                      <td className="py-4 px-4 font-medium text-slate-700">
-                        {group.posts_per_week?.toLocaleString() || "0"}
-                      </td>
-                      <td className="py-4 px-4">
-                        {renderHealthScore(
-                          group.health_score || 0,
-                          group.status,
-                        )}
                       </td>
                       <td className="py-4 px-4">
                         {renderStatusBadge(group.status)}
                       </td>
-                      <td className="py-4 px-4 text-slate-600">
-                        {group.last_crawl || (
-                          <span className="italic text-slate-400">
-                            Chưa crawl
-                          </span>
-                        )}
+                      <td className="py-4 px-4">
+                        <span className="font-medium text-slate-700">
+                          {group.intent || (
+                            <span className="italic text-slate-400">-</span>
+                          )}
+                        </span>
                       </td>
-                      <td className="py-4 px-5 text-center">
+
+                      <td className="py-4 px-5">
                         {isDead ? (
-                          <button
-                            disabled
-                            className="px-3 py-1.5 bg-rose-50 text-rose-500 font-medium rounded-lg text-xs border border-rose-100 cursor-not-allowed"
-                          >
+                          <span className="text-slate-400 text-xs italic">
                             Vô hiệu
-                          </button>
+                          </span>
                         ) : (
-                          <div className="flex items-center justify-center gap-2">
+                          <div className="flex items-center justify-center gap-1">
                             <button
                               onClick={() => {
                                 setSelectedGroupForUpdate(group);
                                 setIsUpdateModalOpen(true);
                               }}
-                              className="px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 font-medium rounded-lg text-xs border border-blue-200 transition"
+                              title="Sửa group"
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md transition"
+                              disabled={isDeleting}
                             >
-                              ✏️ Sửa
+                              <MaterialIcon
+                                name="edit"
+                                className="text-[16px]"
+                              />
+                            </button>
+                            <button
+                              onClick={() => void handleDelete(group)}
+                              title="Xóa group"
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition"
+                              disabled={isDeleting}
+                            >
+                              <MaterialIcon
+                                name="delete"
+                                className="text-[16px]"
+                              />
                             </button>
                             <button
                               onClick={() => window.open(group.url, "_blank")}
-                              className="px-3 py-1.5 bg-white text-violet-600 hover:bg-violet-50 font-medium rounded-lg text-xs border border-violet-200 transition"
+                              title="Xem group trên nền tảng"
+                              className="p-1.5 text-violet-600 hover:bg-violet-50 rounded-md transition"
                             >
-                              Xem Group
+                              <MaterialIcon
+                                name="open_in_new"
+                                className="text-[16px]"
+                              />
                             </button>
                           </div>
                         )}
@@ -564,7 +773,7 @@ export function DashboardGroups() {
         }}
         group={selectedGroupForUpdate}
         onSuccess={() => {
-          fetchPresetGroups();
+          void fetchPresetGroups(d.email);
         }}
       />
     </div>

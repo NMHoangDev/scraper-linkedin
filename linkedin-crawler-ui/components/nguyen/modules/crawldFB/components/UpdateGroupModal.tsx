@@ -9,7 +9,9 @@ import { FacebookGroupDTO } from "../types/dataFb.type";
 import { useUpdateGroup } from "../hooks/useUpdateGroup";
 import { useGetIntents } from "../hooks/useGetIntents";
 import { MaterialIcon } from "@/components/ui";
-
+import { GroupTaxonomyFields } from "@/components/features/shared/GroupTaxonomyFields";
+import { LINKEDIN_GROUP_TYPE_OPTIONS } from "@/lib/group-form-shared";
+import { detectPlatformFromUrl } from "@/lib/group-taxonomy";
 
 // Schema validation
 const UpdateGroupSchema = z.object({
@@ -17,9 +19,12 @@ const UpdateGroupSchema = z.object({
   url: z.string().url("URL không hợp lệ"),
   intent: z.string().optional(),
   members: z.number().optional(),
-  posts_per_week: z.number().optional(),
-  health_score: z.number().min(0).max(100).optional(),
   status: z.enum(["ACTIVE", "IDLE", "DEAD"]).optional(),
+  industry: z.string().optional(),
+  tier: z.number().optional(),
+  team: z.string().optional(),
+  icp: z.string().optional(),
+  icp_desc: z.string().optional(),
 });
 
 type UpdateGroupFormData = z.infer<typeof UpdateGroupSchema>;
@@ -38,7 +43,9 @@ export function UpdateGroupModal({
   onSuccess,
 }: UpdateGroupModalProps) {
   const { intents, fetchIntents } = useGetIntents();
-  
+  const [intentOption, setIntentOption] = useState("");
+  const [intentCustom, setIntentCustom] = useState("");
+
   // Fetch dữ liệu Intents khi load trang giống CreateGroupModal
   useEffect(() => {
     if (isOpen) {
@@ -60,6 +67,7 @@ export function UpdateGroupModal({
     reset: formReset,
     formState: { errors },
     setValue,
+    watch,
   } = useForm<UpdateGroupFormData>({
     resolver: zodResolver(UpdateGroupSchema),
   });
@@ -71,20 +79,78 @@ export function UpdateGroupModal({
       setValue("url", group.url || "");
       setValue("intent", group.intent || "");
       setValue("members", group.members || undefined);
-      setValue("posts_per_week", group.posts_per_week || undefined);
-      setValue("health_score", group.health_score || undefined);
       setValue("status", group.status || "ACTIVE");
+      setValue("industry", group.industry || "");
+      const tierNum =
+        typeof group.tier === "number" && group.tier >= 1 && group.tier <= 3
+          ? group.tier
+          : undefined;
+      if (tierNum != null) setValue("tier", tierNum);
+      else setValue("tier", undefined);
+      const teamStr = Array.isArray(group.team)
+        ? group.team.join(", ")
+        : typeof group.team === "string"
+          ? group.team
+          : "";
+      const icpStr = Array.isArray(group.icp)
+        ? group.icp.join(", ")
+        : typeof group.icp === "string"
+          ? group.icp
+          : "";
+      setValue("team", teamStr);
+      setValue("icp", icpStr);
+      setValue("icp_desc", group.icp_desc || "");
       setSuccessMessage("");
+
+      // Phân tích intent hiện tại có phải preset không để set state
+      const currentIntent = group.intent || "";
+      const isLinkedIn =
+        group.platform === "linkedin" ||
+        detectPlatformFromUrl(group.url) === "linkedin";
+      let isPreset = false;
+      if (isLinkedIn) {
+        isPreset = (LINKEDIN_GROUP_TYPE_OPTIONS as readonly string[]).includes(
+          currentIntent,
+        );
+      } else {
+        isPreset = (intents || []).some(
+          (item: { value: string }) => item.value === currentIntent,
+        );
+      }
+
+      if (currentIntent === "") {
+        setIntentOption("");
+        setIntentCustom("");
+      } else if (isPreset) {
+        setIntentOption(currentIntent);
+        setIntentCustom("");
+      } else {
+        setIntentOption("Khác");
+        setIntentCustom(currentIntent);
+      }
     }
-  }, [group, isOpen, setValue]);
+  }, [group, isOpen, setValue, intents]);
+
+  // Đồng bộ giá trị intent khi option hoặc custom text thay đổi
+  useEffect(() => {
+    if (intentOption === "Khác") {
+      setValue("intent", intentCustom.trim());
+    } else {
+      setValue("intent", intentOption);
+    }
+  }, [intentOption, intentCustom, setValue]);
 
   const onSubmit = async (data: UpdateGroupFormData) => {
     if (!group) return;
+    const finalIntent =
+      intentOption === "Khác" ? intentCustom.trim() : intentOption;
 
     updateGroup(
       {
         group_url: group.url,
+        _originalGroup: group,
         ...data,
+        intent: finalIntent,
       },
       {
         onSuccess: () => {
@@ -101,9 +167,22 @@ export function UpdateGroupModal({
 
   if (!isOpen || !group) return null;
 
+  const isLinkedIn =
+    group.platform === "linkedin" ||
+    detectPlatformFromUrl(group.url) === "linkedin";
+  const industry = watch("industry") ?? "";
+  const tier = watch("tier") ?? "";
+  const team = watch("team") ?? "";
+  const icp = watch("icp") ?? "";
+  const icp_desc = watch("icp_desc") ?? "";
+
   return (
     <div className="fixed inset-0 bg-black/45 backdrop-blur-[1px] flex items-center justify-center z-50 p-md overflow-y-auto">
-      <div className="bg-surface border border-outline-variant rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col my-auto relative" role="dialog" aria-modal="true">
+      <div
+        className="bg-surface border border-outline-variant rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col my-auto relative"
+        role="dialog"
+        aria-modal="true"
+      >
         {/* Nút đóng */}
         <button
           type="button"
@@ -120,14 +199,19 @@ export function UpdateGroupModal({
 
         {/* Header */}
         <div className="p-lg border-b border-outline-variant bg-surface-container-low shrink-0 pr-10">
-          <h3 className="text-h3 text-on-surface font-semibold">Cập nhật Group</h3>
+          <h3 className="text-h3 text-on-surface font-semibold">
+            Cập nhật Group
+          </h3>
           <p className="text-body-sm text-on-surface-variant mt-xs">
-            Chỉnh sửa thông tin nhóm Facebook
+            Chỉnh sửa thông tin nhóm {isLinkedIn ? "LinkedIn" : "Facebook"}
           </p>
         </div>
 
         {/* Form Body - Scrollable */}
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="flex flex-col flex-1 min-h-0"
+        >
           <div className="p-lg space-y-md overflow-y-auto flex-1">
             {/* Success Message */}
             {successMessage && (
@@ -146,6 +230,20 @@ export function UpdateGroupModal({
             <div className="grid md:grid-cols-3 gap-lg">
               {/* CỘT TRÁI: THÔNG TIN CHÍNH */}
               <div className="md:col-span-2 flex flex-col gap-base">
+                {/* Nền tảng (Platform) */}
+                <div>
+                  <label className="text-label-md text-on-surface-variant font-semibold uppercase">
+                    Nền tảng (Platform)
+                  </label>
+                  <input
+                    type="text"
+                    value={isLinkedIn ? "LinkedIn" : "Facebook"}
+                    className="w-full mt-1 px-md py-sm bg-surface-container-low border border-outline-variant text-on-surface-variant rounded-lg text-sm outline-none cursor-not-allowed"
+                    readOnly
+                    disabled
+                  />
+                </div>
+
                 {/* URL Group */}
                 <div>
                   <label className="text-label-md text-on-surface-variant font-semibold uppercase">
@@ -165,7 +263,9 @@ export function UpdateGroupModal({
                     />
                   </div>
                   {errors.url && (
-                    <p className="text-xs text-error font-medium mt-1">{errors.url.message}</p>
+                    <p className="text-xs text-error font-medium mt-1">
+                      {errors.url.message}
+                    </p>
                   )}
                 </div>
 
@@ -203,30 +303,74 @@ export function UpdateGroupModal({
                         <FaTags className="text-base" />
                       </div>
                       <select
-                        {...register("intent")}
+                        value={intentOption}
+                        onChange={(e) => setIntentOption(e.target.value)}
                         className="w-full pl-9 pr-md py-sm bg-surface border border-outline-variant text-on-surface rounded-lg text-sm outline-none focus:border-primary transition-colors appearance-none cursor-pointer"
                       >
                         <option value="">-- Chọn kịch bản --</option>
-                        {intents?.map((item: any, index: number) => (
-                          <option key={index} value={item.value}>{item.name}</option>
-                        ))}
+                        {isLinkedIn
+                          ? LINKEDIN_GROUP_TYPE_OPTIONS.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))
+                          : intents?.map(
+                              (
+                                item: { value: string; name: string },
+                                index: number,
+                              ) => (
+                                <option key={index} value={item.value}>
+                                  {item.name}
+                                </option>
+                              ),
+                            )}
+                        <option value="Khác">Khác (tự nhập)</option>
                       </select>
                     </div>
+                    {intentOption === "Khác" && (
+                      <input
+                        placeholder="Nhập mục đích (Intent) mới..."
+                        className="w-full mt-2 px-md py-sm bg-surface border border-outline-variant text-on-surface rounded-lg text-sm outline-none focus:border-primary transition-colors"
+                        value={intentCustom}
+                        onChange={(e) => setIntentCustom(e.target.value)}
+                        autoFocus
+                      />
+                    )}
                   </div>
 
-                  <div>
-                    <label className="text-label-md text-on-surface-variant font-semibold uppercase">
-                      Trạng thái
-                    </label>
-                    <select
-                      {...register("status")}
-                      className="w-full mt-1 px-md py-sm bg-surface border border-outline-variant text-on-surface rounded-lg text-sm outline-none focus:border-primary cursor-pointer transition-colors"
-                    >
-                      <option value="ACTIVE">Sống</option>
-                      <option value="IDLE">Ít HĐ</option>
-                      <option value="DEAD">Chết</option>
-                    </select>
-                  </div>
+                  {!isLinkedIn ? (
+                    <div>
+                      <label className="text-label-md text-on-surface-variant font-semibold uppercase">
+                        Trạng thái
+                      </label>
+                      <select
+                        {...register("status")}
+                        className="w-full mt-1 px-md py-sm bg-surface border border-outline-variant text-on-surface rounded-lg text-sm outline-none focus:border-primary cursor-pointer transition-colors"
+                      >
+                        <option value="ACTIVE">Sống</option>
+                        <option value="IDLE">Ít HĐ</option>
+                        <option value="DEAD">Chết</option>
+                      </select>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="border-outline-variant mt-xs border-t pt-base">
+                  <GroupTaxonomyFields
+                    industry={industry}
+                    tier={typeof tier === "number" ? tier : ""}
+                    team={team}
+                    icp={icp}
+                    icp_desc={icp_desc}
+                    onIndustryChange={(v) => setValue("industry", v)}
+                    onTierChange={(v) =>
+                      setValue("tier", v === "" ? undefined : v)
+                    }
+                    onTeamChange={(v) => setValue("team", v)}
+                    onIcpChange={(v) => setValue("icp", v)}
+                    onIcpDescChange={(v) => setValue("icp_desc", v)}
+                    disabled={isUpdating}
+                  />
                 </div>
               </div>
 
@@ -249,35 +393,6 @@ export function UpdateGroupModal({
                         className="mt-1 w-full px-md py-sm bg-surface border border-outline-variant text-on-surface rounded-lg text-sm outline-none focus:border-primary transition-colors"
                         placeholder="VD: 5000"
                       />
-                    </div>
-
-                    <div>
-                      <label className="text-label-md text-on-surface-variant font-semibold uppercase">
-                        Bài viết / Tuần
-                      </label>
-                      <input
-                        type="number"
-                        {...register("posts_per_week", { valueAsNumber: true })}
-                        className="mt-1 w-full px-md py-sm bg-surface border border-outline-variant text-on-surface rounded-lg text-sm outline-none focus:border-primary transition-colors"
-                        placeholder="VD: 50"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-label-md text-on-surface-variant font-semibold uppercase">
-                        Health Score (0-100)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        {...register("health_score", { valueAsNumber: true })}
-                        className="mt-1 w-full px-md py-sm bg-surface border border-outline-variant text-on-surface rounded-lg text-sm outline-none focus:border-primary transition-colors"
-                        placeholder="VD: 85"
-                      />
-                      {errors.health_score && (
-                        <p className="text-xs text-error font-medium mt-1">{errors.health_score.message}</p>
-                      )}
                     </div>
                   </div>
                 </div>

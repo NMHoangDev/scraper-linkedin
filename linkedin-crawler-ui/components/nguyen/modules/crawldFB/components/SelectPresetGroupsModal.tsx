@@ -67,73 +67,12 @@ export function SelectPresetGroupsModal({ isOpen, onClose, onSelectGroups }: Sel
         onClose();
     };
 
-    // Helpers UI — giữ nguyên logic, đồng bộ màu token
-    const renderHealthScore = (score: number, status: GroupStatus) => {
-        let bgColor = "bg-rose-500";
-        let textColor = "text-rose-600";
 
-        if (status === "ACTIVE") {
-            bgColor = "bg-emerald-500";
-            textColor = "text-emerald-600";
-        } else if (status === "IDLE") {
-            bgColor = "bg-amber-500";
-            textColor = "text-amber-600";
-        }
-
-        const progressWidth = Math.min(Math.max(score, 0), 100);
-
-        return (
-            <div className="flex items-center gap-2">
-                <div className="w-16 h-1.5 bg-surface-container rounded-full overflow-hidden">
-                    <div
-                        className={`h-full ${bgColor} transition-all duration-300`}
-                        style={{ width: `${progressWidth}%` }}
-                    />
-                </div>
-                <span className={`text-xs font-bold ${textColor}`}>
-                    {score}
-                </span>
-            </div>
-        );
-    };
-
-    const renderStatusBadge = (status?: "ACTIVE" | "IDLE" | "DEAD" | null) => {
-        if (!status) return <span className="text-on-surface-variant italic text-xs">Chưa rõ</span>;
-
-        switch (status) {
-            case "ACTIVE":
-                return (
-                    <span className="px-2.5 py-1 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full text-xs font-medium flex items-center gap-1 w-max">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        Sống
-                    </span>
-                );
-            case "IDLE":
-                return (
-                    <span className="px-2.5 py-1 bg-amber-50 text-amber-600 border border-amber-100 rounded-full text-xs font-medium flex items-center gap-1 w-max">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                        Ít HĐ
-                    </span>
-                );
-            case "DEAD":
-                return (
-                    <span className="px-2.5 py-1 bg-rose-50 text-rose-600 border border-rose-100 rounded-full text-xs font-medium flex items-center gap-1 w-max">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                        Chết
-                    </span>
-                );
-        }
-    };
-
-    const formatCrawlDate = (dateStr?: string | null) => {
-        if (!dateStr) return <span className="text-on-surface-variant italic">Chưa crawl</span>;
-        return <span className="text-on-surface font-medium">{dateStr}</span>;
-    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-[1px] p-md">
             <div
-                className="border-outline-variant bg-surface w-full max-w-6xl rounded-xl border shadow-xl flex flex-col max-h-[85vh] overflow-hidden"
+                className="border-outline-variant bg-surface relative z-10 w-[min(94vw,920px)] rounded-xl border shadow-xl flex flex-col max-h-[85vh] overflow-hidden"
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="preset-groups-modal-title"
@@ -179,7 +118,7 @@ export function SelectPresetGroupsModal({ isOpen, onClose, onSelectGroups }: Sel
                         </div>
                     )}
 
-                    <table className="w-full border-collapse text-left">
+                    <table className="w-full min-w-[640px] border-collapse text-left">
                         <thead className="bg-surface-container-low border-b border-outline-variant text-table-header font-bold text-on-surface-variant uppercase tracking-wider sticky top-0 z-10">
                             <tr>
                                 <th className="py-md px-md w-12">
@@ -193,18 +132,14 @@ export function SelectPresetGroupsModal({ isOpen, onClose, onSelectGroups }: Sel
                                 </th>
                                 <th className="py-md px-md">Tên Group</th>
                                 <th className="py-md px-md">Intent</th>
-                                <th className="py-md px-md">Thành viên</th>
-                                <th className="py-md px-md">Health Score</th>
-                                <th className="py-md px-md">Trạng thái</th>
-                                <th className="py-md px-md">Crawl gần nhất</th>
-                                <th className="py-md px-md text-center">Chạy 24h</th>
+                                <th className="py-md px-md text-right">Thành viên</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-outline-variant text-xs text-on-surface-variant">
 
                             {isLoadingGroups ? (
                                 <tr>
-                                    <td colSpan={8} className="py-12 text-center text-on-surface-variant">
+                                    <td colSpan={4} className="py-12 text-center text-on-surface-variant">
                                         <div className="flex flex-col items-center justify-center gap-2">
                                             <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                                             <span>Đang kết nối tải dữ liệu từ hệ thống...</span>
@@ -257,28 +192,8 @@ export function SelectPresetGroupsModal({ isOpen, onClose, onSelectGroups }: Sel
                                                 )}
                                             </td>
 
-                                            <td className="py-md px-md font-medium text-on-surface tabular-nums">
+                                            <td className="py-md px-md font-medium text-on-surface tabular-nums text-right">
                                                 {group.members?.toLocaleString() || 0}
-                                            </td>
-                                            <td className="py-md px-md">
-                                                {renderHealthScore(group.health_score || 0, group.status)}
-                                            </td>
-                                            <td className="py-md px-md">
-                                                {renderStatusBadge(group.status)}
-                                            </td>
-                                            <td className="py-md px-md">
-                                                {group.last_crawl
-                                                    ? formatCrawlDate(group.last_crawl)
-                                                    : <span className="text-on-surface-variant italic">Chưa crawl</span>
-                                                }
-                                            </td>
-
-                                            <td className="py-md px-md text-center">
-                                                {group.chay_24h ? (
-                                                    <span className="px-2 py-0.5 bg-primary/10 text-primary font-bold rounded text-[10px] uppercase">TRUE</span>
-                                                ) : (
-                                                    <span className="px-2 py-0.5 bg-surface-container text-on-surface-variant font-bold rounded text-[10px] uppercase">FALSE</span>
-                                                )}
                                             </td>
                                         </tr>
                                     );
@@ -287,7 +202,7 @@ export function SelectPresetGroupsModal({ isOpen, onClose, onSelectGroups }: Sel
 
                             {!isLoadingGroups && presetGroups.length === 0 && !errorGroups && (
                                 <tr>
-                                    <td colSpan={8} className="py-12 text-center text-on-surface-variant italic">
+                                    <td colSpan={4} className="py-12 text-center text-on-surface-variant italic">
                                         Chưa có Facebook Group nào được lưu trữ trên hệ thống.
                                     </td>
                                 </tr>

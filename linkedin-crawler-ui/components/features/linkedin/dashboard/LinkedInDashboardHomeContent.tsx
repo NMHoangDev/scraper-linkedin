@@ -7,10 +7,13 @@ import { CrawlerConfigCard } from "./LinkedIn-CrawlerConfigCard";
 import { CrawlResultsSection } from "./LinkedIn-CrawlResultsSection";
 import { LinkedInStats } from "../stats/LinkedInStats";
 import { useDashboard } from "@/components/features/dashboard/dashboard-context";
+import { useGroupIntentMap } from "@/hooks/useGroupIntentMap";
 
-export function LinkedInDashboardHomeContent() {
+export function LinkedInDashboardHomeContent({ hideHeader }: { hideHeader?: boolean }) {
   const d = useDashboard();
   const router = useRouter();
+  const { isLoading: isIntentLoading } = useGroupIntentMap(d.email);
+  const isDataLoading = isIntentLoading || d.crawlSessionsForTable === null;
 
   useEffect(() => {
     if (d.role === "leader") {
@@ -45,16 +48,46 @@ export function LinkedInDashboardHomeContent() {
   }
 
   // Member — dashboard crawler
+  if (isDataLoading) {
+    return (
+      <>
+        {!hideHeader && (
+          <div className="mb-xl">
+            <h1 className="text-h1 text-on-surface mb-xs font-semibold">
+              LinkedIn Group Crawler
+            </h1>
+            <p className="text-body-lg text-on-surface-variant">
+              Thu thập và phân tích dữ liệu từ nhiều nhóm LinkedIn một cách hiệu quả.
+            </p>
+          </div>
+        )}
+
+        <div className="mb-xl max-w-2xl">
+          <CrawlerConfigCard />
+        </div>
+
+        <div className="border-outline-variant bg-surface-container-lowest rounded-xl border p-lg shadow-sm">
+          <div className="flex flex-col items-center justify-center gap-3 py-20">
+            <div className="border-primary h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" />
+            <p className="text-on-surface-variant text-sm font-medium">Đang tải dữ liệu...</p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
-      <div className="mb-xl">
-        <h1 className="text-h1 text-on-surface mb-xs font-semibold">
-          LinkedIn Group Crawler
-        </h1>
-        <p className="text-body-lg text-on-surface-variant">
-          Thu thập và phân tích dữ liệu từ nhiều nhóm LinkedIn một cách hiệu quả.
-        </p>
-      </div>
+      {!hideHeader && (
+        <div className="mb-xl">
+          <h1 className="text-h1 text-on-surface mb-xs font-semibold">
+            LinkedIn Group Crawler
+          </h1>
+          <p className="text-body-lg text-on-surface-variant">
+            Thu thập và phân tích dữ liệu từ nhiều nhóm LinkedIn một cách hiệu quả.
+          </p>
+        </div>
+      )}
 
       <div className="mb-xl">
         <LinkedInStats />

@@ -25,10 +25,18 @@ export interface FacebookGroupDTO {
     url: string;                    // Tương ứng: str
     intent: string;                 // Tương ứng: str
     members?: number | null;        // Tương ứng: Optional[int]
-    last_crawl?: string | null;    // Tương ứng: Optional[str] (Lưu ý chữ C viết hoa theo đúng model API)
-    date_crawl?: string | null;    // Tương ứng: Optional[str] (Lưu ý chữ C viết hoa theo đúng model API)
+    last_crawl?: string | null;    // Tương ứng: Optional[str] 
+    date_crawl?: string | null;    // Tương ứng: Optional[str] 
     posts_per_week?: number | null; // Tương ứng: Optional[int]
     health_score?: number | null;   // Tương ứng: Optional[float]
     chay_24h?: boolean | null;      // Tương ứng: Optional[bool]
-    status?: "ACTIVE" | "IDLE" | "DEAD"; // Giữ lại cho UI hiển thị (nếu cần)
+    status?: "ACTIVE" | "IDLE" | "DEAD"; 
+    
+    // Taxonomy fields
+    platform?: string; // "facebook" | "linkedin"
+    industry?: string;
+    tier?: number;
+    team?: string[] | string;
+    icp?: string[] | string;
+    icp_desc?: string;
 }

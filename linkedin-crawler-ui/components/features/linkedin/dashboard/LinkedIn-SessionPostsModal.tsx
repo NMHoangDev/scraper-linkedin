@@ -19,6 +19,18 @@ import {
   getPostCrawlError,
 } from "@/components/features/linkedin/dashboard/LinkedIn-n8n-sheet-helpers";
 import { SessionPostDetailModal } from "@/components/features/linkedin/dashboard/LinkedIn-SessionPostDetailModal";
+import { useGroupIntentMap } from "@/hooks/useGroupIntentMap";
+
+/** Badge màu cho intent — đồng bộ style với Facebook DashboardPosts. */
+function IntentBadge({ intent }: { intent: string | null }) {
+  if (!intent)
+    return <span className="text-on-surface-variant text-[10px] italic">—</span>;
+  return (
+    <span className="inline-flex items-center rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 whitespace-nowrap">
+      {intent}
+    </span>
+  );
+}
 
 function rowPatchKey(sessionId: string, rowNum: number): string {
   return `${sessionId}:${rowNum}`;
@@ -66,6 +78,8 @@ export function SessionPostsModal({
   onRefreshSessions,
   refreshSessionsBusy = false,
 }: SessionPostsModalProps) {
+  // Tra cứu intent từ presetGroups theo group_url của mỗi post
+  const { getIntent } = useGroupIntentMap(dashboardEmail);
   const PAGE_SIZE = 8;
   const { pendingCount } = useLinkedInEngagementQueue();
   const [page, setPage] = useState(1);
@@ -254,6 +268,9 @@ export function SessionPostsModal({
                   <th className="text-table-header text-on-surface-variant px-md py-sm font-semibold uppercase">
                     Tác giả
                   </th>
+                  <th className="text-table-header text-on-surface-variant px-md py-sm font-semibold uppercase">
+                    Intent
+                  </th>
                   <th className="text-table-header text-on-surface-variant px-md py-sm text-right font-semibold uppercase">
                     Like
                   </th>
@@ -292,6 +309,10 @@ export function SessionPostsModal({
                     "postUrl",
                   ]);
                   const author = pickStr(post, ["Tác giả", "author"]);
+                  // Tra intent từ presetGroups theo group_url — fallback sang field "intent" trong post
+                  const intentFromGroup = getIntent(groupUrl);
+                  const intentFromPost = pickStr(post, ["intent", "Intent", "loại"]);
+                  const resolvedIntent = intentFromGroup || intentFromPost || null;
                   const likes = pickNum(post, ["Số like", "likes"]);
                   const comments = pickNum(post, ["Số comment", "comments"]);
                   const score = pickNum(post, ["Điểm", "score", "Score"]);
@@ -344,6 +365,9 @@ export function SessionPostsModal({
                         <span className="line-clamp-2" title={author}>
                           {author || "—"}
                         </span>
+                      </td>
+                      <td className="px-md py-sm">
+                        <IntentBadge intent={resolvedIntent} />
                       </td>
                       <td className="text-on-surface px-md py-sm text-right tabular-nums">
                         {likes.toLocaleString("vi-VN")}

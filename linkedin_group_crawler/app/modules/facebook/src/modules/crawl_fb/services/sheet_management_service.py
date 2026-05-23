@@ -101,10 +101,23 @@ class SheetManagementService:
         if groups_for_24h:
             tasks.append(asyncio.to_thread(self.group_24h_sheet.add_multiple_target_groups, groups_for_24h))
         
+        total_added = 0
+        h24_added = 0
+        total_skipped = 0
+        
         if tasks:
-            await asyncio.gather(*tasks)
+            results = await asyncio.gather(*tasks)
+            idx = 0
+            if groups_for_total:
+                inserted, skipped = results[idx]
+                total_added = inserted
+                total_skipped = skipped
+                idx += 1
+            if groups_for_24h:
+                inserted_24h, skipped_24h = results[idx]
+                h24_added = inserted_24h
 
-        return len(groups_for_total), len(groups_for_24h)
+        return total_added, h24_added, total_skipped
     
 
     async def bulk_delete_groups(self, urls: List[str]):

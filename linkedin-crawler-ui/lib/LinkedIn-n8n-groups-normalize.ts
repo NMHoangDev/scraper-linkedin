@@ -1,4 +1,5 @@
 import { deriveGroupDisplayName } from "@/components/features/dashboard/dashboard-helpers";
+import { parseViMemberCount } from "@/lib/parse-vn-number";
 
 /** Một dòng nhóm sau khi chuẩn hóa từ JSON n8n. */
 export interface ManagedGroupRow {
@@ -8,6 +9,12 @@ export interface ManagedGroupRow {
   email: string;
   member: number;
   type: string;
+  industry?: string;
+  tier?: number;
+  team?: string;
+  icp?: string;
+  icp_desc?: string;
+  platform?: string;
 }
 
 function pickStr(obj: Record<string, unknown>, keys: string[]): string {
@@ -21,11 +28,8 @@ function pickStr(obj: Record<string, unknown>, keys: string[]): string {
 function pickNum(obj: Record<string, unknown>, keys: string[]): number {
   for (const k of keys) {
     const v = obj[k];
-    if (typeof v === "number" && !Number.isNaN(v))
-      return Math.max(0, Math.trunc(v));
-    if (typeof v === "string" && v.trim()) {
-      const n = Number(String(v).replace(/\s/g, "").replace(/,/g, ""));
-      if (!Number.isNaN(n)) return Math.max(0, Math.trunc(n));
+    if (v !== undefined && v !== null && v !== "") {
+      return parseViMemberCount(v);
     }
   }
   return 0;
@@ -60,6 +64,8 @@ function rowFromUnknown(item: unknown): ManagedGroupRow | null {
     "member",
     "members",
     "Member",
+    "Thành viên",
+    "thanh_vien",
     "so_thanh_vien",
     "count",
     "Số thành viên",
@@ -76,7 +82,27 @@ function rowFromUnknown(item: unknown): ManagedGroupRow | null {
     "loai_nhom",
     "intent",
   ]);
-  return { row_number, url_group: url, name_group: name, email, member, type };
+  const industry = pickStr(o, ["industry", "Ngành", "nganh"]);
+  const team = pickStr(o, ["team", "Team"]);
+  const icp = pickStr(o, ["icp", "ICP"]);
+  const icp_desc = pickStr(o, ["icp_desc", "icpDesc", "Mô tả ICP"]);
+  const platform = pickStr(o, ["platform", "Platform"]);
+  const tierRaw = pickNum(o, ["tier", "Tier"]);
+  const tier = tierRaw >= 1 && tierRaw <= 3 ? tierRaw : undefined;
+  return {
+    row_number,
+    url_group: url,
+    name_group: name,
+    email,
+    member,
+    type,
+    industry: industry || undefined,
+    tier,
+    team: team || undefined,
+    icp: icp || undefined,
+    icp_desc: icp_desc || undefined,
+    platform: platform || undefined,
+  };
 }
 
 /**

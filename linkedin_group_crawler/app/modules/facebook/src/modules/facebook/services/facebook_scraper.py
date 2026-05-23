@@ -69,19 +69,24 @@ class FacebookScraper:
             }
             # Lấy đường dẫn file cookie tương ứng (Nếu có custom_email thì lấy file riêng, không thì lấy mặc định)
             cookie_path = self.auth.get_cookie_path(custom_email) 
-            if not os.path.exists(cookie_path):
-                if custom_email:
-                    # [CHẶN CUSTOM ACCOUNT]: Bắn thẳng câu thông báo thân thiện để FE hiển thị toast lỗi
-                    #logger.error(f"🛑 Tài khoản custom {custom_email} chưa có Cookie.")
+            
+            # Nếu là default account (custom_email trống), luôn cố sử dụng default cookie
+            # Nếu là custom account, yêu cầu cookie đã tồn tại
+            if custom_email and custom_email.strip():
+                # Custom account: cookie phải tồn tại
+                if not os.path.exists(cookie_path):
                     browser.close()
                     raise ValueError("Tài khoản chưa đăng nhập hoặc không tìm thấy phiên làm việc. Vui lòng đăng nhập tài khoản này trước!")
+                context = browser.new_context(storage_state=cookie_path, **context_args)
+            else:
+                # Default account: luôn dùng default cookie (dù tồn tại hay không)
+                if os.path.exists(cookie_path):
+                    #logger.info(f"🚀 Mở phiên làm việc từ file Cookie: {cookie_path}")
+                    context = browser.new_context(storage_state=cookie_path, **context_args)
                 else:
-                    # [CHỈ TÀI KHOẢN MẶC ĐỊNH]: Mở context trắng để đi tiếp xuống Bước 2 login tự động
+                    # Cookie mặc định không tồn tại -> Mở context trắng để login
                     #logger.warning("⚠️ Không tìm thấy Cookie mặc định. Mở trình duyệt trắng để Login lại...")
                     context = browser.new_context(**context_args)
-            else:
-                #logger.info(f"🚀 Mở phiên làm việc từ file Cookie: {cookie_path}")
-                context = browser.new_context(storage_state=cookie_path, **context_args)
 
             
             context.add_init_script("""

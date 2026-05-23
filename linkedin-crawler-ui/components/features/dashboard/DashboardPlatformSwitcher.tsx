@@ -7,7 +7,7 @@ import {
 } from "@/lib/LinkedIn-app-platform";
 import { cn } from "@/lib/utils";
 
-const options: AppPlatform[] = ["linkedin", "facebook"];
+const options: AppPlatform[] = ["linkedin", "facebook", "general"];
 
 export function DashboardPlatformSwitcher() {
   const { platform, setPlatform } = useAppPlatform();

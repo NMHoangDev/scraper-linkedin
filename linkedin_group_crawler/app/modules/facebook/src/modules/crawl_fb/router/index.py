@@ -57,8 +57,15 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, WebSocket] = {}
 
-    async def connect(self, websocket: WebSocket, email: str):
-        await websocket.accept()
+    async def connect(
+        self,
+        websocket: WebSocket,
+        email: str,
+        *,
+        accept: bool = True,
+    ):
+        if accept:
+            await websocket.accept()
         self.active_connections[email] = websocket
 
     def disconnect(self, email: str):
@@ -136,27 +143,60 @@ async def get_all_facebook_posts(
 
 # ROUTER WEBSOCKET XẾP HÀNG YÊU CẦU CÀO DỮ LIỆU
 @crawl_fb_router.websocket("/ws/CrawlFbForFE/{email}")
-async def websocket_crawl_endpoint(
-    websocket: WebSocket, email: str, service: CrawlService = Depends(get_crawl_service)
-):
-    """WebSocket API: Quản lý tiến trình cào dữ liệu ngầm dài hạn (hàng giờ).
+async def websocket_crawl_endpoint(websocket: WebSocket, email: str):
+    """WebSocket API for Facebook crawl data request queuing.
 
-    Hỗ trợ cơ chế Heartbeat chống Proxy Drop và bảo toàn tiến trình khi mất mạng.
+    Không dùng ``Depends(get_crawl_service)`` trên WebSocket — FastAPI resolve dependency
+    *trước* ``accept()``, lỗi Google credentials/config sẽ gây đóng kết nối 1006 im lặng.
     """
-    await manager.connect(websocket, email)
-    # Khởi tạo trạng thái cho chu kỳ cào mới
+    logger.info("WebSocket connection attempt from %s", email)
+    logger.info(
+        "Client headers: origin=%s, host=%s",
+        websocket.headers.get("origin"),
+        websocket.headers.get("host"),
+    )
+
+    try:
+        await websocket.accept()
+        logger.info("WebSocket accepted for %s", email)
+    except Exception as e:
+        logger.error("Failed to accept WebSocket for %s: %s", email, e, exc_info=True)
+        return
+
+    try:
+        service = get_crawl_service()
+    except Exception as e:
+        logger.error("CrawlService init failed for %s: %s", email, e, exc_info=True)
+        try:
+            await websocket.send_json(
+                {
+                    "status": "error",
+                    "message": (
+                        "Không khởi tạo được dịch vụ crawl Facebook. "
+                        "Kiểm tra GOOGLE_CREDENTIALS_PATH, SPREADSHEET_ID trong .env backend. "
+                        f"Chi tiết: {e}"
+                    ),
+                }
+            )
+            await websocket.close(code=1011, reason="Service init failed")
+        except Exception:
+            pass
+        return
+
+    await manager.connect(websocket, email, accept=False)
     cancel_registry[email] = False
 
     try:
-        # 1. NHẬN & PARSE PAYLOAD (Chỉ thực thi 1 lần đầu tiên)
+        logger.info(f"Waiting for payload from {email}...")
         data = await websocket.receive_text()
+        logger.info(f"Received payload from {email}, size: {len(data)} bytes")
         payload_dict = json.loads(data)
         payload = CrawlPayload(**payload_dict)
 
         await manager.send_json(
             {
                 "status": "processing",
-                "message": f"Hệ thống đang tiến hành cào dữ liệu cho {email}...",
+                "message": f"Processing crawl request for {email}...",
             },
             email,
         )
@@ -239,18 +279,15 @@ async def websocket_crawl_endpoint(
         # Chủ động đóng socket khi toàn bộ quy trình kết thúc trọn vẹn
         await websocket.close()
         manager.disconnect(email)
+        logger.info(f"WebSocket closed cleanly for {email}")
 
     except WebSocketDisconnect:
-        # ✅ CHUẨN SENIOR: CHỈ NGẮT GIAO TIẾP, KHÔNG KILL TASK
-        # User rớt mạng hoặc đóng Tab, ta giải phóng Socket nhưng tuyệt đối bảo lưu tiến trình ngầm
-        print(f"\n[CLIENT NGẮT MẠNG / ĐÓNG TAB] - {email} (Tiến trình ngầm vẫn tiếp tục)")
+        logger.warning(f"WebSocket disconnected for {email} (background task continues)")
         manager.disconnect(email)
-        # BỎ HOÀN TOÀN dòng gán cancel_registry = True ở đây
 
     except Exception as general_error:
-        print(f"\n[CRASH NGOẠI LỆ WEBSOCKET - {email}] Chi tiết: {general_error}")
+        logger.error(f"WebSocket error for {email}: {general_error}", exc_info=True)
         manager.disconnect(email)
-        # Tránh văng lỗi HĐH, ngắt giao tiếp nội bộ
 # ── WRAPPER KIỂM SOÁT LUỒNG ĐĂNG NHẬP ─────────────────────────────────────────
 
 async def controlled_login_task(auth_service: FacebookAuth, email: str, password: str, secret_2fa: Optional[str], cache_file: Path):
@@ -468,6 +505,16 @@ async def update_group_api(
         if request.status:
             # Nếu trường status tồn tại, lưu nó (tùy thuộc vào Config)
             update_data["status"] = request.status
+        if request.industry is not None:
+            update_data["industry"] = request.industry
+        if request.tier is not None:
+            update_data["tier"] = request.tier
+        if request.team is not None:
+            update_data["team"] = request.team
+        if request.icp is not None:
+            update_data["icp"] = request.icp
+        if request.icp_desc is not None:
+            update_data["icp_desc"] = request.icp_desc
         
         result = await service.update_group(group_url=group_url, update_data=update_data)
         
@@ -484,6 +531,30 @@ async def update_group_api(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Lỗi cập nhật group: {str(e)}"
+        )
+
+@crawl_fb_router.delete("/groups/delete", status_code=status.HTTP_200_OK)
+async def delete_group_api(
+    group_url: str,
+    service: CrawlService = Depends(get_crawl_service)
+):
+    """
+    Endpoint xóa Group Facebook
+    """
+    try:
+        result = await service.delete_group(group_url=group_url)
+        return {
+            "success": True,
+            "message": result.get("message", "Xóa thành công"),
+            "data": result.get("data")
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Lỗi xóa group: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Lỗi xóa group: {str(e)}"
         )
 
 

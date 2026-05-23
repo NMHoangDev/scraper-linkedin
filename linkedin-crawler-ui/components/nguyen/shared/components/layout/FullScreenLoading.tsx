@@ -1,3 +1,5 @@
+import React from 'react';
+
 interface LoadingProps {
   title?: string;
   content?: string;
@@ -10,19 +12,32 @@ export default function FullScreenLoading({
   onCancel,
 }: LoadingProps) {
   return (
-    <div className="w-screen min-h-screen fixed inset-0 flex items-center justify-center bg-slate-200/30 backdrop-blur-sm z-50">
-      <div className="bg-white shadow-2xl rounded-3xl p-10 max-w-100 w-full border border-slate-200 text-center">
-        <div className="flex justify-center mb-6">
-          <div className="w-16 h-16 border-4 border-violet-200 border-t-violet-600 rounded-full animate-spin" />
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm">
+      <div className="relative w-[400px] max-w-[90vw] shrink-0 overflow-hidden rounded-3xl border border-white/50 bg-white/90 p-8 text-center shadow-2xl backdrop-blur-xl">
+        {/* Decorative background glow */}
+        <div className="pointer-events-none absolute left-1/2 top-0 h-1/2 w-full -translate-x-1/2 rounded-full bg-violet-400/20 blur-3xl" />
+
+        <div className="relative mb-8 flex justify-center">
+          <div className="relative h-20 w-20">
+            {/* Outer spinning ring */}
+            <div className="absolute inset-0 rounded-full border-4 border-violet-100"></div>
+            <div className="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-violet-600"></div>
+            
+            {/* Inner pulsing circle */}
+            <div className="absolute inset-3 flex animate-pulse items-center justify-center rounded-full bg-violet-100">
+              <div className="absolute h-8 w-8 animate-ping rounded-full bg-violet-400 opacity-60"></div>
+              <div className="absolute h-4 w-4 rounded-full bg-violet-600"></div>
+            </div>
+          </div>
         </div>
 
-        <h1 className="text-2xl font-bold text-slate-800 mb-3">{title}</h1>
-        <p className="text-slate-500 leading-7 text-sm">{content}</p>
+        <h1 className="relative mb-4 text-xl font-bold tracking-tight text-slate-800 sm:text-2xl">{title}</h1>
+        <p className="relative text-sm leading-relaxed text-slate-600">{content}</p>
 
         {onCancel && (
           <button
             onClick={onCancel}
-            className="mt-6 px-6 py-2 bg-red-50 text-red-600 hover:bg-red-100 font-semibold rounded-lg transition-colors"
+            className="relative mt-8 rounded-xl border border-rose-100 bg-rose-50 px-8 py-2.5 font-bold text-rose-600 shadow-sm transition-all duration-200 hover:bg-rose-100 hover:text-rose-700 active:scale-95"
           >
             Hủy tiến trình
           </button>

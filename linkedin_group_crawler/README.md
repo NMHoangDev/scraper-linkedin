@@ -4,9 +4,13 @@
 
 ```bash
 cd linkedin_group_crawler
+py -3 -m pip install -r requirements.txt
 py -3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
 
 API docs: `http://127.0.0.1:8000/docs` — header `x-api-key` = gia tri `API_KEY` trong `.env`.
+
+**Facebook crawl WebSocket:** can `uvicorn[standard]` hoac `websockets` trong `requirements.txt`. Neu log co `No supported WebSocket library` / `404` tren `/facebook/api/v1/ws/CrawlFbForFE/...`, chay lai `pip install -r requirements.txt` va restart server.
 
 Ban do day du (API, UI, luong KPI/sync): [../CRAWL_DATA_LINKEDIN_MAP.md](../CRAWL_DATA_LINKEDIN_MAP.md).
 

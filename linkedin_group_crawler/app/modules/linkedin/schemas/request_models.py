@@ -527,6 +527,12 @@ class FilterDataRequest(BaseModel):
         description="Một ngày duy nhất YYYY-MM-DD (tương đương date_from = date_to).",
         validation_alias=AliasChoices("date", "target_date", "targetDate", "ngay"),
     )
+    intent: Optional[str] = Field(
+        default=None,
+        description="Lọc bài viết theo intent (loại nhóm).",
+        validation_alias=AliasChoices("intent", "type", "Loại nhóm", "loai_nhom"),
+    )
+
 
     @field_validator("email")
     @classmethod
@@ -835,6 +841,33 @@ class AddListGroupRequest(BaseModel):
 BulkImportGroupsFromUrlsRequest = AddListGroupRequest
 
 
+def _merge_group_taxonomy_webhook(
+    payload: dict[str, Any],
+    *,
+    industry: Optional[str] = None,
+    tier: Optional[int] = None,
+    team: Optional[str] = None,
+    icp: Optional[str] = None,
+    icp_desc: Optional[str] = None,
+    platform: Optional[str] = None,
+    prefix: str = "",
+) -> None:
+    """Gắn taxonomy vào payload webhook (chuỗi CSV cho team/icp)."""
+    p = prefix
+    if industry and industry.strip():
+        payload[f"{p}industry"] = industry.strip()
+    if tier is not None and int(tier) >= 1:
+        payload[f"{p}tier"] = int(tier)
+    if team and team.strip():
+        payload[f"{p}team"] = team.strip()
+    if icp and icp.strip():
+        payload[f"{p}icp"] = icp.strip()
+    if icp_desc and icp_desc.strip():
+        payload[f"{p}icp_desc"] = icp_desc.strip()
+    if platform and platform.strip():
+        payload[f"{p}platform"] = platform.strip()
+
+
 class N8nAddGroupRequest(BaseModel):
     """POST tới ``N8N_WEBHOOK_ADD_GROUP``."""
 
@@ -860,28 +893,44 @@ class N8nAddGroupRequest(BaseModel):
         description="Loại nhóm/Intent",
         validation_alias=AliasChoices("type", "Loại nhóm", "loai_nhom", "intent"),
     )
+    industry: Optional[str] = Field(default=None)
+    tier: Optional[int] = Field(default=None, ge=1, le=3)
+    team: Optional[str] = Field(default=None, description="Team phụ trách (CSV)")
+    icp: Optional[str] = Field(default=None, description="ICP (CSV)")
+    icp_desc: Optional[str] = Field(default=None)
+    platform: Optional[str] = Field(default=None, description="linkedin | facebook")
 
     @field_validator("url_group", "name_group")
     @classmethod
     def strip_add_strings(cls, value: str) -> str:
         return value.strip()
 
-    @field_validator("email")
+    @field_validator("email", "industry", "team", "icp", "icp_desc", "platform")
     @classmethod
-    def strip_add_email(cls, value: Optional[str]) -> Optional[str]:
+    def strip_add_optional(cls, value: Optional[str]) -> Optional[str]:
         if value is None:
             return None
         t = value.strip()
         return t or None
 
     def to_webhook_payload(self, email_resolved: str) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "url_group": self.url_group.strip(),
             "name_group": self.name_group.strip(),
             "member": int(self.member),
             "email": email_resolved.strip(),
             "type": self.type.strip(),
         }
+        _merge_group_taxonomy_webhook(
+            payload,
+            industry=self.industry,
+            tier=self.tier,
+            team=self.team,
+            icp=self.icp,
+            icp_desc=self.icp_desc,
+            platform=self.platform or "linkedin",
+        )
+        return payload
 
 
 class N8nRemoveGroupRequest(BaseModel):
@@ -953,6 +1002,18 @@ class N8nUpdateGroupRequest(BaseModel):
         default=None,
         validation_alias=AliasChoices("new_type", "newType"),
     )
+    industry: Optional[str] = Field(default=None)
+    tier: Optional[int] = Field(default=None, ge=1, le=3)
+    team: Optional[str] = Field(default=None)
+    icp: Optional[str] = Field(default=None)
+    icp_desc: Optional[str] = Field(default=None)
+    platform: Optional[str] = Field(default=None)
+    new_industry: Optional[str] = Field(default=None)
+    new_tier: Optional[int] = Field(default=None, ge=1, le=3)
+    new_team: Optional[str] = Field(default=None)
+    new_icp: Optional[str] = Field(default=None)
+    new_icp_desc: Optional[str] = Field(default=None)
+    new_platform: Optional[str] = Field(default=None)
     email: Optional[str] = Field(
         default=None,
         validation_alias=AliasChoices("email", "userEmail"),
@@ -963,7 +1024,20 @@ class N8nUpdateGroupRequest(BaseModel):
     def strip_upd_req(cls, value: str) -> str:
         return value.strip()
 
-    @field_validator("new_url_group", "new_name_group")
+    @field_validator(
+        "new_url_group",
+        "new_name_group",
+        "industry",
+        "team",
+        "icp",
+        "icp_desc",
+        "platform",
+        "new_industry",
+        "new_team",
+        "new_icp",
+        "new_icp_desc",
+        "new_platform",
+    )
     @classmethod
     def strip_upd_opt(cls, value: Optional[str]) -> Optional[str]:
         if value is None:
@@ -994,6 +1068,25 @@ class N8nUpdateGroupRequest(BaseModel):
             payload["new_member"] = int(self.new_member)
         if self.new_type is not None:
             payload["new_type"] = self.new_type.strip()
+        _merge_group_taxonomy_webhook(
+            payload,
+            industry=self.industry,
+            tier=self.tier,
+            team=self.team,
+            icp=self.icp,
+            icp_desc=self.icp_desc,
+            platform=self.platform,
+        )
+        _merge_group_taxonomy_webhook(
+            payload,
+            industry=self.new_industry,
+            tier=self.new_tier,
+            team=self.new_team,
+            icp=self.new_icp,
+            icp_desc=self.new_icp_desc,
+            platform=self.new_platform,
+            prefix="new_",
+        )
         return payload
 
 

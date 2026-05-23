@@ -1,5 +1,5 @@
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 
 import gspread
@@ -139,14 +139,15 @@ class GroupManagementSheetService:
         except Exception as e:
             logger.error(f"Lỗi khi thêm hàng loạt Group: {e}", exc_info=True)
             return False
-    def add_multiple_groups_from_dicts(self, groups: List[Dict[str, Any]], spreadsheet_id: str = Config.SPREADSHEET_ID) -> bool:
+    def add_multiple_groups_from_dicts(self, groups: List[Dict[str, Any]], spreadsheet_id: str = Config.SPREADSHEET_ID) -> Tuple[int, int]:
         """
         [DÀNH RIÊNG CHO ROUTER]
         Thêm HÀNG LOẠT Group từ dữ liệu dạng List[Dict].
+        Trả về: (số lượng thêm thành công, số lượng bị bỏ qua do trùng lặp)
         """
         if not groups:
             logger.warning("Danh sách đầu vào trống. Không có Group nào được chèn.")
-            return False
+            return 0, 0
 
         try:
             worksheet: gspread.Worksheet = self._get_worksheet(spreadsheet_id)
@@ -154,7 +155,7 @@ class GroupManagementSheetService:
 
             if not headers:
                 logger.error(f"Sheet '{self.sheet_name}' chưa có tiêu đề ở dòng 1.")
-                return False
+                return 0, len(groups)
 
             # --- Tải danh sách URL hiện tại để tra cứu O(1) ---
             url_col_name: str = Config.NAME_URL_GG_SHEET
@@ -188,7 +189,17 @@ class GroupManagementSheetService:
                     Config.POSTS_PER_WEEK_GG_SHEET: int(group.get("posts_per_week", 0)), 
                     Config.MEMBERS_GG_SHEET: int(group.get("members", 0)), 
                     Config.HEALTH_SCORE_GG_SHEET: float(group.get("health_score", 0.0)),
-                    Config.CHAY_24H_GG_SHEET_POST: "TRUE" if group.get("chay_24h", False) else "FALSE" 
+                    Config.CHAY_24H_GG_SHEET_POST: "TRUE" if group.get("chay_24h", False) else "FALSE",
+                    "Ngành": str(group.get("industry", "")).strip(),
+                    "industry": str(group.get("industry", "")).strip(),
+                    "Tier": int(group.get("tier", 0)) if group.get("tier") else "",
+                    "tier": int(group.get("tier", 0)) if group.get("tier") else "",
+                    "Team": str(group.get("team", "")).strip(),
+                    "team": str(group.get("team", "")).strip(),
+                    "ICP": str(group.get("icp", "")).strip(),
+                    "icp": str(group.get("icp", "")).strip(),
+                    "ICP Description": str(group.get("icp_desc", "")).strip(),
+                    "icp_desc": str(group.get("icp_desc", "")).strip(),
                 }
 
                 # Ánh xạ thành mảng 2D theo đúng thứ tự tiêu đề sheet
@@ -199,14 +210,14 @@ class GroupManagementSheetService:
             if rows_to_insert:
                 worksheet.append_rows(rows_to_insert, value_input_option='USER_ENTERED')
                 logger.info(f"Đã chèn thành công {len(rows_to_insert)} Group mới (Bỏ qua {skipped_count} Group trùng URL).")
-                return True
+                return len(rows_to_insert), skipped_count
             else:
                 logger.info(f"Không có Group mới nào được chèn (Toàn bộ {skipped_count} Group đều đã tồn tại).")
-                return False
+                return 0, skipped_count
 
         except Exception as e:
             logger.error(f"Lỗi khi thêm hàng loạt Group từ Dict: {e}", exc_info=True)
-            return False
+            return 0, len(groups)
     # ===================================================
     # 2. READ (ĐỌC DANH SÁCH GROUP)
     # ===================================================
@@ -245,7 +256,12 @@ class GroupManagementSheetService:
                     "posts_per_week": parse_int(row.get(Config.POSTS_PER_WEEK_GG_SHEET, 0)),
                     "last_crawl": str(row.get(Config.LAST_CRAWL_GG_SHEET, "")).strip(),
                     "health_score": parse_float(row.get(Config.HEALTH_SCORE_GG_SHEET, 0.0)),
-                    "chay_24h": parse_bool(row.get(Config.CHAY_24H_GG_SHEET_POST, None))
+                    "chay_24h": parse_bool(row.get(Config.CHAY_24H_GG_SHEET_POST, None)),
+                    "industry": str(row.get("Ngành", row.get("industry", ""))).strip(),
+                    "tier": parse_int(row.get("Tier", row.get("tier", 0))),
+                    "team": str(row.get("Team", row.get("team", ""))).strip(),
+                    "icp": str(row.get("ICP", row.get("icp", ""))).strip(),
+                    "icp_desc": str(row.get("ICP Description", row.get("icp_desc", ""))).strip(),
                 })
 
             logger.info(f"Đã tải {len(groups)} groups từ Sheet '{self.sheet_name}'.")
@@ -271,6 +287,28 @@ class GroupManagementSheetService:
 
             row_index: int = cell.row
             headers: List[str] = worksheet.row_values(1)
+
+            # Ánh xạ các trường taxonomy & ICP mới từ frontend sang tiêu đề cột thực tế
+            mapped_data = {}
+            for k, v in update_data.items():
+                if k == "industry":
+                    mapped_data["Ngành"] = v
+                    mapped_data["industry"] = v
+                elif k == "tier":
+                    mapped_data["Tier"] = v
+                    mapped_data["tier"] = v
+                elif k == "team":
+                    mapped_data["Team"] = v
+                    mapped_data["team"] = v
+                elif k == "icp":
+                    mapped_data["ICP"] = v
+                    mapped_data["icp"] = v
+                elif k == "icp_desc":
+                    mapped_data["ICP Description"] = v
+                    mapped_data["icp_desc"] = v
+                else:
+                    mapped_data[k] = v
+            update_data = mapped_data
 
             # Tự động gán Last Crawl nếu tác vụ không có chỉ định
             if Config.LAST_CRAWL_GG_SHEET in headers and Config.LAST_CRAWL_GG_SHEET not in update_data:

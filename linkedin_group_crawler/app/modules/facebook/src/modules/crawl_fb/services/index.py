@@ -151,4 +151,23 @@ class CrawlService:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Không thể cập nhật group: {str(e)}"
             )
-        
+
+    async def delete_group(self, group_url: str):
+        """Xóa Group Facebook trong Google Sheets"""
+        try:
+            result = await run_in_threadpool(
+                self.group_sheet.delete_group, 
+                group_url=group_url
+            )
+            
+            return {
+                "status": "success",
+                "message": "Xóa group thành công.",
+                "data": result
+            }
+        except Exception as e:
+            logger.error(f"Lỗi khi xóa group: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Không thể xóa group: {str(e)}"
+            )
