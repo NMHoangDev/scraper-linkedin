@@ -1,3 +1,5 @@
+"use client";
+
 import CombinedCrawlForm from "@/components/nguyen/modules/crawldFB/components/CombinedCrawlForm";
 
 export default function CrawlDataPage() {
