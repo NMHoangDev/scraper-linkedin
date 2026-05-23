@@ -138,6 +138,7 @@ from app.modules.linkedin.services.n8n_post_filter_service import (
     filter_posts_by_inclusive_date_range,
     normalize_n8n_posts,
     posts_from_n8n_payload,
+    group_url_from_post,
 )
 from app.modules.linkedin.services.ranking_service import (
     enrich_and_filter_posts,
@@ -845,6 +846,27 @@ def _pick_group_field(item: dict[str, Any], keys: tuple[str, ...]) -> Any:
     return None
 
 
+def _parse_vn_member_count(raw: Any) -> int:
+    """Parse số thành viên từ sheet/n8n (vd. ``158.177``, ``3.000.000``)."""
+
+    if raw is None:
+        return 0
+    if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+        return max(0, int(raw))
+    s = str(raw).strip().replace(" ", "")
+    if not s:
+        return 0
+    if "." in s and "," not in s:
+        parts = s.split(".")
+        if len(parts) > 1 and all(len(p) == 3 for p in parts[1:]):
+            s = "".join(parts)
+    s = s.replace(",", "")
+    try:
+        return max(0, int(float(s)))
+    except (TypeError, ValueError):
+        return 0
+
+
 def _normalize_n8n_groups(parsed: Any) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for item in _pick_group_rows(parsed):
@@ -865,31 +887,59 @@ def _normalize_n8n_groups(parsed: Any) -> list[dict[str, Any]]:
             ("name_group", "Tên nhóm", "group_name", "groupName", "name"),
         )
         raw_email = _pick_group_field(item, ("email", "Email_crawl", "email_crawl"))
-        raw_member = _pick_group_field(item, ("member", "members", "Thành viên", "thanh_vien"))
+        raw_member = _pick_group_field(
+            item,
+            ("member", "members", "Member", "Thành viên", "thanh_vien", "Số thành viên"),
+        )
         raw_type = _pick_group_field(item, ("type", "Loại nhóm", "loai_nhom", "intent"))
+        raw_industry = _pick_group_field(item, ("industry", "Ngành", "nganh"))
+        raw_team = _pick_group_field(item, ("team", "Team"))
+        raw_icp = _pick_group_field(item, ("icp", "ICP"))
+        raw_icp_desc = _pick_group_field(item, ("icp_desc", "icpDesc", "Mô tả ICP"))
+        raw_platform = _pick_group_field(item, ("platform", "Platform"))
+        raw_tier = _pick_group_field(item, ("tier", "Tier"))
 
         url_group = str(raw_url or "").strip()
         if not url_group:
             continue
         name_group = str(raw_name or "").strip()
         email = str(raw_email or "").strip()
-        try:
-            member = int(raw_member) if raw_member is not None and str(raw_member).strip() else 0
-        except (TypeError, ValueError):
-            member = 0
-
+        member = _parse_vn_member_count(raw_member)
         group_type = str(raw_type or "").strip()
+        industry = str(raw_industry or "").strip()
+        team = str(raw_team or "").strip()
+        icp = str(raw_icp or "").strip()
+        icp_desc = str(raw_icp_desc or "").strip()
+        platform = str(raw_platform or "").strip() or "linkedin"
+        tier_val: int | None = None
+        try:
+            if raw_tier is not None and str(raw_tier).strip():
+                t = int(float(str(raw_tier).strip()))
+                if 1 <= t <= 3:
+                    tier_val = t
+        except (TypeError, ValueError):
+            tier_val = None
 
-        out.append(
-            {
-                "row_number": row_number,
-                "url_group": url_group,
-                "name_group": name_group,
-                "email": email,
-                "member": max(0, member),
-                "type": group_type,
-            },
-        )
+        row: dict[str, Any] = {
+            "row_number": row_number,
+            "url_group": url_group,
+            "name_group": name_group,
+            "email": email,
+            "member": member,
+            "type": group_type,
+            "platform": platform,
+        }
+        if industry:
+            row["industry"] = industry
+        if tier_val is not None:
+            row["tier"] = tier_val
+        if team:
+            row["team"] = team
+        if icp:
+            row["icp"] = icp
+        if icp_desc:
+            row["icp_desc"] = icp_desc
+        out.append(row)
     return out
 
 
@@ -1530,6 +1580,65 @@ def filter_data(payload: FilterDataRequest) -> FilterDataResponse:
 
         raw_posts = normalize_n8n_posts(posts_from_n8n_payload(result_data))
         filtered, _meta = filter_posts_by_inclusive_date_range(raw_posts, window_start, window_end)
+
+        # Lọc theo intent nếu có
+        if payload.intent and payload.intent.strip():
+            target_intent = payload.intent.strip().lower()
+            intent_filtered_posts = []
+
+            def _clean_group_url(url: str) -> str:
+                if not url:
+                    return ""
+                u = url.strip().lower()
+                if u.startswith("https://"):
+                    u = u[8:]
+                elif u.startswith("http://"):
+                    u = u[7:]
+                if u.startswith("www."):
+                    u = u[4:]
+                return u.rstrip("/")
+            
+            # Lấy list groups của user để tạo map URL -> Intent
+            groups_webhook_url = (settings.n8n_webhook_get_group_url or "").strip()
+            group_to_intent_map = {}
+            if groups_webhook_url:
+                try:
+                    gr_body = _n8n_get_all_groups_webhook_body(payload.email)
+                    gr_response = _post_with_retry(
+                        url=groups_webhook_url,
+                        json_body=gr_body,
+                        timeout=timeout
+                    )
+                    if gr_response.status_code < 400:
+                        gr_data = gr_response.json()
+                        parsed_groups = gr_data.get("parsed") if isinstance(gr_data, dict) else None
+                        if parsed_groups:
+                            normalized_grs = _normalize_n8n_groups(parsed_groups)
+                            for gr in normalized_grs:
+                                raw_g_url = gr.get("url_group", "")
+                                gr_url = _clean_group_url(raw_g_url)
+                                gr_type = gr.get("type", "").strip().lower()
+                                if gr_url and gr_type:
+                                    group_to_intent_map[gr_url] = gr_type
+                except Exception as gr_exc:
+                    logger.warning("Lấy danh sách nhóm để lọc intent thất bại: %s", gr_exc)
+            
+            for post in filtered:
+                raw_p_g_url = group_url_from_post(post)
+                p_group_url = _clean_group_url(raw_p_g_url)
+                post_intent = group_to_intent_map.get(p_group_url)
+                
+                # Fallback: nếu post chứa sẵn field intent
+                if not post_intent:
+                    for k in ("intent", "Intent", "loại", "type"):
+                        if k in post and post[k]:
+                            post_intent = str(post[k]).strip().lower()
+                            break
+                            
+                if post_intent == target_intent:
+                    intent_filtered_posts.append(post)
+            filtered = intent_filtered_posts
+
         crawl_sessions = build_crawl_sessions_from_posts(filtered)
 
         return FilterDataResponse(

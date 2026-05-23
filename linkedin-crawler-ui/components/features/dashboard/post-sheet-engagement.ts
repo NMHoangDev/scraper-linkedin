@@ -202,7 +202,7 @@ export function formatSheetInteractionLabelVi(
   post: Record<string, unknown>,
 ): string {
   const { kind, triggerDay } = parseSheetReaction(post);
-  if (!kind) return "Chưa tương tác";
+  if (!kind) return "";
   const label = reactionDoneLabelVi(kind);
   if (!triggerDay) return label;
   const dayLabel = formatSheetInteractionDayLabelVi(triggerDay);
@@ -221,6 +221,6 @@ export function formatSheetCommentAutomationLabelVi(
   post: Record<string, unknown>,
 ): string {
   const count = countAppCommentsFromPost(post);
-  if (count === 0) return "Chưa bình luận";
+  if (count === 0) return "";
   return `Đã có ${count.toLocaleString("vi-VN")} bình luận trên bài viết này`;
 }

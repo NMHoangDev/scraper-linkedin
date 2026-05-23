@@ -67,9 +67,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# ✅ CORS Middleware برای Frontend (شامل WebSocket)
+cors_origins = settings.cors_origins or []
+if isinstance(cors_origins, list):
+    cors_origins = list(cors_origins) + [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins or [],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

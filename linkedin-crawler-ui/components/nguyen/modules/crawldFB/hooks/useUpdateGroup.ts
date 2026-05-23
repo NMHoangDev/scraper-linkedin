@@ -1,5 +1,7 @@
 import { useMutation, UseMutationOptions } from "@tanstack/react-query";
-import axiosClient from "../../../shared/api/axiosClient";
+import { useDashboard } from "@/components/features/dashboard/dashboard-context";
+import { submitSharedUpdateGroup } from "@/lib/group-platform-api";
+import type { FacebookGroupDTO } from "../types/dataFb.type";
 
 interface UpdateGroupPayload {
   group_url: string;
@@ -10,6 +12,12 @@ interface UpdateGroupPayload {
   posts_per_week?: number;
   health_score?: number;
   status?: string;
+  industry?: string;
+  tier?: number;
+  team?: string;
+  icp?: string;
+  icp_desc?: string;
+  _originalGroup?: FacebookGroupDTO;
 }
 
 interface UpdateGroupResponse {
@@ -21,25 +29,24 @@ interface UpdateGroupResponse {
 export function useUpdateGroup(
   options?: UseMutationOptions<UpdateGroupResponse, Error, UpdateGroupPayload>,
 ) {
+  const d = useDashboard();
   const updateGroupMutation = useMutation<
     UpdateGroupResponse,
     Error,
     UpdateGroupPayload
   >({
     mutationFn: async (payload: UpdateGroupPayload) => {
-      const { group_url, ...updateData } = payload;
-
-      try {
-        const response = await axiosClient.put(
-          `/api/v1/groups/update?group_url=${encodeURIComponent(group_url)}`,
-          updateData,
-        );
-        return response.data;
-      } catch (error: any) {
-        throw new Error(
-          error.response?.data?.detail || error.response?.data?.message || `Lỗi cập nhật group`
-        );
+      const { group_url, _originalGroup, ...updateData } = payload;
+      if (!_originalGroup) {
+        throw new Error("Thiếu dữ liệu nhóm gốc để cập nhật.");
       }
+      const result = await submitSharedUpdateGroup(
+        _originalGroup,
+        { group_url, ...updateData },
+        d.email,
+      );
+      if (!result.ok) throw new Error(result.message);
+      return { success: true, message: result.message };
     },
     onSuccess: (data) => {
       console.log("Group cập nhật thành công:", data);

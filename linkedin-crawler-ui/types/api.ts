@@ -94,6 +94,7 @@ export interface FilterDataRequest {
   date_from?: string;
   date_to?: string;
   preset?: FilterDatePreset;
+  intent?: string;
 }
 
 /** Một lần cào — khớp backend (gom ``posts`` trong phiên). */
@@ -141,7 +142,16 @@ export interface GetAllN8nGroupsRequest {
   email: string;
 }
 
-export interface AddN8nGroupRequest {
+export interface GroupTaxonomyFields {
+  industry?: string;
+  tier?: number;
+  team?: string;
+  icp?: string;
+  icp_desc?: string;
+  platform?: string;
+}
+
+export interface AddN8nGroupRequest extends GroupTaxonomyFields {
   url_group: string;
   name_group: string;
   member: number;
@@ -219,7 +229,7 @@ export interface RemoveN8nGroupRequest {
   email?: string;
 }
 
-export interface UpdateN8nGroupRequest {
+export interface UpdateN8nGroupRequest extends GroupTaxonomyFields {
   url_group_need_update: string;
   name_group: string;
   member: number;
@@ -227,6 +237,12 @@ export interface UpdateN8nGroupRequest {
   new_name_group?: string | null;
   new_member?: number | null;
   new_type?: string | null;
+  new_industry?: string | null;
+  new_tier?: number | null;
+  new_team?: string | null;
+  new_icp?: string | null;
+  new_icp_desc?: string | null;
+  new_platform?: string | null;
   email?: string;
 }
 

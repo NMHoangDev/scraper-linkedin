@@ -7,6 +7,13 @@ import { useGetIntents } from "../hooks/useGetIntents";
 import { useFetchAllPosts } from "../hooks/useGetDataFb"; 
 import { DataFBResponse } from "../types/dataFb.type"; 
 import { PostCard } from "./dataFbCard_component";
+import { useAppPlatform } from "@/components/providers/AppPlatformProvider";
+import {
+  PlatformStatCard,
+  PlatformStatsRow,
+} from "@/components/features/shared/PlatformStatCard";
+import { MaterialIcon } from "@/components/ui";
+import type { AppPlatform } from "@/lib/app-platform";
 
 // ============================================================================
 // 1. CÁC HÀM HELPER PURE (ĐẶT NGOÀI COMPONENT)
@@ -92,7 +99,13 @@ const renderComparisonUI = (todayCount: number, yesterdayCount: number) => {
 // ============================================================================
 // 2. COMPONENT CHÍNH
 // ============================================================================
-export function DashboardPosts() {
+export function DashboardPosts({
+    forcedPlatform = null,
+}: {
+    /** Khóa feed theo nền tảng sidebar (facebook / linkedin). */
+    forcedPlatform?: AppPlatform | null;
+}) {
+    const { platform } = useAppPlatform();
     // States bộ lọc & sắp xếp
     const [searchTerm, setSearchTerm] = useState<string>("");
     const [intentFilter, setIntentFilter] = useState<string>("all");
@@ -110,10 +123,65 @@ export function DashboardPosts() {
     const { intents, fetchIntents } = useGetIntents();
     const { allPosts, isLoading, error, refetch } = useFetchAllPosts();
 
+    // State phục vụ lọc và sắp xếp ở Front-end
+    const [processedPosts, setProcessedPosts] = useState<DataFBResponse[]>([]);
+    const [isProcessing, setIsProcessing] = useState<boolean>(false);
+
+    // Tự động set platformFilter theo platform của workspace khi mount / thay đổi workspace
+    useEffect(() => {
+        if (forcedPlatform === "facebook" || forcedPlatform === "linkedin") {
+            setPlatformFilter(forcedPlatform);
+            return;
+        }
+        if (platform === "facebook") {
+            setPlatformFilter("facebook");
+        } else if (platform === "linkedin") {
+            setPlatformFilter("linkedin");
+        } else {
+            setPlatformFilter("all");
+        }
+    }, [platform, forcedPlatform]);
+
     // Tự động tải danh sách Intents khi mount
     useEffect(() => {
         fetchIntents();
     }, [fetchIntents]);
+
+    // Thực hiện lọc và sắp xếp ở Front-end (có Loading)
+    useEffect(() => {
+        setIsProcessing(true);
+        const timer = setTimeout(() => {
+            const filtered = allPosts.filter((post) => {
+                const platformName = detectPlatform(post);
+                
+                const matchSearch = (post.content || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                    (post.group_name || "").toLowerCase().includes(searchTerm.toLowerCase());
+                
+                const matchIntent = intentFilter === "all" || 
+                                    (intentFilter === "unclassified" && !post.intent) ||
+                                    (post.intent || "").toLowerCase() === intentFilter.toLowerCase();
+                
+                const matchPlatform = platformFilter === "all" || platformName.toLowerCase() === platformFilter.toLowerCase();
+
+                return matchSearch && matchIntent && matchPlatform;
+            });
+
+            filtered.sort((a, b) => {
+                if (sortBy === "score_desc") return b.score - a.score;
+                if (sortBy === "score_asc") return a.score - b.score;
+                if (sortBy === "comments_desc") return (b.comments || 0) - (a.comments || 0);
+                if (sortBy === "latest") {
+                    return getDateTimestamp(b.dateCrawl) - getDateTimestamp(a.dateCrawl);
+                }
+                return 0;
+            });
+
+            setProcessedPosts(filtered);
+            setIsProcessing(false);
+        }, 200);
+
+        return () => clearTimeout(timer);
+    }, [allPosts, searchTerm, intentFilter, platformFilter, sortBy]);
 
     // Tự động quay về trang 1 nếu thay đổi từ khóa tìm kiếm hoặc các bộ lọc
     useEffect(() => {
@@ -164,39 +232,10 @@ export function DashboardPosts() {
     const seededYesterdayCount = Math.floor(totalPostsYesterday * 0.2);
 
     // ==========================================
-    // LỌC & SẮP XẾP DỮ LIỆU
+    // LOGIC PHÂN TRANG DỰA TRÊN KẾT QUẢ ĐÃ LỌC & SẮP XẾP (SLIDING WINDOW 5 NÚT)
     // ==========================================
-    let filteredPosts = allPosts.filter((post) => {
-        const platform = detectPlatform(post);
-        
-        const matchSearch = (post.content || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            (post.group_name || "").toLowerCase().includes(searchTerm.toLowerCase());
-        
-        const matchIntent = intentFilter === "all" || 
-                            (intentFilter === "unclassified" && !post.intent) ||
-                            (post.intent || "").toLowerCase() === intentFilter.toLowerCase();
-        
-        const matchPlatform = platformFilter === "all" || platform.toLowerCase() === platformFilter.toLowerCase();
-
-        return matchSearch && matchIntent && matchPlatform;
-    });
-
-    // Thực thi sắp xếp danh sách
-    filteredPosts.sort((a, b) => {
-        if (sortBy === "score_desc") return b.score - a.score;
-        if (sortBy === "score_asc") return a.score - b.score;
-        if (sortBy === "comments_desc") return (b.comments || 0) - (a.comments || 0);
-        if (sortBy === "latest") {
-            return getDateTimestamp(b.dateCrawl) - getDateTimestamp(a.dateCrawl);
-        }
-        return 0;
-    });
-
-    // ==========================================
-    // LOGIC PHÂN TRANG (SLIDING WINDOW 5 NÚT)
-    // ==========================================
-    const totalPages = Math.ceil(filteredPosts.length / itemsPerPage);
-    const paginatedPosts = filteredPosts.slice(
+    const totalPages = Math.ceil(processedPosts.length / itemsPerPage);
+    const paginatedPosts = processedPosts.slice(
         (currentPage - 1) * itemsPerPage,
         currentPage * itemsPerPage
     );
@@ -228,26 +267,42 @@ export function DashboardPosts() {
 
     const { pages: pageNumbers, start: startPage, end: endPage } = getPaginationNumbers();
 
-    return (
-        <div className="w-full max-w-7xl mx-auto p-6 bg-slate-50 min-h-screen font-sans">
-            
-            {/* HÀNG 1: 4 THẺ THỐNG KÊ TỔNG QUAN */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <div className="bg-white p-4 rounded-xl shadow-xs border border-slate-100 border-l-4 border-l-indigo-600 flex flex-col justify-between">
-                    <div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tổng bài hôm nay</p>
-                        <h3 className="text-3xl font-black text-slate-900 mt-1">{totalPostsToday}</h3>
-                    </div>
-                    {renderComparisonUI(totalPostsToday, totalPostsYesterday)}
-                </div>
+    const platformLabel =
+        forcedPlatform === "facebook"
+            ? "Facebook"
+            : forcedPlatform === "linkedin"
+              ? "LinkedIn"
+              : "Tất cả nền tảng";
 
-                <div className="bg-white p-4 rounded-xl shadow-xs border border-slate-100 border-l-4 border-l-emerald-500 flex flex-col justify-between">
-                    <div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Điểm cao (≥70)</p>
-                        <h3 className="text-3xl font-black text-slate-900 mt-1">{highScores.length}</h3>
-                    </div>
-                    <p className="text-xs text-emerald-600 font-medium mt-3">{highScorePercent}% đủ điều kiện</p>
-                </div>
+    return (
+        <div className="flex w-full flex-col gap-lg font-sans">
+            <PlatformStatsRow>
+                <PlatformStatCard
+                    label={`Tổng bài hôm nay (${platformLabel})`}
+                    value={totalPostsToday}
+                    hint={
+                        totalPostsToday - totalPostsYesterday > 0
+                            ? `↑ ${totalPostsToday - totalPostsYesterday} so với hôm qua`
+                            : totalPostsToday - totalPostsYesterday < 0
+                              ? `↓ ${Math.abs(totalPostsToday - totalPostsYesterday)} so với hôm qua`
+                              : "↔ Bằng hôm qua"
+                    }
+                    hintTone={
+                        totalPostsToday > totalPostsYesterday
+                            ? "up"
+                            : totalPostsToday < totalPostsYesterday
+                              ? "down"
+                              : "neutral"
+                    }
+                    accent="primary"
+                />
+                <PlatformStatCard
+                    label="Điểm cao (≥70)"
+                    value={highScores.length}
+                    hint={`${highScorePercent}% trong tập đang lọc`}
+                    hintTone="up"
+                    accent="success"
+                />
 
                 {/* <div className="bg-white p-4 rounded-xl shadow-xs border border-slate-100 border-l-4 border-l-amber-500 flex flex-col justify-between">
                     <div>
@@ -257,31 +312,35 @@ export function DashboardPosts() {
                     <p className="text-xs text-amber-600 font-medium mt-3">Điểm mức trung bình</p>
                 </div> */}
 
-                <div className="bg-white p-4 rounded-xl shadow-xs border border-slate-100 border-l-4 border-l-purple-600 flex flex-col justify-between">
-                    <div>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Đã Seeded hôm nay</p>
-                        <h3 className="text-3xl font-black text-slate-900 mt-1">{seededTodayCount}</h3>
-                    </div>
-                    {renderComparisonUI(seededTodayCount, seededYesterdayCount)}
-                </div>
-            </div>
+                <PlatformStatCard
+                    label="Đã seeded hôm nay"
+                    value={seededTodayCount}
+                    hint={`Ước tính từ batch hôm nay`}
+                    accent="warning"
+                />
+                <PlatformStatCard
+                    label="Tổng bài đang hiển thị"
+                    value={processedPosts.length}
+                    hint={`${allPosts.length} bài trong API`}
+                    accent="primary"
+                />
+            </PlatformStatsRow>
 
-            {/* HÀNG 2: THANH CÔNG CỤ TÌM KIẾM & BỘ LỌC */}
-            <div className="flex flex-wrap items-center gap-3 mb-6 bg-transparent">
-                <div className="relative flex-1 min-w-[220px]">
-                    <input 
-                        type="text" 
-                        placeholder="🔍 Tìm kiếm bài post..."
+            <div className="border-outline-variant bg-surface flex flex-wrap items-center gap-sm rounded-xl border p-md">
+                <div className="relative min-w-[220px] flex-1">
+                    <input
+                        type="text"
+                        placeholder="Tìm kiếm bài post..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-indigo-600 shadow-xs transition"
+                        className="border-outline-variant bg-surface-container-low focus:border-primary w-full rounded-lg border px-md py-sm text-xs outline-none transition focus:ring-1 focus:ring-primary/30"
                     />
                 </div>
 
-                <select 
-                    value={intentFilter} 
+                <select
+                    value={intentFilter}
                     onChange={(e) => setIntentFilter(e.target.value)}
-                    className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 outline-none focus:border-indigo-600 shadow-xs cursor-pointer"
+                    className="border-outline-variant bg-surface-container-low focus:border-primary rounded-lg border px-md py-sm text-xs outline-none"
                 >
                     <option value="all">Tất cả intent</option>
                     <option value="unclassified">Chưa phân loại</option>
@@ -290,20 +349,22 @@ export function DashboardPosts() {
                     ))}
                 </select>
 
-                <select 
-                    value={platformFilter} 
-                    onChange={(e) => setPlatformFilter(e.target.value)}
-                    className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 outline-none focus:border-indigo-600 shadow-xs cursor-pointer"
-                >
-                    <option value="all">Tất cả platform</option>
-                    <option value="facebook">Facebook</option>
-                    <option value="linkedin">LinkedIn</option>
-                </select>
+                {!forcedPlatform && platform !== "facebook" && platform !== "linkedin" ? (
+                    <select
+                        value={platformFilter}
+                        onChange={(e) => setPlatformFilter(e.target.value)}
+                        className="border-outline-variant bg-surface-container-low focus:border-primary rounded-lg border px-md py-sm text-xs outline-none"
+                    >
+                        <option value="all">Tất cả platform</option>
+                        <option value="facebook">Facebook</option>
+                        <option value="linkedin">LinkedIn</option>
+                    </select>
+                ) : null}
 
-                <select 
-                    value={sortBy} 
+                <select
+                    value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
-                    className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 outline-none focus:border-indigo-600 shadow-xs cursor-pointer font-medium"
+                    className="border-outline-variant bg-surface-container-low focus:border-primary rounded-lg border px-md py-sm text-xs font-medium outline-none"
                 >
                     <option value="latest">Sắp xếp: Mới nhất</option>
                     <option value="score_desc">Sắp xếp: Điểm cao nhất</option>
@@ -311,32 +372,37 @@ export function DashboardPosts() {
                     <option value="comments_desc">Sắp xếp: Bình luận nhiều nhất</option>
                 </select>
 
-                <button 
+                <button
+                    type="button"
                     onClick={refetch}
                     disabled={isLoading}
-                    className="px-3 py-2 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg text-xs font-medium transition cursor-pointer flex items-center gap-1 disabled:opacity-50"
+                    className="border-outline-variant bg-surface hover:bg-surface-container-high flex items-center gap-1 rounded-lg border px-md py-sm text-xs font-medium transition disabled:opacity-50"
                     title="Làm mới dữ liệu"
                 >
-                    🔄
+                    <MaterialIcon
+                        name="sync"
+                        className={`text-[18px] ${isLoading ? "animate-spin" : ""}`}
+                    />
                 </button>
             </div>
 
-            {/* KHU VỰC THÔNG BÁO LỖI NẾU CÓ */}
-            {error && (
-                <div className="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-600 rounded-lg text-xs font-medium">
+            {error ? (
+                <div className="border-error/30 bg-error/10 text-error rounded-lg border p-md text-xs font-medium">
                     {error}
                 </div>
-            )}
+            ) : null}
 
             {/* HÀNG 3: DANH SÁCH BÀI VIẾT (DẠNG THẺ THU GỌN) */}
             <div className="flex flex-col gap-4">
-                {isLoading ? (
-                    <div className="py-20 bg-white rounded-xl border border-slate-100 flex flex-col items-center justify-center gap-2">
-                        <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-                        <span className="text-xs text-slate-400">Đang tải dữ liệu bài viết từ API...</span>
+                {isLoading || isProcessing ? (
+                    <div className="border-outline-variant bg-surface flex flex-col items-center justify-center gap-2 rounded-xl border py-20">
+                        <div className="border-primary h-6 w-6 animate-spin rounded-full border-2 border-t-transparent" />
+                        <span className="text-on-surface-variant text-xs">
+                            {isLoading ? "Đang tải dữ liệu bài viết từ API..." : "Đang tính toán và sắp xếp bộ lọc bài viết..."}
+                        </span>
                     </div>
                 ) : paginatedPosts.length === 0 ? (
-                    <div className="py-20 bg-white rounded-xl border border-slate-100 text-center text-xs text-slate-400 italic">
+                    <div className="border-outline-variant bg-surface text-on-surface-variant rounded-xl border py-20 text-center text-xs italic">
                         Không tìm thấy bài post nào phù hợp với bộ lọc.
                     </div>
                 ) : (
@@ -430,7 +496,7 @@ export function DashboardPosts() {
             {!isLoading && totalPages > 1 && (
                 <div className="mt-6 p-4 border border-slate-200/80 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3 bg-white">
                     <div className="text-xs text-slate-500">
-                        Hiển thị <span className="font-bold text-slate-700">{((currentPage - 1) * itemsPerPage) + 1}</span> - <span className="font-bold text-slate-700">{Math.min(currentPage * itemsPerPage, filteredPosts.length)}</span> trong số <span className="font-bold text-slate-700">{filteredPosts.length}</span> bài viết
+                        Hiển thị <span className="font-bold text-slate-700">{((currentPage - 1) * itemsPerPage) + 1}</span> - <span className="font-bold text-slate-700">{Math.min(currentPage * itemsPerPage, processedPosts.length)}</span> trong số <span className="font-bold text-slate-700">{processedPosts.length}</span> bài viết
                     </div>
 
                     <div className="flex items-center gap-1">

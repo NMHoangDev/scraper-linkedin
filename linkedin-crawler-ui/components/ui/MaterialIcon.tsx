@@ -58,7 +58,8 @@ export type MaterialSymbolName =
   | "article"
   | "more_vert"
   | "chat_bubble"
-  | "history";
+  | "history"
+  | "dataset";
 
 export interface MaterialIconProps {
   name: MaterialSymbolName;

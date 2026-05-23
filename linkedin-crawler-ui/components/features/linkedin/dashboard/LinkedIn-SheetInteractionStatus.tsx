@@ -30,15 +30,7 @@ export function SheetInteractionStatus({
   const title = formatSheetInteractionLabelVi(post);
 
   if (!kind) {
-    const emptyClass =
-      variant === "chip"
-        ? "text-on-surface-variant text-xs font-semibold"
-        : "text-on-surface-variant text-[10px] font-semibold";
-    return (
-      <span className={`${emptyClass} ${className}`.trim()}>
-        Chưa tương tác
-      </span>
-    );
+    return null;
   }
 
   const kindLabel = reactionDoneLabelVi(kind);

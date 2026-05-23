@@ -11,6 +11,11 @@ class UpdateGroupRequest(BaseModel):
     posts_per_week: Optional[int] = None
     health_score: Optional[float] = None
     status: Optional[str] = None  # ACTIVE, IDLE, DEAD
+    industry: Optional[str] = None
+    tier: Optional[int] = None
+    team: Optional[str] = None
+    icp: Optional[str] = None
+    icp_desc: Optional[str] = None
 
 class UpdateGroupResponse(BaseModel):
     """Response sau khi cập nhật Group"""

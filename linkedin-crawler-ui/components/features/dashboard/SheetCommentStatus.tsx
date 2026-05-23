@@ -23,24 +23,7 @@ export function SheetCommentStatus({
   const title = formatSheetCommentAutomationLabelVi(post);
 
   if (count === 0) {
-    const emptyClass =
-      variant === "chip"
-        ? "text-on-surface-variant text-xs font-semibold"
-        : "text-on-surface-variant text-[10px] font-semibold";
-    return (
-      <span
-        className={`inline-flex min-w-0 items-center gap-2 ${emptyClass} ${className}`.trim()}
-        title={title}
-      >
-        {variant === "chip" ? (
-          <MaterialIcon
-            name="comment"
-            className="text-on-surface-variant shrink-0 text-[22px] leading-none"
-          />
-        ) : null}
-        Chưa bình luận
-      </span>
-    );
+    return null;
   }
 
   const countLabel = count.toLocaleString("vi-VN");

@@ -1,5 +1,7 @@
 fastapi
-uvicorn
+# Cần [standard] để WebSocket (/facebook/api/v1/ws/CrawlFbForFE) hoạt động (websockets + wsproto)
+uvicorn[standard]
+websockets>=12.0
 playwright
 python-dotenv
 pydantic

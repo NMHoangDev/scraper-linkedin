@@ -1,21 +1,31 @@
 // src/modules/group/services/group.service.ts
 import axiosClient from "../../../shared/api/axiosClient";
+import { getAllN8nGroups } from "@/services/linkedinCrawlerService";
+import { normalizeN8nGroupsList } from "@/lib/LinkedIn-n8n-groups-normalize";
+import { managedRowToGroupDto } from "@/lib/group-platform-api";
 import { FacebookGroupDTO } from "../types/dataFb.type";
 
-// Định nghĩa Interface cho cấu trúc bọc (Wrapper) của Backend trả về
 export interface GetPresetGroupsResponse {
     status: string;
     data: FacebookGroupDTO[];
 }
 
-/**
- * Gọi API lấy danh sách các Facebook Group có sẵn (Preset)
- * @returns Promise chứa mảng FacebookGroupDTO
- */
 export const getPresetGroupsService = async (): Promise<FacebookGroupDTO[]> => {
-    // Truyền kiểu bọc dữ liệu vào generic của axiosClient
     const response = await axiosClient.get<GetPresetGroupsResponse>("/api/v1/groups");
-    
-    // Trả về trực tiếp mảng dữ liệu bên trong, đảm bảo an toàn với fallback mảng rỗng
     return response.data.data || [];
+};
+
+export const getLinkedInGroupsService = async (
+  email: string,
+): Promise<FacebookGroupDTO[]> => {
+  if (!email?.trim()) return [];
+  const res = await getAllN8nGroups({ email: email.trim() });
+  if (!res.success) return [];
+  // Ưu tiên `groups` từ backend (đã chuẩn hóa đủ taxonomy); fallback `parsed` thô từ n8n.
+  const raw =
+    Array.isArray(res.data?.groups) && res.data.groups.length > 0
+      ? res.data.groups
+      : res.data?.parsed;
+  const list = normalizeN8nGroupsList(raw);
+  return list.map(managedRowToGroupDto);
 };

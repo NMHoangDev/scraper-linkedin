@@ -47,15 +47,26 @@ async def api_bulk_add_groups(
     
     try:
         # Gọi Service xử lý
-        total_added, h24_added = await service.bulk_add_groups(groups_data)
+        total_added, h24_added, total_skipped = await service.bulk_add_groups(groups_data)
         
+        if total_added == 0 and total_skipped > 0:
+            return {
+                "success": "error",
+                "message": f"Toàn bộ {total_skipped} Group gửi lên đều đã tồn tại trên hệ thống!"
+            }
+
         # Trả về thành công nếu không có Exception nào văng ra
+        msg = f"Đã thêm {total_added} groups vào Sheet Tổng và {h24_added} groups vào Sheet 24h."
+        if total_skipped > 0:
+            msg += f" (Bỏ qua {total_skipped} group bị trùng)."
+
         return {
             "success": "success", 
-            "message": f"Đã thêm {total_added} groups vào Sheet Tổng và {h24_added} groups vào Sheet 24h.",
+            "message": msg,
             "data": {
                 "total_sheet_added": total_added,
-                "h24_sheet_added": h24_added
+                "h24_sheet_added": h24_added,
+                "total_skipped": total_skipped
             }
         }
     except Exception as e:

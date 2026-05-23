@@ -4,6 +4,7 @@ import type {
   AddMemberRequest,
   AddMemberResponse,
   AddN8nGroupRequest,
+  GroupTaxonomyFields,
   ApiResponse,
   AssignKpiRequest,
   BulkGroupImportResponse,
@@ -43,6 +44,21 @@ import type {
 const JSON_HEADERS = {
   "Content-Type": "application/json",
 } as const;
+
+function appendTaxonomyFields(
+  body: Record<string, unknown>,
+  tax: GroupTaxonomyFields | undefined,
+  prefix: "" | "new_" = "",
+): void {
+  if (!tax) return;
+  const p = prefix;
+  if (tax.industry?.trim()) body[`${p}industry`] = tax.industry.trim();
+  if (tax.tier != null && tax.tier >= 1 && tax.tier <= 3) body[`${p}tier`] = tax.tier;
+  if (tax.team?.trim()) body[`${p}team`] = tax.team.trim();
+  if (tax.icp?.trim()) body[`${p}icp`] = tax.icp.trim();
+  if (tax.icp_desc?.trim()) body[`${p}icp_desc`] = tax.icp_desc.trim();
+  if (tax.platform?.trim()) body[`${p}platform`] = tax.platform.trim();
+}
 
 function buildHeaders(): HeadersInit {
   if (!API_KEY) {
@@ -248,6 +264,8 @@ export function addN8nGroup(
   };
   if (payload.email?.trim()) body.email = payload.email.trim();
   body.type = (payload.type || "").trim();
+  appendTaxonomyFields(body, payload);
+  if (!body.platform) body.platform = "linkedin";
   return requestJson<N8nGroupOperationResponse>("/api/linkedin/groups/add", {
     method: "POST",
     body: JSON.stringify(body),
@@ -283,6 +301,19 @@ export function updateN8nGroup(
   if (payload.new_type != null && payload.new_type !== "")
     body.new_type = payload.new_type.trim();
   if (payload.email?.trim()) body.email = payload.email.trim();
+  appendTaxonomyFields(body, payload);
+  appendTaxonomyFields(
+    body,
+    {
+      industry: payload.new_industry ?? undefined,
+      tier: payload.new_tier ?? undefined,
+      team: payload.new_team ?? undefined,
+      icp: payload.new_icp ?? undefined,
+      icp_desc: payload.new_icp_desc ?? undefined,
+      platform: payload.new_platform ?? undefined,
+    },
+    "new_",
+  );
   return requestJson<N8nGroupOperationResponse>("/api/linkedin/groups/update", {
     method: "POST",
     body: JSON.stringify(body),

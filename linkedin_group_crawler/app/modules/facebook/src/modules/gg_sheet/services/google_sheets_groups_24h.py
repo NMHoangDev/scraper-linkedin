@@ -1,5 +1,5 @@
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 import gspread
 from google.oauth2.service_account import Credentials
 
@@ -51,17 +51,18 @@ class TargetGroupSheet24HService:
 
     def add_multiple_target_groups(
         self, targets: List[Dict[str, Any]], spreadsheet_id: str = Config.SPREADSHEET_ID
-    ) -> bool:
+    ) -> Tuple[int, int]:
         """Thêm HÀNG LOẠT thực thể GroupSummary vào trang tính.
 
         Tự động tra cứu và loại bỏ các URL (link_group) đã tồn tại.
         Chỉ gửi lên 3 trường: Tên Group, URL và Intent.
+        Trả về: (số lượng thêm thành công, số lượng bị bỏ qua do trùng lặp)
         """
         if not targets:
             #logger.warning(
             #    "Danh sách đầu vào trống. Không có Group mục tiêu nào được chèn."
             #)
-            return False
+            return 0, 0
 
         try:
             worksheet: gspread.Worksheet = self._get_worksheet(spreadsheet_id)
@@ -71,7 +72,7 @@ class TargetGroupSheet24HService:
                 # #logger.error(
                 #     f"Sheet '{self.sheet_name}' chưa có tiêu đề ở dòng 1. Vui lòng thiết lập Header trước."
                 # )
-                return False
+                return 0, len(targets)
 
             # --- Tối ưu hóa: Tải danh sách URL hiện tại để tra cứu nhanh O(1) ---
             url_col_name: str = Config.NAME_URL_GG_SHEET_24H
@@ -133,16 +134,16 @@ class TargetGroupSheet24HService:
                 # logger.info(
                 #     f"Đã chèn {len(rows_to_insert)} Group vào Sheet (Bỏ qua {skipped_count} URL trùng)."
                 # )
-                return True
+                return len(rows_to_insert), skipped_count
             else:
                 # logger.info("Không có dữ liệu Group mới nào để chèn vào Sheet.")
-                return False
+                return 0, skipped_count
 
         except Exception as e:
             # logger.error(
             #     f"Lỗi khi thêm GroupSummary vào Sheet 24h: {e}", exc_info=True
             # )
-            return False
+            return 0, len(targets)
 
     # ==========================================
     # 2. READ (ĐỌC DANH SÁCH GROUP)

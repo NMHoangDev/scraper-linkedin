@@ -48,6 +48,8 @@ import {
   postsShareSameLinkedInUrl,
 } from "@/components/features/linkedin/dashboard/LinkedIn-n8n-sheet-helpers";
 import { resolveProfileSlugFromSheetForEmail } from "@/lib/LinkedIn-resolve-profile-slug-from-sheet";
+import type { FacebookGroupDTO } from "@/components/nguyen/modules/crawldFB/types/dataFb.type";
+import { getLinkedInGroupsService } from "@/components/nguyen/modules/crawldFB/services/group";
 
 const LINKEDIN_GROUP_URL_PATTERN =
   /^https:\/\/(www\.)?linkedin\.com\/groups\/\d+\/?/i;
@@ -102,6 +104,9 @@ export interface DashboardCrawlerValue {
   setFilterDateFrom: (v: string) => void;
   filterDateTo: string;
   setFilterDateTo: (v: string) => void;
+  filterIntent: string;
+  setFilterIntent: (v: string) => void;
+  handleFilterIntent: (v: string) => void;
   isFiltering: boolean;
   filterResult: CrawlSessionGroup[] | null;
   filterMessage: string | null;
@@ -224,6 +229,7 @@ export function useDashboardCrawler(): DashboardCrawlerValue {
   const [filterDate, setFilterDate] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
+  const [filterIntent, setFilterIntent] = useState("all");
   const [isFiltering, setIsFiltering] = useState(false);
   const [filterResult, setFilterResult] = useState<CrawlSessionGroup[] | null>(
     null,
@@ -272,6 +278,7 @@ export function useDashboardCrawler(): DashboardCrawlerValue {
   teamMembersPostsResultRef.current = teamMembersPostsResult;
   const filterResultRef = useRef<CrawlSessionGroup[] | null>(null);
   filterResultRef.current = filterResult;
+  const [linkedinGroups, setLinkedinGroups] = useState<FacebookGroupDTO[]>([]);
 
   const [results, setResults] = useState<CrawlResultRow[]>([]);
   const [page, setPage] = useState(1);
@@ -405,6 +412,7 @@ export function useDashboardCrawler(): DashboardCrawlerValue {
     setFilterDate("");
     setFilterDateFrom("");
     setFilterDateTo("");
+    setFilterIntent("all");
     setFilterAppliedLabel("");
     setFilterResult(null);
     setFilterMessage(null);
@@ -579,6 +587,20 @@ export function useDashboardCrawler(): DashboardCrawlerValue {
     [email],
   );
 
+  const loadLinkedInGroups = useCallback(
+    async (options: { emailOverride?: string } = {}) => {
+      const e = (options.emailOverride ?? email).trim();
+      if (!e) return;
+      try {
+        const list = await getLinkedInGroupsService(e);
+        setLinkedinGroups(list);
+      } catch (err) {
+        console.error("Failed to load linkedin groups", err);
+      }
+    },
+    [email],
+  );
+
   const loadLeaderTeamPostsForMemberEmails = useCallback(
     async (emails: string[]) => {
       if (role !== "leader") {
@@ -697,7 +719,8 @@ export function useDashboardCrawler(): DashboardCrawlerValue {
     if (!email.trim()) return;
     void loadN8nSessions();
     void fetchMyKpi();
-  }, [email, loadN8nSessions, fetchMyKpi]);
+    void loadLinkedInGroups();
+  }, [email, loadN8nSessions, fetchMyKpi, loadLinkedInGroups]);
 
   /** Ghi role lên sheet profile (cùng logic với chuyển tài khoản / xác nhận leader). */
   const upsertLinkedInSheetRole = useCallback(
@@ -863,13 +886,13 @@ export function useDashboardCrawler(): DashboardCrawlerValue {
   }, [email]);
 
   const runN8nDateFilter = useCallback(
-    async (body: Omit<FilterDataRequest, "email">, summary: string) => {
+    async (
+      body: Omit<FilterDataRequest, "email">,
+      summary: string,
+      overrideIntent?: string,
+    ) => {
       setFilterMessage(null);
       setFilterError(null);
-      // Stale-While-Revalidate: Only clear filterResult if there is no cached data
-      if (!filterResultRef.current) {
-        setFilterResult(null);
-      }
       setCrawlTableViewMode("filtered");
 
       const e = email.trim();
@@ -881,22 +904,137 @@ export function useDashboardCrawler(): DashboardCrawlerValue {
 
       setIsFiltering(true);
       try {
-        const response = await filterLinkedInPosts({
-          email: e,
-          ...body,
-        });
+        const source = allPostsResult || [];
+        const activeIntent = overrideIntent !== undefined ? overrideIntent : filterIntent;
 
-        if (!response.success) {
-          throw new Error(response.message || "Không thể filter dữ liệu.");
+        // 1. Tính toán startYmd, endYmd
+        let startYmd = "";
+        let endYmd = "";
+        
+        const dateToYmd = (d: Date): string => {
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, "0");
+          const day = String(d.getDate()).padStart(2, "0");
+          return `${y}-${m}-${day}`;
+        };
+
+        if (body.date) {
+          startYmd = body.date;
+          endYmd = body.date;
+        } else if (body.preset === "last_7_days") {
+          const today = new Date();
+          const start = new Date();
+          start.setDate(today.getDate() - 6);
+          startYmd = dateToYmd(start);
+          endYmd = dateToYmd(today);
+        } else if (body.preset === "last_30_days") {
+          const today = new Date();
+          const start = new Date();
+          start.setDate(today.getDate() - 29);
+          startYmd = dateToYmd(start);
+          endYmd = dateToYmd(today);
+        } else {
+          if (body.date_from) startYmd = body.date_from;
+          if (body.date_to) endYmd = body.date_to;
         }
 
-        const freshData = response.data ?? [];
-        setFilterResult(freshData);
+        // 2. Tạo map URL -> Intent từ linkedinGroups
+        const cleanUrl = (url: string): string => {
+          if (!url) return "";
+          let u = url.trim().toLowerCase();
+          if (u.startsWith("https://")) u = u.slice(8);
+          else if (u.startsWith("http://")) u = u.slice(7);
+          if (u.startsWith("www.")) u = u.slice(4);
+          return u.replace(/\/+$/, "");
+        };
+
+        const groupToIntentMap = new Map<string, string>();
+        for (const g of linkedinGroups) {
+          if (g.url && g.intent) {
+            groupToIntentMap.set(cleanUrl(g.url), g.intent.trim().toLowerCase());
+          }
+        }
+
+        // 3. Helper trích xuất ngày
+        const getPostYmd = (post: any): string | null => {
+          const candidates = ["Ngày", "date", "targetDate", "Đăng vào", "posted_at", "created_at", "dang_vao", "postedAt", "createdAt"];
+          for (const c of candidates) {
+            const val = post[c];
+            if (val) {
+              const match = String(val).trim().match(/(\d{4}-\d{2}-\d{2})/);
+              if (match) return match[1];
+            }
+          }
+          return null;
+        };
+
+        // 4. Helper trích xuất intent
+        const getPostIntent = (post: any): string | null => {
+          const groupUrlCandidates = ["URL_Nhóm", "URL_nhom", "url_nhom", "group_url", "groupUrl", "URLnhom"];
+          let gUrl = "";
+          for (const key of groupUrlCandidates) {
+            if (post[key]) {
+              gUrl = String(post[key]).trim();
+              break;
+            }
+          }
+          if (!gUrl) {
+            for (const key of Object.keys(post)) {
+              const lk = key.toLowerCase();
+              if (lk.includes("url") && (lk.includes("nhom") || lk.includes("group"))) {
+                gUrl = String(post[key]).trim();
+                break;
+              }
+            }
+          }
+          
+          const cleaned = cleanUrl(gUrl);
+          let intent = groupToIntentMap.get(cleaned) || null;
+          if (!intent) {
+            for (const k of ["intent", "Intent", "loại", "type"]) {
+              if (post[k]) {
+                intent = String(post[k]).trim().toLowerCase();
+                break;
+              }
+            }
+          }
+          return intent ? intent.toLowerCase() : null;
+        };
+
+        // 5. Thực hiện lọc
+        const filteredSessions: CrawlSessionGroup[] = [];
+
+        for (const s of source) {
+          const matchedPosts = s.posts.filter((post) => {
+            // Check ngày
+            const postYmd = getPostYmd(post);
+            if (startYmd || endYmd) {
+              if (!postYmd) return false;
+              if (startYmd && postYmd < startYmd) return false;
+              if (endYmd && postYmd > endYmd) return false;
+            }
+            // Check intent
+            if (activeIntent && activeIntent !== "all") {
+              const postIntent = getPostIntent(post);
+              if (postIntent !== activeIntent.toLowerCase()) return false;
+            }
+            return true;
+          });
+
+          if (matchedPosts.length > 0) {
+            filteredSessions.push({
+              ...s,
+              posts: matchedPosts,
+            });
+          }
+        }
+
+        setFilterResult(filteredSessions);
         try {
-          localStorage.setItem(`linkedin_cache_filter_posts_${e}`, JSON.stringify(freshData));
+          localStorage.setItem(`linkedin_cache_filter_posts_${e}`, JSON.stringify(filteredSessions));
         } catch {}
         
-        setFilterMessage("Đã nhận dữ liệu filter từ n8n.");
+        setFilterMessage("Đã lọc dữ liệu thành công trên thiết bị.");
         setFilterAppliedLabel(summary);
       } catch (error) {
         setCrawlTableViewMode("all");
@@ -907,7 +1045,7 @@ export function useDashboardCrawler(): DashboardCrawlerValue {
         setIsFiltering(false);
       }
     },
-    [email],
+    [email, filterIntent, allPostsResult, linkedinGroups],
   );
 
   const handleFilterToday = useCallback(() => {
@@ -978,6 +1116,26 @@ export function useDashboardCrawler(): DashboardCrawlerValue {
     void runN8nDateFilter({ date: d }, `Một ngày: ${d}`);
   }, [filterDate, runN8nDateFilter]);
 
+  const handleFilterIntent = useCallback((nextIntent: string) => {
+    setFilterIntent(nextIntent);
+    let body: Omit<FilterDataRequest, "email"> = {};
+    let summary = `Lọc intent: ${nextIntent}`;
+    
+    if (filterDateFrom.trim() || filterDateTo.trim()) {
+      const from = filterDateFrom.trim();
+      const to = filterDateTo.trim();
+      if (from) body.date_from = from;
+      if (to) body.date_to = to;
+      summary = `Khoảng: ${from || '...'} → ${to || '...'} • Intent: ${nextIntent}`;
+    } else if (filterDate.trim()) {
+      const d = filterDate.trim();
+      body.date = d;
+      summary = `Một ngày: ${d} • Intent: ${nextIntent}`;
+    }
+    
+    void runN8nDateFilter(body, summary, nextIntent);
+  }, [filterDateFrom, filterDateTo, filterDate, runN8nDateFilter]);
+
   const fetchTeamMembers = useCallback(async () => {
     const e = email.trim();
     if (!e || role !== "leader") return;
@@ -1018,9 +1176,10 @@ export function useDashboardCrawler(): DashboardCrawlerValue {
 
   const refreshDashboardData = useCallback(async () => {
     await loadN8nSessions({ clear: true, withSuccessMessage: true });
+    void loadLinkedInGroups();
     if (role === "leader") await refreshLeaderTeamPostsFromStoredMembers();
     setDashboardReloadToken((v) => v + 1);
-  }, [loadN8nSessions, refreshLeaderTeamPostsFromStoredMembers, role]);
+  }, [loadN8nSessions, refreshLeaderTeamPostsFromStoredMembers, role, loadLinkedInGroups]);
 
   const applyAccountCredentials = useCallback(
     async (
@@ -1043,6 +1202,7 @@ export function useDashboardCrawler(): DashboardCrawlerValue {
         withSuccessMessage: true,
         emailOverride: normalizedEmail,
       });
+      void loadLinkedInGroups({ emailOverride: normalizedEmail });
       setDashboardReloadToken((v) => v + 1);
 
       let slugTail = "";
@@ -1062,7 +1222,7 @@ export function useDashboardCrawler(): DashboardCrawlerValue {
         `Đã cập nhật tài khoản và làm mới dữ liệu mới nhất.${slugTail}`,
       );
     },
-    [loadN8nSessions],
+    [loadN8nSessions, loadLinkedInGroups],
   );
 
   const showAllCrawlSessions = useCallback(() => {
@@ -1077,10 +1237,9 @@ export function useDashboardCrawler(): DashboardCrawlerValue {
     setFilterDate("");
     setFilterDateFrom("");
     setFilterDateTo("");
+    setFilterIntent("all");
     setCrawlTableViewMode("all");
-    void loadN8nSessions({ clear: true, withSuccessMessage: true });
-    if (role === "leader") void refreshLeaderTeamPostsFromStoredMembers();
-  }, [loadN8nSessions, refreshLeaderTeamPostsFromStoredMembers, role]);
+  }, []);
 
   const crawlSessionsForTable = useMemo((): CrawlSessionGroup[] | null => {
     if (crawlTableViewMode === "filtered") {
@@ -1341,6 +1500,9 @@ export function useDashboardCrawler(): DashboardCrawlerValue {
     setFilterDateFrom,
     filterDateTo,
     setFilterDateTo,
+    filterIntent,
+    setFilterIntent,
+    handleFilterIntent,
     isFiltering,
     filterResult,
     filterMessage,

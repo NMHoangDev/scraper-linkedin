@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crawl dữ liệu — Redesign</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;background:#f5f5f7;color:#1a1d23;min-height:100vh}
+
+/* PAGE WRAPPER */
+.page{max-width:900px;margin:0 auto;padding:32px 24px 60px}
+
+/* PAGE HEADER */
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px}
+.page-title{font-size:22px;font-weight:800;letter-spacing:-.4px;margin-bottom:3px}
+.page-sub{font-size:12px;color:#8a90a8}
+.btn-add-intent{display:flex;align-items:center;gap:6px;padding:9px 16px;border-radius:9px;border:1.5px solid #6366f1;color:#6366f1;background:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
+.btn-add-intent:hover{background:#eef2ff}
+
+/* SECTION */
+.section{background:#fff;border-radius:14px;border:1px solid #e5e7eb;margin-bottom:16px;overflow:hidden}
+.section-header{padding:16px 20px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;gap:8px}
+.section-num{width:22px;height:22px;background:#6366f1;color:#fff;border-radius:50%;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.section-title{font-size:13px;font-weight:700}
+.section-sub{font-size:11px;color:#8a90a8;margin-left:auto}
+.section-body{padding:16px 20px}
+
+/* FORM ELEMENTS */
+.form-label{font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px}
+.form-input{width:100%;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:9px;font-size:13px;color:#1a1d23;font-family:inherit;outline:none;transition:.15s;background:#fff}
+.form-input:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.1)}
+.form-input::placeholder{color:#b0b6c8}
+.form-select{width:100%;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:9px;font-size:13px;color:#1a1d23;font-family:inherit;outline:none;background:#fff;cursor:pointer;transition:.15s;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath fill='%236b7280' d='M5 6L0 0h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+.form-select:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.1)}
+
+/* AUTH SECTION */
+.auth-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end;margin-bottom:12px}
+.auth-confirm-btn{padding:9px 18px;background:#6366f1;color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:.15s}
+.auth-confirm-btn:hover{background:#4f51d4}
+.auth-confirm-btn.verified{background:#dcfce7;color:#16a34a;border:1.5px solid #86efac}
+.checkbox-row{display:flex;align-items:center;gap:8px;font-size:13px;color:#4b5563;cursor:pointer;padding:4px 0}
+.checkbox-row input{width:16px;height:16px;accent-color:#6366f1;cursor:pointer}
+
+/* PLATFORM TABS */
+.platform-tabs{display:flex;gap:8px;margin-bottom:16px}
+.ptab{display:flex;align-items:center;gap:7px;padding:8px 16px;border-radius:9px;border:1.5px solid #e5e7eb;background:#fff;cursor:pointer;font-size:13px;font-weight:600;color:#6b7280;transition:.15s}
+.ptab:hover{border-color:#6366f1;color:#6366f1}
+.ptab.active{border-color:#6366f1;background:#eef2ff;color:#4338ca}
+.ptab-icon{font-size:16px}
+
+/* GROUP ROWS */
+.groups-list{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
+
+.group-card{border:1.5px solid #e5e7eb;border-radius:12px;overflow:hidden;transition:border-color .15s;background:#fafafa}
+.group-card.expanded{border-color:#6366f1;background:#fff}
+.group-card.has-error{border-color:#fca5a5}
+
+/* Compact row */
+.group-row-compact{display:grid;grid-template-columns:170px 1fr 160px auto auto;gap:10px;align-items:center;padding:12px 14px;cursor:pointer}
+.group-row-compact:hover{background:#f5f5ff}
+.group-card.expanded .group-row-compact{background:#f8f8ff;border-bottom:1px solid #e5e7eb;cursor:default}
+.group-row-compact:hover .expand-hint{opacity:1}
+.expand-hint{font-size:10px;color:#6366f1;opacity:0;transition:.15s;white-space:nowrap}
+
+.row-num{width:24px;height:24px;background:#f1f5f9;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#64748b;flex-shrink:0}
+.group-card.expanded .row-num{background:#6366f1;color:#fff}
+
+/* Tag pills in compact row */
+.tag-pills{display:flex;flex-wrap:wrap;gap:3px}
+.tpill{padding:2px 7px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap}
+.tp-industry{background:#dbeafe;color:#1d4ed8}
+.tp-tier1{background:#fee2e2;color:#dc2626}
+.tp-tier2{background:#fef9c3;color:#92400e}
+.tp-tier3{background:#f1f5f9;color:#64748b}
+.tp-team{background:#dcfce7;color:#15803d}
+.tp-icp{background:#ede9fe;color:#5b21b6}
+.tp-empty{background:#f1f5f9;color:#9ca3af;font-style:italic}
+
+/* Expand toggle */
+.expand-btn{width:28px;height:28px;border-radius:7px;border:1.5px solid #e5e7eb;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;color:#6b7280;transition:.15s;flex-shrink:0}
+.expand-btn:hover{border-color:#6366f1;color:#6366f1}
+.group-card.expanded .expand-btn{background:#6366f1;color:#fff;border-color:#6366f1}
+.del-btn{width:28px;height:28px;border-radius:7px;border:1.5px solid #fca5a5;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;color:#ef4444;transition:.15s;flex-shrink:0}
+.del-btn:hover{background:#fee2e2}
+
+/* Expanded taxonomy panel */
+.group-taxonomy-panel{padding:16px 14px;display:none}
+.group-card.expanded .group-taxonomy-panel{display:block}
+.tax-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
+.tax-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+
+/* Multi-select chips */
+.multi-chips{display:flex;flex-wrap:wrap;gap:5px;padding:8px;border:1.5px solid #e5e7eb;border-radius:9px;min-height:42px;cursor:pointer;transition:.15s;background:#fff}
+.multi-chips:hover{border-color:#6366f1}
+.mc{display:flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;transition:.15s;user-select:none;border:1.5px solid transparent}
+.mc.icp-chip{background:#f1f5f9;color:#374151;border-color:#e5e7eb}
+.mc.icp-chip.selected{background:#ede9fe;color:#5b21b6;border-color:#c4b5fd}
+.mc.team-chip{background:#f1f5f9;color:#374151;border-color:#e5e7eb}
+.mc.team-chip.selected{background:#dcfce7;color:#15803d;border-color:#86efac}
+
+/* Tier radio */
+.tier-options{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
+.tier-opt{border:1.5px solid #e5e7eb;border-radius:9px;padding:9px 10px;cursor:pointer;transition:.15s;text-align:center;background:#fff}
+.tier-opt:hover{border-color:#6366f1}
+.tier-opt.selected{border-color:#6366f1;background:#eef2ff}
+.tier-opt input{display:none}
+.tier-opt-icon{font-size:16px;margin-bottom:2px}
+.tier-opt-title{font-size:11px;font-weight:700;color:#1a1d23}
+.tier-opt-sub{font-size:10px;color:#8a90a8;margin-top:1px}
+
+/* COMPLETION STATUS */
+.group-status{font-size:10px;display:flex;align-items:center;gap:3px}
+.gs-done{color:#16a34a}.gs-warn{color:#f59e0b}.gs-empty{color:#9ca3af}
+
+/* BOTTOM ACTIONS */
+.bottom-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.btn-add-row{display:flex;align-items:center;gap:6px;padding:9px 14px;border-radius:9px;border:1.5px dashed #6366f1;color:#6366f1;background:transparent;font-size:12px;font-weight:600;cursor:pointer;transition:.15s}
+.btn-add-row:hover{background:#eef2ff}
+.btn-pick-existing{display:flex;align-items:center;gap:6px;padding:9px 14px;border-radius:9px;border:1.5px solid #e5e7eb;color:#374151;background:#fff;font-size:12px;font-weight:600;cursor:pointer;transition:.15s}
+.btn-pick-existing:hover{border-color:#6366f1;color:#6366f1}
+.spacer{flex:1}
+.btn-process{padding:11px 28px;background:#6366f1;color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;transition:.15s;display:flex;align-items:center;gap:7px}
+.btn-process:hover{background:#4f51d4}
+.btn-process:disabled{opacity:.5;cursor:not-allowed}
+
+/* HINT */
+.hint-bar{background:#fffbeb;border:1px solid #fde68a;border-radius:9px;padding:10px 14px;font-size:12px;color:#92400e;margin-top:12px;display:flex;align-items:center;gap:7px}
+.hint-bar.success{background:#f0fdf4;border-color:#86efac;color:#14532d}
+
+/* DIVIDER */
+hr{border:none;border-top:1px solid #f3f4f6;margin:14px 0}
+
+/* TOOLTIP tag */
+.field-required{color:#ef4444;margin-left:2px}
+.field-optional{font-size:10px;color:#9ca3af;font-weight:400;margin-left:4px}
+
+/* LEGEND */
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:#6b7280;margin-bottom:12px;background:#f8f9fb;border-radius:9px;padding:9px 12px}
+.legend-item{display:flex;align-items:center;gap:4px}
+.legend-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- PAGE HEADER -->
+<div class="page-header">
+  <div>
+    <div class="page-title">Crawl dữ liệu từ mạng xã hội</div>
+    <div class="page-sub">Thêm và quản lý groups cần crawl. Hệ thống tự động chạy theo lịch.</div>
+  </div>
+  <button class="btn-add-intent" onclick="alert('Mở màn hình Thêm hàng loạt Intent')">＋ Thêm intent mới</button>
+</div>
+
+<!-- SECTION 1: AUTH -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num">1</div>
+    <div class="section-title">Tài khoản đăng nhập</div>
+    <div class="section-sub">Tài khoản để crawl dữ liệu</div>
+  </div>
+  <div class="section-body">
+    <div class="auth-row">
+      <div>
+        <label class="form-label">Email hoặc số điện thoại<span class="field-required">*</span></label>
+        <input class="form-input" id="authEmail" type="text" placeholder="email@example.com hoặc 09xxxxxxxx" oninput="checkAuth()">
+      </div>
+      <button class="auth-confirm-btn" id="authBtn" onclick="verifyAccount()">Xác nhận tài khoản FB</button>
+    </div>
+    <label class="checkbox-row">
+      <input type="checkbox" id="useDefault" onchange="toggleDefault()">
+      Sử dụng tài khoản mặc định của hệ thống
+    </label>
+    <div id="authStatus" style="display:none;margin-top:10px" class="hint-bar success">✅ Tài khoản đã được xác nhận và kết nối thành công</div>
+  </div>
+</div>
+
+<!-- SECTION 2: PLATFORM -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num">2</div>
+    <div class="section-title">Chọn nền tảng</div>
+    <div class="section-sub">Có thể thêm cả Facebook và LinkedIn trong cùng 1 lần</div>
+  </div>
+  <div class="section-body">
+    <div class="platform-tabs">
+      <div class="ptab active" onclick="selectPlatform(this,'facebook')">
+        <span class="ptab-icon">🟦</span> Facebook Groups
+      </div>
+      <div class="ptab" onclick="selectPlatform(this,'linkedin')">
+        <span class="ptab-icon">🔵</span> LinkedIn Groups
+      </div>
+      <div class="ptab" onclick="selectPlatform(this,'both')">
+        <span class="ptab-icon">🔀</span> Cả hai
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 3: GROUPS -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num">3</div>
+    <div class="section-title">Thêm Groups & Phân loại</div>
+    <div class="section-sub" id="groupCount">1 group đang nhập</div>
+  </div>
+  <div class="section-body">
+
+    <!-- LEGEND -->
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#dbeafe"></div>Ngành</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#dcfce7"></div>Team phụ trách</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#ede9fe"></div>ICP</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fee2e2"></div>Tier 1 (ưu tiên cao)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fef9c3"></div>Tier 2</div>
+      <div class="legend-item">👆 Bấm vào row để mở taxonomy</div>
+    </div>
+
+    <!-- GROUP LIST -->
+    <div class="groups-list" id="groupsList">
+
+      <!-- GROUP CARD 1 — Expanded by default -->
+      <div class="group-card expanded" id="gc-1">
+        <!-- Compact Header Row -->
+        <div class="group-row-compact" onclick="toggleExpand('gc-1')">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="row-num">1</div>
+            <div style="min-width:0">
+              <div style="font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="gc-1-name-display">Marketing Việt Nam Pro</div>
+              <div style="font-size:10px;color:#8a90a8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">facebook.com/groups/marketingvn</div>
+            </div>
+          </div>
+          <div></div>
+          <div class="tag-pills" id="gc-1-tags">
+            <span class="tpill tp-industry">📣 Marketing</span>
+            <span class="tpill tp-team">Sales</span>
+            <span class="tpill tp-icp">Marketing Mgr</span>
+            <span class="tpill tp-tier1">🔥 Tier 1</span>
+          </div>
+          <button class="expand-btn" onclick="event.stopPropagation();toggleExpand('gc-1')">▲</button>
+          <button class="del-btn" onclick="event.stopPropagation();deleteGroup('gc-1')">🗑</button>
+        </div>
+
+        <!-- Taxonomy Expanded Panel -->
+        <div class="group-taxonomy-panel">
+
+          <!-- Row 1: Name + URL + Platform -->
+          <div style="display:grid;grid-template-columns:200px 1fr 140px;gap:12px;margin-bottom:14px">
+            <div>
+              <label class="form-label">Tên group<span class="field-required">*</span></label>
+              <input class="form-input" type="text" value="Marketing Việt Nam Pro" oninput="updateName('gc-1',this.value)" placeholder="Tên gợi nhớ">
+            </div>
+            <div>
+              <label class="form-label">URL Group<span class="field-required">*</span></label>
+              <input class="form-input" type="url" value="https://facebook.com/groups/marketingvn" placeholder="https://facebook.com/groups/...">
+            </div>
+            <div>
+              <label class="form-label">Platform<span class="field-required">*</span></label>
+              <select class="form-select">
+                <option value="facebook" selected>🟦 Facebook</option>
+                <option value="linkedin">🔵 LinkedIn</option>
+              </select>
+            </div>
+          </div>
+
+          <hr>
+
+          <!-- Row 2: Taxonomy -->
+          <div style="margin-bottom:10px;font-size:11px;font-weight:700;color:#6366f1;text-transform:uppercase;letter-spacing:.5px">🏷️ Phân loại taxonomy</div>
+
+          <div class="tax-grid">
+            <!-- Ngành -->
+            <div>
+              <label class="form-label">🏭 Ngành / Lĩnh vực<span class="field-required">*</span></label>
+              <select class="form-select">
+                <option>💻 Công Nghệ</option>
+                <option selected>📣 Marketing & Growth</option>
+                <option>🛒 Ecommerce & Sales</option>
+                <option>🚀 Startup & Business</option>
+                <option>👥 HR & Tuyển dụng</option>
+                <option>💰 Tài chính & ĐT</option>
+                <option>✍️ Content & Creator</option>
+                <option>📂 Khác</option>
+              </select>
+            </div>
+            <!-- Tier -->
+            <div>
+              <label class="form-label">🔥 Tier ưu tiên<span class="field-required">*</span></label>
+              <div class="tier-options">
+                <label class="tier-opt selected" onclick="selectTier(this,'gc-1',1)">
+                  <input type="radio" name="tier-gc1" value="1" checked>
+                  <div class="tier-opt-icon">🔥</div>
+                  <div class="tier-opt-title">Tier 1</div>
+                  <div class="tier-opt-sub">Hàng ngày</div>
+                </label>
+                <label class="tier-opt" onclick="selectTier(this,'gc-1',2)">
+                  <input type="radio" name="tier-gc1" value="2">
+                  <div class="tier-opt-icon">⚡</div>
+                  <div class="tier-opt-title">Tier 2</div>
+                  <div class="tier-opt-sub">3 lần/tuần</div>
+                </label>
+                <label class="tier-opt" onclick="selectTier(this,'gc-1',3)">
+                  <input type="radio" name="tier-gc1" value="3">
+                  <div class="tier-opt-icon">👁️</div>
+                  <div class="tier-opt-title">Tier 3</div>
+                  <div class="tier-opt-sub">Theo dõi</div>
+                </label>
+              </div>
+            </div>
+            <!-- Team -->
+            <div>
+              <label class="form-label">👥 Team phụ trách<span class="field-required">*</span> <span class="field-optional">chọn nhiều</span></label>
+              <div class="multi-chips" style="gap:4px">
+                <span class="mc team-chip selected" onclick="toggleChip(this)">✓ Sales</span>
+                <span class="mc team-chip" onclick="toggleChip(this)">Marketing</span>
+                <span class="mc team-chip" onclick="toggleChip(this)">Content</span>
+                <span class="mc team-chip" onclick="toggleChip(this)">BD</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ICP + Description -->
+          <div class="tax-grid-2">
+            <div>
+              <label class="form-label">🎯 Đối tượng ICP <span class="field-optional">chọn nhiều, tối đa 3</span></label>
+              <div class="multi-chips">
+                <span class="mc icp-chip" onclick="toggleChip(this)">CEO/Founder</span>
+                <span class="mc icp-chip selected" onclick="toggleChip(this)">✓ Marketing Mgr</span>
+                <span class="mc icp-chip" onclick="toggleChip(this)">Sales/BD</span>
+                <span class="mc icp-chip" onclick="toggleChip(this)">Developer</span>
+                <span class="mc icp-chip" onclick="toggleChip(this)">SME Owner</span>
+                <span class="mc icp-chip" onclick="toggleChip(this)">Content Creator</span>
+              </div>
+            </div>
+            <div>
+              <label class="form-label">📝 Mô tả đối tượng <span class="field-optional">AI dùng khi generate comment</span></label>
+              <textarea class="form-input" rows="3" style="resize:vertical;font-size:12px" placeholder="VD: Chủ yếu là marketer senior, quan tâm đến performance marketing và growth hack...">Marketer và người làm marketing tại VN, quan tâm công cụ và chiến lược tăng trưởng.</textarea>
+            </div>
+          </div>
+
+        </div><!-- /taxonomy panel -->
+      </div><!-- /gc-1 -->
+
+      <!-- GROUP CARD 2 — Collapsed -->
+      <div class="group-card" id="gc-2">
+        <div class="group-row-compact" onclick="toggleExpand('gc-2')">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="row-num">2</div>
+            <div style="min-width:0">
+              <div style="font-size:12.5px;font-weight:700" id="gc-2-name-display">Dev Vietnam</div>
+              <div style="font-size:10px;color:#8a90a8">facebook.com/groups/devvn</div>
+            </div>
+          </div>
+          <div></div>
+          <div class="tag-pills">
+            <span class="tpill tp-industry">💻 Công Nghệ</span>
+            <span class="tpill tp-team">Sales</span>
+            <span class="tpill tp-icp">Developer</span>
+            <span class="tpill tp-tier2">⚡ Tier 2</span>
+          </div>
+          <button class="expand-btn" onclick="event.stopPropagation();toggleExpand('gc-2')">▼</button>
+          <button class="del-btn" onclick="event.stopPropagation();deleteGroup('gc-2')">🗑</button>
+        </div>
+        <div class="group-taxonomy-panel">
+          <div style="display:grid;grid-template-columns:200px 1fr 140px;gap:12px;margin-bottom:14px">
+            <div><label class="form-label">Tên group<span class="field-required">*</span></label><input class="form-input" type="text" value="Dev Vietnam" oninput="updateName('gc-2',this.value)"></div>
+            <div><label class="form-label">URL Group<span class="field-required">*</span></label><input class="form-input" type="url" value="https://facebook.com/groups/devvn"></div>
+            <div><label class="form-label">Platform<span class="field-required">*</span></label><select class="form-select"><option selected>🟦 Facebook</option><option>🔵 LinkedIn</option></select></div>
+          </div>
+          <hr>
+          <div style="margin-bottom:10px;font-size:11px;font-weight:700;color:#6366f1;text-transform:uppercase;letter-spacing:.5px">🏷️ Phân loại taxonomy</div>
+          <div class="tax-grid">
+            <div><label class="form-label">🏭 Ngành / Lĩnh vực<span class="field-required">*</span></label>
+              <select class="form-select"><option selected>💻 Công Nghệ</option><option>📣 Marketing & Growth</option><option>🛒 Ecommerce</option><option>🚀 Startup</option><option>👥 HR</option><option>📂 Khác</option></select>
+            </div>
+            <div><label class="form-label">🔥 Tier ưu tiên<span class="field-required">*</span></label>
+              <div class="tier-options">
+                <label class="tier-opt" onclick="selectTier(this,'gc-2',1)"><input type="radio" name="tier-gc2" value="1"><div class="tier-opt-icon">🔥</div><div class="tier-opt-title">Tier 1</div><div class="tier-opt-sub">Hàng ngày</div></label>
+                <label class="tier-opt selected" onclick="selectTier(this,'gc-2',2)"><input type="radio" name="tier-gc2" value="2" checked><div class="tier-opt-icon">⚡</div><div class="tier-opt-title">Tier 2</div><div class="tier-opt-sub">3 lần/tuần</div></label>
+                <label class="tier-opt" onclick="selectTier(this,'gc-2',3)"><input type="radio" name="tier-gc2" value="3"><div class="tier-opt-icon">👁️</div><div class="tier-opt-title">Tier 3</div><div class="tier-opt-sub">Theo dõi</div></label>
+              </div>
+            </div>
+            <div><label class="form-label">👥 Team phụ trách<span class="field-required">*</span></label>
+              <div class="multi-chips"><span class="mc team-chip selected" onclick="toggleChip(this)">✓ Sales</span><span class="mc team-chip" onclick="toggleChip(this)">Marketing</span><span class="mc team-chip" onclick="toggleChip(this)">Content</span><span class="mc team-chip" onclick="toggleChip(this)">BD</span></div>
+            </div>
+          </div>
+          <div class="tax-grid-2">
+            <div><label class="form-label">🎯 Đối tượng ICP</label>
+              <div class="multi-chips"><span class="mc icp-chip" onclick="toggleChip(this)">CEO/Founder</span><span class="mc icp-chip" onclick="toggleChip(this)">Marketing Mgr</span><span class="mc icp-chip" onclick="toggleChip(this)">Sales/BD</span><span class="mc icp-chip selected" onclick="toggleChip(this)">✓ Developer</span><span class="mc icp-chip" onclick="toggleChip(this)">SME Owner</span></div>
+            </div>
+            <div><label class="form-label">📝 Mô tả đối tượng</label>
+              <textarea class="form-input" rows="3" style="resize:vertical;font-size:12px" placeholder="AI dùng để generate comment phù hợp...">Dev senior và tech lead, thích thảo luận về tool và kỹ thuật thực tế.</textarea>
+            </div>
+          </div>
+        </div>
+      </div><!-- /gc-2 -->
+
+      <!-- GROUP CARD 3 — Missing taxonomy (warning state) -->
+      <div class="group-card has-error" id="gc-3">
+        <div class="group-row-compact" onclick="toggleExpand('gc-3')">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="row-num" style="background:#fef3c7;color:#92400e">3</div>
+            <div style="min-width:0">
+              <div style="font-size:12.5px;font-weight:700" id="gc-3-name-display">Ecommerce VN Network</div>
+              <div style="font-size:10px;color:#8a90a8">linkedin.com/groups/ecvn</div>
+            </div>
+          </div>
+          <div></div>
+          <div class="tag-pills">
+            <span class="tpill tp-industry">🛒 Ecommerce</span>
+            <span class="tpill tp-empty">⚠️ Chưa chọn team</span>
+          </div>
+          <button class="expand-btn" onclick="event.stopPropagation();toggleExpand('gc-3')">▼</button>
+          <button class="del-btn" onclick="event.stopPropagation();deleteGroup('gc-3')">🗑</button>
+        </div>
+        <div class="group-taxonomy-panel">
+          <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:9px 12px;font-size:12px;color:#92400e;margin-bottom:12px">⚠️ Cần chọn <strong>Team phụ trách</strong> trước khi xử lý dữ liệu.</div>
+          <div style="display:grid;grid-template-columns:200px 1fr 140px;gap:12px;margin-bottom:14px">
+            <div><label class="form-label">Tên group<span class="field-required">*</span></label><input class="form-input" type="text" value="Ecommerce VN Network"></div>
+            <div><label class="form-label">URL Group<span class="field-required">*</span></label><input class="form-input" type="url" value="https://linkedin.com/groups/ecvn"></div>
+            <div><label class="form-label">Platform<span class="field-required">*</span></label><select class="form-select"><option>🟦 Facebook</option><option selected>🔵 LinkedIn</option></select></div>
+          </div>
+          <hr>
+          <div style="margin-bottom:10px;font-size:11px;font-weight:700;color:#6366f1;text-transform:uppercase;letter-spacing:.5px">🏷️ Phân loại taxonomy</div>
+          <div class="tax-grid">
+            <div><label class="form-label">🏭 Ngành / Lĩnh vực<span class="field-required">*</span></label>
+              <select class="form-select"><option>💻 Công Nghệ</option><option>📣 Marketing</option><option selected>🛒 Ecommerce & Sales</option><option>🚀 Startup</option><option>👥 HR</option></select>
+            </div>
+            <div><label class="form-label">🔥 Tier ưu tiên<span class="field-required">*</span></label>
+              <div class="tier-options">
+                <label class="tier-opt" onclick="selectTier(this,'gc-3',1)"><input type="radio" name="tier-gc3" value="1"><div class="tier-opt-icon">🔥</div><div class="tier-opt-title">Tier 1</div><div class="tier-opt-sub">Hàng ngày</div></label>
+                <label class="tier-opt selected" onclick="selectTier(this,'gc-3',2)"><input type="radio" name="tier-gc3" value="2" checked><div class="tier-opt-icon">⚡</div><div class="tier-opt-title">Tier 2</div><div class="tier-opt-sub">3 lần/tuần</div></label>
+                <label class="tier-opt" onclick="selectTier(this,'gc-3',3)"><input type="radio" name="tier-gc3" value="3"><div class="tier-opt-icon">👁️</div><div class="tier-opt-title">Tier 3</div><div class="tier-opt-sub">Theo dõi</div></label>
+              </div>
+            </div>
+            <div><label class="form-label" style="color:#dc2626">👥 Team phụ trách<span class="field-required">*</span> ← chọn team!</label>
+              <div class="multi-chips" style="border-color:#fca5a5"><span class="mc team-chip" onclick="toggleChip(this)">Sales</span><span class="mc team-chip" onclick="toggleChip(this)">Marketing</span><span class="mc team-chip" onclick="toggleChip(this)">Content</span><span class="mc team-chip" onclick="toggleChip(this)">BD</span></div>
+            </div>
+          </div>
+          <div class="tax-grid-2">
+            <div><label class="form-label">🎯 Đối tượng ICP</label>
+              <div class="multi-chips"><span class="mc icp-chip" onclick="toggleChip(this)">CEO/Founder</span><span class="mc icp-chip" onclick="toggleChip(this)">Sales/BD</span><span class="mc icp-chip" onclick="toggleChip(this)">SME Owner</span><span class="mc icp-chip" onclick="toggleChip(this)">Content Creator</span></div>
+            </div>
+            <div><label class="form-label">📝 Mô tả đối tượng</label>
+              <textarea class="form-input" rows="3" style="resize:vertical;font-size:12px" placeholder="AI dùng để generate comment phù hợp..."></textarea>
+            </div>
+          </div>
+        </div>
+      </div><!-- /gc-3 -->
+
+    </div><!-- /groups-list -->
+
+    <!-- BOTTOM ACTIONS -->
+    <div class="bottom-actions">
+      <button class="btn-add-row" onclick="addNewRow()">＋ Thêm group mới</button>
+      <button class="btn-pick-existing" onclick="alert('Mở modal chọn từ groups có sẵn trong hệ thống')">📋 Chọn groups có sẵn</button>
+      <div class="spacer"></div>
+      <button class="btn-process" id="processBtn" onclick="processData()">
+        ⚡ Xử lý dữ liệu
+      </button>
+    </div>
+
+    <div class="hint-bar" id="hintBar">
+      ⚠️ Group #3 chưa điền đầy đủ thông tin taxonomy. Vui lòng hoàn thành trước khi xử lý.
+    </div>
+
+  </div>
+</div><!-- /section 3 -->
+
+</div><!-- /page -->
+
+<script>
+let groupCounter = 3;
+
+function toggleExpand(id) {
+  const card = document.getElementById(id);
+  const isExpanded = card.classList.contains('expanded');
+  // Collapse all others
+  document.querySelectorAll('.group-card.expanded').forEach(c => {
+    if (c.id !== id) {
+      c.classList.remove('expanded');
+      const btn = c.querySelector('.expand-btn');
+      if (btn) btn.textContent = '▼';
+    }
+  });
+  card.classList.toggle('expanded', !isExpanded);
+  const btn = card.querySelector('.expand-btn');
+  if (btn) btn.textContent = !isExpanded ? '▲' : '▼';
+}
+
+function deleteGroup(id) {
+  if (!confirm('Xoá group này?')) return;
+  document.getElementById(id).remove();
+  updateCount();
+}
+
+function updateName(id, val) {
+  const el = document.getElementById(id + '-name-display');
+  if (el) el.textContent = val || '(chưa đặt tên)';
+}
+
+function selectTier(el, gcId, tier) {
+  el.closest('.tier-options').querySelectorAll('.tier-opt').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  // Update tags in compact row
+  const tagContainer = document.querySelector('#' + gcId + ' .tag-pills');
+  if (tagContainer) {
+    const oldTier = tagContainer.querySelector('.tpill[class*="tp-tier"]');
+    if (oldTier) {
+      const labels = {1:'🔥 Tier 1', 2:'⚡ Tier 2', 3:'👁️ Tier 3'};
+      const classes = {1:'tp-tier1', 2:'tp-tier2', 3:'tp-tier3'};
+      oldTier.textContent = labels[tier];
+      oldTier.className = 'tpill ' + classes[tier];
+    }
+  }
+}
+
+function toggleChip(el) {
+  const isSelected = el.classList.contains('selected');
+  if (!isSelected) {
+    el.classList.add('selected');
+    el.textContent = '✓ ' + el.textContent.replace('✓ ', '');
+  } else {
+    el.classList.remove('selected');
+    el.textContent = el.textContent.replace('✓ ', '');
+  }
+}
+
+function selectPlatform(el, val) {
+  document.querySelectorAll('.ptab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function verifyAccount() {
+  const email = document.getElementById('authEmail').value;
+  if (!email) { alert('Vui lòng nhập email hoặc số điện thoại!'); return; }
+  const btn = document.getElementById('authBtn');
+  btn.textContent = 'Đang xác nhận...';
+  btn.disabled = true;
+  setTimeout(() => {
+    btn.textContent = '✓ Đã xác nhận';
+    btn.classList.add('verified');
+    btn.disabled = false;
+    document.getElementById('authStatus').style.display = 'flex';
+  }, 1200);
+}
+
+function toggleDefault() {
+  const checked = document.getElementById('useDefault').checked;
+  const emailInput = document.getElementById('authEmail');
+  const authBtn = document.getElementById('authBtn');
+  if (checked) {
+    emailInput.value = 'account.default@markee.vn';
+    emailInput.disabled = true;
+    authBtn.textContent = '✓ Dùng tài khoản mặc định';
+    authBtn.classList.add('verified');
+    document.getElementById('authStatus').style.display = 'flex';
+  } else {
+    emailInput.value = '';
+    emailInput.disabled = false;
+    authBtn.textContent = 'Xác nhận tài khoản FB';
+    authBtn.classList.remove('verified');
+    document.getElementById('authStatus').style.display = 'none';
+  }
+}
+
+function checkAuth() {
+  const btn = document.getElementById('authBtn');
+  btn.classList.remove('verified');
+  btn.textContent = 'Xác nhận tài khoản FB';
+}
+
+function updateCount() {
+  const count = document.querySelectorAll('.group-card').length;
+  document.getElementById('groupCount').textContent = count + ' group đang nhập';
+}
+
+function addNewRow() {
+  groupCounter++;
+  const id = 'gc-' + groupCounter;
+  const card = document.createElement('div');
+  card.className = 'group-card expanded';
+  card.id = id;
+  card.innerHTML = `
+    <div class="group-row-compact" onclick="toggleExpand('${id}')">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="row-num" style="background:#6366f1;color:#fff">${groupCounter}</div>
+        <div style="min-width:0">
+          <div style="font-size:12.5px;font-weight:700" id="${id}-name-display">(chưa đặt tên)</div>
+          <div style="font-size:10px;color:#8a90a8">Nhập URL bên dưới</div>
+        </div>
+      </div>
+      <div></div>
+      <div class="tag-pills"><span class="tpill tp-empty">Chưa phân loại</span></div>
+      <button class="expand-btn" onclick="event.stopPropagation();toggleExpand('${id}')">▲</button>
+      <button class="del-btn" onclick="event.stopPropagation();deleteGroup('${id}')">🗑</button>
+    </div>
+    <div class="group-taxonomy-panel" style="display:block">
+      <div style="display:grid;grid-template-columns:200px 1fr 140px;gap:12px;margin-bottom:14px">
+        <div><label class="form-label">Tên group<span class="field-required">*</span></label><input class="form-input" type="text" placeholder="Tên gợi nhớ" oninput="updateName('${id}',this.value)"></div>
+        <div><label class="form-label">URL Group<span class="field-required">*</span></label><input class="form-input" type="url" placeholder="https://facebook.com/groups/..."></div>
+        <div><label class="form-label">Platform<span class="field-required">*</span></label><select class="form-select"><option>🟦 Facebook</option><option>🔵 LinkedIn</option></select></div>
+      </div>
+      <hr>
+      <div style="margin-bottom:10px;font-size:11px;font-weight:700;color:#6366f1;text-transform:uppercase;letter-spacing:.5px">🏷️ Phân loại taxonomy</div>
+      <div class="tax-grid">
+        <div><label class="form-label">🏭 Ngành<span class="field-required">*</span></label>
+          <select class="form-select"><option value="">-- Chọn ngành --</option><option>💻 Công Nghệ</option><option>📣 Marketing</option><option>🛒 Ecommerce</option><option>🚀 Startup</option><option>👥 HR</option><option>📂 Khác</option></select>
+        </div>
+        <div><label class="form-label">🔥 Tier<span class="field-required">*</span></label>
+          <div class="tier-options">
+            <label class="tier-opt" onclick="selectTier(this,'${id}',1)"><input type="radio" name="tier-${id}" value="1"><div class="tier-opt-icon">🔥</div><div class="tier-opt-title">Tier 1</div><div class="tier-opt-sub">Hàng ngày</div></label>
+            <label class="tier-opt selected" onclick="selectTier(this,'${id}',2)"><input type="radio" name="tier-${id}" value="2" checked><div class="tier-opt-icon">⚡</div><div class="tier-opt-title">Tier 2</div><div class="tier-opt-sub">3 lần/tuần</div></label>
+            <label class="tier-opt" onclick="selectTier(this,'${id}',3)"><input type="radio" name="tier-${id}" value="3"><div class="tier-opt-icon">👁️</div><div class="tier-opt-title">Tier 3</div><div class="tier-opt-sub">Theo dõi</div></label>
+          </div>
+        </div>
+        <div><label class="form-label">👥 Team<span class="field-required">*</span></label>
+          <div class="multi-chips"><span class="mc team-chip" onclick="toggleChip(this)">Sales</span><span class="mc team-chip" onclick="toggleChip(this)">Marketing</span><span class="mc team-chip" onclick="toggleChip(this)">Content</span><span class="mc team-chip" onclick="toggleChip(this)">BD</span></div>
+        </div>
+      </div>
+      <div class="tax-grid-2">
+        <div><label class="form-label">🎯 ICP</label>
+          <div class="multi-chips"><span class="mc icp-chip" onclick="toggleChip(this)">CEO/Founder</span><span class="mc icp-chip" onclick="toggleChip(this)">Marketing Mgr</span><span class="mc icp-chip" onclick="toggleChip(this)">Sales/BD</span><span class="mc icp-chip" onclick="toggleChip(this)">Developer</span><span class="mc icp-chip" onclick="toggleChip(this)">SME Owner</span></div>
+        </div>
+        <div><label class="form-label">📝 Mô tả đối tượng</label>
+          <textarea class="form-input" rows="3" style="resize:vertical;font-size:12px" placeholder="AI dùng để generate comment phù hợp..."></textarea>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('groupsList').appendChild(card);
+  updateCount();
+  card.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+function processData() {
+  const btn = document.getElementById('processBtn');
+  btn.textContent = '⏳ Đang xử lý...';
+  btn.disabled = true;
+  setTimeout(() => {
+    btn.textContent = '✅ Đã gửi thành công!';
+    btn.style.background = '#22c55e';
+    document.getElementById('hintBar').className = 'hint-bar success';
+    document.getElementById('hintBar').textContent = '✅ 3 groups đã được thêm vào hệ thống và đang được crawl dữ liệu.';
+  }, 1800);
+}
+</script>
+</body>
+</html>

@@ -1,5 +1,4 @@
 import { useMutation, UseMutationOptions } from "@tanstack/react-query";
-import { api } from "../services/api";
 import axiosClient from "../../../shared/api/axiosClient";
 
 interface DeleteGroupPayload {

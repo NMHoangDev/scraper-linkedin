@@ -1,15 +1,19 @@
 "use client";
 
-import { MaterialIcon } from "@/components/ui";
-import {DashboardPosts} from "../../nguyen/modules/crawldFB/components/dashboardPost"
-import CrawlFb_form from "@/components/nguyen/modules/crawldFB/components/crawlFB_form";
-/**
- * Khung feed / bảng / card / chi tiết cho Facebook — team Facebook tự triển khai tại đây
- * (hoặc tách thêm module con). Sidebar và chọn nền tảng dùng chung với LinkedIn.
- */
-export function FacebookDashboardHomeContent() {
+import { DashboardPosts } from "@/components/nguyen/modules/crawldFB/components/dashboardPost";
+
+export function FacebookDashboardHomeContent({ hideHeader }: { hideHeader?: boolean }) {
   return (
-    <DashboardPosts/>
-   
+    <>
+      {!hideHeader && (
+        <div className="mb-xl">
+          <h1 className="text-h1 text-on-surface mb-xs font-semibold">Post Feed</h1>
+          <p className="text-body-lg text-on-surface-variant">
+            Bài viết đã crawl từ các nhóm Facebook — phiên cào, điểm và tương tác theo sheet.
+          </p>
+        </div>
+      )}
+      <DashboardPosts forcedPlatform="facebook" />
+    </>
   );
 }

@@ -13,6 +13,11 @@ class GroupItem(BaseModel):
     posts_per_week: Optional[int] = 0
     health_score: Optional[int] = 0
     chay_24h: Optional[bool] = False
+    industry: Optional[str] = ""
+    tier: Optional[int] = 0
+    team: Optional[str] = ""
+    icp: Optional[str] = ""
+    icp_desc: Optional[str] = ""
 
 class BulkAddGroupPayload(BaseModel):
     groups: List[GroupItem]
@@ -48,6 +53,12 @@ class GroupItemResponse(BaseModel):
     chay_24h: Optional[bool] = False
     last_crawl: Optional[str] = ""     # Thêm trường này
     status: Optional[str] = "DEAD"
+    industry: Optional[str] = ""
+    tier: Optional[int] = 0
+    team: Optional[str] = ""
+    icp: Optional[str] = ""
+    icp_desc: Optional[str] = ""
+
 class GetGroupsResponse(BaseModel):
     status: str
     message: str

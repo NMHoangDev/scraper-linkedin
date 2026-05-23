@@ -1,30 +1,41 @@
 // src/modules/group/hooks/useGetPresetGroups.ts
 import { useState, useCallback } from "react";
 import { FacebookGroupDTO } from "../types/dataFb.type";
-import { getPresetGroupsService } from "../services/group"; // ✅ Import Service thuần
+import { getPresetGroupsService, getLinkedInGroupsService } from "../services/group";
 
 export const useGetPresetGroups = () => {
     const [presetGroups, setPresetGroups] = useState<FacebookGroupDTO[]>([]);
     const [isLoadingGroups, setIsLoadingGroups] = useState<boolean>(false);
     const [errorGroups, setErrorGroups] = useState<string | null>(null);
 
-    const fetchPresetGroups = useCallback(async () => {
+    const fetchPresetGroups = useCallback(async (linkedInEmail?: string) => {
         setIsLoadingGroups(true);
         setErrorGroups(null);
 
         try {
-            // ✅ Gọi tầng Service xử lý data thay vì viết Axios trực tiếp ở đây
-            const data = await getPresetGroupsService();
-            console.log(data);
+            const email = linkedInEmail?.trim() ?? "";
+            const [fbData, liData] = await Promise.all([
+                getPresetGroupsService().catch(err => {
+                    console.error("Lỗi fetch FB groups:", err);
+                    return [];
+                }),
+                getLinkedInGroupsService(email).catch(err => {
+                    console.error("Lỗi fetch LI groups:", err);
+                    return [];
+                })
+            ]);
+
+            // Map platform labels to data
+            const fbGroups = fbData.map(g => ({ ...g, platform: 'facebook' }));
+            const liGroups = liData.map(g => ({ ...g, platform: 'linkedin' }));
             
-            setPresetGroups(data);
+            const combinedData = [...fbGroups, ...liGroups];
+            setPresetGroups(combinedData);
             setIsLoadingGroups(false);
-            return data;
+            return combinedData;
         } catch (error: any) {
             setIsLoadingGroups(false);
-            // Trích xuất lỗi chuẩn từ Axios bọc lại cho UI hiển thị
-            const errorMsg = error?.response?.data?.message || "Lỗi tải danh sách Facebook Group.";
-            setErrorGroups(errorMsg);
+            setErrorGroups("Lỗi tải danh sách Group.");
             return [];
         }
     }, []);
