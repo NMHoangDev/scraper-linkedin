@@ -13,7 +13,6 @@ import {
   PlatformStatCard,
   PlatformStatsRow,
 } from "@/components/features/shared/PlatformStatCard";
-import { FilterChipBar } from "@/components/features/shared/FilterChipBar";
 import { MaterialIcon } from "@/components/ui";
 import {
   INDUSTRY_OPTIONS,
@@ -393,16 +392,55 @@ export function DashboardGroups({
     end: endPage,
   } = getPaginationNumbers();
 
+  // Dynamic unique industry values present in the current dataset (case-insensitive deduplication)
+  const uniqueIndustriesInGroups = Array.from(
+    new Set(
+      presetGroups
+        .map((g) => g.industry)
+        .filter((ind): ind is string => typeof ind === "string" && ind.trim() !== "")
+    )
+  );
+  
+  const allIndustryValues = Array.from(
+    new Set([
+      ...INDUSTRY_OPTIONS.map((o) => o.value),
+      ...uniqueIndustriesInGroups
+    ])
+  );
+
   const industryChips = [
     { id: "all", label: "Tất cả" },
-    ...INDUSTRY_OPTIONS.map((o) => ({
-      id: o.value.toLowerCase(),
-      label: o.label,
-    })),
+    ...allIndustryValues.map((val) => {
+      const matched = INDUSTRY_OPTIONS.find((o) => o.value.toLowerCase() === val.toLowerCase());
+      return {
+        id: val.toLowerCase(),
+        label: matched ? matched.label : `📂 ${val}`,
+      };
+    }),
   ];
+
+  // Dynamic unique team values present in the current dataset (case-insensitive deduplication)
+  const uniqueTeamsInGroups = Array.from(
+    new Set(
+      presetGroups
+        .flatMap((g) => teamOrIcpToArray(g.team))
+        .filter((t) => t.trim() !== "")
+    )
+  );
+
+  const allTeamValues = Array.from(
+    new Set([
+      ...TEAM_OPTIONS,
+      ...uniqueTeamsInGroups
+    ])
+  );
+
   const teamChips = [
     { id: "all", label: "Tất cả" },
-    ...TEAM_OPTIONS.map((t) => ({ id: t.toLowerCase(), label: t })),
+    ...allTeamValues.map((t) => ({
+      id: t.toLowerCase(),
+      label: t,
+    })),
   ];
   const tierChips = [
     { id: "all", label: "Tất cả" },
@@ -453,53 +491,32 @@ export function DashboardGroups({
       </div>
 
       <div className="border-outline-variant bg-surface flex flex-col overflow-hidden rounded-xl border">
-        <div className="border-outline-variant bg-surface-container-low/50 space-y-sm border-b p-md">
-          <p className="text-on-surface-variant text-[10px] font-bold tracking-wide uppercase">
-            Lọc theo taxonomy
-          </p>
-          <FilterChipBar
-            label="Ngành"
-            options={industryChips}
-            activeId={industryFilter}
-            onChange={setIndustryFilter}
-          />
-          <FilterChipBar
-            label="Team"
-            options={teamChips}
-            activeId={teamFilter}
-            onChange={setTeamFilter}
-          />
-          <FilterChipBar
-            label="Tier"
-            options={tierChips}
-            activeId={tierFilter}
-            onChange={setTierFilter}
-          />
-          <p className="text-on-surface-variant text-[11px] pl-[78px]">
-            Hiển thị {filteredGroups.length} / {scopeGroups.length} groups
-          </p>
-        </div>
         {/* THANH TÌM KIẾM & BỘ LỌC */}
-        <div className="border-outline-variant flex flex-col items-center justify-between gap-md border-b p-md md:flex-row">
-          <h2 className="text-label-md text-on-surface self-start font-bold md:self-center">
-            Danh sách Groups
-          </h2>
+        <div className="border-outline-variant flex flex-col gap-md border-b p-md">
+          <div className="flex flex-col items-start justify-between gap-sm sm:flex-row sm:items-center">
+            <h2 className="text-label-md text-on-surface font-bold">
+              Danh sách Groups
+            </h2>
+            <p className="text-on-surface-variant text-[11px]">
+              Hiển thị {filteredGroups.length} / {scopeGroups.length} groups
+            </p>
+          </div>
 
-          <div className="flex w-full flex-wrap items-center gap-sm md:w-auto">
-            <div className="relative min-w-[200px] flex-1 md:w-60">
+          <div className="flex w-full flex-wrap items-center gap-sm">
+            <div className="relative min-w-[200px] flex-1 sm:flex-none sm:w-60">
               <input
                 type="text"
                 placeholder="Tìm group..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="border-outline-variant bg-surface-container-low focus:border-primary w-full rounded-lg border px-md py-sm text-xs outline-none"
+                className="border-outline-variant bg-surface focus:border-primary focus:ring-primary w-full rounded-lg border px-md py-sm text-xs outline-none focus:ring-1 transition-colors"
               />
             </div>
             {!forcedPlatform ? (
               <select
                 value={platformFilter}
                 onChange={(e) => setPlatformFilter(e.target.value)}
-                className="border-outline-variant bg-surface-container-low focus:border-primary rounded-lg border px-md py-sm text-xs outline-none"
+                className="border-outline-variant bg-surface focus:border-primary focus:ring-primary rounded-lg border px-md py-sm text-xs outline-none focus:ring-1 cursor-pointer transition-colors"
               >
                 <option value="all">Tất cả platform</option>
                 <option value="facebook">Facebook</option>
@@ -509,7 +526,7 @@ export function DashboardGroups({
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-600 outline-none focus:border-violet-500 cursor-pointer"
+              className="border-outline-variant bg-surface focus:border-primary focus:ring-primary rounded-lg border px-md py-sm text-xs outline-none focus:ring-1 cursor-pointer transition-colors"
             >
               <option value="all">Tất cả trạng thái</option>
               <option value="active">Sống</option>
@@ -519,7 +536,7 @@ export function DashboardGroups({
             <select
               value={intentFilter}
               onChange={(e) => setIntentFilter(e.target.value)}
-              className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-600 outline-none focus:border-violet-500 cursor-pointer"
+              className="border-outline-variant bg-surface focus:border-primary focus:ring-primary rounded-lg border px-md py-sm text-xs outline-none focus:ring-1 cursor-pointer transition-colors"
             >
               <option value="all">Tất cả Intent</option>
               {uniqueIntents.map((intent) => (
@@ -528,6 +545,77 @@ export function DashboardGroups({
                 </option>
               ))}
             </select>
+            
+            {/* Bộ lọc Ngành */}
+            <select
+              value={industryFilter}
+              onChange={(e) => setIndustryFilter(e.target.value)}
+              className="border-outline-variant bg-surface focus:border-primary focus:ring-primary rounded-lg border px-md py-sm text-xs outline-none focus:ring-1 cursor-pointer transition-colors"
+            >
+              <option value="all">Tất cả Ngành</option>
+              {allIndustryValues.map((val) => {
+                const matched = INDUSTRY_OPTIONS.find((o) => o.value.toLowerCase() === val.toLowerCase());
+                return (
+                  <option key={val} value={val.toLowerCase()}>
+                    {matched ? matched.label : val}
+                  </option>
+                );
+              })}
+            </select>
+
+            {/* Bộ lọc Team */}
+            <select
+              value={teamFilter}
+              onChange={(e) => setTeamFilter(e.target.value)}
+              className="border-outline-variant bg-surface focus:border-primary focus:ring-primary rounded-lg border px-md py-sm text-xs outline-none focus:ring-1 cursor-pointer transition-colors"
+            >
+              <option value="all">Tất cả Team</option>
+              {allTeamValues.map((t) => (
+                <option key={t} value={t.toLowerCase()}>
+                  {t}
+                </option>
+              ))}
+            </select>
+
+            {/* Bộ lọc Tier */}
+            <select
+              value={tierFilter}
+              onChange={(e) => setTierFilter(e.target.value)}
+              className="border-outline-variant bg-surface focus:border-primary focus:ring-primary rounded-lg border px-md py-sm text-xs outline-none focus:ring-1 cursor-pointer transition-colors"
+            >
+              <option value="all">Tất cả Tier</option>
+              {TIER_OPTIONS.map((t) => (
+                <option key={t.tier} value={String(t.tier)}>
+                  {t.icon} {t.title}
+                </option>
+              ))}
+            </select>
+
+            {/* Nút Xóa bộ lọc */}
+            {(searchTerm !== "" ||
+              platformFilter !== (forcedPlatform || "all") ||
+              statusFilter !== "all" ||
+              intentFilter !== "all" ||
+              industryFilter !== "all" ||
+              teamFilter !== "all" ||
+              tierFilter !== "all") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm("");
+                  setPlatformFilter(forcedPlatform || "all");
+                  setStatusFilter("all");
+                  setIntentFilter("all");
+                  setIndustryFilter("all");
+                  setTeamFilter("all");
+                  setTierFilter("all");
+                }}
+                className="border-outline-variant hover:border-error hover:text-error text-on-surface-variant flex items-center gap-1 rounded-lg border px-md py-sm text-xs font-bold transition cursor-pointer"
+              >
+                <MaterialIcon name="filter_alt_off" className="text-[16px]" />
+                Xóa bộ lọc
+              </button>
+            )}
           </div>
         </div>
 
