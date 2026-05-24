@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { INDUSTRY_OPTIONS, TEAM_OPTIONS, TIER_OPTIONS } from "@/lib/group-taxonomy";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +38,30 @@ export function GroupTaxonomyFields({
   disabled = false,
   className,
 }: GroupTaxonomyFieldsProps) {
+  const [showCustomIndustry, setShowCustomIndustry] = useState(() => {
+    return industry !== "" && !INDUSTRY_OPTIONS.some((o) => o.value === industry);
+  });
+
+  const [showCustomTeam, setShowCustomTeam] = useState(() => {
+    return team !== "" && !TEAM_OPTIONS.includes(team as any);
+  });
+
+  useEffect(() => {
+    if (industry !== "" && INDUSTRY_OPTIONS.some((o) => o.value === industry)) {
+      setShowCustomIndustry(false);
+    } else if (industry !== "" && !INDUSTRY_OPTIONS.some((o) => o.value === industry)) {
+      setShowCustomIndustry(true);
+    }
+  }, [industry]);
+
+  useEffect(() => {
+    if (team !== "" && TEAM_OPTIONS.includes(team as any)) {
+      setShowCustomTeam(false);
+    } else if (team !== "" && !TEAM_OPTIONS.includes(team as any)) {
+      setShowCustomTeam(true);
+    }
+  }, [team]);
+
   return (
     <div className={cn("space-y-md", className)}>
       <p className={LABEL}>Phân loại & ICP (Taxonomy)</p>
@@ -45,8 +70,17 @@ export function GroupTaxonomyFields({
           <label className={LABEL}>Ngành</label>
           <select
             className={INPUT}
-            value={industry}
-            onChange={(e) => onIndustryChange(e.target.value)}
+            value={showCustomIndustry ? "__custom__" : industry}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === "__custom__") {
+                setShowCustomIndustry(true);
+                onIndustryChange("");
+              } else {
+                setShowCustomIndustry(false);
+                onIndustryChange(val);
+              }
+            }}
             disabled={disabled}
           >
             <option value="">— Chọn ngành —</option>
@@ -55,14 +89,34 @@ export function GroupTaxonomyFields({
                 {o.label}
               </option>
             ))}
+            <option value="__custom__">✍️ Khác (tự nhập)...</option>
           </select>
+          {showCustomIndustry && (
+            <input
+              type="text"
+              className={cn(INPUT, "mt-2")}
+              value={industry}
+              onChange={(e) => onIndustryChange(e.target.value)}
+              placeholder="Nhập tên ngành tự định nghĩa..."
+              disabled={disabled}
+            />
+          )}
         </div>
         <div>
           <label className={LABEL}>Team phụ trách</label>
           <select
             className={INPUT}
-            value={team}
-            onChange={(e) => onTeamChange(e.target.value)}
+            value={showCustomTeam ? "__custom__" : team}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === "__custom__") {
+                setShowCustomTeam(true);
+                onTeamChange("");
+              } else {
+                setShowCustomTeam(false);
+                onTeamChange(val);
+              }
+            }}
             disabled={disabled}
           >
             <option value="">— Chọn team —</option>
@@ -71,7 +125,18 @@ export function GroupTaxonomyFields({
                 {t}
               </option>
             ))}
+            <option value="__custom__">✍️ Khác (tự nhập)...</option>
           </select>
+          {showCustomTeam && (
+            <input
+              type="text"
+              className={cn(INPUT, "mt-2")}
+              value={team}
+              onChange={(e) => onTeamChange(e.target.value)}
+              placeholder="Nhập tên team tự định nghĩa..."
+              disabled={disabled}
+            />
+          )}
         </div>
       </div>
 
