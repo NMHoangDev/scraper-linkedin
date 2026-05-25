@@ -46,8 +46,24 @@ SUBMIT_SELECTORS = [
     'button:has-text("Log in")',
 ]
 
-OTP_INPUT_SELECTOR = "#input__email_verification_pin"
-OTP_SUBMIT_SELECTOR = "#email-pin-submit-button"
+OTP_INPUT_SELECTORS = [
+    "#input__email_verification_pin",
+    "input[name='pin']",
+    "input[id='input__email_verification_pin']",
+    "input[name='code']",
+    "input[autocomplete='one-time-code']",
+    "input[type='text'][id*='pin']",
+    "input[type='text'][id*='code']",
+]
+OTP_SUBMIT_SELECTORS = [
+    "#email-pin-submit-button",
+    "button[type='submit']",
+    "button#email-pin-submit-button",
+    "button:has-text('Submit')",
+    "button:has-text('Verify')",
+    "button:has-text('Xác nhận')",
+    "button:has-text('Gửi')",
+]
 PENDING_LOGIN_TTL_SEC = 900
 
 
@@ -484,6 +500,9 @@ def _wait_for_login_session(page: Page, context: BrowserContext, timeout_ms: int
         if _context_has_li_at_cookie(context) and not _is_authwall_url(page.url):
             return
 
+        if _is_checkpoint_challenge_url(page.url):
+            raise RuntimeError("checkpoint_challenge")
+
         try:
             page.wait_for_timeout(1000)
         except Error:
@@ -552,7 +571,7 @@ def _existing_state_is_reusable(state_path: Path) -> bool:
 def _is_checkpoint_challenge_url(current_url: str) -> bool:
     parsed = urlparse((current_url or "").strip())
     path = (parsed.path or "").lower()
-    return path.startswith("/checkpoint/challenge")
+    return path.startswith("/checkpoint")
 
 
 def _close_pending_browser_objects(pending: PendingLoginSession) -> None:
@@ -841,9 +860,17 @@ def verify_pending_login_otp(
         if target_url and page.url != target_url:
             page.goto(target_url, wait_until="domcontentloaded", timeout=120000)
 
-        page.wait_for_selector(OTP_INPUT_SELECTOR, timeout=30000)
-        page.fill(OTP_INPUT_SELECTOR, otp_value)
-        page.click(OTP_SUBMIT_SELECTOR)
+        otp_input = _first_visible_locator(page, OTP_INPUT_SELECTORS, timeout_ms=30000)
+        if otp_input is None:
+            raise RuntimeError("Không tìm thấy trường nhập mã OTP trên trang checkpoint.")
+
+        _set_input_value(otp_input, otp_value)
+
+        otp_submit = _first_visible_locator(page, OTP_SUBMIT_SELECTORS, timeout_ms=10000)
+        if otp_submit is not None:
+            otp_submit.click(force=True)
+        else:
+            otp_input.press("Enter")
 
         end_time = time.time() + 120
         while time.time() < end_time:
