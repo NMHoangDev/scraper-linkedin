@@ -1,7 +1,11 @@
 """Tests for LinkedIn guest/login URL detection."""
 
 from app.modules.linkedin.schemas.request_models import resolve_playwright_session_email
-from app.modules.linkedin.services.auth_service import _is_authwall_url, _is_linkedin_authenticated_app_url
+from app.modules.linkedin.services.auth_service import (
+    _is_authwall_url,
+    _is_linkedin_authenticated_app_url,
+    _is_checkpoint_challenge_url,
+)
 
 
 def test_authwall_detects_login_paths() -> None:
@@ -47,3 +51,10 @@ def test_resolve_playwright_email_prefers_email_crawl() -> None:
         )
         == "fallback@gmail.com"
     )
+
+
+def test_checkpoint_challenge_url() -> None:
+    assert _is_checkpoint_challenge_url("https://www.linkedin.com/checkpoint/challenge/123")
+    assert _is_checkpoint_challenge_url("https://www.linkedin.com/checkpoint/lg/login-submit-secure")
+    assert _is_checkpoint_challenge_url("https://www.linkedin.com/checkpoint/")
+    assert not _is_checkpoint_challenge_url("https://www.linkedin.com/feed")
