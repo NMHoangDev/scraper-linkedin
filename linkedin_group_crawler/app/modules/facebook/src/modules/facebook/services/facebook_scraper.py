@@ -42,12 +42,11 @@ class FacebookScraper:
     ) -> List[GroupSummary]:
         
         results: List[GroupSummary] = []
-        
         with sync_playwright() as p:
             # ── CẤU HÌNH HEADLESS TỐI ƯU CHO VPS PRODUCTION ────────────────────
             # Đổi headless=True tiết kiệm RAM, thêm các cờ chống dội tài nguyên
             browser = p.chromium.launch(
-                headless=True,
+                headless=True,  
                 args=[
                     '--disable-blink-features=AutomationControlled',
                     '--disable-dev-shm-usage',
@@ -251,7 +250,7 @@ class FacebookScraper:
                                     media_url=media_url, images=image_urls,
                                 )
                                 all_valid_posts.append(post)
-
+                                
                                 if len(seen_urls) >= safe_limit:
                                     should_stop = True
                                     break

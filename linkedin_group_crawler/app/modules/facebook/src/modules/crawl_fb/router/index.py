@@ -4,7 +4,7 @@ import asyncio
 import logging
 from pathlib import Path
 from fastapi import APIRouter, Depends, status, BackgroundTasks, WebSocket, WebSocketDisconnect
-from typing import List, Optional, Dict
+from typing import Any, List, Optional, Dict
 from pydantic import BaseModel
 import uuid
 # Imports từ project của bạn
@@ -142,151 +142,323 @@ async def get_all_facebook_posts(
     return posts
 
 # ROUTER WEBSOCKET XẾP HÀNG YÊU CẦU CÀO DỮ LIỆU
+# @crawl_fb_router.websocket("/ws/CrawlFbForFE/{email}")
+# async def websocket_crawl_endpoint(websocket: WebSocket, email: str):
+#     """WebSocket API for Facebook crawl data request queuing.
+
+#     Không dùng ``Depends(get_crawl_service)`` trên WebSocket — FastAPI resolve dependency
+#     *trước* ``accept()``, lỗi Google credentials/config sẽ gây đóng kết nối 1006 im lặng.
+#     """
+#     logger.info("WebSocket connection attempt from %s", email)
+#     logger.info(
+#         "Client headers: origin=%s, host=%s",
+#         websocket.headers.get("origin"),
+#         websocket.headers.get("host"),
+#     )
+
+#     try:
+#         await websocket.accept()
+#         logger.info("WebSocket accepted for %s", email)
+#     except Exception as e:
+#         logger.error("Failed to accept WebSocket for %s: %s", email, e, exc_info=True)
+#         return
+
+#     try:
+#         service = get_crawl_service()
+#     except Exception as e:
+#         logger.error("CrawlService init failed for %s: %s", email, e, exc_info=True)
+#         try:
+#             await websocket.send_json(
+#                 {
+#                     "status": "error",
+#                     "message": (
+#                         "Không khởi tạo được dịch vụ crawl Facebook. "
+#                         "Kiểm tra GOOGLE_CREDENTIALS_PATH, SPREADSHEET_ID trong .env backend. "
+#                         f"Chi tiết: {e}"
+#                     ),
+#                 }
+#             )
+#             await websocket.close(code=1011, reason="Service init failed")
+#         except Exception:
+#             pass
+#         return
+
+#     await manager.connect(websocket, email, accept=False)
+#     cancel_registry[email] = False
+
+#     try:
+#         logger.info(f"Waiting for payload from {email}...")
+#         data = await websocket.receive_text()
+#         logger.info(f"Received payload from {email}, size: {len(data)} bytes")
+#         payload_dict = json.loads(data)
+#         payload = CrawlPayload(**payload_dict)
+
+#         await manager.send_json(
+#             {
+#                 "status": "processing",
+#                 "message": f"Processing crawl request for {email}...",
+#             },
+#             email,
+#         )
+
+#         # 2. ✅ CHUẨN SENIOR: TẠO BACKGROUND TASK ĐỘC LẬP
+#         # Đẩy luồng I/O nặng sang Async Task để giải phóng hoàn toàn Event Loop
+#         crawl_task = asyncio.create_task(
+#             service.FetchDataDirectly(payload, client_id=email)
+#         )
+
+#         # 3. ✅ VÒNG LẶP DUY TRÌ KẾT NỐI (POLLING & HEARTBEAT LOOP)
+#         elapsed_seconds = 0
+
+#         while not crawl_task.done():
+#             # A. KIỂM TRA LỆNH HỦY TỪ USER
+#             # Chỉ hủy khi cờ cancel_registry thực sự được Admin/User bật sang True
+#             if cancel_registry.get(email):
+#                 crawl_task.cancel()  # Gửi tín hiệu ngắt ngay lập tức vào Task ngầm
+#                 await manager.send_json(
+#                     {"status": "canceled", "message": "Đã hủy tiến trình cào dữ liệu."},
+#                     email,
+#                 )
+#                 await websocket.close()
+#                 manager.disconnect(email)
+#                 return
+
+#             # B. CƠ CHẾ HEARTBEAT (Bơm tín hiệu mỗi 30 giây)
+#             # Ngăn chặn các bộ định tuyến mạng (Nginx, Cloudflare) ngắt Socket do rỗi (Idle)
+#             if elapsed_seconds % 30 == 0 and elapsed_seconds > 0:
+#                 try:
+#                     await manager.send_json(
+#                         {
+#                             "status": "heartbeat",
+#                             "message": f"Tiến trình vẫn đang thu thập dữ liệu ngầm... ({elapsed_seconds // 60} phút)",
+#                         },
+#                         email,
+#                     )
+#                 except Exception:
+#                     # Rớt mạng Client -> Bỏ qua lỗi gửi tin để Task ngầm tiếp tục sống
+#                     pass
+
+#             # C. NHƯỜNG LUỒNG (1 giây) để hệ điều hành phản hồi các gói tin TCP/Ping ngầm
+#             await asyncio.sleep(1)
+#             elapsed_seconds += 1
+
+#         # 4. ✅ TRÍCH XUẤT KẾT QUẢ KHI TIẾN TRÌNH HOÀN TẤT
+#         try:
+#             raw_result = crawl_task.result()
+
+#             # Chuẩn hóa dữ liệu đầu ra
+#             actual_data_list = (
+#                 raw_result["data"]
+#                 if isinstance(raw_result, dict) and "data" in raw_result
+#                 else raw_result
+#             )
+
+#             # --- NƠI ĐÂY LÀ LOGIC ĐƯA VÀO GOOGLE SHEET CỦA BẠN ---
+#             # ...
+
+#             # Gửi kết quả cuối cùng cho Client (Nếu họ vẫn còn đang mở kết nối)
+#             if not cancel_registry.get(email):
+#                 standardized_response = {
+#                     "status": "success",
+#                     "message": "Cào dữ liệu thành công!",
+#                     "data": actual_data_list,
+#                 }
+#                 await manager.send_json(standardized_response, email)
+
+#         except asyncio.CancelledError:
+#             # Luồng Task bị ngắt do lệnh Cancel -> Thoát êm ái
+#             pass
+#         except Exception as task_error:
+#             # Bắt trọn vẹn lỗi từ Scraper (lỗi parse, rớt mạng HĐH ngầm...)
+#             if not cancel_registry.get(email):
+#                 await manager.send_json(
+#                     {"status": "error", "message": f"Lỗi Scraper: {str(task_error)}"},
+#                     email,
+#                 )
+
+#         # Chủ động đóng socket khi toàn bộ quy trình kết thúc trọn vẹn
+#         await websocket.close()
+#         manager.disconnect(email)
+#         logger.info(f"WebSocket closed cleanly for {email}")
+
+#     except WebSocketDisconnect:
+#         logger.warning(f"WebSocket disconnected for {email} (background task continues)")
+#         manager.disconnect(email)
+
+#     except Exception as general_error:
+#         logger.error(f"WebSocket error for {email}: {general_error}", exc_info=True)
+#         manager.disconnect(email)
+
+
+import httpx
+
+job_tracker = {}
+
+class WebhookResponse(BaseModel):
+    client_id: str
+    status: str
+    message: Optional[str] = None
+    data: Optional[List[Any]] = []
+
+# ========================================================
+# 1. API ĐÓN KẾT QUẢ (WEBHOOK) TỪ CÁC MÁY CÀY TRẢ VỀ
+# ========================================================
+@crawl_fb_router.post("/webhook/crawl-result")
+async def receive_webhook_result(payload: WebhookResponse):
+    client_id = payload.client_id
+    
+    # ==========================================
+    # 1. GOM DỮ LIỆU TỪ WORKER VÀO TRACKER CHUNG
+    # ==========================================
+    if client_id in job_tracker:
+        job_tracker[client_id]["completed"] += 1
+        if payload.status == "success" and payload.data:
+            # Đảm bảo có key data để không bị lỗi KeyError
+            if "data" not in job_tracker[client_id]:
+                job_tracker[client_id]["data"] = []
+            
+            # Gộp dữ liệu từ máy này vào mảng tổng
+            job_tracker[client_id]["data"].extend(payload.data)
+
+    # ==========================================
+    # 2. XỬ LÝ GIAO DIỆN REALTIME CHO FRONTEND
+    # ==========================================
+    # Nếu không phải CRON, tức là người dùng đang xem trên UI -> Bắn WebSocket
+    if client_id != "CRON_24H":
+        if payload.status == "success":
+            await manager.send_json(
+                {
+                    "status": "partial_success",
+                    "message": f"Vừa nhận dữ liệu từ 1 máy chủ ({len(payload.data)} groups).",
+                    "data": payload.data
+                }, 
+                client_id
+            )
+        else:
+            await manager.send_json(
+                {"status": "warning", "message": f"Máy chủ báo lỗi: {payload.message}"}, 
+                client_id
+            )
+
+    # ==========================================
+    # 3. KIỂM TRA HOÀN THÀNH & CHỐT SỔ LÊN GG SHEETS
+    # ==========================================
+    # Logic này áp dụng cho TẤT CẢ client_id (CRON hay FE đều chạy)
+    if client_id in job_tracker and job_tracker[client_id]["completed"] >= job_tracker[client_id]["total"]:
+        logger.info(f"✅ Tất cả các máy chủ đã hoàn tất lệnh cào cho: {client_id}!")
+        
+        final_data = job_tracker[client_id].get("data", [])
+        
+        if final_data:
+            from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_posts import GoogleSheetServicePosts
+            from app.modules.facebook.src.modules.crawl_fb.models.GroupSummary import GroupSummary
+            # Tạm thời comment Telegram để tránh spam group khi test tay. 
+            # Nếu muốn gửi Telegram luôn thì bạn uncomment 2 dòng dưới:
+            # from app.modules.facebook.src.modules.telegram.services.telegram_service import TelegramService
+            # telegram = TelegramService()
+            
+            service_posts = GoogleSheetServicePosts()
+            
+            # Ép kiểu lại dữ liệu thành các entity GroupSummary chuẩn
+            summaries = [GroupSummary(**item) for item in final_data]
+            
+            try:
+                if service_posts.append_data(data=summaries):
+                    logger.info(f"📊 Đã lưu thành công tổng hợp dữ liệu lên Google Sheets cho {client_id}")
+                    
+                    # Logic báo Telegram (tùy chọn)
+                    # telegram.send_completion_notification()
+                    # mes = telegram.format_daily_telegram_report(summaries=summaries)
+                    # telegram.send_message(mes)
+            except Exception as e:
+                logger.error(f"❌ Lỗi khi lưu Google Sheets cho {client_id}: {e}")
+        
+        # Dọn dẹp tracker giải phóng RAM sau khi hoàn thành
+        del job_tracker[client_id]
+            
+    return {"status": "ok"}
+
 @crawl_fb_router.websocket("/ws/CrawlFbForFE/{email}")
 async def websocket_crawl_endpoint(websocket: WebSocket, email: str):
-    """WebSocket API for Facebook crawl data request queuing.
-
-    Không dùng ``Depends(get_crawl_service)`` trên WebSocket — FastAPI resolve dependency
-    *trước* ``accept()``, lỗi Google credentials/config sẽ gây đóng kết nối 1006 im lặng.
-    """
-    logger.info("WebSocket connection attempt from %s", email)
-    logger.info(
-        "Client headers: origin=%s, host=%s",
-        websocket.headers.get("origin"),
-        websocket.headers.get("host"),
-    )
-
-    try:
-        await websocket.accept()
-        logger.info("WebSocket accepted for %s", email)
-    except Exception as e:
-        logger.error("Failed to accept WebSocket for %s: %s", email, e, exc_info=True)
-        return
-
-    try:
-        service = get_crawl_service()
-    except Exception as e:
-        logger.error("CrawlService init failed for %s: %s", email, e, exc_info=True)
-        try:
-            await websocket.send_json(
-                {
-                    "status": "error",
-                    "message": (
-                        "Không khởi tạo được dịch vụ crawl Facebook. "
-                        "Kiểm tra GOOGLE_CREDENTIALS_PATH, SPREADSHEET_ID trong .env backend. "
-                        f"Chi tiết: {e}"
-                    ),
-                }
-            )
-            await websocket.close(code=1011, reason="Service init failed")
-        except Exception:
-            pass
-        return
-
+    await websocket.accept()
     await manager.connect(websocket, email, accept=False)
     cancel_registry[email] = False
 
     try:
-        logger.info(f"Waiting for payload from {email}...")
         data = await websocket.receive_text()
-        logger.info(f"Received payload from {email}, size: {len(data)} bytes")
-        payload_dict = json.loads(data)
-        payload = CrawlPayload(**payload_dict)
+        payload = CrawlPayload(**json.loads(data))
+        
+        WORKER_URLS = Config.get_worker_urls()
+        MAIN_WEBHOOK_URL = Config.MAIN_WEBHOOK_URL
+        
+        if not WORKER_URLS or not MAIN_WEBHOOK_URL:
+            await manager.send_json({"status": "error", "message": "Lỗi cấu hình VPS. Kiểm tra file .env."}, email)
+            return
+
+        # Chia Lô
+        all_groups_dict = [{"name": g.name, "url": g.url, "Intent": g.Intent} for g in payload.groups]
+        num_workers = len(WORKER_URLS)
+        chunk_size = (len(all_groups_dict) + num_workers - 1) // num_workers
+        batches = [all_groups_dict[i:i + chunk_size] for i in range(0, len(all_groups_dict), chunk_size)]
+
+        # Khởi tạo bộ theo dõi
+        job_tracker[email] = {"total": len(batches), "completed": 0, "data": []}
 
         await manager.send_json(
-            {
-                "status": "processing",
-                "message": f"Processing crawl request for {email}...",
-            },
-            email,
+            {"status": "processing", "message": f"Giao việc cho {len(batches)} máy chủ (bao gồm máy chính)..."}, email
         )
 
-        # 2. ✅ CHUẨN SENIOR: TẠO BACKGROUND TASK ĐỘC LẬP
-        # Đẩy luồng I/O nặng sang Async Task để giải phóng hoàn toàn Event Loop
-        crawl_task = asyncio.create_task(
-            service.FetchDataDirectly(payload, client_id=email)
-        )
+        # PHÁT LỆNH BẰNG HTTPX (Tốc độ ánh sáng, timeout rất ngắn)
+        async with httpx.AsyncClient() as client:
+            for idx, batch in enumerate(batches):
+                url = WORKER_URLS[idx % num_workers]
+                payload_data = {"batch_data": batch, "client_id": email, "webhook_url": MAIN_WEBHOOK_URL}
+                
+                try:
+                    # Gửi lệnh và chỉ đợi max 5s. Máy bên kia nhận là ngắt ngay.
+                    await client.post(url, json=payload_data, timeout=5)
+                except Exception as e:
+                    logger.error(f"Lỗi gọi VPS {url}: {e}")
+                    # Máy nào sập thì đánh dấu "completed" mồi để tí vòng lặp không bị kẹt vô tận
+                    job_tracker[email]["completed"] += 1
+                    await manager.send_json({"status": "warning", "message": f"VPS {idx+1} mất kết nối."}, email)
 
-        # 3. ✅ VÒNG LẶP DUY TRÌ KẾT NỐI (POLLING & HEARTBEAT LOOP)
+        # VÒNG LẶP CHỜ WEBHOOK TỪ CÁC MÁY BÁO VỀ
         elapsed_seconds = 0
-
-        while not crawl_task.done():
-            # A. KIỂM TRA LỆNH HỦY TỪ USER
-            # Chỉ hủy khi cờ cancel_registry thực sự được Admin/User bật sang True
+        # Thêm điều kiện 'email in job_tracker' lên trước
+        while email in job_tracker and job_tracker[email]["completed"] < job_tracker[email]["total"]:
             if cancel_registry.get(email):
-                crawl_task.cancel()  # Gửi tín hiệu ngắt ngay lập tức vào Task ngầm
-                await manager.send_json(
-                    {"status": "canceled", "message": "Đã hủy tiến trình cào dữ liệu."},
-                    email,
-                )
-                await websocket.close()
-                manager.disconnect(email)
-                return
+                await manager.send_json({"status": "canceled", "message": "Đã ngắt theo dõi giao diện."}, email)
+                break
 
-            # B. CƠ CHẾ HEARTBEAT (Bơm tín hiệu mỗi 30 giây)
-            # Ngăn chặn các bộ định tuyến mạng (Nginx, Cloudflare) ngắt Socket do rỗi (Idle)
             if elapsed_seconds % 30 == 0 and elapsed_seconds > 0:
                 try:
                     await manager.send_json(
                         {
                             "status": "heartbeat",
-                            "message": f"Tiến trình vẫn đang thu thập dữ liệu ngầm... ({elapsed_seconds // 60} phút)",
-                        },
-                        email,
+                            "message": f"Đang cào dữ liệu... ({job_tracker[email]['completed']}/{job_tracker[email]['total']} máy chủ đã xong)",
+                        }, email
                     )
-                except Exception:
-                    # Rớt mạng Client -> Bỏ qua lỗi gửi tin để Task ngầm tiếp tục sống
-                    pass
+                except: pass
 
-            # C. NHƯỜNG LUỒNG (1 giây) để hệ điều hành phản hồi các gói tin TCP/Ping ngầm
             await asyncio.sleep(1)
             elapsed_seconds += 1
 
-        # 4. ✅ TRÍCH XUẤT KẾT QUẢ KHI TIẾN TRÌNH HOÀN TẤT
-        try:
-            raw_result = crawl_task.result()
+        # KẾT THÚC
+        if not cancel_registry.get(email):
+            await manager.send_json({"status": "success", "message": "Toàn bộ máy chủ đã hoàn tất!"}, email)
 
-            # Chuẩn hóa dữ liệu đầu ra
-            actual_data_list = (
-                raw_result["data"]
-                if isinstance(raw_result, dict) and "data" in raw_result
-                else raw_result
-            )
-
-            # --- NƠI ĐÂY LÀ LOGIC ĐƯA VÀO GOOGLE SHEET CỦA BẠN ---
-            # ...
-
-            # Gửi kết quả cuối cùng cho Client (Nếu họ vẫn còn đang mở kết nối)
-            if not cancel_registry.get(email):
-                standardized_response = {
-                    "status": "success",
-                    "message": "Cào dữ liệu thành công!",
-                    "data": actual_data_list,
-                }
-                await manager.send_json(standardized_response, email)
-
-        except asyncio.CancelledError:
-            # Luồng Task bị ngắt do lệnh Cancel -> Thoát êm ái
-            pass
-        except Exception as task_error:
-            # Bắt trọn vẹn lỗi từ Scraper (lỗi parse, rớt mạng HĐH ngầm...)
-            if not cancel_registry.get(email):
-                await manager.send_json(
-                    {"status": "error", "message": f"Lỗi Scraper: {str(task_error)}"},
-                    email,
-                )
-
-        # Chủ động đóng socket khi toàn bộ quy trình kết thúc trọn vẹn
+        # Dọn dẹp
+        if email in job_tracker:
+            del job_tracker[email]
+            
         await websocket.close()
         manager.disconnect(email)
-        logger.info(f"WebSocket closed cleanly for {email}")
 
     except WebSocketDisconnect:
-        logger.warning(f"WebSocket disconnected for {email} (background task continues)")
         manager.disconnect(email)
-
-    except Exception as general_error:
-        logger.error(f"WebSocket error for {email}: {general_error}", exc_info=True)
+    except Exception as e:
+        logger.error(f"WS Error: {e}", exc_info=True)
         manager.disconnect(email)
 # ── WRAPPER KIỂM SOÁT LUỒNG ĐĂNG NHẬP ─────────────────────────────────────────
 

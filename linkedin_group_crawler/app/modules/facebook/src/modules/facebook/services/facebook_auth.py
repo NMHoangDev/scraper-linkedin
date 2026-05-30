@@ -266,7 +266,7 @@ class FacebookAuth:
         bot_check_notified = False
         # page.wait_for_timeout(30000) 
         for step in range(self.MAX_CHECKPOINT_RETRIES):
-            page.wait_for_timeout(3000) 
+            page.wait_for_timeout(7000) 
             current_url = page.url
 
             # Trạng thái 1: Thành công vào Feed

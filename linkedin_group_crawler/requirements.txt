@@ -15,4 +15,5 @@ pyotp
 gspread
 apscheduler
 pyngrok
-gspread_asyncio
+celery
+redis

@@ -2,7 +2,7 @@ import asyncio
 import logging
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
-
+import httpx
 # THAY ĐỔI: Sử dụng AsyncIOScheduler
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.executors.asyncio import AsyncIOExecutor
@@ -19,62 +19,74 @@ from app.modules.facebook.src.modules.telegram.services.telegram_service import 
 from app.modules.facebook.src.core.config.env import Config
 from app.modules.facebook.src.modules.crawl_fb.models.GroupSummary import GroupSummary
 
-
+from app.modules.facebook.src.modules.crawl_fb.router.index import job_tracker
 
 
 logger = logging.getLogger(__name__)
 
-def execute_crawl_workflow():
-    """
-    Luồng công việc thực tế cào dữ liệu và báo cáo.
-    """
+async def execute_crawl_workflow():
+    """Luồng đọc sheet 24h và chia lệnh cào cho 3 VPS"""
     logger.info("🚀 BẮT ĐẦU CHẠY TIẾN TRÌNH CÀO DỮ LIỆU TỰ ĐỘNG...")
-    telegram = TelegramService()
     service_24h = TargetGroupSheet24HService()
-    service_posts = GoogleSheetServicePosts()
+    telegram = TelegramService()
     
     try:
+        sheet_data = await asyncio.to_thread(service_24h.get_all_target_groups)
         
-        sheet_data = service_24h.get_all_target_groups()
-        print(f"🚀 Lấy dữ liệu nhóm mục tiêu từ Google Sheet 24h: {sheet_data} nhóm")
-        target_groups: List[GroupTarget] = []
+        all_groups_dict = []
         for row in sheet_data:
-            
             group_url = row.get("url", "").strip()
             group_name = row.get("group_name", "Unknown").strip()
-            Intent = row.get("intent", "").strip()
-            if not group_url: continue
-            target_groups.append(GroupTarget(name=group_name, url=group_url,Intent=Intent or ""))
+            intent = row.get("intent", "").strip()
+            if group_url:
+                all_groups_dict.append({"name": group_name, "url": group_url, "Intent": intent})
 
-        if not target_groups:
+        if not all_groups_dict:
             logger.warning("❌ Không tìm thấy danh sách Group hợp lệ.")
             return
 
-        # 3. Bắt đầu cào
-        logger.info(f"Tổng cộng có {len(target_groups)} group cần cào.")
-        scraper = FacebookScraper(Config)
-        daily_summary_report: List[GroupSummary] = scraper.scrape_groups(target_groups)
+        # 1. Lấy thông tin các VPS
+        WORKER_URLS = Config.get_worker_urls()
+        MAIN_WEBHOOK_URL = Config.MAIN_WEBHOOK_URL
+        
+        if not WORKER_URLS or not MAIN_WEBHOOK_URL:
+            logger.error("❌ Thiếu cấu hình WORKER_URLS hoặc MAIN_WEBHOOK_URL trong .env")
+            return
 
-        # 4. Gửi báo cáo
-        if daily_summary_report:
-            success = service_posts.append_data(data=daily_summary_report)
-            if success:
-                telegram.send_completion_notification()
-                mes = telegram.format_daily_telegram_report(summaries=daily_summary_report)
-                telegram.send_message(mes)
-                logger.info("✅ HOÀN TẤT TIẾN TRÌNH.")
-            else:
-                logger.error("❌ Lỗi khi lưu dữ liệu vào Google Sheet.")
-        else:
-            logger.warning("⚠️ Không thu được dữ liệu.")
+        # 2. Chia lô cho các máy cày
+        num_workers = len(WORKER_URLS)
+        chunk_size = (len(all_groups_dict) + num_workers - 1) // num_workers
+        batches = [all_groups_dict[i:i + chunk_size] for i in range(0, len(all_groups_dict), chunk_size)]
+
+        # 3. Ghi danh vào sổ theo dõi (Để Webhook biết mà hứng)
+        job_tracker["CRON_24H"] = {
+            "total": len(batches),
+            "completed": 0,
+            "data": [] # Khởi tạo mảng rỗng để hứng data đổ về
+        }
+
+        # 4. Phát lệnh gọi các máy cày
+        logger.info(f"Đã chia {len(all_groups_dict)} groups thành {len(batches)} phần. Phát lệnh tới các VPS...")
+        async with httpx.AsyncClient() as client:
+            for idx, batch in enumerate(batches):
+                url = WORKER_URLS[idx % num_workers]
+                payload_data = {
+                    "batch_data": batch, 
+                    "client_id": "CRON_24H", # Định danh là Cronjob
+                    "webhook_url": MAIN_WEBHOOK_URL
+                }
+                try:
+                    await client.post(url, json=payload_data, timeout=5)
+                except Exception as e:
+                    logger.error(f"⚠️ Gửi lệnh thất bại tới {url}: {e}")
+                    # Nếu máy chết, phải +1 completed ảo để Webhook không đợi mãi
+                    job_tracker["CRON_24H"]["completed"] += 1 
 
     except Exception as e:
         logger.error(f"❌ Thất bại: {e}", exc_info=True)
         try:
-            # FIX 2: Thêm 'await' khi gửi tin báo lỗi trong block except
-             telegram.send_message(f"🚨 <b>LỖI HỆ THỐNG</b> 🚨\n\n<code>{str(e)}</code>")
-        except: 
-            pass
+            telegram.send_message(f"🚨 <b>LỖI HỆ THỐNG CRON 24H</b> 🚨\n\n<code>{str(e)}</code>")
+        except: pass
 def execute_update_groups_workflow():
     """
     Luồng công việc tổng hợp chỉ số (Post/tuần, Điểm số cao nhất và Ngày cào gần nhất) 
