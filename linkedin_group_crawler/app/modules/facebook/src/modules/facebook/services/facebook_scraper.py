@@ -16,6 +16,8 @@ from app.modules.facebook.src.core.utils.logger import setup_logger
 from app.modules.facebook.src.modules.crawl_fb.models.GroupSummary import GroupSummary
 from .human_behavior import HumanBehavior
 
+from app.modules.facebook.src.core.utils.facebook_parsers import get_exact_post_time, extract_ts_hint
+
 logger = setup_logger(__name__)
 
 cancel_registry = {}
@@ -244,7 +246,7 @@ class FacebookScraper:
                                 content = PostExtractor.get_content(block)
 
                                 post = Post(
-                                    url=post_url, date=post_date,
+                                    url=post_url, date=get_exact_post_time(post_date) or post_date,
                                     reactions=stats['reactions'], comments=stats['comments'],
                                     shares=stats['shares'], score=score, content=content,
                                     media_url=media_url, images=image_urls,

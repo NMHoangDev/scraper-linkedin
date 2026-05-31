@@ -373,8 +373,15 @@ async def receive_webhook_result(payload: WebhookResponse):
             except Exception as e:
                 logger.error(f"❌ Lỗi khi lưu Google Sheets cho {client_id}: {e}")
         
-        # Dọn dẹp tracker giải phóng RAM sau khi hoàn thành
-        del job_tracker[client_id]
+            # DỌN DẸP THÔNG MINH:
+            if client_id == "CRON_24H":
+                # CRON không có WebSocket, Webhook phải tự dọn dẹp RAM của nó
+                del job_tracker[client_id]
+                logger.info("Đã dọn dẹp bộ nhớ cho CRON_24H.")
+            else:
+                # Nếu là FE, để nguyên đó cho WebSocket lấy data gửi về. 
+                # WebSocket sẽ chịu trách nhiệm dọn dẹp sau!
+                pass
             
     return {"status": "ok"}
 
@@ -446,7 +453,9 @@ async def websocket_crawl_endpoint(websocket: WebSocket, email: str):
 
         # KẾT THÚC
         if not cancel_registry.get(email):
-            await manager.send_json({"status": "success", "message": "Toàn bộ máy chủ đã hoàn tất!"}, email)
+            final_data = job_tracker.get(email, {}).get("data", [])
+
+            await manager.send_json({"status": "success", "message": "Toàn bộ máy chủ đã hoàn tất!","data": final_data}, email)
 
         # Dọn dẹp
         if email in job_tracker:

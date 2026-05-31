@@ -6,6 +6,53 @@ from app.modules.facebook.src.modules.facebook.constants.facebook_regex import (
     RE_MONTHS, RE_YEAR_4D,
 )
 
+from typing import Optional
+
+def get_exact_post_time(post_date: str) -> Optional[str]:
+    """
+    Chuyển đổi chuỗi thời gian Facebook thành chuỗi định dạng YYYY-MM-DD HH:MM:SS
+    """
+    if not post_date:
+        return None
+        
+    post_date = post_date.lower().strip()
+    now = datetime.now()
+    result_dt = None
+
+    # 1. Vừa xong / giây
+    if "vừa xong" in post_date or "giây" in post_date:
+        result_dt = now
+
+    # 2. Phút / Giờ
+    elif match_time := re.search(r'(\d+)\s*(phút|giờ)', post_date):
+        value = int(match_time.group(1))
+        if match_time.group(2) == 'phút':
+            result_dt = now - timedelta(minutes=value)
+        else:
+            result_dt = now - timedelta(hours=value)
+
+    # 3. Hôm qua
+    elif match_yesterday := re.search(r'hôm qua(?:\s*lúc\s*(\d{1,2}):(\d{1,2}))?', post_date):
+        yesterday = now - timedelta(days=1)
+        hour = int(match_yesterday.group(1)) if match_yesterday.group(1) else 0
+        minute = int(match_yesterday.group(2)) if match_yesterday.group(2) else 0
+        result_dt = yesterday.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+    # 4. Quá khứ xa (có năm)
+    elif match_full_date := re.search(r'(\d{1,2})\s*tháng\s*(\d{1,2})(?:\s*,\s*|\s*năm\s*)(\d{4})', post_date):
+        result_dt = datetime(int(match_full_date.group(3)), int(match_full_date.group(2)), int(match_full_date.group(1)))
+
+    # 5. Trong năm nay (không năm)
+    elif match_this_year := re.search(r'(\d{1,2})\s*tháng\s*(\d{1,2})(?:\s*lúc\s*(\d{1,2}):(\d{1,2}))?', post_date):
+        hour = int(match_this_year.group(3)) if match_this_year.group(3) else 0
+        minute = int(match_this_year.group(4)) if match_this_year.group(4) else 0
+        result_dt = datetime(now.year, int(match_this_year.group(2)), int(match_this_year.group(1)), hour, minute)
+
+    # Nếu parse thành công, chuyển sang định dạng chuỗi yêu cầu
+    if result_dt:
+        return result_dt.strftime("%Y-%m-%d %H:%M:%S")
+        
+    return None
 
 def extract_ts_hint(raw: str) -> str:
     """
