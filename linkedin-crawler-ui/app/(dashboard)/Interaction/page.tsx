@@ -1,4 +1,4 @@
-import { InteractionUI } from "@/components/nguyen/modules/crawldFB/components/Interaction_component";
+import { InteractionUI } from "@/components/facebook-crawler/modules/facebook-crawl/components/interaction-component";
 const InteractionPage = () => {
   return (
    <InteractionUI />

@@ -1,239 +1,515 @@
 "use client";
 
-import { useState } from "react";
-import { FaFacebook, FaLinkedin } from "react-icons/fa";
-import { MaterialIcon } from "@/components/ui";
-import type { MaterialSymbolName } from "@/components/ui";
-import { DashboardPosts } from "@/components/nguyen/modules/crawldFB/components/dashboardPost";
-import { CrawlResultsSection } from "@/components/features/linkedin/dashboard/LinkedIn-CrawlResultsSection";
-import { sessionLatestDateLabel } from "@/components/features/linkedin/dashboard/LinkedIn-n8n-sheet-helpers";
-import {
-  PlatformStatCard,
-  PlatformStatsRow,
-} from "@/components/features/shared/PlatformStatCard";
-import { useDashboard } from "@/components/features/dashboard/dashboard-context";
+import { useState, useCallback, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { useGroupIntentMap } from "@/hooks/useGroupIntentMap";
+import { CrawlLinkedInPopup } from "@/components/all-platform/crawl-linkedin-popup";
+import { CrawlFacebookPopup } from "@/components/all-platform/crawl-facebook-popup";
+import { useAppAuth } from "@/contexts/AppAuthContext";
+import { FilterBar, type FilterState } from "@/components/all-platform/components/filter-bar";
+import { PostCard } from "@/components/all-platform/components/post-card";
+import { PostDetailModal } from "@/components/all-platform/components/post-detail-modal";
+import { VerifyAccountModal } from "@/components/all-platform/components/verify-account-modal";
+import { allPlatformPostsService, allPlatformCategoriesService } from "@/services/all-platform.service";
+import type { UnifiedPost, UnifiedStats, Category, FeedPlatform } from "@/types/unified.types";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-type FeedPlatform = "facebook" | "linkedin";
+// ─── Timezone Helpers (Vietnam UTC+7) ─────────────────────────────────────────
+const VIETNAM_OFFSET_HOURS = 7;
 
-interface PlatformConfig {
-  label: string;
-  icon: React.ReactNode;
-  description: string;
-  accentClass: string;
-  badgeClass: string;
-  viewModeLabel: string;
-  viewModeIcon: MaterialSymbolName;
+function getVietnamNow(): Date {
+  return new Date(Date.now() + VIETNAM_OFFSET_HOURS * 60 * 60 * 1000);
 }
 
-// ─── Config ──────────────────────────────────────────────────────────────────
-const PLATFORM_CONFIG: Record<FeedPlatform, PlatformConfig> = {
-  facebook: {
-    label: "Facebook",
-    icon: <FaFacebook className="text-[15px] text-blue-600" />,
-    description:
-      "Xem bài viết đã crawl từ các nhóm Facebook — hiển thị theo từng post với AI score.",
-    accentClass: "border-blue-500",
-    badgeClass: "bg-blue-50 text-blue-700 border-blue-200",
-    viewModeLabel: "Card từng bài viết · Lọc theo intent, platform, score",
-    viewModeIcon: "article",
-  },
-  linkedin: {
-    label: "LinkedIn",
-    icon: <FaLinkedin className="text-[15px] text-blue-700" />,
-    description:
-      "Xem kết quả crawl LinkedIn — nhóm theo phiên cào, click phiên để xem chi tiết bài.",
-    accentClass: "border-blue-700",
-    badgeClass: "bg-blue-100 text-blue-800 border-blue-300",
-    viewModeLabel: "Bảng phiên cào · Click phiên để xem danh sách bài trong modal",
-    viewModeIcon: "dataset",
-  },
+function getVietnamDateStr(): string {
+  return getVietnamNow().toISOString().split("T")[0];
+}
+
+function getVietnamYesterdayStr(): string {
+  const d = getVietnamNow();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().split("T")[0];
+}
+
+const getDatePart = (dateInput?: Date | string | null) => {
+  if (!dateInput) return "";
+  if (typeof dateInput === "string") {
+    const normalized = dateInput.replace(" ", "T");
+    const datePart = normalized.split("T")[0];
+    if (datePart.length === 10) {
+      return datePart;
+    }
+    return normalized.substring(0, 10);
+  }
+  try {
+    return dateInput.toISOString().split("T")[0];
+  } catch (e) {
+    return "";
+  }
 };
 
-// ─── Sub-component: Stats row cho LinkedIn ──────────────────────────────────
-/**
- * Hiển thị 4 stat cards cho LinkedIn — đồng bộ layout với DashboardPosts (Facebook).
- * Dùng `crawlSessionsForTable` từ dashboard context, không fetch thêm API.
- */
-function LinkedInStatsRow() {
-  const d = useDashboard();
-
-  const sessions = d.crawlSessionsForTable ?? [];
-  const isFiltered = d.crawlTableViewMode === "filtered";
-
-  // Tổng phiên & bài từ context (đã tính sẵn, kể cả chế độ filtered)
-  const totalSessions = d.displayedCrawlSessionCount;
-  const totalPosts = d.displayedCrawlPostCount;
-
-  // Tính phiên hôm nay dựa trên sessionLatestDateLabel
-  const todayStr = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
-  const todaySessions = sessions.filter(
-    (s) => sessionLatestDateLabel(s).slice(0, 10) === todayStr,
-  );
-  const todayPosts = todaySessions.reduce((sum, s) => sum + (s.posts_count ?? 0), 0);
-
-  // Tổng bài / phiên overall (từ allPostsResult, không bị ảnh hưởng filter)
-  const overallSessionCount = d.allPostsResult?.length ?? 0;
-
-  return (
-    <PlatformStatsRow>
-      <PlatformStatCard
-        label="Tổng phiên cào"
-        value={totalSessions}
-        hint={isFiltered ? "Trong khoảng lọc" : `${overallSessionCount} phiên tất cả`}
-        accent="primary"
-      />
-      <PlatformStatCard
-        label="Tổng bài đã crawl"
-        value={totalPosts}
-        hint={isFiltered ? "Trong khoảng lọc" : "Gộp từ tất cả phiên"}
-        hintTone={totalPosts > 0 ? "up" : "neutral"}
-        accent="success"
-      />
-      <PlatformStatCard
-        label="Phiên hôm nay"
-        value={todaySessions.length}
-        hint={
-          todayPosts > 0
-            ? `${todayPosts.toLocaleString("vi-VN")} bài trong ngày`
-            : "Chưa có phiên hôm nay"
-        }
-        hintTone={todaySessions.length > 0 ? "up" : "neutral"}
-        accent="warning"
-      />
-      <PlatformStatCard
-        label="Trạng thái xem"
-        value={isFiltered ? "Đã lọc" : "Tất cả"}
-        hint={
-          d.crawlSessionsTableBusy
-            ? "Đang tải dữ liệu…"
-            : isFiltered
-              ? d.filterAppliedLabel || "Điều kiện lọc đang áp dụng"
-              : "Nhấn phiên để xem bài chi tiết"
-        }
-        accent="primary"
-      />
-    </PlatformStatsRow>
-  );
+// ─── Stats Card (Redesigned & Premium & Softer) ─────────────────────────────────
+interface StatCardProps {
+  icon: string;
+  label: string;
+  value: string | number;
+  sub?: string;
+  accent?: "blue" | "green" | "amber" | "indigo" | string;
+  progress?: { value: number; label: string };
+  trend?: { value: number; isUp: boolean; label: string };
 }
 
-// ─── Main component ──────────────────────────────────────────────────────────
-/**
- * Nền tảng «Chung» — platform switcher nội bộ:
- * - Facebook → per-post card feed (DashboardPosts)
- * - LinkedIn → stats row + session table (CrawlResultsSection)
- *
- * Switcher này độc lập với sidebar DashboardPlatformSwitcher,
- * không thay đổi AppPlatform context toàn cục.
- */
-export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boolean }) {
-  const [feedPlatform, setFeedPlatform] = useState<FeedPlatform>("facebook");
-  const d = useDashboard();
-  const { isLoading: isIntentLoading } = useGroupIntentMap(d.email);
-  const isDataLoading = isIntentLoading || d.crawlSessionsForTable === null;
+function StatCard({
+  icon,
+  label,
+  value,
+  sub,
+  accent,
+  progress,
+  trend,
+}: StatCardProps) {
+  const [coords, setCoords] = useState({ x: 0, y: 0 });
+  const [isHovered, setIsHovered] = useState(false);
 
-  const cfg = PLATFORM_CONFIG[feedPlatform];
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const card = e.currentTarget;
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const rotateX = (y - centerY) / 25;
+    const rotateY = (centerX - x) / 25;
+    setCoords({ x: rotateY, y: rotateX });
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    setCoords({ x: 0, y: 0 });
+  };
+
+  const transformStyle = isHovered
+    ? {
+        transform: `perspective(1000px) rotateX(${coords.y}deg) rotateY(${coords.x}deg)`,
+        transition: "transform 0.05s ease",
+      }
+    : {
+        transform: "perspective(1000px) rotateX(0deg) rotateY(0deg)",
+        transition: "transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)",
+      };
+
+  let iconCls = "bg-slate-50 text-slate-500";
+  let barColor = "bg-slate-400";
+
+  if (accent === "blue") {
+    iconCls = "bg-blue-50/80 text-blue-500 dark:bg-blue-950/20 dark:text-blue-400";
+    barColor = "bg-blue-500";
+  } else if (accent === "green") {
+    iconCls = "bg-emerald-50/80 text-emerald-500 dark:bg-emerald-950/20 dark:text-emerald-400";
+    barColor = "bg-emerald-500";
+  } else if (accent === "amber") {
+    iconCls = "bg-amber-50/80 text-amber-500 dark:bg-amber-950/20 dark:text-amber-400";
+    barColor = "bg-amber-500";
+  } else if (accent === "indigo") {
+    iconCls = "bg-indigo-50/80 text-indigo-500 dark:bg-indigo-950/20 dark:text-indigo-400";
+    barColor = "bg-indigo-500";
+  }
 
   return (
-    <>
-      {/* ── HEADER ──────────────────────────────────────────── */}
-      {!hideHeader && (
-        <div className="mb-xl">
-          <h1 className="text-h1 text-on-surface mb-xs font-semibold">Post Feed</h1>
-          
+    <div
+      onMouseMove={handleMouseMove}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={handleMouseLeave}
+      style={transformStyle}
+      className="bg-white p-5 rounded-2xl border border-slate-100/90 shadow-[0_4px_20px_rgba(0,0,0,0.015)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all duration-300 flex flex-col justify-between relative overflow-hidden group select-none"
+    >
+      <div className="flex justify-between items-start">
+        <div className="space-y-1">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</p>
+          <h3 className="text-xl font-bold text-slate-800 tracking-tight mt-1">
+            {typeof value === "number" ? value.toLocaleString("vi-VN") : value}
+          </h3>
         </div>
-      )}
-
-      {/* ── PLATFORM SWITCHER CARD ──────────────────────────── */}
-      <div
-        className={cn(
-          "border-outline-variant bg-surface mb-xl flex flex-col gap-sm rounded-xl border border-l-4 p-md shadow-sm transition-all duration-300",
-          cfg.accentClass,
-        )}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-sm">
-          {/* Platform icon + description */}
-          <div className="flex items-center gap-sm">
-            <div
-              className={cn(
-                "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border",
-                cfg.badgeClass,
-              )}
-            >
-              {cfg.icon}
-            </div>
-            <div>
-              <p className="text-on-surface text-sm font-bold leading-tight">
-                Đang xem: {cfg.label}
-              </p>
-              <p className="text-on-surface-variant text-[11px] leading-snug">
-                {cfg.description}
-              </p>
-            </div>
-          </div>
-
-          {/* Toggle pill buttons */}
-          <div
-            className="border-outline-variant bg-surface-container-low flex rounded-lg border p-0.5"
-            role="group"
-            aria-label="Chọn nền tảng hiển thị"
-          >
-            {(Object.keys(PLATFORM_CONFIG) as FeedPlatform[]).map((p) => {
-              const c = PLATFORM_CONFIG[p];
-              const isActive = feedPlatform === p;
-              return (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setFeedPlatform(p)}
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-md px-md py-sm font-sans text-[11px] font-bold tracking-wide uppercase transition-all",
-                    isActive
-                      ? "bg-primary text-on-primary shadow-sm"
-                      : "text-on-surface-variant hover:bg-surface-container-high/80",
-                  )}
-                  aria-pressed={isActive}
-                >
-                  {c.icon}
-                  {c.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* View mode indicator */}
-        <div className="border-outline-variant flex items-center gap-xs border-t pt-sm">
-          <MaterialIcon
-            name={cfg.viewModeIcon}
-            className="text-on-surface-variant text-[15px]"
-          />
-          <span className="text-on-surface-variant text-[11px] font-medium">
-            Hiển thị: {cfg.viewModeLabel}
-          </span>
+        <div
+          className={cn(
+            "w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-105",
+            iconCls,
+          )}
+        >
+          <span className="material-symbols-outlined text-[20px]">{icon}</span>
         </div>
       </div>
 
-      {/* ── CONTENT AREA ─────────────────────────────────────── */}
-      {feedPlatform === "facebook" ? (
-        <DashboardPosts forcedPlatform="facebook" />
-      ) : isDataLoading ? (
-        <div className="border-outline-variant bg-surface-container-lowest rounded-xl border p-lg shadow-sm">
-          <div className="flex flex-col items-center justify-center gap-3 py-20">
-            <div className="border-primary h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" />
-            <p className="text-on-surface-variant text-sm font-medium">Đang tải dữ liệu...</p>
+      <div className="mt-4 pt-3 border-t border-slate-50 flex items-center justify-between">
+        {trend ? (
+          <span
+            className={cn(
+              "text-[11px] font-bold flex items-center gap-1",
+              trend.isUp ? "text-emerald-500" : "text-amber-500",
+            )}
+          >
+            <span className="material-symbols-outlined text-[14px]">
+              {trend.isUp ? "arrow_upward" : "arrow_downward"}
+            </span>
+            {trend.label}
+          </span>
+        ) : progress ? (
+          <div className="flex-1 max-w-[140px]">
+            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+              <div
+                className={cn("h-full rounded-full transition-all duration-500", barColor)}
+                style={{ width: `${progress.value}%` }}
+              />
+            </div>
+            <span className="text-[9px] font-semibold text-slate-400 mt-1 block leading-none">
+              {progress.label}
+            </span>
           </div>
+        ) : sub ? (
+          <span className="text-[10px] text-slate-400 font-medium leading-none">{sub}</span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Component ──────────────────────────────────────────────────────────
+export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boolean }) {
+  const { user } = useAppAuth();
+  const CURRENT_USER_EMAIL = user?.email || "";
+
+  const [feedPlatform, setFeedPlatform] = useState<FeedPlatform>("facebook");
+  const [showCrawlPopup, setShowCrawlPopup] = useState(false);
+  const [showFacebookCrawlPopup, setShowFacebookCrawlPopup] = useState(false);
+
+  const [detailModalPost, setDetailModalPost] = useState<UnifiedPost | null>(null);
+  const [verifyModalPost, setVerifyModalPost] = useState<UnifiedPost | null>(null);
+
+  // States
+  const [posts, setPosts] = useState<UnifiedPost[]>([]);
+  const [stats, setStats] = useState<UnifiedStats>({
+    totalPostsToday: 0,
+    postsYesterday: 0,
+    highScoreCount: 0,
+    highScorePercent: 0,
+    seededToday: 0,
+    kpiProgress: 0,
+    kpiTarget: 0,
+    kpiProgressPercent: 0,
+  });
+  const [isLoadingPosts, setIsLoadingPosts] = useState(false);
+  const [postsError, setPostsError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
+  // Filter & Taxonomy States
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [filters, setFilters] = useState<FilterState>({
+    search: "",
+    intent: "",
+    industry: "",
+    team: "",
+    tier: "",
+    icp: "",
+    sort: "latest",
+    dateRange: "",
+  });
+
+  // Fetch Taxonomy
+  const fetchCategories = useCallback(async () => {
+    try {
+      const res = await allPlatformCategoriesService.getAllCategories(CURRENT_USER_EMAIL);
+      if (res.success && res.data) setCategories(res.data as Category[]);
+    } catch {}
+  }, [CURRENT_USER_EMAIL]);
+
+  // Fetch Posts
+  const fetchPosts = useCallback(async () => {
+    if (!CURRENT_USER_EMAIL) return;
+    setIsLoadingPosts(true);
+    setPostsError(null);
+    try {
+      let dateFrom: string | undefined;
+      let dateTo: string | undefined;
+
+      if (filters.dateRange === "today") {
+        dateFrom = new Date().toISOString().split("T")[0];
+      } else if (filters.dateRange === "yesterday") {
+        const d = new Date();
+        d.setDate(d.getDate() - 1);
+        dateFrom = d.toISOString().split("T")[0];
+        dateTo = dateFrom;
+      } else if (filters.dateRange === "7days") {
+        const d = new Date();
+        d.setDate(d.getDate() - 7);
+        dateFrom = d.toISOString().split("T")[0];
+      } else if (filters.dateRange === "30days") {
+        const d = new Date();
+        d.setDate(d.getDate() - 30);
+        dateFrom = d.toISOString().split("T")[0];
+      }
+
+      const res = await allPlatformPostsService.filter({
+        email: CURRENT_USER_EMAIL,
+        platform: feedPlatform,
+        date_from: dateFrom,
+        date_to: dateTo,
+        intent: filters.intent || undefined,
+        industry: filters.industry || undefined,
+        team: filters.team || undefined,
+        tier: filters.tier ? parseInt(filters.tier) : undefined,
+        icp: filters.icp || undefined,
+        search: filters.search || undefined,
+        sort: filters.sort,
+        page,
+        page_size: 15,
+      });
+
+      if (res.success && res.data) {
+        setPosts(res.data.posts || []);
+        setTotalCount(res.data.total || 0);
+        setTotalPages(res.data.total_pages || 1);
+      } else {
+        setPostsError(res.message || "Không thể tải bài viết.");
+      }
+    } catch (err) {
+      setPostsError(err instanceof Error ? err.message : "Lỗi khi tải bài viết.");
+    } finally {
+      setIsLoadingPosts(false);
+    }
+  }, [CURRENT_USER_EMAIL, feedPlatform, filters, page]);
+
+  // Fetch Stats
+  const fetchStats = useCallback(async () => {
+    if (!CURRENT_USER_EMAIL) return;
+    try {
+      const res = await allPlatformPostsService.getStats({
+        email: CURRENT_USER_EMAIL,
+        platform: feedPlatform,
+      });
+      if (res.success && res.data) {
+        setStats(res.data as UnifiedStats);
+      }
+    } catch {}
+  }, [CURRENT_USER_EMAIL, feedPlatform]);
+
+  useEffect(() => {
+    if (!CURRENT_USER_EMAIL) return;
+    fetchPosts();
+  }, [fetchPosts]);
+
+  useEffect(() => {
+    if (!CURRENT_USER_EMAIL) return;
+    fetchStats();
+  }, [fetchStats]);
+
+  useEffect(() => {
+    if (!CURRENT_USER_EMAIL) return;
+    fetchCategories();
+  }, [fetchCategories]);
+
+  const handleFilter = useCallback((f: FilterState) => {
+    setFilters(f);
+    setPage(1);
+  }, []);
+
+  const intents = categories.filter((c) => c.category_type === "intent");
+  const industries = categories.filter((c) => c.category_type === "industry");
+  const icps = categories.filter((c) => c.category_type === "icp");
+  const teams: Category[] = [];
+
+  const fbDiff = stats.totalPostsToday - stats.postsYesterday;
+
+  return (
+    <div className="w-full space-y-6">
+      {!hideHeader && (
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Unified Post Feed</h1>
+            <p className="text-sm text-slate-500">
+              Quản lý và theo dõi bài viết đa nền tảng với trí tuệ nhân tạo.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <div className="bg-slate-100/80 rounded-xl p-1 border border-slate-200/50 flex">
+              {([
+                { key: "facebook", label: "Facebook" },
+                { key: "linkedin", label: "LinkedIn" },
+              ] as const).map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => { setFeedPlatform(t.key); setPage(1); }}
+                  className={cn(
+                    "px-4 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all cursor-pointer",
+                    feedPlatform === t.key
+                      ? "bg-[#E3000F] text-white shadow-sm"
+                      : "text-slate-500 hover:text-slate-800 hover:bg-slate-200/40",
+                  )}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (feedPlatform === "linkedin") {
+                  setShowCrawlPopup(true);
+                } else {
+                  setShowFacebookCrawlPopup(true);
+                }
+              }}
+              className="px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm hover:shadow transition-all active:scale-[0.98] cursor-pointer text-white bg-[#E3000F] hover:bg-[#C40009]"
+            >
+              <span className="material-symbols-outlined text-[18px]">download</span>
+              Cào dữ liệu
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard
+          icon="description"
+          label="Tổng bài hôm nay"
+          value={stats.totalPostsToday}
+          trend={{
+            value: Math.abs(fbDiff),
+            isUp: fbDiff >= 0,
+            label: `${fbDiff >= 0 ? "+" : ""}${fbDiff} so với hôm qua`,
+          }}
+          accent="blue"
+        />
+        <StatCard
+          icon="trending_up"
+          label="Tiến độ KPI"
+          value={stats.kpiProgress || 0}
+          progress={{
+            value: stats.kpiProgressPercent || 0,
+            label: `${stats.kpiProgressPercent || 0}% trong tập bài`,
+          }}
+          accent="green"
+        />
+        <StatCard
+          icon="rocket_launch"
+          label="Đã Seeded hôm nay"
+          value={stats.seededToday}
+          sub="Ước tính từ batch hôm nay"
+          accent="amber"
+        />
+        <StatCard
+          icon="visibility"
+          label="Tổng bài hiển thị"
+          value={totalCount}
+          sub={`${totalCount} bài trong cơ sở dữ liệu`}
+          accent="indigo"
+        />
+      </div>
+
+      <FilterBar
+        intents={intents}
+        industries={industries}
+        teams={teams}
+        icps={icps}
+        onFilter={handleFilter}
+        isLoading={isLoadingPosts}
+      />
+
+      {isLoadingPosts ? (
+        <div className="py-12 text-center text-slate-400">Đang tải bài viết...</div>
+      ) : postsError ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {postsError}
+          <button type="button" onClick={fetchPosts} className="ml-3 underline">
+            Thử lại
+          </button>
+        </div>
+      ) : posts.length === 0 ? (
+        <div className="py-12 text-center text-slate-400">
+          Không có bài viết nào phù hợp với bộ lọc.
         </div>
       ) : (
         <>
-          {/* Stats row — đồng bộ style với Facebook DashboardPosts */}
-          <LinkedInStatsRow />
-          {/* Session table (filter controls + bảng phiên + modal chi tiết) */}
-          <CrawlResultsSection />
+          <div className="flex flex-col gap-4">
+            {posts.map((post) => (
+              <PostCard
+                key={post.id || post.post_url}
+                post={post}
+                seeded={post.verify_status === "yes" || post.verify_status === "pending" || post.verify_status === "đã seeding" || post.verify_status === "verified"}
+                verifyStatus={post.verify_status as any}
+                onSeeding={() => {}}
+                onVerify={() => {}}
+                onViewDetail={(post) => setDetailModalPost(post)}
+              />
+            ))}
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-6">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm disabled:opacity-50 cursor-pointer"
+              >
+                ‹ Trước
+              </button>
+              <span className="text-sm text-slate-600">
+                Trang {page} / {totalPages} ({totalCount} bài)
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm disabled:opacity-50 cursor-pointer"
+              >
+                Sau ›
+              </button>
+            </div>
+          )}
         </>
       )}
-    </>
+
+      <CrawlLinkedInPopup
+        open={showCrawlPopup}
+        onClose={() => setShowCrawlPopup(false)}
+        onSuccess={() => {
+          setShowCrawlPopup(false);
+          fetchPosts();
+          fetchStats();
+        }}
+      />
+      <CrawlFacebookPopup
+        open={showFacebookCrawlPopup}
+        onClose={() => setShowFacebookCrawlPopup(false)}
+        onSuccess={() => {
+          setShowFacebookCrawlPopup(false);
+          fetchPosts();
+          fetchStats();
+        }}
+      />
+
+      <PostDetailModal
+        post={detailModalPost}
+        isOpen={!!detailModalPost}
+        onClose={() => setDetailModalPost(null)}
+        onVerify={(post) => {
+          setVerifyModalPost(post);
+        }}
+        verifyStatus={detailModalPost?.verify_status as any}
+      />
+
+      {verifyModalPost && (
+        <VerifyAccountModal
+          isOpen={!!verifyModalPost}
+          onClose={() => setVerifyModalPost(null)}
+          postUrl={verifyModalPost.post_url}
+          postId={verifyModalPost.id}
+          platform={verifyModalPost.platform}
+          memberEmail={CURRENT_USER_EMAIL}
+        />
+      )}
+    </div>
   );
 }

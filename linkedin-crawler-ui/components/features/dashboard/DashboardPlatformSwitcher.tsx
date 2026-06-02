@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname, useRouter } from "next/navigation";
 import { useAppPlatform } from "@/components/providers/AppPlatformProvider";
 import {
   APP_PLATFORM_LABEL,
@@ -11,6 +12,25 @@ const options: AppPlatform[] = ["linkedin", "facebook", "general"];
 
 export function DashboardPlatformSwitcher() {
   const { platform, setPlatform } = useAppPlatform();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const handlePlatformChange = (p: AppPlatform) => {
+    setPlatform(p);
+    if (p === "general") {
+      if (pathname === "/post-feed") router.push("/all-platform/post-feed");
+      else if (pathname === "/quan-ly-nhom") router.push("/all-platform/quan-ly-nhom");
+      else if (pathname === "/quan-ly-tai-khoan") router.push("/all-platform/quan-ly-tai-khoan");
+      else if (pathname === "/quan-ly-danh-muc") router.push("/all-platform/quan-ly-danh-muc");
+      else if (pathname === "/profile") router.push("/all-platform/profile");
+    } else {
+      if (pathname === "/all-platform/post-feed") router.push("/post-feed");
+      else if (pathname === "/all-platform/quan-ly-nhom") router.push("/quan-ly-nhom");
+      else if (pathname === "/all-platform/quan-ly-tai-khoan") router.push("/quan-ly-tai-khoan");
+      else if (pathname === "/all-platform/quan-ly-danh-muc") router.push("/post-feed");
+      else if (pathname === "/all-platform/profile") router.push("/profile");
+    }
+  };
 
   return (
     <div className="mb-4 px-2">
@@ -26,7 +46,7 @@ export function DashboardPlatformSwitcher() {
           <button
             key={p}
             type="button"
-            onClick={() => setPlatform(p)}
+            onClick={() => handlePlatformChange(p)}
             className={cn(
               "flex-1 rounded-md px-2 py-2 font-sans text-[10px] font-bold tracking-wide uppercase transition-colors",
               platform === p

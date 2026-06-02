@@ -1,4 +1,6 @@
 import asyncio
+import json
+from pathlib import Path
 
 from typing import List, Dict, Tuple
 from datetime import datetime
@@ -11,6 +13,8 @@ from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_intent_ser
 from app.modules.facebook.src.modules.gg_sheet.services.user_score_sheet_service import UserScoreSheetService
 from app.modules.facebook.src.modules.gg_sheet.services.history_sheet_service import HistorySheetService
 from app.modules.facebook.src.modules.gg_sheet.services.comment_sheet_service import CommentSheetService
+from app.modules.facebook.src.modules.crawl_fb.services.facebook_category_sheet_service import FacebookCategorySheetService
+from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_posts import GoogleSheetServicePosts
 
 def format_time_and_status(last_crawl_str: str) -> Tuple[str, str]:
     """
@@ -54,6 +58,79 @@ def format_time_and_status(last_crawl_str: str) -> Tuple[str, str]:
     except ValueError:
         # Xử lý ngoại lệ nếu format ngày tháng trên Sheet bị sai
         return last_crawl_str, "DEAD"
+
+
+CATEGORIES_FILE = Path("storage/categories.json")
+
+def ensure_categories_file():
+    if not CATEGORIES_FILE.exists():
+        # Initialize with defaults in the new structure
+        defaults = {
+            "type": [
+                {
+                    "name": "KOL/Influencer",
+                    "desc": "Cá nhân có sức ảnh hưởng lớn",
+                    "platform": "Linkedin"
+                },
+                {
+                    "name": "Community",
+                    "desc": "Các hội nhóm, cộng đồng ngành",
+                    "platform": "Linkedin"
+                }
+            ],
+            "industry": [
+                {
+                    "industry_name": "Information Technology",
+                    "status": "active"
+                },
+                {
+                    "industry_name": "Marketing & Advertising",
+                    "status": "active"
+                }
+            ],
+            "tier": [
+                {
+                    "tier_level": "Tier 1",
+                    "budget": "High"
+                },
+                {
+                    "tier_level": "Tier 2",
+                    "budget": "Medium"
+                }
+            ],
+            "team": [
+                {
+                    "team_name": "Growth Team",
+                    "leader": "Minh Hoang"
+                }
+            ],
+            "icp": [
+                {
+                    "target": "Founder / CEO",
+                    "geo": "US/UK"
+                }
+            ]
+        }
+        CATEGORIES_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(CATEGORIES_FILE, "w", encoding="utf-8") as f:
+            json.dump(defaults, f, ensure_ascii=False, indent=2)
+
+
+def get_category_keys(category_type: str) -> tuple[str, str]:
+    c = category_type.strip().lower()
+    if c == "type":
+        return "name", "desc"
+    elif c == "industry":
+        return "industry_name", "status"
+    elif c == "tier":
+        return "tier_level", "budget"
+    elif c == "team":
+        return "team_name", "leader"
+    elif c == "icp":
+        return "target", "geo"
+    return "value", "name"
+
+
 class SheetManagementService:
     def __init__(self):
         self.group_sheet = GroupManagementSheetService()
@@ -62,6 +139,8 @@ class SheetManagementService:
         self.user_score_sheet = UserScoreSheetService()
         self.history_sheet = HistorySheetService()
         self.comment_sheet = CommentSheetService()
+        self.category_sheet = FacebookCategorySheetService()
+        self.post_sheet = GoogleSheetServicePosts()
     # ==========================================
     # LOGIC XỬ LÝ GROUP (TỔNG & 24H)
     # ==========================================
@@ -79,70 +158,186 @@ class SheetManagementService:
        
         return raw_groups
     
-
+    async def bulk_add_groups(self, groups: List) -> bool:
+        """Thêm danh sách Group mới vào Google Sheet (chạy bất đồng bộ)."""
+        # Chuyển đổi danh sách GroupItem thành list[dict]
+        groups_dict = [group.model_dump() if hasattr(group, 'model_dump') else group for group in groups]
+        return await asyncio.to_thread(self.group_sheet.add_multiple_groups, groups_dict)
     
-    async def bulk_add_groups(self, groups_data: List[Dict]):
-        """Phân loại và lưu Group vào các Sheet tương ứng chạy song song."""
-        groups_for_total = []
-        groups_for_24h = []
-          # Debug log để kiểm tra dữ liệu đầu vào
-        
-        for g in groups_data:
-            groups_for_total.append(g)
-            if g.get("chay_24h") is True:
-                groups_for_24h.append(g)
-        
-        print(f"DEBUG: Dữ liệu groups_for_total: {groups_for_total}")
-        print(f"DEBUG: Dữ liệu groups_for_24h: {groups_for_24h}")
-        tasks = []
-        if groups_for_total:
-            tasks.append(asyncio.to_thread(self.group_sheet.add_multiple_groups_from_dicts, groups_for_total))
-            
-        if groups_for_24h:
-            tasks.append(asyncio.to_thread(self.group_24h_sheet.add_multiple_target_groups, groups_for_24h))
-        
-        total_added = 0
-        h24_added = 0
-        total_skipped = 0
-        
-        if tasks:
-            results = await asyncio.gather(*tasks)
-            idx = 0
-            if groups_for_total:
-                inserted, skipped = results[idx]
-                total_added = inserted
-                total_skipped = skipped
-                idx += 1
-            if groups_for_24h:
-                inserted_24h, skipped_24h = results[idx]
-                h24_added = inserted_24h
-
-        return total_added, h24_added, total_skipped
+    async def bulk_delete_groups(self, urls: List[str]) -> bool:
+        """Xóa danh sách Group khỏi Google Sheet dựa trên link_group (chạy bất đồng bộ)."""
+        return await asyncio.to_thread(self.group_sheet.delete_multiple_groups, urls)
     
-
-    async def bulk_delete_groups(self, urls: List[str]):
-        """Xóa Group trên cả 2 Sheet chạy song song."""
-        tasks = [
-            asyncio.to_thread(self.group_sheet.delete_multiple_groups, urls),
-            asyncio.to_thread(self.group_24h_sheet.delete_multiple_groups, urls)
-        ]
-        await asyncio.gather(*tasks)
-        return True
+    async def update_group(self, group) -> bool:
+        """Cập nhật thông tin Group trong Google Sheet (chạy bất đồng bộ)."""
+        data = group.model_dump() if hasattr(group, 'model_dump') else group
+        return await asyncio.to_thread(self.group_sheet.update_group, data)
+    
+    async def get_all_groups_24h(self) -> List[dict]:
+        """Lấy toàn bộ dữ liệu Group 24h từ Google Sheet (chạy bất đồng bộ)."""
+        return await asyncio.to_thread(self.group_24h_sheet.get_all_groups)
+    
+    async def add_group_24h(self, group_name: str, url: str) -> bool:
+        """Thêm một Group mới vào danh sách 24h (chạy bất đồng bộ)."""
+        return await asyncio.to_thread(self.group_24h_sheet.add_group, group_name, url)
+        
+    async def delete_group_24h(self, url: str) -> bool:
+        """Xóa một Group khỏi danh sách 24h (chạy bất đồng bộ)."""
+        return await asyncio.to_thread(self.group_24h_sheet.delete_group, url)
 
     # ==========================================
-    # LOGIC XỬ LÝ INTENT
+    # LOGIC XỬ LÝ INTENTS & CATEGORIES (DANH MỤC)
     # ==========================================
-    async def bulk_add_intents(self, intents_data: List[Dict]):
-        """Thêm hàng loạt Intent vào Sheet."""
-        return await asyncio.to_thread(self.intent_sheet.add_multiple_intents, intents_data)
+    async def bulk_add_intents(self, intents: List) -> bool:
+        """Thêm hàng loạt Intent mới vào Google Sheet (chạy bất đồng bộ)."""
+        intents_dict = [intent.model_dump() if hasattr(intent, 'model_dump') else intent for intent in intents]
+        return await asyncio.to_thread(self.intent_sheet.add_multiple_intents, intents_dict)
 
     async def bulk_delete_intents(self, intents: List[str]):
         """Xóa hàng loạt Intent khỏi Sheet."""
         return await asyncio.to_thread(self.intent_sheet.delete_multiple_intents, intents)
+    
     async def get_all_intents(self) -> List[dict]:
         """Lấy toàn bộ dữ liệu Intents từ Google Sheet."""
-        # YÊU CẦU: Trong class IntentSheetService phải có hàm get_all_intents()
         return await asyncio.to_thread(self.intent_sheet.get_all_intents)
+
+    async def get_all_categories(self) -> Dict[str, List[Dict[str, str]]]:
+        """Lấy toàn bộ danh mục từ Google Sheet cho type, industry, tier, team, icp."""
+        try:
+            return await asyncio.to_thread(self.category_sheet.get_all_categories)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Lỗi khi lấy danh sách danh mục từ Google Sheet: {e}", exc_info=True)
+            return {
+                "type": [],
+                "industry": [],
+                "tier": [],
+                "team": [],
+                "icp": []
+            }
+
+    async def add_category(self, category_type: str, value: str, name: str, platform: str = "") -> bool:
+        """Thêm danh mục mới vào Google Sheet."""
+        category_type = category_type.strip().lower()
+        value = value.strip()
+        name = name.strip()
+        
+        if not value or not name:
+            return False
+            
+        try:
+            return await asyncio.to_thread(
+                self.category_sheet.add_record,
+                category_type,
+                value,
+                name,
+                platform or "Facebook"
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Lỗi khi thêm danh mục vào Google Sheet: {e}", exc_info=True)
+            return False
+
+    async def update_category(self, category_type: str, value: str, name: str, platform: str = "") -> bool:
+        """Cập nhật danh mục trong Google Sheet."""
+        category_type = category_type.strip().lower()
+        value = value.strip()
+        name = name.strip()
+        
+        if not value or not name:
+            return False
+            
+        try:
+            return await asyncio.to_thread(
+                self.category_sheet.update_record,
+                category_type,
+                value,
+                name,
+                platform or "Facebook"
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Lỗi khi cập nhật danh mục trong Google Sheet: {e}", exc_info=True)
+            return False
+
+    async def delete_category(self, category_type: str, value: str, platform: str = "") -> bool:
+        """Xóa danh mục khỏi Google Sheet."""
+        category_type = category_type.strip().lower()
+        value = value.strip()
+        
+        if not value:
+            return False
+            
+        try:
+            return await asyncio.to_thread(
+                self.category_sheet.delete_record,
+                category_type,
+                value
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Lỗi khi xóa danh mục khỏi Google Sheet: {e}", exc_info=True)
+            return False
+
+    async def delete_groups_and_posts_by_category(self, category_type: str, value: str) -> None:
+        """Cascade delete related groups and posts when a category is deleted."""
+        try:
+            # Determine which group field maps to this category type
+            c = category_type.strip().lower()
+            val = value.strip()
+            field_map = {
+                "type": "intent",
+                "industry": "industry",
+                "tier": "tier",
+                "team": "team",
+                "icp": "icp"
+            }
+            if c not in field_map:
+                return
+            
+            target_field = field_map[c]
+
+            # 1. Lấy tất cả groups
+            all_groups = await self.get_all_groups()
+            
+            # Lọc ra các group có giá trị field = value của danh mục bị xóa
+            groups_to_delete = []
+            urls_to_delete = []
+            
+            for g in all_groups:
+                g_val = str(g.get(target_field, "")).strip()
+                # Đối với tier, có thể là number hoặc text
+                if g_val.lower() == val.lower() or str(g_val) == str(val):
+                    urls_to_delete.append(g.get("url"))
+                    groups_to_delete.append(g)
+            
+            if not urls_to_delete:
+                return
+            
+            # 2. Xóa các groups đó
+            await self.bulk_delete_groups(urls_to_delete)
+            
+            # 3. Lấy các bài post của các group bị xóa
+            all_posts = await asyncio.to_thread(self.post_sheet.get_all_posts)
+            post_urls_to_delete = []
+            
+            # Tìm các post có group trùng khớp
+            for p in all_posts:
+                if str(p.get("link_group", "")).strip() in urls_to_delete:
+                    post_url = str(p.get("url", "")).strip()
+                    if post_url:
+                        post_urls_to_delete.append(post_url)
+            
+            # 4. Xóa các posts
+            if post_urls_to_delete:
+                await asyncio.to_thread(self.post_sheet.delete_multiple_posts_by_urls, post_urls_to_delete)
+                
+            import logging
+            logging.getLogger(__name__).info(f"Đã cascade delete {len(urls_to_delete)} groups và {len(post_urls_to_delete)} posts cho category {category_type}={value}")
+
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Lỗi cascade delete groups/posts: {e}", exc_info=True)
     async def get_all_user_scores(self) -> List[dict]:
         """Lấy toàn bộ dữ liệu User Scores từ Google Sheet."""
         # Gọi hàm đồng bộ get_all_user_scores trong luồng background

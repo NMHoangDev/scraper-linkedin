@@ -64,3 +64,30 @@ class GetGroupsResponse(BaseModel):
     message: str
     data: List[GroupItemResponse]
 
+
+class CategoryItem(BaseModel):
+    value: str
+    name: str
+
+class GetCategoriesResponse(BaseModel):
+    status: str
+    message: str
+    data: dict[str, List[dict]]
+
+class AddCategoryPayload(BaseModel):
+    category_type: str
+    value: str
+    name: Optional[str] = ""
+    platform: Optional[str] = ""
+
+class UpdateCategoryPayload(BaseModel):
+    category_type: str
+    value: str
+    name: Optional[str] = ""
+    platform: Optional[str] = ""
+
+class DeleteCategoryPayload(BaseModel):
+    category_type: str
+    value: str
+    platform: Optional[str] = ""
+

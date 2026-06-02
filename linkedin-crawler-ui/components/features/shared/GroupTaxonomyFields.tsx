@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { INDUSTRY_OPTIONS, TEAM_OPTIONS, TIER_OPTIONS } from "@/lib/group-taxonomy";
 import { cn } from "@/lib/utils";
+import { useGetCategoriesQuery } from "@/components/facebook-crawler/modules/facebook-crawl/hooks/use-get-categories-query";
 
 const LABEL =
   "text-label-md text-on-surface-variant font-semibold tracking-wide uppercase";
@@ -38,29 +39,55 @@ export function GroupTaxonomyFields({
   disabled = false,
   className,
 }: GroupTaxonomyFieldsProps) {
-  const [showCustomIndustry, setShowCustomIndustry] = useState(() => {
-    return industry !== "" && !INDUSTRY_OPTIONS.some((o) => o.value === industry);
-  });
+  const { data } = useGetCategoriesQuery();
 
-  const [showCustomTeam, setShowCustomTeam] = useState(() => {
-    return team !== "" && !TEAM_OPTIONS.includes(team as any);
-  });
-
-  useEffect(() => {
-    if (industry !== "" && INDUSTRY_OPTIONS.some((o) => o.value === industry)) {
-      setShowCustomIndustry(false);
-    } else if (industry !== "" && !INDUSTRY_OPTIONS.some((o) => o.value === industry)) {
-      setShowCustomIndustry(true);
+  const dynCategories = useMemo(() => {
+    if (!data) {
+      return {
+        industry: [],
+        team: [],
+        tier: [],
+        icp: [],
+      };
     }
-  }, [industry]);
 
-  useEffect(() => {
-    if (team !== "" && TEAM_OPTIONS.includes(team as any)) {
-      setShowCustomTeam(false);
-    } else if (team !== "" && !TEAM_OPTIONS.includes(team as any)) {
-      setShowCustomTeam(true);
-    }
-  }, [team]);
+    const mappedIndustries = (data.industry || []).map((item: any) => ({
+      id: item.code || item.value,
+      label: item.name,
+      value: item.code || item.value,
+    }));
+
+    const teams = (data.team || []).map((item: any) => ({
+      code: item.code || item.value || item.team_name,
+      name: item.name || item.leader,
+    }));
+
+    const icps = (data.icp || []).map((item: any) => ({
+      code: item.code || item.value || item.target,
+      name: item.name || item.geo,
+    }));
+
+    const tiers = (data.tier || []).map((item: any) => {
+      const tierNum = parseInt(item.code || item.value) || 1;
+      const parts = item.name.split(" ");
+      const icon = parts[0] || "🔥";
+      const title = parts.slice(1).join(" ") || `Tier ${tierNum}`;
+      const sub = item.name.includes("-") ? item.name.split("-")[1].trim() : "";
+      return {
+        tier: tierNum,
+        icon,
+        title,
+        sub,
+      };
+    });
+
+    return {
+      industry: mappedIndustries,
+      team: teams,
+      tier: tiers,
+      icp: icps,
+    };
+  }, [data]);
 
   return (
     <div className={cn("space-y-md", className)}>
@@ -70,80 +97,40 @@ export function GroupTaxonomyFields({
           <label className={LABEL}>Ngành</label>
           <select
             className={INPUT}
-            value={showCustomIndustry ? "__custom__" : industry}
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val === "__custom__") {
-                setShowCustomIndustry(true);
-                onIndustryChange("");
-              } else {
-                setShowCustomIndustry(false);
-                onIndustryChange(val);
-              }
-            }}
+            value={industry}
+            onChange={(e) => onIndustryChange(e.target.value)}
             disabled={disabled}
           >
             <option value="">— Chọn ngành —</option>
-            {INDUSTRY_OPTIONS.map((o) => (
+            {dynCategories.industry.map((o) => (
               <option key={o.id} value={o.value}>
                 {o.label}
               </option>
             ))}
-            <option value="__custom__">✍️ Khác (tự nhập)...</option>
           </select>
-          {showCustomIndustry && (
-            <input
-              type="text"
-              className={cn(INPUT, "mt-2")}
-              value={industry}
-              onChange={(e) => onIndustryChange(e.target.value)}
-              placeholder="Nhập tên ngành tự định nghĩa..."
-              disabled={disabled}
-            />
-          )}
         </div>
         <div>
           <label className={LABEL}>Team phụ trách</label>
           <select
             className={INPUT}
-            value={showCustomTeam ? "__custom__" : team}
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val === "__custom__") {
-                setShowCustomTeam(true);
-                onTeamChange("");
-              } else {
-                setShowCustomTeam(false);
-                onTeamChange(val);
-              }
-            }}
+            value={team}
+            onChange={(e) => onTeamChange(e.target.value)}
             disabled={disabled}
           >
             <option value="">— Chọn team —</option>
-            {TEAM_OPTIONS.map((t) => (
-              <option key={t} value={t}>
-                {t}
+            {dynCategories.team.map((t) => (
+              <option key={t.code} value={t.code}>
+                {t.code} {t.name ? `(Leader: ${t.name})` : ""}
               </option>
             ))}
-            <option value="__custom__">✍️ Khác (tự nhập)...</option>
           </select>
-          {showCustomTeam && (
-            <input
-              type="text"
-              className={cn(INPUT, "mt-2")}
-              value={team}
-              onChange={(e) => onTeamChange(e.target.value)}
-              placeholder="Nhập tên team tự định nghĩa..."
-              disabled={disabled}
-            />
-          )}
         </div>
       </div>
 
       <div>
         <span className={LABEL}>Tier ưu tiên</span>
         <div className="mt-sm grid grid-cols-3 gap-sm">
-          {TIER_OPTIONS.map((t) => (
+          {dynCategories.tier.map((t) => (
             <button
               key={t.tier}
               type="button"
@@ -165,13 +152,19 @@ export function GroupTaxonomyFields({
 
       <div>
         <label className={LABEL}>ICP (phân cách dấu phẩy nếu nhiều)</label>
-        <input
+        <select
           className={INPUT}
           value={icp}
           onChange={(e) => onIcpChange(e.target.value)}
-          placeholder="Marketing Mgr, CMO"
           disabled={disabled}
-        />
+        >
+          <option value="">— Chọn ICP —</option>
+          {dynCategories.icp.map((t) => (
+            <option key={t.code} value={t.code}>
+              {t.code} {t.name ? `(${t.name})` : ""}
+            </option>
+          ))}
+        </select>
       </div>
       <div>
         <label className={LABEL}>Mô tả ICP</label>

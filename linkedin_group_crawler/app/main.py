@@ -5,9 +5,8 @@ from __future__ import annotations
 import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.modules.linkedin.router import linkedin_app_router, router
@@ -15,6 +14,7 @@ from app.modules.linkedin.schemas.response_models import BaseResponse
 from app.core.config import settings
 from app.modules.facebook.src.jobs.daily_crawl_job import setup_and_start_jobs
 from app.modules.facebook.src.modules.api_router.index import api_router
+from app.modules.all_platform.router import all_platform_router
 from app.core.playwright_browser_pool import (
     shutdown_playwright_pool,
     warmup_playwright_pool,
@@ -67,23 +67,45 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# ✅ CORS Middleware برای Frontend (شامل WebSocket)
-cors_origins = settings.cors_origins or []
-if isinstance(cors_origins, list):
-    cors_origins = list(cors_origins) + [
+@app.middleware("http")
+async def handle_cors_middleware(request: Request, call_next):
+    origin = request.headers.get("origin", "")
+
+    # Allow Chrome extension origin and known frontend origins
+    allowed_origins = {
+        "chrome-extension://" + origin.replace("chrome-extension://", "").split("/")[0]
+        if origin.startswith("chrome-extension://") else "",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "http://localhost:3001",
-        "http://127.0.0.1:3001",
-    ]
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+    }
+    
+    is_allowed = origin in allowed_origins or origin.startswith("chrome-extension://")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    if request.method == "OPTIONS":
+        response = Response(status_code=200)
+        if is_allowed and origin:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+        else:
+            response.headers["Access-Control-Allow-Origin"] = origin or "*"
+        response.headers["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS, PUT, DELETE, PATCH"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, x-api-key, Authorization"
+        return response
+
+    response = await call_next(request)
+
+    # Set CORS headers for actual responses
+    if origin:
+        if is_allowed:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+        else:
+            response.headers["Access-Control-Allow-Origin"] = origin
+
+    return response
+
 @app.get("/health", response_model=BaseResponse)
 def root_health() -> BaseResponse:
     """Root health check for DevOps/Docker infrastructure."""
@@ -114,3 +136,4 @@ async def request_validation_exception_handler(_, exc: RequestValidationError) -
 app.include_router(router)
 app.include_router(linkedin_app_router)
 app.include_router(api_router, prefix="/facebook/api/v1")
+app.include_router(all_platform_router, prefix="/api/all-platform")

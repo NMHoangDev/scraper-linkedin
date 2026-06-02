@@ -3,14 +3,14 @@
 import { useEffect, useState } from "react";
 import { useFieldArray, useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { MaterialIcon } from "@/components/ui";
 import { GroupTaxonomyFields } from "@/components/features/shared/GroupTaxonomyFields";
 import { useDashboard } from "@/components/features/dashboard/dashboard-context";
-import { useGetIntents } from "@/components/nguyen/modules/crawldFB/hooks/useGetIntents";
+import { useGetIntents } from "@/components/facebook-crawler/modules/facebook-crawl/hooks/use-get-intents";
 import {
   emptyUnifiedGroupEntry,
-  LINKEDIN_GROUP_TYPE_OPTIONS,
   unifiedRegistryFormSchema,
   type UnifiedGroupEntryValues,
   type UnifiedRegistryFormValues,
@@ -44,6 +44,7 @@ export function UnifiedGroupRegistrySection({
   platform: "facebook" | "linkedin";
 }) {
   const d = useDashboard();
+  const queryClient = useQueryClient();
   const { intents, fetchIntents } = useGetIntents();
   const [expanded, setExpanded] = useState<Set<number>>(() => new Set([0]));
   const [busy, setBusy] = useState(false);
@@ -112,6 +113,9 @@ export function UnifiedGroupRegistrySection({
       else failures.push(`${row.name || row.url}: ${res.message}`);
     }
     setBusy(false);
+    if (okCount > 0) {
+      void queryClient.invalidateQueries({ queryKey: ["presetGroups"] });
+    }
     if (failures.length === 0) {
       setFeedback({ type: "ok", text: `Đã lưu ${okCount} nhóm lên hệ thống.` });
       reset({ entries: [emptyUnifiedGroupEntry(platform)] });
@@ -124,10 +128,7 @@ export function UnifiedGroupRegistrySection({
     }
   });
 
-  const intentOptions =
-    platform === "linkedin"
-      ? LINKEDIN_GROUP_TYPE_OPTIONS.map((t) => ({ value: t, name: t }))
-      : (intents ?? []).map((i) => ({ value: i.value, name: i.name }));
+  const intentOptions = (intents ?? []).map((i) => ({ value: i.value, name: i.name }));
 
   return (
     <div className="border-outline-variant bg-surface mt-lg flex flex-col overflow-hidden rounded-xl border shadow-sm">

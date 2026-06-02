@@ -7,11 +7,12 @@ export interface PlatformStatCardProps {
   value: string | number;
   hint?: string;
   hintTone?: "up" | "down" | "neutral";
-  accent?: "primary" | "success" | "warning" | "error";
+  accent?: "primary" | "secondary" | "success" | "warning" | "error";
 }
 
 const accentBorder: Record<NonNullable<PlatformStatCardProps["accent"]>, string> = {
   primary: "border-l-primary",
+  secondary: "border-l-slate-400",
   success: "border-l-[var(--color-success,#22c55e)]",
   warning: "border-l-[var(--color-warning,#f59e0b)]",
   error: "border-l-error",

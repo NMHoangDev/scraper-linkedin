@@ -7,7 +7,8 @@ export const metadata: Metadata = {
     "Configure, run, and monitor LinkedIn group crawls with live logs and exportable results.",
 };
 import { Toaster } from "sonner"
-import { AuthProvider } from "@/components/nguyen/shared/components/contexts/AuthContext";
+import { AuthProvider } from "@/components/facebook-crawler/shared/components/contexts/AuthContext";
+import { AppAuthProvider } from "@/contexts/AppAuthContext";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 
 export default function RootLayout({
@@ -28,7 +29,9 @@ export default function RootLayout({
       <body className="min-h-full">
         <QueryProvider>
           <AuthProvider>
-            {children}
+            <AppAuthProvider>
+              {children}
+            </AppAuthProvider>
           </AuthProvider>
         </QueryProvider>
      

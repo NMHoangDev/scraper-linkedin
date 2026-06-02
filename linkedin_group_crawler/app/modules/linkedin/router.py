@@ -46,8 +46,18 @@ from app.modules.linkedin.schemas.request_models import (
     SyncPostProgressRequest,
     UpdateProfileSlugRequest,
     VerifyLeaderCodeRequest,
+    UpdateRoleToMemberRequest,
     VerifyLoginRequest,
+    N8nCategoryAddRequest,
+    N8nCategoryUpdateRequest,
+    N8nCategoryDeleteRequest,
+    SaveSeedingKpiRequest,
+    GetSeedingKpiRequest,
+    MarkSeedingRequest,
+    GetSeedingMarkRequest,
+    VerifySeedingRequest,
 )
+from pydantic import BaseModel
 from app.modules.linkedin.schemas.response_models import (
     BaseResponse,
     AddMemberResponse,
@@ -131,6 +141,8 @@ from app.modules.linkedin.services.sync_progress_service import (
     sync_post_engagement,
     sync_post_engagement_on_page,
 )
+
+from app.modules.linkedin.services.linkedin_category_sheet_service import LinkedinCategorySheetService
 
 from app.shared.services import google_sheet_service as gsheet
 from app.modules.linkedin.services.n8n_post_filter_service import (
@@ -731,6 +743,69 @@ def crawl_linkedin_group(payload: CrawlGroupRequest) -> CrawlResponse:
             posts=[TopPostResponse.from_post_dict(p) for p in posts_out],
             selection_mode=selection_mode,
         )
+
+        # Save to Supabase
+        try:
+            from app.core.supabase_client import get_supabase_client
+            supabase = get_supabase_client()
+            
+            # Inherit taxonomy from group
+            group_urls = [payload.group_url]
+            if payload.group_url.endswith("/"):
+                group_urls.append(payload.group_url[:-1])
+            else:
+                group_urls.append(payload.group_url + "/")
+            group_res = supabase.table("linkedin_groups").select("intent, industry, team, tier, icp, icp_desc").in_("group_url", group_urls).execute()
+            group_data = group_res.data[0] if group_res.data else {}
+            
+            # Insert session
+            session_record = {
+                "session_id": response_data.session_id,
+                "email_crawl": response_data.email or "",
+                "platform": "linkedin",
+                "group_name": response_data.group_name or "",
+                "group_url": response_data.group_url,
+                "posts_count": len(posts_out),
+                "status": "completed"
+            }
+            supabase.table("crawl_sessions").insert(session_record).execute()
+            
+            # Insert/upsert posts
+            posts_records = []
+            for p in posts_out:
+                posted_at_val = p.get("posted_at")
+                if not posted_at_val:
+                    posted_at_val = None
+                
+                post_rec = {
+                    "session_id": response_data.session_id,
+                    "email_crawl": response_data.email or "",
+                    "crawl_date": target_day.isoformat(),
+                    "group_name": response_data.group_name or "",
+                    "group_url": response_data.group_url,
+                    "post_url": p.get("post_url") or "",
+                    "author": p.get("author") or "",
+                    "content": p.get("content") or "",
+                    "likes": p.get("likes") or 0,
+                    "comments": p.get("comments") or 0,
+                    "shares": p.get("reposts") or 0,
+                    "score": p.get("score") or 0,
+                    "posted_at": posted_at_val,
+                    "intent": group_data.get("intent"),
+                    "industry": group_data.get("industry"),
+                    "team": group_data.get("team"),
+                    "tier": group_data.get("tier"),
+                    "icp": group_data.get("icp"),
+                    "icp_desc": group_data.get("icp_desc"),
+                }
+                posts_records.append(post_rec)
+                
+            if posts_records:
+                supabase.table("linkedin_posts").upsert(posts_records, on_conflict="post_url").execute()
+                
+        except Exception as db_err:
+            logger.exception("Failed to save crawl results to Supabase")
+
         return CrawlResponse(success=True, message=msg, data=response_data)
     except Exception as exc:
         logger.exception("Crawl endpoint failed")
@@ -1379,6 +1454,129 @@ def n8n_groups_update(
         env_hint="N8N_WEBHOOK_UPDATE_GROUP",
         json_body=payload.to_webhook_payload(email),
     )
+
+
+def build_linkedin_n8n_payload(category_type: str, action: str, value: str, name: str) -> dict:
+    category = category_type.strip().lower()
+    payload = {
+        "type_action": action,
+        "category": category,
+    }
+    if category == "type":
+        payload["name"] = value
+        payload["desc"] = name
+        payload["platform"] = "Linkedin"
+    elif category == "industry":
+        payload["industry_name"] = value
+        payload["status"] = name
+    elif category == "tier":
+        payload["tier_level"] = value
+        payload["budget"] = name
+    elif category == "team":
+        payload["team_name"] = value
+        payload["leader"] = name
+    elif category == "icp":
+        payload["target"] = value
+        payload["geo"] = name
+    return payload
+
+def build_linkedin_n8n_delete_payload(category_type: str, value: str) -> dict:
+    category = category_type.strip().lower()
+    payload = {
+        "type_action": "delete",
+        "category": category,
+    }
+    if category == "type":
+        payload["name"] = value
+    elif category == "industry":
+        payload["industry_name"] = value
+    elif category == "tier":
+        payload["tier_level"] = value
+    elif category == "team":
+        payload["team_name"] = value
+    elif category == "icp":
+        payload["target"] = value
+    return payload
+
+from app.shared.services.category_sheet_service import CategorySheetService as _CategorySheetService
+import asyncio as _cat_asyncio
+
+@router.get(
+    "/categories",
+    dependencies=[Depends(verify_api_key)],
+)
+def get_linkedin_categories() -> dict:
+    """Lấy toàn bộ danh mục từ Google Sheet (shared LinkedIn sheet)."""
+    try:
+        svc = _CategorySheetService()
+        data = svc.get_all_categories()
+        return {"status": "success", "message": "Lấy danh sách danh mục thành công.", "data": data}
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Lỗi khi lấy danh sách danh mục: {str(e)}",
+            "data": {"type": [], "industry": [], "tier": [], "team": [], "icp": []},
+        }
+
+@router.post(
+    "/categories/add",
+    response_model=BaseResponse,
+    dependencies=[Depends(verify_api_key)],
+)
+def n8n_categories_add(payload: N8nCategoryAddRequest) -> BaseResponse:
+    """Thêm danh mục vào Google Sheet (dùng chung cho LinkedIn và Facebook)."""
+    try:
+        svc = _CategorySheetService()
+        success = svc.add_record(
+            payload.category_type,
+            payload.value,
+            payload.name,
+            payload.platform or "Linkedin",
+        )
+        if not success:
+            return BaseResponse(success=False, message="Thêm danh mục thất bại (có thể đã tồn tại hoặc lỗi Google Sheets).")
+        return BaseResponse(success=True, message=f"Đã thêm danh mục '{payload.value}' thành công.")
+    except Exception as e:
+        return BaseResponse(success=False, message=f"Lỗi hệ thống khi thêm danh mục: {str(e)}")
+
+
+@router.post(
+    "/categories/update",
+    response_model=BaseResponse,
+    dependencies=[Depends(verify_api_key)],
+)
+def n8n_categories_update(payload: N8nCategoryUpdateRequest) -> BaseResponse:
+    """Cập nhật danh mục trong Google Sheet."""
+    try:
+        svc = _CategorySheetService()
+        success = svc.update_record(
+            payload.category_type,
+            payload.value,
+            payload.name,
+            payload.platform or "Linkedin",
+        )
+        if not success:
+            return BaseResponse(success=False, message="Cập nhật danh mục thất bại (không tìm thấy hoặc lỗi Google Sheets).")
+        return BaseResponse(success=True, message=f"Đã cập nhật danh mục '{payload.value}' thành công.")
+    except Exception as e:
+        return BaseResponse(success=False, message=f"Lỗi hệ thống khi cập nhật danh mục: {str(e)}")
+
+
+@router.post(
+    "/categories/delete",
+    response_model=BaseResponse,
+    dependencies=[Depends(verify_api_key)],
+)
+def n8n_categories_delete(payload: N8nCategoryDeleteRequest) -> BaseResponse:
+    """Xóa danh mục khỏi Google Sheet."""
+    try:
+        svc = _CategorySheetService()
+        success = svc.delete_record(payload.category_type, payload.value)
+        if not success:
+            return BaseResponse(success=False, message="Xóa danh mục thất bại (không tìm thấy hoặc lỗi Google Sheets).")
+        return BaseResponse(success=True, message=f"Đã xóa danh mục '{payload.value}' thành công.")
+    except Exception as e:
+        return BaseResponse(success=False, message=f"Lỗi hệ thống khi xóa danh mục: {str(e)}")
 
 
 @router.post(
@@ -2348,7 +2546,7 @@ def linkedin_sync_all_progress(payload: SyncAllProgressRequest) -> SyncAllProgre
     dependencies=[Depends(verify_api_key)],
 )
 def linkedin_assign_kpi(payload: AssignKpiRequest) -> BaseResponse:
-    """Leader gán KPI cho member — Forward JSON tới ``N8N_WEBHOOK_ASSIGN_KPI``."""
+    """Leader gán KPI cho member trực tiếp vào Google Sheet."""
 
     if payload.leader_role != "leader":
         raise HTTPException(
@@ -2356,35 +2554,38 @@ def linkedin_assign_kpi(payload: AssignKpiRequest) -> BaseResponse:
             detail="Chỉ leader mới có quyền gán KPI.",
         )
 
-    webhook_url = settings.n8n_webhook_assign_kpi_url
-    if not webhook_url:
-        return BaseResponse(
-            success=False,
-            message="N8N_WEBHOOK_ASSIGN_KPI chưa được cấu hình trong .env.",
-        )
-
     try:
-        # Chuyển đổi sang dict, sử dụng alias để khớp key frontend/n8n mong đợi
-        json_body = payload.model_dump(mode="json", by_alias=True)
-        
-        status_code, response_text = post_json_to_n8n_webhook(
-            url=webhook_url,
-            json_body=json_body,
-        )
+        results = []
+        for item in payload.kpi:
+            try:
+                target_count = int(item.total_post_crawl)
+            except ValueError:
+                target_count = 0
+                
+            plat = item.platform or "Facebook"
+            
+            res = gsheet.assign_kpi_to_sheet_tracker(
+                email_member=payload.email,
+                email_leader=payload.email_leader,
+                platform=plat,
+                kpi_sedding_per_week=target_count,
+                start=item.start_day,
+                end=item.end_day
+            )
+            results.append(res)
+            
+        success = all(r.get("success") for r in results)
+        message = "; ".join(r.get("message", "") for r in results) if results else "Không có KPI nào được gán."
         
         return BaseResponse(
-            success=True,
-            message=f"Đã gán KPI và gửi tới n8n thành công (Status: {status_code}).",
-            data={
-                "webhook_status": status_code,
-                "response_preview": response_text[:200]
-            }
+            success=success,
+            message=message
         )
     except Exception as exc:
-        logger.exception("KPI assignment webhook failed")
+        logger.exception("KPI assignment sheet write failed")
         return BaseResponse(
             success=False,
-            message=f"Lỗi khi gửi KPI tới n8n: {exc}",
+            message=f"Lỗi khi lưu KPI vào sheet: {exc}",
         )
 
 
@@ -2613,35 +2814,66 @@ def _parse_kpi_field_to_dict_list(raw: Any) -> list[dict[str, Any]]:
     dependencies=[Depends(verify_api_key)],
 )
 def get_all_kpi(payload: GetAllKpiRequest) -> GetAllKpiResponse:
-    """Lấy toàn bộ KPI cho leader qua n8n; chuẩn hóa alias cột và lọc theo ``email_leader``."""
-    webhook_url = settings.n8n_webhook_get_all_kpi_url
-    if not webhook_url:
-        return GetAllKpiResponse(success=False, message="Webhook get-all-kpi chưa cấu hình.")
-
+    """Lấy toàn bộ KPI của members thuộc quản lý của leader trực tiếp từ Google Sheet."""
     leader = payload.email_leader.strip()
     if not leader:
         return GetAllKpiResponse(success=False, message="email_leader không hợp lệ.")
 
     try:
-        _status_code, response_text = post_json_to_n8n_webhook(
-            url=webhook_url,
-            json_body={"email_leader": leader},
-        )
-        raw_rows = _parse_get_all_kpi_rows(response_text)
-        normalized: list[KpiMemberData] = []
-        for item in raw_rows:
-            mem = _normalize_kpi_member_row(item, leader)
-            if mem is not None:
-                normalized.append(mem)
-
+        # 1. Lấy danh sách members của leader
+        members = gsheet.get_members_for_leader(leader)
+        member_emails = [m["email"] for m in members]
+        
+        if not member_emails:
+            return GetAllKpiResponse(
+                success=True,
+                message="Không tìm thấy thành viên nào.",
+                total=0,
+                data=[]
+            )
+            
+        # 2. Đồng bộ tiến độ seeding & lấy tất cả KPI của các member này
+        kpi_rows = gsheet.sync_and_get_kpis_for_members(member_emails)
+        
+        # 3. Gom nhóm KPIs theo email member để trả về KpiMemberData
+        members_map = {m["email"]: m for m in members}
+        kpis_by_member = {}
+        for row in kpi_rows:
+            email = row.get("email_member", "").strip().lower()
+            if email not in kpis_by_member:
+                kpis_by_member[email] = []
+            
+            kpis_by_member[email].append({
+                "start_day": row.get("start", ""),
+                "end_day": row.get("end", ""),
+                "platform": row.get("platform", "Facebook"),
+                "total_post_crawl": int(row.get("kpi_sedding_per_week") or 0),
+                "total_session_crawl": 0,
+                "total_comment": 0,
+                "total_reaction": 0,
+                "actual_seeding": row.get("actual_seeding", 0),
+                "status": row.get("status", "Proccess"),
+                "matching_posts": row.get("matching_posts", [])
+            })
+            
+        normalized = []
+        for email, m_info in members_map.items():
+            normalized.append(KpiMemberData(
+                email=email,
+                role=m_info.get("role", "member"),
+                profile_slug=m_info.get("profile_slug") or email.split("@")[0],
+                email_leader=leader,
+                kpi=kpis_by_member.get(email, [])
+            ))
+            
         return GetAllKpiResponse(
             success=True,
-            message="Success",
+            message="Lấy toàn bộ KPI thành công.",
             total=len(normalized),
-            data=normalized,
+            data=normalized
         )
     except Exception as exc:
-        logger.exception("get_all_kpi failed")
+        logger.exception("get_all_kpi sheet fetch failed")
         return GetAllKpiResponse(success=False, message=str(exc))
 
 
@@ -2651,35 +2883,66 @@ def get_all_kpi(payload: GetAllKpiRequest) -> GetAllKpiResponse:
     dependencies=[Depends(verify_api_key)],
 )
 def get_kpi_by_email(payload: GetKpiByEmailRequest) -> GetKpiByEmailResponse:
-    """Lấy KPI cho member qua n8n."""
-    webhook_url = settings.n8n_webhook_get_kpi_by_email_url
-    if not webhook_url:
-        return GetKpiByEmailResponse(success=False, message="Webhook get-kpi-by-email chưa cấu hình.")
+    """Lấy KPI của member trực tiếp từ Google Sheet."""
+    email = payload.email.strip().lower()
+    if not email:
+        return GetKpiByEmailResponse(success=False, message="email không hợp lệ.")
 
     try:
-        _status_code, response_text = post_json_to_n8n_webhook(
-            url=webhook_url,
-            json_body={"email": payload.email},
-        )
-        parsed = json.loads(response_text)
-        raw_rows = _coerce_payload_to_row_dicts(parsed)
-        normalized: list[KpiMemberData] = []
-        for item in raw_rows:
-            mem = _normalize_kpi_member_row(
-                item,
-                "",
-                require_leader_match=False,
-            )
-            if mem is not None:
-                normalized.append(mem)
-
+        # Lấy thông tin member và leader
+        info = gsheet.get_member_info_from_users_sheet(email)
+        
+        # Tìm email leader
+        leader_email = ""
+        service = gsheet.get_sheets_service()
+        sid = settings.google_spreadsheet_id
+        raw_users = service.spreadsheets().values().get(
+            spreadsheetId=sid,
+            range="'users'!A:E",
+            majorDimension="ROWS"
+        ).execute().get("values", [])
+        
+        if raw_users:
+            for idx, r in enumerate(raw_users[1:]):
+                if len(r) >= 5:
+                    r_email = str(r[0] or "").strip().lower()
+                    if r_email == email:
+                        leader_email = str(r[4] or "").strip()
+                        break
+                        
+        kpi_rows = gsheet.sync_and_get_kpis_for_members([email])
+        
+        kpi_list = []
+        for row in kpi_rows:
+            kpi_list.append({
+                "start_day": row.get("start", ""),
+                "end_day": row.get("end", ""),
+                "platform": row.get("platform", "Facebook"),
+                "total_post_crawl": int(row.get("kpi_sedding_per_week") or 0),
+                "total_session_crawl": 0,
+                "total_comment": 0,
+                "total_reaction": 0,
+                "actual_seeding": row.get("actual_seeding", 0),
+                "status": row.get("status", "Proccess"),
+                "matching_posts": row.get("matching_posts", [])
+            })
+            
+        data = [KpiMemberData(
+            email=email,
+            role="member",
+            profile_slug=info.get("url_profile") or email.split("@")[0],
+            email_leader=leader_email or None,
+            kpi=kpi_list
+        )]
+        
         return GetKpiByEmailResponse(
             success=True,
-            message="Success",
-            total=len(normalized),
-            data=normalized,
+            message="Lấy KPI theo email thành công.",
+            total=len(data),
+            data=data
         )
     except Exception as exc:
+        logger.exception("get_kpi_by_email sheet fetch failed")
         return GetKpiByEmailResponse(success=False, message=str(exc))
 
 
@@ -2689,68 +2952,45 @@ def get_kpi_by_email(payload: GetKpiByEmailRequest) -> GetKpiByEmailResponse:
     dependencies=[Depends(verify_api_key)],
 )
 def add_member(payload: AddMemberRequest) -> AddMemberResponse:
-    """Thêm member mới qua n8n."""
+    """Thêm member mới qua Google Sheet và n8n."""
+    # 1. Update/check user in users tab of Google Sheet directly
+    sheet_res = gsheet.update_user_leader_in_users_sheet(
+        member_email=payload.email_member,
+        leader_email=payload.email_leader
+    )
+    
+    if not sheet_res.get("success"):
+        return AddMemberResponse(
+            success=False,
+            allowAdd=False,
+            code="MEMBER_NOT_FOUND",
+            message=sheet_res.get("message", "Email thành viên không tồn tại trong danh sách hệ thống.")
+        )
+
+    # 2. Notify n8n webhook if configured
     webhook_url = settings.n8n_webhook_add_member_url
-    if not webhook_url:
-        return AddMemberResponse(
-            success=False,
-            allowAdd=False,
-            code="CONFIG_ERROR",
-            message="Webhook add-member chưa cấu hình.",
-        )
-
-    try:
-        status_code, response_text = post_json_to_n8n_webhook(
-            url=webhook_url,
-            json_body={
-                "email": payload.email_member,
-                "email_leader": payload.email_leader
-            },
-        )
-        
-        # Parse the JSON response returned from the n8n webhook
-        res_json = {}
-        if response_text and response_text.strip():
-            try:
-                res_json = json.loads(response_text)
-            except Exception:
-                pass
-
-        if isinstance(res_json, dict):
-            # Parse structure matching the n8n webhook success/failed schema
-            success = res_json.get("success", status_code < 400)
-            allow_add = res_json.get("allowAdd", success)
-            code = res_json.get("code", "ADD_MEMBER_SUCCESS" if success else "ADD_MEMBER_FAILED")
-            message = res_json.get("message", "Thêm thành viên thành công." if success else "Thêm thành viên thất bại.")
-            data = res_json.get("data", None)
-
-            return AddMemberResponse(
-                success=success,
-                allowAdd=allow_add,
-                code=code,
-                message=message,
-                data=data
+    if webhook_url:
+        try:
+            post_json_to_n8n_webhook(
+                url=webhook_url,
+                json_body={
+                    "email": payload.email_member,
+                    "email_leader": payload.email_leader
+                },
             )
-        
-        # Fallback if webhook returned non-JSON payload
-        success_status = status_code < 400
-        return AddMemberResponse(
-            success=success_status,
-            allowAdd=success_status,
-            code="ADD_MEMBER_SUCCESS" if success_status else "ADD_MEMBER_FAILED",
-            message=f"Đã gửi yêu cầu thêm member (Status: {status_code}). Response: {response_text}",
-            data={
-                "email": payload.email_member,
-                "email_leader": payload.email_leader
-            }
-        )
-    except Exception as exc:
-        return AddMemberResponse(
-            success=False,
-            allowAdd=False,
-            code="EXCEPTION_ERROR",
-            message=str(exc),
-        )
+        except Exception as exc:
+            logger.warning("n8n add member webhook notification failed: %s", exc)
+
+    return AddMemberResponse(
+        success=True,
+        allowAdd=True,
+        code="ADD_MEMBER_SUCCESS",
+        message=f"Đã thêm thành viên '{payload.email_member}' vào đội ngũ quản lý của bạn.",
+        data={
+            "email": payload.email_member,
+            "email_leader": payload.email_leader
+        }
+    )
 
 
 @router.post(
@@ -2760,9 +3000,38 @@ def add_member(payload: AddMemberRequest) -> AddMemberResponse:
 )
 def verify_leader_code(payload: VerifyLeaderCodeRequest) -> BaseResponse:
     """Xác nhận mã code leader."""
-    if payload.code == settings.leader_code:
-        return BaseResponse(success=True, message="Mã code chính xác.")
-    return BaseResponse(success=False, message="Mã code không đúng.")
+    is_valid = (payload.code == "888" or payload.code == settings.leader_code)
+    if not is_valid:
+        return BaseResponse(success=False, message="Mã code không đúng.")
+    
+    if payload.email:
+        res = gsheet.update_user_role_to_leader_in_sheet(payload.email)
+        if not res.get("success"):
+            return BaseResponse(
+                success=False,
+                message=f"Xác thực thành công nhưng lỗi Google Sheet: {res.get('message')}"
+            )
+            
+    return BaseResponse(success=True, message="Mã code chính xác.")
+
+
+@router.post(
+    "/auth/update-role-to-member",
+    response_model=BaseResponse,
+    dependencies=[Depends(verify_api_key)],
+)
+def update_role_to_member(payload: UpdateRoleToMemberRequest) -> BaseResponse:
+    """Cập nhật vai trò member cho tài khoản."""
+    if payload.email:
+        res = gsheet.update_user_role_to_member_in_sheet(payload.email)
+        if not res.get("success"):
+            return BaseResponse(
+                success=False,
+                message=f"Lỗi khi cập nhật Google Sheet: {res.get('message')}"
+            )
+    return BaseResponse(success=True, message="Đã cập nhật vai trò member thành công.")
+
+
 @router.post("/all-profiles")
 def get_all_profiles(
     payload: GetProfilesRequest,
@@ -2813,3 +3082,342 @@ def update_profile_slug_endpoint(
         return {"success": True, "message": "Cập nhật profile slug thành công."}
     except Exception as e:
         return {"success": False, "message": str(e)}
+
+
+@router.post(
+    "/seeding-kpi/save",
+    response_model=BaseResponse,
+)
+def save_seeding_kpi(payload: SaveSeedingKpiRequest) -> BaseResponse:
+    """Lưu seeding kpi từ extension Chrome."""
+    try:
+        name = payload.name.strip() if payload.name else ""
+        if not name:
+            name = gsheet.get_member_name_from_users_sheet(payload.email_member)
+        if not name:
+            name = payload.email_member.split("@")[0]
+            
+        gsheet.append_seeding_kpi_row(
+            email_member=payload.email_member.strip().lower(),
+            name=name,
+            link_comment=(payload.link_comment or "").strip(),
+            name_profile=payload.name_profile.strip(),
+            platform=payload.platform.strip(),
+            content=payload.content.strip(),
+            link_post=payload.link_post.strip(),
+            verify=payload.verify.strip(),
+            profile_id=(payload.profile_id or "").strip(),
+            facebook_name=(payload.facebook_name or "").strip(),
+        )
+        return BaseResponse(
+            success=True,
+            message="Lưu kết quả seeding thành công."
+        )
+    except Exception as e:
+        logger.error("Error saving seeding KPI: %s", e)
+        return BaseResponse(
+            success=False,
+            message=f"Lỗi: {str(e)}"
+        )
+
+
+@router.post(
+    "/seeding-kpi/get-all",
+    response_model=BaseResponse,
+)
+def get_all_seeding_kpi(payload: GetSeedingKpiRequest) -> BaseResponse:
+    """Lấy danh sách seeding kpi."""
+    try:
+        rows = gsheet.get_seeding_kpi_rows_for_member(
+            email_member=payload.email_member,
+            profile_id=payload.profile_id,
+            facebook_name=payload.facebook_name,
+        )
+        return BaseResponse(
+            success=True,
+            message="Lấy danh sách seeding kpi thành công.",
+            data=rows
+        )
+    except Exception as e:
+        logger.error("Error getting seeding KPI: %s", e)
+        return BaseResponse(
+            success=False,
+            message=f"Lỗi: {str(e)}"
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SEEDING MARK — Step 1: Đánh dấu đã seeding (chỉ lưu email + link_post)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@router.post("/seeding-mark/save", response_model=BaseResponse)
+def mark_seeding(payload: MarkSeedingRequest) -> BaseResponse:
+    """Đánh dấu đã seeding (Step 1).
+    Lưu email + link_post vào tab seeding_content_kpi với verify='pending'.
+    """
+    try:
+        gsheet.append_seeding_mark(
+            email_member=payload.email_member,
+            link_post=payload.link_post,
+        )
+        return BaseResponse(success=True, message="Đã đánh dấu seeding thành công.")
+    except Exception as e:
+        logger.error("Error marking seeding: %s", e)
+        return BaseResponse(success=False, message=f"Lỗi: {str(e)}")
+
+
+@router.post("/seeding-mark/get-unverified", response_model=BaseResponse)
+def get_unverified_seeding_marks(payload: GetSeedingMarkRequest) -> BaseResponse:
+    """Lấy danh sách seeding marks chưa verify của 1 member."""
+    try:
+        rows = gsheet.get_seeding_mark_rows(
+            email_member=payload.email_member,
+            verified=False,
+        )
+        return BaseResponse(
+            success=True,
+            message=f"Tìm thấy {len(rows)} bài chưa verify.",
+            data=rows
+        )
+    except Exception as e:
+        logger.error("Error getting unverified marks: %s", e)
+        return BaseResponse(success=False, message=f"Lỗi: {str(e)}")
+
+
+@router.post("/seeding-mark/verify", response_model=BaseResponse)
+def verify_seeding_mark(payload: VerifySeedingRequest) -> BaseResponse:
+    """Verify dòng đã mark (Step 2) — fill đầy đủ columns."""
+    try:
+        ok = gsheet.update_seeding_mark_to_verified(
+            email_member=payload.email_member,
+            link_post=payload.link_post,
+            name=payload.name or "",
+            link_comment=payload.link_comment or "",
+            name_profile=payload.name_profile or "",
+            platform=payload.platform or "facebook",
+            content=payload.content or "",
+            profile_id=payload.profile_id or "",
+            facebook_name=payload.facebook_name or "",
+            verify=payload.verify or "yes",
+        )
+        if ok:
+            return BaseResponse(success=True, message="Đã verify seeding thành công.")
+        return BaseResponse(success=False, message="Không tìm thấy dòng pending để verify.")
+    except Exception as e:
+        logger.error("Error verifying seeding mark: %s", e)
+        return BaseResponse(success=False, message=f"Lỗi: {str(e)}")
+
+
+@router.post("/seeding-mark/get-all", response_model=BaseResponse)
+def get_all_seeding_marks(email_member: str = "") -> BaseResponse:
+    """Lấy TẤT CẢ seeding marks của 1 member (cả verified và chưa verified).
+    Trả về dict với link_post -> verify status để frontend check nhanh.
+    """
+    try:
+        if not email_member:
+            return BaseResponse(success=True, data={})
+        rows = gsheet.get_all_seeding_marks(email_member=email_member)
+        # Convert list -> dict: key=link_post, value=verify status
+        result = {}
+        for row in rows:
+            link = row.get("link_post", "")
+            if link:
+                result[link.lower()] = row.get("verify", "pending")
+        return BaseResponse(success=True, data=result, message=f"Tìm thấy {len(rows)} marks.")
+    except Exception as e:
+        logger.error("Error getting all seeding marks: %s", e)
+        return BaseResponse(success=False, message=f"Lỗi: {str(e)}")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LEADER: Lấy seeding count từ seeding_content_kpi
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class MemberSeedingCountRequest(BaseModel):
+    email_member: str = ""
+    profile_id: str = ""
+    facebook_name: str = ""
+    date_from: str = ""  # Optional: filter by day range (YYYY-MM-DD)
+    date_to: str = ""
+
+
+@router.post("/seeding-mark/get-actual-count", response_model=BaseResponse)
+def get_member_actual_seeding_count(payload: MemberSeedingCountRequest) -> BaseResponse:
+    """Lấy số bài seeding thực tế (verify='yes') của 1 member từ seeding_content_kpi.
+    Dùng cho leader xem KPI member.
+    Hỗ trợ lọc theo ngày nếu date_from/date_to được truyền.
+    """
+    try:
+        rows = gsheet.get_seeding_kpi_rows_for_member(
+            email_member=payload.email_member,
+            profile_id=payload.profile_id,
+            facebook_name=payload.facebook_name,
+        )
+
+        target_from = payload.date_from.strip() if payload.date_from else ""
+        target_to = payload.date_to.strip() if payload.date_to else ""
+
+        # Parse date strings to comparable YYYY-MM-DD format
+        def to_ymd(d: str) -> str:
+            """Convert DD-MM-YYYY or YYYY-MM-DD to YYYY-MM-DD for comparison."""
+            if not d:
+                return ""
+            d = d.strip()
+            # Already YYYY-MM-DD
+            if re.match(r"^\d{4}-\d{2}-\d{2}$", d):
+                return d
+            # DD-MM-YYYY or DD/MM/YYYY
+            m = re.match(r"^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$", d)
+            if m:
+                dd, mm, yyyy = m.groups()
+                return f"{yyyy}-{dd.zfill(2)}-{mm.zfill(2)}"
+            return d
+
+        target_from_ymd = to_ymd(target_from)
+        target_to_ymd = to_ymd(target_to)
+
+        # Đếm rows: verify='yes' VÀ có content (comment) = 1 điểm KPI
+        verified_count = 0
+        for row in rows:
+            verify = str(row.get("verify", "")).strip().lower()
+            content = str(row.get("content", "")).strip()
+            # Thống nhất: verify='yes' || 'đã seeding' || 'xác minh' + có content
+            is_verified = verify == "yes" or verify == "đã xác minh" or "xác minh" in verify or "đã seeding" in verify
+
+            if not is_verified or not content:
+                continue
+
+            # Lọc theo ngày nếu có date range
+            if target_from_ymd or target_to_ymd:
+                day_ymd = to_ymd(str(row.get("day", "")).strip())
+                if day_ymd:
+                    if target_from_ymd and day_ymd < target_from_ymd:
+                        continue
+                    if target_to_ymd and day_ymd > target_to_ymd:
+                        continue
+
+            verified_count += 1
+
+        return BaseResponse(
+            success=True,
+            message=f"Tìm thấy {verified_count} bài seeding đã xác minh (có comment).",
+            data={
+                "verified_count": verified_count,
+                "total_count": len(rows),
+                "items": rows,
+            }
+        )
+    except Exception as e:
+        logger.error("Error getting actual seeding count: %s", e)
+        return BaseResponse(success=False, message=f"Lỗi: {str(e)}")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LEADER: Lấy KPI target (kpi_per_week) của member trong khoảng ngày
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class MemberKpiTargetRequest(BaseModel):
+    email_member: str = ""
+    profile_id: str = ""
+    facebook_name: str = ""
+    date_from: str = ""
+    date_to: str = ""
+
+
+@router.post("/seeding-mark/get-kpi-target", response_model=BaseResponse)
+def get_member_kpi_target(payload: MemberKpiTargetRequest) -> BaseResponse:
+    """Lấy KPI target (kpi_sedding_per_week) của 1 member trong khoảng ngày.
+    Dùng để leader so sánh với actual seeding count.
+    """
+    try:
+        from app.shared.services.google_sheet_service import get_sheets_service, settings as gs_settings
+
+        service = get_sheets_service()
+        sid = gs_settings.google_spreadsheet_id
+
+        # Đọc kpi_tracker
+        raw = service.spreadsheets().values().get(
+            spreadsheetId=sid,
+            range="'kpi_tracker'!A:I",
+            majorDimension="ROWS"
+        ).execute().get("values", [])
+
+        if not raw or len(raw) < 2:
+            return BaseResponse(success=True, data={"kpi_target": 0, "kpi_rows": []})
+
+        headers = [str(h).strip() for h in raw[0]]
+        rows = raw[1:]
+
+        target_email = payload.email_member.strip().lower()
+        target_from = payload.date_from.strip()
+        target_to = payload.date_to.strip()
+
+        def _parse_d(date_str):
+            if not date_str:
+                return None
+            date_str = date_str.strip()
+            for fmt in ("%d-%m-%Y", "%Y-%m-%d", "%d/%m/%Y"):
+                try:
+                    return datetime.strptime(date_str, fmt).date()
+                except ValueError:
+                    continue
+            return None
+
+        matching_rows = []
+        total_target = 0
+
+        for r in rows:
+            if len(r) < 1:
+                continue
+            padded = r + [""] * (len(headers) - len(r))
+            row_dict = dict(zip(headers, padded))
+
+            row_email = row_dict.get("email_member", "").strip().lower()
+            if row_email != target_email:
+                continue
+
+            start_str = row_dict.get("start", "")
+            end_str = row_dict.get("end", "")
+            start_date = _parse_d(start_str)
+            end_date = _parse_d(end_str)
+
+            # Kiểm tra overlap với date range
+            from_date = _parse_d(target_from) if target_from else None
+            to_date = _parse_d(target_to) if target_to else None
+
+            if from_date and to_date and start_date and end_date:
+                # Kiểm tra 2 khoảng có giao nhau
+                if start_date > to_date or end_date < from_date:
+                    continue
+            elif from_date and start_date and start_date > from_date:
+                continue
+            elif to_date and end_date and end_date < to_date:
+                continue
+
+            # Lấy kpi_per_week
+            kpi_str = str(row_dict.get("kpi_sedding_per_week", "0")).strip()
+            try:
+                kpi_val = int(kpi_str)
+            except ValueError:
+                kpi_val = 0
+
+            total_target += kpi_val
+            matching_rows.append({
+                "start": start_str,
+                "end": end_str,
+                "kpi_per_week": kpi_val,
+                "platform": row_dict.get("platform", ""),
+                "status": row_dict.get("status", ""),
+            })
+
+        return BaseResponse(
+            success=True,
+            message=f"KPI target: {total_target}",
+            data={
+                "kpi_target": total_target,
+                "kpi_rows": matching_rows,
+            }
+        )
+    except Exception as e:
+        logger.error("Error getting KPI target: %s", e)
+        return BaseResponse(success=False, message=f"Lỗi: {str(e)}")

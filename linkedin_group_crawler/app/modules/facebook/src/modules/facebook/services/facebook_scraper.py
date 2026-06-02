@@ -291,7 +291,13 @@ class FacebookScraper:
 
                 except Exception as e:
                     #logger.error(f"❌ Lỗi group {group.name}: {e}")
-                    results.append(GroupSummary(group_name=group.name, total_posts_24h=0,Intent=group.Intent, hot_post=None))
+                    results.append(GroupSummary(
+                        group_name=group.name,
+                        link_group=group.url,
+                        total_posts_24h=0,
+                        Intent=group.Intent,
+                        hot_post=None
+                    ))
 
             browser.close()
             return results

@@ -7,7 +7,7 @@ import { useAppPlatform } from "@/components/providers/AppPlatformProvider";
 import { useDashboard } from "@/components/features/dashboard/dashboard-context";
 import { FacebookGroupManagementPlaceholder } from "@/components/features/facebook/FacebookGroupManagementPlaceholder";
 import { LinkedInGroupManagementPageContent } from "@/components/features/linkedin/group-management";
-import { DashboardGroups } from "@/components/nguyen/modules/crawldFB/components/dashboardGroups";
+import { DashboardGroups } from "@/components/facebook-crawler/modules/facebook-crawl/components/dashboard-groups";
 
 export function PlatformGroupManagementContent() {
   const { platform } = useAppPlatform();

@@ -176,6 +176,13 @@ def open_group_and_collect_posts(
     scroll_delay_max_ms: int | None = None,
 ) -> dict[str, Any]:
     """Open a LinkedIn group page, scroll, and parse post data."""
+    
+    group_url = (group_url or "").strip()
+    if not group_url.lower().startswith("http://") and not group_url.lower().startswith("https://"):
+        raise ValueError(
+            f"URL nhóm không hợp lệ: '{group_url}'. "
+            "Vui lòng kiểm tra lại cấu hình Nhóm để đảm bảo URL bắt đầu bằng http:// hoặc https://."
+        )
 
     normalized_session_id, state_path = build_session_state_path(session_id=session_id, email=email)
 
