@@ -10,8 +10,6 @@ import type {
   Category,
   FacebookGroup,
   LinkedInGroup,
-  TeamMember,
-  GetAllPostsRequest,
   ApiResponse,
   AppUser,
   AuthLoginResponse,
@@ -227,6 +225,7 @@ export const allPlatformPostsService = {
     industry?: string;
     team?: string;
     tier?: number;
+    icp?: string;
     search?: string;
     sort?: string;
     page?: number;

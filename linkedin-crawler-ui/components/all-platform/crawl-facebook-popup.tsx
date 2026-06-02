@@ -8,9 +8,8 @@ import {
   socialAccountsService,
   allPlatformGroupsService,
   crawlFacebookService,
-  type SocialAccount,
 } from "@/services/all-platform.service";
-import type { FacebookGroup } from "@/types/unified.types";
+import type { FacebookGroup, SocialAccount } from "@/types/unified.types";
 
 interface CrawlFacebookPopupProps {
   open: boolean;

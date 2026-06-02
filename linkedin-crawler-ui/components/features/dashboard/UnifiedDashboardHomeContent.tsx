@@ -217,10 +217,10 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
   // Fetch Taxonomy
   const fetchCategories = useCallback(async () => {
     try {
-      const res = await allPlatformCategoriesService.getAllCategories(CURRENT_USER_EMAIL);
+      const res = await allPlatformCategoriesService.getAll();
       if (res.success && res.data) setCategories(res.data as Category[]);
     } catch {}
-  }, [CURRENT_USER_EMAIL]);
+  }, []);
 
   // Fetch Posts
   const fetchPosts = useCallback(async () => {
@@ -436,7 +436,7 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
               <PostCard
                 key={post.id || post.post_url}
                 post={post}
-                seeded={post.verify_status === "yes" || post.verify_status === "pending" || post.verify_status === "đã seeding" || post.verify_status === "verified"}
+                seeded={!!post.verify_status && post.verify_status !== "no"}
                 verifyStatus={post.verify_status as any}
                 onSeeding={() => {}}
                 onVerify={() => {}}

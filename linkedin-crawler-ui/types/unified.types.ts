@@ -20,6 +20,7 @@ export interface UnifiedPost {
   post_url: string;
   crawl_date: string;
   post_time?: string;
+  posted_at?: string;
   content: string;
   score: number;
   reactions: number;

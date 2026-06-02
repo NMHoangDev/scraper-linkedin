@@ -7,10 +7,9 @@ import { cn } from "@/lib/utils";
 import {
   socialAccountsService,
   platformsService,
-  type SocialAccount,
-  type SocialPlatform,
-  type FeedPlatform,
 } from "@/services/all-platform.service";
+import type { SocialAccount, FeedPlatform } from "@/types/unified.types";
+import type { SocialPlatform } from "@/services/all-platform.service";
 
 interface SocialAccountsProps {
   onAccountChange?: (platform: string, accountName: string) => void;
@@ -100,6 +99,8 @@ export function SocialAccountsManager({ onAccountChange }: SocialAccountsProps) 
       id_platform: acc.id_platform ?? null,
       is_primary: acc.is_primary,
       notes: acc.notes || "",
+      two_fa_secret: acc.two_fa_secret || "",
+      session_cookie: acc.session_cookie || "",
     });
     setShowForm(true);
   };
@@ -110,6 +111,7 @@ export function SocialAccountsManager({ onAccountChange }: SocialAccountsProps) 
       account_name: "", account_email: "", account_password: "",
       account_profile_id: "", id_platform: null,
       is_primary: false, notes: "",
+      two_fa_secret: "", session_cookie: "",
     });
     setShowForm(true);
   };
@@ -121,12 +123,12 @@ export function SocialAccountsManager({ onAccountChange }: SocialAccountsProps) 
     try {
       const payload = {
         account_name: formData.account_name,
-        account_email: formData.account_email || null,
-        account_password: formData.account_password || null,
-        account_profile_id: formData.account_profile_id || null,
+        account_email: formData.account_email || undefined,
+        account_password: formData.account_password || undefined,
+        account_profile_id: formData.account_profile_id || undefined,
         id_platform: formData.id_platform,
         is_primary: formData.is_primary,
-        notes: formData.notes || null,
+        notes: formData.notes || undefined,
       };
       let res;
       if (editingId) {
@@ -263,7 +265,7 @@ export function SocialAccountsManager({ onAccountChange }: SocialAccountsProps) 
                         <button onClick={() => void handleSetPrimary(acc.id)}
                           className="p-1.5 text-[#D97706] hover:bg-amber-50 rounded-lg transition cursor-pointer"
                           title="Đặt mặc định">
-                          <MaterialIcon name="star" className="text-base" />
+                          <MaterialIcon name="favorite" className="text-base" />
                         </button>)}
                       <button onClick={() => setViewAccount(acc)}
                         className="p-1.5 text-[#666666] hover:bg-[#F5F5F5] rounded-lg transition cursor-pointer" title="Xem chi tiết">
