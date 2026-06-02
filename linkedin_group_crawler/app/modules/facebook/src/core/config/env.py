@@ -73,7 +73,7 @@ class Config:
        # giờ chạy
     CRAWL_MINUTE=35
        # phút chạy
-    # Cấu hình giờ mặt định để chạy mỗi ngày
+    # Cấu hình giờ mặt định để chạy mỗi tuần cập nhật lại điểm số và thông tin groups
     GROUP_HOUR=2
        # giờ chạy
     GROUP_MINUTE=20

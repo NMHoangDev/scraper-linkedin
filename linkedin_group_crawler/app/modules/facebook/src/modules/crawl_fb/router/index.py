@@ -24,7 +24,7 @@ from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_groups_24h
 from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_intent_service import IntentSheetService
 from app.modules.facebook.src.core.config.env import Config
 from app.modules.facebook.src.modules.crud.posts.post import create_multiple_postsFB
-
+from app.modules.facebook.src.modules.crud.groupsFb.groups import update_groups_per_crawl
 from app.modules.facebook.src.core.utils.facebook_parsers import convert_to_datetime
 from fastapi.encoders import jsonable_encoder
 import traceback
@@ -369,14 +369,19 @@ async def receive_webhook_result(payload: WebhookResponse):
             
             try:
                     service_posts_to_db=[]
+                    groups_update=[]
                     for summary in summaries:
                         # 2. Tạo một DICTIONARY (Từ điển) MỚI cho bài viết hiện tại
+                        groups_data={}
+                        groups_data["id"]=summary.id
+                        groups_data["last_crawl"]=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         post_data = {}
                         post_data["id"] = str(uuid.uuid4())
                         post_data["group_id"] = summary.id
                         post_data["crawl_date"]=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         post = summary.hot_post
                         if post:
+                            groups_data["health_score"]=post.score
                             post_data["post_time"] = post.date
                             post_data["content"] = post.content
                             post_data["reactions"] = post.reactions
@@ -390,7 +395,8 @@ async def receive_webhook_result(payload: WebhookResponse):
                         service_posts_to_db.append(post_data)
                     # thêm vào supabase
                     await asyncio.to_thread(create_multiple_postsFB, service_posts_to_db)
-                   
+                    # cập nhật lại thông tin groups sau mỗi lần crawl
+                    await asyncio.to_thread(update_groups_per_crawl, groups_update)
                     # Logic báo Telegram (tùy chọn)
                     # telegram.send_completion_notification()
                     # mes = telegram.format_daily_telegram_report(summaries=summaries)

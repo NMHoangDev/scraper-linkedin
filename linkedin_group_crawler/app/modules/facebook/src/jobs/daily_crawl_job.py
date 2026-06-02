@@ -20,7 +20,8 @@ from app.modules.facebook.src.core.config.env import Config
 from app.modules.facebook.src.modules.crawl_fb.models.GroupSummary import GroupSummary
 
 from app.modules.facebook.src.modules.crawl_fb.router.index import job_tracker
-
+from app.modules.facebook.src.modules.crud.groups24hFb.group24h import get_all_groupsFB_24h
+from app.modules.facebook.src.modules.crud.groupsFb.groups import reset_all_posts_per_week
 
 logger = logging.getLogger(__name__)
 
@@ -31,15 +32,15 @@ async def execute_crawl_workflow():
     telegram = TelegramService()
     
     try:
-        sheet_data = await asyncio.to_thread(service_24h.get_all_target_groups)
+        sheet_data = await asyncio.to_thread(get_all_groupsFB_24h)
         
         all_groups_dict = []
         for row in sheet_data:
             group_url = row.get("url", "").strip()
             group_name = row.get("group_name", "Unknown").strip()
-            intent = row.get("intent", "").strip()
+            id = row.get("id", "").strip()
             if group_url:
-                all_groups_dict.append({"name": group_name, "url": group_url, "Intent": intent})
+                all_groups_dict.append({"name": group_name, "url": group_url, "id": id})
 
         if not all_groups_dict:
             logger.warning("❌ Không tìm thấy danh sách Group hợp lệ.")
@@ -89,88 +90,13 @@ async def execute_crawl_workflow():
         except: pass
 def execute_update_groups_workflow():
     """
-    Luồng công việc tổng hợp chỉ số (Post/tuần, Điểm số cao nhất và Ngày cào gần nhất) 
-    từ danh sách Posts và cập nhật lại vào sheet Groups.
+    Luồng công việc tổng hợp cập nhập lại điểm số sau 1 tuần
     """
-    logger.info("📊 BẮT ĐẦU TỔNG HỢP VÀ CẬP NHẬT CHỈ SỐ GROUPS...")
-    service_posts = GoogleSheetServicePosts()
-    service_groups = GroupManagementSheetService()
-    telegram = TelegramService()
-
     try:
-        # 1. Lấy toàn bộ bài viết đã lưu
-        all_posts = service_posts.get_all_posts()
-        if not all_posts:
-            logger.warning("⚠️ Không có dữ liệu bài viết để tổng hợp chỉ số.")
-            return
-
-        # 2. Phân tích và gom nhóm theo URL Group
-        group_metrics: Dict[str, Dict[str, Any]] = {}
-        seven_days_ago = datetime.now() - timedelta(days=7)
-
-        for post in all_posts:
-            group_url = post.get("link_group", "").strip()
-            if not group_url:
-                continue
-
-            score = post.get("score", 0)
-            crawl_date_str = post.get("dateCrawl", "").strip()
-
-            # Khởi tạo dữ liệu cho Group nếu chưa tồn tại
-            if group_url not in group_metrics:
-                group_metrics[group_url] = {
-                    "max_score": 0.0,
-                    "posts_last_7d": 0,
-                    "last_crawl": "" # <--- THÊM MỚI
-                }
-
-            # Cập nhật điểm số cao nhất
-            if score > group_metrics[group_url]["max_score"]:
-                group_metrics[group_url]["max_score"] = float(score)
-
-            # Xử lý ngày tháng để đếm bài viết 7 ngày và tìm ngày cào gần nhất
-            if crawl_date_str:
-                try:
-                    crawl_date = datetime.strptime(crawl_date_str, "%Y-%m-%d %H:%M:%S")
-                    
-                    # Cập nhật ngày cào gần nhất (So sánh chuỗi hoặc datetime)
-                    # Nếu last_crawl trống hoặc ngày hiện tại mới hơn ngày đã lưu
-                    current_last_crawl_str = group_metrics[group_url]["last_crawl"]
-                    if not current_last_crawl_str or crawl_date_str > current_last_crawl_str:
-                        group_metrics[group_url]["last_crawl"] = crawl_date_str
-
-                    # Đếm số bài trong 7 ngày qua
-                    if crawl_date >= seven_days_ago:
-                        group_metrics[group_url]["posts_last_7d"] += 1
-                except Exception:
-                    # Nếu lỗi định dạng ngày, vẫn tính là 1 post nhưng không cập nhật last_crawl
-                    group_metrics[group_url]["posts_last_7d"] += 1
-            else:
-                group_metrics[group_url]["posts_last_7d"] += 1
-
-        # 3. Thực thi cập nhật từng Group trên Sheet
-        logger.info(f"🔄 Bắt đầu cập nhật dữ liệu cho {len(group_metrics)} Groups...")
-        success_count = 0
-
-        for group_url, metrics in group_metrics.items():
-            # Chuẩn bị payload cập nhật
-            update_payload = {
-                Config.POSTS_PER_WEEK_GG_SHEET: metrics["posts_last_7d"],
-                Config.HEALTH_SCORE_GG_SHEET: metrics["max_score"],
-                Config.LAST_CRAWL_GG_SHEET: metrics["last_crawl"] # <--- THÊM MỚI
-            }
-            
-            is_updated = service_groups.update_group_metrics(
-                group_url=group_url, 
-                update_data=update_payload
-            )
-            if is_updated:
-                success_count += 1
-
-        logger.info(f"✅ HOÀN TẤT CẬP NHẬT CHỈ SỐ GROUPS. Thành công: {success_count}/{len(group_metrics)}")
-
+        logger.info("🔄 BẮT ĐẦU QUY TRÌNH CẬP NHẬT LẠI ĐIỂM SỐ VÀ THÔNG TIN GROUPS...")
+        reset_all_posts_per_week() # Reset lại posts_per_week về 0 cho tất cả groups trước khi cập nhật
     except Exception as e:
-        logger.error(f"❌ Thất bại khi cập nhật chỉ số Groups: {e}", exc_info=True)
+        logger.error(f"❌ Thất bại trong quy trình cập nhật groups: {e}", exc_info=True)
 
 # ==============================================================================
 # ✅ LUỒNG TÁC VỤ 3 THÊM MỚI: BACKUP VÀ RESET ĐIỂM SỐ HÀNG TUẦN (CHỦ NHẬT 2:00 AM)
@@ -272,6 +198,7 @@ def setup_and_start_jobs():
     scheduler.add_job(
         func=execute_update_groups_workflow,
         trigger='cron',
+        day_of_week='mon', # Thực thi vào Chủ nhật
         hour=Config.GROUP_HOUR,
         minute=Config.GROUP_MINUTE,
         id='daily_facebook_UPDATE_GROUP',
