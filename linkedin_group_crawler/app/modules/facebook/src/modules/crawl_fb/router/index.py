@@ -1,4 +1,5 @@
 # src/modules/crawl/route/crawl_route.py
+from datetime import datetime
 import json
 import asyncio
 import logging
@@ -7,6 +8,8 @@ from fastapi import APIRouter, Depends, status, BackgroundTasks, WebSocket, WebS
 from typing import Any, List, Optional, Dict
 from pydantic import BaseModel
 import uuid
+from fastapi import HTTPException
+
 # Imports từ project của bạn
 from app.modules.facebook.src.modules.facebook.services.facebook_auth import FacebookAuth
 from app.modules.facebook.src.modules.crawl_fb.schemas.crawl_schema import CrawlPayload
@@ -20,7 +23,9 @@ from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_posts impo
 from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_groups_24h import TargetGroupSheet24HService
 from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_intent_service import IntentSheetService
 from app.modules.facebook.src.core.config.env import Config
+from app.modules.facebook.src.modules.crud.posts.post import create_multiple_postsFB
 
+from app.modules.facebook.src.core.utils.facebook_parsers import convert_to_datetime
 from fastapi.encoders import jsonable_encoder
 import traceback
 
@@ -357,15 +362,35 @@ async def receive_webhook_result(payload: WebhookResponse):
             # from app.modules.facebook.src.modules.telegram.services.telegram_service import TelegramService
             # telegram = TelegramService()
             
-            service_posts = GoogleSheetServicePosts()
+            
             
             # Ép kiểu lại dữ liệu thành các entity GroupSummary chuẩn
             summaries = [GroupSummary(**item) for item in final_data]
             
             try:
-                if service_posts.append_data(data=summaries):
-                    logger.info(f"📊 Đã lưu thành công tổng hợp dữ liệu lên Google Sheets cho {client_id}")
-                    
+                    service_posts_to_db=[]
+                    for summary in summaries:
+                        # 2. Tạo một DICTIONARY (Từ điển) MỚI cho bài viết hiện tại
+                        post_data = {}
+                        post_data["id"] = str(uuid.uuid4())
+                        post_data["group_id"] = summary.id
+                        post_data["crawl_date"]=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        post = summary.hot_post
+                        if post:
+                            post_data["post_time"] = post.date
+                            post_data["content"] = post.content
+                            post_data["reactions"] = post.reactions
+                            post_data["comments"] = post.comments
+                            post_data["shares"] = post.shares
+                            post_data["score"] = post.score
+                            post_data["media_url"] = post.media_url
+                            post_data["image_urls"] = post.images
+                            # Nếu API yêu cầu post_url, bạn có thể thêm:
+                            post_data["post_url"] = post.url
+                        service_posts_to_db.append(post_data)
+                    # thêm vào supabase
+                    await asyncio.to_thread(create_multiple_postsFB, service_posts_to_db)
+                   
                     # Logic báo Telegram (tùy chọn)
                     # telegram.send_completion_notification()
                     # mes = telegram.format_daily_telegram_report(summaries=summaries)
@@ -403,7 +428,7 @@ async def websocket_crawl_endpoint(websocket: WebSocket, email: str):
             return
 
         # Chia Lô
-        all_groups_dict = [{"name": g.name, "url": g.url, "Intent": g.Intent} for g in payload.groups]
+        all_groups_dict = [{"name": g.name, "url": g.url, "id": g.id} for g in payload.groups]
         num_workers = len(WORKER_URLS)
         chunk_size = (len(all_groups_dict) + num_workers - 1) // num_workers
         batches = [all_groups_dict[i:i + chunk_size] for i in range(0, len(all_groups_dict), chunk_size)]

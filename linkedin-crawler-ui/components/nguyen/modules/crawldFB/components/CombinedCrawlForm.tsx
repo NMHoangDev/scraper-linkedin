@@ -587,7 +587,7 @@ function LinkedInForm({ onSuccess }: { onSuccess?: () => void }) {
 function FacebookForm({ onSuccess }: { onSuccess?: () => void }) {
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
   const [selectedGroups, setSelectedGroups] = useState<
-    { name: string; url: string; Intent: string }[]
+    { name: string; url: string; id: string }[]
   >([]);
   const { user } = useAuthContext();
   const { isLoading, loadingMsg, submitCrawlData, result, cancelCrawl } =
@@ -621,12 +621,12 @@ function FacebookForm({ onSuccess }: { onSuccess?: () => void }) {
   const firstErrorMsg = getFirstErrorMessage(errors);
 
   const handleSelectPresetGroups = (
-    groups: { name: string; url: string; intent: string }[],
+    groups: { name: string; url: string; id: string }[],
   ) => {
     const formatted = groups.map((g) => ({
       name: g.name,
       url: g.url,
-      Intent: g.intent || "default",
+      id: g.id || "default",
     }));
     setSelectedGroups(formatted);
     setValue("rows", formatted, { shouldValidate: true });

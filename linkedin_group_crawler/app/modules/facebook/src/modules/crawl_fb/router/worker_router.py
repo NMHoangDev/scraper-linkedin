@@ -16,7 +16,7 @@ scraper = FacebookScraper(Config())
 class GroupItemDTO(BaseModel):
     name: str
     url: str
-    Intent: str
+    id: str
 
 class CrawlBatchRequest(BaseModel):
     batch_data: List[GroupItemDTO]
@@ -54,7 +54,7 @@ def process_and_callback(target_groups: List[GroupTarget], worker_email: str, cl
 @worker_router.post("/internal/crawl-batch")
 def execute_crawl_batch(req: CrawlBatchRequest, background_tasks: BackgroundTasks):
     worker_email = os.getenv("FB_DEFAULT_EMAIL")
-    target_groups = [GroupTarget(name=item.name, url=item.url, Intent=item.Intent) for item in req.batch_data]
+    target_groups = [GroupTarget(name=item.name, url=item.url, id=item.id) for item in req.batch_data]
 
     # Quăng vào luồng ngầm (Luồng chính trả HTTP 200 luôn)
     background_tasks.add_task(

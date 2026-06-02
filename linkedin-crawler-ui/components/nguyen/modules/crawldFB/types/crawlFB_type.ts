@@ -14,8 +14,8 @@ export interface CrawlFBRequest {
 
 export interface PostType {
   group_name: string;
-  total_posts_24h: number;
-  url: string;
+  post_url: string;
+  group_url: string;
   date: string;
   reactions: number;
   comments: number;
@@ -23,7 +23,7 @@ export interface PostType {
   score: number;
   content?: string;
   media_url: string | null; // Optional[str] trong Python sẽ là string hoặc null
-  images: string[]; // List[str] trong Python
+  image_urls: string[]; // List[str] trong Python
 }
 
 // 2. Type cho tổng hợp nhóm (Đồng bộ với class GroupSummary)

@@ -11,7 +11,7 @@ import { MaterialIcon } from "@/components/ui";
 interface SelectPresetGroupsModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSelectGroups: (selectedGroups: { name: string; url: string; intent: string }[]) => void;
+    onSelectGroups: (selectedGroups: { name: string; url: string; id: string }[]) => void;
 }
 type GroupStatus = "ACTIVE" | "IDLE" | "DEAD" | null | undefined;
 
@@ -21,7 +21,7 @@ export function SelectPresetGroupsModal({ isOpen, onClose, onSelectGroups }: Sel
 
     const { intents, fetchIntents } = useGetIntents();
     const { presetGroups, isLoadingGroups, errorGroups, fetchPresetGroups } = useGetPresetGroups();
-
+    
     useEffect(() => {
         if (isOpen) {
             fetchIntents();
@@ -53,12 +53,12 @@ export function SelectPresetGroupsModal({ isOpen, onClose, onSelectGroups }: Sel
     const handleConfirmSelection = () => {
         const payload = selectedIndices.map((targetIndex) => {
             const originalGroup = presetGroups[targetIndex];
-            const matchedIntent = intents.find((item) => item.name === originalGroup.intent);
 
+     
             return {
                 name: originalGroup.group_name,
-                url: originalGroup.url,
-                intent: matchedIntent ? matchedIntent.value : originalGroup.intent,
+                url: originalGroup.group_url,
+                id: originalGroup.id,
             };
         });
 
@@ -150,7 +150,7 @@ export function SelectPresetGroupsModal({ isOpen, onClose, onSelectGroups }: Sel
                                 presetGroups.map((group, index) => {
                                     const isMatchSearch =
                                         (group.group_name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        (group.url || "").toLowerCase().includes(searchTerm.toLowerCase());
+                                        (group.group_url || "").toLowerCase().includes(searchTerm.toLowerCase());
                                     if (!isMatchSearch) return null;
 
                                     const isSelected = selectedIndices.includes(index);
@@ -179,7 +179,7 @@ export function SelectPresetGroupsModal({ isOpen, onClose, onSelectGroups }: Sel
                                                     <FaFacebook className="text-blue-600 shrink-0" />
                                                     <span className="line-clamp-1">{group.group_name}</span>
                                                 </div>
-                                                <div className="text-[11px] text-on-surface-variant mt-0.5">{group.url}</div>
+                                                <div className="text-[11px] text-on-surface-variant mt-0.5">{group.group_url}</div>
                                             </td>
 
                                             <td className="py-md px-md">

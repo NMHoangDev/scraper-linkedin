@@ -12,7 +12,7 @@ export const CrawlFb_Schemas = z
       z.object({
         name: z.string().min(1, "Vui lòng nhập tên GroupFb"),
         url: z.string().url("Đường dẫn không hợp lệ").or(z.literal("")),
-        Intent: z.string().min(1, "Vui lòng chọn mục đích quét dữ liệu"),
+        id: z.string().min(1, "Vui lòng chọn mục đích quét dữ liệu"),
       }),
     ),
   })

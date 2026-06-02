@@ -11,8 +11,10 @@ from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_groups_ser
 from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_posts import GoogleSheetServicePosts
 from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_groups_24h import TargetGroupSheet24HService
 from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_intent_service import IntentSheetService
-
-
+from datetime import datetime
+from app.modules.facebook.src.modules.crud.posts.post import get_all_postsFB
+from app.modules.facebook.src.modules.crud.categories.categories import get_all_categoriesFB
+from app.modules.facebook.src.core.utils.facebook_parsers import convert_to_datetime
 logger = logging.getLogger(__name__)
 
 # ĐÃ XÓA Ổ KHÓA TOÀN CỤC (crawl_lock) ĐỂ CHẠY SONG SONG KHÔNG GIỚI HẠN
@@ -106,7 +108,32 @@ class CrawlService:
             
     async def get_all_posts_from_sheet(self):
         try:
-            records = await run_in_threadpool(self.post_sheet.get_all_posts)  # Giả sử có hàm get_all_posts() trong GoogleSheetServicePosts
+            records = await asyncio.to_thread(get_all_postsFB)  # Giả sử có hàm get_all_posts() trong GoogleSheetServicePosts
+            categories_dict = await asyncio.to_thread(get_all_categoriesFB)  # Lấy categories từ Supabase
+            # map lấy value của từng loại dựa vào id trong records
+            intents_map = {str(item["id"]): item["value"] for item in categories_dict.get("intents", [])}
+            industries_map = {str(item["id"]): item["value"] for item in categories_dict.get("industries", [])}
+            tiers_map = {str(item["id"]): item["value"] for item in categories_dict.get("tiers", [])}
+            teams_map = {str(item["id"]): item["value"] for item in categories_dict.get("teams", [])}
+            icp_map = {str(item["id"]): item["value"] for item in categories_dict.get("icp", [])}
+            for record in records:
+                fb_group_data = record.get("facebook_groups", {})
+                record["group_url"] = fb_group_data.get("group_url")  
+                record["group_name"] = fb_group_data.get("group_name")
+                record["intent"] = intents_map.get(str(fb_group_data.get("id_intent")), None)
+                record["industry"] = industries_map.get(str(fb_group_data.get("id_industry")), None)
+                record["tier"] = tiers_map.get(str(fb_group_data.get("id_tier")), None)
+                record["team"] = teams_map.get(str(fb_group_data.get("id_team")), None)
+                record["icp"] = icp_map.get(str(fb_group_data.get("id_icp")), None)
+                record["date"]=convert_to_datetime(record.get("post_time"))  # Hoặc trường nào chứa ngày tháng bạn muốn
+                record.pop("id_intent", None)
+                record.pop("id_industry", None)
+                record.pop("id_tier", None)
+                record.pop("id_team", None)
+                record.pop("id_icp", None)
+                record.pop("group_id",None)
+                record.pop("facebook_groups", None)  # Xóa trường facebook_groups sau khi đã map dữ liệu cần thiết
+            
             return {
                 "status": "success", 
                 "message": "Lấy dữ liệu thành công.", 

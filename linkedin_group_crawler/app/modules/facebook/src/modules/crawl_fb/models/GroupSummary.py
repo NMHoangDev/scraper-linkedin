@@ -11,7 +11,7 @@ class GroupSummary:
     link_group:str
     total_posts_24h: int             # Số lượng bài viết cào được trong 24h qua
     hot_post: Optional[Post]          # bài viết
-    Intent:str
+    id:str
     def __post_init__(self):
         # Nếu hot_post đang là kiểu dict (do giải mã từ JSON Webhook)
         # thì ép kiểu nó trở lại thành object Post

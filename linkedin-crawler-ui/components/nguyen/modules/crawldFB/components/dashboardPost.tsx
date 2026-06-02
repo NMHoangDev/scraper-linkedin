@@ -22,7 +22,7 @@ import type { AppPlatform } from "@/lib/app-platform";
 
 // Nhận diện nền tảng mạng xã hội dựa trên URL
 const detectPlatform = (post: DataFBResponse) => {
-    const targetUrl = post.link_group || post.url || "";
+    const targetUrl = post.link_group || post.group_url || "";
     return targetUrl.includes("linkedin.com") ? "LinkedIn" : "Facebook";
 };
 
@@ -434,7 +434,7 @@ export function DashboardPosts({
                                             {renderPlatformIcon(platform)}
 
                                             <a 
-                                                href={post.link_group || "#"} 
+                                                href={post.group_url || "#"} 
                                                 target="_blank" 
                                                 rel="noopener noreferrer"
                                                 className="text-xs font-bold text-slate-900 hover:text-indigo-600 hover:underline truncate max-w-[220px]"

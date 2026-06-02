@@ -142,7 +142,7 @@ export function DashboardGroups({
   // 1. TÍNH TOÁN CÁC CHỈ SỐ THỐNG KÊ (SUMMARY CARDS)
   // ==========================================
   const scopeGroups = presetGroups.filter((g) => {
-    const p = g.platform || detectPlatformFromUrl(g.url);
+    const p = g.platform || detectPlatformFromUrl(g.group_url || "");
     if (forcedPlatform && p !== forcedPlatform) return false;
     if (platformFilter !== "all" && p !== platformFilter) return false;
     return true;
@@ -310,12 +310,12 @@ export function DashboardGroups({
   ).sort();
 
   const filteredGroups = presetGroups.filter((group) => {
-    const platform = detectPlatform(group.url);
+    const platform = detectPlatform(group.group_url);
     const matchSearch =
       (group.group_name || "")
         .toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
-      (group.url || "").toLowerCase().includes(searchTerm.toLowerCase());
+      (group.group_url || "").toLowerCase().includes(searchTerm.toLowerCase());
     const matchPlatform =
       platformFilter === "all" ||
       platform.toLowerCase() === platformFilter.toLowerCase();
@@ -662,12 +662,12 @@ export function DashboardGroups({
                 </tr>
               ) : (
                 paginatedGroups.map((group) => {
-                  const platform = detectPlatform(group.url);
+                  const platform = detectPlatform(group.group_url);
                   const isDead = group.status === "DEAD";
 
                   return (
                     <tr
-                      key={group.url}
+                      key={group.id}
                       className="hover:bg-slate-50/50 transition duration-150"
                     >
                       <td className="py-4 px-5 max-w-[250px]">
@@ -676,15 +676,15 @@ export function DashboardGroups({
                         </div>
                         <a
                           href={
-                            group.url.startsWith("http")
-                              ? group.url
-                              : `https://${group.url}`
+                            group.group_url.startsWith("http")
+                              ? group.group_url
+                              : `https://${group.group_url}`
                           }
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-[11px] text-slate-400 hover:text-blue-600 hover:underline truncate block mt-0.5"
                         >
-                          {group.url.replace(/^https?:\/\//, "")}
+                          {group.group_url.replace(/^https?:\/\//, "")}
                         </a>
                       </td>
                       <td className="py-4 px-4 font-medium text-slate-700">
@@ -698,7 +698,7 @@ export function DashboardGroups({
                         {group.members?.toLocaleString() || "0"}
                       </td>
                       <td className="py-4 px-4">
-                        {renderStatusBadge(group.status)}
+                        {renderStatusBadge(group.status )}
                       </td>
                       <td className="py-4 px-4">
                         <span className="font-medium text-slate-700">
@@ -741,7 +741,7 @@ export function DashboardGroups({
                               />
                             </button>
                             <button
-                              onClick={() => window.open(group.url, "_blank")}
+                              onClick={() => window.open(group.group_url, "_blank")}
                               title="Xem group trên nền tảng"
                               className="p-1.5 text-violet-600 hover:bg-violet-50 rounded-md transition"
                             >

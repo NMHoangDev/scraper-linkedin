@@ -163,3 +163,21 @@ def clean_post_url(href: str) -> str:
         return urlunparse(clean)
     except Exception:
         return href
+    
+
+
+def convert_to_datetime(time_str: Optional[str]) -> Optional[datetime]:
+    if not time_str:
+        return None
+        
+    try:
+        # 1. Thay chữ T bằng khoảng trắng
+        clean_str = time_str.replace("T", " ")
+        
+        # 2. Cắt bỏ múi giờ (+00:00 hoặc Z) nếu vô tình dính vào
+        clean_str = clean_str.split("+")[0].split("Z")[0]
+        
+        # 3. Parse theo chuẩn ngày giờ bình thường
+        return datetime.strptime(clean_str, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return None

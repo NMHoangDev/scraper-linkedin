@@ -63,7 +63,7 @@ function GroupCrawlCard({ group }: { group: GroupSummaryType }) {
   }
 
   const dateLabel = formatRelativeCrawl(post.date);
-  const hasImages = Boolean(post.images?.length);
+  const hasImages = Boolean(post.image_urls?.length);
   const hasVideo = Boolean(post.media_url?.trim());
 
   return (
@@ -135,10 +135,10 @@ function GroupCrawlCard({ group }: { group: GroupSummaryType }) {
             {hasImages ? (
               <div>
                 <p className="text-label-md text-on-surface-variant mb-xs font-semibold uppercase">
-                  Ảnh ({post.images!.length})
+                  Ảnh ({post.image_urls!.length})
                 </p>
                 <div className="flex flex-wrap gap-sm">
-                  {post.images!.slice(0, 6).map((img, i) => (
+                  {post.image_urls!.slice(0, 6).map((img, i) => (
                     <a
                       key={`${img}-${i}`}
                       href={img}
@@ -161,9 +161,9 @@ function GroupCrawlCard({ group }: { group: GroupSummaryType }) {
           </div>
         )}
 
-        {post.url ? (
+        {post.post_url ? (
           <a
-            href={post.url}
+            href={post.post_url}
             target="_blank"
             rel="noopener noreferrer"
             className="bg-primary text-on-primary hover:bg-primary-container mt-auto inline-flex items-center justify-center gap-sm rounded-lg py-sm text-sm font-bold transition-colors"

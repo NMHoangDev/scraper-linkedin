@@ -43,21 +43,29 @@ class GetIntentsResponse(BaseModel):
     data: List[IntentItem]
 
 class GroupItemResponse(BaseModel):
+    id: str
     group_name: str
-    url: str
-    intent: str
-    members: Optional[int] = 0
-    posts_per_week: Optional[int] = 0
-    health_score: Optional[int] = 0
-    date_crawl: Optional[str] = ""     # Thêm trường này để lưu ngày crawl thô từ Sheet
+    group_url: str
+    
+    # Cập nhật tên các trường theo đúng log database trả về (thêm tiền tố id_)
+    # Bắt buộc phải có "= None" ở cuối để FastAPI không báo lỗi 'missing' nếu cột không có dữ liệu
+    intent: Optional[str] = None
+    industry: Optional[str] = None
+    tier: Optional[int] = None
+    team: Optional[str] = None
+    icp: Optional[str] = None
+    
+    # Các trường khác giữ nguyên
+    icp_desc: Optional[str] = None
+    members: Optional[int] = None
+    posts_per_week: Optional[int] = None
+    health_score: Optional[int] = None
     chay_24h: Optional[bool] = False
-    last_crawl: Optional[str] = ""     # Thêm trường này
-    status: Optional[str] = "DEAD"
-    industry: Optional[str] = ""
-    tier: Optional[int] = 0
-    team: Optional[str] = ""
-    icp: Optional[str] = ""
-    icp_desc: Optional[str] = ""
+    last_crawl: Optional[str] = None
+    status: Optional[str] = None
+    date_crawl: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
 class GetGroupsResponse(BaseModel):
     status: str

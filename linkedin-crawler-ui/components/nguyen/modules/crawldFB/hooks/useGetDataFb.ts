@@ -43,10 +43,12 @@ export const useFetchAllPosts = () => {
                 if (Array.isArray(session.posts)) {
                     session.posts.forEach((post: any) => {
                         liPosts.push({
+                            id: post.id || `${session.group_name}-${post.posted_at}`,
                             group_name: session.group_name || "Nhóm LinkedIn",
                             total_posts_24h: 0,
+                            group_url: session.group_url || "",
                             link_group: session.group_url || "",
-                            url: post.post_url || "",
+                            post_url: post.post_url || "",
                             date: post.posted_at || "",
                             dateCrawl: session.date_crawl || new Date(),
                             intent: post.intent || "",
@@ -56,7 +58,7 @@ export const useFetchAllPosts = () => {
                             score: Number(post.score || 0),
                             content: post.content || "",
                             media_url: post.media_url || null,
-                            images: Array.isArray(post.images) ? post.images : [],
+                            image_urls: Array.isArray(post.image_urls) ? post.image_urls : [],
                         });
                     });
                 }

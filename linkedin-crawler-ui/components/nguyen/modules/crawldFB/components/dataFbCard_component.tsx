@@ -24,7 +24,7 @@ export function PostCard({ item, onLinkClick }: PostCardProps) {
     useEffect(() => {
         fetchIntents();
     }, []);
-    const hasMedia = item.images.length > 0 || Boolean(item.media_url);
+    const hasMedia = (item.image_urls?.length || 0) > 0 || Boolean(item.media_url);
 
     const displayDate = typeof item.dateCrawl === 'string' 
         ? new Date(item.dateCrawl).toLocaleDateString('vi-VN') 
@@ -35,7 +35,7 @@ export function PostCard({ item, onLinkClick }: PostCardProps) {
     const detectPlatform = (targetUrl: string) => {
         return targetUrl.includes("linkedin.com") ? "LinkedIn" : "Facebook";
     };
-    const platform = detectPlatform(item.link_group || item.url);
+    const platform = detectPlatform(item.link_group || item.group_url || "");
 
   
 
@@ -92,7 +92,7 @@ export function PostCard({ item, onLinkClick }: PostCardProps) {
                     </span>
 }
                     <a
-                        href={item.url}
+                        href={item.post_url}
                         target="_blank"
                         rel="noreferrer"
                         className="text-gray-400 hover:text-indigo-600 transition p-1"
@@ -110,9 +110,9 @@ export function PostCard({ item, onLinkClick }: PostCardProps) {
                 {/* Media */}
                 {hasMedia && (
                     <div className="mt-5 max-h-[420px] space-y-4 overflow-y-auto pr-2">
-                        {item.images.length > 0 && (
+                        {item.image_urls.length > 0 && (
                             <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                                {item.images.map((img, index) => (
+                                {item.image_urls.map((img, index) => (
                                     <img
                                         key={index}
                                         src={img}
@@ -160,13 +160,13 @@ export function PostCard({ item, onLinkClick }: PostCardProps) {
                     {/* Nút Xem bài viết */}
                     <div className="flex items-center gap-3">
                         <a
-                            href={item.url}
+                            href={item.post_url}
                             target="_blank"
                             rel="noreferrer"
                             className="bg-violet-600 hover:bg-violet-700 text-white text-xs px-4 py-2 rounded-xl font-semibold transition inline-block text-center shadow-xs"
                             onClick={() => {
                                 if (onLinkClick) {
-                                    onLinkClick(item.url);
+                                    onLinkClick(item.post_url);
                                 }
                             }}
                         >
@@ -176,7 +176,7 @@ export function PostCard({ item, onLinkClick }: PostCardProps) {
 
                 </div>
             </div>
-            <InteractionForm url={item.url} />
+            <InteractionForm url={item.post_url} />
 
         </div>
     );

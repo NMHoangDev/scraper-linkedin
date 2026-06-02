@@ -61,7 +61,7 @@ export default function CrawlFB_Form() {
             userName: user?.email || "",
             password: "",
 
-            rows: [{ name: "", url: "", Intent: "" }],
+            rows: [{ name: "", url: "", id: "" }],
         }
     })
     const { fields, append, remove } = useFieldArray({
@@ -110,18 +110,20 @@ export default function CrawlFB_Form() {
     };
     const firstErrorMsg = getFirstErrorMessage(errors);
 
-    const handleSelectPresetGroups = (selectedGroups: { name: string; url: string; intent: string }[]) => {
+    const handleSelectPresetGroups = (selectedGroups: { name: string; url: string; id: string }[]) => {
 
 
         // Lặp qua mảng kết quả và chèn tự động các dòng mới vào Form
+        console.log("DEBUG: Groups được chọn từ Modal:", selectedGroups);
         selectedGroups.forEach((group) => {
             append({
                 name: group.name,
                 url: group.url,
-                Intent: group.intent, // Đổ thẳng kịch bản đã tick chọn từ Modal vào Dropdown của dòng
+                id: group.id, // Đổ thẳng kịch bản đã tick chọn từ Modal vào Dropdown của dòng
             });
         });
     };
+    console.log("DEBUG: ", errors);
     return (
         <>
             {isLoading && (
@@ -205,7 +207,7 @@ export default function CrawlFB_Form() {
                                         id="intentSelect"
                                         className={`md:col-span-3 w-full border-2 rounded-xl px-4 py-3 outline-none transition-all bg-white text-slate-900  border-slate-300
                                             `}
-                                        {...register(`rows.${index}.Intent` as const)}
+                                        {...register(`rows.${index}.id` as const)}
                                     >
                                         {/* Option mặc định dùng để hướng dẫn user */}
                                         <option value="" disabled>-- Chọn kịch bản quét --</option>
@@ -231,7 +233,7 @@ export default function CrawlFB_Form() {
                             <button
 
                                 type="button"
-                                onClick={() => { append({ name: "", url: "", Intent: "" }) }}
+                                onClick={() => { append({ name: "", url: "", id: "" }) }}
                                 className="border border-violet-300 text-violet-600 px-5 py-3 rounded-xl font-semibold hover:bg-violet-50 transition"
                             >
                                 + Thêm dòng mới
