@@ -144,14 +144,14 @@ export function FilterBar({ intents, industries, teams, tiers, icps, onFilter, i
       </div>
 
       {/* Row 2: Taxonomy filters */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-3 items-center">
         <select
           value={intent}
           onChange={(e) => {
             setIntent(e.target.value);
             handleChange({ intent: e.target.value });
           }}
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none"
+          className="w-[160px] flex-shrink-0 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none"
         >
           <option value="">Tất cả Intent</option>
           {intents.map((i) => (
@@ -167,7 +167,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, onFilter, i
             setIndustry(e.target.value);
             handleChange({ industry: e.target.value });
           }}
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none"
+          className="w-[160px] flex-shrink-0 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none"
         >
           <option value="">Tất cả Ngành</option>
           {industries.map((i) => (
@@ -183,7 +183,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, onFilter, i
             setTeam(e.target.value);
             handleChange({ team: e.target.value });
           }}
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none"
+          className="w-[160px] flex-shrink-0 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none"
         >
           <option value="">Tất cả Team</option>
           {teams.map((t) => (
@@ -199,7 +199,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, onFilter, i
             setTier(e.target.value);
             handleChange({ tier: e.target.value });
           }}
-          className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none"
+          className="w-[160px] flex-shrink-0 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none"
         >
           <option value="">Tất cả Tier</option>
           {tiers.map((t) => (
@@ -216,7 +216,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, onFilter, i
               setIcp(e.target.value);
               handleChange({ icp: e.target.value });
             }}
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none"
+            className="w-[160px] flex-shrink-0 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none"
           >
             <option value="">Tất cả ICP</option>
             {icps.map((c) => (
@@ -231,7 +231,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, onFilter, i
           type="button"
           onClick={clearFilters}
           disabled={isLoading}
-          className="ml-auto rounded-lg border border-[#E3000F]/20 bg-[#E3000F]/5 px-4 py-2 text-sm font-medium text-[#E3000F] transition-colors hover:bg-[#E3000F]/10 hover:border-[#E3000F]/40 disabled:opacity-50 cursor-pointer"
+          className="ml-auto flex-shrink-0 rounded-lg border border-[#E3000F]/20 bg-[#E3000F]/5 px-4 py-2 text-sm font-medium text-[#E3000F] transition-colors hover:bg-[#E3000F]/10 hover:border-[#E3000F]/40 disabled:opacity-50 cursor-pointer"
         >
           Xóa lọc
         </button>
