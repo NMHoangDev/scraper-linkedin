@@ -15,6 +15,7 @@ from app.modules.facebook.src.modules.gg_sheet.services.history_sheet_service im
 from app.modules.facebook.src.modules.gg_sheet.services.comment_sheet_service import CommentSheetService
 from app.modules.facebook.src.modules.crud.groupsFb.groups import get_all_groupsFB, create_groupFB, update_groupFB, delete_groupFB
 from app.modules.facebook.src.modules.crud.categories.categories import get_all_categoriesFB
+from app.modules.facebook.src.modules.crud.kpi_fb.kpi_tracker import get_all_kpis
 def format_time_and_status(last_crawl_str: str) -> Tuple[str, str]:
     """
     Tính toán khoảng cách thời gian từ lúc cào đến hiện tại.
@@ -253,7 +254,23 @@ class SheetManagementService:
     async def get_all_user_scores(self) -> List[dict]:
         """Lấy toàn bộ dữ liệu User Scores từ supabase."""
         # Gọi hàm đồng bộ get_all_user_scores trong luồng background
-        return await asyncio.to_thread(self.user_score_sheet.get_all_user_scores)
+        
+        try:
+            user_scores = await asyncio.to_thread(get_all_kpis)  # Giả sử có hàm get_all_user_scores() trong UserScoreSheetService
+            result = []
+            for user in user_scores:
+                # Trích xuất object member_info an toàn (tránh lỗi NoneType)
+                member_info = user.get("member_info") or {}
+    
+                result.append({
+                    "id": user.get("id"),
+                    "name": member_info.get("name", "Unknown"), # Chui vào member_info để lấy name
+                    "scorePerWeek": user.get("kpi_per_week", 0) # Map đúng trường kpi_per_week sang scorePerWeek cho FE
+                })
+            return result
+        except Exception as e:
+            print(f"Lỗi khi lấy User Scores từ supabase: {e}")
+            return []
     async def check_comment_within_24h(self, url_post: str, comment_id: str) -> bool:
         """
         Kiểm tra xem comment (dựa theo url_post và id) đã tồn tại trong vòng 24h qua hay chưa.
