@@ -203,7 +203,7 @@ export const allPlatformPostsService = {
     intent?: string;
     industry?: string;
     team?: string;
-    tier?: number;
+    tier?: string;
     sort?: string;
     page?: number;
     page_size?: number;
@@ -224,7 +224,7 @@ export const allPlatformPostsService = {
     intent?: string;
     industry?: string;
     team?: string;
-    tier?: number;
+    tier?: string;
     icp?: string;
     search?: string;
     sort?: string;

@@ -9,7 +9,7 @@ import { FilterBar, type FilterState } from "@/components/all-platform/component
 import { PostCard } from "@/components/all-platform/components/post-card";
 import { PostDetailModal } from "@/components/all-platform/components/post-detail-modal";
 import { VerifyAccountModal } from "@/components/all-platform/components/verify-account-modal";
-import { allPlatformPostsService, allPlatformCategoriesService } from "@/services/all-platform.service";
+import { allPlatformPostsService, allPlatformCategoriesService, teamsService } from "@/services/all-platform.service";
 import type { UnifiedPost, UnifiedStats, Category, FeedPlatform } from "@/types/unified.types";
 
 // ─── Timezone Helpers (Vietnam UTC+7) ─────────────────────────────────────────
@@ -203,6 +203,7 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
 
   // Filter & Taxonomy States
   const [categories, setCategories] = useState<Category[]>([]);
+  const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
   const [filters, setFilters] = useState<FilterState>({
     search: "",
     intent: "",
@@ -217,8 +218,22 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
   // Fetch Taxonomy
   const fetchCategories = useCallback(async () => {
     try {
-      const res = await allPlatformCategoriesService.getAll();
-      if (res.success && res.data) setCategories(res.data as Category[]);
+      const [catRes, teamRes] = await Promise.all([
+        allPlatformCategoriesService.getAll(),
+        teamsService.getAll(),
+      ]);
+      if (catRes.success && catRes.data) setCategories(catRes.data as Category[]);
+      if (teamRes.success && teamRes.data) {
+        const seen = new Set<string>();
+        const list: { id: string; name: string }[] = [];
+        for (const t of teamRes.data as any[]) {
+          if (t.id && t.name_team && !seen.has(t.id)) {
+            seen.add(t.id);
+            list.push({ id: t.id, name: t.name_team });
+          }
+        }
+        setTeams(list);
+      }
     } catch {}
   }, []);
 
@@ -256,7 +271,7 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
         intent: filters.intent || undefined,
         industry: filters.industry || undefined,
         team: filters.team || undefined,
-        tier: filters.tier ? parseInt(filters.tier) : undefined,
+        tier: filters.tier || undefined,
         icp: filters.icp || undefined,
         search: filters.search || undefined,
         sort: filters.sort,
@@ -314,8 +329,15 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
 
   const intents = categories.filter((c) => c.category_type === "intent");
   const industries = categories.filter((c) => c.category_type === "industry");
+  const tiers = categories.filter((c) => c.category_type === "tier");
   const icps = categories.filter((c) => c.category_type === "icp");
-  const teams: Category[] = [];
+  const teamCategories: Category[] = teams.map((t) => ({
+    id: t.id,
+    code: t.name,
+    name: t.name,
+    category_type: "team",
+    platform: "all",
+  }));
 
   const fbDiff = stats.totalPostsToday - stats.postsYesterday;
 
@@ -410,7 +432,8 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
       <FilterBar
         intents={intents}
         industries={industries}
-        teams={teams}
+        teams={teamCategories}
+        tiers={tiers}
         icps={icps}
         onFilter={handleFilter}
         isLoading={isLoadingPosts}

@@ -10,6 +10,7 @@ interface FilterBarProps {
   intents: Category[];
   industries: Category[];
   teams: Category[];
+  tiers: Category[];
   icps: Category[];
   onFilter: (filters: FilterState) => void;
   isLoading?: boolean;
@@ -41,7 +42,7 @@ const DATE_OPTIONS = [
   { value: "30days", label: "30 ngày" },
 ];
 
-export function FilterBar({ intents, industries, teams, icps, onFilter, isLoading }: FilterBarProps) {
+export function FilterBar({ intents, industries, teams, tiers, icps, onFilter, isLoading }: FilterBarProps) {
   const [search, setSearch] = useState("");
   const [intent, setIntent] = useState("");
   const [industry, setIndustry] = useState("");
@@ -154,7 +155,7 @@ export function FilterBar({ intents, industries, teams, icps, onFilter, isLoadin
         >
           <option value="">Tất cả Intent</option>
           {intents.map((i) => (
-            <option key={i.id} value={i.code}>
+            <option key={i.id} value={i.id}>
               {i.name || i.code}
             </option>
           ))}
@@ -170,7 +171,7 @@ export function FilterBar({ intents, industries, teams, icps, onFilter, isLoadin
         >
           <option value="">Tất cả Ngành</option>
           {industries.map((i) => (
-            <option key={i.id} value={i.code}>
+            <option key={i.id} value={i.id}>
               {i.name || i.code}
             </option>
           ))}
@@ -186,7 +187,7 @@ export function FilterBar({ intents, industries, teams, icps, onFilter, isLoadin
         >
           <option value="">Tất cả Team</option>
           {teams.map((t) => (
-            <option key={t.id} value={t.code}>
+            <option key={t.id} value={t.id}>
               {t.name || t.code}
             </option>
           ))}
@@ -201,9 +202,11 @@ export function FilterBar({ intents, industries, teams, icps, onFilter, isLoadin
           className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none"
         >
           <option value="">Tất cả Tier</option>
-          <option value="1">Tier 1</option>
-          <option value="2">Tier 2</option>
-          <option value="3">Tier 3</option>
+          {tiers.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name || t.code}
+            </option>
+          ))}
         </select>
 
         {icps.length > 0 && (
@@ -217,7 +220,7 @@ export function FilterBar({ intents, industries, teams, icps, onFilter, isLoadin
           >
             <option value="">Tất cả ICP</option>
             {icps.map((c) => (
-              <option key={c.id} value={c.code}>
+              <option key={c.id} value={c.id}>
                 {c.name || c.code}
               </option>
             ))}
