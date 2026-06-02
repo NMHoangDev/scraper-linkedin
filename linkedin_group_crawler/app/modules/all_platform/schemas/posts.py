@@ -22,7 +22,7 @@ class FilterPostsRequest(BaseModel):
     intent: Optional[str] = None
     industry: Optional[str] = None
     team: Optional[str] = None
-    tier: Optional[int] = None
+    tier: Optional[str] = None
 
 
 class UnifiedPostsRequest(BaseModel):
@@ -33,7 +33,7 @@ class UnifiedPostsRequest(BaseModel):
     intent: Optional[str] = None
     industry: Optional[str] = None
     team: Optional[str] = None
-    tier: Optional[int] = None
+    tier: Optional[str] = None
     sort: str = "latest"
     page: int = 1
     page_size: int = 20
@@ -48,7 +48,8 @@ class UnifiedFilterRequest(BaseModel):
     intent: Optional[str] = None
     industry: Optional[str] = None
     team: Optional[str] = None
-    tier: Optional[int] = None
+    tier: Optional[str] = None
+    icp: Optional[str] = None
     search: Optional[str] = None
     sort: str = "latest"
     page: int = 1
