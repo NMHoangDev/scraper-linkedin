@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { CrawlLinkedInPopup } from "@/components/all-platform/crawl-linkedin-popup";
 import { CrawlFacebookPopup } from "@/components/all-platform/crawl-facebook-popup";
@@ -11,6 +11,24 @@ import { PostDetailModal } from "@/components/all-platform/components/post-detai
 import { VerifyAccountModal } from "@/components/all-platform/components/verify-account-modal";
 import { allPlatformPostsService, allPlatformCategoriesService, teamsService } from "@/services/all-platform.service";
 import type { UnifiedPost, UnifiedStats, Category, FeedPlatform } from "@/types/unified.types";
+
+// ─── Retry helper ────────────────────────────────────────────────────────────────
+async function fetchWithRetry<T>(
+  fn: () => Promise<T>,
+  retries = 3,
+  delay = 1000,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      if (attempt < retries) await new Promise((r) => setTimeout(r, delay * (attempt + 1)));
+    }
+  }
+  throw lastError;
+}
 
 // ─── Timezone Helpers (Vietnam UTC+7) ─────────────────────────────────────────
 const VIETNAM_OFFSET_HOURS = 7;
@@ -214,6 +232,7 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
     sort: "latest",
     dateRange: "",
   });
+  const filterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch Taxonomy
   const fetchCategories = useCallback(async () => {
@@ -263,21 +282,23 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
         dateFrom = d.toISOString().split("T")[0];
       }
 
-      const res = await allPlatformPostsService.filter({
-        email: CURRENT_USER_EMAIL,
-        platform: feedPlatform,
-        date_from: dateFrom,
-        date_to: dateTo,
-        intent: filters.intent || undefined,
-        industry: filters.industry || undefined,
-        team: filters.team || undefined,
-        tier: filters.tier || undefined,
-        icp: filters.icp || undefined,
-        search: filters.search || undefined,
-        sort: filters.sort,
-        page,
-        page_size: 15,
-      });
+      const res = await fetchWithRetry(() =>
+        allPlatformPostsService.filter({
+          email: CURRENT_USER_EMAIL,
+          platform: feedPlatform,
+          date_from: dateFrom,
+          date_to: dateTo,
+          intent: filters.intent || undefined,
+          industry: filters.industry || undefined,
+          team: filters.team || undefined,
+          tier: filters.tier || undefined,
+          icp: filters.icp || undefined,
+          search: filters.search || undefined,
+          sort: filters.sort,
+          page,
+          page_size: 15,
+        })
+      );
 
       if (res.success && res.data) {
         setPosts(res.data.posts || []);
@@ -323,8 +344,17 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
   }, [fetchCategories]);
 
   const handleFilter = useCallback((f: FilterState) => {
-    setFilters(f);
-    setPage(1);
+    if (filterDebounceRef.current) clearTimeout(filterDebounceRef.current);
+    filterDebounceRef.current = setTimeout(() => {
+      setFilters(f);
+      setPage(1);
+    }, 300);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (filterDebounceRef.current) clearTimeout(filterDebounceRef.current);
+    };
   }, []);
 
   const intents = categories.filter((c) => c.category_type === "intent");
