@@ -422,7 +422,7 @@ export default function PostFeedPage() {
         intent: intentFilter || undefined,
         industry: industryFilter || undefined,
         team: teamFilter || undefined,
-        tier: tierFilter ? Number(tierFilter) : undefined,
+        tier: tierFilter || undefined,
         sort,
         page,
         page_size: pageSize,
