@@ -32,6 +32,7 @@ export interface UnifiedPost {
   industry?: string;
   team?: string;
   tier?: number;
+  icp?: string;
   created_at?: string;
   seeding_content?: string;
   seeding_name?: string;
