@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import Image from "next/image";
 import { FaRobot } from "react-icons/fa";
 import { AiOutlineInteraction } from "react-icons/ai";
 import { MaterialIcon } from "@/components/ui";
@@ -183,8 +184,15 @@ export function DashboardSidebar() {
   return (
     <aside className="fixed top-0 left-0 z-40 hidden h-screen w-64 flex-col border-r border-slate-200 bg-white pt-20 lg:flex dark:border-zinc-800 dark:bg-zinc-900">
       <div className="mb-8 flex items-center gap-3 px-6">
-        <div className="bg-primary-container flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-white">
-          <MaterialIcon name="radar" />
+        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-white ring-1 ring-black/5">
+          <Image
+            src="https://markeeai.com/logo.svg"
+            alt="MarkeeAI"
+            fill
+            sizes="40px"
+            className="object-contain p-1"
+            priority
+          />
         </div>
         <div>
           <h2 className="text-lg leading-tight font-black text-slate-900 dark:text-zinc-100">

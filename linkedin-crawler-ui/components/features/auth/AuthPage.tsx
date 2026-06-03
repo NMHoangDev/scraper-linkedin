@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent, useCallback } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 
@@ -70,14 +71,25 @@ export function AuthPage() {
       className="min-h-screen flex items-center justify-center relative overflow-hidden"
       style={{ background: "radial-gradient(ellipse at 0% 0%, #C40009 0%, transparent 50%), radial-gradient(ellipse at 50% 0%, #E3000F 0%, transparent 50%), radial-gradient(ellipse at 100% 0%, #FF3344 0%, transparent 50%), radial-gradient(ellipse at 0% 100%, #E3000F 0%, transparent 50%), radial-gradient(ellipse at 100% 100%, #C40009 0%, transparent 50%), radial-gradient(ellipse at 50% 50%, #D4001A 0%, transparent 70%), #C40009" }}
     >
-      {/* Grid overlay */}
-      <div
-        className="absolute inset-0 pointer-events-none z-0"
-        style={{
-          backgroundImage: "linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px)",
-          backgroundSize: "80px 80px",
-        }}
-      />
+      <div className="absolute top-6 left-6 flex items-center gap-3">
+        <div className="relative h-10 w-10 overflow-hidden rounded-lg bg-white/10 ring-1 ring-white/20 backdrop-blur-sm">
+          <Image
+            src="https://markeeai.com/logo.svg"
+            alt="MarkeeAI"
+            fill
+            sizes="40px"
+            className="object-contain p-1"
+            priority
+          />
+        </div>
+        <div>
+          <div className="text-base font-black tracking-wide text-white">MarkeeAi Seeding</div>
+          <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-white/70">
+            CrawlerPro
+          </div>
+        </div>
+      </div>
+
 
       {/* Animated orbs */}
       <div
