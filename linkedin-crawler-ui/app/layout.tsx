@@ -6,7 +6,7 @@ import { AppAuthProvider } from "@/contexts/AppAuthContext";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 
 export const metadata: Metadata = {
-  title: "CrawlerPro — LinkedIn Group Crawler",
+  title: "MarkeeAI - Seeding Tool",
   description:
     "Configure, run, and monitor LinkedIn group crawls with live logs and exportable results.",
   icons: {
