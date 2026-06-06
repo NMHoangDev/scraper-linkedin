@@ -32,21 +32,10 @@ class Config:
     DEFAULT_FB_EMAIL = os.getenv("FB_EMAIL")
     DEFAULT_FB_PASSWORD = os.getenv("FB_PASSWORD")
     DEFAULT_FB_2FA = os.getenv("FB_2FA_SECRET")
-    MAIN_WEBHOOK_URL = os.getenv("MAIN_WEBHOOK_URL")
-    WORKER_URL_MAIN = os.getenv("WORKER_URL_MAIN", "http://127.0.0.1:8000/api/internal/crawl-batch")
-    WORKER_URL_SUB1 = os.getenv("WORKER_URL_SUB1", "")
-    WORKER_URL_SUB2 = os.getenv("WORKER_URL_SUB2", "")
+    ID_VPS=os.getenv("ID_VPS")
 
     # 2. Hàm gom mảng tự động
-    @classmethod
-    def get_worker_urls(cls):
-        """
-        Gom các biến thành một mảng. 
-        Tự động loại bỏ các máy bị bỏ trống trong .env (giúp linh hoạt nếu 1 máy bị hỏng).
-        """
-        urls = [cls.WORKER_URL_MAIN, cls.WORKER_URL_SUB1, cls.WORKER_URL_SUB2]
-        # Lọc bỏ các phần tử rỗng hoặc None
-        return [url.strip() for url in urls if url and url.strip()]
+    
     
     # Thẻ bao quanh toàn bộ 1 bài viết (thường là div con trực tiếp của feed)
     FB_POST_CONTAINER = 'div[role="feed"] > div, div[data-testid="fbfeed_story"]'

@@ -3,8 +3,9 @@ import time
 import random
 from dataclasses import dataclass
 from typing import List, Optional
-import sys
-
+import sys 
+from datetime import datetime
+import asyncio
 from playwright.sync_api import sync_playwright
 
 from app.modules.facebook.src.modules.crawl_fb.models.post import Post
@@ -17,7 +18,7 @@ from app.modules.facebook.src.modules.crawl_fb.models.GroupSummary import GroupS
 from .human_behavior import HumanBehavior
 
 from app.modules.facebook.src.core.utils.facebook_parsers import get_exact_post_time, extract_ts_hint
-
+from app.modules.facebook.src.modules.crud.vps_fb.vps_fb import get_cookie_vps_default,update_vps
 logger = setup_logger(__name__)
 
 cancel_registry = {}
@@ -28,6 +29,7 @@ class GroupTarget:
     name: str
     url: str
     id:str
+    id_member:str
 
 class FacebookScraper:
     def __init__(self, config):
@@ -44,6 +46,7 @@ class FacebookScraper:
     ) -> List[GroupSummary]:
         
         results: List[GroupSummary] = []
+        print(f"Đã tới")
         with sync_playwright() as p:
             # ── CẤU HÌNH HEADLESS TỐI ƯU CHO VPS PRODUCTION ────────────────────
             # Đổi headless=True tiết kiệm RAM, thêm các cờ chống dội tài nguyên
@@ -69,25 +72,18 @@ class FacebookScraper:
                 "timezone_id": "Asia/Ho_Chi_Minh"
             }
             # Lấy đường dẫn file cookie tương ứng (Nếu có custom_email thì lấy file riêng, không thì lấy mặc định)
-            cookie_path = self.auth.get_cookie_path(custom_email) 
-            
-            # Nếu là default account (custom_email trống), luôn cố sử dụng default cookie
-            # Nếu là custom account, yêu cầu cookie đã tồn tại
-            if custom_email and custom_email.strip():
-                # Custom account: cookie phải tồn tại
-                if not os.path.exists(cookie_path):
+            try:
+              
+                cookie = get_cookie_vps_default()
+                if cookie is None:
                     browser.close()
-                    raise ValueError("Tài khoản chưa đăng nhập hoặc không tìm thấy phiên làm việc. Vui lòng đăng nhập tài khoản này trước!")
-                context = browser.new_context(storage_state=cookie_path, **context_args)
-            else:
-                # Default account: luôn dùng default cookie (dù tồn tại hay không)
-                if os.path.exists(cookie_path):
-                    #logger.info(f"🚀 Mở phiên làm việc từ file Cookie: {cookie_path}")
-                    context = browser.new_context(storage_state=cookie_path, **context_args)
-                else:
-                    # Cookie mặc định không tồn tại -> Mở context trắng để login
-                    #logger.warning("⚠️ Không tìm thấy Cookie mặc định. Mở trình duyệt trắng để Login lại...")
-                    context = browser.new_context(**context_args)
+                    raise ValueError("LOGIN_FAILED")
+                
+            except Exception as e:
+                browser.close()
+                raise ValueError("LOGIN_FAILED")
+
+            context = browser.new_context(storage_state=cookie, **context_args)
 
             
             context.add_init_script("""
@@ -105,17 +101,17 @@ class FacebookScraper:
             page.goto("https://www.facebook.com/", wait_until="domcontentloaded", timeout=30_000)
             
             if self.auth._is_bot_check_screen(page):
-                #logger.error("🛑 Phát hiện bị chặn Bot/Captcha ngay sau khi load Cookie!")
-                if os.path.exists(cookie_path):
-                    try:
-                        os.remove(cookie_path)
-                        #logger.warning(f"🗑️ Đã XÓA FILE COOKIE bị đánh dấu lỗi: {cookie_path}")
-                    except Exception as file_err:
-                        #logger.error(f"⚠️ Lỗi khi xóa file cookie vật lý: {file_err}")
-                        pass
-                else:
-                    #logger.debug("File Cookie không tồn tại để xóa.")
-                    pass
+                try:
+                    
+                        update_vps(self.config.ID_VPS, 
+                        {
+                            "status": False, 
+                            "cookie": None  # Xóa cookie hoặc set chuỗi rỗng tùy schema DB của bạn
+                        })
+                        
+                    
+                except Exception as db_err:
+                    pass # Hoặc log lỗi DB ra
                 browser.close()
                 raise ValueError("LOGIN_FAILED")
             HumanBehavior.act_like_reading(page) 
@@ -163,10 +159,27 @@ class FacebookScraper:
                 #logger.info("✅ Đã đăng nhập sẵn (Cookie còn hiệu lực).")
                 pass
             try:
-                        context.storage_state(path=str(cookie_path))
+                     
+                # Lấy toàn bộ dữ liệu session (cookie, local storage...) dưới dạng Dictionary
+                new_cookie_state = context.storage_state()
+                
+               
+                
+                # CẬP NHẬT DATABASE: Lưu Cookie mới + tự động cập nhật updated_at
+                
+                update_vps(
+                    self.config.ID_VPS, 
+                    {
+                        "status": True, 
+                        "cookie": new_cookie_state,
+                        "update_at":datetime.now()
+                    }
+                )
+                logger.info("🔄 Đã cập nhật Cookie mới lên Database thành công.")
+            
                         #logger.info(f"🔄 Đã cập nhật/gia hạn Cookie thành công vào: {cookie_path}")
             except Exception as e:
-                        #logger.error(f"⚠️ Lỗi khi cập nhật cookie: {e}")
+                        logger.error(f"⚠️ Lỗi khi cập nhật cookie: {e}")
                         pass
             # ── 3. LẶP QUA MẢNG CÁC GROUP (SỐ LƯỢNG NGẪU NHIÊN) ───────────────
             for index, group in enumerate(groups):
@@ -284,6 +297,7 @@ class FacebookScraper:
                         link_group=group.url,
                         total_posts_24h=len(all_valid_posts),
                         id=group.id,
+                        id_member=group.id_member,
                         hot_post=sorted_posts[0] if sorted_posts else None
                     )
                     results.append(summary)
@@ -292,7 +306,7 @@ class FacebookScraper:
 
                 except Exception as e:
                     #logger.error(f"❌ Lỗi group {group.name}: {e}")
-                    results.append(GroupSummary(group_name=group.name, total_posts_24h=0, id=group.id, hot_post=None))
+                    results.append(GroupSummary(group_name=group.name, total_posts_24h=0, id=group.id,id_member=group.id_member, hot_post=None))
 
             browser.close()
             return results

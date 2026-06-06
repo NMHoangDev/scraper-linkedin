@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from pyparsing import Optional
+from typing import Optional
 from app.modules.facebook.src.modules.crawl_fb.models.post import Post
 @dataclass
 class GroupSummary:
@@ -12,6 +12,7 @@ class GroupSummary:
     total_posts_24h: int             # Số lượng bài viết cào được trong 24h qua
     hot_post: Optional[Post]          # bài viết
     id:str
+    id_member:str
     def __post_init__(self):
         # Nếu hot_post đang là kiểu dict (do giải mã từ JSON Webhook)
         # thì ép kiểu nó trở lại thành object Post

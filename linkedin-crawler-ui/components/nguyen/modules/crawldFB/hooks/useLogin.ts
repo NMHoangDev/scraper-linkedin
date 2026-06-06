@@ -15,6 +15,10 @@ export const useAuthHook = () => {
   const [isOtpModalOpen, setIsOtpModalOpen] = useState<boolean>(false);
   const [currentSessionId, setCurrentSessionId] = useState<string>("");
 
+  // Thêm state để lưu trữ cookie và quản lý hiển thị Modal Copy
+  const [cookieData, setCookieData] = useState<any>(null);
+  const [showCookieModal, setShowCookieModal] = useState<boolean>(false);
+
   const handleLogin = async (values: LoginFormValues) => {
     setIsLoading(true);
     setErrorMessage(null);
@@ -28,20 +32,24 @@ export const useAuthHook = () => {
         setIsLoading(false);
         setSuccessMessage("Đăng nhập thành công!");
         saveUserSession(values.email, values.password);
-        route.push("/minhhoang-scraper/crawl-data");
+        
+        // Nhận cookie từ backend và mở bảng Copy
+        if (res.cookie) {
+          setCookieData(res.cookie);
+          setShowCookieModal(true);
+        }
+        // Tạm tắt auto redirect để khách copy xong mới đi
+        // route.push("/minhhoang-scraper/crawl-data"); 
       } 
       else if (res.status === "need_otp" && res.session_id) {
         setIsLoading(false);
         setCurrentSessionId(res.session_id);
         setIsOtpModalOpen(true);
       } 
-      // SỬA LỖI 2: Gộp chung xử lý "need_phone_approval" VÀ "processing" (mạng chậm)
-      // Cả 2 trường hợp này đều tiếp tục gọi API bước 2 để chờ kết quả chính xác
       else if ((res.status === "need_phone_approval" || res.status === "processing") && res.session_id) {
         const sessionId = res.session_id;
         setCurrentSessionId(sessionId);
         
-        // Hiển thị lời nhắc chính xác theo trạng thái
         if (res.status === "need_phone_approval") {
           setSuccessMessage("Vui lòng MỞ ĐIỆN THOẠI bấm xác nhận 'Đây là tôi'. Đang chờ đồng bộ (tối đa 60s)...");
         } else {
@@ -56,14 +64,19 @@ export const useAuthHook = () => {
             setIsLoading(false);
             setSuccessMessage("Đăng nhập thành công!");
             saveUserSession(values.email, values.password);
-            route.push("/minhhoang-scraper/crawl-data");
+            
+            // Nhận cookie từ backend (bước 2) và mở bảng Copy
+            if (approvalRes.cookie) {
+              setCookieData(approvalRes.cookie);
+              setShowCookieModal(true);
+            }
+            // route.push("/minhhoang-scraper/crawl-data");
           } 
           else if (approvalRes.status === "need_otp") {
             setIsLoading(false);
             setSuccessMessage(null); 
             setIsOtpModalOpen(true); 
           } 
-          // Bắt chính xác lỗi out ra cho FE
           else if (approvalRes.status === "error_bot_blocked") {
             setIsLoading(false);
             setSuccessMessage(null);
@@ -72,7 +85,6 @@ export const useAuthHook = () => {
           else {
             setIsLoading(false);
             setSuccessMessage(null);
-            // Sẽ hiển thị chuẩn thông báo "Sai email hoặc mật khẩu" từ Backend truyền về
             setErrorMessage(approvalRes.message || "Đăng nhập thất bại.");
           }
         } catch (err) {
@@ -84,7 +96,6 @@ export const useAuthHook = () => {
         setIsLoading(false);
         setErrorMessage("Đăng nhập thất bại: Tài khoản bị Facebook chặn xác minh Bot/CAPTCHA.");
       } 
-      // Trạng thái error (Sai pass ngay từ đầu)
       else {
         setIsLoading(false);
         setErrorMessage(res.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.");
@@ -94,6 +105,7 @@ export const useAuthHook = () => {
       setErrorMessage("Lỗi kết nối đến máy chủ.");
     }
   };
+
   const handleVerifyOtp = async (otpCode: string, originalValues: LoginFormValues) => {
     if (!otpCode.trim()) {
       setErrorMessage("Vui lòng nhập mã OTP");
@@ -104,7 +116,6 @@ export const useAuthHook = () => {
     setErrorMessage(null);
 
     try {
-      // Gửi mã OTP kèm session_id để điền tiếp vào trình duyệt đang mở ngầm
       const res = await AuthService.submitOtp(currentSessionId, otpCode);
 
       if (res.status === "success") {
@@ -113,7 +124,13 @@ export const useAuthHook = () => {
         setIsOtpModalOpen(false);
         
         saveUserSession(originalValues.email, originalValues.password);
-        route.push("/minhhoang-scraper/crawl-data");
+        
+        // Nhận cookie từ backend (bước 3) và mở bảng Copy
+        if (res.cookie) {
+          setCookieData(res.cookie);
+          setShowCookieModal(true);
+        }
+        // route.push("/minhhoang-scraper/crawl-data");
       } else {
         setIsLoading(false);
         setErrorMessage(res.message || "Mã OTP không chính xác hoặc đã hết hạn.");
@@ -130,6 +147,9 @@ export const useAuthHook = () => {
     successMessage,
     isOtpModalOpen,
     setIsOtpModalOpen,
+    cookieData,              // Xuất state để dùng cho Modal
+    showCookieModal,         // Xuất state bật/tắt Modal
+    setShowCookieModal,      // Cho phép UI chủ động đóng Modal
     handleLogin,
     handleVerifyOtp,
   };

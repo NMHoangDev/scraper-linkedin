@@ -30,9 +30,10 @@ export default function FullScreenLoading({
             </div>
           </div>
         </div>
-
+        
         <h1 className="relative mb-4 text-xl font-bold tracking-tight text-slate-800 sm:text-2xl">{title}</h1>
-        <p className="relative text-sm leading-relaxed text-slate-600">{content}</p>
+        
+        <p className="w-full relative whitespace-pre-line text-sm leading-relaxed text-slate-600">{content}</p>
 
         {onCancel && (
           <button

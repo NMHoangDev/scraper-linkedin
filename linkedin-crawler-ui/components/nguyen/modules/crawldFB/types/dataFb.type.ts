@@ -38,7 +38,6 @@ export interface FacebookGroupDTO {
     health_score?: number | null;   // Tương ứng: Optional[float]
     chay_24h?: boolean | null;      // Tương ứng: Optional[bool]
     status?: "ACTIVE" | "IDLE" | "DEAD"; 
-    
     // Taxonomy fields
     platform?: string; // "facebook" | "linkedin"
     industry?: string;
@@ -46,4 +45,6 @@ export interface FacebookGroupDTO {
     team?: string[] | string;
     icp?: string[] | string;
     icp_desc?: string;
+    id_intent?: string | null;
+    id_member:string
 }

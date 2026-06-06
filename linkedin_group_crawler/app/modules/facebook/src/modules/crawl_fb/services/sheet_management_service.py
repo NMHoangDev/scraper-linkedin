@@ -134,12 +134,12 @@ class SheetManagementService:
                     group["icp"] = None
 
                 
-                group.pop("id_intent", None)
+                
                 group.pop("id_industry", None)
                 group.pop("id_tier", None)
                 group.pop("id_team", None)
                 group.pop("id_icp", None)
-            print(f"DEBUG: Dữ liệu groups sau khi mapping: {raw_groups[0:2]}")
+            
             return raw_groups
 
         except Exception as e:

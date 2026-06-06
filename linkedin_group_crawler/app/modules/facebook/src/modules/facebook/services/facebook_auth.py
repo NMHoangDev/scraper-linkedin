@@ -1,23 +1,42 @@
 import json
 import re
 import time
+import random
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
+from dataclasses import dataclass
+from datetime import datetime
+
 from playwright_stealth import Stealth
 import pyotp
 from playwright.sync_api import sync_playwright, Page, BrowserContext, Browser, TimeoutError as PlaywrightTimeoutError
+
 from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_account import GoogleSheetAccountService
 from .human_behavior import HumanBehavior
 from app.modules.facebook.src.core.config.env import Config
 from app.modules.facebook.src.core.utils.logger import setup_logger
 
-logger = setup_logger(__name__)
+from app.modules.facebook.src.modules.crawl_fb.models.post import Post
+from app.modules.facebook.src.modules.facebook.services.post_extractor import PostExtractor
+from app.modules.facebook.src.core.utils.facebook_parsers import classify_timestamp, get_exact_post_time
+from app.modules.facebook.src.modules.crawl_fb.models.GroupSummary import GroupSummary
 
+from app.modules.facebook.src.modules.crud.vps_fb.vps_fb import get_cookie_vps_default, update_vps
+
+logger = setup_logger(__name__)
+cancel_registry = {}
+
+@dataclass
+class GroupTarget:
+    """Entity để truyền dữ liệu đầu vào cho các Group cần cào"""
+    name: str
+    url: str
+    id: str
+    id_member: str
 
 class FacebookAuthError(Exception):
     """Custom exception cho các lỗi xác thực Facebook."""
     pass
-
 
 class FacebookAuth:
     # --- CONSTANTS ---
@@ -31,18 +50,10 @@ class FacebookAuth:
         self.config = config
         self.human = human or HumanBehavior()
         self.google_sheet_account = GoogleSheetAccountService()
-        # Setup directories
-        self.sessions_dir = Path(config.COOKIE_DIR or "sessions")
-        self.sessions_dir.mkdir(parents=True, exist_ok=True)
-        self.default_state_path = self.sessions_dir / "default_account_cookie.json"
         
+        # Thư mục lưu cache trạng thái OTP (vẫn dùng file để giao tiếp với FE)
         self.otp_dir = Path("temp_otp")
         self.otp_dir.mkdir(parents=True, exist_ok=True)
-
-    def get_cookie_path(self, email: Optional[str]) -> Path:
-        if not email or email == getattr(self.config, 'DEFAULT_FB_EMAIL', ''):
-            return self.default_state_path
-        return self.sessions_dir / f"{self._safe_email(email)}_cookie.json"
 
     def login(
         self, 
@@ -52,113 +63,89 @@ class FacebookAuth:
         custom_pass: str, 
         custom_2fa: Optional[str] = None
     ) -> bool:
-        """Hàm login dùng cho luồng scraper trực tiếp (Giữ nguyên)."""
         safe_email = self._safe_email(custom_email)
         otp_cache_file = self.otp_dir / f"temp_otp_{safe_email}.json"
         self._reset_otp_cache(otp_cache_file)
-        #logger.info(f"🚀 [Scraper Auth Direct] Bắt đầu đăng nhập cho: {custom_email}")
 
         try:
             self._login_with_credentials(page, custom_email, custom_pass)
             is_success = self._handle_checkpoint_loop(page, custom_2fa, otp_cache_file)
 
             if is_success:
-                cookie_file = self.get_cookie_path(custom_email) if custom_email != self.config.DEFAULT_FB_EMAIL else self.default_state_path
-                self._save_session(context, page, cookie_file)
-                #logger.info("✅ Đăng nhập trực tiếp thành công.")
+                self._save_session_to_db(context, page)
                 return True
-            else:
-                #logger.error("❌ Đăng nhập trực tiếp thất bại do kẹt Checkpoint/OTP.")
-                return False
+            return False
         except Exception as e:
-            #logger.error(f"❌ Lỗi khi login trực tiếp: {str(e)}", exc_info=True)
             return False
         finally:
             otp_cache_file.unlink(missing_ok=True)
 
     def default_login(self, page: Page, context: BrowserContext) -> bool:
-        """
-        Hàm login dành RIÊNG cho tài khoản mặc định cấu hình trong hệ thống (.env).
-        Tự động bóc tách email, password và 2FA mặc định cực kỳ an toàn.
-        """
-        default_email =  getattr(self.config, 'DEFAULT_FB_EMAIL', '')
-        default_pass =  getattr(self.config, 'DEFAULT_FB_PASSWORD', '')
+        default_email = getattr(self.config, 'DEFAULT_FB_EMAIL', '')
+        default_pass = getattr(self.config, 'DEFAULT_FB_PASSWORD', '')
         default_2fa = getattr(self.config, 'DEFAULT_FB_2FA', None)
+        
         if not default_email or not default_pass:
-            #logger.error("❌ Hệ thống chưa cấu hình DEFAULT_FB_EMAIL hoặc DEFAULT_FB_PASSWORD!")
             return False
         
         safe_email = self._safe_email(default_email)
         otp_cache_file = self.otp_dir / f"temp_otp_default_{safe_email}.json"
         self._reset_otp_cache(otp_cache_file)
-        
-        #logger.info(f"🚀 [Default Auth] Bắt đầu đăng nhập tự động cho tài khoản hệ thống: {default_email}")
 
         try:
             self._login_with_credentials(page, default_email, default_pass)
             is_success = self._handle_checkpoint_loop(page, default_2fa, otp_cache_file)
 
             if is_success:
-                self._save_session(context, page, self.default_state_path)
-                #logger.info("✅ Đăng nhập tài khoản mặc định thành công!")
+                self._save_session_to_db(context, page)
                 return True
-            else:
-                #logger.error("❌ Đăng nhập tài khoản mặc định thất bại do kẹt Checkpoint/OTP.")
-                return False
+            return False
         except Exception as e:
-            #logger.error(f"❌ Lỗi khi login tài khoản mặc định: {str(e)}", exc_info=True)
             return False
         finally:
             otp_cache_file.unlink(missing_ok=True)
 
     def standalone_login(self, custom_email: str, custom_pass: str, session_id: str, custom_2fa: Optional[str] = None) -> Dict[str, str]:
-        """
-        Main entry point cho quá trình đăng nhập ngầm từ FE.
-        Sử dụng session_id để định danh chính xác phiên làm việc.
-        """
-        cookie_file = self.get_cookie_path(custom_email)
-        # Sử dụng session_id làm tên file giao tiếp trạng thái
         otp_cache_file = self.otp_dir / f"session_{session_id}.json"
-        
         self._reset_otp_cache(otp_cache_file)
-        #logger.info(f"🚀 [Standalone Auth] Bắt đầu đăng nhập: {custom_email} | Session: {session_id}")
 
         with sync_playwright() as p:
             browser = None
             try:
                 browser, context, page = self._init_browser(p)
 
-                # 1. Thử đăng nhập bằng Cookie
-                if self._try_login_with_cookie(context, page, cookie_file):
-                    self._update_cache_status(otp_cache_file, "SUCCESS", "Đăng nhập sẵn qua cookie.")
-                    return {"status": "success", "message": "Đăng nhập sẵn qua cookie."}
+                # 1. Lấy Cookie từ DB
+                cookie_data = get_cookie_vps_default()
+                if cookie_data and isinstance(cookie_data, str):
+                    cookie_data = json.loads(cookie_data)
 
-                # 2. Đăng nhập bằng Credentials
+                # 2. Thử đăng nhập bằng Cookie Database
+                if self._try_login_with_cookie(context, page, cookie_data):
+                    self._update_cache_status(otp_cache_file, "SUCCESS", "Đăng nhập sẵn qua cookie DB.")
+                    return {"status": "success", "message": "Đăng nhập sẵn qua cookie DB."}
+
+                # 3. Đăng nhập bằng Credentials
                 self._login_with_credentials(page, custom_email, custom_pass)
 
-                # 3. Xử lý Checkpoint / 2FA / Phone Approval
+                # 4. Xử lý Checkpoint / 2FA
                 is_success = self._handle_checkpoint_loop(page, custom_2fa, otp_cache_file)
 
                 if is_success:
-                    self._save_session(context, page, cookie_file)
+                    self._save_session_to_db(context, page)
                     self._update_cache_status(otp_cache_file, "SUCCESS", "Đăng nhập thành công.")
                     return {"status": "success", "message": "Đăng nhập thành công."}
                 else:
-                    # Nếu thất bại mà chưa có status lỗi cụ thể, gán lỗi chung
                     status_data = json.loads(otp_cache_file.read_text(encoding="utf-8"))
                     if status_data.get("status") not in ["ERROR_WRONG_PASS", "ERROR_BOT_BLOCKED"]:
                         self._update_cache_status(otp_cache_file, "ERROR", "Kẹt Checkpoint quá thời gian.")
                     return {"status": "error", "message": "Kẹt Checkpoint quá thời gian."}
 
             except FacebookAuthError as fe:
-                #logger.warning(f"⚠️ Dừng đăng nhập: {str(fe)}")
                 return {"status": "error", "message": str(fe)}
             except Exception as e:
-                #logger.error(f"❌ Lỗi hệ thống đăng nhập: {str(e)}", exc_info=True)
                 self._update_cache_status(otp_cache_file, "ERROR", f"Lỗi hệ thống: {str(e)}")
                 return {"status": "error", "message": str(e)}
             finally:
-                # Treo giữ file cache thêm 10s để BE HTTP kịp đọc trạng thái cuối trước khi dọn dẹp
                 time.sleep(10)
                 if browser:
                     browser.close()
@@ -213,26 +200,48 @@ class FacebookAuth:
         Stealth().apply_stealth_sync(page)
         return browser, context, page
 
-    def _try_login_with_cookie(self, context: BrowserContext, page: Page, cookie_file: Path) -> bool:
-        if not cookie_file.exists():
+    def _try_login_with_cookie(self, context: BrowserContext, page: Page, cookie_data: dict) -> bool:
+        if not cookie_data:
             return False
         try:
-            state = json.loads(cookie_file.read_text(encoding="utf-8"))
-            if "cookies" in state:
-                context.add_cookies(state["cookies"])
+            if "cookies" in cookie_data:
+                context.add_cookies(cookie_data["cookies"])
             page.goto("https://www.facebook.com/", wait_until="domcontentloaded")
             try:
                 page.wait_for_selector('div[role="navigation"]', timeout=self.TIMEOUT_SHORT)
-                #logger.info("✅ Cookie cũ hợp lệ, đã vào feed!")
                 return True
             except PlaywrightTimeoutError:
-                #logger.warning("⚠️ Cookie hết hạn, tiến hành đăng nhập lại...")
-                cookie_file.unlink(missing_ok=True)
+                # Cookie hết hạn, update DB xóa cookie
+                try:
+                    update_vps(self.config.ID_VPS, {"status": False, "cookie": None, "updated_at": datetime.now()})
+                except:
+                    pass
                 return False
         except Exception as e:
-            #logger.warning(f"⚠️ Lỗi đọc cookie: {e}")
-            cookie_file.unlink(missing_ok=True)
+            try:
+                update_vps(self.config.ID_VPS, {"status": False, "cookie": None, "updated_at": datetime.now()})
+            except:
+                pass
             return False
+
+    def _save_session_to_db(self, context: BrowserContext, page: Page):
+        try:
+            page.wait_for_load_state("networkidle", timeout=self.TIMEOUT_SHORT)
+        except PlaywrightTimeoutError:
+            pass
+            
+        new_cookie_state = context.storage_state()
+        try:
+            update_vps(
+                self.config.ID_VPS, 
+                {
+                    "status": True, 
+                    "cookie": new_cookie_state,
+                    "updated_at": datetime.now()
+                }
+            )
+        except Exception as e:
+            logger.error(f"⚠️ Lỗi lưu Cookie lên Supabase: {e}")
 
     def _login_with_credentials(self, page: Page, email: str, password: str):
         page.goto("https://www.facebook.com/login", wait_until="domcontentloaded")
@@ -240,11 +249,11 @@ class FacebookAuth:
         try:
             another_acc_btn = page.locator("text=/Dùng trang cá nhân khác|Log Into Another Account|Log in to another account/i").first
             if another_acc_btn.count() > 0 and another_acc_btn.is_visible(timeout=3000):
-                # logger.info("Phát hiện màn hình chọn tài khoản, đang click để hiện form...")
                 another_acc_btn.click()
-                page.wait_for_timeout(2000) # Chờ form Email/Pass trượt ra
+                page.wait_for_timeout(2000) 
         except Exception:
             pass
+            
         email_input = page.locator(self.config.AUTH_SELECTORS["email"])
         email_input.wait_for(state="visible")
         self._type_like_human(email_input, email)
@@ -260,11 +269,10 @@ class FacebookAuth:
             pass 
 
     def _handle_checkpoint_loop(self, page: Page, custom_2fa: Optional[str], otp_cache_file: Path) -> bool:
-        #logger.info("⏳ Bắt đầu xử lý Checkpoint/State Machine...")
         otp_filled = False
         phone_approval_waited = False  
         bot_check_notified = False
-        # page.wait_for_timeout(30000) 
+        
         for step in range(self.MAX_CHECKPOINT_RETRIES):
             page.wait_for_timeout(7000) 
             current_url = page.url
@@ -281,53 +289,43 @@ class FacebookAuth:
             # Trạng thái 3: Bị chặn Bot / CAPTCHA
             if self._is_bot_check_screen(page):
                 if not bot_check_notified:
-                    #logger.warning(f"[Step {step}] 🤖 Phát hiện Bot/CAPTCHA.")
                     self._update_cache_status(otp_cache_file, "ERROR_BOT_BLOCKED", "Bị chặn bởi Bot/CAPTCHA. Vui lòng giải quyết trên trình duyệt.")
                     bot_check_notified = True
-                # Bắn lỗi out ngay cho FE theo đúng yêu cầu
                 raise FacebookAuthError("Bị Facebook chặn bởi xác minh Bot/CAPTCHA.")
 
             # Trạng thái 4: Phê duyệt qua điện thoại / Passkey
             if self._is_passkey_screen(page):
                 is_phone_screen = page.locator("text=/Kiểm tra thông báo trên thiết bị khác|Check notifications on another device/i").count() > 0
                 
-                # KỊCH BẢN: Treo ngầm chờ điện thoại tối đa 60 giây
                 if is_phone_screen and not phone_approval_waited:
-                    logger.info(f"[Step {step}] 📱 Yêu cầu Phê duyệt thiết bị. Bắt đầu treo ngầm 60 giây...")
                     self._update_cache_status(otp_cache_file, "WAITING_FOR_PHONE_APPROVAL", "Vui lòng xác nhận trên điện thoại.")
 
                     approval_success = False
-                    # Lặp 20 chu kỳ * 3s = 60 giây chờ đợi
                     for wait_sec in range(20):
                         page.wait_for_timeout(3000)
                         if self._is_feed_loaded(page, page.url):
                             approval_success = True
                             break
                         if not self._is_passkey_screen(page):
-                            # Đã thoát khỏi màn hình phone approval (có thể nhảy sang form khác)
                             break
                     
                     if approval_success:
                         continue 
                     else:
-                        #logger.warning("⚠️ Quá 1 phút không phê duyệt điện thoại! Tự động chuyển sang hỏi mã OTP 60s...")
-                        phone_approval_waited = True  # Đánh dấu đã hết cơ hội chờ điện thoại
-                        self._bypass_passkey(page, step)  # Bấm "Thử cách khác"
-                        # Cập nhật trạng thái ngay để FE hiển thị form OTP
+                        phone_approval_waited = True
+                        self._bypass_passkey(page, step)
                         self._update_cache_status(otp_cache_file, "WAITING_FOR_OTP", "Chuyển sang xác thực OTP.")
                         continue
-
-                # Nếu là Passkey thường HOẶC đã quá 1 phút chờ điện thoại
                 else:
                     self._bypass_passkey(page, step)
                     otp_filled = False
                     continue
 
-            # Trạng thái 5: Chọn phương thức xác thực (nếu bị hỏi)
+            # Trạng thái 5: Chọn phương thức xác thực
             if self._handle_auth_method_selection(page, step, bool(custom_2fa)):
                 continue
 
-            # Trạng thái 6: Điền OTP (Khi giao diện đã ở form nhập mã 6 số)
+            # Trạng thái 6: Điền OTP
             if not otp_filled and self._handle_otp_input(page, step, custom_2fa, otp_cache_file):
                 otp_filled = True
                 continue
@@ -337,18 +335,12 @@ class FacebookAuth:
 
         return False
 
-    # ─────────────────────────────────────────────────────────────────────────────
-    # PRIVATE METHODS - DOM INTERACTION HELPERS
-    # ─────────────────────────────────────────────────────────────────────────────
-
     def _update_cache_status(self, file_path: Path, status: str, message: str = "", otp_code: Any = None):
-        """Hàm ghi trạng thái chuẩn hóa ra file giao tiếp."""
         if file_path.parent.exists():
             try:
                 data = {"status": status, "message": message, "otp_code": otp_code}
                 file_path.write_text(json.dumps(data), encoding="utf-8")
             except Exception as e:
-                #logger.error(f"Lỗi ghi file trạng thái {status}: {e}")
                 pass
 
     def _is_feed_loaded(self, page: Page, url: str) -> bool:
@@ -374,7 +366,6 @@ class FacebookAuth:
         return False
 
     def _bypass_passkey(self, page: Page, step: int):
-        #logger.info(f"[Step {step}] 🔒 Bấm Thử cách khác / Bỏ qua Passkey...")
         btn_try_other = page.locator('text=/Thử cách khác|Try another way/i')
         clicked = False
         try:
@@ -434,17 +425,14 @@ class FacebookAuth:
         if otp_input.count() > 0 and otp_input.first.is_visible():
             code = self._get_otp_code(custom_2fa, otp_cache_file)
             if code:
-                #logger.info(f"[Step {step}] 🔑 Phát hiện mã OTP mới: {code}. Tiến hành điền...")
                 otp_input.first.triple_click()
                 self._type_like_human(otp_input.first, code)
                 page.wait_for_timeout(1000)
                 
                 if self._click_continue_btn(page, submit_texts=["Gửi", "Tiếp tục", "Submit", "Continue"]):
-                    logger.info("✅ Đã submit OTP, chờ xác nhận...")
                     page.wait_for_timeout(4000)
                 return True
             else:
-                # Đang ở form OTP nhưng chưa có mã -> Ghi trạng thái báo FE
                 self._update_cache_status(otp_cache_file, "WAITING_FOR_OTP", "Vui lòng nhập mã OTP 6 số.")
         return False
 
@@ -472,10 +460,6 @@ class FacebookAuth:
                         return True
         return False
 
-    # ─────────────────────────────────────────────────────────────────────────────
-    # UTILITIES
-    # ─────────────────────────────────────────────────────────────────────────────
-
     def _get_otp_code(self, custom_2fa: Optional[str], otp_cache_file: Path) -> Optional[str]:
         if custom_2fa:
             totp = pyotp.TOTP(custom_2fa.replace(" ", "").upper())
@@ -485,27 +469,16 @@ class FacebookAuth:
             try:
                 data = json.loads(otp_cache_file.read_text(encoding="utf-8"))
                 code = data.get("otp_code")
-                # Nếu đã nhận được mã OTP từ FE truyền lên
                 if code and data.get("status") == "RECEIVED_OTP":
-                    # Đọc xong thì đổi trạng thái sang PROCESSING để tránh điền lặp lại
                     self._update_cache_status(otp_cache_file, "PROCESSING", "Đang xử lý mã OTP...")
                     return str(code).strip()
             except Exception as e:
-                #logger.error(f"Lỗi đọc file OTP: {e}")
                 pass
         return None
 
     def _reset_otp_cache(self, otp_cache_file: Path):
         otp_cache_file.parent.mkdir(parents=True, exist_ok=True)
         self._update_cache_status(otp_cache_file, "INIT", "Khởi tạo trình duyệt...")
-
-    def _save_session(self, context: BrowserContext, page: Page, cookie_file: Path):
-        try:
-            page.wait_for_load_state("networkidle", timeout=self.TIMEOUT_SHORT)
-        except PlaywrightTimeoutError:
-            pass
-        context.storage_state(path=str(cookie_file))
-        #logger.info("✅ Đã lưu phiên đăng nhập (Storage State) thành công!")
 
     def _is_bot_check_screen(self, page: Page) -> bool:
         try:
@@ -537,3 +510,59 @@ class FacebookAuth:
     @staticmethod
     def _safe_email(email: str) -> str:
         return email.replace("@", "_at_").replace(".", "_dot_")
+    
+
+    def user_login_get_cookie(self, user_email: str, user_pass: str, session_id: str, custom_2fa: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Hàm đăng nhập độc lập cho User để lấy cookie.
+        Tuyệt đối không sử dụng hay lưu trữ vào Database mặc định của VPS.
+        """
+        otp_cache_file = self.otp_dir / f"session_{session_id}.json"
+        self._reset_otp_cache(otp_cache_file)
+
+        with sync_playwright() as p:
+            browser = None
+            try:
+                browser, context, page = self._init_browser(p)
+
+                # 1. Đăng nhập trực tiếp bằng thông tin User cung cấp
+                self._login_with_credentials(page, user_email, user_pass)
+
+                # 2. Xử lý Checkpoint / 2FA (Chờ điện thoại, OTP, v.v.)
+                is_success = self._handle_checkpoint_loop(page, custom_2fa, otp_cache_file)
+
+                if is_success:
+                    # Đợi mạng load xong để không bị sót cookie
+                    try:
+                        page.wait_for_load_state("networkidle", timeout=self.TIMEOUT_SHORT)
+                    except PlaywrightTimeoutError:
+                        pass
+                    
+                    # 3. Trích xuất Cookie
+                    new_cookie_state = context.storage_state()
+                    
+                    # Ghi cookie vào file cache JSON để API có thể đọc và trả về FE
+                    self._update_cache_status(
+                        otp_cache_file, 
+                        "SUCCESS", 
+                        "Đăng nhập thành công.", 
+                        cookie_data=new_cookie_state
+                    )
+                    return {"status": "success", "message": "Đăng nhập thành công.", "cookie": new_cookie_state}
+                else:
+                    status_data = json.loads(otp_cache_file.read_text(encoding="utf-8"))
+                    if status_data.get("status") not in ["ERROR_WRONG_PASS", "ERROR_BOT_BLOCKED"]:
+                        self._update_cache_status(otp_cache_file, "ERROR", "Kẹt Checkpoint quá thời gian.")
+                    return {"status": "error", "message": "Kẹt Checkpoint quá thời gian."}
+
+            except FacebookAuthError as fe:
+                return {"status": "error", "message": str(fe)}
+            except Exception as e:
+                self._update_cache_status(otp_cache_file, "ERROR", f"Lỗi hệ thống: {str(e)}")
+                return {"status": "error", "message": str(e)}
+            finally:
+                time.sleep(5) # Đợi một chút trước khi đóng trình duyệt để tiến trình không bị ngắt gắt
+                if browser:
+                    browser.close()
+                # KHÔNG dùng otp_cache_file.unlink() ở đây vì BƯỚC 2 (Polling) và BƯỚC 3 (Submit OTP) 
+                # cần đọc file này để trả cookie về cho Frontend.

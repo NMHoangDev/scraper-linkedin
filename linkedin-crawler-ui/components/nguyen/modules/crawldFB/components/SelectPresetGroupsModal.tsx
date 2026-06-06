@@ -8,10 +8,11 @@ import { useGetIntents } from "../hooks/useGetIntents";
 import { useGetPresetGroups } from "../hooks/useGetPresetGroups";
 import { MaterialIcon } from "@/components/ui";
 
+
 interface SelectPresetGroupsModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSelectGroups: (selectedGroups: { name: string; url: string; id: string }[]) => void;
+    onSelectGroups: (selectedGroups: { name: string; url: string; id: string, id_intent: string | undefined,id_member:string,group_name:string }[]) => void;
 }
 type GroupStatus = "ACTIVE" | "IDLE" | "DEAD" | null | undefined;
 
@@ -21,7 +22,7 @@ export function SelectPresetGroupsModal({ isOpen, onClose, onSelectGroups }: Sel
 
     const { intents, fetchIntents } = useGetIntents();
     const { presetGroups, isLoadingGroups, errorGroups, fetchPresetGroups } = useGetPresetGroups();
-    
+    console.log(presetGroups)
     useEffect(() => {
         if (isOpen) {
             fetchIntents();
@@ -59,6 +60,9 @@ export function SelectPresetGroupsModal({ isOpen, onClose, onSelectGroups }: Sel
                 name: originalGroup.group_name,
                 url: originalGroup.group_url,
                 id: originalGroup.id,
+                id_intent: originalGroup.id_intent ?? undefined ,
+                id_member:originalGroup.id_member,
+                group_name:originalGroup.group_name
             };
         });
 

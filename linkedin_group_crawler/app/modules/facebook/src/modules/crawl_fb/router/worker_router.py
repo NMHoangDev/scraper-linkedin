@@ -3,8 +3,9 @@ from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 from typing import List
 import os
+import asyncio
 import httpx
-
+import asyncio
 from app.modules.facebook.src.modules.facebook.services.facebook_scraper import FacebookScraper, GroupTarget
 from app.modules.facebook.src.core.config.env import Config
 from app.modules.facebook.src.core.utils.logger import setup_logger
@@ -17,6 +18,7 @@ class GroupItemDTO(BaseModel):
     name: str
     url: str
     id: str
+    id_member:str
 
 class CrawlBatchRequest(BaseModel):
     batch_data: List[GroupItemDTO]
@@ -54,10 +56,11 @@ def process_and_callback(target_groups: List[GroupTarget], worker_email: str, cl
 @worker_router.post("/internal/crawl-batch")
 def execute_crawl_batch(req: CrawlBatchRequest, background_tasks: BackgroundTasks):
     worker_email = os.getenv("FB_DEFAULT_EMAIL")
-    target_groups = [GroupTarget(name=item.name, url=item.url, id=item.id) for item in req.batch_data]
+    target_groups = [GroupTarget(name=item.name, url=item.url, id=item.id,id_member=item.id_member) for item in req.batch_data]
 
     # Quăng vào luồng ngầm (Luồng chính trả HTTP 200 luôn)
     background_tasks.add_task(
+        asyncio.to_thread,
         process_and_callback, 
         target_groups=target_groups, 
         worker_email=worker_email, 

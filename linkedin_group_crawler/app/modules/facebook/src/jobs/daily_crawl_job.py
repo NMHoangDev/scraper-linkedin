@@ -7,6 +7,9 @@ import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.executors.asyncio import AsyncIOExecutor
 
+
+from collections import defaultdict
+
 # Import các service
 from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_groups_24h import TargetGroupSheet24HService
 from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_posts import GoogleSheetServicePosts
@@ -21,73 +24,134 @@ from app.modules.facebook.src.modules.crawl_fb.models.GroupSummary import GroupS
 
 from app.modules.facebook.src.modules.crawl_fb.router.index import job_tracker
 from app.modules.facebook.src.modules.crud.groups24hFb.group24h import get_all_groupsFB_24h
-from app.modules.facebook.src.modules.crud.groupsFb.groups import reset_all_posts_per_week
-
+from app.modules.facebook.src.modules.crud.groupsFb.groups import reset_all_posts_per_week,get_all_groupsFB
+from app.modules.facebook.src.modules.crud.vps_fb.vps_fb import get_http_main_vps_result,get_active_vps
 logger = logging.getLogger(__name__)
 
 async def execute_crawl_workflow():
-    """Luồng đọc sheet 24h và chia lệnh cào cho 3 VPS"""
-    logger.info("🚀 BẮT ĐẦU CHẠY TIẾN TRÌNH CÀO DỮ LIỆU TỰ ĐỘNG...")
+    """Luồng đọc sheet 24h và phân bổ lệnh cào cho VPS chuẩn Intent-based Routing"""
+    logger.info("🚀 BẮT ĐẦU CHẠY TIẾN TRÌNH CÀO DỮ LIỆU TỰ ĐỘNG (CRON 24H)...")
     service_24h = TargetGroupSheet24HService()
     telegram = TelegramService()
     
     try:
+        # 1. Lấy thông tin cấu hình và VPS hoạt động
+        https_result = await asyncio.to_thread(get_http_main_vps_result)
+        MAIN_WEBHOOK_URL = https_result
+        
+        active_vps = await asyncio.to_thread(get_active_vps)
+        
+        if not active_vps or not MAIN_WEBHOOK_URL:
+            logger.error("❌ Lỗi cấu hình: Không có VPS nào đang hoạt động hoặc thiếu Webhook URL.")
+            return
+
+        # Phân loại VPS theo id_intent
+        vps_by_intent = defaultdict(list)
+        vps_null = []
+
+        for vps in active_vps:
+            intent = vps.get('id_intent')
+            vps_url = vps.get('http')
+            
+            if not vps_url:
+                continue
+                
+            if intent:
+                vps_by_intent[intent].append(vps_url)
+            else:
+                vps_null.append(vps_url)
+
+        # 2. Lấy danh sách Group từ cơ sở dữ liệu 24h
         sheet_data = await asyncio.to_thread(get_all_groupsFB_24h)
         
-        all_groups_dict = []
+        if not sheet_data:
+            logger.warning("❌ Không tìm thấy danh sách Group hợp lệ trong 24h.")
+            return
+
+        # Khởi tạo bộ chia lô
+        vps_batches = {vps['http']: [] for vps in active_vps if vps.get('http')}
+        intent_counters = defaultdict(int)
+        null_counter = 0
+        
+       
+        
+
         for row in sheet_data:
             group_url = row.get("url", "").strip()
             group_name = row.get("group_name", "Unknown").strip()
-            id = row.get("id", "").strip()
-            if group_url:
-                all_groups_dict.append({"name": group_name, "url": group_url, "id": id})
+            group_id = row.get("id", "").strip()
+            id_member = row.get("id_member")
+            g_intent = row.get("id_intent")
+            
+            if not group_url:
+                continue
 
-        if not all_groups_dict:
-            logger.warning("❌ Không tìm thấy danh sách Group hợp lệ.")
+            # --- KIỂM TRA RÀNG BUỘC THỜI GIAN ---
+
+            # --- PHÂN BỔ VÀO VPS (Intent-based Routing) ---
+            # Chỉ truyền payload cần thiết cho Frontend/VPS xử lý
+            clean_group = {
+                "name": group_name, 
+                "url": group_url, 
+                "id": group_id,
+                "id_member": id_member
+            }
+
+            if g_intent and g_intent in vps_by_intent and len(vps_by_intent[g_intent]) > 0:
+                # Có VPS xử lý riêng cho intent này -> Chia vòng xoay
+                target_list = vps_by_intent[g_intent]
+                idx = intent_counters[g_intent] % len(target_list)
+                selected_url = target_list[idx]
+                
+                vps_batches[selected_url].append(clean_group)
+                intent_counters[g_intent] += 1
+            else:
+                # Không có intent hoặc không có VPS map với intent đó
+                if len(vps_null) > 0:
+                    idx = null_counter % len(vps_null)
+                    selected_url = vps_null[idx]
+                    
+                    vps_batches[selected_url].append(clean_group)
+                    null_counter += 1
+                else:
+                    logger.warning(f"Bỏ qua group {group_name} vì không có VPS phù hợp đang hoạt động.")
+
+        # 3. Dọn dẹp và chuẩn bị Job Tracker
+        active_batches = {url: batch for url, batch in vps_batches.items() if len(batch) > 0}
+        total_jobs = len(active_batches)
+
+        if total_jobs == 0:
+            logger.info("⏭️ Không có task nào được phân bổ cho các máy chủ trong cron 24h.")
             return
 
-        # 1. Lấy thông tin các VPS
-        WORKER_URLS = Config.get_worker_urls()
-        MAIN_WEBHOOK_URL = Config.MAIN_WEBHOOK_URL
-        
-        if not WORKER_URLS or not MAIN_WEBHOOK_URL:
-            logger.error("❌ Thiếu cấu hình WORKER_URLS hoặc MAIN_WEBHOOK_URL trong .env")
-            return
-
-        # 2. Chia lô cho các máy cày
-        num_workers = len(WORKER_URLS)
-        chunk_size = (len(all_groups_dict) + num_workers - 1) // num_workers
-        batches = [all_groups_dict[i:i + chunk_size] for i in range(0, len(all_groups_dict), chunk_size)]
-
-        # 3. Ghi danh vào sổ theo dõi (Để Webhook biết mà hứng)
         job_tracker["CRON_24H"] = {
-            "total": len(batches),
+            "total": total_jobs,
             "completed": 0,
-            "data": [] # Khởi tạo mảng rỗng để hứng data đổ về
+            "data": [] 
         }
 
         # 4. Phát lệnh gọi các máy cày
-        logger.info(f"Đã chia {len(all_groups_dict)} groups thành {len(batches)} phần. Phát lệnh tới các VPS...")
+        logger.info(f"Đã chia groups thành {total_jobs} lô. Phát lệnh tới các VPS...")
         async with httpx.AsyncClient() as client:
-            for idx, batch in enumerate(batches):
-                url = WORKER_URLS[idx % num_workers]
+            for url, batch in active_batches.items():
                 payload_data = {
                     "batch_data": batch, 
-                    "client_id": "CRON_24H", # Định danh là Cronjob
+                    "client_id": "CRON_24H",
                     "webhook_url": MAIN_WEBHOOK_URL
                 }
                 try:
                     await client.post(url, json=payload_data, timeout=5)
                 except Exception as e:
                     logger.error(f"⚠️ Gửi lệnh thất bại tới {url}: {e}")
-                    # Nếu máy chết, phải +1 completed ảo để Webhook không đợi mãi
+                    # Cộng completed ảo để không bị treo logic webhook chờ
                     job_tracker["CRON_24H"]["completed"] += 1 
 
     except Exception as e:
-        logger.error(f"❌ Thất bại: {e}", exc_info=True)
+        logger.error(f"❌ Thất bại trong luồng cron 24h: {e}", exc_info=True)
         try:
             telegram.send_message(f"🚨 <b>LỖI HỆ THỐNG CRON 24H</b> 🚨\n\n<code>{str(e)}</code>")
-        except: pass
+        except Exception: 
+            pass
 def execute_update_groups_workflow():
     """
     Luồng công việc tổng hợp cập nhập lại điểm số sau 1 tuần
@@ -159,11 +223,7 @@ async def execute_weekly_backup_and_reset_workflow():
         if reset_success:
             logger.info("✅ HOÀN TẤT CHU KỲ TUẦN. Đã sao lưu dữ liệu và đưa toàn bộ điểm về 0.")
             # Báo cáo trạng thái tốt qua Telegram channel
-            telegram.send_message(
-                f"📊 <b>BÁO CÁO CUỐI TUẦN</b> 📊\n\n"
-                f"✅ Đã sao lưu thành công <code>{len(records_to_backup)}</code> tài khoản sang lịch sử.\n"
-                f"🔄 Đã đưa toàn bộ điểm số tuần về 0."
-            )
+            
         else:
             logger.error("❌ Sao lưu thành công nhưng lệnh RESET điểm số về 0 thất bại.")
 
@@ -173,6 +233,161 @@ async def execute_weekly_backup_and_reset_workflow():
             telegram.send_message(f"🚨 <b>LỖI HỆ THỐNG CRON WEEKLY</b> 🚨\n\n<code>{str(e)}</code>")
         except Exception:
             pass
+async def execute_crawl_hourly():
+    """Luồng đọc data từ database và chia lệnh cào theo cấu hình start/end/interval, phân bổ VPS theo id_intent"""
+    logger.info("🚀 BẮT ĐẦU CHẠY TIẾN TRÌNH CÀO DỮ LIỆU TỰ ĐỘNG THEO GIỜ...")
+    
+    try:
+        current_hour = datetime.now().hour
+        now = datetime.now()
+        current_date = now.date()
+
+        # 1. Lấy thông tin cấu hình và VPS hoạt động
+        https_result = await asyncio.to_thread(get_http_main_vps_result)
+        MAIN_WEBHOOK_URL = https_result
+        
+        active_vps = await asyncio.to_thread(get_active_vps)
+        
+        if not active_vps or not MAIN_WEBHOOK_URL:
+            logger.error("❌ Lỗi cấu hình: Không có VPS nào đang hoạt động hoặc thiếu Webhook URL.")
+            return
+
+        # 2. Phân loại VPS theo id_intent
+        vps_by_intent = defaultdict(list)
+        vps_null = []
+
+        for vps in active_vps:
+            intent = vps.get('id_intent')
+            vps_url = vps.get('http')
+            
+            if not vps_url:
+                continue
+                
+            if intent:
+                vps_by_intent[intent].append(vps_url)
+            else:
+                vps_null.append(vps_url)
+
+        # 3. Lấy dữ liệu Groups và thiết lập bộ chia lô
+        sheet_data = await asyncio.to_thread(get_all_groupsFB) 
+        
+        vps_batches = {vps['http']: [] for vps in active_vps if vps.get('http')}
+        intent_counters = defaultdict(int)
+        null_counter = 0
+
+        for row in sheet_data:
+            group_url = row.get("url", "").strip()
+            group_name = row.get("group_name", "Unknown").strip()
+            group_id = row.get("id", "").strip()
+            id_member = row.get("id_member")
+            g_intent = row.get("id_intent")
+            
+            # --- KIỂM TRA NGÀY HẾT HẠN (end_date_hour) ---
+            end_date_hour_raw = row.get("end_date_hour")
+            if not end_date_hour_raw or str(end_date_hour_raw).strip() == "":
+                continue
+                
+            try:
+                end_date_str = str(end_date_hour_raw).strip()[:10]
+                end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+                if end_date < current_date:
+                    continue
+            except Exception as parse_err:
+                logger.error(f"⚠️ Lỗi định dạng ngày tại group {group_name}: {parse_err}")
+                continue 
+
+            # --- KIỂM TRA ĐIỀU KIỆN THỜI GIAN CÀO ---
+            start_hour_raw = row.get("start_date_crawl")
+            end_hour_raw = row.get("end_date_crawl")
+            time_crawl_raw = row.get("time_crawl")
+
+            # Bỏ qua ngay lập tức nếu bất kỳ cờ thời gian nào bị Null hoặc rỗng
+            if start_hour_raw is None or start_hour_raw == "" or \
+               end_hour_raw is None or end_hour_raw == "" or \
+               time_crawl_raw is None or time_crawl_raw == "":
+                continue
+
+            try:
+                time_crawl = int(time_crawl_raw)
+                start_hour = int(start_hour_raw)
+                end_hour = int(end_hour_raw)
+            except ValueError:
+                continue
+
+            # Kiểm tra xem giờ hiện tại có nằm trong khung giờ quy định không
+            if not (start_hour <= current_hour <= end_hour):
+                continue 
+
+            # Tính toán chu kỳ cào: Khoảng cách từ lúc bắt đầu chia hết cho chu kỳ
+            hours_passed = current_hour - start_hour 
+            if hours_passed % time_crawl != 0:
+                continue
+
+            if not group_url:
+                continue
+
+            # --- PHÂN BỔ VÀO VPS (Chuẩn Intent-based Routing) ---
+            # Payload sạch, không chứa id_intent để gửi cho VPS
+            clean_group = {
+                "name": group_name, 
+                "url": group_url, 
+                "id": group_id,
+                "id_member": id_member
+            }
+
+            if g_intent and g_intent in vps_by_intent and len(vps_by_intent[g_intent]) > 0:
+                # Xoay vòng VPS cho intent hiện tại
+                target_list = vps_by_intent[g_intent]
+                idx = intent_counters[g_intent] % len(target_list)
+                selected_url = target_list[idx]
+                
+                vps_batches[selected_url].append(clean_group)
+                intent_counters[g_intent] += 1
+            else:
+                # Đẩy vào các VPS không định danh intent
+                if len(vps_null) > 0:
+                    idx = null_counter % len(vps_null)
+                    selected_url = vps_null[idx]
+                    
+                    vps_batches[selected_url].append(clean_group)
+                    null_counter += 1
+                else:
+                    logger.warning(f"Bỏ qua group {group_name} vì không có VPS phù hợp đang hoạt động.")
+
+        # 4. Phát lệnh gọi VPS
+        # Lọc bỏ các VPS rỗng không có task
+        active_batches = {url: batch for url, batch in vps_batches.items() if len(batch) > 0}
+        total_jobs = len(active_batches)
+
+        if total_jobs == 0:
+            logger.info(f"⏭️ Khung giờ {current_hour}h: Không có Group nào đến lịch cần cào hoặc không có task phân bổ.")
+            return
+
+        job_tracker["CRON_HOURLY"] = {
+            "total": total_jobs,
+            "completed": 0,
+            "data": [] 
+        }
+
+        logger.info(f"Khung {current_hour}h: Giao việc cho {total_jobs} máy chủ. Phát lệnh tới VPS...")
+        async with httpx.AsyncClient() as client:
+            for url, batch in active_batches.items():
+                payload_data = {
+                    "batch_data": batch, 
+                    "client_id": "CRON_HOURLY", 
+                    "webhook_url": MAIN_WEBHOOK_URL
+                }
+                
+                try:
+                    # Request timeout cực ngắn giống WS, máy chủ nhận lệnh là xử lý nền ngay
+                    await client.post(url, json=payload_data, timeout=5)
+                except Exception as e:
+                    logger.error(f"⚠️ Gửi lệnh thất bại tới {url}: {e}")
+                    # Mồi completion để tránh kẹt vòng lặp job tracking phía sau
+                    job_tracker["CRON_HOURLY"]["completed"] += 1 
+
+    except Exception as e:
+        logger.error(f"❌ Thất bại trong luồng cron hourly: {e}", exc_info=True)
         
 def setup_and_start_jobs():
     """
@@ -195,6 +410,14 @@ def setup_and_start_jobs():
         id='daily_facebook_crawl',
         replace_existing=True
     )
+    scheduler.add_job(
+    func=execute_crawl_hourly,
+    trigger='cron',
+    hour='*',      # Chạy mỗi đầu giờ (0h - 23h)
+    minute=0,      # Đúng phút 00
+    id='hourly_facebook_crawl',
+    replace_existing=True
+)
     scheduler.add_job(
         func=execute_update_groups_workflow,
         trigger='cron',

@@ -13,6 +13,9 @@ export const CrawlFb_Schemas = z
         name: z.string().min(1, "Vui lòng nhập tên GroupFb"),
         url: z.string().url("Đường dẫn không hợp lệ").or(z.literal("")),
         id: z.string().min(1, "Vui lòng chọn mục đích quét dữ liệu"),
+        id_intent: z.string().min(0, "Vui lòng chọn mục đích quét dữ liệu").optional(),
+        id_member:z.string().min(1, "chưa chọn id nhân viên"),
+        group_name:z.string().min(1, "chưa chọn name groups")
       }),
     ),
   })

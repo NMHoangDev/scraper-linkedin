@@ -9,7 +9,7 @@ from typing import Any, List, Optional, Dict
 from pydantic import BaseModel
 import uuid
 from fastapi import HTTPException
-
+from collections import defaultdict
 # Imports từ project của bạn
 from app.modules.facebook.src.modules.facebook.services.facebook_auth import FacebookAuth
 from app.modules.facebook.src.modules.crawl_fb.schemas.crawl_schema import CrawlPayload
@@ -26,6 +26,7 @@ from app.modules.facebook.src.core.config.env import Config
 from app.modules.facebook.src.modules.crud.posts.post import create_multiple_postsFB
 from app.modules.facebook.src.modules.crud.groupsFb.groups import update_groups_per_crawl
 from app.modules.facebook.src.core.utils.facebook_parsers import convert_to_datetime
+from app.modules.facebook.src.modules.crud.vps_fb.vps_fb import get_active_vps,get_http_main_vps_result
 from fastapi.encoders import jsonable_encoder
 import traceback
 
@@ -73,19 +74,25 @@ class ConnectionManager:
             await websocket.accept()
         self.active_connections[email] = websocket
 
+    # ĐÂY LÀ HÀM BẠN ĐÃ ĐỊNH NGHĨA
     def disconnect(self, email: str):
         if email in self.active_connections:
             del self.active_connections[email]
 
-    async def send_json(self, message: dict, email: str):
+    async def send_json(self, email: str, safe_message: dict):
         if email in self.active_connections:
             try:
-                safe_message = jsonable_encoder(message)
                 await self.active_connections[email].send_json(safe_message)
-            except Exception:
-                traceback.print_exc()
-                self.disconnect(email)
-
+            except WebSocketDisconnect:
+                 print(f"Client {email} đã ngắt kết nối (WebSocketDisconnect).")
+                 # SỬA LẠI Ở ĐÂY: Dùng self.disconnect(email) thay vì self._remove_connection
+                 self.disconnect(email)
+            except RuntimeError as e:
+                 print(f"Lỗi RuntimeError khi gửi cho {email}: {e}")
+                 # SỬA LẠI Ở ĐÂY
+                 self.disconnect(email)
+            except Exception as e:
+                 print(f"Lỗi không xác định khi gửi tin nhắn cho {email}: {e}")
 manager = ConnectionManager()
 
 # ── ĐỊNH NGHĨA DEPENDENCY ─────────────────────────────────────────────────────
@@ -329,22 +336,25 @@ async def receive_webhook_result(payload: WebhookResponse):
     # 2. XỬ LÝ GIAO DIỆN REALTIME CHO FRONTEND
     # ==========================================
     # Nếu không phải CRON, tức là người dùng đang xem trên UI -> Bắn WebSocket
-    if client_id != "CRON_24H":
-        if payload.status == "success":
-            await manager.send_json(
-                {
-                    "status": "partial_success",
-                    "message": f"Vừa nhận dữ liệu từ 1 máy chủ ({len(payload.data)} groups).",
-                    "data": payload.data
-                }, 
-                client_id
-            )
-        else:
-            await manager.send_json(
-                {"status": "warning", "message": f"Máy chủ báo lỗi: {payload.message}"}, 
-                client_id
-            )
-
+    if client_id != "CRON_24H" and client_id != "CRON_HOURLY":
+        try:
+            if payload.status == "success":
+                await manager.send_json(
+                    {
+                        "status": "partial_success",
+                        "message": f"Vừa nhận dữ liệu từ 1 máy chủ ({len(payload.data)} groups).",
+                        "data": payload.data
+                    }, 
+                    client_id
+                )
+            else:
+                await manager.send_json(
+                    {"status": "warning", "message": f"Máy chủ báo lỗi: {payload.message}"}, 
+                    client_id
+                )
+        except Exception as e:
+            # Chỉ ghi log cảnh báo, KHÔNG làm crash hàm
+            logger.warning(f"Người dùng {client_id} đã tắt giao diện, bỏ qua bước gửi realtime. Tiếp tục lưu Data...")
     # ==========================================
     # 3. KIỂM TRA HOÀN THÀNH & CHỐT SỔ LÊN GG SHEETS
     # ==========================================
@@ -379,7 +389,11 @@ async def receive_webhook_result(payload: WebhookResponse):
                         post_data["id"] = str(uuid.uuid4())
                         post_data["group_id"] = summary.id
                         post_data["crawl_date"]=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        post_data["id_member"]=summary.id_member
                         post = summary.hot_post
+                        
+                        if post is None:
+                            continue
                         if post:
                             groups_data["health_score"]=post.score
                             post_data["post_time"] = post.date
@@ -394,6 +408,7 @@ async def receive_webhook_result(payload: WebhookResponse):
                             post_data["post_url"] = post.url
                         service_posts_to_db.append(post_data)
                     # thêm vào supabase
+                    
                     await asyncio.to_thread(create_multiple_postsFB, service_posts_to_db)
                     # cập nhật lại thông tin groups sau mỗi lần crawl
                     await asyncio.to_thread(update_groups_per_crawl, groups_update)
@@ -422,59 +437,150 @@ async def websocket_crawl_endpoint(websocket: WebSocket, email: str):
     await manager.connect(websocket, email, accept=False)
     cancel_registry[email] = False
 
+    def build_status_msg(vps_info_dict):
+        """Hàm hỗ trợ tạo chuỗi text báo cáo trạng thái các VPS"""
+        lines = []
+        for vps_name, info in vps_info_dict.items():
+            g_names = ", ".join(info["group_names"])
+            if info["status"] == "đang cào":
+                lines.append(f"🟢 {vps_name} đang cào {info['count']} groups gồm: {g_names}")
+            elif info["status"] == "hoàn thành":
+                lines.append(f"✅ {vps_name} cào {info['count']} groups đã hoàn thành")
+            elif info["status"] == "lỗi":
+                lines.append(f"❌ {vps_name} bị lỗi khi cào {info['count']} groups")
+        return "\n".join(lines)
+
     try:
         data = await websocket.receive_text()
         payload = CrawlPayload(**json.loads(data))
         
-        WORKER_URLS = Config.get_worker_urls()
-        MAIN_WEBHOOK_URL = Config.MAIN_WEBHOOK_URL
+        # 1. Lấy thông tin cấu hình và VPS hoạt động
+        https_result = await asyncio.to_thread(get_http_main_vps_result)
+        MAIN_WEBHOOK_URL = https_result
+        active_vps = await asyncio.to_thread(get_active_vps)
+
+        print(f"debug vps: {active_vps}")
+        print(f"debug payload: {payload}")
+        await manager.send_json({"status": "info", "message": "Đang phân tích và phân bổ công việc..."}, email)
         
-        if not WORKER_URLS or not MAIN_WEBHOOK_URL:
-            await manager.send_json({"status": "error", "message": "Lỗi cấu hình VPS. Kiểm tra file .env."}, email)
+        # Xóa bỏ lệnh return chặn ngang nếu có
+        if not active_vps or not MAIN_WEBHOOK_URL:
+            await manager.send_json({"status": "error", "message": "Lỗi cấu hình VPS hoặc Webhook. Vui lòng kiểm tra lại."}, email)
             return
 
-        # Chia Lô
-        all_groups_dict = [{"name": g.name, "url": g.url, "id": g.id} for g in payload.groups]
-        num_workers = len(WORKER_URLS)
-        chunk_size = (len(all_groups_dict) + num_workers - 1) // num_workers
-        batches = [all_groups_dict[i:i + chunk_size] for i in range(0, len(all_groups_dict), chunk_size)]
+        # 2. Phân loại VPS theo id_intent & Tạo bộ từ điển ánh xạ URL sang Tên
+        vps_by_intent = defaultdict(list)
+        vps_null = []
+        url_to_name = {} # Map url -> name để hiển thị
 
-        # Khởi tạo bộ theo dõi
-        job_tracker[email] = {"total": len(batches), "completed": 0, "data": []}
+        for vps in active_vps:
+            intent = vps.get('id_intent')
+            vps_url = vps.get('http')
+            vps_name = vps.get('name', 'Unknown VPS')
+            
+            if not vps_url:
+                continue
+                
+            url_to_name[vps_url] = vps_name
+            if intent:
+                vps_by_intent[intent].append(vps_url)
+            else:
+                vps_null.append(vps_url)
 
+        # 3. Chia Lô (Phân bổ Groups vào các VPS)
+        vps_batches = {vps['http']: [] for vps in active_vps if vps.get('http')}
+        intent_counters = defaultdict(int)
+        null_counter = 0
+        
+        for group in payload.groups:
+            g_intent = getattr(group, 'id_intent', None)
+            clean_group = {"name": group.name, "url": group.url, "id": group.id,"id_member":group.id_member}
+            
+            if g_intent and g_intent in vps_by_intent and len(vps_by_intent[g_intent]) > 0:
+                target_list = vps_by_intent[g_intent]
+                idx = intent_counters[g_intent] % len(target_list)
+                selected_url = target_list[idx]
+                
+                vps_batches[selected_url].append(clean_group)
+                intent_counters[g_intent] += 1
+            else:
+                if len(vps_null) > 0:
+                    idx = null_counter % len(vps_null)
+                    selected_url = vps_null[idx]
+                    
+                    vps_batches[selected_url].append(clean_group)
+                    null_counter += 1
+                else:
+                    logger.warning(f"Bỏ qua group {group.name} vì không có VPS phù hợp đang hoạt động.")
+
+        active_batches = {url: batch for url, batch in vps_batches.items() if len(batch) > 0}
+        total_jobs = len(active_batches)
+
+        if total_jobs == 0:
+            await manager.send_json({"status": "error", "message": "Không có task nào được phân bổ cho các máy chủ."}, email)
+            return
+
+        # 4. Khởi tạo bộ theo dõi chi tiết từng VPS
+        vps_tracking_info = {}
+        for url, batch in active_batches.items():
+            v_name = url_to_name[url]
+            vps_tracking_info[v_name] = {
+                "status": "đang cào",
+                "count": len(batch),
+                "group_names": [g["name"] for g in batch]
+            }
+
+        job_tracker[email] = {
+            "total": total_jobs, 
+            "completed": 0, 
+            "data": [],
+            "vps_info": vps_tracking_info # Thêm dữ liệu chi tiết vào tracker
+        }
+
+        # Gửi thông báo khởi tạo ban đầu cho FE
+        initial_msg = build_status_msg(job_tracker[email]["vps_info"])
         await manager.send_json(
-            {"status": "processing", "message": f"Giao việc cho {len(batches)} máy chủ (bao gồm máy chính)..."}, email
+            {"status": "processing", "message": f"Bắt đầu phân bổ công việc:\n\n{initial_msg}"}, email
         )
 
-        # PHÁT LỆNH BẰNG HTTPX (Tốc độ ánh sáng, timeout rất ngắn)
+        # 5. PHÁT LỆNH BẰNG HTTPX
         async with httpx.AsyncClient() as client:
-            for idx, batch in enumerate(batches):
-                url = WORKER_URLS[idx % num_workers]
-                payload_data = {"batch_data": batch, "client_id": email, "webhook_url": MAIN_WEBHOOK_URL}
+            for url, batch in active_batches.items():
+                v_name = url_to_name[url]
+                # CHÚ Ý: Gửi thêm vps_name vào payload để webhook biết máy nào trả kết quả về
+                payload_data = {
+                    "batch_data": batch, 
+                    "client_id": email, 
+                    "webhook_url": MAIN_WEBHOOK_URL,
+                    "vps_name": v_name 
+                }
                 
                 try:
-                    # Gửi lệnh và chỉ đợi max 5s. Máy bên kia nhận là ngắt ngay.
                     await client.post(url, json=payload_data, timeout=5)
                 except Exception as e:
                     logger.error(f"Lỗi gọi VPS {url}: {e}")
-                    # Máy nào sập thì đánh dấu "completed" mồi để tí vòng lặp không bị kẹt vô tận
                     job_tracker[email]["completed"] += 1
-                    await manager.send_json({"status": "warning", "message": f"VPS {idx+1} mất kết nối."}, email)
+                    job_tracker[email]["vps_info"][v_name]["status"] = "lỗi"
+                    
+                    # Cập nhật ngay khi có máy lỗi
+                    current_msg = build_status_msg(job_tracker[email]["vps_info"])
+                    await manager.send_json({"status": "warning", "message": f"Cập nhật tiến độ:\n\n{current_msg}"}, email)
 
-        # VÒNG LẶP CHỜ WEBHOOK TỪ CÁC MÁY BÁO VỀ
+        # 6. VÒNG LẶP CHỜ WEBHOOK TỪ CÁC MÁY BÁO VỀ
         elapsed_seconds = 0
-        # Thêm điều kiện 'email in job_tracker' lên trước
         while email in job_tracker and job_tracker[email]["completed"] < job_tracker[email]["total"]:
             if cancel_registry.get(email):
                 await manager.send_json({"status": "canceled", "message": "Đã ngắt theo dõi giao diện."}, email)
                 break
 
-            if elapsed_seconds % 30 == 0 and elapsed_seconds > 0:
+            # Cập nhật tiến độ mỗi 5 giây thay vì 30 giây để FE thấy real-time rõ hơn
+            if elapsed_seconds % 5 == 0 and elapsed_seconds > 0:
                 try:
+                    current_msg = build_status_msg(job_tracker[email]["vps_info"])
                     await manager.send_json(
                         {
                             "status": "heartbeat",
-                            "message": f"Đang cào dữ liệu... ({job_tracker[email]['completed']}/{job_tracker[email]['total']} máy chủ đã xong)",
+                            "message": f"Tiến độ cào dữ liệu:\n\n{current_msg}",
                         }, email
                     )
                 except: pass
@@ -482,13 +588,15 @@ async def websocket_crawl_endpoint(websocket: WebSocket, email: str):
             await asyncio.sleep(1)
             elapsed_seconds += 1
 
-        # KẾT THÚC
+        # 7. KẾT THÚC
         if not cancel_registry.get(email):
             final_data = job_tracker.get(email, {}).get("data", [])
+            final_msg = build_status_msg(job_tracker.get(email, {}).get("vps_info", {}))
+            await manager.send_json(
+                {"status": "success", "message": f"Toàn bộ quá trình hoàn tất!\n\n{final_msg}", "data": final_data}, email
+            )
 
-            await manager.send_json({"status": "success", "message": "Toàn bộ máy chủ đã hoàn tất!","data": final_data}, email)
-
-        # Dọn dẹp
+        # 8. Dọn dẹp
         if email in job_tracker:
             del job_tracker[email]
             
@@ -527,9 +635,9 @@ async def controlled_login_task(auth_service: FacebookAuth, email: str, password
 async def controlled_login_task(auth_service: FacebookAuth, email: str, password: str, session_id: str, secret_2fa: Optional[str]):
     """Tiến trình ngầm bọc Playwright."""
     await asyncio.to_thread(
-        auth_service.standalone_login,
-        custom_email=email,
-        custom_pass=password,
+        auth_service.user_login_get_cookie,
+        user_email=email,   # Sửa custom_email thành user_email
+        user_pass=password, # Sửa custom_pass thành user_pass
         session_id=session_id,
         custom_2fa=secret_2fa
     )
@@ -541,9 +649,6 @@ async def standalone_login_api(payload: LoginPayload):
     """
     auth_service = FacebookAuth(config=Config)
     
-    if auth_service.get_cookie_path(payload.email).exists():
-        return {"status": "success", "message": "Đăng nhập thành công (Đã có cookie)!"}
-
     session_id = uuid.uuid4().hex
     otp_cache_file = OTP_DIRECTORY / f"session_{session_id}.json"
     
@@ -569,7 +674,7 @@ async def standalone_login_api(payload: LoginPayload):
                 st = current.get("status")
                 
                 if st == "SUCCESS":
-                    return {"status": "success", "message": "Đăng nhập thành công!"}
+                    return {"status": "success", "message": "Đăng nhập thành công!","cookie": current.get("cookie") }
                 elif st == "ERROR_WRONG_PASS":
                     # Trả về lỗi Out ngay lập tức
                     return {"status": "error", "message": current.get("message", "Sai email hoặc mật khẩu.")}
@@ -621,7 +726,12 @@ async def check_phone_approval_api(payload: CheckPhonePayload):
             st = current.get("status")
 
             if st == "SUCCESS":
-                return {"status": "success", "message": "Đăng nhập thành công!"}
+                
+                return {
+                        "status": "success", 
+                        "message": "Đăng nhập thành công!",
+                        "cookie": current.get("cookie")
+                    }
             elif st == "ERROR_WRONG_PASS":
                 # Bắt bồi thêm lỗi sai pass nếu trước đó bị delay
                 return {"status": "error", "message": current.get("message", "Sai email hoặc mật khẩu.")}
@@ -663,7 +773,7 @@ async def submit_auth_otp_api(payload: SubmitOTPPayload):
         for _ in range(15):
             await asyncio.sleep(1)
             if not otp_cache_file.exists():
-                return {"status": "success", "message": "Xác thực thành công!"}
+                return {"status": "success", "message": "Xác thực thành công!","cookie": check.get("cookie")}
             
             try:
                 check = json.loads(otp_cache_file.read_text(encoding="utf-8"))

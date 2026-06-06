@@ -54,7 +54,8 @@ class GroupItemResponse(BaseModel):
     tier: Optional[int] = None
     team: Optional[str] = None
     icp: Optional[str] = None
-    
+    id_intent:Optional[str]=None
+    id_member:Optional[str]=None
     # Các trường khác giữ nguyên
     icp_desc: Optional[str] = None
     members: Optional[int] = None
