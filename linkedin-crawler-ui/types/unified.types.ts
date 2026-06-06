@@ -5,7 +5,7 @@
    These types mirror the Supabase database schema. */
 
 export type FeedPlatform = "facebook" | "linkedin";
-export type CategoryType = "intent" | "industry" | "tier" | "team" | "icp";
+export type CategoryType = "intent" | "industry" | "tier" | "team" | "icp" | "content_type" | "product_seeding";
 export type VerifyStatus = "pending" | "yes" | "no";
 export type UserRole = "member" | "leader" | "admin";
 
@@ -131,8 +131,6 @@ export interface Category {
   code: string;
   name?: string;
   description?: string;
-  leader?: string;
-  geo?: string;
   platform: string;
   created_at?: string;
 }
@@ -179,6 +177,19 @@ export interface FacebookGroup {
   tier_name?: string;
   team_name?: string;
   icp_name?: string;
+  // New fields
+  end_time_24h?: string;
+  start_time_in_day?: number;
+  end_time_in_day?: number;
+  time_crawl?: string;
+  end_date_hour?: string;
+  id_content_type?: string;
+  id_product_seeding?: string;
+  content_type_name?: string;
+  product_seeding_name?: string;
+  note?: string;
+  risk_note?: string;
+  assignee_id?: string;
 }
 
 export interface LinkedInGroup {

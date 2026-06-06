@@ -71,24 +71,7 @@ export function AuthPage() {
       className="min-h-screen flex items-center justify-center relative overflow-hidden"
       style={{ background: "radial-gradient(ellipse at 0% 0%, #C40009 0%, transparent 50%), radial-gradient(ellipse at 50% 0%, #E3000F 0%, transparent 50%), radial-gradient(ellipse at 100% 0%, #FF3344 0%, transparent 50%), radial-gradient(ellipse at 0% 100%, #E3000F 0%, transparent 50%), radial-gradient(ellipse at 100% 100%, #C40009 0%, transparent 50%), radial-gradient(ellipse at 50% 50%, #D4001A 0%, transparent 70%), #C40009" }}
     >
-      <div className="absolute top-6 left-6 flex items-center gap-3">
-        <div className="relative h-10 w-10 overflow-hidden rounded-lg bg-white/10 ring-1 ring-white/20 backdrop-blur-sm">
-          <Image
-            src="https://markeeai.com/logo.svg"
-            alt="MarkeeAI"
-            fill
-            sizes="40px"
-            className="object-contain p-1"
-            priority
-          />
-        </div>
-        <div>
-          <div className="text-base font-black tracking-wide text-white">MarkeeAi Seeding</div>
-          <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-white/70">
-            CrawlerPro
-          </div>
-        </div>
-      </div>
+
 
 
       {/* Animated orbs */}
@@ -177,10 +160,17 @@ export function AuthPage() {
             style={{ background: "linear-gradient(135deg, #C40009 0%, #E3000F 100%)" }}
           >
             <div
-              className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-xl"
+              className="relative w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-xl overflow-hidden"
               style={{ transform: "rotate(3deg)", transition: "transform 0.3s" }}
             >
-              <span className="text-[#E3000F] font-black text-2xl tracking-tight">CP</span>
+              <Image
+                src="https://markeeai.com/logo.svg"
+                alt="MarkeeAI"
+                fill
+                sizes="64px"
+                className="object-contain p-2"
+                priority
+              />
             </div>
             <h1 className="text-white font-semibold text-xl leading-tight tracking-tight">
               {mode === "login" ? "Chào mừng trở lại" : "Tạo tài khoản mới"}

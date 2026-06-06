@@ -7,6 +7,8 @@ import {
   allPlatformGroupsService, 
   allPlatformCategoriesService,
   teamsService,
+  usersService,
+  type AppUserProfile,
   type TeamRow 
 } from "@/services/all-platform.service";
 import type { FacebookGroup, LinkedInGroup, FeedPlatform, Category } from "@/types/unified.types";
@@ -171,6 +173,16 @@ interface FbGroupFormData {
   chay_24h: boolean;
   crawl_time: string;
   crawl_frequency: string;
+  id_content_type: string;
+  id_product_seeding: string;
+  end_time_24h: string;
+  start_time_in_day: string;
+  end_time_in_day: string;
+  time_crawl: string;
+  end_date_hour: string;
+  note: string;
+  risk_note: string;
+  assignee_id: string;
 }
 
 const FB_EMPTY_FORM: FbGroupFormData = {
@@ -188,6 +200,16 @@ const FB_EMPTY_FORM: FbGroupFormData = {
   chay_24h: false,
   crawl_time: "10:00",
   crawl_frequency: "daily",
+  id_content_type: "",
+  id_product_seeding: "",
+  end_time_24h: "",
+  start_time_in_day: "",
+  end_time_in_day: "",
+  time_crawl: "",
+  end_date_hour: "",
+  note: "",
+  risk_note: "",
+  assignee_id: "",
 };
 
 function FacebookGroupForm({
@@ -199,6 +221,9 @@ function FacebookGroupForm({
   teamOptions,
   tierOptions,
   icpOptions,
+  contentTypeOptions,
+  productSeedingOptions,
+  userOptions,
 }: {
   initial?: Partial<FbGroupFormData>;
   onSubmit: (data: Partial<FbGroupFormData>) => Promise<void>;
@@ -208,6 +233,9 @@ function FacebookGroupForm({
   teamOptions: Category[];
   tierOptions: Category[];
   icpOptions: Category[];
+  contentTypeOptions: Category[];
+  productSeedingOptions: Category[];
+  userOptions: Category[];
 }) {
   const [form, setForm] = useState<FbGroupFormData>({ ...FB_EMPTY_FORM, ...initial });
   const [busy, setBusy] = useState(false);
@@ -323,6 +351,36 @@ function FacebookGroupForm({
           />
         </div>
         <div>
+          <SearchableDropdown
+            label="Người phụ trách chính"
+            value={form.assignee_id}
+            onChange={(val) => set("assignee_id", val)}
+            options={userOptions}
+            placeholder="Tìm theo tên/email..."
+            valueField="id"
+          />
+        </div>
+        <div>
+          <SearchableDropdown
+            label="Loại nội dung"
+            value={form.id_content_type}
+            onChange={(val) => set("id_content_type", val)}
+            options={contentTypeOptions}
+            placeholder="Tìm chọn Loại nội dung..."
+            valueField="id"
+          />
+        </div>
+        <div>
+          <SearchableDropdown
+            label="Sản phẩm Seeding"
+            value={form.id_product_seeding}
+            onChange={(val) => set("id_product_seeding", val)}
+            options={productSeedingOptions}
+            placeholder="Tìm chọn SP Seeding..."
+            valueField="id"
+          />
+        </div>
+        <div>
           <label className="text-xs font-bold text-[#666666] block mb-1">Số thành viên</label>
           <input
             className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A]"
@@ -338,6 +396,24 @@ function FacebookGroupForm({
             value={form.posts_per_week}
             onChange={(e) => set("posts_per_week", e.target.value)}
             placeholder="10"
+          />
+        </div>
+        <div className="md:col-span-2">
+          <label className="text-xs font-bold text-[#666666] block mb-1">Ghi chú rủi ro</label>
+          <textarea
+            className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A] resize-y min-h-[60px]"
+            value={form.risk_note}
+            onChange={(e) => set("risk_note", e.target.value)}
+            placeholder="Nhập cảnh báo/rủi ro nếu có..."
+          />
+        </div>
+        <div className="md:col-span-2">
+          <label className="text-xs font-bold text-[#666666] block mb-1">Ghi chú</label>
+          <textarea
+            className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A] resize-y min-h-[80px]"
+            value={form.note}
+            onChange={(e) => set("note", e.target.value)}
+            placeholder="Nhập ghi chú chung..."
           />
         </div>
         <div className="md:col-span-2 p-4 border border-[#E5E5E5] rounded-lg bg-[#F5F5F5]/50 space-y-4">
@@ -372,6 +448,63 @@ function FacebookGroupForm({
                   <option value="daily">Hàng ngày</option>
                   <option value="weekly">Hàng tuần</option>
                 </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-[#666666] block mb-1">Giờ bắt đầu trong ngày (int)</label>
+                <input
+                  type="number"
+                  className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A]"
+                  value={form.start_time_in_day}
+                  onChange={(e) => set("start_time_in_day", e.target.value)}
+                  placeholder="VD: 7"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-[#666666] block mb-1">Giờ kết thúc trong ngày (int)</label>
+                <input
+                  type="number"
+                  className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A]"
+                  value={form.end_time_in_day}
+                  onChange={(e) => set("end_time_in_day", e.target.value)}
+                  placeholder="VD: 16"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-[#666666] block mb-1">Khoảng cách cào</label>
+                <select
+                  className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A] bg-white"
+                  value={form.time_crawl}
+                  onChange={(e) => set("time_crawl", e.target.value)}
+                >
+                  <option value="">-- Chọn khoảng cách --</option>
+                  <option value="30">30p</option>
+                  <option value="60">1 tiếng</option>
+                  <option value="120">2 tiếng</option>
+                  <option value="180">3 tiếng</option>
+                  <option value="240">4 tiếng</option>
+                  <option value="300">5 tiếng</option>
+                  <option value="360">6 tiếng</option>
+                  <option value="480">8 tiếng</option>
+                  <option value="720">12 tiếng</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-[#666666] block mb-1">Ngày kết thúc (khoảng giờ)</label>
+                <input
+                  type="date"
+                  className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A]"
+                  value={form.end_date_hour}
+                  onChange={(e) => set("end_date_hour", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-[#666666] block mb-1">Ngày kết thúc cào 24h</label>
+                <input
+                  type="date"
+                  className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A]"
+                  value={form.end_time_24h}
+                  onChange={(e) => set("end_time_24h", e.target.value)}
+                />
               </div>
             </div>
           )}
@@ -579,8 +712,19 @@ export function GroupManagementContent() {
   const [liGroups, setLiGroups] = useState<LinkedInGroup[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [teamsData, setTeamsData] = useState<TeamRow[]>([]);
+  const [allUsers, setAllUsers] = useState<AppUserProfile[]>([]);
 
-      const teamCategories: Category[] = useMemo(() => {
+  const userOptions: Category[] = useMemo(() => {
+    return allUsers.map(u => ({
+      id: u.id,
+      name: (u as any).full_name || (u as any).name || u.email,
+      code: u.email,
+      category_type: "user",
+      platform: "all"
+    } as unknown as Category));
+  }, [allUsers]);
+
+  const teamCategories: Category[] = useMemo(() => {
     const uniqueTeams: TeamRow[] = [];
     const seen = new Set<string>();
     teamsData.forEach((t) => {
@@ -635,15 +779,19 @@ export function GroupManagementContent() {
 
   const fetchCategories = useCallback(async () => {
     try {
-      const [catRes, teamRes] = await Promise.all([
+      const [catRes, teamRes, userRes] = await Promise.all([
         allPlatformCategoriesService.getAll(),
-        teamsService.getAll()
+        teamsService.getAll(),
+        usersService.getAllProfiles()
       ]);
       if (catRes.success && catRes.data) {
         setCategories(catRes.data);
       }
       if (teamRes.success && teamRes.data) {
         setTeamsData(teamRes.data);
+      }
+      if (userRes.success && userRes.data) {
+        setAllUsers(userRes.data);
       }
     } catch (e) {
       console.error("Lỗi khi tải danh mục:", e);
@@ -654,6 +802,20 @@ export function GroupManagementContent() {
     fetchGroups();
     fetchCategories();
   }, [fetchGroups, fetchCategories]);
+
+  const getUserName = useCallback((id: string | null | undefined) => {
+    if (!id) return "—";
+    const user = allUsers.find(u => String(u.id) === String(id));
+    if (!user) return "—";
+    return (user as any).full_name || (user as any).name || user.email;
+  }, [allUsers]);
+
+  const getTeamName = useCallback((id: string | null | undefined) => {
+    if (!id) return "—";
+    const team = teamsData.find(t => String((t as any).id) === String(id));
+    if (!team) return "—";
+    return team.name_team || "—";
+  }, [teamsData]);
 
   // Mapping helper từ id hoặc code sang name danh mục
   const categoryNameMap = useMemo(() => {
@@ -714,9 +876,14 @@ export function GroupManagementContent() {
     const payload = {
       ...data,
       // ensure numeric fields are sent as numbers where backend expects
-      members: data.members,
-      posts_per_week: data.posts_per_week,
-      health_score: data.health_score,
+      members: data.members ? parseInt(data.members as string) : null,
+      posts_per_week: data.posts_per_week ? parseInt(data.posts_per_week as string) : null,
+      health_score: data.health_score ? parseInt(data.health_score as string) : null,
+      start_time_in_day: data.start_time_in_day ? parseInt(data.start_time_in_day as string) : null,
+      end_time_in_day: data.end_time_in_day ? parseInt(data.end_time_in_day as string) : null,
+      time_crawl: data.time_crawl ? parseInt(data.time_crawl as string) : null,
+      end_time_24h: data.end_time_24h || null,
+      end_date_hour: data.end_date_hour || null,
     };
     if (editingGroup) {
       res = await allPlatformGroupsService.update({ ...payload, id: editingGroup.id }, "facebook");
@@ -946,7 +1113,7 @@ export function GroupManagementContent() {
             className="bg-[#FFFFFF] rounded-2xl border border-[#E5E5E5] shadow-xl overflow-hidden animate-in zoom-in-95 duration-200"
             style={{
               width: "100%",
-              maxWidth: "520px",
+              maxWidth: "680px",
               minWidth: "300px",
               maxHeight: "90vh",
               display: "flex",
@@ -985,6 +1152,9 @@ export function GroupManagementContent() {
                   teamOptions={teamCategories}
                   tierOptions={categories.filter((c) => c.category_type === "tier")}
                   icpOptions={categories.filter((c) => c.category_type === "icp").map(c => ({...c, name: `${c.code} ${c.name ? `(${c.name})` : ""}`.trim()}))}
+                  contentTypeOptions={categories.filter((c) => c.category_type === "content_type")}
+                  productSeedingOptions={categories.filter((c) => c.category_type === "product_seeding")}
+                  userOptions={userOptions}
                   initial={
                     editingGroup
                       ? {
@@ -995,12 +1165,22 @@ export function GroupManagementContent() {
                           id_tier: String((editingGroup as any).id_tier ?? ""),
                           id_team: String((editingGroup as any).id_team ?? ""),
                           id_icp: String((editingGroup as any).id_icp ?? ""),
+                          id_content_type: String((editingGroup as any).id_content_type ?? ""),
+                          id_product_seeding: String((editingGroup as any).id_product_seeding ?? ""),
+                          assignee_id: String((editingGroup as FacebookGroup).assignee_id ?? ""),
+                          note: (editingGroup as FacebookGroup).note || "",
+                          risk_note: (editingGroup as FacebookGroup).risk_note || "",
                           icp_desc: (editingGroup as FacebookGroup).icp_desc || "",
                           members: (editingGroup as FacebookGroup).members !== undefined && (editingGroup as FacebookGroup).members !== null ? String((editingGroup as FacebookGroup).members) : "",
                           posts_per_week: (editingGroup as FacebookGroup).posts_per_week !== undefined && (editingGroup as FacebookGroup).posts_per_week !== null ? String((editingGroup as FacebookGroup).posts_per_week) : "",
                           chay_24h: (editingGroup as FacebookGroup).chay_24h || false,
                           crawl_time: (editingGroup as any).crawl_time ? String((editingGroup as any).crawl_time).substring(0, 5) : "10:00",
                           crawl_frequency: (editingGroup as any).crawl_frequency || "daily",
+                          start_time_in_day: (editingGroup as FacebookGroup).start_time_in_day !== undefined && (editingGroup as FacebookGroup).start_time_in_day !== null ? String((editingGroup as FacebookGroup).start_time_in_day) : "",
+                          end_time_in_day: (editingGroup as FacebookGroup).end_time_in_day !== undefined && (editingGroup as FacebookGroup).end_time_in_day !== null ? String((editingGroup as FacebookGroup).end_time_in_day) : "",
+                          time_crawl: (editingGroup as FacebookGroup).time_crawl || "",
+                          end_time_24h: (editingGroup as FacebookGroup).end_time_24h ? String((editingGroup as FacebookGroup).end_time_24h).substring(0, 10) : "",
+                          end_date_hour: (editingGroup as FacebookGroup).end_date_hour ? String((editingGroup as FacebookGroup).end_date_hour).substring(0, 10) : "",
                         }
                       : undefined
                   }
@@ -1065,16 +1245,16 @@ export function GroupManagementContent() {
                 <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider">
                   Tên nhóm
                 </th>
-                <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[120px]">
-                  URL
+                <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[150px]">
+                  URL nhóm
                 </th>
-                <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[140px]">
-                  Intent
-                </th>
-                <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider">
+                <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[280px]">
                   Phân loại
                 </th>
-                <th className="text-right px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[150px]">
+                <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[150px]">
+                  Người phụ trách
+                </th>
+                <th className="text-right px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[120px]">
                   Hành động
                 </th>
               </tr>
@@ -1082,13 +1262,17 @@ export function GroupManagementContent() {
             <tbody className="divide-y divide-[#E5E5E5]">
               {currentGroups.map((g) => (
                 <tr key={g.id} className="hover:bg-[#F5F5F5]/30 transition">
-                  <td className="px-4 py-3 font-medium text-[#1A1A1A] max-w-[220px] truncate">
-                    {platform === "facebook" ? (
-                      g.group_name || "—"
-                    ) : (
-                      <div>
-                        <div className="font-semibold text-[#1A1A1A]">{g.group_name || "—"}</div>
-                        <div className="text-[10px] text-[#666666] mt-0.5 flex gap-2 items-center">
+                  <td className="px-4 py-3">
+                    <div className="font-bold text-[#1A1A1A] max-w-[200px] truncate" title={g.group_name}>
+                      {g.group_name || "—"}
+                    </div>
+                    {platform === "facebook" && (
+                      <div className="flex items-center gap-2 mt-1 text-[10px] text-[#666666]">
+                        <span title="Số thành viên">👥 {(g as FacebookGroup).members || "?"}</span>
+                      </div>
+                    )}
+                    {platform === "linkedin" && (
+                      <div className="mt-1">
                           <span className={`font-black px-1.5 py-0.5 rounded text-[9px] uppercase ${
                             (g as LinkedInGroup).status === "success"
                               ? "bg-green-100 text-green-700"
@@ -1098,38 +1282,41 @@ export function GroupManagementContent() {
                           }`}>
                             {(g as LinkedInGroup).status || "idle"}
                           </span>
-                        </div>
                       </div>
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <a
-                      href={g.group_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 bg-[#E3000F]/10 text-[#E3000F] hover:bg-[#E3000F]/20 px-2.5 py-1 rounded-lg text-xs font-bold transition border border-[#E3000F]/20 active:scale-95 whitespace-nowrap cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[14px]">open_in_new</span>
-                      Xem nhóm
-                    </a>
+                    <div className="max-w-[150px] truncate">
+                      <a href={g.group_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-xs" title={g.group_url}>
+                        {g.group_url}
+                      </a>
+                    </div>
                   </td>
                   <td className="px-4 py-3">
-                    {g.intent_name ? (
-                      <span className="bg-transparent text-[#E3000F] border-none px-2 py-0.5 rounded text-xs font-bold">
-                        {g.intent_name}
-                      </span>
-                    ) : (
-                      <span className="text-[#666666] text-xs">—</span>
-                    )}
+                    <div className="flex flex-wrap gap-1 max-w-[280px]">
+                      {platform === "facebook" && (g as FacebookGroup).chay_24h && (
+                        <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[10px] font-bold flex items-center gap-0.5" title={`Giờ chạy: ${(g as FacebookGroup).start_time_in_day}h - ${(g as FacebookGroup).end_time_in_day}h\nCách: ${(g as FacebookGroup).time_crawl} phút\nĐến: ${(g as FacebookGroup).end_time_24h ? String((g as FacebookGroup).end_time_24h).substring(0, 10) : ""}`}>
+                          <span className="material-symbols-outlined text-[10px]">bolt</span> 24h Tự động
+                        </span>
+                      )}
+                      {g.intent_name && <span className="px-1.5 py-0.5 bg-[#E3000F]/10 text-[#E3000F] rounded text-[10px] font-bold" title="Intent">{g.intent_name}</span>}
+                      {(g as any).id_team && getTeamName((g as any).id_team) !== "—" && <span className="px-1.5 py-0.5 bg-teal-50 text-teal-700 rounded text-[10px] font-bold" title="Team">{getTeamName((g as any).id_team)}</span>}
+                      {g.industry_name && <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[10px] font-bold" title="Industry">{g.industry_name}</span>}
+                      {(g as any).content_type_name && <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-bold" title="Content Type">{(g as any).content_type_name}</span>}
+                      {(g as any).product_seeding_name && <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-[10px] font-bold" title="Product Seeding">{(g as any).product_seeding_name}</span>}
+                      {(g as any).tier_name && <span className="px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded text-[10px] font-bold" title="Tier">{(g as any).tier_name}</span>}
+                      {g.icp_name && <span className="px-1.5 py-0.5 bg-pink-50 text-pink-700 rounded text-[10px] font-bold" title="ICP">{g.icp_name}</span>}
+                      <button
+                        onClick={() => setViewingGroupClassification(g)}
+                        className="px-1.5 py-0.5 bg-[#F5F5F5] text-[#666666] hover:bg-[#E5E5E5] rounded text-[10px] font-bold transition flex items-center gap-1 cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[10px]">more_horiz</span>
+                        Thêm
+                      </button>
+                    </div>
                   </td>
-                  <td className="px-4 py-3">
-                    <button
-                      onClick={() => setViewingGroupClassification(g)}
-                      className="inline-flex items-center gap-1.5 bg-[#E3000F]/10 text-[#E3000F] hover:bg-[#E3000F]/20 hover:text-[#C40009] px-3 py-1.5 rounded-lg text-xs font-bold transition border border-[#E3000F]/20 shadow-sm active:scale-95 whitespace-nowrap cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[14px] text-[#E3000F]">visibility</span>
-                      Xem phân loại
-                    </button>
+                  <td className="px-4 py-3 text-xs font-medium text-[#1A1A1A]">
+                    {getUserName((g as any).assignee_id)}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
@@ -1217,7 +1404,7 @@ export function GroupManagementContent() {
                 <div>
                   <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Team</span>
                   <span className="inline-flex bg-teal-50 text-teal-700 border border-teal-200 px-2.5 py-0.5 rounded-lg text-xs font-bold">
-                    {(viewingGroupClassification as any).team_name || "—"}
+                    {getTeamName((viewingGroupClassification as any).id_team)}
                   </span>
                 </div>
                 <div>
@@ -1236,6 +1423,18 @@ export function GroupManagementContent() {
                   <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Tier</span>
                   <span className="inline-flex bg-purple-50 text-purple-700 border border-purple-200 px-2.5 py-0.5 rounded-lg text-xs font-bold">
                     {(viewingGroupClassification as any).tier_name || "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Loại nội dung</span>
+                  <span className="inline-flex bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-0.5 rounded-lg text-xs font-bold">
+                    {(viewingGroupClassification as any).content_type_name || "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">SP Seeding</span>
+                  <span className="inline-flex bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-0.5 rounded-lg text-xs font-bold">
+                    {(viewingGroupClassification as any).product_seeding_name || "—"}
                   </span>
                 </div>
                 {platform === "facebook" ? (
@@ -1258,6 +1457,30 @@ export function GroupManagementContent() {
                         <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Tần suất</span>
                         <span className="text-sm font-bold text-[#1A1A1A]">
                           {(viewingGroupClassification as any).crawl_frequency === "weekly" ? "Hàng tuần" : "Hàng ngày"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Khung giờ</span>
+                        <span className="text-sm font-bold text-[#1A1A1A]">
+                          {(viewingGroupClassification as FacebookGroup).start_time_in_day ?? "—"}h - {(viewingGroupClassification as FacebookGroup).end_time_in_day ?? "—"}h
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Khoảng cách cào</span>
+                        <span className="text-sm font-bold text-[#1A1A1A]">
+                          {(viewingGroupClassification as FacebookGroup).time_crawl || "—"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Đến (khoảng giờ)</span>
+                        <span className="text-sm font-bold text-[#1A1A1A]">
+                          {(viewingGroupClassification as FacebookGroup).end_date_hour ? String((viewingGroupClassification as FacebookGroup).end_date_hour).substring(0, 10) : "—"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Đến (24h)</span>
+                        <span className="text-sm font-bold text-[#1A1A1A]">
+                          {(viewingGroupClassification as FacebookGroup).end_time_24h ? String((viewingGroupClassification as FacebookGroup).end_time_24h).substring(0, 10) : "—"}
                         </span>
                       </div>
                     </>

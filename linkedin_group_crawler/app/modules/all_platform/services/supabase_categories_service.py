@@ -43,8 +43,6 @@ def add_category(payload: dict) -> dict:
         "code": payload["code"],
         "name": payload.get("name"),
         "description": payload.get("description"),
-        "leader": payload.get("leader"),
-        "geo": payload.get("geo"),
         "platform": payload.get("platform", "general"),
     }
 

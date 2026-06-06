@@ -11,8 +11,6 @@ class CategoryAddRequest(BaseModel):
     code: str
     name: Optional[str] = None
     description: Optional[str] = None
-    leader: Optional[str] = None
-    geo: Optional[str] = None
     platform: str = "general"
 
 
@@ -22,9 +20,6 @@ class CategoryUpdateRequest(BaseModel):
     code: Optional[str] = None
     name: Optional[str] = None
     description: Optional[str] = None
-    leader: Optional[str] = None
-    geo: Optional[str] = None
-
 
 class CategoryDeleteRequest(BaseModel):
     id: str

@@ -18,14 +18,18 @@ const CATEGORY_TABS: { type: CategoryType; label: string; icon: string }[] = [
   { type: "tier", label: "Tier", icon: "🔥" },
   { type: "team", label: "Team", icon: "👥" },
   { type: "icp", label: "ICP Target", icon: "🎯" },
+  { type: "content_type", label: "Loại nội dung", icon: "📄" },
+  { type: "product_seeding", label: "Sản phẩm Seeding", icon: "📦" },
 ];
 
 const CATEGORY_TYPE_COLS: Record<CategoryType, string[]> = {
   intent: ["code", "name", "platform"],
   industry: ["code", "name", "description"],
   tier: ["code", "name", "description"],
-  icp: ["target", "geo", "platform"],
+  icp: ["code", "name", "platform"],
   team: ["name_team", "leader_email", "number_of_member"],
+  content_type: ["code", "name", "description"],
+  product_seeding: ["code", "name", "description"],
 };
 
 // ── CATEGORY MODAL (Intent, Industry, Tier, ICP) ─────────────────────────────
@@ -33,7 +37,6 @@ function CategoryModal({ isOpen, onClose, onSave, editing, categoryType }: any) 
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [geo, setGeo] = useState("");
   const [platform, setPlatform] = useState("general");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -42,13 +45,11 @@ function CategoryModal({ isOpen, onClose, onSave, editing, categoryType }: any) 
       setCode(editing.code || "");
       setName(editing.name || "");
       setDescription(editing.description || "");
-      setGeo(editing.geo || "");
       setPlatform(editing.platform || "general");
     } else {
       setCode("");
       setName("");
       setDescription("");
-      setGeo("");
       setPlatform("general");
     }
   }, [editing, isOpen]);
@@ -65,7 +66,6 @@ function CategoryModal({ isOpen, onClose, onSave, editing, categoryType }: any) 
         code: code.trim(),
         name: name.trim() || undefined,
         description: description.trim() || undefined,
-        geo: geo.trim() || undefined,
         platform,
       });
       onClose();
@@ -115,18 +115,7 @@ function CategoryModal({ isOpen, onClose, onSave, editing, categoryType }: any) 
               />
             </div>
           )}
-          {categoryType === "icp" && (
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-[#A0A0A0]">Geo</label>
-              <input
-                type="text"
-                value={geo}
-                onChange={(e) => setGeo(e.target.value)}
-                placeholder="Ví dụ: Vietnam, Global..."
-                className="w-full rounded-lg border border-[#333333] px-3 py-2 text-sm focus:border-[#E3000F] focus:outline-none"
-              />
-            </div>
-          )}
+
           <div>
             <label className="mb-1 block text-xs font-semibold text-[#A0A0A0]">Platform</label>
             <select
