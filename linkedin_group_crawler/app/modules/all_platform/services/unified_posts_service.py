@@ -35,6 +35,8 @@ def _fetch_posts(
     team: Optional[str] = None,
     tier: Optional[str] = None,
     icp: Optional[str] = None,
+    content_type: Optional[str] = None,
+    product_seeding: Optional[str] = None,
     search: Optional[str] = None,
     sort: str = "latest",
     page: int = 1,
@@ -55,9 +57,9 @@ def _fetch_posts(
 
     # Select nested group to get group_name and taxonomy UUIDs
     if table == "facebook_posts":
-        query = tbl.select("*, facebook_groups(group_name, id_intent, id_industry, id_team, id_tier, id_icp)", count="exact")
+        query = tbl.select("*, facebook_groups(group_name, id_intent, id_industry, id_team, id_tier, id_icp, id_content_type, id_product_seeding)", count="exact")
     else:
-        query = tbl.select("*, linkedin_groups(group_name, id_intent, id_industry, id_team, id_tier, id_icp)", count="exact")
+        query = tbl.select("*, linkedin_groups(group_name, id_intent, id_industry, id_team, id_tier, id_icp, id_content_type, id_product_seeding)", count="exact")
 
     # Scope to requesting user
     if email:
@@ -86,7 +88,7 @@ def _fetch_posts(
             else:
                 query = query.eq("id_member", "00000000-0000-0000-0000-000000000000")
                 
-        if intent or industry or team or tier is not None or icp:
+        if intent or industry or team or tier is not None or icp or content_type or product_seeding:
             gq = sb.table("facebook_groups").select("id")
             if intent:
                 gq = gq.eq("id_intent", intent)
@@ -98,6 +100,10 @@ def _fetch_posts(
                 gq = gq.eq("id_tier", str(tier))
             if icp:
                 gq = gq.eq("id_icp", icp)
+            if content_type:
+                gq = gq.eq("id_content_type", content_type)
+            if product_seeding:
+                gq = gq.eq("id_product_seeding", product_seeding)
             gres = gq.execute()
             group_ids = [r.get("id") for r in (gres.data or []) if r.get("id")]
             query = query.in_("group_id", group_ids or ["00000000-0000-0000-0000-000000000000"])
@@ -129,6 +135,12 @@ def _fetch_posts(
             needs_group_filter = True
         if icp:
             gq = gq.eq("id_icp", icp)
+            needs_group_filter = True
+        if content_type:
+            gq = gq.eq("id_content_type", content_type)
+            needs_group_filter = True
+        if product_seeding:
+            gq = gq.eq("id_product_seeding", product_seeding)
             needs_group_filter = True
             
         if needs_group_filter:
@@ -173,6 +185,8 @@ def _fetch_posts(
         if grp.get("id_industry"): cat_ids.add(grp["id_industry"])
         if grp.get("id_icp"): cat_ids.add(grp["id_icp"])
         if grp.get("id_tier"): cat_ids.add(grp["id_tier"])
+        if grp.get("id_content_type"): cat_ids.add(grp["id_content_type"])
+        if grp.get("id_product_seeding"): cat_ids.add(grp["id_product_seeding"])
         if grp.get("id_team"): team_ids.add(grp["id_team"])
 
     # Resolve names
@@ -196,6 +210,8 @@ def _fetch_posts(
             if grp.get("id_industry"): p["industry"] = cat_map.get(grp["id_industry"])
             if grp.get("id_icp"): p["icp"] = cat_map.get(grp["id_icp"])
             if grp.get("id_tier"): p["tier"] = cat_map.get(grp["id_tier"])
+            if grp.get("id_content_type"): p["content_type"] = cat_map.get(grp["id_content_type"])
+            if grp.get("id_product_seeding"): p["product_seeding"] = cat_map.get(grp["id_product_seeding"])
             if grp.get("id_team"): p["team"] = team_map.get(grp["id_team"])
 
     return posts, total
@@ -372,6 +388,8 @@ def get_unified_posts(
     team: Optional[str] = None,
     tier: Optional[str] = None,
     icp: Optional[str] = None,
+    content_type: Optional[str] = None,
+    product_seeding: Optional[str] = None,
     search: Optional[str] = None,
     sort: str = "latest",
     page: int = 1,
@@ -413,6 +431,8 @@ def get_unified_posts(
                 team=team,
                 tier=tier,
                 icp=icp,
+                content_type=content_type,
+                product_seeding=product_seeding,
                 search=search,
                 sort=db_sort,
                 page=1,
@@ -458,6 +478,8 @@ def get_unified_posts(
             team=team,
             tier=tier,
             icp=icp,
+            content_type=content_type,
+            product_seeding=product_seeding,
             search=search,
             sort=db_sort,
             page=page,
@@ -521,6 +543,8 @@ def filter_unified_posts(
     team: Optional[str] = None,
     tier: Optional[str] = None,
     icp: Optional[str] = None,
+    content_type: Optional[str] = None,
+    product_seeding: Optional[str] = None,
     search: Optional[str] = None,
     sort: str = "latest",
     page: int = 1,
@@ -538,6 +562,8 @@ def filter_unified_posts(
         team=team,
         tier=tier,
         icp=icp,
+        content_type=content_type,
+        product_seeding=product_seeding,
         search=search,
         sort=sort,
         page=page,

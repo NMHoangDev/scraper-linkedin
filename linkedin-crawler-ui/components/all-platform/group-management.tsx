@@ -183,6 +183,7 @@ interface FbGroupFormData {
   note: string;
   risk_note: string;
   assignee_id: string;
+  co_assignee_id: string;
 }
 
 const FB_EMPTY_FORM: FbGroupFormData = {
@@ -210,6 +211,7 @@ const FB_EMPTY_FORM: FbGroupFormData = {
   note: "",
   risk_note: "",
   assignee_id: "",
+  co_assignee_id: "",
 };
 
 function FacebookGroupForm({
@@ -249,7 +251,7 @@ function FacebookGroupForm({
 
     // Validate that intent, industry, team, tier and icp are chosen from options (if selected)
     if (form.id_intent && !intentOptions.some((o) => String(o.id) === form.id_intent)) {
-      alert("Vui lòng chọn Intent hợp lệ từ danh mục!");
+      alert("Vui lòng chọn Lĩnh vực hợp lệ từ danh mục!");
       return;
     }
     if (form.id_industry && !industryOptions.some((o) => String(o.id) === form.id_industry)) {
@@ -302,11 +304,11 @@ function FacebookGroupForm({
         </div>
         <div>
           <SearchableDropdown
-            label="Intent"
+            label="Lĩnh vực"
             value={form.id_intent}
             onChange={(val) => set("id_intent", val)}
             options={intentOptions}
-            placeholder="Tìm chọn Intent..."
+            placeholder="Tìm chọn Lĩnh vực..."
             valueField="id"
           />
         </div>
@@ -355,6 +357,16 @@ function FacebookGroupForm({
             label="Người phụ trách chính"
             value={form.assignee_id}
             onChange={(val) => set("assignee_id", val)}
+            options={userOptions}
+            placeholder="Tìm theo tên/email..."
+            valueField="id"
+          />
+        </div>
+        <div>
+          <SearchableDropdown
+            label="Đồng phụ trách"
+            value={form.co_assignee_id}
+            onChange={(val) => set("co_assignee_id", val)}
             options={userOptions}
             placeholder="Tìm theo tên/email..."
             valueField="id"
@@ -540,6 +552,10 @@ interface LiGroupFormData {
   id_tier: string;
   id_team: string;
   id_icp: string;
+  note: string;
+  risk_note: string;
+  assignee_id: string;
+  co_assignee_id: string;
 }
 
 const LI_EMPTY_FORM: LiGroupFormData = {
@@ -551,6 +567,10 @@ const LI_EMPTY_FORM: LiGroupFormData = {
   id_tier: "",
   id_team: "",
   id_icp: "",
+  note: "",
+  risk_note: "",
+  assignee_id: "",
+  co_assignee_id: "",
 };
 
 function LinkedInGroupForm({
@@ -562,6 +582,7 @@ function LinkedInGroupForm({
   teamOptions,
   tierOptions,
   icpOptions,
+  userOptions,
 }: {
   initial?: Partial<LiGroupFormData>;
   onSubmit: (data: Partial<LiGroupFormData>) => Promise<void>;
@@ -571,6 +592,7 @@ function LinkedInGroupForm({
   teamOptions: Category[];
   tierOptions: Category[];
   icpOptions: Category[];
+  userOptions: Category[];
 }) {
   const [form, setForm] = useState<LiGroupFormData>({ ...LI_EMPTY_FORM, ...initial });
   const [busy, setBusy] = useState(false);
@@ -583,7 +605,7 @@ function LinkedInGroupForm({
     if (!form.group_url.trim()) return;
 
     if (form.id_intent && !intentOptions.some((o) => String(o.id) === form.id_intent)) {
-      alert("Vui lòng chọn Intent hợp lệ từ danh mục!");
+      alert("Vui lòng chọn Lĩnh vực hợp lệ từ danh mục!");
       return;
     }
     if (form.id_industry && !industryOptions.some((o) => String(o.id) === form.id_industry)) {
@@ -636,11 +658,11 @@ function LinkedInGroupForm({
 
         <div>
           <SearchableDropdown
-            label="Intent"
+            label="Lĩnh vực"
             value={form.id_intent}
             onChange={(val) => set("id_intent", val)}
             options={intentOptions}
-            placeholder="Tìm chọn Intent..."
+            placeholder="Tìm chọn Lĩnh vực..."
             valueField="id"
           />
         </div>
@@ -682,6 +704,44 @@ function LinkedInGroupForm({
             options={icpOptions}
             placeholder="Tìm chọn ICP Target..."
             valueField="id"
+          />
+        </div>
+        <div>
+          <SearchableDropdown
+            label="Người phụ trách chính"
+            value={form.assignee_id}
+            onChange={(val) => set("assignee_id", val)}
+            options={userOptions}
+            placeholder="Tìm theo tên/email..."
+            valueField="id"
+          />
+        </div>
+        <div>
+          <SearchableDropdown
+            label="Đồng phụ trách"
+            value={form.co_assignee_id}
+            onChange={(val) => set("co_assignee_id", val)}
+            options={userOptions}
+            placeholder="Tìm theo tên/email..."
+            valueField="id"
+          />
+        </div>
+        <div className="md:col-span-2">
+          <label className="text-xs font-bold text-[#666666] block mb-1">Ghi chú rủi ro</label>
+          <textarea
+            className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A] resize-y min-h-[60px]"
+            value={form.risk_note}
+            onChange={(e) => set("risk_note", e.target.value)}
+            placeholder="Nhập cảnh báo/rủi ro nếu có..."
+          />
+        </div>
+        <div className="md:col-span-2">
+          <label className="text-xs font-bold text-[#666666] block mb-1">Ghi chú</label>
+          <textarea
+            className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A] resize-y min-h-[80px]"
+            value={form.note}
+            onChange={(e) => set("note", e.target.value)}
+            placeholder="Nhập ghi chú chung..."
           />
         </div>
       </div>
@@ -760,6 +820,10 @@ export function GroupManagementContent() {
   const [teamFilter, setTeamFilter] = useState("all");
   const [tierFilter, setTierFilter] = useState("all");
   const [icpFilter, setIcpFilter] = useState("all");
+  const [contentTypeFilter, setContentTypeFilter] = useState("all");
+  const [productSeedingFilter, setProductSeedingFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
   const fetchGroups = useCallback(async () => {
     setLoading(true);
@@ -846,7 +910,9 @@ export function GroupManagementContent() {
       (industryFilter === "all" || String((g as any).id_industry ?? "") === industryFilter) &&
       (teamFilter === "all" || String((g as any).id_team ?? "") === teamFilter) &&
       (tierFilter === "all" || String((g as any).id_tier ?? "") === tierFilter) &&
-      (icpFilter === "all" || String((g as any).id_icp ?? "") === icpFilter)
+      (icpFilter === "all" || String((g as any).id_icp ?? "") === icpFilter) &&
+      (contentTypeFilter === "all" || String((g as any).id_content_type ?? "") === contentTypeFilter) &&
+      (productSeedingFilter === "all" || String((g as any).id_product_seeding ?? "") === productSeedingFilter)
   );
 
   const filteredLi = liGroups.filter(
@@ -858,7 +924,9 @@ export function GroupManagementContent() {
       (industryFilter === "all" || String((g as any).id_industry ?? "") === industryFilter) &&
       (teamFilter === "all" || String((g as any).id_team ?? "") === teamFilter) &&
       (tierFilter === "all" || String((g as any).id_tier ?? "") === tierFilter) &&
-      (icpFilter === "all" || String((g as any).id_icp ?? "") === icpFilter)
+      (icpFilter === "all" || String((g as any).id_icp ?? "") === icpFilter) &&
+      (contentTypeFilter === "all" || String((g as any).id_content_type ?? "") === contentTypeFilter) &&
+      (productSeedingFilter === "all" || String((g as any).id_product_seeding ?? "") === productSeedingFilter)
   );
 
   const handleDeleteGroup = async (id: string) => {
@@ -918,6 +986,14 @@ export function GroupManagementContent() {
   };
 
   const currentGroups = platform === "facebook" ? filteredFb : filteredLi;
+  const totalItems = currentGroups.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const paginatedGroups = currentGroups.slice((page - 1) * pageSize, page * pageSize);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [platform, search, intentFilter, industryFilter, teamFilter, tierFilter, icpFilter, contentTypeFilter, productSeedingFilter]);
 
   return (
     <div className="space-y-4">
@@ -955,6 +1031,8 @@ export function GroupManagementContent() {
               setTeamFilter("all");
               setTierFilter("all");
               setIcpFilter("all");
+              setContentTypeFilter("all");
+              setProductSeedingFilter("all");
             }}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition cursor-pointer ${
               platform === key
@@ -1009,7 +1087,7 @@ export function GroupManagementContent() {
           onChange={(e) => setIntentFilter(e.target.value)}
           className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
         >
-          <option value="all">Tất cả Intent</option>
+          <option value="all">Tất cả Lĩnh vực</option>
           {categories.filter(c => c.category_type === 'intent').map((opt) => (
             <option key={opt.id} value={String(opt.id)}>{opt.name || opt.code}</option>
           ))}
@@ -1063,12 +1141,40 @@ export function GroupManagementContent() {
           ))}
         </select>
 
+        <select
+          value={contentTypeFilter}
+          onChange={(e) => setContentTypeFilter(e.target.value)}
+          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
+        >
+          <option value="all">Tất cả Loại nội dung</option>
+          {categories.filter(c => c.category_type === 'content_type').map((opt) => (
+            <option key={opt.id} value={String(opt.id)}>
+              {opt.name || opt.code}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={productSeedingFilter}
+          onChange={(e) => setProductSeedingFilter(e.target.value)}
+          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
+        >
+          <option value="all">Tất cả SP Seeding</option>
+          {categories.filter(c => c.category_type === 'product_seeding').map((opt) => (
+            <option key={opt.id} value={String(opt.id)}>
+              {opt.name || opt.code}
+            </option>
+          ))}
+        </select>
+
         {(search !== "" ||
           intentFilter !== "all" ||
           industryFilter !== "all" ||
           teamFilter !== "all" ||
           tierFilter !== "all" ||
-          icpFilter !== "all") && (
+          icpFilter !== "all" ||
+          contentTypeFilter !== "all" ||
+          productSeedingFilter !== "all") && (
             <button
               type="button"
               onClick={() => {
@@ -1078,6 +1184,8 @@ export function GroupManagementContent() {
                 setTeamFilter("all");
                 setTierFilter("all");
                 setIcpFilter("all");
+                setContentTypeFilter("all");
+                setProductSeedingFilter("all");
               }}
               className="border border-[#FF3344]/20 hover:border-[#FF3344]/30 bg-[#FF3344]/5 hover:bg-[#FF3344]/10 hover:text-[#C40009] text-[#FF3344] flex items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold transition cursor-pointer shadow-sm active:scale-95"
               title="Xóa tất cả bộ lọc"
@@ -1168,6 +1276,7 @@ export function GroupManagementContent() {
                           id_content_type: String((editingGroup as any).id_content_type ?? ""),
                           id_product_seeding: String((editingGroup as any).id_product_seeding ?? ""),
                           assignee_id: String((editingGroup as FacebookGroup).assignee_id ?? ""),
+                          co_assignee_id: String((editingGroup as FacebookGroup).co_assignee_id ?? ""),
                           note: (editingGroup as FacebookGroup).note || "",
                           risk_note: (editingGroup as FacebookGroup).risk_note || "",
                           icp_desc: (editingGroup as FacebookGroup).icp_desc || "",
@@ -1208,9 +1317,14 @@ export function GroupManagementContent() {
                           id_tier: String((editingGroup as any).id_tier ?? ""),
                           id_team: String((editingGroup as any).id_team ?? ""),
                           id_icp: String((editingGroup as any).id_icp ?? ""),
+                          assignee_id: String((editingGroup as LinkedInGroup).assignee_id ?? ""),
+                          co_assignee_id: String((editingGroup as LinkedInGroup).co_assignee_id ?? ""),
+                          note: (editingGroup as LinkedInGroup).note || "",
+                          risk_note: (editingGroup as LinkedInGroup).risk_note || "",
                         }
                       : undefined
                   }
+                  userOptions={userOptions}
                   onSubmit={handleLiSubmit}
                   onCancel={() => {
                     setShowAddForm(false);
@@ -1245,14 +1359,14 @@ export function GroupManagementContent() {
                 <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider">
                   Tên nhóm
                 </th>
-                <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[150px]">
-                  URL nhóm
-                </th>
                 <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[280px]">
                   Phân loại
                 </th>
                 <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[150px]">
                   Người phụ trách
+                </th>
+                <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[150px]">
+                  Đồng phụ trách
                 </th>
                 <th className="text-right px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[120px]">
                   Hành động
@@ -1260,15 +1374,21 @@ export function GroupManagementContent() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E5E5E5]">
-              {currentGroups.map((g) => (
+              {paginatedGroups.map((g) => (
                 <tr key={g.id} className="hover:bg-[#F5F5F5]/30 transition">
                   <td className="px-4 py-3">
-                    <div className="font-bold text-[#1A1A1A] max-w-[200px] truncate" title={g.group_name}>
+                    <a 
+                      href={g.group_url} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="font-bold text-[#1A1A1A] hover:text-[#E3000F] hover:underline transition block leading-snug"
+                      title={g.group_name}
+                    >
                       {g.group_name || "—"}
-                    </div>
+                    </a>
                     {platform === "facebook" && (
-                      <div className="flex items-center gap-2 mt-1 text-[10px] text-[#666666]">
-                        <span title="Số thành viên">👥 {(g as FacebookGroup).members || "?"}</span>
+                      <div className="mt-1.5 text-xs text-[#666666]">
+                        Thành viên: <span className="font-semibold text-[#1A1A1A]">{Number((g as FacebookGroup).members) > 0 ? Number((g as FacebookGroup).members).toLocaleString("vi-VN") : "?"}</span> thành viên
                       </div>
                     )}
                     {platform === "linkedin" && (
@@ -1286,20 +1406,13 @@ export function GroupManagementContent() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="max-w-[150px] truncate">
-                      <a href={g.group_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-xs" title={g.group_url}>
-                        {g.group_url}
-                      </a>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1 max-w-[280px]">
                       {platform === "facebook" && (g as FacebookGroup).chay_24h && (
                         <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[10px] font-bold flex items-center gap-0.5" title={`Giờ chạy: ${(g as FacebookGroup).start_time_in_day}h - ${(g as FacebookGroup).end_time_in_day}h\nCách: ${(g as FacebookGroup).time_crawl} phút\nĐến: ${(g as FacebookGroup).end_time_24h ? String((g as FacebookGroup).end_time_24h).substring(0, 10) : ""}`}>
                           <span className="material-symbols-outlined text-[10px]">bolt</span> 24h Tự động
                         </span>
                       )}
-                      {g.intent_name && <span className="px-1.5 py-0.5 bg-[#E3000F]/10 text-[#E3000F] rounded text-[10px] font-bold" title="Intent">{g.intent_name}</span>}
+                      {g.intent_name && <span className="px-1.5 py-0.5 bg-[#E3000F]/10 text-[#E3000F] rounded text-[10px] font-bold" title="Lĩnh vực">{g.intent_name}</span>}
                       {(g as any).id_team && getTeamName((g as any).id_team) !== "—" && <span className="px-1.5 py-0.5 bg-teal-50 text-teal-700 rounded text-[10px] font-bold" title="Team">{getTeamName((g as any).id_team)}</span>}
                       {g.industry_name && <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[10px] font-bold" title="Industry">{g.industry_name}</span>}
                       {(g as any).content_type_name && <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-bold" title="Content Type">{(g as any).content_type_name}</span>}
@@ -1317,6 +1430,9 @@ export function GroupManagementContent() {
                   </td>
                   <td className="px-4 py-3 text-xs font-medium text-[#1A1A1A]">
                     {getUserName((g as any).assignee_id)}
+                  </td>
+                  <td className="px-4 py-3 text-xs font-medium text-[#1A1A1A]">
+                    {getUserName((g as any).co_assignee_id)}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
@@ -1339,6 +1455,33 @@ export function GroupManagementContent() {
               ))}
             </tbody>
           </table>
+          
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-[#E5E5E5] bg-white rounded-b-xl">
+              <div className="text-sm text-[#666666]">
+                Hiển thị <span className="font-bold text-[#1A1A1A]">{(page - 1) * pageSize + 1}</span> đến <span className="font-bold text-[#1A1A1A]">{Math.min(page * pageSize, totalItems)}</span> trong số <span className="font-bold text-[#1A1A1A]">{totalItems}</span> nhóm
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="px-3 py-1 border border-[#E5E5E5] rounded-lg text-sm font-bold text-[#666666] hover:bg-[#F5F5F5] disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer"
+                >
+                  Trước
+                </button>
+                <div className="px-3 py-1 text-sm font-bold text-[#1A1A1A] bg-[#F5F5F5] rounded-lg border border-[#E5E5E5]">
+                  {page} / {totalPages}
+                </div>
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="px-3 py-1 border border-[#E5E5E5] rounded-lg text-sm font-bold text-[#666666] hover:bg-[#F5F5F5] disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer"
+                >
+                  Sau
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1397,7 +1540,7 @@ export function GroupManagementContent() {
               </div>
               <div className="grid grid-cols-2 gap-4 border-t border-[#E5E5E5] pt-4">
                 <div>
-                  <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Intent</span>
+                  <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Lĩnh vực</span>
                   <span className="inline-flex bg-[#E3000F]/10 text-[#E3000F] border border-[#E3000F]/20 px-2.5 py-0.5 rounded-lg text-xs font-bold">
                     {(viewingGroupClassification as any).intent_name || "—"}
                   </span>

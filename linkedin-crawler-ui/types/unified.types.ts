@@ -34,6 +34,8 @@ export interface UnifiedPost {
   team?: string;
   tier?: number;
   icp?: string;
+  content_type?: string;
+  product_seeding?: string;
   created_at?: string;
   seeding_content?: string;
   seeding_name?: string;
@@ -190,6 +192,7 @@ export interface FacebookGroup {
   note?: string;
   risk_note?: string;
   assignee_id?: string;
+  co_assignee_id?: string;
 }
 
 export interface LinkedInGroup {
@@ -217,6 +220,10 @@ export interface LinkedInGroup {
   tier_name?: string;
   team_name?: string;
   icp_name?: string;
+  note?: string;
+  risk_note?: string;
+  assignee_id?: string;
+  co_assignee_id?: string;
 }
 
 // ── Crawl Sessions ─────────────────────────────────────────────────────────────

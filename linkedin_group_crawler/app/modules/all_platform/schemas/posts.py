@@ -50,6 +50,8 @@ class UnifiedFilterRequest(BaseModel):
     team: Optional[str] = None
     tier: Optional[str] = None
     icp: Optional[str] = None
+    content_type: Optional[str] = None
+    product_seeding: Optional[str] = None
     search: Optional[str] = None
     sort: str = "latest"
     page: int = 1

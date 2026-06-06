@@ -176,7 +176,7 @@ interface CategoryMeta {
 const CATEGORIES_METADATA: CategoryMeta[] = [
   {
     key: "intent",
-    label: "Loại nhóm (Intent)",
+    label: "Lĩnh vực",
     emoji: "🏷️",
     description: "Mục đích cào dữ liệu của nhóm (Facebook synced với Google Sheet Intents, LinkedIn forward qua n8n).",
     placeholderValue: "Vd: KOL_INFLUENCER",
@@ -234,6 +234,30 @@ const CATEGORIES_METADATA: CategoryMeta[] = [
     valueLabel: "Đối tượng (target)",
     nameLabel: "Khu vực (geo)",
   },
+  {
+    key: "content_type",
+    label: "Loại nội dung",
+    emoji: "📄",
+    description: "Phân loại nội dung thường xuyên đăng tải (vd: Bài viết, Video).",
+    placeholderValue: "Vd: VIDEO",
+    placeholderName: "Vd: Video Ngắn",
+    valueKey: "code",
+    nameKey: "name",
+    valueLabel: "Mã loại (code)",
+    nameLabel: "Tên hiển thị (name)",
+  },
+  {
+    key: "product_seeding",
+    label: "Sản phẩm Seeding",
+    emoji: "📦",
+    description: "Sản phẩm hoặc dịch vụ dùng để seeding trong nhóm.",
+    placeholderValue: "Vd: CRM",
+    placeholderName: "Vd: Phần mềm CRM",
+    valueKey: "code",
+    nameKey: "name",
+    valueLabel: "Mã sản phẩm (code)",
+    nameLabel: "Tên sản phẩm (name)",
+  },
 ];
 
 export function CategoryManagementContent() {
@@ -248,6 +272,8 @@ export function CategoryManagementContent() {
     tier: [],
     team: [],
     icp: [],
+    content_type: [],
+    product_seeding: [],
   });
 
   const [selectedTab, setSelectedTab] = useState<CategoryType>("intent");
@@ -301,6 +327,8 @@ export function CategoryManagementContent() {
         tier: [],
         team: [],
         icp: [],
+        content_type: [],
+        product_seeding: [],
       };
 
       list.forEach((item) => {

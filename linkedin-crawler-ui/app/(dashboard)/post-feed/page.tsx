@@ -323,6 +323,8 @@ export default function PostFeedPage() {
   const [industryFilter, setIndustryFilter] = useState("");
   const [teamFilter, setTeamFilter] = useState("");
   const [tierFilter, setTierFilter] = useState("");
+  const [contentTypeFilter, setContentTypeFilter] = useState("");
+  const [productSeedingFilter, setProductSeedingFilter] = useState("");
 
   const [posts, setPosts] = useState<UnifiedPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -330,6 +332,8 @@ export default function PostFeedPage() {
   const [intents, setIntents] = useState<CategoryItem[]>([]);
   const [industries, setIndustries] = useState<CategoryItem[]>([]);
   const [teams, setTeams] = useState<CategoryItem[]>([]);
+  const [contentTypes, setContentTypes] = useState<CategoryItem[]>([]);
+  const [productSeedings, setProductSeedings] = useState<CategoryItem[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const pageSize = 10;
@@ -364,10 +368,12 @@ export default function PostFeedPage() {
   // Load categories
   const loadCategories = useCallback(async () => {
     try {
-      const [ir, indr, teamRes] = await Promise.all([
+      const [ir, indr, teamRes, ctRes, psRes] = await Promise.all([
         allPlatformCategoriesService.getAll("intent"),
         allPlatformCategoriesService.getAll("industry"),
-        teamsService.getAll()
+        teamsService.getAll(),
+        allPlatformCategoriesService.getAll("content_type"),
+        allPlatformCategoriesService.getAll("product_seeding")
       ]);
       if (ir.success && ir.data) {
         setIntents(
@@ -388,13 +394,29 @@ export default function PostFeedPage() {
         );
       }
       if (teamRes.success && teamRes.data) {
-        const uniqueNames = Array.from(new Set((teamRes.data as any[]).map(t => t.name_team)))
-          .filter(name => name && name.toLowerCase() !== "tất cả team" && name.toLowerCase() !== "all");
         setTeams(
-          uniqueNames.map((name: string) => ({
-            id: name,
+          (teamRes.data as any[]).map((t: any) => ({
+            id: t.id,
             category_type: "team",
-            category_name: name,
+            category_name: t.name_team,
+          }))
+        );
+      }
+      if (ctRes.success && ctRes.data) {
+        setContentTypes(
+          ctRes.data.map((c: any) => ({
+            id: c.id,
+            category_type: c.category_type,
+            category_name: c.name || c.code || "",
+          }))
+        );
+      }
+      if (psRes.success && psRes.data) {
+        setProductSeedings(
+          psRes.data.map((c: any) => ({
+            id: c.id,
+            category_type: c.category_type,
+            category_name: c.name || c.code || "",
           }))
         );
       }
@@ -423,6 +445,8 @@ export default function PostFeedPage() {
         industry: industryFilter || undefined,
         team: teamFilter || undefined,
         tier: tierFilter || undefined,
+        content_type: contentTypeFilter || undefined,
+        product_seeding: productSeedingFilter || undefined,
         sort,
         page,
         page_size: pageSize,
@@ -434,14 +458,14 @@ export default function PostFeedPage() {
     } catch { /* ignore */ } finally {
       setLoading(false);
     }
-  }, [user?.email, platformForApi, search, intentFilter, industryFilter, teamFilter, tierFilter, sort, page]);
+  }, [user?.email, platformForApi, search, intentFilter, industryFilter, teamFilter, tierFilter, contentTypeFilter, productSeedingFilter, sort, page]);
 
   useEffect(() => { void loadCategories(); }, [loadCategories]);
   useEffect(() => { void loadStats(); }, [loadStats]);
   useEffect(() => { void loadPosts(); }, [loadPosts]);
 
   // Reset page on filter change
-  useEffect(() => { setPage(1); }, [activeTab, search, intentFilter, industryFilter, teamFilter, tierFilter, sort]);
+  useEffect(() => { setPage(1); }, [activeTab, search, intentFilter, industryFilter, teamFilter, tierFilter, contentTypeFilter, productSeedingFilter, sort]);
 
   const totalPages = Math.ceil(total / pageSize);
   const displayFrom = Math.min((page - 1) * pageSize + 1, total);
@@ -578,9 +602,9 @@ export default function PostFeedPage() {
               value={intentFilter}
               onChange={(e) => setIntentFilter(e.target.value)}
             >
-              <option value="">Tất cả Intent</option>
+              <option value="">Tất cả Lĩnh vực</option>
               {intents.map((i) => (
-                <option key={i.id} value={i.category_name}>{i.category_name}</option>
+                <option key={i.id} value={i.id}>{i.category_name}</option>
               ))}
             </select>
           </div>
@@ -597,7 +621,7 @@ export default function PostFeedPage() {
             >
               <option value="">Tất cả Ngành</option>
               {industries.map((i) => (
-                <option key={i.id} value={i.category_name}>{i.category_name}</option>
+                <option key={i.id} value={i.id}>{i.category_name}</option>
               ))}
             </select>
           </div>
@@ -614,7 +638,7 @@ export default function PostFeedPage() {
             >
               <option value="">Tất cả Team</option>
               {teams.map((t) => (
-                <option key={t.id} value={t.category_name}>{t.category_name}</option>
+                <option key={t.id} value={t.id}>{t.category_name}</option>
               ))}
             </select>
           </div>
@@ -632,6 +656,40 @@ export default function PostFeedPage() {
               <option value="">Tất cả Tier</option>
               {[0, 1, 2, 3, 4].map((t) => (
                 <option key={t} value={t.toString()}>Tier {t}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Content Type */}
+          <div className="md:col-span-3">
+            <select
+              className={cn(
+                "w-full bg-slate-50 border border-slate-200/80 rounded-xl py-2 px-3 text-sm focus:ring-2 focus:outline-none text-slate-600 cursor-pointer transition-all",
+                brandFocusClass
+              )}
+              value={contentTypeFilter}
+              onChange={(e) => setContentTypeFilter(e.target.value)}
+            >
+              <option value="">Loại nội dung</option>
+              {contentTypes.map((c) => (
+                <option key={c.id} value={c.id}>{c.category_name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Product Seeding */}
+          <div className="md:col-span-3">
+            <select
+              className={cn(
+                "w-full bg-slate-50 border border-slate-200/80 rounded-xl py-2 px-3 text-sm focus:ring-2 focus:outline-none text-slate-600 cursor-pointer transition-all",
+                brandFocusClass
+              )}
+              value={productSeedingFilter}
+              onChange={(e) => setProductSeedingFilter(e.target.value)}
+            >
+              <option value="">Sản phẩm Seeding</option>
+              {productSeedings.map((c) => (
+                <option key={c.id} value={c.id}>{c.category_name}</option>
               ))}
             </select>
           </div>
@@ -675,20 +733,24 @@ export default function PostFeedPage() {
               <span className="material-symbols-outlined text-[16px]">analytics</span>
               Tính KPI
             </button>
-            <button 
-              onClick={() => {
-                setSearch("");
-                setIntentFilter("");
-                setIndustryFilter("");
-                setTeamFilter("");
-                setTierFilter("");
-                setSort("newest");
-              }}
-              className="text-slate-500 hover:text-red-500 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all hover:bg-red-50 cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[16px]">backspace</span>
-              Xóa lọc
-            </button>
+            {(intentFilter || industryFilter || teamFilter || tierFilter || search || contentTypeFilter || productSeedingFilter) && (
+              <button
+                onClick={() => {
+                  setSearch("");
+                  setIntentFilter("");
+                  setIndustryFilter("");
+                  setTeamFilter("");
+                  setTierFilter("");
+                  setContentTypeFilter("");
+                  setProductSeedingFilter("");
+                  setSort("newest");
+                }}
+                className="text-slate-500 hover:text-red-500 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all hover:bg-red-50 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">backspace</span>
+                Xóa lọc
+              </button>
+            )}
           </div>
         </div>
       </div>

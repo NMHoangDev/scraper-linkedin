@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { MaterialIcon } from "@/components/ui";
 
 const CATEGORY_TABS: { type: CategoryType; label: string; icon: string }[] = [
-  { type: "intent", label: "Loại nhóm (Intent)", icon: "🏷️" },
+  { type: "intent", label: "Lĩnh vực", icon: "🏷️" },
   { type: "industry", label: "Ngành (Industry)", icon: "📂" },
   { type: "tier", label: "Tier", icon: "🔥" },
   { type: "team", label: "Team", icon: "👥" },

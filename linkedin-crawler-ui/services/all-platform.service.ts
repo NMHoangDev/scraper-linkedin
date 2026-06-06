@@ -226,6 +226,8 @@ export const allPlatformPostsService = {
     team?: string;
     tier?: string;
     icp?: string;
+    content_type?: string;
+    product_seeding?: string;
     search?: string;
     sort?: string;
     page?: number;

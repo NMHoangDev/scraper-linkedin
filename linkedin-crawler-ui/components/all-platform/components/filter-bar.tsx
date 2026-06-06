@@ -13,6 +13,8 @@ interface FilterBarProps {
   teams: Category[];
   tiers: Category[];
   icps: Category[];
+  contentTypes?: Category[];
+  productSeedings?: Category[];
   onFilter: (filters: FilterState) => void;
   isLoading?: boolean;
 }
@@ -24,6 +26,8 @@ export interface FilterState {
   team: string;
   tier: string;
   icp: string;
+  content_type: string;
+  product_seeding: string;
   sort: SortOption;
   dateRange: string;
 }
@@ -43,13 +47,15 @@ const DATE_OPTIONS = [
   { value: "30days", label: "30 ngày" },
 ];
 
-export function FilterBar({ intents, industries, teams, tiers, icps, onFilter, isLoading }: FilterBarProps) {
+export function FilterBar({ intents, industries, teams, tiers, icps, contentTypes = [], productSeedings = [], onFilter, isLoading }: FilterBarProps) {
   const [search, setSearch] = useState("");
   const [intent, setIntent] = useState("");
   const [industry, setIndustry] = useState("");
   const [team, setTeam] = useState("");
   const [tier, setTier] = useState("");
   const [icp, setIcp] = useState("");
+  const [contentType, setContentType] = useState("");
+  const [productSeeding, setProductSeeding] = useState("");
   const [sort, setSort] = useState<SortOption>("latest");
   const [dateRange, setDateRange] = useState("");
 
@@ -60,6 +66,8 @@ export function FilterBar({ intents, industries, teams, tiers, icps, onFilter, i
     const t = updates.team !== undefined ? updates.team : team;
     const ti = updates.tier !== undefined ? updates.tier : tier;
     const ic = updates.icp !== undefined ? updates.icp : icp;
+    const ct = updates.content_type !== undefined ? updates.content_type : contentType;
+    const ps = updates.product_seeding !== undefined ? updates.product_seeding : productSeeding;
     const so = updates.sort !== undefined ? updates.sort : sort;
     const dr = updates.dateRange !== undefined ? updates.dateRange : dateRange;
 
@@ -70,6 +78,8 @@ export function FilterBar({ intents, industries, teams, tiers, icps, onFilter, i
       team: t,
       tier: ti,
       icp: ic,
+      content_type: ct,
+      product_seeding: ps,
       sort: so,
       dateRange: dr,
     });
@@ -82,6 +92,8 @@ export function FilterBar({ intents, industries, teams, tiers, icps, onFilter, i
     setTeam("");
     setTier("");
     setIcp("");
+    setContentType("");
+    setProductSeeding("");
     setSort("latest");
     setDateRange("");
     onFilter({
@@ -91,6 +103,8 @@ export function FilterBar({ intents, industries, teams, tiers, icps, onFilter, i
       team: "",
       tier: "",
       icp: "",
+      content_type: "",
+      product_seeding: "",
       sort: "latest",
       dateRange: "",
     });
@@ -150,7 +164,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, onFilter, i
         }}
         className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[120px]"
       >
-        <option value="">Tất cả Intent</option>
+        <option value="">Tất cả Lĩnh vực</option>
         {intents.map((i) => (
           <option key={i.id} value={i.id}>
             {i.name || i.code}
@@ -217,6 +231,42 @@ export function FilterBar({ intents, industries, teams, tiers, icps, onFilter, i
         >
           <option value="">Tất cả ICP</option>
           {icps.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name || c.code}
+            </option>
+          ))}
+        </select>
+      )}
+
+      {contentTypes.length > 0 && (
+        <select
+          value={contentType}
+          onChange={(e) => {
+            setContentType(e.target.value);
+            handleChange({ content_type: e.target.value });
+          }}
+          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[120px]"
+        >
+          <option value="">Loại nội dung</option>
+          {contentTypes.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name || c.code}
+            </option>
+          ))}
+        </select>
+      )}
+
+      {productSeedings.length > 0 && (
+        <select
+          value={productSeeding}
+          onChange={(e) => {
+            setProductSeeding(e.target.value);
+            handleChange({ product_seeding: e.target.value });
+          }}
+          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
+        >
+          <option value="">Sản phẩm Seeding</option>
+          {productSeedings.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name || c.code}
             </option>

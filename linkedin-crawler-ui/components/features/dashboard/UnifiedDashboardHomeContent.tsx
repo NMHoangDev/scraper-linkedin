@@ -229,6 +229,8 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
     team: "",
     tier: "",
     icp: "",
+    content_type: "",
+    product_seeding: "",
     sort: "latest",
     dateRange: "",
   });
@@ -293,6 +295,8 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
           team: filters.team || undefined,
           tier: filters.tier || undefined,
           icp: filters.icp || undefined,
+          content_type: filters.content_type || undefined,
+          product_seeding: filters.product_seeding || undefined,
           search: filters.search || undefined,
           sort: filters.sort,
           page,
@@ -361,6 +365,8 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
   const industries = categories.filter((c) => c.category_type === "industry");
   const tiers = categories.filter((c) => c.category_type === "tier");
   const icps = categories.filter((c) => c.category_type === "icp");
+  const contentTypes = categories.filter((c) => c.category_type === "content_type");
+  const productSeedings = categories.filter((c) => c.category_type === "product_seeding");
   const teamCategories: Category[] = teams.map((t) => ({
     id: t.id,
     code: t.name,
@@ -465,6 +471,8 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
         teams={teamCategories}
         tiers={tiers}
         icps={icps}
+        contentTypes={contentTypes}
+        productSeedings={productSeedings}
         onFilter={handleFilter}
         isLoading={isLoadingPosts}
       />

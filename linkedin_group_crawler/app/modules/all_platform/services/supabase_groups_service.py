@@ -140,6 +140,7 @@ def add_facebook_group(payload: dict) -> dict:
         "note": cleaned.get("note"),
         "risk_note": cleaned.get("risk_note"),
         "assignee_id": cleaned.get("assignee_id"),
+        "co_assignee_id": cleaned.get("co_assignee_id"),
     }
 
     result = (
@@ -181,6 +182,7 @@ def update_facebook_group(group_id: str, payload: dict) -> dict:
         "note",
         "risk_note",
         "assignee_id",
+        "co_assignee_id",
     }
 
     update_data = {k: v for k, v in cleaned.items() if k in allowed_fields}
@@ -314,6 +316,10 @@ def add_linkedin_group(payload: dict) -> dict:
         "id_tier": cleaned.get("id_tier"),
         "id_team": cleaned.get("id_team"),
         "id_icp": cleaned.get("id_icp"),
+        "note": cleaned.get("note"),
+        "risk_note": cleaned.get("risk_note"),
+        "assignee_id": cleaned.get("assignee_id"),
+        "co_assignee_id": cleaned.get("co_assignee_id"),
     }
 
     result = (
@@ -340,6 +346,10 @@ def update_linkedin_group(group_id: str, payload: dict) -> dict:
         "id_tier",
         "id_team",
         "id_icp",
+        "note",
+        "risk_note",
+        "assignee_id",
+        "co_assignee_id",
     }
 
     update_data = {k: v for k, v in cleaned.items() if k in allowed_fields and v is not None}
