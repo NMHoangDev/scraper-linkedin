@@ -127,7 +127,7 @@ function SearchableDropdown({
       </div>
 
       {isOpen && (
-        <div className="absolute z-[60] left-0 right-0 mt-1 bg-white border border-[#E5E5E5] rounded-lg shadow-lg max-h-48 overflow-y-auto">
+        <div className="absolute top-full z-[60] left-0 right-0 mt-1 bg-white border border-[#E5E5E5] rounded-lg shadow-lg max-h-48 overflow-y-auto">
           {filteredOptions.length === 0 ? (
             <div className="p-3 text-xs text-[#A0A0A0] text-center">Không tìm thấy danh mục</div>
           ) : (
@@ -1364,15 +1364,16 @@ export function GroupManagementContent() {
             className="bg-[#FFFFFF] rounded-2xl border border-[#E5E5E5] shadow-xl overflow-hidden animate-in zoom-in-95 duration-200"
             style={{
               width: "100%",
-              maxWidth: "460px",
+              maxWidth: "600px",
               minWidth: "300px",
+              maxHeight: "90vh",
               display: "flex",
               flexDirection: "column",
             }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E5E5E5] bg-[#F5F5F5]/50">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E5E5E5] bg-[#F5F5F5]/50 flex-shrink-0">
               <h3 className="text-sm font-bold text-[#1A1A1A] flex items-center gap-2">
                 <span className="material-symbols-outlined text-[20px] text-[#E3000F]">
                   info
@@ -1389,7 +1390,7 @@ export function GroupManagementContent() {
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 overflow-y-auto">
               <div>
                 <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Tên nhóm</span>
                 <span className="text-sm font-bold text-[#1A1A1A] break-all">{viewingGroupClassification.group_name || "—"}</span>
@@ -1436,6 +1437,18 @@ export function GroupManagementContent() {
                   <span className="inline-flex bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-0.5 rounded-lg text-xs font-bold">
                     {(viewingGroupClassification as any).product_seeding_name || "—"}
                   </span>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Ghi chú rủi ro</span>
+                  <div className={`text-sm p-3 rounded-lg border whitespace-pre-wrap ${(viewingGroupClassification as any).risk_note ? 'bg-[#FFF0F0] border-[#FFE0E0] text-red-700 font-medium' : 'bg-[#F9F9F9] border-[#E5E5E5] text-[#A0A0A0]'}`}>
+                    {(viewingGroupClassification as any).risk_note || "—"}
+                  </div>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Ghi chú chung</span>
+                  <div className={`text-sm p-3 rounded-lg border whitespace-pre-wrap ${(viewingGroupClassification as any).note ? 'bg-[#F5F5F5] border-[#E5E5E5] text-[#1A1A1A]' : 'bg-[#F9F9F9] border-[#E5E5E5] text-[#A0A0A0]'}`}>
+                    {(viewingGroupClassification as any).note || "—"}
+                  </div>
                 </div>
                 {platform === "facebook" ? (
                   <>
@@ -1498,7 +1511,7 @@ export function GroupManagementContent() {
             </div>
 
             {/* Modal Footer */}
-            <div className="flex gap-3 border-t border-[#E5E5E5] px-6 py-4 bg-[#F5F5F5]/50 justify-end">
+            <div className="flex gap-3 border-t border-[#E5E5E5] px-6 py-4 bg-[#F5F5F5]/50 justify-end flex-shrink-0">
               <button
                 type="button"
                 onClick={() => setViewingGroupClassification(null)}

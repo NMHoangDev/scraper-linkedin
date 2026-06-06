@@ -39,7 +39,7 @@ def get_facebook_groups(
     # Collect all FK ids to batch-fetch categories
     cat_ids: set[str] = set()
     for r in rows:
-        for fk in ("id_intent", "id_industry", "id_tier", "id_team", "id_icp"):
+        for fk in ("id_intent", "id_industry", "id_tier", "id_team", "id_icp", "id_content_type", "id_product_seeding"):
             val = r.get(fk)
             if val:
                 cat_ids.add(str(val))
@@ -63,6 +63,8 @@ def get_facebook_groups(
         "id_tier":     "tier",
         "id_team":     "team",
         "id_icp":      "icp",
+        "id_content_type": "content_type",
+        "id_product_seeding": "product_seeding",
     }
     name_field_map = {
         "id_intent":   "intent_name",
@@ -70,6 +72,8 @@ def get_facebook_groups(
         "id_tier":     "tier_name",
         "id_team":     "team_name",
         "id_icp":      "icp_name",
+        "id_content_type": "content_type_name",
+        "id_product_seeding": "product_seeding_name",
     }
 
     for r in rows:
@@ -87,7 +91,7 @@ def get_facebook_groups(
 def _clean_group_payload(payload: dict) -> dict:
     """Clean group payload by converting empty/whitespace strings to None/proper types."""
     cleaned = {}
-    numeric_fields = {"tier", "members", "posts_per_week", "health_score"}
+    numeric_fields = {"tier", "members", "posts_per_week", "health_score", "start_time_in_day", "end_time_in_day"}
 
     for k, v in payload.items():
         if k in numeric_fields:
@@ -126,6 +130,16 @@ def add_facebook_group(payload: dict) -> dict:
         "id_tier": cleaned.get("id_tier"),
         "id_team": cleaned.get("id_team"),
         "id_icp": cleaned.get("id_icp"),
+        "id_content_type": cleaned.get("id_content_type"),
+        "id_product_seeding": cleaned.get("id_product_seeding"),
+        "end_time_24h": cleaned.get("end_time_24h"),
+        "start_time_in_day": cleaned.get("start_time_in_day"),
+        "end_time_in_day": cleaned.get("end_time_in_day"),
+        "time_crawl": cleaned.get("time_crawl"),
+        "end_date_hour": cleaned.get("end_date_hour"),
+        "note": cleaned.get("note"),
+        "risk_note": cleaned.get("risk_note"),
+        "assignee_id": cleaned.get("assignee_id"),
     }
 
     result = (
@@ -157,6 +171,16 @@ def update_facebook_group(group_id: str, payload: dict) -> dict:
         "id_tier",
         "id_team",
         "id_icp",
+        "id_content_type",
+        "id_product_seeding",
+        "end_time_24h",
+        "start_time_in_day",
+        "end_time_in_day",
+        "time_crawl",
+        "end_date_hour",
+        "note",
+        "risk_note",
+        "assignee_id",
     }
 
     update_data = {k: v for k, v in cleaned.items() if k in allowed_fields}
