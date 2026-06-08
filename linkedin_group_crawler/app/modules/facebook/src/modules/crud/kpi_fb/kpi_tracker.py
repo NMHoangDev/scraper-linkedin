@@ -9,7 +9,7 @@ TABLE_KPI = "kpi_tracker"
 def get_all_kpis():
     query_string = """
         *,
-        member_info:app_users!fk_kpi_tracker_member(*)
+        member_info:app_users!kpi_tracker_id_member_fkey(*)
     """
     
     response = supabase.table("kpi_tracker") \

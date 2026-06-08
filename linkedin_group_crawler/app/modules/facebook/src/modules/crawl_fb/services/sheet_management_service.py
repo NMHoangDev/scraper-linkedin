@@ -267,7 +267,9 @@ class SheetManagementService:
                     "name": member_info.get("name", "Unknown"), # Chui vào member_info để lấy name
                     "scorePerWeek": user.get("kpi_per_week", 0) # Map đúng trường kpi_per_week sang scorePerWeek cho FE
                 })
+            print(f"debug: {result}")
             return result
+            
         except Exception as e:
             print(f"Lỗi khi lấy User Scores từ supabase: {e}")
             return []
