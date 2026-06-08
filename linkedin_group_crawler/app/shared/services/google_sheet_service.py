@@ -506,3 +506,841 @@ def safe_http_message(exc: Exception) -> str:
         except Exception:
             return str(exc)
     return str(exc)
+
+
+def get_member_name_from_users_sheet(email: str) -> str:
+    """Đọc cột A và B của tab 'users' để tìm tên tương ứng với email member."""
+    try:
+        service = get_sheets_service()
+        sid = settings.google_spreadsheet_id
+        raw = service.spreadsheets().values().get(
+            spreadsheetId=sid,
+            range="'users'!A:B",
+            majorDimension="ROWS"
+        ).execute().get("values", [])
+        
+        if not raw or len(raw) < 2:
+            return ""
+            
+        target = email.strip().lower()
+        for row in raw[1:]:
+            if len(row) >= 2:
+                row_email = str(row[0] or "").strip().lower()
+                row_name = str(row[1] or "").strip()
+                if row_email == target:
+                    return row_name
+    except Exception as e:
+        logger.error("Error reading member name from users sheet: %s", e)
+    return ""
+
+
+def append_seeding_kpi_row(
+    *,
+    email_member: str,
+    name: str,
+    link_comment: str,
+    name_profile: str,
+    platform: str,
+    content: str,
+    link_post: str,
+    verify: str,
+    profile_id: str = "",
+    facebook_name: str = "",
+) -> None:
+    """Thêm dòng mới vào tab 'seeding_content_kpi' của Google Sheet.
+
+    Columns (11 cột A→K):
+      A=email_member, B=name, C=link_comment, D=name_profile,
+      E=platform, F=content, G=link_post, H=verify,
+      I=current_day, J=profile_id, K=facebook_name
+    """
+    sid = settings.google_spreadsheet_id
+    tab = "seeding_content_kpi"
+
+    # Lấy ngày hiện tại định dạng DD-MM-YYYY
+    from datetime import datetime
+    current_day = datetime.now().strftime("%d-%m-%Y")
+
+    row_values = [
+        email_member,
+        name,
+        link_comment,
+        name_profile,
+        platform,
+        content,
+        link_post,
+        verify,
+        current_day,
+        profile_id,
+        facebook_name,
+    ]
+
+    service = get_sheets_service()
+    service.spreadsheets().values().append(
+        spreadsheetId=sid,
+        range=f"'{tab}'!A:K",
+        valueInputOption="USER_ENTERED",
+        insertDataOption="INSERT_ROWS",
+        body={"values": [row_values]},
+    ).execute()
+
+
+def update_user_leader_in_users_sheet(member_email: str, leader_email: str) -> dict:
+    """Tìm member_email trong tab 'users', cập nhật email_leader thành leader_email, và trả về kết quả."""
+    try:
+        service = get_sheets_service()
+        sid = settings.google_spreadsheet_id
+        # Read A:E
+        raw = service.spreadsheets().values().get(
+            spreadsheetId=sid,
+            range="'users'!A:E",
+            majorDimension="ROWS"
+        ).execute().get("values", [])
+
+        if not raw:
+            return {"success": False, "message": "Không thể đọc dữ liệu từ tab 'users'."}
+
+        target_email = member_email.strip().lower()
+        found_row_idx = -1
+        for idx, row in enumerate(raw):
+            if idx == 0:
+                continue
+            if len(row) >= 1:
+                row_email = str(row[0] or "").strip().lower()
+                if row_email == target_email:
+                    found_row_idx = idx + 1 # 1-indexed for Google Sheets
+                    break
+
+        if found_row_idx == -1:
+            return {"success": False, "message": f"Email thành viên '{member_email}' không tồn tại trong danh sách 'users'."}
+
+        # Update role to 'member' (Column D) and email_leader to leader_email (Column E)
+        service.spreadsheets().values().update(
+            spreadsheetId=sid,
+            range=f"'users'!D{found_row_idx}:E{found_row_idx}",
+            valueInputOption="USER_ENTERED",
+            body={"values": [["member", leader_email.strip().lower()]]}
+        ).execute()
+
+        return {"success": True, "message": f"Đã thêm thành viên '{member_email}' vào quản lý của leader '{leader_email}'."}
+    except Exception as e:
+        logger.error("Error updating member leader in sheet: %s", e)
+        return {"success": False, "message": f"Lỗi Google Sheet: {str(e)}"}
+
+
+def update_user_role_to_leader_in_sheet(email: str) -> dict:
+    """Tìm email trong tab 'users', cập nhật role thành 'leader', xóa email_leader (nếu có)."""
+    try:
+        service = get_sheets_service()
+        sid = settings.google_spreadsheet_id
+        raw = service.spreadsheets().values().get(
+            spreadsheetId=sid,
+            range="'users'!A:E",
+            majorDimension="ROWS"
+        ).execute().get("values", [])
+
+        target_email = email.strip().lower()
+        found_row_idx = -1
+        if raw:
+            for idx, row in enumerate(raw):
+                if idx == 0:
+                    continue
+                if len(row) >= 1:
+                    row_email = str(row[0] or "").strip().lower()
+                    if row_email == target_email:
+                        found_row_idx = idx + 1
+                        break
+
+        if found_row_idx != -1:
+            # Update role (Column D) to 'leader', clear email_leader (Column E)
+            service.spreadsheets().values().update(
+                spreadsheetId=sid,
+                range=f"'users'!D{found_row_idx}:E{found_row_idx}",
+                valueInputOption="USER_ENTERED",
+                body={"values": [["leader", ""]]}
+            ).execute()
+        else:
+            # Append new leader row: email, name, slug, role, email_leader
+            name = email.split("@")[0]
+            row_values = [target_email, name, name, "leader", ""]
+            service.spreadsheets().values().append(
+                spreadsheetId=sid,
+                range="'users'!A:E",
+                valueInputOption="USER_ENTERED",
+                insertDataOption="INSERT_ROWS",
+                body={"values": [row_values]}
+            ).execute()
+
+        return {"success": True, "message": f"Đã cập nhật vai trò leader cho email '{email}'."}
+    except Exception as e:
+        logger.error("Error setting user as leader in sheet: %s", e)
+        return {"success": False, "message": str(e)}
+
+
+def update_user_role_to_member_in_sheet(email: str) -> dict:
+    """Tìm email trong tab 'users', cập nhật role thành 'member'."""
+    try:
+        service = get_sheets_service()
+        sid = settings.google_spreadsheet_id
+        raw = service.spreadsheets().values().get(
+            spreadsheetId=sid,
+            range="'users'!A:E",
+            majorDimension="ROWS"
+        ).execute().get("values", [])
+
+        target_email = email.strip().lower()
+        found_row_idx = -1
+        if raw:
+            for idx, row in enumerate(raw):
+                if idx == 0:
+                    continue
+                if len(row) >= 1:
+                    row_email = str(row[0] or "").strip().lower()
+                    if row_email == target_email:
+                        found_row_idx = idx + 1
+                        break
+
+        if found_row_idx != -1:
+            # Update role (Column D) to 'member'
+            service.spreadsheets().values().update(
+                spreadsheetId=sid,
+                range=f"'users'!D{found_row_idx}",
+                valueInputOption="USER_ENTERED",
+                body={"values": [["member"]]}
+            ).execute()
+        else:
+            # Append new member row: email, name, slug, role, email_leader
+            name = email.split("@")[0]
+            row_values = [target_email, name, name, "member", ""]
+            service.spreadsheets().values().append(
+                spreadsheetId=sid,
+                range="'users'!A:E",
+                valueInputOption="USER_ENTERED",
+                insertDataOption="INSERT_ROWS",
+                body={"values": [row_values]}
+            ).execute()
+
+        return {"success": True, "message": f"Đã cập nhật vai trò member cho email '{email}'."}
+    except Exception as e:
+        logger.error("Error setting user as member in sheet: %s", e)
+        return {"success": False, "message": str(e)}
+
+
+def get_seeding_kpi_rows_for_member(
+    email_member: str,
+    profile_id: str = "",
+    facebook_name: str = "",
+) -> list[dict]:
+    """Đọc tab 'seeding_content_kpi' và lọc theo email_member + profile_id + facebook_name (AND).
+
+    Filter logic:
+    - Nếu profile_id không rỗng → bắt buộc khớp cột J (profile_id)
+    - Nếu facebook_name không rỗng → bắt buộc khớp cột K (facebook_name) theo lowercase
+    - Nếu email_member không rỗng → bắt buộc khớp cột A (email_member)
+    - Nếu tất cả rỗng → trả về tất cả rows
+    """
+    try:
+        service = get_sheets_service()
+        sid = settings.google_spreadsheet_id
+        # columns: A=email, B=name, C=link_comment, D=name_profile,
+        #          E=platform, F=content, G=link_post, H=verify, I=day, J=profile_id, K=fb_name
+        raw = service.spreadsheets().values().get(
+            spreadsheetId=sid,
+            range="'seeding_content_kpi'!A:K",
+            majorDimension="ROWS"
+        ).execute().get("values", [])
+
+        if not raw or len(raw) < 2:
+            return []
+
+        headers = [str(h).strip() for h in raw[0]]
+        rows = raw[1:]
+
+        target_email = email_member.strip().lower() if email_member else ""
+        target_pid = profile_id.strip() if profile_id else ""
+        target_fb_name = (facebook_name or "").strip().lower()
+
+        # Nếu tất cả filter rỗng → trả mọi thứ
+        no_filter = not target_email and not target_pid and not target_fb_name
+
+        out = []
+        for r in rows:
+            if len(r) < 1:
+                continue
+            r_email = str(r[0] or "").strip().lower()
+            r_pid = str(r[9] if len(r) > 9 else "").strip()
+            r_fb_name = str(r[10] if len(r) > 10 else "").strip().lower()
+
+            if not no_filter:
+                # email filter
+                if target_email and r_email != target_email:
+                    continue
+                # profile_id filter (exact match, không phân biệt case)
+                if target_pid and r_pid.lower() != target_pid.lower():
+                    continue
+                # facebook_name filter (lowercase)
+                if target_fb_name and r_fb_name != target_fb_name:
+                    continue
+
+            # Pad row values to match headers length
+            padded = r + [""] * (len(headers) - len(r))
+            row_dict = dict(zip(headers, padded))
+            out.append(row_dict)
+
+        return out
+    except Exception as e:
+        logger.error("Error reading seeding kpi rows: %s", e)
+        return []
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SEEDING MARK (Step 1: đánh dấu seeding - lưu trước verify)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def append_seeding_mark(
+    *,
+    email_member: str,
+    link_post: str,
+) -> None:
+    """Lưu dấu đã seeding (Step 1): chỉ lưu email + link_post vào tab 'seeding_content_kpi'.
+
+    Columns (2 cột đầu tiên):
+      A=email_member, G=link_post
+    verify sẽ được fill sau ở Step 2 (verify).
+    """
+    sid = settings.google_spreadsheet_id
+    tab = "seeding_content_kpi"
+
+    row_values = [
+        email_member.strip().lower(),
+        "",        # B=name
+        "",        # C=link_comment
+        "",        # D=name_profile
+        "",        # E=platform
+        "",        # F=content
+        link_post.strip(),
+        "pending", # H=verify (Step 2 sẽ fill thành "yes")
+        "",        # I=day
+        "",        # J=profile_id
+        "",        # K=facebook_name
+    ]
+
+    service = get_sheets_service()
+    service.spreadsheets().values().append(
+        spreadsheetId=sid,
+        range=f"'{tab}'!A:K",
+        valueInputOption="USER_ENTERED",
+        insertDataOption="INSERT_ROWS",
+        body={"values": [row_values]},
+    ).execute()
+
+
+def update_seeding_mark_to_verified(
+    *,
+    email_member: str,
+    link_post: str,
+    name: str,
+    link_comment: str,
+    name_profile: str,
+    platform: str,
+    content: str,
+    profile_id: str = "",
+    facebook_name: str = "",
+    verify: str = "yes",
+) -> bool:
+    """Update dòng đã mark thành verified (Step 2): fill đầy đủ columns.
+
+    Tìm dòng có email + link_post khớp, verify='pending', và update.
+    """
+    sid = settings.google_spreadsheet_id
+    tab = "seeding_content_kpi"
+
+    try:
+        service = get_sheets_service()
+        # Đọc tất cả rows
+        raw = service.spreadsheets().values().get(
+            spreadsheetId=sid,
+            range=f"'{tab}'!A:K",
+            majorDimension="ROWS"
+        ).execute().get("values", [])
+
+        if not raw or len(raw) < 2:
+            return False
+
+        from datetime import datetime as dt
+        current_day = dt.now().strftime("%d-%m-%Y")
+        target_email = email_member.strip().lower()
+        target_link = link_post.strip().lower()
+
+        # Tìm row index (1-indexed, dòng 1 = header)
+        row_idx = None
+        for i, r in enumerate(raw[1:], start=2):
+            r_email = str(r[0] or "").strip().lower()
+            r_link = str(r[6] if len(r) > 6 else "").strip().lower()
+            r_verify = str(r[7] if len(r) > 7 else "").strip().lower()
+
+            if r_email == target_email and r_link == target_link and r_verify == "pending":
+                row_idx = i
+                break
+
+        if row_idx is None:
+            logger.warning("Không tìm thấy dòng pending để verify: email=%s, link=%s", target_email, target_link)
+            return False
+
+        # Update row
+        update_values = [
+            target_email,       # A=email
+            name,              # B=name
+            link_comment,      # C=link_comment
+            name_profile,      # D=name_profile
+            platform,          # E=platform
+            content,           # F=content
+            link_post.strip(), # G=link_post
+            verify,            # H=verify
+            current_day,       # I=day
+            profile_id,        # J=profile_id
+            facebook_name,     # K=facebook_name
+        ]
+
+        service.spreadsheets().values().update(
+            spreadsheetId=sid,
+            range=f"'{tab}'!A{row_idx}:K{row_idx}",
+            valueInputOption="USER_ENTERED",
+            body={"values": [update_values]},
+        ).execute()
+
+        return True
+    except Exception as e:
+        logger.error("Error updating seeding mark to verified: %s", e)
+        return False
+
+
+def get_seeding_mark_rows(email_member: str, verified: bool = False) -> list[dict]:
+    """Lấy danh sách seeding marks của 1 member.
+
+    Args:
+        email_member: email cần lọc
+        verified: True = đã verify (verify='yes'), False = chưa verify (verify='pending')
+    """
+    try:
+        service = get_sheets_service()
+        sid = settings.google_spreadsheet_id
+        raw = service.spreadsheets().values().get(
+            spreadsheetId=sid,
+            range="'seeding_content_kpi'!A:K",
+            majorDimension="ROWS"
+        ).execute().get("values", [])
+
+        if not raw or len(raw) < 2:
+            return []
+
+        headers = [str(h).strip() for h in raw[0]]
+        rows = raw[1:]
+        target_email = email_member.strip().lower()
+        verify_filter = "yes" if verified else "pending"
+
+        out = []
+        for r in rows:
+            if len(r) < 1:
+                continue
+            r_email = str(r[0] or "").strip().lower()
+            r_verify = str(r[7] if len(r) > 7 else "").strip().lower()
+            r_link = str(r[6] if len(r) > 6 else "").strip().lower()
+
+            # Filter email + verify status
+            if r_email != target_email:
+                continue
+            if r_verify != verify_filter:
+                continue
+            if not r_link:
+                continue
+
+            padded = r + [""] * (len(headers) - len(r))
+            row_dict = dict(zip(headers, padded))
+            out.append(row_dict)
+
+        return out
+    except Exception as e:
+        logger.error("Error reading seeding mark rows: %s", e)
+        return []
+
+
+def get_all_seeding_marks(email_member: str) -> list[dict]:
+    """Lấy TẤT CẢ seeding marks của 1 member (cả verified và chưa verified).
+
+    Args:
+        email_member: email cần lọc
+
+    Returns:
+        List of dict với fields: link_post, verify (yes/pending)
+    """
+    try:
+        service = get_sheets_service()
+        sid = settings.google_spreadsheet_id
+        raw = service.spreadsheets().values().get(
+            spreadsheetId=sid,
+            range="'seeding_content_kpi'!A:K",
+            majorDimension="ROWS"
+        ).execute().get("values", [])
+
+        if not raw or len(raw) < 2:
+            return []
+
+        target_email = email_member.strip().lower()
+
+        out = []
+        for r in raw[1:]:  # Skip header row
+            if len(r) < 7:
+                continue
+            r_email = str(r[0] or "").strip().lower()
+            r_verify = str(r[7] if len(r) > 7 else "").strip().lower()
+            r_link = str(r[6] if len(r) > 6 else "").strip().lower()
+
+            if r_email != target_email:
+                continue
+            if not r_link:
+                continue
+
+            out.append({
+                "link_post": r_link,
+                "verify": r_verify,  # "yes" = đã verify, "pending" = chưa verify
+            })
+
+        return out
+    except Exception as e:
+        logger.error("Error reading all seeding marks: %s", e)
+        return []
+
+
+def get_member_info_from_users_sheet(email: str) -> dict:
+    """Đọc tab 'users' và tìm name, url_profile của member."""
+    try:
+        service = get_sheets_service()
+        sid = settings.google_spreadsheet_id
+        raw = service.spreadsheets().values().get(
+            spreadsheetId=sid,
+            range="'users'!A:E",
+            majorDimension="ROWS"
+        ).execute().get("values", [])
+        
+        if not raw or len(raw) < 2:
+            return {}
+            
+        target = email.strip().lower()
+        for row in raw[1:]:
+            if len(row) >= 1:
+                row_email = str(row[0] or "").strip().lower()
+                if row_email == target:
+                    name = str(row[1] or "").strip() if len(row) > 1 else ""
+                    slug = str(row[2] or "").strip() if len(row) > 2 else ""
+                    
+                    # Build profile URL
+                    url = ""
+                    if slug:
+                        if slug.startswith("http"):
+                            url = slug
+                        elif "facebook.com" in slug or "fb.com" in slug:
+                            url = slug
+                        else:
+                            url = f"https://www.linkedin.com/in/{slug}"
+                    return {"name": name, "url_profile": url}
+    except Exception as e:
+        logger.error("Error reading member info from users sheet: %s", e)
+    return {}
+
+
+def assign_kpi_to_sheet_tracker(
+    email_member: str,
+    email_leader: str,
+    platform: str,
+    kpi_sedding_per_week: int,
+    start: str,
+    end: str
+) -> dict:
+    """Ghi đè hoặc thêm mới KPI vào tab 'kpi_tracker'."""
+    try:
+        service = get_sheets_service()
+        sid = settings.google_spreadsheet_id
+        
+        # 1. Lấy thông tin name, url_profile từ users sheet
+        info = get_member_info_from_users_sheet(email_member)
+        name = info.get("name") or email_member.split("@")[0]
+        url_profile = info.get("url_profile") or ""
+        
+        # 2. Đọc toàn bộ kpi_tracker để tìm dòng trùng
+        # columns: email_member, name, url_profile, email_leader, platfom, kpi_sedding_per_week, start, end, status
+        raw = service.spreadsheets().values().get(
+            spreadsheetId=sid,
+            range="'kpi_tracker'!A:I",
+            majorDimension="ROWS"
+        ).execute().get("values", [])
+        
+        target_email = email_member.strip().lower()
+        target_platform = platform.strip()
+        target_start = start.strip()
+        target_end = end.strip()
+        
+        found_row_idx = -1
+        if raw and len(raw) > 1:
+            for idx, r in enumerate(raw[1:], start=2):
+                if len(r) >= 8:
+                    r_email = str(r[0] or "").strip().lower()
+                    r_plat = str(r[4] or "").strip().lower()
+                    r_start = str(r[6] or "").strip()
+                    r_end = str(r[7] or "").strip()
+                    
+                    if (r_email == target_email and 
+                        r_plat.replace(" ", "") == target_platform.lower().replace(" ", "") and 
+                        r_start == target_start and 
+                        r_end == target_end):
+                        found_row_idx = idx
+                        break
+                        
+        row_values = [
+            target_email,
+            name,
+            url_profile,
+            email_leader.strip().lower(),
+            target_platform,
+            str(kpi_sedding_per_week),
+            target_start,
+            target_end,
+            "Proccess" # Trạng thái ban đầu
+        ]
+        
+        if found_row_idx != -1:
+            # Ghi đè dòng cũ
+            service.spreadsheets().values().update(
+                spreadsheetId=sid,
+                range=f"'kpi_tracker'!A{found_row_idx}:I{found_row_idx}",
+                valueInputOption="USER_ENTERED",
+                body={"values": [row_values]}
+            ).execute()
+            msg = f"Đã cập nhật KPI cho {email_member} (tuần {start} -> {end})."
+        else:
+            # Thêm dòng mới
+            service.spreadsheets().values().append(
+                spreadsheetId=sid,
+                range="'kpi_tracker'!A:I",
+                valueInputOption="USER_ENTERED",
+                insertDataOption="INSERT_ROWS",
+                body={"values": [row_values]}
+            ).execute()
+            msg = f"Đã thêm mới KPI cho {email_member} (tuần {start} -> {end})."
+            
+        return {"success": True, "message": msg}
+    except Exception as e:
+        logger.error("Error assigning KPI in sheet: %s", e)
+        return {"success": False, "message": f"Lỗi Google Sheet: {str(e)}"}
+
+
+def sync_and_get_kpis_for_members(member_emails: list[str]) -> list[dict]:
+    """
+    Lấy toàn bộ KPI của các member và tiến hành tính toán tiến độ seeding thực tế.
+    Nếu seeding đạt mục tiêu thì tự động cập nhật status = "Done".
+    Nếu quá hạn và chưa đạt thì cập nhật status = "Trễ deadline".
+    Ngược lại status = "Proccess".
+    """
+    try:
+        service = get_sheets_service()
+        sid = settings.google_spreadsheet_id
+        
+        # 1. Đọc toàn bộ kpi_tracker
+        # email_member, name, url_profile, email_leader, platfom, kpi_sedding_per_week, start, end, status
+        raw_kpi = service.spreadsheets().values().get(
+            spreadsheetId=sid,
+            range="'kpi_tracker'!A:I",
+            majorDimension="ROWS"
+        ).execute().get("values", [])
+        
+        if not raw_kpi or len(raw_kpi) < 1:
+            return []
+            
+        kpi_headers = [str(h).strip() for h in raw_kpi[0]]
+        # Chuẩn hóa để tránh 'platfom' vs 'platform'
+        normalized_headers = []
+        for h in kpi_headers:
+            if h.lower() == "platfom":
+                normalized_headers.append("platform")
+            else:
+                normalized_headers.append(h)
+                
+        kpi_rows = raw_kpi[1:]
+        
+        # 2. Đọc toàn bộ seeding_content_kpi
+        # email_member, name, url_profile, platform, content, link_post, verify, day
+        raw_seeding = service.spreadsheets().values().get(
+            spreadsheetId=sid,
+            range="'seeding_content_kpi'!A:I",
+            majorDimension="ROWS"
+        ).execute().get("values", [])
+        
+        seeding_rows = []
+        if raw_seeding and len(raw_seeding) > 1:
+            seed_headers = [str(h).strip() for h in raw_seeding[0]]
+            for r in raw_seeding[1:]:
+                padded = r + [""] * (len(seed_headers) - len(r))
+                seeding_rows.append(dict(zip(seed_headers, padded)))
+                
+        # 3. Lọc danh sách email cần tính toán
+        target_emails = {email.strip().lower() for email in member_emails if email.strip()}
+        
+        today = datetime.now().date()
+        results = []
+        
+        # Helper to parse dates safely
+        def _parse_d(date_str):
+            if not date_str:
+                return None
+            date_str = date_str.strip()
+            for fmt in ("%d-%m-%Y", "%Y-%m-%d", "%d/%m/%Y"):
+                try:
+                    return datetime.strptime(date_str, fmt).date()
+                except ValueError:
+                    continue
+            return None
+            
+        # Duyệt qua các dòng KPI
+        for idx, r in enumerate(kpi_rows, start=2):
+            if not r or len(r) < 1:
+                continue
+                
+            padded = r + [""] * (len(normalized_headers) - len(r))
+            kpi_dict = dict(zip(normalized_headers, padded))
+            
+            kpi_member_email = kpi_dict.get("email_member", "").strip().lower()
+            if target_emails and kpi_member_email not in target_emails:
+                continue
+                
+            # Lấy thông tin KPI
+            platform = kpi_dict.get("platform") or ""
+            target_count_str = kpi_dict.get("kpi_sedding_per_week") or "0"
+            try:
+                target_count = int(target_count_str)
+            except ValueError:
+                target_count = 0
+                
+            start_str = kpi_dict.get("start", "")
+            end_str = kpi_dict.get("end", "")
+            current_status = kpi_dict.get("status", "").strip()
+            
+            start_date = _parse_d(start_str)
+            end_date = _parse_d(end_str)
+            
+            # Tính toán số lượng seeding thực tế
+            # Đếm khi: verify='yes' HOẶC 'đã seeding' VÀ có content (comment)
+            actual_count = 0
+            matching_seeding_posts = []
+            for s in seeding_rows:
+                s_email = s.get("email_member", "").strip().lower()
+                s_plat = s.get("platform", "").strip().lower()
+                s_verify = s.get("verify", "").strip().lower()
+                s_content = s.get("content", "").strip()
+                s_day_str = s.get("day", "")
+                
+                # Check email and platform
+                if s_email == kpi_member_email and s_plat == platform.strip().lower():
+                    # Thống nhất: verify='yes' || 'đã seeding' || 'xác minh' + có content
+                    is_verified = s_verify == "yes" or "đã seeding" in s_verify or "da seeding" in s_verify or "xác minh" in s_verify
+                    if is_verified and s_content:
+                        s_date = _parse_d(s_day_str)
+                        # Check date range
+                        if s_date and start_date and end_date:
+                            if start_date <= s_date <= end_date:
+                                actual_count += 1
+                                matching_seeding_posts.append({
+                                    "day": s_day_str,
+                                    "link_post": s.get("link_post", ""),
+                                    "link_comment": s.get("link_comment", ""),
+                                    "content": s_content,
+                                    "verify": s.get("verify", "")
+                                })
+                                
+            # Đánh giá trạng thái KPI mới
+            new_status = "Proccess"
+            if actual_count >= target_count:
+                new_status = "Done"
+            elif end_date and today > end_date:
+                new_status = "Trễ deadline"
+                
+            # Nếu trạng thái thay đổi, cập nhật lên Google Sheets
+            if new_status != current_status:
+                try:
+                    service.spreadsheets().values().update(
+                        spreadsheetId=sid,
+                        range=f"'kpi_tracker'!I{idx}",
+                        valueInputOption="USER_ENTERED",
+                        body={"values": [[new_status]]}
+                    ).execute()
+                    kpi_dict["status"] = new_status
+                except Exception as e:
+                    logger.error(f"Error updating KPI status for row {idx}: {e}")
+                    
+            # Thêm các trường tiến độ thực tế vào kết quả trả về
+            kpi_dict["actual_seeding"] = actual_count
+            kpi_dict["matching_posts"] = matching_seeding_posts
+            results.append(kpi_dict)
+            
+        return results
+    except Exception as e:
+        logger.error("Error syncing and getting member KPIs: %s", e)
+        return []
+
+
+def to_ymd(d: str) -> str:
+    """Convert DD-MM-YYYY or YYYY-MM-DD to YYYY-MM-DD for comparison."""
+    if not d:
+        return ""
+    d = d.strip()
+    if re.match(r"^\d{4}-\d{2}-\d{2}$", d):
+        return d
+    m = re.match(r"^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$", d)
+    if m:
+        dd, mm, yyyy = m.groups()
+        return f"{yyyy}-{dd.zfill(2)}-{mm.zfill(2)}"
+    return d
+
+
+def get_members_for_leader(leader_email: str) -> list[dict]:
+    """Lấy danh sách các member thuộc quản lý của leader từ tab 'users'."""
+    try:
+        service = get_sheets_service()
+        sid = settings.google_spreadsheet_id
+        raw = service.spreadsheets().values().get(
+            spreadsheetId=sid,
+            range="'users'!A:E",
+            majorDimension="ROWS"
+        ).execute().get("values", [])
+        
+        if not raw or len(raw) < 2:
+            return []
+            
+        headers = [str(h).strip().lower() for h in raw[0]]
+        rows = raw[1:]
+        
+        leader_norm = leader_email.strip().lower()
+        out = []
+        for r in rows:
+            if not r:
+                continue
+            padded = r + [""] * (len(headers) - len(r))
+            row_dict = dict(zip(headers, padded))
+            
+            r_leader = row_dict.get("email_leader", "").strip().lower()
+            r_role = row_dict.get("role", "").strip().lower()
+            
+            if r_leader == leader_norm and r_role == "member":
+                out.append({
+                    "email": row_dict.get("email", "").strip().lower(),
+                    "name": row_dict.get("name", "").strip(),
+                    "profile_slug": row_dict.get("profile_slug", "").strip(),
+                    "role": "member",
+                    "email_leader": leader_norm
+                })
+        return out
+    except Exception as e:
+        logger.error("Error getting members for leader: %s", e)
+        return []
+
+
+

@@ -6,7 +6,6 @@ from typing import Dict, Any, Optional
 from playwright_stealth import Stealth
 import pyotp
 from playwright.sync_api import sync_playwright, Page, BrowserContext, Browser, TimeoutError as PlaywrightTimeoutError
-from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_account import GoogleSheetAccountService
 from .human_behavior import HumanBehavior
 from app.modules.facebook.src.core.config.env import Config
 from app.modules.facebook.src.core.utils.logger import setup_logger
@@ -30,7 +29,6 @@ class FacebookAuth:
     def __init__(self, config: Config, human: Optional[HumanBehavior] = None):
         self.config = config
         self.human = human or HumanBehavior()
-        self.google_sheet_account = GoogleSheetAccountService()
         # Setup directories
         self.sessions_dir = Path(config.COOKIE_DIR or "sessions")
         self.sessions_dir.mkdir(parents=True, exist_ok=True)

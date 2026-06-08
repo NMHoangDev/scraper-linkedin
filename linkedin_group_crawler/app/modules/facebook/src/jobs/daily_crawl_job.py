@@ -8,9 +8,9 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.executors.asyncio import AsyncIOExecutor
 
 # Import các service
-from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_groups_24h import TargetGroupSheet24HService
-from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_posts import GoogleSheetServicePosts
 from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_groups_service import GroupManagementSheetService
+from app.modules.all_platform.services.supabase_facebook_crawl_service import save_facebook_crawl_to_supabase
+from app.core.supabase_client import get_supabase_client
 
 from app.modules.facebook.src.modules.gg_sheet.services.history_sheet_service import HistorySheetService
 from app.modules.facebook.src.modules.gg_sheet.services.user_score_sheet_service import UserScoreSheetService
@@ -26,28 +26,41 @@ logger = logging.getLogger(__name__)
 
 def execute_crawl_workflow():
     """
-    Luồng công việc thực tế cào dữ liệu và báo cáo.
+    Luồng công việc thực tế cào dữ liệu và báo cáo theo lịch tự động từ Supabase.
+    Chạy mỗi phút để kiểm tra nhóm nào có giờ cào khớp với hiện tại.
     """
-    logger.info("🚀 BẮT ĐẦU CHẠY TIẾN TRÌNH CÀO DỮ LIỆU TỰ ĐỘNG...")
+    logger.info("🚀 KIỂM TRA LỊCH CÀO DỮ LIỆU TỰ ĐỘNG...")
     telegram = TelegramService()
-    service_24h = TargetGroupSheet24HService()
-    service_posts = GoogleSheetServicePosts()
+    supabase = get_supabase_client()
     
     try:
+        now = datetime.now()
+        current_time_str = now.strftime("%H:%M") # Ví dụ: "10:15"
         
-        sheet_data = service_24h.get_all_target_groups()
-        print(f"🚀 Lấy dữ liệu nhóm mục tiêu từ Google Sheet 24h: {sheet_data} nhóm")
+        # Lấy tất cả nhóm được bật cào 24h
+        res = supabase.table("facebook_groups").select("*").eq("chay_24h", True).execute()
+        all_auto_groups = res.data or []
+        
         target_groups: List[GroupTarget] = []
-        for row in sheet_data:
+        for row in all_auto_groups:
+            # Lấy giờ đã set trong DB, nếu lưu kiểu time SQL thì chuỗi có dạng "15:30:00"
+            db_time = row.get("crawl_time")
+            if not db_time:
+                continue
             
-            group_url = row.get("url", "").strip()
-            group_name = row.get("group_name", "Unknown").strip()
-            Intent = row.get("intent", "").strip()
-            if not group_url: continue
-            target_groups.append(GroupTarget(name=group_name, url=group_url,Intent=Intent or ""))
+            # Cắt lấy giờ phút từ DB (để so sánh với HH:MM)
+            # Ví dụ: "15:30:00" -> "15:30"
+            db_time_hhmm = str(db_time)[:5] 
+            
+            if db_time_hhmm == current_time_str:
+                group_url = row.get("group_url", "").strip()
+                group_name = row.get("group_name", "Unknown").strip()
+                intent_val = str(row.get("id_intent", ""))
+                if not group_url: continue
+                target_groups.append(GroupTarget(name=group_name, url=group_url, Intent=intent_val))
 
         if not target_groups:
-            logger.warning("❌ Không tìm thấy danh sách Group hợp lệ.")
+            # Không log error, chỉ kết thúc nhẹ nhàng nếu không có job vào phút này
             return
 
         # 3. Bắt đầu cào
@@ -55,16 +68,17 @@ def execute_crawl_workflow():
         scraper = FacebookScraper(Config)
         daily_summary_report: List[GroupSummary] = scraper.scrape_groups(target_groups)
 
-        # 4. Gửi báo cáo
+        # 4. Gửi báo cáo và lưu Supabase
         if daily_summary_report:
-            success = service_posts.append_data(data=daily_summary_report)
-            if success:
+            try:
+                save_facebook_crawl_to_supabase("cronjob", daily_summary_report)
+                
                 telegram.send_completion_notification()
                 mes = telegram.format_daily_telegram_report(summaries=daily_summary_report)
                 telegram.send_message(mes)
-                logger.info("✅ HOÀN TẤT TIẾN TRÌNH.")
-            else:
-                logger.error("❌ Lỗi khi lưu dữ liệu vào Google Sheet.")
+                logger.info("✅ HOÀN TẤT TIẾN TRÌNH LƯU SUPABASE.")
+            except Exception as e:
+                logger.error(f"❌ Lỗi khi lưu dữ liệu vào Supabase: {e}")
         else:
             logger.warning("⚠️ Không thu được dữ liệu.")
 
@@ -75,90 +89,7 @@ def execute_crawl_workflow():
              telegram.send_message(f"🚨 <b>LỖI HỆ THỐNG</b> 🚨\n\n<code>{str(e)}</code>")
         except: 
             pass
-def execute_update_groups_workflow():
-    """
-    Luồng công việc tổng hợp chỉ số (Post/tuần, Điểm số cao nhất và Ngày cào gần nhất) 
-    từ danh sách Posts và cập nhật lại vào sheet Groups.
-    """
-    logger.info("📊 BẮT ĐẦU TỔNG HỢP VÀ CẬP NHẬT CHỈ SỐ GROUPS...")
-    service_posts = GoogleSheetServicePosts()
-    service_groups = GroupManagementSheetService()
-    telegram = TelegramService()
 
-    try:
-        # 1. Lấy toàn bộ bài viết đã lưu
-        all_posts = service_posts.get_all_posts()
-        if not all_posts:
-            logger.warning("⚠️ Không có dữ liệu bài viết để tổng hợp chỉ số.")
-            return
-
-        # 2. Phân tích và gom nhóm theo URL Group
-        group_metrics: Dict[str, Dict[str, Any]] = {}
-        seven_days_ago = datetime.now() - timedelta(days=7)
-
-        for post in all_posts:
-            group_url = post.get("link_group", "").strip()
-            if not group_url:
-                continue
-
-            score = post.get("score", 0)
-            crawl_date_str = post.get("dateCrawl", "").strip()
-
-            # Khởi tạo dữ liệu cho Group nếu chưa tồn tại
-            if group_url not in group_metrics:
-                group_metrics[group_url] = {
-                    "max_score": 0.0,
-                    "posts_last_7d": 0,
-                    "last_crawl": "" # <--- THÊM MỚI
-                }
-
-            # Cập nhật điểm số cao nhất
-            if score > group_metrics[group_url]["max_score"]:
-                group_metrics[group_url]["max_score"] = float(score)
-
-            # Xử lý ngày tháng để đếm bài viết 7 ngày và tìm ngày cào gần nhất
-            if crawl_date_str:
-                try:
-                    crawl_date = datetime.strptime(crawl_date_str, "%Y-%m-%d %H:%M:%S")
-                    
-                    # Cập nhật ngày cào gần nhất (So sánh chuỗi hoặc datetime)
-                    # Nếu last_crawl trống hoặc ngày hiện tại mới hơn ngày đã lưu
-                    current_last_crawl_str = group_metrics[group_url]["last_crawl"]
-                    if not current_last_crawl_str or crawl_date_str > current_last_crawl_str:
-                        group_metrics[group_url]["last_crawl"] = crawl_date_str
-
-                    # Đếm số bài trong 7 ngày qua
-                    if crawl_date >= seven_days_ago:
-                        group_metrics[group_url]["posts_last_7d"] += 1
-                except Exception:
-                    # Nếu lỗi định dạng ngày, vẫn tính là 1 post nhưng không cập nhật last_crawl
-                    group_metrics[group_url]["posts_last_7d"] += 1
-            else:
-                group_metrics[group_url]["posts_last_7d"] += 1
-
-        # 3. Thực thi cập nhật từng Group trên Sheet
-        logger.info(f"🔄 Bắt đầu cập nhật dữ liệu cho {len(group_metrics)} Groups...")
-        success_count = 0
-
-        for group_url, metrics in group_metrics.items():
-            # Chuẩn bị payload cập nhật
-            update_payload = {
-                Config.POSTS_PER_WEEK_GG_SHEET: metrics["posts_last_7d"],
-                Config.HEALTH_SCORE_GG_SHEET: metrics["max_score"],
-                Config.LAST_CRAWL_GG_SHEET: metrics["last_crawl"] # <--- THÊM MỚI
-            }
-            
-            is_updated = service_groups.update_group_metrics(
-                group_url=group_url, 
-                update_data=update_payload
-            )
-            if is_updated:
-                success_count += 1
-
-        logger.info(f"✅ HOÀN TẤT CẬP NHẬT CHỈ SỐ GROUPS. Thành công: {success_count}/{len(group_metrics)}")
-
-    except Exception as e:
-        logger.error(f"❌ Thất bại khi cập nhật chỉ số Groups: {e}", exc_info=True)
 
 # ==============================================================================
 # ✅ LUỒNG TÁC VỤ 3 THÊM MỚI: BACKUP VÀ RESET ĐIỂM SỐ HÀNG TUẦN (CHỦ NHẬT 2:00 AM)
@@ -252,19 +183,11 @@ def setup_and_start_jobs():
     scheduler.add_job(
         func=execute_crawl_workflow,
         trigger='cron',
-        hour=Config.CRAWL_HOUR,
-        minute=Config.CRAWL_MINUTE,
+        minute='*', # Chạy mỗi phút
         id='daily_facebook_crawl',
         replace_existing=True
     )
-    scheduler.add_job(
-        func=execute_update_groups_workflow,
-        trigger='cron',
-        hour=Config.GROUP_HOUR,
-        minute=Config.GROUP_MINUTE,
-        id='daily_facebook_UPDATE_GROUP',
-        replace_existing=True
-    )
+
     scheduler.add_job(
         func=execute_weekly_backup_and_reset_workflow,
         trigger='cron',

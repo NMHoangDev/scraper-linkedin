@@ -469,6 +469,7 @@ export interface KpiItem {
   total_comment: string | number;
   total_post_crawl: string | number;
   total_session_crawl: string | number;
+  platform?: string;
 }
 
 export interface AssignKpiRequest {
@@ -518,6 +519,7 @@ export interface UpdateProfileSlugRequest {
 
 export interface VerifyLeaderCodeRequest {
   code: string;
+  email?: string;
 }
 
 export interface KpiMemberData {
@@ -526,6 +528,10 @@ export interface KpiMemberData {
   profile_slug?: string;
   email_leader?: string;
   kpi: any[];
+  /** Facebook/LinkedIn profile ID — dùng lọc seeding chuẩn xác */
+  profile_id?: string;
+  /** Tên Facebook hiển thị trên web — dùng lọc dự phòng */
+  facebook_name?: string;
 }
 
 export interface GetAllKpiResponse extends ApiResponse<KpiMemberData[]> {

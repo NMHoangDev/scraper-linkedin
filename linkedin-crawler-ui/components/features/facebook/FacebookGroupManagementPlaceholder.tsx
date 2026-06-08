@@ -1,6 +1,6 @@
 "use client";
 
-import { DashboardGroups } from "@/components/nguyen/modules/crawldFB/components/dashboardGroups";
+import { DashboardGroups } from "@/components/facebook-crawler/modules/facebook-crawl/components/dashboard-groups";
 
 export function FacebookGroupManagementPlaceholder() {
   return (

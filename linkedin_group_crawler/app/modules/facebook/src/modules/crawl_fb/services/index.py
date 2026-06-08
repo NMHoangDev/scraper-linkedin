@@ -11,6 +11,7 @@ from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_groups_ser
 from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_posts import GoogleSheetServicePosts
 from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_groups_24h import TargetGroupSheet24HService
 from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_intent_service import IntentSheetService
+from app.modules.all_platform.services.supabase_facebook_crawl_service import save_facebook_crawl_to_supabase
 
 
 logger = logging.getLogger(__name__)
@@ -21,18 +22,10 @@ class CrawlService:
     def __init__(
         self, 
         scraper: FacebookScraper, 
-        telegram: TelegramService, 
-        group_sheet: GroupManagementSheetService,
-        post_sheet: GoogleSheetServicePosts,
-        group_24h_sheet:TargetGroupSheet24HService,
-        intent_sheet:IntentSheetService
+        telegram: TelegramService
     ):
         self.scraper = scraper
         self.telegram = telegram
-        self.group_sheet = group_sheet
-        self.post_sheet = post_sheet
-        self.group_24h_sheet = group_24h_sheet
-        self.intent_sheet = intent_sheet
 
 
     async def _execute_scraping(self, payload: CrawlPayload, client_id: Optional[str] = None) -> List[GroupSummary]:
@@ -54,7 +47,14 @@ class CrawlService:
             daily_summary_report = await self._execute_scraping(payload)
              
             if daily_summary_report:
-                self.post_sheet.append_data(data=daily_summary_report)
+                # Chỉ lưu lên Supabase, loại bỏ Google Sheets
+                email_crawl = getattr(payload.tkFB, 'useName', '') if payload.tkFB else ''
+                
+                try:
+                    await asyncio.to_thread(save_facebook_crawl_to_supabase, email_crawl, daily_summary_report)
+                except Exception as db_err:
+                    logger.error(f"Lỗi khi lưu Supabase trong Cronjob: {db_err}")
+
                 self.telegram.send_completion_notification()
                 mes = self.telegram.format_daily_telegram_report(summaries=daily_summary_report)
                 self.telegram.send_message(mes)
@@ -81,10 +81,15 @@ class CrawlService:
             scraped_data = await self._execute_scraping(payload, client_id=client_id)
             
             if scraped_data:
-                await asyncio.gather(
-                    asyncio.to_thread(self.post_sheet.append_data, scraped_data),
-                    asyncio.to_thread(self.group_sheet.add_multiple_groups, scraped_data)
-                )
+                email_crawl = client_id or (getattr(payload.tkFB, 'useName', '') if payload.tkFB else '')
+                
+                try:
+                    # Chuyển đổi và lưu bài viết lên Supabase facebook_posts
+                    await asyncio.to_thread(save_facebook_crawl_to_supabase, email_crawl, scraped_data)
+                except Exception as db_err:
+                    logger.error(f"Lỗi khi lưu Supabase: {db_err}")
+                    # Không văng lỗi 500 để vẫn trả về data cho FE, chỉ log lại
+                    
                 return {"status": "success", "message": "Cào thành công.", "data": scraped_data}
             else:
                 return {"status": "success", "message": "Không có bài viết mới.", "data": []}
@@ -104,70 +109,4 @@ class CrawlService:
                 detail=f"Hệ thống Crawler gặp sự cố: {str(e)}"
             )
             
-    async def get_all_posts_from_sheet(self):
-        try:
-            records = await run_in_threadpool(self.post_sheet.get_all_posts)  # Giả sử có hàm get_all_posts() trong GoogleSheetServicePosts
-            return {
-                "status": "success", 
-                "message": "Lấy dữ liệu thành công.", 
-                "data": records
-            }
-            
-        except Exception as e:
-            logger.error(f"Lỗi khi đọc Google Sheet: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Không thể đọc dữ liệu từ Google Sheets: {str(e)}"
-            )
 
-    async def update_group(self, group_url: str, update_data: dict):
-        """
-        Cập nhật thông tin Group Facebook trong Google Sheets
-        
-        Args:
-            group_url: URL của group cần cập nhật
-            update_data: Dict chứa các trường cần cập nhật
-        
-        Returns:
-            Dict với status và message
-        """
-        try:
-            # Cập nhật group trong Google Sheets
-            result = await run_in_threadpool(
-                self.group_sheet.update_group_metrics, 
-                group_url=group_url, 
-                update_data=update_data
-            )
-            
-            return {
-                "status": "success",
-                "message": "Cập nhật group thành công.",
-                "data": result
-            }
-        
-        except Exception as e:
-            logger.error(f"Lỗi khi cập nhật group: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Không thể cập nhật group: {str(e)}"
-            )
-
-    async def delete_group(self, group_url: str):
-        """Xóa Group Facebook trong Google Sheets"""
-        try:
-            result = await run_in_threadpool(
-                self.group_sheet.delete_group, 
-                group_url=group_url
-            )
-            
-            return {
-                "status": "success",
-                "message": "Xóa group thành công.",
-                "data": result
-            }
-        except Exception as e:
-            logger.error(f"Lỗi khi xóa group: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Không thể xóa group: {str(e)}"
-            )

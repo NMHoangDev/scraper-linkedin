@@ -10,6 +10,8 @@ import {
   shortenSessionId,
 } from "@/components/features/linkedin/dashboard/LinkedIn-n8n-sheet-helpers";
 import { SessionPostsModal } from "@/components/features/linkedin/dashboard/LinkedIn-SessionPostsModal";
+import { linkedInCrawlService } from "@/services/all-platform.service";
+import { MaterialIcon } from "@/components/ui";
 
 export interface CrawlSessionsTableCoreProps {
   sessions: CrawlSessionGroup[] | null;
@@ -50,6 +52,26 @@ export function CrawlSessionsTableCore({
     return sessions.find((s) => s.id_session_crawl === openSessionId) ?? null;
   }, [openSessionId, sessions]);
   const [page, setPage] = useState(1);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDeleteSession = async (sessionId: string) => {
+    if (!confirm("Bạn có chắc chắn muốn xóa phiên cào này và TẤT CẢ các bài viết trong phiên?")) return;
+    setDeletingId(sessionId);
+    try {
+      const res = await linkedInCrawlService.deleteSession(sessionId);
+      if (res.success) {
+        if (refreshSessionsAfterReaction) {
+          await refreshSessionsAfterReaction();
+        }
+      } else {
+        alert(res.message || "Xóa thất bại");
+      }
+    } catch (e) {
+      alert("Lỗi khi xóa phiên cào");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const isFiltered = tableVariant === "filtered";
   const colCount = isFiltered ? 6 : 5;
@@ -69,38 +91,38 @@ export function CrawlSessionsTableCore({
 
   return (
     <>
-      <div className="overflow-x-auto rounded-lg border border-outline-variant">
-        <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-          <thead className="bg-surface-container-low border-outline-variant border-b">
+      <div className="overflow-x-auto rounded-2xl border border-slate-100 shadow-sm bg-white">
+        <table className="w-full min-w-[720px] border-collapse text-left text-xs font-sans">
+          <thead className="bg-slate-50 border-b border-slate-100">
             <tr>
-              <th className="text-table-header text-on-surface-variant px-md py-md font-semibold uppercase">
+              <th className="text-slate-500 font-bold px-4 py-3.5 uppercase tracking-wider">
                 Phiên cào
               </th>
-              <th className="text-table-header text-on-surface-variant px-md py-md font-semibold uppercase">
+              <th className="text-slate-500 font-bold px-4 py-3.5 uppercase tracking-wider">
                 Email crawl
               </th>
-              <th className="text-table-header text-on-surface-variant px-md py-md text-right font-semibold uppercase">
+              <th className="text-slate-500 font-bold px-4 py-3.5 text-right uppercase tracking-wider">
                 Số nhóm / bài
               </th>
-              <th className="text-table-header text-on-surface-variant px-md py-md font-semibold uppercase">
+              <th className="text-slate-500 font-bold px-4 py-3.5 uppercase tracking-wider">
                 Ngày (gần nhất)
               </th>
               {isFiltered ? (
-                <th className="text-table-header text-on-surface-variant max-w-[200px] px-md py-md font-semibold uppercase">
+                <th className="text-slate-500 font-bold max-w-[200px] px-4 py-3.5 uppercase tracking-wider">
                   Ngày / điều kiện lọc
                 </th>
               ) : null}
-              <th className="text-table-header text-on-surface-variant px-md py-md text-right font-semibold uppercase">
-                Chi tiết
+              <th className="text-slate-500 font-bold px-4 py-3.5 text-right uppercase tracking-wider">
+                Hành động
               </th>
             </tr>
           </thead>
-          <tbody className="divide-outline-variant divide-y">
+          <tbody className="divide-y divide-slate-100">
             {loading ? (
               <tr>
                 <td
                   colSpan={colCount}
-                  className="text-on-surface-variant px-md py-lg text-center"
+                  className="text-slate-500 px-4 py-8 text-center font-medium text-sm"
                 >
                   {loadingHint}
                 </td>
@@ -111,7 +133,7 @@ export function CrawlSessionsTableCore({
               <tr>
                 <td
                   colSpan={colCount}
-                  className="text-on-surface-variant px-md py-lg text-center"
+                  className="text-slate-500 px-4 py-8 text-center font-medium text-sm"
                 >
                   {emptyHint}
                 </td>
@@ -122,42 +144,58 @@ export function CrawlSessionsTableCore({
               paginatedSessions.map((row, rowIdx) => (
                 <tr
                   key={`${row.id_session_crawl}-${pageStart + rowIdx}`}
-                  className={`hover:bg-surface-container/50 transition-colors ${
+                  className={`hover:bg-slate-50/50 transition-colors ${
                     refreshingWithRows ? "opacity-70" : ""
                   }`}
                 >
-                  <td className="px-md py-md">
+                  <td className="px-4 py-3.5">
                     <button
                       type="button"
                       onClick={() => setOpenSessionId(row.id_session_crawl)}
-                      className="text-primary hover:underline text-left font-mono text-xs"
+                      className="text-[#E3000F] hover:text-[#C40009] hover:underline text-left font-mono font-bold text-xs"
                       title={row.id_session_crawl}
                     >
                       {shortenSessionId(row.id_session_crawl)}
                     </button>
                   </td>
-                  <td className="text-on-surface max-w-[200px] px-md py-md break-all">
+                  <td className="text-slate-700 font-semibold max-w-[200px] px-4 py-3.5 break-all text-sm">
                     {row.email_crawl || "—"}
                   </td>
-                  <td className="text-on-surface px-md py-md text-right tabular-nums">
+                  <td className="text-slate-700 font-bold px-4 py-3.5 text-right tabular-nums text-sm">
                     {row.posts_count.toLocaleString("vi-VN")}
                   </td>
-                  <td className="text-on-surface-variant px-md py-md whitespace-nowrap">
+                  <td className="text-slate-500 px-4 py-3.5 whitespace-nowrap text-sm">
                     {sessionLatestDateLabel(row)}
                   </td>
                   {isFiltered ? (
-                    <td className="text-on-surface-variant max-w-[220px] px-md py-md text-xs break-words">
+                    <td className="text-slate-500 max-w-[220px] px-4 py-3.5 text-xs break-words font-medium">
                       {filterAppliedLabel || "—"}
                     </td>
                   ) : null}
-                  <td className="px-md py-md text-right">
-                    <button
-                      type="button"
-                      onClick={() => setOpenSessionId(row.id_session_crawl)}
-                      className="text-primary text-xs font-bold uppercase tracking-wide hover:underline"
-                    >
-                      Xem
-                    </button>
+                  <td className="px-4 py-3.5 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setOpenSessionId(row.id_session_crawl)}
+                        className="text-[#E3000F] hover:bg-[#F5F5F5] rounded-lg p-1.5 transition cursor-pointer"
+                        title="Xem chi tiết"
+                      >
+                        <MaterialIcon name="visibility" className="text-base" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteSession(row.id_session_crawl)}
+                        disabled={deletingId === row.id_session_crawl}
+                        className="text-[#FF3344] hover:bg-red-50 rounded-lg p-1.5 transition cursor-pointer disabled:opacity-50"
+                        title="Xóa phiên"
+                      >
+                        {deletingId === row.id_session_crawl ? (
+                          <div className="w-4 h-4 border-2 border-red-200 border-t-red-600 rounded-full animate-spin" />
+                        ) : (
+                          <MaterialIcon name="delete" className="text-base" />
+                        )}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -166,7 +204,7 @@ export function CrawlSessionsTableCore({
               <tr>
                 <td
                   colSpan={colCount}
-                  className="text-on-surface-variant px-md py-lg text-center"
+                  className="text-slate-500 px-4 py-8 text-center font-medium text-sm"
                 >
                   {emptyHint}
                 </td>
@@ -176,27 +214,27 @@ export function CrawlSessionsTableCore({
         </table>
       </div>
       {hasRows || refreshingWithRows ? (
-        <div className="text-body-sm text-on-surface-variant mt-md flex items-center justify-between gap-md">
+        <div className="text-xs text-slate-500 mt-4 flex items-center justify-between gap-4 font-sans font-medium">
           <span>
             Hiển thị {pageStart + 1}–
             {Math.min(pageStart + PAGE_SIZE, totalRows)} / {totalRows} phiên
           </span>
-          <div className="flex items-center gap-sm">
+          <div className="flex items-center gap-1">
             <button
               type="button"
-              className="hover:bg-surface-container-high rounded p-2 transition-colors disabled:opacity-30"
+              className="hover:bg-slate-100 rounded-lg p-2 transition-all disabled:opacity-30 disabled:hover:bg-transparent"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={safePage <= 1}
               aria-label="Trang trước"
             >
               ‹
             </button>
-            <span className="text-on-surface px-md font-bold">
+            <span className="text-slate-800 px-3 font-bold text-sm">
               {safePage}/{totalPages}
             </span>
             <button
               type="button"
-              className="hover:bg-surface-container-high rounded p-2 transition-colors disabled:opacity-30"
+              className="hover:bg-slate-100 rounded-lg p-2 transition-all disabled:opacity-30 disabled:hover:bg-transparent"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={safePage >= totalPages}
               aria-label="Trang sau"

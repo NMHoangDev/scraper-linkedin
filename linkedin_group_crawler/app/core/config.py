@@ -203,6 +203,11 @@ def _n8n_webhook_add_member_from_env() -> str:
     return (os.getenv("N8N_WEBHOOK_ADD_MEMBER") or "").strip()
 
 
+def _n8n_webhook_category_management_from_env() -> str:
+    """Webhook quản lý danh mục — /categories (n8n category management)."""
+    return (os.getenv("N8N_CATEGORY_MANAGEMENT") or "").strip()
+
+
 def _leader_code_from_env() -> str:
     """Mã code để xác nhận vai trò Leader."""
     return (os.getenv("LEADER_CODE") or "8888").strip()
@@ -375,8 +380,16 @@ class Settings:
     n8n_webhook_add_member_url: str = field(
         default_factory=_n8n_webhook_add_member_from_env,
     )
+    n8n_webhook_category_management_url: str = field(
+        default_factory=_n8n_webhook_category_management_from_env,
+    )
     leader_code: str = field(
         default_factory=_leader_code_from_env,
+    )
+    jwt_secret_key: str = os.getenv("JWT_SECRET_KEY", "crawlpro-default-secret-change-me")
+    jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
+    jwt_access_token_expire_minutes: int = int(
+        os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "10080"),
     )
     google_service_account_json_path: Path = field(
         default_factory=_google_service_account_json_from_env,

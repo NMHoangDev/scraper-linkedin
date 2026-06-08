@@ -56,12 +56,7 @@ export const emptyUnifiedGroupEntry = (
 
 import { detectPlatformFromUrl } from "@/lib/group-taxonomy";
 
-export const LINKEDIN_GROUP_TYPE_OPTIONS = [
-  "Group cào",
-  "Group cộng đồng",
-  "Group việc làm",
-  "Group chuyên môn",
-] as const;
+export const LINKEDIN_GROUP_TYPE_OPTIONS: readonly string[] = []; // Deprecated, use dynamic categories from getCategoriesService() instead
 
 export function detectPlatformFromGroupUrl(url: string): "facebook" | "linkedin" {
   return detectPlatformFromUrl(url);

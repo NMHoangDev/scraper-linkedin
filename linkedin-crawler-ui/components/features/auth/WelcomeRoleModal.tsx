@@ -6,7 +6,7 @@ import { MaterialIcon } from "@/components/ui";
 interface WelcomeRoleModalProps {
   isOpen: boolean;
   onSelect: (role: "leader" | "member") => void;
-  confirmLeaderRoleWithSheet: (code: string) => Promise<void>;
+  confirmLeaderRoleWithSheet: (email: string, code: string) => Promise<void>;
 }
 
 export function WelcomeRoleModal({
@@ -15,6 +15,7 @@ export function WelcomeRoleModal({
   confirmLeaderRoleWithSheet,
 }: WelcomeRoleModalProps) {
   const [selectedRole, setSelectedRole] = useState<"leader" | "member">("member");
+  const [emailVal, setEmailVal] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -23,6 +24,10 @@ export function WelcomeRoleModal({
 
   const handleConfirm = async () => {
     if (selectedRole === "leader") {
+      if (!emailVal.trim()) {
+        setError("Vui lòng nhập email.");
+        return;
+      }
       if (!code.trim()) {
         setError("Vui lòng nhập mã code Leader.");
         return;
@@ -30,7 +35,7 @@ export function WelcomeRoleModal({
       setBusy(true);
       setError(null);
       try {
-        await confirmLeaderRoleWithSheet(code.trim());
+        await confirmLeaderRoleWithSheet(emailVal.trim(), code.trim());
         onSelect("leader");
       } catch (err) {
         setError(
@@ -40,7 +45,13 @@ export function WelcomeRoleModal({
         setBusy(false);
       }
     } else {
+      if (!emailVal.trim()) {
+        setError("Vui lòng nhập email của bạn.");
+        return;
+      }
+      localStorage.setItem("linkedin_crawler_email", emailVal.trim());
       localStorage.setItem("linkedin_crawler_role", "member");
+      localStorage.removeItem("linkedin_crawler_role_bypass");
       onSelect("member");
     }
   };
@@ -57,34 +68,34 @@ export function WelcomeRoleModal({
         </div>
 
         <div className="grid grid-cols-2 gap-md">
-          <label 
+          <label
             className={`
               flex flex-col items-center gap-sm p-lg rounded-xl border-2 cursor-pointer transition-all
               ${selectedRole === "member" ? "border-primary bg-primary/5" : "border-outline-variant hover:border-outline"}
             `}
           >
-            <input 
-              type="radio" 
-              name="role" 
-              className="hidden" 
-              checked={selectedRole === "member"} 
+            <input
+              type="radio"
+              name="role"
+              className="hidden"
+              checked={selectedRole === "member"}
               onChange={() => { setSelectedRole("member"); setError(null); }}
             />
             <MaterialIcon name="person" className={selectedRole === "member" ? "text-primary" : "text-on-surface-variant"} />
             <span className={`font-bold ${selectedRole === "member" ? "text-primary" : "text-on-surface-variant"}`}>Thành Viên</span>
           </label>
 
-          <label 
+          <label
             className={`
               flex flex-col items-center gap-sm p-lg rounded-xl border-2 cursor-pointer transition-all
               ${selectedRole === "leader" ? "border-primary bg-primary/5" : "border-outline-variant hover:border-outline"}
             `}
           >
-            <input 
-              type="radio" 
-              name="role" 
-              className="hidden" 
-              checked={selectedRole === "leader"} 
+            <input
+              type="radio"
+              name="role"
+              className="hidden"
+              checked={selectedRole === "leader"}
               onChange={() => { setSelectedRole("leader"); setError(null); }}
             />
             <MaterialIcon name="shield_person" className={selectedRole === "leader" ? "text-primary" : "text-on-surface-variant"} />
@@ -92,19 +103,33 @@ export function WelcomeRoleModal({
           </label>
         </div>
 
-        {selectedRole === "leader" && (
-          <div className="space-y-base animate-in slide-in-from-top-2">
-            <label className="text-label-md font-bold text-on-surface-variant">Nhập mã code xác nhận</label>
-            <input 
-              type="password"
-              placeholder="••••"
-              className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-md py-sm text-center text-xl tracking-[1em] outline-none focus:ring-2 focus:ring-primary"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
+        <div className="space-y-xs animate-in slide-in-from-top-2">
+          <div className="space-y-xs">
+            <label className="text-label-md font-bold text-on-surface-variant">Email của bạn <span className="text-error">*</span></label>
+            <input
+              type="email"
+              placeholder="email@example.com"
+              className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-md py-sm outline-none focus:ring-2 focus:ring-primary"
+              value={emailVal}
+              onChange={(e) => setEmailVal(e.target.value)}
               disabled={busy}
             />
           </div>
-        )}
+
+          {selectedRole === "leader" && (
+            <div className="space-y-xs animate-in slide-in-from-top-2">
+              <label className="text-label-md font-bold text-on-surface-variant">Nhập mã code xác nhận</label>
+              <input
+                type="password"
+                placeholder="••••"
+                className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-md py-sm text-center text-xl tracking-[1em] outline-none focus:ring-2 focus:ring-primary"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                disabled={busy}
+              />
+            </div>
+          )}
+        </div>
 
         {error && (
           <div className="flex items-center gap-xs text-error bg-error-container/20 p-sm rounded border border-error-container text-body-sm">
@@ -113,10 +138,10 @@ export function WelcomeRoleModal({
           </div>
         )}
 
-        <button 
+        <button
           onClick={handleConfirm}
           disabled={busy}
-          className="w-full bg-primary text-on-primary py-md rounded-xl font-h3 font-bold uppercase hover:brightness-110 disabled:opacity-50 transition-all shadow-lg shadow-primary/20"
+          className="w-full bg-primary text-on-primary py-md rounded-xl font-h3 font-bold uppercase hover:brightness-110 disabled:opacity-50 transition-all shadow-lg shadow-primary/20 cursor-pointer"
         >
           {busy ? "Đang xác thực..." : "Vào Dashboard"}
         </button>

@@ -1893,11 +1893,11 @@ class KpiItem(BaseModel):
     start_day: str = Field(..., validation_alias=AliasChoices("start_day", "startDay"))
     end_day: str = Field(..., validation_alias=AliasChoices("end_day", "endDay"))
     total_reaction: Union[int, str] = Field(
-        ...,
+        default=0,
         validation_alias=AliasChoices("total_reaction", "totalReaction", "reactions"),
     )
     total_comment: Union[int, str] = Field(
-        ...,
+        default=0,
         validation_alias=AliasChoices("total_comment", "totalComment", "comments"),
     )
     total_post_crawl: Union[int, str] = Field(
@@ -1905,9 +1905,10 @@ class KpiItem(BaseModel):
         validation_alias=AliasChoices("total_post_crawl", "totalPostCrawl", "posts"),
     )
     total_session_crawl: Union[int, str] = Field(
-        ...,
+        default=0,
         validation_alias=AliasChoices("total_session_crawl", "totalSessionCrawl", "sessions"),
     )
+    platform: Optional[str] = Field(default="Facebook")
 
 
 class AssignKpiRequest(BaseModel):
@@ -1979,6 +1980,12 @@ class VerifyLeaderCodeRequest(BaseModel):
     """POST /auth/verify-leader-code — Kiểm tra mã leader."""
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
     code: str
+    email: Optional[str] = None
+
+class UpdateRoleToMemberRequest(BaseModel):
+    """POST /auth/update-role-to-member — Cập nhật vai trò member."""
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    email: str
 
 class GetProfilesRequest(BaseModel):
     """POST /linkedin/all-profiles — Lấy danh sách toàn bộ profile."""
@@ -1994,3 +2001,94 @@ class UpdateProfileSlugRequest(BaseModel):
     role: str = Field(default="member", validation_alias=AliasChoices("role", "member_role", "memberRole"))
     kpi: list[dict[str, Any]] = Field(default_factory=list)
     email_leader: Optional[str] = Field(default="", validation_alias=AliasChoices("email_leader", "emailLeader", "leaderEmail"))
+
+
+class N8nCategoryAddRequest(BaseModel):
+    """POST /categories/add — Thêm tùy chọn danh mục."""
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    category_type: str = Field(..., validation_alias=AliasChoices("category_type", "categoryType", "category"))
+    value: str = Field(..., validation_alias=AliasChoices("value", "type"))
+    name: str
+    platform: Optional[str] = Field(default=None)
+
+class N8nCategoryUpdateRequest(BaseModel):
+    """POST /categories/update — Cập nhật tùy chọn danh mục."""
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    category_type: str = Field(..., validation_alias=AliasChoices("category_type", "categoryType", "category"))
+    value: str = Field(..., validation_alias=AliasChoices("value", "type"))
+    name: str
+    platform: Optional[str] = Field(default=None)
+
+class N8nCategoryDeleteRequest(BaseModel):
+    """POST /categories/delete — Xóa tùy chọn danh mục."""
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    category_type: str = Field(..., validation_alias=AliasChoices("category_type", "categoryType", "category"))
+    value: str = Field(..., validation_alias=AliasChoices("value", "type"))
+    platform: Optional[str] = Field(default=None)
+
+class SaveSeedingKpiRequest(BaseModel):
+    """POST /seeding-kpi/save — Lưu seeding kpi của extension.
+    Extension cần gửi kèm profile_id (lọc chuẩn) và facebook_name (lọc dự phòng)
+    để đảm bảo chỉ đọc seeding của đúng người dùng.
+    """
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    email_member: str = Field(..., validation_alias=AliasChoices("email_member", "emailMember", "email"))
+    name: Optional[str] = Field(default="", validation_alias=AliasChoices("name", "memberName"))
+    name_profile: str = Field(..., validation_alias=AliasChoices("name_profile", "nameProfile", "profileName", "url_profile", "url_profiles"))
+    platform: str = Field(default="facebook", validation_alias=AliasChoices("platform"))
+    content: str = Field(..., validation_alias=AliasChoices("content", "text"))
+    link_post: str = Field(..., validation_alias=AliasChoices("link_post", "linkPost", "postUrl"))
+    verify: str = Field(default="Đã seeding", validation_alias=AliasChoices("verify", "status"))
+    link_comment: Optional[str] = Field(default="", validation_alias=AliasChoices("link_comment", "linkComment", "commentLink"))
+    # --- Trường mới: lọc chuẩn xác ---
+    profile_id: Optional[str] = Field(
+        default="",
+        validation_alias=AliasChoices("profile_id", "profileId", "uid"),
+        description="Facebook/LinkedIn profile ID của người dùng hiện tại"
+    )
+    facebook_name: Optional[str] = Field(
+        default="",
+        validation_alias=AliasChoices("facebook_name", "facebookName", "fb_name"),
+        description="Tên Facebook hiển thị trên web (lọc dự phòng)"
+    )
+
+
+class GetSeedingKpiRequest(BaseModel):
+    """POST /seeding-kpi/get-all — Lấy danh sách seeding kpi.
+    Filter theo email_member + profile_id + facebook_name (AND logic).
+    Nếu profile_id hoặc facebook_name rỗng — bỏ qua filter đó.
+    """
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    email_member: Optional[str] = Field(default="", validation_alias=AliasChoices("email_member", "emailMember", "email"))
+    profile_id: Optional[str] = Field(default="", validation_alias=AliasChoices("profile_id", "profileId", "uid"))
+    facebook_name: Optional[str] = Field(default="", validation_alias=AliasChoices("facebook_name", "facebookName", "fb_name"))
+
+
+class MarkSeedingRequest(BaseModel):
+    """POST /seeding-mark/save — Đánh dấu seeding (Step 1).
+    Lưu email + link_post vào sheet. Verify sẽ được fill ở Step 2.
+    """
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    email_member: str = Field(..., validation_alias=AliasChoices("email_member", "emailMember", "email"))
+    link_post: str = Field(..., validation_alias=AliasChoices("link_post", "linkPost", "postUrl"))
+
+
+class GetSeedingMarkRequest(BaseModel):
+    """POST /seeding-mark/get-unverified — Lấy danh sách seeding marks chưa verify của 1 member."""
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    email_member: str = Field(..., validation_alias=AliasChoices("email_member", "emailMember", "email"))
+
+
+class VerifySeedingRequest(BaseModel):
+    """POST /seeding-mark/verify — Verify dòng đã mark (Step 2)."""
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    email_member: str = Field(..., validation_alias=AliasChoices("email_member", "emailMember", "email"))
+    link_post: str = Field(..., validation_alias=AliasChoices("link_post", "linkPost", "postUrl"))
+    name: Optional[str] = Field(default="")
+    link_comment: Optional[str] = Field(default="")
+    name_profile: Optional[str] = Field(default="")
+    platform: Optional[str] = Field(default="facebook")
+    content: Optional[str] = Field(default="")
+    profile_id: Optional[str] = Field(default="")
+    facebook_name: Optional[str] = Field(default="")
+    verify: Optional[str] = Field(default="yes")

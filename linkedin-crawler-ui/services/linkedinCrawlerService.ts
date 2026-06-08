@@ -73,20 +73,38 @@ function buildHeaders(): HeadersInit {
 async function requestJson<TResponse>(
   path: string,
   init?: RequestInit,
+  timeoutMs = 10000,
 ): Promise<TResponse> {
   let response: Response;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  // Chain signals: dùng AbortSignal.any() nếu có, hoặc fallback về internal signal
+  let finalSignal: AbortSignal | undefined = controller.signal;
+  const externalSignal = init?.signal;
+  if (externalSignal && typeof AbortSignal.any === "function") {
+    finalSignal = AbortSignal.any([controller.signal, externalSignal]);
+  }
+
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
-      credentials: init?.credentials ?? "include",
+      signal: finalSignal,
+      credentials: "omit",
       headers: {
         ...buildHeaders(),
         ...init?.headers,
       },
     });
   } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === "AbortError") {
+      throw error; // re-throw AbortError as-is, don't wrap
+    }
     const hint = error instanceof Error ? error.message : String(error);
     throw new Error(`Không kết nối được API (${API_BASE_URL}${path}): ${hint}`);
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   let payload: TResponse;
@@ -113,11 +131,23 @@ async function requestJson<TResponse>(
 }
 
 export function fetchCrawlerStatus(): Promise<StatusResponse> {
-  return requestJson<StatusResponse>("/api/linkedin/status", { method: "GET" });
+  return requestJson<StatusResponse>("/api/all-platform/linkedin/status", { method: "GET" });
+}
+
+export async function deleteLinkedinCategory(
+  payload: { category_type: string; value: string; platform?: string },
+) {
+  return requestJson<ApiResponse<null>>("/facebook/api/v1/sheet-management/categories/delete", {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
 }
 
 export function loginLinkedIn(payload: LoginRequest): Promise<LoginResponse> {
-  return requestJson<LoginResponse>("/api/linkedin/login", {
+  return requestJson<LoginResponse>("/api/all-platform/linkedin/login", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -127,7 +157,7 @@ export function checkProfileSlugInSheet(payload: {
   email: string;
 }): Promise<ProfileSlugSheetCheckResponse> {
   return requestJson<ProfileSlugSheetCheckResponse>(
-    "/api/linkedin/me/profile-slug-sheet-check",
+    "/api/all-platform/linkedin/me/profile-slug-sheet-check",
     {
       method: "POST",
       body: JSON.stringify({ email: payload.email.trim() }),
@@ -144,7 +174,7 @@ export function ensureProfileSlugIfMissing(payload: {
   const sid = payload.sessionId?.trim();
   if (sid) body.session_id = sid;
   return requestJson<EnsureProfileSlugResponse>(
-    "/api/linkedin/me/ensure-profile-slug",
+    "/api/all-platform/linkedin/me/ensure-profile-slug",
     {
       method: "POST",
       body: JSON.stringify(body),
@@ -163,7 +193,7 @@ export function getMyProfileSlug(payload: {
   if (session_id) body.session_id = session_id;
   if (email) body.email = email;
   return requestJson<GetMyProfileSlugResponse>(
-    "/api/linkedin/me/profile-slug",
+    "/api/all-platform/linkedin/me/profile-slug",
     {
       method: "POST",
       body: JSON.stringify(body),
@@ -174,7 +204,7 @@ export function getMyProfileSlug(payload: {
 export function verifyLinkedInOtp(
   payload: VerifyLoginRequest,
 ): Promise<VerifyLoginResponse> {
-  return requestJson<VerifyLoginResponse>("/api/linkedin/verify", {
+  return requestJson<VerifyLoginResponse>("/api/all-platform/linkedin/verify", {
     method: "POST",
     body: JSON.stringify({
       session_id: payload.sessionId,
@@ -187,7 +217,7 @@ export function verifyLinkedInOtp(
 export function startN8nWorkflow(
   payload: StartWorkflowRequest,
 ): Promise<StartWorkflowResponse> {
-  return requestJson<StartWorkflowResponse>("/api/linkedin/start", {
+  return requestJson<StartWorkflowResponse>("/api/all-platform/linkedin/start", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -196,7 +226,7 @@ export function startN8nWorkflow(
 export function crawlLinkedInGroup(
   payload: CrawlGroupRequest,
 ): Promise<CrawlResponse> {
-  return requestJson<CrawlResponse>("/api/linkedin/crawl-linkedin-group", {
+  return requestJson<CrawlResponse>("/api/all-platform/linkedin/crawl-linkedin-group", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -205,7 +235,7 @@ export function crawlLinkedInGroup(
 export function filterLinkedInPosts(
   payload: FilterDataRequest,
 ): Promise<FilterDataResponse> {
-  return requestJson<FilterDataResponse>("/api/linkedin/filter-data", {
+  return requestJson<FilterDataResponse>("/api/all-platform/linkedin/posts/filter", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -214,7 +244,7 @@ export function filterLinkedInPosts(
 export function getAllLinkedInPosts(
   payload: GetAllPostsRequest,
 ): Promise<GetAllPostsResponse> {
-  return requestJson<GetAllPostsResponse>("/api/linkedin/get-all-posts", {
+  return requestJson<GetAllPostsResponse>("/api/all-platform/linkedin/posts/get-all", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -222,13 +252,16 @@ export function getAllLinkedInPosts(
 
 export function getAllN8nGroups(
   payload: GetAllN8nGroupsRequest,
+  /** Timeout cho n8n webhook — mặc định 120s vì n8n có thể cào nhiều group. */
+  timeoutMs = 120_000,
 ): Promise<N8nGroupOperationResponse> {
   return requestJson<N8nGroupOperationResponse>(
-    "/api/linkedin/groups/n8n-get-all",
+    "/api/all-platform/linkedin/groups/n8n-get-all",
     {
       method: "POST",
       body: JSON.stringify({ email: payload.email.trim() }),
     },
+    timeoutMs,
   );
 }
 
@@ -246,7 +279,7 @@ export function addListGroupBulk(
   if (payload.webhook_timeout_sec != null)
     body.webhook_timeout_sec = payload.webhook_timeout_sec;
   return requestJson<BulkGroupImportResponse>(
-    "/api/linkedin/groups/add-list-group",
+    "/api/all-platform/linkedin/groups/add-list-group",
     {
       method: "POST",
       body: JSON.stringify(body),
@@ -266,7 +299,7 @@ export function addN8nGroup(
   body.type = (payload.type || "").trim();
   appendTaxonomyFields(body, payload);
   if (!body.platform) body.platform = "linkedin";
-  return requestJson<N8nGroupOperationResponse>("/api/linkedin/groups/add", {
+  return requestJson<N8nGroupOperationResponse>("/api/all-platform/linkedin/groups/add", {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -279,7 +312,7 @@ export function removeN8nGroup(
     url_group: payload.url_group.trim(),
   };
   if (payload.email?.trim()) body.email = payload.email.trim();
-  return requestJson<N8nGroupOperationResponse>("/api/linkedin/groups/remove", {
+  return requestJson<N8nGroupOperationResponse>("/api/all-platform/linkedin/groups/remove", {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -314,7 +347,7 @@ export function updateN8nGroup(
     },
     "new_",
   );
-  return requestJson<N8nGroupOperationResponse>("/api/linkedin/groups/update", {
+  return requestJson<N8nGroupOperationResponse>("/api/all-platform/linkedin/groups/update", {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -336,7 +369,7 @@ export function syncPostProgress(payload: {
   timeout_ms?: number;
 }): Promise<import("@/types/api").SyncPostProgressResponse> {
   return requestJson<import("@/types/api").SyncPostProgressResponse>(
-    "/api/linkedin/post/sync-progress",
+    "/api/all-platform/linkedin/post/sync-progress",
     {
       method: "POST",
       body: JSON.stringify(payload),
@@ -356,7 +389,7 @@ export function syncAllProgress(payload: {
   limit_posts?: number;
 }): Promise<import("@/types/api").SyncAllProgressResponse> {
   return requestJson<import("@/types/api").SyncAllProgressResponse>(
-    "/api/linkedin/sync-all-progress",
+    "/api/all-platform/linkedin/sync-all-progress",
     {
       method: "POST",
       body: JSON.stringify(payload),
@@ -367,7 +400,7 @@ export function syncAllProgress(payload: {
 export function getLinkedInStats(
   payload: LinkedinAppStatsRequest,
 ): Promise<LinkedinAppStatsResponse> {
-  return requestJson<LinkedinAppStatsResponse>("/api/linkedin/app/stats", {
+  return requestJson<LinkedinAppStatsResponse>("/api/all-platform/linkedin/app/stats", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -377,7 +410,7 @@ export function getLinkedInStats(
 export function assignKpi(
   payload: AssignKpiRequest,
 ): Promise<ApiResponse<unknown>> {
-  return requestJson<ApiResponse<unknown>>("/api/linkedin/kpi/assign", {
+  return requestJson<ApiResponse<unknown>>("/api/all-platform/linkedin/kpi/assign", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -388,7 +421,7 @@ export function checkPermission(
   payload: CheckPermissionRequest,
 ): Promise<CheckPermissionResponse> {
   return requestJson<CheckPermissionResponse>(
-    "/api/linkedin/auth/check-permission",
+    "/api/all-platform/linkedin/auth/check-permission",
     {
       method: "POST",
       body: JSON.stringify(payload),
@@ -400,7 +433,7 @@ export function checkPermission(
 export function getAllKpi(
   payload: GetAllKpiRequest,
 ): Promise<GetAllKpiResponse> {
-  return requestJson<GetAllKpiResponse>("/api/linkedin/kpi/get-all", {
+  return requestJson<GetAllKpiResponse>("/api/all-platform/linkedin/kpi/get-all", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -410,7 +443,7 @@ export function getAllKpi(
 export function getKpiByEmail(
   payload: GetKpiByEmailRequest,
 ): Promise<GetKpiByEmailResponse> {
-  return requestJson<GetKpiByEmailResponse>("/api/linkedin/kpi/get-by-email", {
+  return requestJson<GetKpiByEmailResponse>("/api/all-platform/linkedin/kpi/get-by-email", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -420,7 +453,7 @@ export function getKpiByEmail(
 export function addMember(
   payload: AddMemberRequest,
 ): Promise<AddMemberResponse> {
-  return requestJson<AddMemberResponse>("/api/linkedin/team/add-member", {
+  return requestJson<AddMemberResponse>("/api/all-platform/linkedin/team/add-member", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -431,7 +464,20 @@ export function verifyLeaderCode(
   payload: VerifyLeaderCodeRequest,
 ): Promise<ApiResponse<unknown>> {
   return requestJson<ApiResponse<unknown>>(
-    "/api/linkedin/auth/verify-leader-code",
+    "/api/all-platform/linkedin/auth/verify-leader-code",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+/** Cập nhật vai trò member cho tài khoản. */
+export function updateRoleToMember(
+  payload: { email: string },
+): Promise<ApiResponse<unknown>> {
+  return requestJson<ApiResponse<unknown>>(
+    "/api/all-platform/linkedin/auth/update-role-to-member",
     {
       method: "POST",
       body: JSON.stringify(payload),
@@ -441,7 +487,7 @@ export function verifyLeaderCode(
 export const getAllProfiles = async (
   payload: GetProfilesRequest,
 ): Promise<ApiResponse<any[]>> => {
-  const response = await fetch(`${API_BASE_URL}/api/linkedin/all-profiles`, {
+  const response = await fetch(`${API_BASE_URL}/api/all-platform/linkedin/all-profiles`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -455,10 +501,207 @@ export function updateProfileSlug(
   payload: UpdateProfileSlugRequest,
 ): Promise<ApiResponse<unknown>> {
   return requestJson<ApiResponse<unknown>>(
-    "/api/linkedin/me/profile-slug-update",
+    "/api/all-platform/linkedin/me/profile-slug-update",
     {
       method: "POST",
       body: JSON.stringify(payload),
+    },
+  );
+}
+
+export interface LinkedinCategoryPayload {
+  category_type: string;
+  value: string;
+  name?: string;
+}
+
+export function addLinkedinCategory(
+  payload: LinkedinCategoryPayload,
+): Promise<ApiResponse<unknown>> {
+  return requestJson<ApiResponse<unknown>>(
+    "/api/all-platform/linkedin/categories/add",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export function updateLinkedinCategory(
+  payload: LinkedinCategoryPayload,
+): Promise<ApiResponse<unknown>> {
+  return requestJson<ApiResponse<unknown>>(
+    "/api/all-platform/linkedin/categories/update",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+
+
+export interface GetLinkedinCategoriesResponse {
+  status: string;
+  message: string;
+  data: Record<string, any[]>;
+}
+
+export function getLinkedinCategories(): Promise<GetLinkedinCategoriesResponse> {
+  return requestJson<GetLinkedinCategoriesResponse>(
+    "/api/all-platform/linkedin/categories",
+    {
+      method: "GET",
+    },
+  );
+}
+
+export interface SeedingKpiItem {
+  email_member: string;
+  name: string;
+  url_profile: string;
+  platform: string;
+  content: string;
+  link_post: string;
+  verify: string;
+  day: string;
+  link_comment?: string;
+  /** Facebook/LinkedIn profile ID — dùng để lọc chính xác */
+  profile_id?: string;
+  /** Tên Facebook hiển thị trên web — dùng để lọc dự phòng */
+  facebook_name?: string;
+}
+
+export function getSeedingKpis(payload: {
+  email_member?: string;
+  profile_id?: string;
+  facebook_name?: string;
+}): Promise<ApiResponse<SeedingKpiItem[]>> {
+  return requestJson<ApiResponse<SeedingKpiItem[]>>(
+    "/api/all-platform/linkedin/seeding-kpi/get-all",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export function saveSeedingKpi(payload: {
+  email_member: string;
+  name: string;
+  name_profile: string;
+  platform: string;
+  content: string;
+  link_post: string;
+  verify: string;
+  link_comment?: string;
+  profile_id?: string;
+  facebook_name?: string;
+  day?: string;
+}): Promise<ApiResponse<unknown>> {
+  return requestJson<ApiResponse<unknown>>(
+    "/api/all-platform/linkedin/seeding-kpi/save",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+/** Step 1: Đánh dấu seeding — chỉ lưu email + link_post (verify='pending') */
+export function markSeeding(payload: {
+  email_member: string;
+  link_post: string;
+}): Promise<ApiResponse<unknown>> {
+  return requestJson<ApiResponse<unknown>>(
+    "/api/all-platform/linkedin/seeding-mark/save",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+/** Lấy danh sách seeding marks chưa verify của 1 member */
+export function getUnverifiedSeedingMarks(
+  payload: { email_member: string },
+  init?: RequestInit,
+): Promise<ApiResponse<SeedingKpiItem[]>> {
+  return requestJson<ApiResponse<SeedingKpiItem[]>>(
+    "/api/all-platform/linkedin/seeding-mark/get-unverified",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+      ...init,
+    },
+  );
+}
+
+/** Lấy TẤT CẢ seeding marks của 1 member (cả verified và chưa verified)
+ * Trả về dict: key=link_post, value=verify status ("yes"/"pending") */
+export function getAllSeedingMarks(
+  payload: { email_member: string },
+  init?: RequestInit,
+): Promise<ApiResponse<Record<string, string>>> {
+  return requestJson<ApiResponse<Record<string, string>>>(
+    "/api/all-platform/linkedin/seeding-mark/get-all",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+      ...init,
+    },
+  );
+}
+
+/** Lấy số bài seeding thực tế đã xác minh của 1 member (dùng cho leader xem KPI)
+ * Trả về { verified_count, total_count, items } */
+export function getMemberActualSeedingCount(
+  payload: { email_member: string; profile_id?: string; facebook_name?: string; date_from?: string; date_to?: string },
+  init?: RequestInit,
+): Promise<ApiResponse<{ verified_count: number; total_count: number; items: SeedingKpiItem[] }>> {
+  return requestJson<ApiResponse<{ verified_count: number; total_count: number; items: SeedingKpiItem[] }>>(
+    "/api/all-platform/linkedin/seeding-mark/get-actual-count",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+      ...init,
+    },
+  );
+}
+
+/** Step 2: Verify dòng đã mark — fill đầy đủ columns */
+export function verifySeedingMark(payload: {
+  email_member: string;
+  link_post: string;
+  name?: string;
+  link_comment?: string;
+  name_profile?: string;
+  platform?: string;
+  content?: string;
+  profile_id?: string;
+  facebook_name?: string;
+  verify?: string;
+}): Promise<ApiResponse<unknown>> {
+  return requestJson<ApiResponse<unknown>>(
+    "/api/all-platform/linkedin/seeding-mark/verify",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+/** Lấy KPI target (kpi_per_week) của member trong khoảng ngày */
+export function getMemberKpiTarget(
+  payload: { email_member: string; date_from?: string; date_to?: string },
+  init?: RequestInit,
+): Promise<ApiResponse<{ kpi_target: number; kpi_rows: { start: string; end: string; kpi_per_week: number; platform: string; status: string }[] }>> {
+  return requestJson<ApiResponse<{ kpi_target: number; kpi_rows: { start: string; end: string; kpi_per_week: number; platform: string; status: string }[] }>>(
+    "/api/all-platform/linkedin/seeding-mark/get-kpi-target",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+      ...init,
     },
   );
 }

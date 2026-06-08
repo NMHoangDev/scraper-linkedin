@@ -1,14 +1,20 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Toaster } from "sonner";
+import { AuthProvider } from "@/components/facebook-crawler/shared/components/contexts/AuthContext";
+import { AppAuthProvider } from "@/contexts/AppAuthContext";
+import { QueryProvider } from "@/components/providers/QueryProvider";
 
 export const metadata: Metadata = {
-  title: "CrawlerPro — LinkedIn Group Crawler",
+  title: "MarkeeAI - Seeding Tool",
   description:
     "Configure, run, and monitor LinkedIn group crawls with live logs and exportable results.",
+  icons: {
+    icon: "https://markeeai.com/logo.svg",
+    shortcut: "https://markeeai.com/logo.svg",
+    apple: "https://markeeai.com/logo.svg",
+  },
 };
-import { Toaster } from "sonner"
-import { AuthProvider } from "@/components/nguyen/shared/components/contexts/AuthContext";
-import { QueryProvider } from "@/components/providers/QueryProvider";
 
 export default function RootLayout({
   children,
@@ -28,16 +34,18 @@ export default function RootLayout({
       <body className="min-h-full">
         <QueryProvider>
           <AuthProvider>
-            {children}
+            <AppAuthProvider>
+              {children}
+            </AppAuthProvider>
           </AuthProvider>
         </QueryProvider>
-     
+
         <Toaster
-            position="top-right"
-            richColors        // màu xanh/đỏ đẹp cho success/error
-            closeButton       // hiện nút X
-            duration={4000}
-          />
+          position="top-right"
+          richColors
+          closeButton
+          duration={4000}
+        />
       </body>
     </html>
   );

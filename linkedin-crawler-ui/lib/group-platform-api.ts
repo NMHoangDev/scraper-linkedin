@@ -1,6 +1,6 @@
-import { createGroupService } from "@/components/nguyen/modules/crawldFB/services/createGroupsService";
-import type { CreateGroupPayload } from "@/components/nguyen/modules/crawldFB/schemas/create_groups_shemas";
-import type { FacebookGroupDTO } from "@/components/nguyen/modules/crawldFB/types/dataFb.type";
+import { createGroupService } from "@/components/facebook-crawler/modules/facebook-crawl/services/createGroupsService";
+import type { CreateGroupPayload } from "@/components/facebook-crawler/modules/facebook-crawl/schemas/create_groups_shemas";
+import type { FacebookGroupDTO } from "@/components/facebook-crawler/modules/facebook-crawl/types/data-fb.type";
 import {
   addN8nGroup,
   removeN8nGroup,
@@ -172,7 +172,7 @@ export async function submitSharedUpdateGroup(
     };
   }
 
-  const axios = (await import("@/components/nguyen/shared/api/axiosClient"))
+  const axios = (await import("@/components/facebook-crawler/shared/api/axiosClient"))
     .default;
   const { group_url, ...updateData } = data;
   try {
@@ -219,7 +219,7 @@ export async function submitSharedDeleteGroup(
         (res.success ? "Đã xóa nhóm LinkedIn." : "Xóa thất bại."),
     };
   }
-  const axios = (await import("@/components/nguyen/shared/api/axiosClient"))
+  const axios = (await import("@/components/facebook-crawler/shared/api/axiosClient"))
     .default;
   try {
     const response = await axios.delete(

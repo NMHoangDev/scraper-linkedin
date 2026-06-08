@@ -16,3 +16,8 @@ gspread
 apscheduler
 pyngrok
 gspread_asyncio
+# Supabase
+supabase>=2.0.0
+# Auth
+bcrypt
+python-jose[cryptography]

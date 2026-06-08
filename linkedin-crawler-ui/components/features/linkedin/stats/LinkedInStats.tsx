@@ -1,9 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { MaterialIcon } from "@/components/ui";
 import { useDashboard } from "@/components/features/dashboard/dashboard-context";
 import { parseYmd, addDaysLocal } from "@/lib/date-helpers";
+import { getMemberActualSeedingCount, getMemberKpiTarget } from "@/services/linkedinCrawlerService";
 import {
   sessionLatestDateLabel,
   parseSheetReaction,
@@ -15,11 +17,31 @@ export function LinkedInStats() {
     allPostsResult,
     isGettingAllPosts,
     role,
+    email,
     memberKpiTargetsForToday,
     memberKpiStats,
   } = useDashboard();
 
   const isMember = role === "member";
+
+  // Fetch seeding KPI cho member (từ seeding_content_kpi)
+  const { data: seedingData } = useQuery({
+    queryKey: ["memberSeedingKpi", email, isMember],
+    queryFn: async () => {
+      if (!email || !isMember) return { verified_count: 0, total_count: 0, kpi_target: 0 };
+      const [countRes, kpiRes] = await Promise.all([
+        getMemberActualSeedingCount({ email_member: email }),
+        getMemberKpiTarget({ email_member: email }),
+      ]);
+      return {
+        verified_count: countRes.success ? countRes.data!.verified_count : 0,
+        total_count: countRes.success ? countRes.data!.total_count : 0,
+        kpi_target: kpiRes.success ? kpiRes.data!.kpi_target : 0,
+      };
+    },
+    enabled: !!email && isMember,
+    staleTime: 60_000,
+  });
 
   /** Leader / fallback: 7 ngày gần nhất + cách đếm cũ (bài đã comment / reaction unique). */
   const leaderStyleStats = useMemo(() => {
@@ -117,13 +139,14 @@ export function LinkedInStats() {
       },
     ];
 
+    // MEMBER: dùng KPI từ seeding_content_kpi + kpi_tracker
     if (isMember) {
+      const seeding = seedingData ?? { verified_count: 0, total_count: 0, kpi_target: 0 };
+      const kpi = memberKpiTargetsForToday;
       const s = memberKpiStats;
-      const k = memberKpiTargetsForToday;
-      const tSess = k ? Math.max(0, k.total_session_crawl) : 0;
-      const tPost = k ? Math.max(0, k.total_post_crawl) : 0;
-      const tComm = k ? Math.max(0, k.total_comment) : 0;
-      const tReact = k ? Math.max(0, k.total_reaction) : 0;
+      const tSess = kpi ? Math.max(0, kpi.total_session_crawl) : 0;
+      const tComm = kpi ? Math.max(0, kpi.total_comment) : 0;
+      const tReact = kpi ? Math.max(0, kpi.total_reaction) : 0;
 
       return [
         {
@@ -133,9 +156,9 @@ export function LinkedInStats() {
           ...styles[0],
         },
         {
-          label: "BÀI VIẾT",
-          value: s.posts,
-          target: tPost,
+          label: "SEEDING KPI",
+          value: seeding.verified_count,
+          target: seeding.kpi_target,
           ...styles[1],
         },
         {
@@ -180,7 +203,7 @@ export function LinkedInStats() {
         ...styles[3],
       },
     ];
-  }, [isMember, memberKpiStats, memberKpiTargetsForToday, leaderStyleStats]);
+  }, [isMember, seedingData, memberKpiStats, memberKpiTargetsForToday, leaderStyleStats]);
 
   if (isGettingAllPosts && !allPostsResult) {
     return (
@@ -203,10 +226,19 @@ export function LinkedInStats() {
             ? Math.min(100, Math.round((card.value / card.target) * 100))
             : 0;
 
+        const isSeedingCard = card.label === "SEEDING KPI";
+        const isDone = card.value >= card.target && card.target > 0;
+
         return (
           <div
             key={card.label}
-            className="flex min-h-[120px] flex-col gap-3 rounded-xl border border-outline-variant bg-white p-6 shadow-sm"
+            className={`flex min-h-[120px] flex-col gap-3 rounded-xl border p-6 shadow-sm transition-all ${
+              isSeedingCard
+                ? isDone
+                  ? "border-emerald-300 bg-emerald-50/50"
+                  : "border-amber-200 bg-amber-50/50"
+                : "border-outline-variant bg-white"
+            }`}
           >
             <div className="flex items-start justify-between">
               <div className="flex min-w-0 flex-col">
@@ -215,38 +247,55 @@ export function LinkedInStats() {
                 </span>
 
                 <span
-                  className="mt-1 truncate text-xs font-semibold uppercase tracking-wider text-on-surface-variant"
+                  className={`mt-1 truncate text-xs font-semibold uppercase tracking-wider ${
+                    isSeedingCard
+                      ? isDone
+                        ? "text-emerald-700"
+                        : "text-amber-700"
+                      : "text-on-surface-variant"
+                  }`}
                   title={card.label}
                 >
                   {card.label}
                 </span>
               </div>
 
-              <div className={`rounded-lg p-2 ${card.iconBg}`}>
-                <MaterialIcon
-                  name={card.icon}
-                  className={`text-xl ${card.iconColor}`}
-                />
+              <div className={`rounded-lg p-2 ${isSeedingCard ? (isDone ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700") : card.iconBg}`}>
+                {isSeedingCard ? (
+                  <MaterialIcon name={isDone ? "verified" : "pending"} className={`text-xl ${isDone ? "text-emerald-700" : "text-amber-700"}`} />
+                ) : (
+                  <MaterialIcon
+                    name={card.icon}
+                    className={`text-xl ${card.iconColor}`}
+                  />
+                )}
               </div>
             </div>
 
             <div className="mt-auto w-full">
-              <div className="mb-1 flex items-center justify-between">
-                <span className={`text-[10px] font-bold ${card.textColor}`}>
-                  {card.value.toLocaleString("vi-VN")}/{card.target} COMPLETED
+              <div className={`mb-1 flex items-center justify-between ${isSeedingCard ? (isDone ? "text-emerald-700" : "text-amber-700") : ""}`}>
+                <span className={`text-[10px] font-bold ${isSeedingCard ? (isDone ? "text-emerald-700" : "text-amber-700") : card.textColor}`}>
+                  {card.value}/{card.target} COMPLETED
                 </span>
 
-                <span className="text-[10px] font-bold text-on-surface-variant">
+                <span className={`text-[10px] font-bold ${isSeedingCard ? (isDone ? "text-emerald-600" : "text-amber-600") : "text-on-surface-variant"}`}>
                   {percent}%
                 </span>
               </div>
 
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-container-highest">
                 <div
-                  className={`h-full rounded-full ${card.progressBg}`}
+                  className={`h-full rounded-full ${isSeedingCard ? (isDone ? "bg-emerald-500" : card.progressBg) : card.progressBg}`}
                   style={{ width: `${percent}%` }}
                 />
               </div>
+
+              {isSeedingCard && card.target === 0 && (
+                <p className="mt-1 text-[9px] text-amber-600 italic">Chưa có KPI tuần này</p>
+              )}
+              {isSeedingCard && isDone && (
+                <p className="mt-1 text-[9px] text-emerald-600 font-bold">✓ Đã hoàn thành KPI!</p>
+              )}
             </div>
           </div>
         );

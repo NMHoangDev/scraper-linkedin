@@ -1,8 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  basePath: "/minhhoang-scraper",
-  assetPrefix: "/minhhoang-scraper",
   reactStrictMode: true,
   output: "standalone",
   images: {
@@ -13,6 +11,14 @@ const nextConfig: NextConfig = {
         pathname: "/**",
       },
     ],
+  },
+  async rewrites() {
+    return [
+      {
+        source: "/api/:path*",
+        destination: "http://127.0.0.1:8000/api/:path*",
+      },
+    ];
   },
   async headers() {
     return [

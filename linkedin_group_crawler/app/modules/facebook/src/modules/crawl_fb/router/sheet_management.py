@@ -5,10 +5,13 @@ from fastapi.concurrency import run_in_threadpool
 from app.modules.facebook.src.core.config.env import Config
 from app.modules.facebook.src.modules.crawl_fb.schemas.sheet_schema import (
     BulkAddGroupPayload, BulkDeleteGroupPayload,
-    BulkAddIntentPayload, BulkDeleteIntentPayload,GetIntentsResponse,
-    GetGroupsResponse
+    BulkAddIntentPayload, BulkDeleteIntentPayload, GetIntentsResponse,
+    GetGroupsResponse, GetCategoriesResponse, AddCategoryPayload,
+    UpdateCategoryPayload, DeleteCategoryPayload
 )
 from app.modules.facebook.src.modules.crawl_fb.services.sheet_management_service import SheetManagementService
+from app.core.config import settings
+from app.shared.services.n8n_webhook_service import post_json_to_n8n_webhook
 
 sheet_management_router = APIRouter( tags=["Sheet Management API"])
 
@@ -131,6 +134,84 @@ async def api_bulk_delete_intents(
     if success:
         return {"status": "success", "message": f"Đã xóa {len(payload.intents)} Intents."}
     return {"status": "error", "message": "Xóa Intent thất bại."}
+
+
+# ==========================================
+# 3. API QUẢN LÝ DANH MỤC (CATEGORIES)
+#    Dùng chung sheet LinkedIn cho cả FB & LI
+# ==========================================
+from app.shared.services.category_sheet_service import CategorySheetService
+import asyncio as _asyncio
+
+def _get_category_service() -> CategorySheetService:
+    return CategorySheetService()
+
+@sheet_management_router.get("/categories", response_model=GetCategoriesResponse, status_code=status.HTTP_200_OK)
+async def api_get_all_categories():
+    """Lấy danh sách tất cả danh mục từ Google Sheet (shared LinkedIn sheet)."""
+    try:
+        svc = _get_category_service()
+        data = await _asyncio.to_thread(svc.get_all_categories)
+        return {"status": "success", "message": "Lấy danh sách danh mục thành công.", "data": data}
+    except Exception as e:
+        return {"status": "error", "message": f"Lỗi khi lấy danh mục: {str(e)}", "data": {}}
+
+@sheet_management_router.post("/categories/add", status_code=status.HTTP_200_OK)
+async def api_add_category(payload: AddCategoryPayload):
+    """Thêm một danh mục mới vào Google Sheet."""
+    svc = _get_category_service()
+    success = await _asyncio.to_thread(
+        svc.add_record,
+        payload.category_type,
+        payload.value,
+        payload.name,
+        payload.platform or "",
+    )
+    if success:
+        return {
+            "status": "success",
+            "message": f"Đã thêm danh mục '{payload.value}' thành công.",
+            "data": {"category_type": payload.category_type, "value": payload.value, "name": payload.name},
+        }
+    return {"status": "error", "message": "Thêm danh mục thất bại (có thể đã tồn tại hoặc lỗi hệ thống)."}
+
+@sheet_management_router.put("/categories/update", status_code=status.HTTP_200_OK)
+async def api_update_category(payload: UpdateCategoryPayload):
+    """Cập nhật một danh mục trong Google Sheet."""
+    svc = _get_category_service()
+    success = await _asyncio.to_thread(
+        svc.update_record,
+        payload.category_type,
+        payload.value,
+        payload.name,
+        payload.platform or "",
+    )
+    if success:
+        return {
+            "status": "success",
+            "message": f"Đã cập nhật danh mục '{payload.value}' thành công.",
+            "data": {"category_type": payload.category_type, "value": payload.value, "name": payload.name},
+        }
+    return {"status": "error", "message": "Cập nhật danh mục thất bại."}
+
+@sheet_management_router.delete("/categories/delete", status_code=status.HTTP_200_OK)
+async def api_delete_category(
+    payload: DeleteCategoryPayload,
+    service: SheetManagementService = Depends(get_sheet_management_service)
+):
+    """Xóa một danh mục khỏi Google Sheet."""
+    svc = _get_category_service()
+    success = await _asyncio.to_thread(
+        svc.delete_record,
+        payload.category_type,
+        payload.value,
+    )
+    if success:
+        # Cascade delete groups and posts
+        await service.delete_groups_and_posts_by_category(payload.category_type, payload.value)
+        return {"status": "success", "message": f"Đã xóa danh mục '{payload.value}' thành công và các groups/posts liên quan."}
+    return {"status": "error", "message": "Xóa danh mục thất bại."}
+
 
 from app.modules.facebook.src.modules.facebook.services.FacebookInteractor import FacebookInteractor, InteractionResult,InteractionTarget
 @sheet_management_router.post("/posts/interact", status_code=status.HTTP_200_OK)

@@ -92,12 +92,8 @@ def get_crawl_service():
     """
     scraper = FacebookScraper(config=Config)
     telegram = TelegramService()
-    group_sheet: GroupManagementSheetService = GroupManagementSheetService()
-    post_sheet: GoogleSheetServicePosts = GoogleSheetServicePosts()
-    group_24h_sheet: TargetGroupSheet24HService = TargetGroupSheet24HService()
-    intent_sheet: IntentSheetService = IntentSheetService()
 
-    return CrawlService(scraper=scraper, telegram=telegram, group_sheet=group_sheet, post_sheet=post_sheet, intent_sheet=intent_sheet, group_24h_sheet=group_24h_sheet)
+    return CrawlService(scraper=scraper, telegram=telegram)
 
 # ── ROUTER CÀO DỮ LIỆU (CŨ) ───────────────────────────────────────────────────
 
@@ -130,16 +126,7 @@ async def fetch_data_direct_for_fe(
     """
     return await service.FetchDataDirectly(payload)
 
-@crawl_fb_router.get("/Posts", status_code=status.HTTP_200_OK)
-async def get_all_facebook_posts(
-    service: CrawlService = Depends(get_crawl_service)
-):
-    """
-    API dành cho Frontend: 
-    Lấy toàn bộ dữ liệu bài viết đã được cào và lưu trong Database.
-    """
-    posts = await service.get_all_posts_from_sheet()
-    return posts
+
 
 # ROUTER WEBSOCKET XẾP HÀNG YÊU CẦU CÀO DỮ LIỆU
 @crawl_fb_router.websocket("/ws/CrawlFbForFE/{email}")
@@ -431,7 +418,7 @@ async def check_phone_approval_api(payload: CheckPhonePayload):
 
     return {"status": "error", "message": "Hết thời gian chờ phản hồi từ Facebook."}
 @crawl_fb_router.post("/auth/submit-otp", status_code=status.HTTP_200_OK)
-async def submit_auth_otp_api(payload: SubmitOTPPayload):
+async def submit_otp_api(payload: SubmitOTPPayload):
     """
     BƯỚC 3: Nạp mã OTP vào phiên ngầm đang đứng đợi.
     """
@@ -470,45 +457,6 @@ async def submit_auth_otp_api(payload: SubmitOTPPayload):
 
 # ── ENDPOINT CẬP NHẬT GROUP ─────────────────────────────────────────────────
 
-@crawl_fb_router.put("/groups/update", status_code=status.HTTP_200_OK, response_model=UpdateGroupResponse)
-async def update_group_api(
-    group_url: str,
-    request: UpdateGroupRequest,
-    service: CrawlService = Depends(get_crawl_service)
-):
-    """
-    Endpoint cập nhật thông tin Group Facebook
-    
-    Parameters:
-    - group_url: URL của group cần cập nhật
-    - request: UpdateGroupRequest chứa các trường cần cập nhật
-    
-    Returns:
-    - UpdateGroupResponse với status, message và dữ liệu được cập nhật
-    """
-    try:
-        # Map tên trường từ frontend sang Google Sheets
-        update_data = {}
-        
-        if request.group_name:
-            update_data[Config.NAME_GROUP_GG_SHEET] = request.group_name
-        if request.url:
-            update_data[Config.NAME_URL_GG_SHEET] = request.url
-        if request.intent:
-            update_data[Config.INTENT_GG_SHEET] = request.intent
-        if request.members is not None:
-            update_data[Config.MEMBERS_GG_SHEET] = request.members
-        if request.posts_per_week is not None:
-            update_data[Config.POSTS_PER_WEEK_GG_SHEET] = request.posts_per_week
-        if request.health_score is not None:
-            update_data[Config.HEALTH_SCORE_GG_SHEET] = request.health_score
-        if request.status:
-            # Nếu trường status tồn tại, lưu nó (tùy thuộc vào Config)
-            update_data["status"] = request.status
-        if request.industry is not None:
-            update_data["industry"] = request.industry
-        if request.tier is not None:
-            update_data["tier"] = request.tier
         if request.team is not None:
             update_data["team"] = request.team
         if request.icp is not None:

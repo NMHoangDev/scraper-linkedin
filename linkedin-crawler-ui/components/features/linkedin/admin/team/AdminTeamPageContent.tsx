@@ -1,20 +1,21 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { useDashboard } from "@/components/features/dashboard/dashboard-context";
 import { AdminTeamStats } from "./AdminTeamStats";
 import { AdminTeamTable, MemberPerformance } from "./AdminTeamTable";
 import { MaterialIcon } from "@/components/ui";
 import { AddMemberModal } from "./AddMemberModal";
+import { cn } from "@/lib/utils";
+import { getMemberActualSeedingCount, getMemberKpiTarget, type SeedingKpiItem } from "@/services/linkedinCrawlerService";
 import {
   findKpiOverlappingWindow,
   getMonthWeekWindowContaining,
   hasKpiForCurrentMonthWeek,
+  buildWeekPickerOptionsAroundDate,
+  normalizeKpiList,
+  rangesOverlap,
 } from "@/lib/kpi-month-weeks";
-import {
-  computeMemberActualsInYmdRange,
-  computeTeamActualsSumInYmdRange,
-} from "@/lib/admin-team-kpi-metrics";
 import type { CrawlSessionGroup } from "@/types/api";
 
 const NO_CRAWL_SESSIONS: CrawlSessionGroup[] = [];
@@ -22,6 +23,26 @@ const NO_CRAWL_SESSIONS: CrawlSessionGroup[] = [];
 function numKpi(v: unknown): number {
   const n = parseInt(String(v ?? 0), 10);
   return Number.isFinite(n) ? n : 0;
+}
+
+/**
+ * Tính tổng actual_seeding của một member trong khoảng ngày rangeStart→rangeEnd.
+ * Đọc từ mảng KPI (đã có actual_seeding từ backend/seeding_content_kpi).
+ */
+function getMemberActualSeedingInRange(
+  kpiList: unknown[],
+  rangeStart: string,
+  rangeEnd: string,
+): number {
+  const entries = normalizeKpiList(kpiList);
+  let total = 0;
+  for (const e of entries) {
+    if (!e.start_day || !e.end_day) continue;
+    if (rangesOverlap(e.start_day, e.end_day, rangeStart, rangeEnd)) {
+      total += e.actual_seeding ?? 0;
+    }
+  }
+  return total;
 }
 
 export function AdminTeamPageContent() {
@@ -46,12 +67,40 @@ export function AdminTeamPageContent() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [addModalOpen, setAddModalOpen] = useState(false);
+  // Lưu seeding data cho mỗi member: email -> { verified_count, total_count, kpi_target }
+  const [memberSeedingData, setMemberSeedingData] = useState<Record<string, { verified_count: number; total_count: number; kpi_target: number }>>({});
+  // Lưu full seeding items cho mỗi member (để truyền vào modal, tránh fetch lại)
+  const [memberSeedingItems, setMemberSeedingItems] = useState<Record<string, SeedingKpiItem[]>>({});
 
-  useEffect(() => {
-    void fetchTeamMembers();
-    handleGetAllPosts({ skipLeaderTeamPosts: true });
-  }, [fetchTeamMembers, handleGetAllPosts]);
+  const weekOptions = useMemo(() => {
+    return buildWeekPickerOptionsAroundDate(new Date(), 4, 1);
+  }, []);
 
+  const [selectedWeekKey, setSelectedWeekKey] = useState<string>("custom");
+
+  const handleWeekChange = (val: string) => {
+    setSelectedWeekKey(val);
+    if (val === "custom") {
+      setDateFrom("");
+      setDateTo("");
+    } else {
+      const [start, end] = val.split("|");
+      setDateFrom(start);
+      setDateTo(end);
+    }
+  };
+
+  const handleDateFromChange = (val: string) => {
+    setDateFrom(val);
+    setSelectedWeekKey("custom");
+  };
+
+  const handleDateToChange = (val: string) => {
+    setDateTo(val);
+    setSelectedWeekKey("custom");
+  };
+
+  // Định nghĩa dedupedTeam TRƯỚC khi dùng trong fetchSeedingCounts
   const dedupedTeam = useMemo(() => {
     const map = new Map<string, (typeof teamMembers)[number]>();
     for (const tm of teamMembers) {
@@ -61,12 +110,67 @@ export function AdminTeamPageContent() {
     return [...map.values()];
   }, [teamMembers]);
 
-  const rangeStart = dateFrom.trim() || "0000-01-01";
-  const rangeEnd = dateTo.trim() || "9999-12-31";
-  const teamMemberEmails = useMemo(
-    () => dedupedTeam.map((t) => t.email.trim()),
-    [dedupedTeam],
-  );
+  // Khoảng lọc: nếu không có dateFrom/dateTo → tuần hiện tại
+  const currentWeekWindow = useMemo(() => getMonthWeekWindowContaining(new Date()), []);
+  const rangeStart = dateFrom.trim() || currentWeekWindow.startYmd;
+  const rangeEnd = dateTo.trim() || currentWeekWindow.endYmd;
+
+  useEffect(() => {
+    void fetchTeamMembers();
+    handleGetAllPosts({ skipLeaderTeamPosts: true });
+  }, [fetchTeamMembers, handleGetAllPosts]);
+
+  // Fetch actual seeding counts + KPI target cho mỗi member
+  const fetchSeedingCounts = useCallback(async () => {
+    const team = dedupedTeam;
+    if (team.length === 0) return;
+
+    const counts: Record<string, { verified_count: number; total_count: number; kpi_target: number }> = {};
+    const allItems: Record<string, SeedingKpiItem[]> = {};
+    await Promise.all(
+      team.map(async (tm) => {
+        try {
+          // Gọi API lấy actual seeding count và KPI target song song
+          const [countRes, kpiRes] = await Promise.all([
+            getMemberActualSeedingCount({
+              email_member: tm.email,
+              profile_id: tm.profile_id || undefined,
+              facebook_name: tm.facebook_name || undefined,
+              date_from: rangeStart,
+              date_to: rangeEnd,
+            }),
+            getMemberKpiTarget({
+              email_member: tm.email,
+              date_from: rangeStart,
+              date_to: rangeEnd,
+            }),
+          ]);
+
+          const verified_count = countRes.success && countRes.data ? countRes.data.verified_count : 0;
+          const total_count = countRes.success && countRes.data ? countRes.data.total_count : 0;
+          const kpi_target = kpiRes.success && kpiRes.data ? kpiRes.data.kpi_target : 0;
+          const items = countRes.success && countRes.data ? (countRes.data.items || []) : [];
+
+          const key = tm.email.trim().toLowerCase();
+          counts[key] = { verified_count, total_count, kpi_target };
+          allItems[key] = items;
+        } catch (e) {
+          console.error(`Lỗi fetch data cho ${tm.email}:`, e);
+          const key = tm.email.trim().toLowerCase();
+          counts[key] = { verified_count: 0, total_count: 0, kpi_target: 0 };
+          allItems[key] = [];
+        }
+      })
+    );
+    setMemberSeedingData(counts);
+    setMemberSeedingItems(allItems);
+  }, [dedupedTeam, rangeStart, rangeEnd]);
+
+  useEffect(() => {
+    if (dedupedTeam.length > 0) {
+      void fetchSeedingCounts();
+    }
+  }, [fetchSeedingCounts]);
 
   const members = useMemo(() => {
     return dedupedTeam.map((tm): MemberPerformance => {
@@ -78,86 +182,80 @@ export function AdminTeamPageContent() {
       const sheetKpi = Array.isArray(tm.kpi) ? tm.kpi : [];
       const win = getMonthWeekWindowContaining(new Date());
       const hasKpiCurrentWeek = hasKpiForCurrentMonthWeek(sheetKpi, new Date());
-      const kWindow = findKpiOverlappingWindow(sheetKpi, win);
 
-      const actualsFiltered = computeMemberActualsInYmdRange(
-        tm.email,
-        postsDatasetForTeamKpi,
-        rangeStart,
-        rangeEnd,
-      );
+      // Tìm KPI giao với khoảng lọc hiện tại
+      const kWindow = findKpiOverlappingWindow(sheetKpi, {
+        startYmd: rangeStart,
+        endYmd: rangeEnd,
+      });
+
+      // Lấy actual seeding count từ API seeding_content_kpi
+      const seedingKey = tm.email.trim().toLowerCase();
+      const seedingFromApi = memberSeedingData[seedingKey];
+      const actualSeedingInRange = seedingFromApi?.verified_count ?? 0;
+
+      // Mục tiêu seeding: ưu tiên KPI target từ API, fallback về sheet KPI overlap
+      const kpiTargetFromApi = seedingFromApi?.kpi_target ?? 0;
+      const kpiTargetInRange = kpiTargetFromApi > 0
+        ? kpiTargetFromApi
+        : (kWindow?.total_post_crawl ?? 0);
+
+      // Trạng thái: so sánh actual seeding với KPI target
+      let status: MemberPerformance["status"] = "idle";
+      if (kpiTargetInRange > 0) {
+        if (actualSeedingInRange >= kpiTargetInRange) {
+          status = "completed";
+        } else {
+          status = "processing";
+        }
+      }
 
       const perf: MemberPerformance = {
         email: tm.email,
         profile_slug: slug,
         name: slug,
-        status: "idle",
-        sessions: actualsFiltered.sessions,
-        posts: actualsFiltered.posts,
-        comments: actualsFiltered.comments,
-        interactions: actualsFiltered.interactions,
+        status,
+        // posts = số bài seeding thực tế từ seeding_content_kpi (API)
+        sessions: actualSeedingInRange,
+        posts: actualSeedingInRange,
+        // comments = mục tiêu KPI để hiển thị tiến độ
+        comments: kpiTargetInRange,
+        interactions: 0,
         sheetKpi,
         hasKpiCurrentWeek,
         kpiWindowLabel: win.labelVi,
+        // Lọc seeding chuẩn xác theo profile_id + facebook_name
+        profile_id: tm.profile_id,
+        facebook_name: tm.facebook_name,
+        // Actual seeding data từ API
+        seedingData: seedingFromApi,
       };
-
-      if (kWindow) {
-        const actualKpiWeek = computeMemberActualsInYmdRange(
-          tm.email,
-          postsDatasetForTeamKpi,
-          kWindow.start_day,
-          kWindow.end_day,
-        );
-        const hit =
-          actualKpiWeek.comments >= numKpi(kWindow.total_comment) &&
-          actualKpiWeek.interactions >= numKpi(kWindow.total_reaction) &&
-          actualKpiWeek.posts >= numKpi(kWindow.total_post_crawl) &&
-          actualKpiWeek.sessions >= numKpi(kWindow.total_session_crawl);
-        if (hit) perf.status = "completed";
-        else if (
-          perf.sessions > 0 ||
-          perf.posts > 0 ||
-          perf.comments > 0 ||
-          perf.interactions > 0
-        ) {
-          perf.status = "processing";
-        }
-      } else if (perf.sessions > 0 || perf.posts > 0) {
-        perf.status = "processing";
-      }
 
       return perf;
     });
-  }, [dedupedTeam, postsDatasetForTeamKpi, rangeStart, rangeEnd]);
+  }, [dedupedTeam, rangeStart, rangeEnd, memberSeedingData]);
 
   const stats = useMemo(() => {
-    const winRef = getMonthWeekWindowContaining(new Date());
-    const totalTargetComments = dedupedTeam.reduce((acc, tm) => {
-      const kw = findKpiOverlappingWindow(Array.isArray(tm.kpi) ? tm.kpi : [], winRef);
-      return acc + numKpi(kw?.total_comment);
-    }, 0);
-    const totalTargetInteractions = dedupedTeam.reduce((acc, tm) => {
-      const kw = findKpiOverlappingWindow(Array.isArray(tm.kpi) ? tm.kpi : [], winRef);
-      return acc + numKpi(kw?.total_reaction);
-    }, 0);
+    const totalMembers = members.length;
 
-    const teamActuals = computeTeamActualsSumInYmdRange(
-      teamMemberEmails,
-      postsDatasetForTeamKpi,
-      rangeStart,
-      rangeEnd,
-    );
+    // Tổng seeding thực tế của toàn đội trong khoảng lọc
+    const totalActualSeeding = members.reduce((acc, m) => acc + m.posts, 0);
+
+    // Tổng KPI target của toàn đội
+    const totalKpiTarget = Object.values(memberSeedingData).reduce((acc, d) => acc + (d.kpi_target || 0), 0);
+
+    // Số thành viên hoàn thành KPI (Done) và đang xử lý
+    const completedKpiCount = members.filter((m) => m.status === "completed").length;
+    const failedKpiCount = members.filter((m) => m.status === "processing").length;
 
     return {
-      totalMembers: members.length,
-      totalPosts: teamActuals.posts,
-      totalComments: teamActuals.comments,
-      totalInteractions: teamActuals.interactions,
-      completedKpiCount: members.filter((m) => m.status === "completed").length,
-      totalTargetComments,
-      totalTargetInteractions,
+      totalMembers,
+      totalPosts: totalActualSeeding,
+      completedKpiCount,
+      failedKpiCount,
+      totalKpiTarget,
     };
-  }, [members, dedupedTeam, teamMemberEmails, postsDatasetForTeamKpi, rangeStart, rangeEnd]);
+  }, [members, memberSeedingData]);
 
   const refreshAll = () => {
     void (async () => {
@@ -167,78 +265,98 @@ export function AdminTeamPageContent() {
   };
 
   return (
-    <div className="flex flex-col gap-lg">
+    <div className="w-full space-y-lg">
       {/* Page Header */}
-      <div className="bg-surface-container-lowest border border-outline-variant p-lg rounded-xl flex justify-between items-start">
-        <div className="flex gap-md">
-          <div className="w-12 h-12 rounded-lg bg-primary-container flex items-center justify-center text-white">
-            <MaterialIcon name="verified_user" className="text-3xl" />
-          </div>
-          <div>
-            <p className="text-primary font-bold tracking-wider text-[11px] uppercase">KHÔNG GIAN LEADER</p>
-            <h2 className="font-h1 text-h1 text-on-surface">Quản lý Đội ngũ & KPI</h2>
-            <p className="font-body-md text-on-surface-variant mt-1"> Theo dõi thành viên, giao KPI và đối chiếu tiến độ thực tế với mục tiêu đã đề ra.</p>
-          </div>
-        </div>
-        <span className="px-3 py-1 bg-surface-container-high rounded-full font-label-md text-primary text-[11px]">LEADER ROLE</span>
+      <div className="mb-xl">
+        <h1 className="text-h1 text-on-surface mb-xs font-semibold">
+          Quản lý Đội ngũ & KPI
+        </h1>
+        <p className="text-body-lg text-on-surface-variant">
+          Theo dõi thành viên, giao KPI và đối chiếu tiến độ thực tế với mục tiêu đã đề ra.
+        </p>
       </div>
 
       {/* Action Bar */}
-      <div className="bg-surface-container-low p-md rounded-xl flex flex-col md:flex-row items-center justify-between gap-md">
-        <div className="flex gap-md w-full md:w-auto">
+      <div className="border-outline-variant bg-surface-container-low/50 flex flex-col xl:flex-row items-center justify-between gap-md rounded-lg border px-md py-md mb-xl">
+        <div className="flex flex-wrap items-center gap-sm w-full xl:w-auto">
           <button
             onClick={() => setAddModalOpen(true)}
-            className="flex-1 md:flex-none bg-secondary text-white px-lg py-sm rounded-lg flex items-center justify-center gap-xs font-h3 hover:opacity-90 active:scale-95 transition-all"
+            className="bg-primary text-on-primary hover:bg-primary-container flex items-center gap-2 rounded-lg px-md py-sm text-xs font-bold uppercase tracking-wide transition-all active:scale-[0.98] cursor-pointer"
           >
-            <MaterialIcon name="person_add" filled />
+            <MaterialIcon name="person_add" className="shrink-0 text-[18px]" />
             Thêm thành viên
           </button>
           <button
             onClick={() => refreshAll()}
             disabled={isGettingAllPosts || isTeamLoading || (role === "leader" && isGettingTeamMembersPosts)}
-            className="flex-1 md:flex-none bg-primary text-white px-lg py-sm rounded-lg flex items-center justify-center gap-xs font-h3 hover:bg-primary-container active:scale-95 transition-all disabled:opacity-50"
+            className="border-outline-variant bg-surface text-on-surface hover:bg-surface-container-high flex items-center gap-2 rounded-lg border px-md py-sm text-xs font-bold uppercase tracking-wide transition-all disabled:opacity-50"
           >
             <MaterialIcon
               name="refresh"
-              className={isGettingAllPosts || (role === "leader" && isGettingTeamMembersPosts) ? "animate-spin" : ""}
+              className={cn("shrink-0 text-[18px]", (isGettingAllPosts || (role === "leader" && isGettingTeamMembersPosts)) ? "animate-spin" : "")}
             />
-            Làm mới
+            Làm mới dữ liệu
           </button>
         </div>
-        <div className="flex items-center gap-md bg-white border border-outline-variant px-md py-sm rounded-lg w-full md:w-auto">
-          <MaterialIcon name="calendar_month" className="text-outline" />
-          <input
-            type="date"
-            className="w-full md:w-32 border-none p-0 text-body-md focus:ring-0 bg-transparent"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-          />
-          <span className="text-outline">→</span>
-          <input
-            type="date"
-            className="w-full md:w-32 border-none p-0 text-body-md focus:ring-0 bg-transparent"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-          />
+        
+        {/* Date Filters & Week Dropdown Selector */}
+        <div className="flex flex-wrap items-center gap-sm w-full xl:w-auto">
+          <div className="flex items-center gap-xs w-full sm:w-auto">
+            <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider whitespace-nowrap">Xem theo:</span>
+            <select
+              className="border-outline-variant bg-surface-container-low focus:border-primary text-on-surface rounded-lg border px-md py-sm text-xs outline-none w-full sm:w-64 cursor-pointer"
+              value={selectedWeekKey}
+              onChange={(e) => handleWeekChange(e.target.value)}
+            >
+              <option value="custom">-- Tự chọn khoảng ngày --</option>
+              {weekOptions.map((w) => (
+                <option key={`${w.startYmd}|${w.endYmd}`} value={`${w.startYmd}|${w.endYmd}`}>
+                  {w.labelVi}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-xs w-full sm:w-auto">
+            <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider hidden sm:inline whitespace-nowrap">Từ:</span>
+            <input
+              type="date"
+              className="border-outline-variant bg-surface-container-low focus:border-primary rounded-lg border px-md py-sm text-xs outline-none w-full sm:w-36 text-on-surface"
+              value={dateFrom}
+              onChange={(e) => handleDateFromChange(e.target.value)}
+            />
+            <span className="text-xs text-on-surface-variant">→</span>
+            <input
+              type="date"
+              className="border-outline-variant bg-surface-container-low focus:border-primary rounded-lg border px-md py-sm text-xs outline-none w-full sm:w-36 text-on-surface"
+              value={dateTo}
+              onChange={(e) => handleDateToChange(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 
-      <AdminTeamStats
-        totalMembers={stats.totalMembers}
-        totalPosts={stats.totalPosts}
-        totalKpiComments={stats.totalTargetComments}
-        totalKpiInteractions={stats.totalTargetInteractions}
-        completedKpiCount={stats.completedKpiCount}
-        actualComments={stats.totalComments}
-        actualInteractions={stats.totalInteractions}
-      />
+      <div className="mb-xl">
+        <AdminTeamStats
+          totalMembers={stats.totalMembers}
+          totalPosts={stats.totalPosts}
+          completedKpiCount={stats.completedKpiCount}
+          failedKpiCount={stats.failedKpiCount}
+          totalKpiTarget={stats.totalKpiTarget}
+        />
+      </div>
 
-      <AdminTeamTable
-        members={members}
-        leaderEmail={email}
-        allPostsResult={postsDatasetForTeamKpi}
-        onRefresh={() => refreshAll()}
-      />
+      <div className="mb-xl">
+        <AdminTeamTable
+          members={members}
+          leaderEmail={email}
+          allPostsResult={postsDatasetForTeamKpi}
+          pageDateRange={{ start: rangeStart, end: rangeEnd }}
+          memberSeedingItems={memberSeedingItems}
+          memberSeedingStats={memberSeedingData}
+          onRefresh={() => refreshAll()}
+        />
+      </div>
 
       <AddMemberModal
         isOpen={addModalOpen}
@@ -246,6 +364,25 @@ export function AdminTeamPageContent() {
         leaderEmail={email}
         onSuccess={() => void fetchTeamMembers()}
       />
+
+      {(isTeamLoading || isGettingTeamMembersPosts) && (
+        <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-background/60 backdrop-blur-sm transition-opacity duration-300">
+          <div className="bg-surface-container-highest border-outline-variant flex flex-col items-center gap-md rounded-2xl border p-xl shadow-2xl">
+            <span className="material-symbols-outlined text-[40px] text-primary animate-spin">
+              sync
+            </span>
+            <div className="flex flex-col items-center gap-xs text-center">
+              <p className="text-body-md font-bold text-on-surface">
+                Đang tính toán & tải dữ liệu...
+              </p>
+              <p className="text-body-sm text-on-surface-variant">
+                Vui lòng đợi trong giây lát
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

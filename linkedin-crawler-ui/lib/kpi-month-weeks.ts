@@ -192,6 +192,10 @@ export type NormalizedKpiEntry = {
   total_post_crawl: number;
   total_comment: number;
   total_reaction: number;
+  platform?: string;
+  actual_seeding?: number;
+  status?: string;
+  matching_posts?: any[];
 };
 
 function num(v: unknown): number {
@@ -201,19 +205,40 @@ function num(v: unknown): number {
   return Number.isFinite(p) ? p : 0;
 }
 
+function ensureYmd(dateStr: string): string {
+  if (!dateStr) return "";
+  const s = dateStr.trim();
+  if (/^\d{2}-\d{2}-\d{4}$/.test(s)) {
+    const parts = s.split("-");
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
+    const parts = s.split("/");
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  return s;
+}
+
 export function normalizeKpiEntry(raw: unknown): NormalizedKpiEntry | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
-  const sd = String(o.start_day ?? o.startDay ?? "").trim().slice(0, 10);
-  const ed = String(o.end_day ?? o.endDay ?? "").trim().slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(sd) || !/^\d{4}-\d{2}-\d{2}$/.test(ed)) return null;
+  const sd = ensureYmd(String(o.start_day ?? o.startDay ?? o.start ?? "").trim()).slice(0, 10);
+  const ed = ensureYmd(String(o.end_day ?? o.endDay ?? o.end ?? "").trim()).slice(0, 10);
+  
+  const isValid = /^\d{4}-\d{2}-\d{2}$/.test(sd) && /^\d{4}-\d{2}-\d{2}$/.test(ed);
+  if (!isValid) return null;
+
   return {
     start_day: sd,
     end_day: ed,
     total_session_crawl: num(o.total_session_crawl ?? o.totalSessionCrawl ?? o.sessions),
-    total_post_crawl: num(o.total_post_crawl ?? o.totalPostCrawl ?? o.posts),
+    total_post_crawl: num(o.total_post_crawl ?? o.totalPostCrawl ?? o.posts ?? o.kpi_sedding_per_week),
     total_comment: num(o.total_comment ?? o.totalComment ?? o.comments),
     total_reaction: num(o.total_reaction ?? o.totalReaction ?? o.reactions),
+    platform: o.platform ? String(o.platform) : undefined,
+    actual_seeding: o.actual_seeding !== undefined ? num(o.actual_seeding) : undefined,
+    status: o.status ? String(o.status) : undefined,
+    matching_posts: Array.isArray(o.matching_posts) ? o.matching_posts : undefined,
   };
 }
 
@@ -232,10 +257,12 @@ export function findKpiOverlappingWindow(
   kpiList: unknown[],
   win: Pick<MonthWeekWindow, "startYmd" | "endYmd">,
 ): NormalizedKpiEntry | null {
+  const targetStart = ensureYmd(win.startYmd);
+  const targetEnd = ensureYmd(win.endYmd);
   for (const raw of kpiList) {
     const e = normalizeKpiEntry(raw);
     if (!e) continue;
-    if (rangesOverlap(e.start_day, e.end_day, win.startYmd, win.endYmd)) return e;
+    if (rangesOverlap(e.start_day, e.end_day, targetStart, targetEnd)) return e;
   }
   return null;
 }

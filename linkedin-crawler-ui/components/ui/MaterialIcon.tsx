@@ -22,6 +22,7 @@ export type MaterialSymbolName =
   | "code"
   | "refresh"
   | "visibility"
+  | "visibility_off"
   | "chevron_left"
   | "chevron_right"
   | "group_add"
@@ -59,20 +60,34 @@ export type MaterialSymbolName =
   | "more_vert"
   | "chat_bubble"
   | "history"
-  | "dataset";
+  | "dataset"
+  | "category"
+  | "dashboard"
+  | "verified"
+  | "link"
+  | "pending"
+  | "manage_accounts"
+  | "logout"
+  | "warning"
+  | "lock_reset"
+  | "calendar_today"
+  | "key"
+  | "check_circle"
+  | "check"
+  | "arrow_forward"
+  | "arrow_downward"
+  | "folder"
+  | "rocket_launch"
+  | "travel_explore"
+  | "group_off";
 
 export interface MaterialIconProps {
   name: MaterialSymbolName;
   className?: string;
-  /** FILL=1 (ví dụ icon check tròn đặc) */
   filled?: boolean;
   "aria-hidden"?: boolean;
 }
 
-/**
- * Icon Material Symbols — cần font "Material Symbols Outlined"
- * (load trong layout + class `.material-symbols-outlined` trong globals.css).
- */
 const OUTLINED_VAR =
   "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24" as const;
 const FILLED_VAR =

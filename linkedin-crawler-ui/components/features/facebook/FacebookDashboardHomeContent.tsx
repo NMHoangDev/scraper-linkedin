@@ -1,6 +1,6 @@
 "use client";
 
-import { DashboardPosts } from "@/components/nguyen/modules/crawldFB/components/dashboardPost";
+import { DashboardPosts } from "@/components/facebook-crawler/modules/facebook-crawl/components/dashboard-post";
 
 export function FacebookDashboardHomeContent({ hideHeader }: { hideHeader?: boolean }) {
   return (

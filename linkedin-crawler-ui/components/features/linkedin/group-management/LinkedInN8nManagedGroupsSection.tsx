@@ -24,6 +24,7 @@ import {
 import { cn } from "@/lib/utils";
 
 import { useDashboard } from "@/components/features/dashboard/dashboard-context";
+import { useGetCategoriesQuery } from "@/components/facebook-crawler/modules/facebook-crawl/hooks/use-get-categories-query";
 
 const GROUPS_PAGE_SIZE = 8;
 /** Chờ backend + n8n (giây) — khớp .env / timeout server (~5–6 phút). */
@@ -31,12 +32,6 @@ const ADD_LIST_GROUP_WEBHOOK_TIMEOUT_SEC = 360;
 /** Banner info ngắn sau refresh. */
 const ADD_SUCCESS_DISMISS_MS = 2000;
 
-export const GROUP_TYPE_OPTIONS = [
-  "Group cào",
-  "Group cộng đồng",
-  "Group việc làm",
-  "Group chuyên môn",
-];
 export function LinkedInN8nManagedGroupsSection() {
   const d = useDashboard();
   const email = d.email.trim();
@@ -111,14 +106,22 @@ export function LinkedInN8nManagedGroupsSection() {
     if (email) void loadGroups();
   }, [email, d.dashboardReloadToken, loadGroups]);
 
-  /** Danh sách type duy nhất từ data n8n (không tính rỗng/undefined). */
+  /** Danh sách type duy nhất từ data API Categories. */
+  const { data: categoriesData } = useGetCategoriesQuery();
+
+  const dynTypes = useMemo(() => {
+    const intentList = categoriesData?.intent || [];
+    return intentList.map((t: any) => t.name || t.code || t.value || "");
+  }, [categoriesData]);
+
   const uniqueTypes = useMemo(() => {
-    const set = new Set<string>();
+    const set = new Set<string>(dynTypes);
+    // Vẫn lấy những type hiện có trong list groups đề phòng group dùng type cũ
     for (const r of rows) {
       if (r.type && r.type.trim()) set.add(r.type.trim());
     }
     return Array.from(set).sort();
-  }, [rows]);
+  }, [rows, dynTypes]);
 
   /** Rows sau khi lọc type. */
   const filteredRows = useMemo(() => {
@@ -301,7 +304,7 @@ export function LinkedInN8nManagedGroupsSection() {
     if (!row.type) {
       setEditTypeOption("");
       setEditTypeCustom("");
-    } else if (GROUP_TYPE_OPTIONS.includes(row.type)) {
+    } else if (dynTypes.includes(row.type) || uniqueTypes.includes(row.type)) {
       setEditTypeOption(row.type);
       setEditTypeCustom("");
     } else {

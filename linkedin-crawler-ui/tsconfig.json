@@ -20,7 +20,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@/components/nguyen/*": ["./components/facebook-crawler/*"]
     }
   },
   "include": [
