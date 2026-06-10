@@ -123,14 +123,16 @@ async def run_crawl_task_background(groups: List[Dict[str, Any]], user_id: str, 
                     recent_posts_text += f"\n{i+1}. <i>{content}</i>\n"
                     recent_posts_text += f"   👉 Tương tác: 👍 {post.get('reactions', 0)} | 💬 {post.get('comments', 0)}\n"
         
+        group_names = ", ".join([g.get("name", "Unknown Group") for g in groups])
+        
         msg = f"✅ <b>[ALL-PLATFORM] BÁO CÁO CÀO TỰ ĐỘNG 24H</b>\n"
         msg += f"• Nền tảng: Facebook\n"
         msg += f"• Người thực thi: {user_name}\n"
-        msg += f"• Tổng số nhóm đã quét: {len(groups)}\n"
+        msg += f"• Nhóm đã quét ({len(groups)}): {group_names}\n"
         msg += f"• Nhóm thành công: {result.total_groups_ok}\n"
         msg += f"• Tổng số bài viết mới: {total_posts}\n"
         if total_duplicates > 0:
-            msg += f"• Bỏ qua {total_duplicates} bài viết trùng lặp (đã có trong DB)."
+            msg += f"• Bỏ qua {total_duplicates} bài viết trùng lặp (từ các nhóm trên)."
         msg += recent_posts_text
         
         telegram.send_message(msg)
