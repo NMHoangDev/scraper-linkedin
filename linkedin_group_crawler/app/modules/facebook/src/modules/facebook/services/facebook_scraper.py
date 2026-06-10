@@ -2,7 +2,7 @@ import os
 import time
 import random
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Callable
 import sys
 
 from playwright.sync_api import sync_playwright
@@ -26,6 +26,7 @@ class GroupTarget:
     name: str
     url: str
     Intent:str
+    id_member: str = ""
 
 class FacebookScraper:
     def __init__(self, config):
@@ -39,6 +40,7 @@ class FacebookScraper:
         custom_pass: Optional[str] = None,
         client_id: Optional[str] = None,
         custom_2fa: Optional[str] = None,
+        on_group_crawled: Optional[Callable[[GroupSummary], None]] = None,
     ) -> List[GroupSummary]:
         
         results: List[GroupSummary] = []
@@ -283,21 +285,27 @@ class FacebookScraper:
                         link_group=group.url,
                         total_posts_24h=len(all_valid_posts),
                         Intent=group.Intent,
+                        id_member=group.id_member,
                         hot_post=sorted_posts[0] if sorted_posts else None
                     )
                     results.append(summary)
+                    if on_group_crawled:
+                        on_group_crawled(summary)
                     
-                   
 
                 except Exception as e:
                     logger.error(f"❌ Lỗi group {group.name}: {e}")
-                    results.append(GroupSummary(
+                    summary = GroupSummary(
                         group_name=group.name,
                         link_group=group.url,
                         total_posts_24h=0,
                         Intent=group.Intent,
+                        id_member=group.id_member,
                         hot_post=None
-                    ))
+                    )
+                    results.append(summary)
+                    if on_group_crawled:
+                        on_group_crawled(summary)
 
             browser.close()
             return results

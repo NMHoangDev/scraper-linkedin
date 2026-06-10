@@ -37,7 +37,8 @@ async def run_crawl_task_background(groups: List[Dict[str, Any]], user_id: str, 
         try:
             result = await crawl_facebook_groups(
                 groups=groups,
-                user_id=user_id
+                user_id=user_id,
+                involved_users_list=involved_users_list
             )
             
             # Kiểm tra xem có lỗi liên quan đến mạng không
@@ -82,62 +83,8 @@ async def run_crawl_task_background(groups: List[Dict[str, Any]], user_id: str, 
         logger.error("❌ Không lấy được kết quả sau các lần thử.")
         return
 
-    # 3. Gửi báo cáo
-    total_posts = result.total_posts_saved
-    total_duplicates = getattr(result, 'total_duplicates', 0)
-    
-    msg_broadcast = f"Cào xong {len(groups)} nhóm, lưu được {total_posts} bài viết."
-    if total_duplicates > 0:
-        msg_broadcast += f" Phát hiện {total_duplicates} bài viết trùng lặp đã có trong cơ sở dữ liệu."
-
-    asyncio.create_task(manager.broadcast({
-        "event": "crawl_success",
-        "message": msg_broadcast,
-        "total_posts": total_posts,
-        "total_duplicates": total_duplicates,
-        "involved_users": involved_users_list
-    }))
-    logger.info(f"✅ HOÀN TẤT TIẾN TRÌNH CÀO FB CHO {len(groups)} NHÓM (user: {user_id}).")
-    
-    try:
-        telegram = TelegramService()
-        supabase = get_supabase_client()
-        
-        # Lấy tên User
-        user_name = user_id
-        if user_id != "00000000-0000-0000-0000-000000000000":
-            user_res = supabase.table("app_users").select("name, email").eq("id", user_id).execute()
-            if user_res.data:
-                user_name = user_res.data[0].get("name") or user_res.data[0].get("email") or user_id
-        
-        # Lấy tối đa 5 bài viết mới nhất vừa được lưu
-        recent_posts_text = ""
-        if total_posts > 0:
-            posts_res = supabase.table("facebook_posts").select("content, reactions, comments, group_id").eq("id_member", user_id).order("created_at", desc=True).limit(min(5, total_posts)).execute()
-            if posts_res.data:
-                recent_posts_text = "\n\n📝 <b>CHI TIẾT CÁC BÀI VIẾT NỔI BẬT:</b>\n"
-                for i, post in enumerate(posts_res.data):
-                    content = post.get("content") or ""
-                    if len(content) > 100:
-                        content = content[:100] + "..."
-                    recent_posts_text += f"\n{i+1}. <i>{content}</i>\n"
-                    recent_posts_text += f"   👉 Tương tác: 👍 {post.get('reactions', 0)} | 💬 {post.get('comments', 0)}\n"
-        
-        group_names = ", ".join([g.get("name", "Unknown Group") for g in groups])
-        
-        msg = f"✅ <b>[ALL-PLATFORM] BÁO CÁO CÀO TỰ ĐỘNG 24H</b>\n"
-        msg += f"• Nền tảng: Facebook\n"
-        msg += f"• Người thực thi: {user_name}\n"
-        msg += f"• Nhóm đã quét ({len(groups)}): {group_names}\n"
-        msg += f"• Nhóm thành công: {result.total_groups_ok}\n"
-        msg += f"• Tổng số bài viết mới: {total_posts}\n"
-        if total_duplicates > 0:
-            msg += f"• Bỏ qua {total_duplicates} bài viết trùng lặp (từ các nhóm trên)."
-        msg += recent_posts_text
-        
-        telegram.send_message(msg)
-    except Exception as tel_err:
-        logger.error(f"Lỗi gửi Telegram: {tel_err}")
+    # Đã báo cáo từng nhóm qua callback trong facebook_crawl_service.py
+    logger.info(f"✅ HOÀN TẤT TIẾN TRÌNH CÀO FB CHO {len(groups)} NHÓM.")
     
     if result.errors and len(result.errors) > 0:
         for err in result.errors:
@@ -159,9 +106,9 @@ async def execute_all_platform_crawl_workflow():
         res = supabase.table("facebook_groups").select("*").eq("chay_24h", True).execute()
         all_auto_groups = res.data or []
         
-        # Gom nhóm theo user_id để mỗi user chạy một luồng background cào riêng
-        target_groups_by_user: Dict[str, List[Dict[str, Any]]] = {}
-        involved_users_by_user: Dict[str, set] = {}
+        # Gom tất cả nhóm vào chung 1 luồng duy nhất
+        all_target_groups: List[Dict[str, Any]] = []
+        all_involved_users: set = set()
         
         for row in all_auto_groups:
             start_time = row.get("start_time_in_day")
@@ -194,34 +141,28 @@ async def execute_all_platform_crawl_workflow():
                         # Lấy UUID hợp lệ từ cấu hình
                         user_id = str(row.get("id_member") or row.get("assignee_id") or "00000000-0000-0000-0000-000000000000")
                         
-                        if user_id not in target_groups_by_user:
-                            target_groups_by_user[user_id] = []
-                            involved_users_by_user[user_id] = set()
-                            
-                        target_groups_by_user[user_id].append({
+                        all_target_groups.append({
                             "name": group_name,
                             "url": group_url,
-                            "Intent": intent_val
+                            "Intent": intent_val,
+                            "id_member": user_id
                         })
                         
                         # Thu thập ID của những người liên quan
                         id_member = row.get("id_member")
                         assignee_id = row.get("assignee_id")
                         co_assignee_id = row.get("co_assignee_id")
-                        if id_member: involved_users_by_user[user_id].add(str(id_member))
-                        if assignee_id: involved_users_by_user[user_id].add(str(assignee_id))
-                        if co_assignee_id: involved_users_by_user[user_id].add(str(co_assignee_id))
+                        if id_member: all_involved_users.add(str(id_member))
+                        if assignee_id: all_involved_users.add(str(assignee_id))
+                        if co_assignee_id: all_involved_users.add(str(co_assignee_id))
 
-        if not target_groups_by_user:
+        if not all_target_groups:
             return
 
-        # 2. Đẩy các luồng cào ra background tasks
-        logger.info(f"Phát hiện {len(target_groups_by_user)} luồng cào cần khởi chạy.")
-        
-        for user_id, groups in target_groups_by_user.items():
-            involved_users_list = list(involved_users_by_user.get(user_id, set()))
-            # Sử dụng create_task để chạy ngầm và trả ngay luồng điều khiển lại cho Scheduler
-            asyncio.create_task(run_crawl_task_background(groups, user_id, involved_users_list))
+        # 2. Đẩy luồng cào duy nhất ra background task
+        logger.info(f"Phát hiện {len(all_target_groups)} nhóm cần cào. Đang gom vào 1 luồng duy nhất.")
+        involved_users_list = list(all_involved_users)
+        asyncio.create_task(run_crawl_task_background(all_target_groups, "00000000-0000-0000-0000-000000000000", involved_users_list))
 
     except Exception as e:
         logger.error(f"❌ Thất bại trong lúc check scheduler: {e}", exc_info=True)

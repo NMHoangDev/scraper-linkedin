@@ -149,7 +149,7 @@ def save_facebook_crawl_to_supabase(user_id: str, summaries: List[GroupSummary])
             "image_urls": [],
             "created_at": now_iso,
             "updated_at": now_iso,
-            "id_member": user_id
+            "id_member": summary.id_member or user_id
         }
         
         # Chỉ chèn các bài có group_id để đảm bảo Foreign Key Constraint (nếu có)
