@@ -191,13 +191,13 @@ def get_member_seeding_count(
         if id_member:
             kpi_result = (
                 supabase.table("kpi_tracker")
-                .select("kpi_per_week")
+                .select("kpi_comment")
                 .eq("id_member", id_member)
                 .eq("status", "active")
                 .execute()
             )
             if kpi_result.data:
-                kpi_target = kpi_result.data[0].get("kpi_per_week", 0) or 0
+                kpi_target = kpi_result.data[0].get("kpi_comment", 0) or 0
     except Exception:
         pass
 
@@ -223,6 +223,7 @@ def get_kpi_target(
     email_member: str,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    id_team: Optional[str] = None,
 ) -> dict:
     """Get KPI target for a member from kpi_tracker.
 
@@ -247,6 +248,8 @@ def get_kpi_target(
         .eq("id_member", member_id)
         .eq("status", "active")
     )
+    if id_team:
+        query = query.eq("id_team", id_team)
 
     if date_from:
         query = query.lte("start_date", date_to or _today())

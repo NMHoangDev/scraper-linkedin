@@ -30,6 +30,14 @@ export function AuthPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<"idle" | "loading" | "success">("idle");
 
+  // Forgot password states
+  const [forgotStep, setForgotStep] = useState<"hidden" | "email" | "password">("hidden");
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotNewPass, setForgotNewPass] = useState("");
+  const [forgotConfirmPass, setForgotConfirmPass] = useState("");
+  const [forgotError, setForgotError] = useState<string | null>(null);
+  const [forgotLoading, setForgotLoading] = useState(false);
+
   const { login, register, setLwuuSession } = useAppAuth();
   const router = useRouter();
 
@@ -62,6 +70,63 @@ export function AuthPage() {
       setSubmitting(false);
     }
   }, [mode, email, password, name, login, register, setLwuuSession, router]);
+
+  const handleCheckEmail = async (e: FormEvent) => {
+    e.preventDefault();
+    setForgotError(null);
+    setForgotLoading(true);
+    try {
+      const { API_BASE_URL } = await import("@/lib/env");
+      const res = await fetch(`${API_BASE_URL}/api/all-platform/auth/check-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: forgotEmail.trim() })
+      });
+      const data = await res.json();
+      if (data.success && data.data?.exists) {
+        setForgotStep("password");
+      } else {
+        setForgotError(data.message || "Email không tồn tại.");
+      }
+    } catch (err) {
+      setForgotError("Lỗi kết nối máy chủ");
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: FormEvent) => {
+    e.preventDefault();
+    setForgotError(null);
+    if (forgotNewPass !== forgotConfirmPass) {
+      setForgotError("Mật khẩu xác nhận không khớp");
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      const { API_BASE_URL } = await import("@/lib/env");
+      const res = await fetch(`${API_BASE_URL}/api/all-platform/auth/reset-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: forgotEmail.trim(), new_password: forgotNewPass })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("Đổi mật khẩu thành công! Vui lòng đăng nhập lại bằng mật khẩu mới.");
+        setForgotStep("hidden");
+        setForgotEmail("");
+        setForgotNewPass("");
+        setForgotConfirmPass("");
+        setEmail(forgotEmail.trim()); // Điền sẵn email vào form login
+      } else {
+        setForgotError(data.message || "Lỗi khi đổi mật khẩu.");
+      }
+    } catch (err) {
+      setForgotError("Lỗi kết nối máy chủ");
+    } finally {
+      setForgotLoading(false);
+    }
+  };
 
   const isLoading = submitStatus === "loading";
   const isSuccess = submitStatus === "success";
@@ -255,9 +320,9 @@ export function AuthPage() {
                     Mật khẩu <span className="text-red-500">*</span>
                   </label>
                   {mode === "login" && (
-                    <a href="#" className="text-xs text-[#E3000F] hover:underline">
+                    <button type="button" onClick={() => { setForgotStep("email"); setForgotEmail(""); setForgotError(null); }} className="text-xs text-[#E3000F] hover:underline bg-transparent border-0 p-0 cursor-pointer">
                       Quên mật khẩu?
-                    </a>
+                    </button>
                   )}
                 </div>
                 <div className="relative">
@@ -357,11 +422,12 @@ export function AuthPage() {
                     type="button"
                     className="flex items-center justify-center gap-2 py-2 px-3 border rounded-xl transition-colors cursor-pointer bg-white border-[#cbc4d2] hover:bg-[#f3f4f5]"
                   >
-                    <img
-                      src="https://lh3.googleusercontent.com/COUgScCx-pODA3oMozpVFH-m7uOZ-8DlR3V2t6v7I3K_AGt-Q6JYPhbLW0v63hZqYXo=w48-h48-n"
-                      alt="Google"
-                      className="w-5 h-5"
-                    />
+                    <svg className="w-5 h-5" viewBox="0 0 48 48">
+                      <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
+                      <path fill="#FF3D00" d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
+                      <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
+                      <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
+                    </svg>
                     <span className="text-xs font-medium text-[#494551]">Google</span>
                   </button>
                   <button
@@ -406,6 +472,99 @@ export function AuthPage() {
           </div>
         </footer>
       </main>
+
+      {/* ── Forgot Password Popup ── */}
+      {forgotStep !== "hidden" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+          <div className="bg-white rounded-2xl w-[400px] max-w-[90vw] p-6 shadow-2xl animate-in zoom-in-95 fade-in duration-200">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-[#1f1c24]">
+                {forgotStep === "email" ? "Quên mật khẩu" : "Đặt lại mật khẩu"}
+              </h3>
+              <button 
+                onClick={() => setForgotStep("hidden")}
+                className="text-[#7a7582] hover:bg-gray-100 p-1 rounded-lg transition-colors border-0 bg-transparent cursor-pointer"
+              >
+                <Icon name="close" />
+              </button>
+            </div>
+
+            {forgotStep === "email" && (
+              <form onSubmit={handleCheckEmail} className="flex flex-col gap-4">
+                <p className="text-sm text-[#7a7582]">Vui lòng nhập địa chỉ email bạn đã đăng ký để đặt lại mật khẩu.</p>
+                <div className="relative">
+                  <Icon name="mail" className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7a7582] text-xl" />
+                  <input
+                    type="email"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    placeholder="name@company.com"
+                    required
+                    className="w-full pl-10 pr-3 py-2.5 bg-white border border-[#cbc4d2] rounded-xl text-sm focus:border-[#E3000F] focus:ring-1 focus:ring-[#E3000F] transition-all outline-none"
+                  />
+                </div>
+                {forgotError && <p className="text-red-500 text-xs font-medium">{forgotError}</p>}
+                <button
+                  type="submit"
+                  disabled={forgotLoading}
+                  className="w-full py-2.5 bg-gradient-to-r from-[#C40009] to-[#E3000F] text-white rounded-xl font-semibold disabled:opacity-70 transition-all active:scale-95 border-0 cursor-pointer flex items-center justify-center gap-2"
+                >
+                  {forgotLoading ? <Icon name="progress_activity" className="animate-spin text-sm" /> : null}
+                  Xác nhận
+                </button>
+              </form>
+            )}
+
+            {forgotStep === "password" && (
+              <form onSubmit={handleResetPassword} className="flex flex-col gap-4">
+                <p className="text-sm text-[#7a7582]">Nhập mật khẩu mới cho tài khoản <b>{forgotEmail}</b></p>
+                
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-[#494551]">Mật khẩu mới</label>
+                  <div className="relative">
+                    <Icon name="lock" className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7a7582] text-xl" />
+                    <input
+                      type="password"
+                      value={forgotNewPass}
+                      onChange={(e) => setForgotNewPass(e.target.value)}
+                      placeholder="••••••••"
+                      required
+                      minLength={6}
+                      className="w-full pl-10 pr-3 py-2 bg-white border border-[#cbc4d2] rounded-xl text-sm focus:border-[#E3000F] outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-[#494551]">Xác nhận mật khẩu mới</label>
+                  <div className="relative">
+                    <Icon name="lock_reset" className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7a7582] text-xl" />
+                    <input
+                      type="password"
+                      value={forgotConfirmPass}
+                      onChange={(e) => setForgotConfirmPass(e.target.value)}
+                      placeholder="••••••••"
+                      required
+                      minLength={6}
+                      className="w-full pl-10 pr-3 py-2 bg-white border border-[#cbc4d2] rounded-xl text-sm focus:border-[#E3000F] outline-none"
+                    />
+                  </div>
+                </div>
+
+                {forgotError && <p className="text-red-500 text-xs font-medium">{forgotError}</p>}
+                <button
+                  type="submit"
+                  disabled={forgotLoading}
+                  className="w-full py-2.5 mt-2 bg-gradient-to-r from-[#C40009] to-[#E3000F] text-white rounded-xl font-semibold disabled:opacity-70 transition-all active:scale-95 border-0 cursor-pointer flex items-center justify-center gap-2"
+                >
+                  {forgotLoading ? <Icon name="progress_activity" className="animate-spin text-sm" /> : null}
+                  Đổi mật khẩu
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

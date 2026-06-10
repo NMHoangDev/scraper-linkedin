@@ -41,7 +41,7 @@ def kpi_assign(payload: AssignKpiRequest) -> BaseResponse:
 def kpi_get_all(payload: GetAllKpiRequest) -> BaseResponse:
     """Leader gets all KPIs for their team members."""
     try:
-        data = get_all_kpis_for_leader(payload.leader_email)
+        data = get_all_kpis_for_leader(payload.leader_email, payload.id_team)
         return BaseResponse(success=True, data=data)
     except Exception as e:
         return BaseResponse(success=False, message=str(e))

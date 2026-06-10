@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { FaFacebook, FaLinkedin, FaPlus, FaEdit, FaTrash, FaSearch } from "react-icons/fa";
 import { MaterialIcon } from "@/components/ui";
+import { useAppAuth } from "@/contexts/AppAuthContext";
 import { 
   allPlatformGroupsService, 
   allPlatformCategoriesService,
@@ -159,6 +160,7 @@ function SearchableDropdown({
 
 // ── Facebook Group Form ──────────────────────────────────────────────────────
 interface FbGroupFormData {
+  id_member?: string;
   group_name: string;
   group_url: string;
   id_intent: string;
@@ -187,6 +189,7 @@ interface FbGroupFormData {
 }
 
 const FB_EMPTY_FORM: FbGroupFormData = {
+  id_member: "",
   group_name: "",
   group_url: "",
   id_intent: "",
@@ -239,6 +242,8 @@ function FacebookGroupForm({
   productSeedingOptions: Category[];
   userOptions: Category[];
 }) {
+  const { user } = useAppAuth();
+  const isAdmin = user?.role === "admin";
   const [form, setForm] = useState<FbGroupFormData>({ ...FB_EMPTY_FORM, ...initial });
   const [busy, setBusy] = useState(false);
 
@@ -273,6 +278,29 @@ function FacebookGroupForm({
 
     setBusy(true);
     try {
+      // Validate 24h crawl config
+      if (form.chay_24h) {
+        if (!form.start_time_in_day && form.start_time_in_day !== "0") {
+          alert("Vui lòng nhập Giờ bắt đầu trong ngày!");
+          setBusy(false);
+          return;
+        }
+        if (!form.end_time_in_day && form.end_time_in_day !== "0") {
+          alert("Vui lòng nhập Giờ kết thúc trong ngày!");
+          setBusy(false);
+          return;
+        }
+        if (Number(form.start_time_in_day) >= Number(form.end_time_in_day)) {
+          alert("Giờ bắt đầu phải nhỏ hơn giờ kết thúc!");
+          setBusy(false);
+          return;
+        }
+        if (!form.time_crawl) {
+          alert("Vui lòng chọn Khoảng cách cào!");
+          setBusy(false);
+          return;
+        }
+      }
       await onSubmit(form);
     } finally {
       setBusy(false);
@@ -372,6 +400,19 @@ function FacebookGroupForm({
             valueField="id"
           />
         </div>
+        {isAdmin && (
+          <div>
+            <SearchableDropdown
+              label="Thành viên sở hữu *"
+              value={form.id_member || ""}
+              onChange={(val) => set("id_member", val)}
+              options={userOptions}
+              placeholder="Tìm theo tên/email..."
+              valueField="id"
+              required
+            />
+          </div>
+        )}
         <div>
           <SearchableDropdown
             label="Loại nội dung"
@@ -440,84 +481,80 @@ function FacebookGroupForm({
           </label>
           
           {form.chay_24h && (
-            <div className="grid grid-cols-2 gap-4 mt-2">
-              <div>
-                <label className="text-xs font-bold text-[#666666] block mb-1">Giờ chạy (HH:MM)</label>
-                <input
-                  type="time"
-                  className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A]"
-                  value={form.crawl_time}
-                  onChange={(e) => set("crawl_time", e.target.value)}
-                />
+            <div className="space-y-3">
+              <div className="text-xs text-[#666666] bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 leading-relaxed">
+                ⚡ <b>Cách hoạt động:</b> Mỗi phút scheduler sẽ kiểm tra — nếu thời điểm hiện tại nằm trong khung giờ và chia hết cho khoảng cách cào (theo phút) thì sẽ cào nhóm này.
+                <br/>Ví dụ: Khung giờ <b>7h–22h</b>, khoảng cách <b>60 phút</b> → cào vào 7:00, 8:00, 9:00... cho đến 22:00.
               </div>
-              <div>
-                <label className="text-xs font-bold text-[#666666] block mb-1">Tần suất</label>
-                <select
-                  className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A] bg-white"
-                  value={form.crawl_frequency}
-                  onChange={(e) => set("crawl_frequency", e.target.value)}
-                >
-                  <option value="daily">Hàng ngày</option>
-                  <option value="weekly">Hàng tuần</option>
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-[#666666] block mb-1">
+                    Giờ bắt đầu trong ngày <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={23}
+                    className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A]"
+                    value={form.start_time_in_day}
+                    onChange={(e) => set("start_time_in_day", e.target.value)}
+                    placeholder="VD: 7 (7 giờ sáng)"
+                    required={form.chay_24h}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-[#666666] block mb-1">
+                    Giờ kết thúc trong ngày <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={23}
+                    className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A]"
+                    value={form.end_time_in_day}
+                    onChange={(e) => set("end_time_in_day", e.target.value)}
+                    placeholder="VD: 22 (10 giờ tối)"
+                    required={form.chay_24h}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-[#666666] block mb-1">
+                    Khoảng cách cào (phút) <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A] bg-white"
+                    value={form.time_crawl}
+                    onChange={(e) => set("time_crawl", e.target.value)}
+                    required={form.chay_24h}
+                  >
+                    <option value="">-- Chọn khoảng cách --</option>
+                    <option value="30">30 phút</option>
+                    <option value="60">1 tiếng (60 phút)</option>
+                    <option value="120">2 tiếng (120 phút)</option>
+                    <option value="180">3 tiếng (180 phút)</option>
+                    <option value="240">4 tiếng (240 phút)</option>
+                    <option value="300">5 tiếng (300 phút)</option>
+                    <option value="360">6 tiếng (360 phút)</option>
+                    <option value="480">8 tiếng (480 phút)</option>
+                    <option value="720">12 tiếng (720 phút)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-[#666666] block mb-1">
+                    Ngày kết thúc cào tự động
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A]"
+                    value={form.end_date_hour}
+                    onChange={(e) => set("end_date_hour", e.target.value)}
+                  />
+                  <p className="text-[10px] text-[#A0A0A0] mt-1">Để trống = không có ngày hết hạn</p>
+                </div>
               </div>
-              <div>
-                <label className="text-xs font-bold text-[#666666] block mb-1">Giờ bắt đầu trong ngày (int)</label>
-                <input
-                  type="number"
-                  className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A]"
-                  value={form.start_time_in_day}
-                  onChange={(e) => set("start_time_in_day", e.target.value)}
-                  placeholder="VD: 7"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-[#666666] block mb-1">Giờ kết thúc trong ngày (int)</label>
-                <input
-                  type="number"
-                  className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A]"
-                  value={form.end_time_in_day}
-                  onChange={(e) => set("end_time_in_day", e.target.value)}
-                  placeholder="VD: 16"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-[#666666] block mb-1">Khoảng cách cào</label>
-                <select
-                  className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A] bg-white"
-                  value={form.time_crawl}
-                  onChange={(e) => set("time_crawl", e.target.value)}
-                >
-                  <option value="">-- Chọn khoảng cách --</option>
-                  <option value="30">30p</option>
-                  <option value="60">1 tiếng</option>
-                  <option value="120">2 tiếng</option>
-                  <option value="180">3 tiếng</option>
-                  <option value="240">4 tiếng</option>
-                  <option value="300">5 tiếng</option>
-                  <option value="360">6 tiếng</option>
-                  <option value="480">8 tiếng</option>
-                  <option value="720">12 tiếng</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-bold text-[#666666] block mb-1">Ngày kết thúc (khoảng giờ)</label>
-                <input
-                  type="date"
-                  className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A]"
-                  value={form.end_date_hour}
-                  onChange={(e) => set("end_date_hour", e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-[#666666] block mb-1">Ngày kết thúc cào 24h</label>
-                <input
-                  type="date"
-                  className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A]"
-                  value={form.end_time_24h}
-                  onChange={(e) => set("end_time_24h", e.target.value)}
-                />
-              </div>
+              {form.start_time_in_day && form.end_time_in_day && Number(form.start_time_in_day) >= Number(form.end_time_in_day) && (
+                <p className="text-xs text-red-500 font-bold">⚠️ Giờ bắt đầu phải nhỏ hơn giờ kết thúc!</p>
+              )}
             </div>
           )}
         </div>
@@ -544,6 +581,7 @@ function FacebookGroupForm({
 
 // ── LinkedIn Group Form ──────────────────────────────────────────────────────
 interface LiGroupFormData {
+  id_member?: string;
   group_name: string;
   group_url: string;
   status: string;
@@ -552,6 +590,8 @@ interface LiGroupFormData {
   id_tier: string;
   id_team: string;
   id_icp: string;
+  id_content_type: string;
+  id_product_seeding: string;
   note: string;
   risk_note: string;
   assignee_id: string;
@@ -559,6 +599,7 @@ interface LiGroupFormData {
 }
 
 const LI_EMPTY_FORM: LiGroupFormData = {
+  id_member: "",
   group_name: "",
   group_url: "",
   status: "idle",
@@ -567,6 +608,8 @@ const LI_EMPTY_FORM: LiGroupFormData = {
   id_tier: "",
   id_team: "",
   id_icp: "",
+  id_content_type: "",
+  id_product_seeding: "",
   note: "",
   risk_note: "",
   assignee_id: "",
@@ -582,6 +625,8 @@ function LinkedInGroupForm({
   teamOptions,
   tierOptions,
   icpOptions,
+  contentTypeOptions,
+  productSeedingOptions,
   userOptions,
 }: {
   initial?: Partial<LiGroupFormData>;
@@ -592,8 +637,12 @@ function LinkedInGroupForm({
   teamOptions: Category[];
   tierOptions: Category[];
   icpOptions: Category[];
+  contentTypeOptions: Category[];
+  productSeedingOptions: Category[];
   userOptions: Category[];
 }) {
+  const { user } = useAppAuth();
+  const isAdmin = user?.role === "admin";
   const [form, setForm] = useState<LiGroupFormData>({ ...LI_EMPTY_FORM, ...initial });
   const [busy, setBusy] = useState(false);
 
@@ -708,6 +757,26 @@ function LinkedInGroupForm({
         </div>
         <div>
           <SearchableDropdown
+            label="Loại nội dung"
+            value={form.id_content_type}
+            onChange={(val) => set("id_content_type", val)}
+            options={contentTypeOptions}
+            placeholder="Tìm chọn Loại nội dung..."
+            valueField="id"
+          />
+        </div>
+        <div>
+          <SearchableDropdown
+            label="Sản phẩm Seeding"
+            value={form.id_product_seeding}
+            onChange={(val) => set("id_product_seeding", val)}
+            options={productSeedingOptions}
+            placeholder="Tìm chọn SP Seeding..."
+            valueField="id"
+          />
+        </div>
+        <div>
+          <SearchableDropdown
             label="Người phụ trách chính"
             value={form.assignee_id}
             onChange={(val) => set("assignee_id", val)}
@@ -726,6 +795,19 @@ function LinkedInGroupForm({
             valueField="id"
           />
         </div>
+        {isAdmin && (
+          <div>
+            <SearchableDropdown
+              label="Thành viên sở hữu *"
+              value={form.id_member || ""}
+              onChange={(val) => set("id_member", val)}
+              options={userOptions}
+              placeholder="Tìm theo tên/email..."
+              valueField="id"
+              required
+            />
+          </div>
+        )}
         <div className="md:col-span-2">
           <label className="text-xs font-bold text-[#666666] block mb-1">Ghi chú rủi ro</label>
           <textarea
@@ -767,12 +849,31 @@ function LinkedInGroupForm({
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export function GroupManagementContent() {
+  const { user } = useAppAuth();
+  const isAdmin = user?.role === "admin";
+  const isLeader = user?.role === "leader";
+
   const [platform, setPlatform] = useState<FeedPlatform>("facebook");
   const [fbGroups, setFbGroups] = useState<FacebookGroup[]>([]);
   const [liGroups, setLiGroups] = useState<LinkedInGroup[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [teamsData, setTeamsData] = useState<TeamRow[]>([]);
   const [allUsers, setAllUsers] = useState<AppUserProfile[]>([]);
+
+  const myTeams = useMemo(() => {
+    if (!user || user.role !== "leader") return [];
+    return teamsData.filter(t => String(t.id_leader) === String(user.id));
+  }, [teamsData, user]);
+
+  const myTeamMemberIds = useMemo(() => {
+    const ids = new Set<string>();
+    myTeams.forEach(t => {
+      t.members?.forEach(m => {
+        if (m.id) ids.add(String(m.id));
+      });
+    });
+    return ids;
+  }, [myTeams]);
 
   const userOptions: Category[] = useMemo(() => {
     return allUsers.map(u => ({
@@ -813,7 +914,7 @@ export function GroupManagementContent() {
   const [success, setSuccess] = useState<string | null>(null);
   const [viewingGroupClassification, setViewingGroupClassification] = useState<FacebookGroup | LinkedInGroup | null>(null);
   const [deletingGroupItem, setDeletingGroupItem] = useState<FacebookGroup | LinkedInGroup | null>(null);
-
+  
   // States bộ lọc
   const [intentFilter, setIntentFilter] = useState("all");
   const [industryFilter, setIndustryFilter] = useState("all");
@@ -867,6 +968,7 @@ export function GroupManagementContent() {
     fetchCategories();
   }, [fetchGroups, fetchCategories]);
 
+  // Local filtering...
   const getUserName = useCallback((id: string | null | undefined) => {
     if (!id) return "—";
     const user = allUsers.find(u => String(u.id) === String(id));
@@ -877,6 +979,13 @@ export function GroupManagementContent() {
   const getTeamName = useCallback((id: string | null | undefined) => {
     if (!id) return "—";
     const team = teamsData.find(t => String((t as any).id) === String(id));
+    if (!team) return "—";
+    return team.name_team || "—";
+  }, [teamsData]);
+
+  const getUserTeamName = useCallback((idMember: string | null | undefined) => {
+    if (!idMember) return "—";
+    const team = teamsData.find(t => t.members?.some(m => String(m.id) === String(idMember)));
     if (!team) return "—";
     return team.name_team || "—";
   }, [teamsData]);
@@ -901,33 +1010,124 @@ export function GroupManagementContent() {
     return categoryNameMap.get(String(val)) || categoryNameMap.get(String(val).toLowerCase()) || val;
   }, [categoryNameMap]);
 
-      const filteredFb = fbGroups.filter(
-    (g) =>
-      (!search ||
-        g.group_name?.toLowerCase().includes(search.toLowerCase()) ||
-        g.group_url?.toLowerCase().includes(search.toLowerCase())) &&
-      (intentFilter === "all" || String((g as any).id_intent ?? "") === intentFilter) &&
-      (industryFilter === "all" || String((g as any).id_industry ?? "") === industryFilter) &&
-      (teamFilter === "all" || String((g as any).id_team ?? "") === teamFilter) &&
-      (tierFilter === "all" || String((g as any).id_tier ?? "") === tierFilter) &&
-      (icpFilter === "all" || String((g as any).id_icp ?? "") === icpFilter) &&
-      (contentTypeFilter === "all" || String((g as any).id_content_type ?? "") === contentTypeFilter) &&
-      (productSeedingFilter === "all" || String((g as any).id_product_seeding ?? "") === productSeedingFilter)
-  );
+  const filteredFb = useMemo(() => {
+    return fbGroups
+      .filter((g) => {
+        if (isLeader && user) {
+          const isOwnerLeader = String(g.id_member) === String(user.id);
+          const isOwnerMemberOfMyTeam = myTeamMemberIds.has(String(g.id_member));
+          if (!isOwnerLeader && !isOwnerMemberOfMyTeam) {
+            return false;
+          }
+        }
 
-  const filteredLi = liGroups.filter(
-    (g) =>
-      (!search ||
-        g.group_name?.toLowerCase().includes(search.toLowerCase()) ||
-        g.group_url?.toLowerCase().includes(search.toLowerCase())) &&
-      (intentFilter === "all" || String((g as any).id_intent ?? "") === intentFilter) &&
-      (industryFilter === "all" || String((g as any).id_industry ?? "") === industryFilter) &&
-      (teamFilter === "all" || String((g as any).id_team ?? "") === teamFilter) &&
-      (tierFilter === "all" || String((g as any).id_tier ?? "") === tierFilter) &&
-      (icpFilter === "all" || String((g as any).id_icp ?? "") === icpFilter) &&
-      (contentTypeFilter === "all" || String((g as any).id_content_type ?? "") === contentTypeFilter) &&
-      (productSeedingFilter === "all" || String((g as any).id_product_seeding ?? "") === productSeedingFilter)
-  );
+        const matchesSearch = !search ||
+          g.group_name?.toLowerCase().includes(search.toLowerCase()) ||
+          g.group_url?.toLowerCase().includes(search.toLowerCase());
+        
+        const matchesIntent = intentFilter === "all" || String((g as any).id_intent ?? "") === intentFilter;
+        const matchesIndustry = industryFilter === "all" || String((g as any).id_industry ?? "") === industryFilter;
+        
+        // Team filter: for admin, filter by member's team. Otherwise filter by category id_team.
+        let matchesTeam = true;
+        if (teamFilter !== "all") {
+          if (isAdmin) {
+            const selectedTeam = teamsData.find(t => String(t.id) === teamFilter);
+            matchesTeam = selectedTeam?.members?.some(m => String(m.id) === String(g.id_member)) || false;
+          } else {
+            matchesTeam = String((g as any).id_team ?? "") === teamFilter;
+          }
+        }
+
+        const matchesTier = tierFilter === "all" || String((g as any).id_tier ?? "") === tierFilter;
+        const matchesIcp = icpFilter === "all" || String((g as any).id_icp ?? "") === icpFilter;
+        const matchesContentType = contentTypeFilter === "all" || String((g as any).id_content_type ?? "") === contentTypeFilter;
+        const matchesProductSeeding = productSeedingFilter === "all" || String((g as any).id_product_seeding ?? "") === productSeedingFilter;
+
+        return matchesSearch && matchesIntent && matchesIndustry && matchesTeam && matchesTier && matchesIcp && matchesContentType && matchesProductSeeding;
+      })
+      .sort((g1, g2) => {
+        if (isLeader && user) {
+          const isLeader1 = String(g1.id_member) === String(user.id);
+          const isLeader2 = String(g2.id_member) === String(user.id);
+          // Leader's own groups float to top
+          if (isLeader1 && !isLeader2) return -1;
+          if (!isLeader1 && isLeader2) return 1;
+          // Then group by member name A-Z (same as admin)
+          const u1 = getUserName(g1.id_member) || "";
+          const u2 = getUserName(g2.id_member) || "";
+          const userComp = u1.localeCompare(u2, "vi");
+          if (userComp !== 0) return userComp;
+        } else if (isAdmin) {
+          const u1 = getUserName(g1.id_member) || "";
+          const u2 = getUserName(g2.id_member) || "";
+          const userComp = u1.localeCompare(u2, "vi");
+          if (userComp !== 0) return userComp;
+        }
+        const name1 = g1.group_name || "";
+        const name2 = g2.group_name || "";
+        return name1.localeCompare(name2, "vi");
+      });
+  }, [fbGroups, search, intentFilter, industryFilter, teamFilter, tierFilter, icpFilter, contentTypeFilter, productSeedingFilter, isAdmin, isLeader, user, myTeamMemberIds, teamsData, getUserName]);
+
+  const filteredLi = useMemo(() => {
+    return liGroups
+      .filter((g) => {
+        if (isLeader && user) {
+          const isOwnerLeader = String(g.id_member) === String(user.id);
+          const isOwnerMemberOfMyTeam = myTeamMemberIds.has(String(g.id_member));
+          if (!isOwnerLeader && !isOwnerMemberOfMyTeam) {
+            return false;
+          }
+        }
+
+        const matchesSearch = !search ||
+          g.group_name?.toLowerCase().includes(search.toLowerCase()) ||
+          g.group_url?.toLowerCase().includes(search.toLowerCase());
+        
+        const matchesIntent = intentFilter === "all" || String((g as any).id_intent ?? "") === intentFilter;
+        const matchesIndustry = industryFilter === "all" || String((g as any).id_industry ?? "") === industryFilter;
+        
+        let matchesTeam = true;
+        if (teamFilter !== "all") {
+          if (isAdmin) {
+            const selectedTeam = teamsData.find(t => String(t.id) === teamFilter);
+            matchesTeam = selectedTeam?.members?.some(m => String(m.id) === String(g.id_member)) || false;
+          } else {
+            matchesTeam = String((g as any).id_team ?? "") === teamFilter;
+          }
+        }
+
+        const matchesTier = tierFilter === "all" || String((g as any).id_tier ?? "") === tierFilter;
+        const matchesIcp = icpFilter === "all" || String((g as any).id_icp ?? "") === icpFilter;
+        const matchesContentType = contentTypeFilter === "all" || String((g as any).id_content_type ?? "") === contentTypeFilter;
+        const matchesProductSeeding = productSeedingFilter === "all" || String((g as any).id_product_seeding ?? "") === productSeedingFilter;
+
+        return matchesSearch && matchesIntent && matchesIndustry && matchesTeam && matchesTier && matchesIcp && matchesContentType && matchesProductSeeding;
+      })
+      .sort((g1, g2) => {
+        if (isLeader && user) {
+          const isLeader1 = String(g1.id_member) === String(user.id);
+          const isLeader2 = String(g2.id_member) === String(user.id);
+          // Leader's own groups float to top
+          if (isLeader1 && !isLeader2) return -1;
+          if (!isLeader1 && isLeader2) return 1;
+          // Then group by member name A-Z (same as admin)
+          const u1 = getUserName(g1.id_member) || "";
+          const u2 = getUserName(g2.id_member) || "";
+          const userComp = u1.localeCompare(u2, "vi");
+          if (userComp !== 0) return userComp;
+        } else if (isAdmin) {
+          const u1 = getUserName(g1.id_member) || "";
+          const u2 = getUserName(g2.id_member) || "";
+          const userComp = u1.localeCompare(u2, "vi");
+          if (userComp !== 0) return userComp;
+        }
+        const name1 = g1.group_name || "";
+        const name2 = g2.group_name || "";
+        return name1.localeCompare(name2, "vi");
+      });
+  }, [liGroups, search, intentFilter, industryFilter, teamFilter, tierFilter, icpFilter, contentTypeFilter, productSeedingFilter, isAdmin, isLeader, user, myTeamMemberIds, teamsData, getUserName]);
 
   const handleDeleteGroup = async (id: string) => {
     const res = await allPlatformGroupsService.delete(id, platform);
@@ -1266,6 +1466,7 @@ export function GroupManagementContent() {
                   initial={
                     editingGroup
                       ? {
+                          id_member: String((editingGroup as any).id_member ?? ""),
                           group_name: (editingGroup as FacebookGroup).group_name,
                           group_url: (editingGroup as FacebookGroup).group_url,
                           id_intent: String((editingGroup as any).id_intent ?? ""),
@@ -1306,9 +1507,12 @@ export function GroupManagementContent() {
                   teamOptions={teamCategories}
                   tierOptions={categories.filter((c) => c.category_type === "tier")}
                   icpOptions={categories.filter((c) => c.category_type === "icp").map(c => ({...c, name: `${c.code} ${c.name ? `(${c.name})` : ""}`.trim()}))}
+                  contentTypeOptions={categories.filter((c) => c.category_type === "content_type")}
+                  productSeedingOptions={categories.filter((c) => c.category_type === "product_seeding")}
                   initial={
                     editingGroup
                       ? {
+                          id_member: String((editingGroup as any).id_member ?? ""),
                           group_name: (editingGroup as LinkedInGroup).group_name,
                           group_url: (editingGroup as LinkedInGroup).group_url,
                           status: (editingGroup as LinkedInGroup).status || "idle",
@@ -1317,6 +1521,8 @@ export function GroupManagementContent() {
                           id_tier: String((editingGroup as any).id_tier ?? ""),
                           id_team: String((editingGroup as any).id_team ?? ""),
                           id_icp: String((editingGroup as any).id_icp ?? ""),
+                          id_content_type: String((editingGroup as any).id_content_type ?? ""),
+                          id_product_seeding: String((editingGroup as any).id_product_seeding ?? ""),
                           assignee_id: String((editingGroup as LinkedInGroup).assignee_id ?? ""),
                           co_assignee_id: String((editingGroup as LinkedInGroup).co_assignee_id ?? ""),
                           note: (editingGroup as LinkedInGroup).note || "",
@@ -1362,97 +1568,139 @@ export function GroupManagementContent() {
                 <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[280px]">
                   Phân loại
                 </th>
-                <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[150px]">
-                  Người phụ trách
-                </th>
-                <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[150px]">
-                  Đồng phụ trách
-                </th>
+                {isLeader ? (
+                  <>
+                    <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[150px]">
+                      Người phụ trách
+                    </th>
+                    <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[150px]">
+                      Đồng phụ trách
+                    </th>
+                    <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[150px]">
+                      Thành viên
+                    </th>
+                  </>
+                ) : (
+                  <>
+                    <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[150px]">
+                      {isAdmin ? "Thành viên" : "Người phụ trách"}
+                    </th>
+                    <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[150px]">
+                      {isAdmin ? "Team" : "Đồng phụ trách"}
+                    </th>
+                  </>
+                )}
                 <th className="text-right px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[120px]">
                   Hành động
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E5E5E5]">
-              {paginatedGroups.map((g) => (
-                <tr key={g.id} className="hover:bg-[#F5F5F5]/30 transition">
-                  <td className="px-4 py-3">
-                    <a 
-                      href={g.group_url} 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      className="font-bold text-[#1A1A1A] hover:text-[#E3000F] hover:underline transition block leading-snug"
-                      title={g.group_name}
-                    >
-                      {g.group_name || "—"}
-                    </a>
-                    {platform === "facebook" && (
-                      <div className="mt-1.5 text-xs text-[#666666]">
-                        Thành viên: <span className="font-semibold text-[#1A1A1A]">{Number((g as FacebookGroup).members) > 0 ? Number((g as FacebookGroup).members).toLocaleString("vi-VN") : "?"}</span> thành viên
-                      </div>
-                    )}
-                    {platform === "linkedin" && (
-                      <div className="mt-1">
-                          <span className={`font-black px-1.5 py-0.5 rounded text-[9px] uppercase ${
-                            (g as LinkedInGroup).status === "success"
-                              ? "bg-green-100 text-green-700"
-                              : (g as LinkedInGroup).status === "failed"
-                              ? "bg-red-100 text-red-700"
-                              : "bg-amber-100 text-amber-700"
-                          }`}>
-                            {(g as LinkedInGroup).status || "idle"}
-                          </span>
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-1 max-w-[280px]">
-                      {platform === "facebook" && (g as FacebookGroup).chay_24h && (
-                        <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[10px] font-bold flex items-center gap-0.5" title={`Giờ chạy: ${(g as FacebookGroup).start_time_in_day}h - ${(g as FacebookGroup).end_time_in_day}h\nCách: ${(g as FacebookGroup).time_crawl} phút\nĐến: ${(g as FacebookGroup).end_time_24h ? String((g as FacebookGroup).end_time_24h).substring(0, 10) : ""}`}>
-                          <span className="material-symbols-outlined text-[10px]">bolt</span> 24h Tự động
-                        </span>
-                      )}
-                      {g.intent_name && <span className="px-1.5 py-0.5 bg-[#E3000F]/10 text-[#E3000F] rounded text-[10px] font-bold" title="Lĩnh vực">{g.intent_name}</span>}
-                      {(g as any).id_team && getTeamName((g as any).id_team) !== "—" && <span className="px-1.5 py-0.5 bg-teal-50 text-teal-700 rounded text-[10px] font-bold" title="Team">{getTeamName((g as any).id_team)}</span>}
-                      {g.industry_name && <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[10px] font-bold" title="Industry">{g.industry_name}</span>}
-                      {(g as any).content_type_name && <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-bold" title="Content Type">{(g as any).content_type_name}</span>}
-                      {(g as any).product_seeding_name && <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-[10px] font-bold" title="Product Seeding">{(g as any).product_seeding_name}</span>}
-                      {(g as any).tier_name && <span className="px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded text-[10px] font-bold" title="Tier">{(g as any).tier_name}</span>}
-                      {g.icp_name && <span className="px-1.5 py-0.5 bg-pink-50 text-pink-700 rounded text-[10px] font-bold" title="ICP">{g.icp_name}</span>}
-                      <button
-                        onClick={() => setViewingGroupClassification(g)}
-                        className="px-1.5 py-0.5 bg-[#F5F5F5] text-[#666666] hover:bg-[#E5E5E5] rounded text-[10px] font-bold transition flex items-center gap-1 cursor-pointer"
+              {paginatedGroups.map((g) => {
+                const isLeaderGroup = isLeader && user && String(g.id_member) === String(user.id);
+                return (
+                  <tr 
+                    key={g.id} 
+                    className={`transition ${
+                      isLeaderGroup 
+                        ? "bg-green-50/70 hover:bg-green-100/80" 
+                        : "hover:bg-[#F5F5F5]/30"
+                    }`}
+                  >
+                    <td className="px-4 py-3">
+                      <a 
+                        href={g.group_url} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="font-bold text-[#1A1A1A] hover:text-[#E3000F] hover:underline transition block leading-snug"
+                        title={g.group_name}
                       >
-                        <span className="material-symbols-outlined text-[10px]">more_horiz</span>
-                        Thêm
+                        {g.group_name || "—"}
+                      </a>
+                      {platform === "facebook" && (
+                        <div className="mt-1.5 text-xs text-[#666666]">
+                          Thành viên: <span className="font-semibold text-[#1A1A1A]">{Number((g as FacebookGroup).members) > 0 ? Number((g as FacebookGroup).members).toLocaleString("vi-VN") : "?"}</span> thành viên
+                        </div>
+                      )}
+                      {platform === "linkedin" && (
+                        <div className="mt-1">
+                            <span className={`font-black px-1.5 py-0.5 rounded text-[9px] uppercase ${
+                              (g as LinkedInGroup).status === "success"
+                                ? "bg-green-100 text-green-700"
+                                : (g as LinkedInGroup).status === "failed"
+                                ? "bg-red-100 text-red-700"
+                                : "bg-amber-100 text-amber-700"
+                            }`}>
+                              {(g as LinkedInGroup).status || "idle"}
+                            </span>
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-1 max-w-[280px]">
+                        {platform === "facebook" && (g as FacebookGroup).chay_24h && (
+                          <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[10px] font-bold flex items-center gap-0.5" title={`Giờ chạy: ${(g as FacebookGroup).start_time_in_day}h - ${(g as FacebookGroup).end_time_in_day}h\nCách: ${(g as FacebookGroup).time_crawl} phút\nĐến: ${(g as FacebookGroup).end_time_24h ? String((g as FacebookGroup).end_time_24h).substring(0, 10) : ""}`}>
+                            <span className="material-symbols-outlined text-[10px]">bolt</span> 24h Tự động
+                          </span>
+                        )}
+                        {g.intent_name && <span className="px-1.5 py-0.5 bg-[#E3000F]/10 text-[#E3000F] rounded text-[10px] font-bold" title="Lĩnh vực">{g.intent_name}</span>}
+                        {(g as any).id_team && getTeamName((g as any).id_team) !== "—" && <span className="px-1.5 py-0.5 bg-teal-50 text-teal-700 rounded text-[10px] font-bold" title="Team">{getTeamName((g as any).id_team)}</span>}
+                        {g.industry_name && <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[10px] font-bold" title="Industry">{g.industry_name}</span>}
+                        {(g as any).content_type_name && <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-bold" title="Content Type">{(g as any).content_type_name}</span>}
+                        {(g as any).product_seeding_name && <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-[10px] font-bold" title="Product Seeding">{(g as any).product_seeding_name}</span>}
+                        {(g as any).tier_name && <span className="px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded text-[10px] font-bold" title="Tier">{(g as any).tier_name}</span>}
+                        {g.icp_name && <span className="px-1.5 py-0.5 bg-pink-50 text-pink-700 rounded text-[10px] font-bold" title="ICP">{g.icp_name}</span>}
+                        <button
+                          onClick={() => setViewingGroupClassification(g)}
+                          className="px-1.5 py-0.5 bg-[#F5F5F5] text-[#666666] hover:bg-[#E5E5E5] rounded text-[10px] font-bold transition flex items-center gap-1 cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[10px]">more_horiz</span>
+                          Thêm
+                        </button>
+                      </div>
+                    </td>
+                    {isLeader ? (
+                      <>
+                        <td className="px-4 py-3 text-xs font-medium text-[#1A1A1A]">
+                          {getUserName((g as any).assignee_id)}
+                        </td>
+                        <td className="px-4 py-3 text-xs font-medium text-[#1A1A1A]">
+                          {getUserName((g as any).co_assignee_id)}
+                        </td>
+                        <td className="px-4 py-3 text-xs font-medium text-[#1A1A1A]">
+                          {getUserName((g as any).id_member)}
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-4 py-3 text-xs font-medium text-[#1A1A1A]">
+                          {isAdmin ? getUserName((g as any).id_member) : getUserName((g as any).assignee_id)}
+                        </td>
+                        <td className="px-4 py-3 text-xs font-medium text-[#1A1A1A]">
+                          {isAdmin ? getUserTeamName((g as any).id_member) : getUserName((g as any).co_assignee_id)}
+                        </td>
+                      </>
+                    )}
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => {
+                          setEditingGroup(g);
+                          setShowAddForm(false);
+                        }}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-[#666666] hover:text-[#E3000F] transition text-xs font-bold cursor-pointer"
+                      >
+                        <FaEdit size={12} /> Sửa
                       </button>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-xs font-medium text-[#1A1A1A]">
-                    {getUserName((g as any).assignee_id)}
-                  </td>
-                  <td className="px-4 py-3 text-xs font-medium text-[#1A1A1A]">
-                    {getUserName((g as any).co_assignee_id)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => {
-                        setEditingGroup(g);
-                        setShowAddForm(false);
-                      }}
-                      className="inline-flex items-center gap-1 px-2 py-1 text-[#666666] hover:text-[#E3000F] transition text-xs font-bold cursor-pointer"
-                    >
-                      <FaEdit size={12} /> Sửa
-                    </button>
-                    <button
-                      onClick={() => setDeletingGroupItem(g)}
-                      className="inline-flex items-center gap-1 px-2 py-1 text-[#666666] hover:text-[#FF3344] transition text-xs font-bold ml-2 cursor-pointer"
-                    >
-                      <FaTrash size={12} /> Xóa
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                      <button
+                        onClick={() => setDeletingGroupItem(g)}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-[#666666] hover:text-[#FF3344] transition text-xs font-bold ml-2 cursor-pointer"
+                      >
+                        <FaTrash size={12} /> Xóa
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           

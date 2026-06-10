@@ -81,11 +81,11 @@ class FacebookScraper:
             else:
                 # Default account: luôn dùng default cookie (dù tồn tại hay không)
                 if os.path.exists(cookie_path):
-                    #logger.info(f"🚀 Mở phiên làm việc từ file Cookie: {cookie_path}")
+                    logger.info(f"🚀 Mở phiên làm việc từ file Cookie: {cookie_path}")
                     context = browser.new_context(storage_state=cookie_path, **context_args)
                 else:
                     # Cookie mặc định không tồn tại -> Mở context trắng để login
-                    #logger.warning("⚠️ Không tìm thấy Cookie mặc định. Mở trình duyệt trắng để Login lại...")
+                    logger.warning("⚠️ Không tìm thấy Cookie mặc định. Mở trình duyệt trắng để Login lại...")
                     context = browser.new_context(**context_args)
 
             
@@ -100,20 +100,20 @@ class FacebookScraper:
             
 
             # ── 2. KIỂM TRA VÀ ĐĂNG NHẬP ──────────────────────────────────────
-            #logger.info("Khởi động trình duyệt và kiểm tra trạng thái đăng nhập...")
+            logger.info("Khởi động trình duyệt và kiểm tra trạng thái đăng nhập...")
             page.goto("https://www.facebook.com/", wait_until="domcontentloaded", timeout=30_000)
             
             if self.auth._is_bot_check_screen(page):
-                #logger.error("🛑 Phát hiện bị chặn Bot/Captcha ngay sau khi load Cookie!")
+                logger.error("🛑 Phát hiện bị chặn Bot/Captcha ngay sau khi load Cookie!")
                 if os.path.exists(cookie_path):
                     try:
                         os.remove(cookie_path)
-                        #logger.warning(f"🗑️ Đã XÓA FILE COOKIE bị đánh dấu lỗi: {cookie_path}")
+                        logger.warning(f"🗑️ Đã XÓA FILE COOKIE bị đánh dấu lỗi: {cookie_path}")
                     except Exception as file_err:
-                        #logger.error(f"⚠️ Lỗi khi xóa file cookie vật lý: {file_err}")
+                        logger.error(f"⚠️ Lỗi khi xóa file cookie vật lý: {file_err}")
                         pass
                 else:
-                    #logger.debug("File Cookie không tồn tại để xóa.")
+                    logger.debug("File Cookie không tồn tại để xóa.")
                     pass
                 browser.close()
                 raise ValueError("LOGIN_FAILED")
@@ -125,13 +125,13 @@ class FacebookScraper:
                 another_acc_btn = page.locator("text=/Đăng nhập bằng tài khoản khác|Log Into Another Account|Log in to another account/i").first
                 
                 if another_acc_btn.count() > 0 and another_acc_btn.is_visible():
-                    # logger.info("Phát hiện màn hình One-Tap Login, đang click 'Đăng nhập bằng tài khoản khác'...")
+                    logger.info("Phát hiện màn hình One-Tap Login, đang click 'Đăng nhập bằng tài khoản khác'...")
                     another_acc_btn.click(timeout=5000)
                     # Chờ 1 chút để form email/pass truyền thống xuất hiện lại trên DOM
                     page.wait_for_timeout(2000)
             except Exception as e:
                 # Nếu không tìm thấy nút này hoặc có lỗi thì cứ bỏ qua và đi tiếp
-                # logger.debug(f"Không có màn hình chọn tài khoản: {e}")
+                logger.debug(f"Không có màn hình chọn tài khoản: {e}")
                 pass
             is_logged_in = False
             try:
@@ -144,46 +144,46 @@ class FacebookScraper:
             if not is_logged_in:
                 if custom_email:
                     # Nếu có email FE mà cookie hết hạn (không vào được feed) -> Thử login lại bằng thông tin FE gửi
-                    #logger.info(f"⚠️ Cookie của {custom_email} hết hạn. Đang thử login lại...")
+                    logger.info(f"⚠️ Cookie của {custom_email} hết hạn. Đang thử login lại...")
                     login_success = self.auth.login(
                         page=page, context=context, 
                         custom_email=custom_email, custom_pass=custom_pass, custom_2fa=custom_2fa
                     )
                 else:
                     # Nếu không có email FE -> Gọi hàm LOGIN MẶC ĐỊNH
-                    #logger.info("⚠️ Chưa đăng nhập tài khoản hệ thống. Đang login mặc định...")
+                    logger.info("⚠️ Chưa đăng nhập tài khoản hệ thống. Đang login mặc định...")
                     login_success = self.auth.default_login(page=page, context=context)
                 
                 if not login_success:
-                    #logger.error("🛑 Đăng nhập thất bại. Kết thúc.")
+                    logger.error("🛑 Đăng nhập thất bại. Kết thúc.")
                     browser.close()
                     raise ValueError("LOGIN_FAILED")
             else:
-                #logger.info("✅ Đã đăng nhập sẵn (Cookie còn hiệu lực).")
+                logger.info("✅ Đã đăng nhập sẵn (Cookie còn hiệu lực).")
                 pass
             try:
                         context.storage_state(path=str(cookie_path))
-                        #logger.info(f"🔄 Đã cập nhật/gia hạn Cookie thành công vào: {cookie_path}")
+                        logger.info(f"🔄 Đã cập nhật/gia hạn Cookie thành công vào: {cookie_path}")
             except Exception as e:
-                        #logger.error(f"⚠️ Lỗi khi cập nhật cookie: {e}")
+                        logger.error(f"⚠️ Lỗi khi cập nhật cookie: {e}")
                         pass
             # ── 3. LẶP QUA MẢNG CÁC GROUP (SỐ LƯỢNG NGẪU NHIÊN) ───────────────
             for index, group in enumerate(groups):
                 if client_id and cancel_registry.get(client_id):
-                    #logger.info(f"🛑 Đã nhận lệnh hủy cào dữ liệu cho client {client_id}.")
+                    logger.info(f"🛑 Đã nhận lệnh hủy cào dữ liệu cho client {client_id}.")
                     
                     break
                 if index > 0:
                     # Nghỉ ngẫu nhiên từ 30 giây đến 60 giây (1-3 phút)
                     macro_delay = random.uniform(10, 20)
-                    #logger.info(f"⏳ Giãn cách an toàn: Đang nghỉ ngơi {macro_delay:.0f} giây trước khi vào {group.name}...")
+                    logger.info(f"⏳ Giãn cách an toàn: Đang nghỉ ngơi {macro_delay:.0f} giây trước khi vào {group.name}...")
                     
                     # Chia nhỏ thời gian sleep để vẫn có thể nhận lệnh hủy (cancel_registry) giữa chừng
                     for _ in range(int(macro_delay)):
                         if client_id and cancel_registry.get(client_id):
                             break
                         time.sleep(1)
-                #logger.info(f"🚀 Bắt đầu cào group: {group.name}")
+                logger.info(f"🚀 Bắt đầu cào group: {group.name}")
                 try:
                     url = group.url
                     if 'sorting_setting=CHRONOLOGICAL' not in url:
@@ -235,7 +235,7 @@ class FacebookScraper:
                                     continue
                                 else:
                                     consecutive_old = 0
-                                #logger.info(f"👉 Đang bóc bài: URL={post_url} | DATE={post_date} | Lịch sử Seen={len(seen_urls)}")
+                                logger.info(f"👉 Đang bóc bài: URL={post_url} | DATE={post_date} | Lịch sử Seen={len(seen_urls)}")
                                 seen_urls.add(post_url)
                                 
                                 stats = PostExtractor.get_stats(block)
@@ -256,7 +256,7 @@ class FacebookScraper:
                                     should_stop = True
                                     break
                             except Exception as e:
-                                #logger.debug(f"[block error] {e}")
+                                logger.debug(f"[block error] {e}")
                                 continue
 
                         if should_stop: break
@@ -290,7 +290,7 @@ class FacebookScraper:
                    
 
                 except Exception as e:
-                    #logger.error(f"❌ Lỗi group {group.name}: {e}")
+                    logger.error(f"❌ Lỗi group {group.name}: {e}")
                     results.append(GroupSummary(
                         group_name=group.name,
                         link_group=group.url,

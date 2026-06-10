@@ -52,43 +52,84 @@ def classify_timestamp(ts: str) -> str:
         return 'unknown'
 
     t = ts.lower().strip()
+    now = datetime.now()
 
-    # ── RECENT (trong 24h) ────────────────────────────────────────────────
-    if RE_JUST_NOW.search(t):   return 'recent'
-    if RE_SECONDS.search(t):    return 'recent'
-    if RE_MINUTES.search(t):    return 'recent'
-    if RE_TODAY.search(t):      return 'recent'
+    try:
+        post_time = now
 
-    # N giờ → recent nếu < 24
-    m = RE_HOURS.search(t)
-    if m:
-        try:
-            hours = int(re.search(r'\d+', m.group(0)).group())
-            return 'recent' if hours < 24 else 'old'
-        except Exception:
-            return 'recent'  # parse lỗi → ưu tiên giữ bài
+        # 1. "Vừa xong"
+        if "vừa xong" in t:
+            post_time = now
+            
+        # 2. Phút
+        elif "phút" in t:
+            match = re.search(r'(\d+)\s*phút', t)
+            if match:
+                post_time = now - timedelta(minutes=int(match.group(1)))
+                
+        # 3. Giờ
+        elif "giờ" in t:
+            match = re.search(r'(\d+)\s*giờ', t)
+            if match:
+                post_time = now - timedelta(hours=int(match.group(1)))
+                
+        # 4. Hôm qua
+        elif "hôm qua" in t:
+            base_time = now - timedelta(days=1)
+            time_match = re.search(r'lúc\s*(\d{1,2}):(\d{2})', t)
+            if time_match:
+                h, m = int(time_match.group(1)), int(time_match.group(2))
+                base_time = base_time.replace(hour=h, minute=m, second=0, microsecond=0)
+            post_time = base_time
+            
+        # 5. Ngày/Tuần
+        elif "ngày" in t and "hôm nay" not in t:
+            match = re.search(r'(\d+)\s*ngày', t)
+            if match:
+                post_time = now - timedelta(days=int(match.group(1)))
+        elif "tuần" in t:
+            match = re.search(r'(\d+)\s*tuần', t)
+            if match:
+                post_time = now - timedelta(weeks=int(match.group(1)))
+                
+        # 6. Ngày tháng (Ví dụ: 12 tháng 5 lúc 10:00)
+        elif "tháng" in t:
+            match = re.search(r'(\d{1,2})\s*tháng\s*(\d{1,2})', t)
+            if match:
+                day, month = int(match.group(1)), int(match.group(2))
+                
+                year_match = re.search(r'năm\s*(\d{4})', t)
+                year = int(year_match.group(1)) if year_match else now.year
+                    
+                base_time = now.replace(year=year, month=month, day=day)
+                
+                time_match = re.search(r'lúc\s*(\d{1,2}):(\d{2})', t)
+                if time_match:
+                    h, m = int(time_match.group(1)), int(time_match.group(2))
+                    base_time = base_time.replace(hour=h, minute=m, second=0, microsecond=0)
+                    
+                if base_time > now:
+                    base_time = base_time.replace(year=year - 1)
+                    
+                post_time = base_time
+                
+        # 7. Năm
+        elif "năm" in t:
+            match = re.search(r'(\d{4})', t)
+            if match:
+                year = int(match.group(1))
+                if year < now.year:
+                    return 'old'
 
-    # ── OLD (quá 24h) ─────────────────────────────────────────────────────
-    if RE_YESTERDAY.search(t):  return 'old'
-    if RE_DAYS_AGO.search(t):   return 'old'
-    if RE_WEEKS_AGO.search(t):  return 'old'
+        # Kiểm tra khoảng cách thời gian
+        delta = now - post_time
+        if delta.total_seconds() <= 24 * 3600:
+            return 'recent'
+        else:
+            return 'old'
 
-    # Có tháng → kiểm tra thêm năm để xác định có phải năm nay không
-    if RE_MONTHS.search(t):
-        # Nếu có năm khác năm hiện tại → cũ chắc chắn
-        m_year = RE_YEAR_4D.search(t)
-        if m_year:
-            try:
-                year = int(m_year.group(0))
-                return 'recent' if year == datetime.now().year else 'old'
-            except Exception:
-                pass
-        return 'old'  # Có tháng nhưng không rõ năm → coi là cũ
-
-    if RE_YEAR_4D.search(t):    return 'old'
-
-    # ── UNKNOWN → coi là recent để không bỏ sót bài ──────────────────────
-    return 'unknown'
+    except Exception:
+        return 'unknown'
 
 
 def clean_post_url(href: str) -> str:

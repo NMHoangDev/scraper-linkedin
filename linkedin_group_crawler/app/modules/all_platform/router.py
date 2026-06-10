@@ -23,8 +23,15 @@ from app.modules.all_platform.routers.groups_linkedin import linkedin_groups_rou
 from app.modules.all_platform.routers.crawl_linkedin import crawl_linkedin_router
 from app.modules.all_platform.routers.linkedin_legacy import router as linkedin_legacy_router
 from app.modules.all_platform.routers.crawl_facebook import crawl_facebook_router
+from app.modules.all_platform.routers.websocket import router as websocket_router
 
 all_platform_router = APIRouter()
+
+# ── WebSocket ──────────────────────────────────────────────────────────────────
+all_platform_router.include_router(
+    websocket_router,
+    tags=["All-Platform WebSockets"],
+)
 
 # ── Facebook ────────────────────────────────────────────────────────────────────
 all_platform_router.include_router(
@@ -131,4 +138,12 @@ all_platform_router.include_router(
     platforms_router,
     prefix="/platforms",
     tags=["All-Platform Platforms"],
+)
+
+# ── Admin Dashboard ────────────────────────────────────────────────────────────
+from app.modules.all_platform.routers.admin_dashboard import router as admin_dashboard_router
+all_platform_router.include_router(
+    admin_dashboard_router,
+    prefix="/admin/dashboard",
+    tags=["All-Platform Admin Dashboard"],
 )

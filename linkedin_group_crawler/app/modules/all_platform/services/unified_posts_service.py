@@ -248,7 +248,7 @@ def _get_kpi_progress(sb: Client, id_member: str, platform: str) -> tuple[int, i
         now_vn = datetime.now(timezone.utc) + timedelta(hours=7)
         today = now_vn.date().isoformat()
         
-        kpi_query = sb.table("kpi_tracker").select("start_date, end_date, kpi_per_week, id_platform").eq("id_member", id_member).eq("status", "active")
+        kpi_query = sb.table("kpi_tracker").select("start_date, end_date, kpi_comment, id_platform").eq("id_member", id_member).eq("status", "active")
         kpi_res = kpi_query.execute()
         
         if not kpi_res.data:
@@ -267,7 +267,7 @@ def _get_kpi_progress(sb: Client, id_member: str, platform: str) -> tuple[int, i
             
         start_date = active_kpi.get("start_date")
         end_date = active_kpi.get("end_date")
-        kpi_target = active_kpi.get("kpi_per_week") or 0
+        kpi_target = active_kpi.get("kpi_comment") or 0
         
         if not start_date or not end_date:
             return 0, kpi_target

@@ -20,6 +20,15 @@ class RefreshTokenRequest(BaseModel):
     token: str
 
 
+class CheckEmailRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    email: str
+    new_password: str = Field(..., min_length=6, max_length=128)
+
+
 class UpdateProfileRequest(BaseModel):
     name: str | None = Field(None, max_length=255)
 

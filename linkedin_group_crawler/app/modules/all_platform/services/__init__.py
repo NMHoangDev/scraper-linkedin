@@ -66,11 +66,13 @@ from app.modules.all_platform.services.auth_service import (
     create_access_token,
     verify_leader_code,
     promote_to_leader,
+    promote_to_leader,
     get_user_sessions,
     delete_session,
     delete_all_sessions,
     change_password,
     deactivate_account,
+    reset_password_without_old,
 )
 from app.modules.all_platform.services.social_accounts_service import (
     get_social_accounts,

@@ -103,14 +103,14 @@ def login_user(email: str, password: str) -> dict:
 
     result = supabase.table("app_users").select("*").eq("email", email.lower().strip()).execute()
     if not result.data:
-        raise ValueError("Invalid email or password")
+        raise ValueError("Email không tồn tại")
 
     user = result.data[0]
     if not user.get("is_active", True):
-        raise ValueError("Account is deactivated")
+        raise ValueError("Tài khoản đã bị vô hiệu hóa")
 
     if not _verify_password(password, user["password"]):
-        raise ValueError("Invalid email or password")
+        raise ValueError("Sai mật khẩu")
 
     access_token = create_access_token(user["id"], user["email"], user["role"])
 
@@ -339,6 +339,18 @@ def change_password(user_id: str, current_password: str, new_password: str) -> N
     if _verify_password(new_password, user["password"]):
         raise ValueError("New password must be different from current password")
 
+    hashed_pw = _hash_password(new_password)
+    supabase.table("app_users").update({"password": hashed_pw, "updated_at": "now()"}).eq("id", user_id).execute()
+    delete_all_sessions(user_id)
+
+
+def reset_password_without_old(email: str, new_password: str) -> None:
+    """Reset user password by email without verifying the current password."""
+    supabase = get_supabase_client()
+    result = supabase.table("app_users").select("id").eq("email", email.lower().strip()).execute()
+    if not result.data:
+        raise ValueError("Email không tồn tại trong hệ thống")
+    user_id = result.data[0]["id"]
     hashed_pw = _hash_password(new_password)
     supabase.table("app_users").update({"password": hashed_pw, "updated_at": "now()"}).eq("id", user_id).execute()
     delete_all_sessions(user_id)

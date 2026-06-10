@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Query, Header, Request, HTTPException
 
+from app.core.supabase_client import get_supabase_client
 from app.modules.all_platform.schemas import BaseResponse
 from app.modules.all_platform.services import (
     get_linkedin_groups,
@@ -49,7 +50,8 @@ def li_groups_get_all(
     """Get all LinkedIn groups."""
     try:
         user = _get_user_from_header(authorization, request)
-        data = get_linkedin_groups(status=status, id_member=user["id"])
+        id_member = None if user.get("role") in ("admin", "leader") else user["id"]
+        data = get_linkedin_groups(status=status, id_member=id_member)
         return BaseResponse(success=True, data=data)
     except HTTPException as e:
         return BaseResponse(success=False, message=e.detail)
@@ -68,7 +70,10 @@ def li_groups_add(
         import traceback
         print(f"li_groups_add received payload: {payload}")
         user = _get_user_from_header(authorization, request)
-        payload["id_member"] = user["id"]
+        if user.get("role") != "admin":
+            payload["id_member"] = user["id"]
+        elif "id_member" not in payload or not payload["id_member"]:
+            payload["id_member"] = user["id"]
         print(f"li_groups_add enriched payload: {payload}")
         data = add_linkedin_group(payload)
         print(f"li_groups_add success, data: {data}")
@@ -94,7 +99,13 @@ def li_groups_update(
         group_id = payload.get("id")
         if not group_id:
             return BaseResponse(success=False, message="id is required")
-        payload["id_member"] = user["id"]
+        if user.get("role") not in ("admin", "leader"):
+            # Verify ownership
+            supabase = get_supabase_client()
+            group_res = supabase.table("linkedin_groups").select("id_member").eq("id", group_id).execute()
+            if not group_res.data or group_res.data[0].get("id_member") != user["id"]:
+                return BaseResponse(success=False, message="You do not have permission to update this group.")
+            payload["id_member"] = user["id"]
         data = update_linkedin_group(group_id, payload)
         return BaseResponse(success=True, message="Group updated", data=data)
     except HTTPException as e:
@@ -112,7 +123,12 @@ def li_groups_delete(
     """Delete a LinkedIn group."""
     try:
         user = _get_user_from_header(authorization, request)
-        # Note: delete_linkedin_group logic might need row-level policy or id_member check
+        if user.get("role") not in ("admin", "leader"):
+            # Verify ownership
+            supabase = get_supabase_client()
+            group_res = supabase.table("linkedin_groups").select("id_member").eq("id", id).execute()
+            if not group_res.data or group_res.data[0].get("id_member") != user["id"]:
+                return BaseResponse(success=False, message="You do not have permission to delete this group.")
         data = delete_linkedin_group(id)
         return BaseResponse(success=True, message="Group deleted", data=data)
     except HTTPException as e:

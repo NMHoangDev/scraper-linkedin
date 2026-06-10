@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 from app.modules.linkedin.router import linkedin_app_router, router
 from app.modules.linkedin.schemas.response_models import BaseResponse
 from app.core.config import settings
-from app.modules.facebook.src.jobs.daily_crawl_job import setup_and_start_jobs
+from app.modules.all_platform.jobs.crawl_24h_job import setup_all_platform_jobs
 from app.modules.facebook.src.modules.api_router.index import api_router
 from app.modules.all_platform.router import all_platform_router
 from app.core.playwright_browser_pool import (
@@ -35,7 +35,7 @@ ensure_directory(settings.session_storage_dir)
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     warmup_task: asyncio.Task[None] | None = None
-    setup_and_start_jobs()
+    setup_all_platform_jobs()
     async def _warmup_background() -> None:
         try:
             await asyncio.to_thread(warmup_playwright_pool)

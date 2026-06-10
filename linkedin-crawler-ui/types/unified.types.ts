@@ -106,7 +106,7 @@ export interface KpiAssignment {
   url_profile?: string;
   email_leader: string;
   platform: FeedPlatform;
-  kpi_per_week: number;
+  kpi_comment: number;
   start_date: string;
   end_date: string;
   status: "active" | "inactive";
@@ -193,6 +193,7 @@ export interface FacebookGroup {
   risk_note?: string;
   assignee_id?: string;
   co_assignee_id?: string;
+  id_member?: string;
 }
 
 export interface LinkedInGroup {
@@ -224,6 +225,7 @@ export interface LinkedInGroup {
   risk_note?: string;
   assignee_id?: string;
   co_assignee_id?: string;
+  id_member?: string;
 }
 
 // ── Crawl Sessions ─────────────────────────────────────────────────────────────

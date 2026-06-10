@@ -691,12 +691,12 @@ export function verifySeedingMark(payload: {
   );
 }
 
-/** Lấy KPI target (kpi_per_week) của member trong khoảng ngày */
+/** Lấy KPI target (kpi_comment) của member trong khoảng ngày */
 export function getMemberKpiTarget(
   payload: { email_member: string; date_from?: string; date_to?: string },
   init?: RequestInit,
-): Promise<ApiResponse<{ kpi_target: number; kpi_rows: { start: string; end: string; kpi_per_week: number; platform: string; status: string }[] }>> {
-  return requestJson<ApiResponse<{ kpi_target: number; kpi_rows: { start: string; end: string; kpi_per_week: number; platform: string; status: string }[] }>>(
+): Promise<ApiResponse<{ kpi_target: number; kpi_rows: { start: string; end: string; kpi_comment: number; platform: string; status: string }[] }>> {
+  return requestJson<ApiResponse<{ kpi_target: number; kpi_rows: { start: string; end: string; kpi_comment: number; platform: string; status: string }[] }>>(
     "/api/all-platform/linkedin/seeding-mark/get-kpi-target",
     {
       method: "POST",
@@ -704,4 +704,42 @@ export function getMemberKpiTarget(
       ...init,
     },
   );
+}
+
+export interface TeamDto {
+  id: string;
+  name_team: string;
+  id_leader: string;
+  leader_email: string;
+  leader_name: string;
+  members: { id: string; email: string; name?: string }[];
+  number_of_member: number;
+}
+
+export function getAllTeams(): Promise<ApiResponse<TeamDto[]>> {
+  return requestJson<ApiResponse<TeamDto[]>>("/api/all-platform/teams", { method: "GET" });
+}
+
+export function createTeam(payload: { name_team: string; leader_id?: string; leader_email?: string; member_emails: string[] }): Promise<ApiResponse<unknown>> {
+  return requestJson<ApiResponse<unknown>>("/api/all-platform/teams", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateTeam(payload: { name_team: string; leader_id?: string; leader_email?: string; member_emails: string[] }): Promise<ApiResponse<unknown>> {
+  return requestJson<ApiResponse<unknown>>("/api/all-platform/teams", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteTeam(name_team: string, leader_id_or_email: string): Promise<ApiResponse<unknown>> {
+  return requestJson<ApiResponse<unknown>>(`/api/all-platform/teams?name_team=${encodeURIComponent(name_team)}&leader=${encodeURIComponent(leader_id_or_email)}`, {
+    method: "DELETE",
+  });
+}
+
+export function getUsersByRole(role: string): Promise<ApiResponse<import("@/types/unified.types").AppUser[]>> {
+  return requestJson<ApiResponse<import("@/types/unified.types").AppUser[]>>(`/api/all-platform/users/by-role?role=${role}`, { method: "GET" });
 }

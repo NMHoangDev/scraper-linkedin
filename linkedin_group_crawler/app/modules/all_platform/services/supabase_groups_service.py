@@ -91,7 +91,7 @@ def get_facebook_groups(
 def _clean_group_payload(payload: dict) -> dict:
     """Clean group payload by converting empty/whitespace strings to None/proper types."""
     cleaned = {}
-    numeric_fields = {"tier", "members", "posts_per_week", "health_score", "start_time_in_day", "end_time_in_day"}
+    numeric_fields = {"tier", "members", "posts_per_week", "health_score", "start_time_in_day", "end_time_in_day", "time_crawl"}
 
     for k, v in payload.items():
         if k in numeric_fields:
@@ -201,8 +201,8 @@ def update_facebook_group(group_id: str, payload: dict) -> dict:
     return result.data[0] if result.data else {}
 
 
-def delete_facebook_group(group_id: str, id_member: str) -> dict:
-    """Delete a Facebook group and all its posts, scoped to member."""
+def delete_facebook_group(group_id: str, id_member: str, is_admin: bool = False) -> dict:
+    """Delete a Facebook group and all its posts, scoped to member unless admin."""
     supabase: Client = get_supabase_client()
 
     group_res = (
@@ -214,8 +214,8 @@ def delete_facebook_group(group_id: str, id_member: str) -> dict:
     deleted_posts = 0
     if group_res.data:
         group = group_res.data[0]
-        # Ensure the group belongs to the member before deleting
-        if group.get("id_member") != id_member:
+        # Ensure the group belongs to the member before deleting (unless admin)
+        if not is_admin and group.get("id_member") != id_member:
             raise ValueError("You don't have permission to delete this group.")
             
         group_url = group.get("group_url")
@@ -228,13 +228,10 @@ def delete_facebook_group(group_id: str, id_member: str) -> dict:
             )
             deleted_posts = len(posts_res.data) if posts_res.data else 0
 
-    result = (
-        supabase.table("facebook_groups")
-        .delete()
-        .eq("id", group_id)
-        .eq("id_member", id_member)
-        .execute()
-    )
+    query = supabase.table("facebook_groups").delete().eq("id", group_id)
+    if not is_admin:
+        query = query.eq("id_member", id_member)
+    result = query.execute()
     return {
         "deleted": len(result.data) if result.data else 0,
         "deleted_posts": deleted_posts
@@ -262,7 +259,7 @@ def get_linkedin_groups(status: Optional[str] = None, id_member: Optional[str] =
     # Collect all FK ids to batch-fetch categories
     cat_ids: set[str] = set()
     for r in rows:
-        for fk in ("id_intent", "id_industry", "id_tier", "id_team", "id_icp"):
+        for fk in ("id_intent", "id_industry", "id_tier", "id_team", "id_icp", "id_content_type", "id_product_seeding"):
             val = r.get(fk)
             if val:
                 cat_ids.add(str(val))
@@ -279,13 +276,14 @@ def get_linkedin_groups(status: Optional[str] = None, id_member: Optional[str] =
         for c in (cat_rows.data or []):
             cat_map[str(c["id"])] = c
 
-    # Resolve FK → display name and attach to each row
     name_field_map = {
         "id_intent":   "intent_name",
         "id_industry": "industry_name",
         "id_tier":     "tier_name",
         "id_team":     "team_name",
         "id_icp":      "icp_name",
+        "id_content_type": "content_type_name",
+        "id_product_seeding": "product_seeding_name",
     }
 
     for r in rows:
@@ -316,6 +314,8 @@ def add_linkedin_group(payload: dict) -> dict:
         "id_tier": cleaned.get("id_tier"),
         "id_team": cleaned.get("id_team"),
         "id_icp": cleaned.get("id_icp"),
+        "id_content_type": cleaned.get("id_content_type"),
+        "id_product_seeding": cleaned.get("id_product_seeding"),
         "note": cleaned.get("note"),
         "risk_note": cleaned.get("risk_note"),
         "assignee_id": cleaned.get("assignee_id"),
@@ -346,6 +346,8 @@ def update_linkedin_group(group_id: str, payload: dict) -> dict:
         "id_tier",
         "id_team",
         "id_icp",
+        "id_content_type",
+        "id_product_seeding",
         "note",
         "risk_note",
         "assignee_id",

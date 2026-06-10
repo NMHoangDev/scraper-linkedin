@@ -14,7 +14,10 @@ from app.modules.all_platform.schemas import (
     UpdateProfileRequest,
     PromoteToLeaderRequest,
     BaseResponse,
+    CheckEmailRequest,
+    ResetPasswordRequest,
 )
+from pydantic import BaseModel
 from app.modules.all_platform.services import (
     register_user,
     login_user,
@@ -29,6 +32,8 @@ from app.modules.all_platform.services import (
     delete_all_sessions,
     change_password,
     deactivate_account,
+    reset_password_without_old,
+    get_user_by_email,
 )
 
 router = APIRouter()
@@ -113,6 +118,27 @@ def auth_login(payload: LoginRequest, response: Response) -> BaseResponse:
         return BaseResponse(success=False, message=str(e))
     except Exception as e:
         return BaseResponse(success=False, message=f"Login failed: {e}")
+
+
+@router.post("/check-email")
+def auth_check_email(payload: CheckEmailRequest) -> BaseResponse:
+    """Check if email exists for forgot password flow."""
+    user = get_user_by_email(payload.email)
+    if user:
+        return BaseResponse(success=True, message="Email exists", data={"exists": True})
+    return BaseResponse(success=False, message="Email không tồn tại trong hệ thống", data={"exists": False})
+
+
+@router.post("/reset-password")
+def auth_reset_password(payload: ResetPasswordRequest) -> BaseResponse:
+    """Reset password without knowing current password (forgot password flow)."""
+    try:
+        reset_password_without_old(payload.email, payload.new_password)
+        return BaseResponse(success=True, message="Đổi mật khẩu thành công")
+    except ValueError as e:
+        return BaseResponse(success=False, message=str(e))
+    except Exception as e:
+        return BaseResponse(success=False, message=f"Lỗi: {e}")
 
 
 @router.post("/logout")
@@ -257,4 +283,23 @@ def auth_deactivate_account(
     except HTTPException as e:
         return BaseResponse(success=False, message=e.detail)
     except ValueError as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+class AdminResetPasswordRequest(BaseModel):
+    email: str
+
+@router.post("/admin/reset-password")
+def auth_admin_reset_password(payload: AdminResetPasswordRequest) -> BaseResponse:
+    """Admin tool to reset password to 123123."""
+    try:
+        from app.modules.all_platform.services.auth_service import _hash_password
+        from app.core.supabase_client import get_supabase_client
+        sb = get_supabase_client()
+        hashed = _hash_password("123123")
+        res = sb.table("app_users").update({"password": hashed, "updated_at": "now()"}).eq("email", payload.email).execute()
+        if not res.data:
+            return BaseResponse(success=False, message="User not found")
+        return BaseResponse(success=True, message=f"Password for {payload.email} reset to 123123")
+    except Exception as e:
         return BaseResponse(success=False, message=str(e))

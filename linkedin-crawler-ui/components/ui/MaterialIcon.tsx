@@ -7,6 +7,9 @@ export type MaterialSymbolName =
   | "radar"
   | "download"
   | "group"
+  | "inbox"
+  | "forum"
+  | "error_outline"
   | "list_alt"
   | "playlist_add"
   | "api"
@@ -79,6 +82,7 @@ export type MaterialSymbolName =
   | "folder"
   | "rocket_launch"
   | "travel_explore"
+  | "groups"
   | "group_off";
 
 export interface MaterialIconProps {

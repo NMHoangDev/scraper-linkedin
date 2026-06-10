@@ -71,3 +71,4 @@ class KpiTargetRequest(BaseModel):
     email_member: str
     date_from: Optional[str] = None
     date_to: Optional[str] = None
+    id_team: Optional[str] = None

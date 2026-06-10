@@ -217,13 +217,8 @@ def crawl_linkedin_post(payload: CrawlLinkedInPostRequest) -> BaseResponse:
                     target_date=target_date_str,
                     crawl_time=crawl_result["crawl_time"],
                 )
-                if filtered_posts:
-                    posts_out = filtered_posts
-                else:
-                    posts_out = select_most_recent_posts(
-                        list(crawl_result["posts"]),
-                        limit=payload.fallback_recent_count,
-                    )
+                
+                posts_out = filtered_posts
 
                 groups_results.append({
                     "success": True,

@@ -135,14 +135,19 @@ export const allPlatformKpiService = {
     email: string;
     profile_slug: string;
     email_leader: string;
+    id_team?: string;
     kpi: Array<{
       start_day: string;
       end_day: string;
-      total_reaction: number;
-      total_comment: number;
-      total_post_crawl: number;
-      total_session_crawl: number;
-      platform: string;
+      kpi_comment?: number;
+      kpi_post?: number;
+      kpi_lead?: number;
+      kpi_inbox?: number;
+      total_reaction?: number;
+      total_comment?: number;
+      total_post_crawl?: number;
+      total_session_crawl?: number;
+      platform?: string;
     }>;
     platform: string;
   }): Promise<ApiResponse<KpiAssignment>> => {
@@ -152,10 +157,10 @@ export const allPlatformKpiService = {
     });
   },
 
-  getAll: (leader_email: string): Promise<ApiResponse<{ total: number; members: KpiMember[] }>> => {
+  getAll: (leader_email: string, id_team?: string): Promise<ApiResponse<{ total: number; members: KpiMember[] }>> => {
     return requestJson(`${BASE}/kpi/get-all`, {
       method: "POST",
-      body: JSON.stringify({ leader_email }),
+      body: JSON.stringify({ leader_email, id_team }),
     });
   },
 
@@ -715,6 +720,12 @@ export const usersService = {
   getByRole: (role: string): Promise<ApiResponse<AppUserProfile[]>> => {
     return requestJson(`${BASE}/users/by-role?role=${encodeURIComponent(role)}`);
   },
+  updateRole: (email: string, role: string): Promise<ApiResponse<any>> => {
+    return requestJson(`${BASE}/users/update-role`, {
+      method: "POST",
+      body: JSON.stringify({ email, role }),
+    });
+  },
 };
 
 export const teamsService = {
@@ -809,5 +820,43 @@ export const crawlFacebookService = {
       method: "POST",
       body: JSON.stringify(payload),
     });
+  },
+};
+
+export interface AdminDashboardSummaryData {
+  total_crawled_posts: number;
+  total_seeding_comments: number;
+  approval_rate: number;
+  kpi_rate: number;
+}
+
+export interface AdminKpiPerformanceData {
+  team_name: string;
+  target: number;
+  actual: number;
+}
+
+export interface AdminLeaderboardsData {
+  top_seeders: Array<{
+    name: string;
+    email: string;
+    count: number;
+  }>;
+  top_groups: Array<{
+    name: string;
+    url: string;
+    interactions: number;
+  }>;
+}
+
+export const adminDashboardService = {
+  getSummary: (): Promise<ApiResponse<AdminDashboardSummaryData>> => {
+    return requestJson(`${BASE}/admin/dashboard/summary`);
+  },
+  getKpiPerformance: (): Promise<ApiResponse<AdminKpiPerformanceData[]>> => {
+    return requestJson(`${BASE}/admin/dashboard/kpi-performance`);
+  },
+  getLeaderboards: (): Promise<ApiResponse<AdminLeaderboardsData>> => {
+    return requestJson(`${BASE}/admin/dashboard/leaderboards`);
   },
 };

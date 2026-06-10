@@ -110,6 +110,7 @@ def get_target(payload: KpiTargetRequest) -> BaseResponse:
             email_member=payload.email_member,
             date_from=payload.date_from,
             date_to=payload.date_to,
+            id_team=payload.id_team,
         )
         return BaseResponse(success=True, data=data)
     except Exception as e:

@@ -43,7 +43,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    if (state.role === "leader" && pathname !== "/admin/team") {
+    // Only redirect within old (dashboard) routes, not all-platform
+    if (state.role === "leader" && pathname !== "/admin/team" && !pathname.startsWith("/all-platform")) {
       router.replace("/admin/team");
     }
   }, [state.role, pathname, router]);
