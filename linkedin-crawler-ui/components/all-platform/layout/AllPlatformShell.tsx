@@ -49,8 +49,10 @@ function AllPlatformShellInner({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background text-on-background">
       <AllPlatformSidebar />
-      <main className="p-lg lg:ml-64">{children}</main>
-      <GlobalCrawlNotification />
+      <main className="p-lg lg:ml-64">
+        <GlobalCrawlNotification />
+        {children}
+      </main>
     </div>
   );
 }

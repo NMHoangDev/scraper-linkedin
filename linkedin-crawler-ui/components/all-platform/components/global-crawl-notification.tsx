@@ -19,13 +19,19 @@ export function GlobalCrawlNotification() {
       try {
         const data = JSON.parse(event.data);
         
+        console.log("WebSocket received:", data);
+        
         // Chỉ thông báo nếu current user có liên quan đến group đang cào
         // hoặc là admin (người có quyền xem mọi thứ)
         if (data.involved_users && user?.id) {
           const isIncluded = data.involved_users.includes(user.id);
           const isAdmin = user?.role === "admin";
+          console.log("WebSocket user check:", { userId: user.id, isIncluded, isAdmin, involved: data.involved_users });
+          
           if (!isIncluded && !isAdmin) {
-            return; // Bỏ qua nếu không liên quan
+            console.log("WebSocket message ignored because user is not involved.");
+            // Tạm thời comment dòng return này để test hiển thị thông báo cho tất cả
+            // return; // Bỏ qua nếu không liên quan
           }
         }
 
@@ -51,12 +57,12 @@ export function GlobalCrawlNotification() {
   if (!crawlStatus) return null;
 
   return (
-    <div className="fixed top-6 right-6 z-50 animate-in slide-in-from-top-4 fade-in duration-300">
+    <div className="relative mb-6 w-full animate-in slide-in-from-top-2 fade-in duration-300">
       <div
-        className={`px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 text-sm font-medium border ${
+        className={`w-full px-6 py-4 rounded-xl flex items-center justify-center gap-3 text-sm font-medium border shadow-sm ${
           crawlStatus.isError
             ? "bg-red-50 text-red-700 border-red-200"
-            : "bg-blue-50 text-blue-700 border-blue-200"
+            : "bg-indigo-50 text-indigo-700 border-indigo-200"
         }`}
       >
         {crawlStatus.isError ? (
@@ -64,7 +70,9 @@ export function GlobalCrawlNotification() {
         ) : (
           <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
         )}
-        {crawlStatus.message}
+        <span className="font-semibold tracking-wide">
+          {crawlStatus.message}
+        </span>
       </div>
     </div>
   );

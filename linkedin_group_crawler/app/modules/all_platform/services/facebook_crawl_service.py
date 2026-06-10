@@ -48,6 +48,7 @@ class CrawlFacebookResult:
     total_groups_failed: int
     total_sessions_saved: int
     total_posts_saved: int
+    total_duplicates: int = 0
     groups_results: List[CrawlGroupResult] = field(default_factory=list)
     errors: List[str] = field(default_factory=list)
 
@@ -110,6 +111,7 @@ async def crawl_facebook_groups(
             total_groups_failed=0,
             total_sessions_saved=0,
             total_posts_saved=0,
+            total_duplicates=0,
             groups_results=[],
             errors=["Không có nhóm nào hợp lệ để cào."],
         )
@@ -128,6 +130,7 @@ async def crawl_facebook_groups(
             total_groups_failed=len(groups),
             total_sessions_saved=0,
             total_posts_saved=0,
+            total_duplicates=0,
             groups_results=[],
             errors=["Scraper không trả về kết quả nào."],
         )
@@ -135,9 +138,11 @@ async def crawl_facebook_groups(
     # 2. Lưu hot_post vào Supabase
     save_errors: List[str] = []
     total_saved = 0
+    total_duplicates = 0
     try:
         result = save_facebook_crawl_to_supabase(user_id, group_summaries)
         total_saved = result.get("total_posts", 0)
+        total_duplicates = result.get("duplicates", 0)
         save_errors = result.get("errors", [])
     except Exception as e:
         logger.warning("Không lưu được vào Supabase: %s", e)
@@ -172,6 +177,7 @@ async def crawl_facebook_groups(
         total_groups_failed=total_failed,
         total_sessions_saved=total_ok,
         total_posts_saved=total_saved,
+        total_duplicates=total_duplicates,
         groups_results=groups_results,
         errors=save_errors,
     )
