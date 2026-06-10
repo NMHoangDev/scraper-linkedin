@@ -1245,7 +1245,7 @@ export function GroupManagementContent() {
             <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-black ${
               platform === key ? "bg-[#E3000F]/20 text-[#E3000F]" : "bg-[#E5E5E5] text-[#666666]"
             }`}>
-              {key === "facebook" ? fbGroups.length : liGroups.length}
+              {key === "facebook" ? filteredFb.length : filteredLi.length}
             </span>
           </button>
         ))}
