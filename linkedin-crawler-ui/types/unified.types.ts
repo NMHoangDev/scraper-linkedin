@@ -41,6 +41,8 @@ export interface UnifiedPost {
   seeding_name?: string;
   link_comment?: string;
   verify_status?: VerifyStatus;
+  crawler_name?: string;
+  crawler_team?: string;
 }
 
 export interface GetAllPostsRequest {
