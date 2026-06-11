@@ -11,6 +11,14 @@ export type UserRole = "member" | "leader" | "admin";
 
 // ── Posts ────────────────────────────────────────────────────────────────────
 
+export interface UnifiedSeedingInfo {
+  member_name?: string;
+  seeding_content?: string;
+  seeding_name?: string;
+  link_comment?: string;
+  verify_status?: VerifyStatus;
+}
+
 export interface UnifiedPost {
   id: string;
   platform: FeedPlatform;
@@ -43,6 +51,7 @@ export interface UnifiedPost {
   verify_status?: VerifyStatus;
   crawler_name?: string;
   crawler_team?: string;
+  all_seedings?: UnifiedSeedingInfo[];
 }
 
 export interface GetAllPostsRequest {

@@ -107,7 +107,34 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
           "{post.content || "Nội dung bài viết rỗng hoặc chứa thuần hình ảnh/video."}"
         </p>
 
-        {post.seeding_content && (
+        {(userRole === "admin" || userRole === "leader") && post.all_seedings && post.all_seedings.length > 0 ? (
+          <div className="mb-3 flex flex-col gap-2">
+            {post.all_seedings.map((seed, idx) => (
+              <div key={idx} className="px-3 py-2 bg-emerald-50/50 border border-emerald-100 rounded-lg flex flex-col gap-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Đã seeding bởi <span className="font-bold text-slate-800">{seed.member_name}</span> (Tài khoản: {seed.seeding_name || "Unknown"}):</span>
+                </div>
+                <p className="text-xs text-slate-600 line-clamp-2">
+                  <span className="text-emerald-500 font-serif font-bold text-lg leading-none mr-1">"</span>
+                  {seed.seeding_content}
+                  <span className="text-emerald-500 font-serif font-bold text-lg leading-none ml-1">"</span>
+                </p>
+                <div className="flex items-center justify-between mt-1">
+                  {seed.link_comment && (
+                    <a href={seed.link_comment} target="_blank" rel="noopener noreferrer" className="text-[10px] font-medium text-blue-600 hover:underline inline-flex items-center gap-1">
+                      Xem bình luận <FiExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                  {seed.verify_status === "yes" ? (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700">✓ Đã xác minh</span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700">Chờ xác minh</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : post.seeding_content ? (
           <div className="mb-3 px-3 py-2 bg-emerald-50/50 border border-emerald-100 rounded-lg flex flex-col gap-1">
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Đã seeding bằng tài khoản:</span>
@@ -124,7 +151,7 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
               </a>
             )}
           </div>
-        )}
+        ) : null}
 
         {/* Footer */}
         <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
