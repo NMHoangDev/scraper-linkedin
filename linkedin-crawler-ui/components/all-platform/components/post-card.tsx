@@ -7,6 +7,7 @@ import type { UnifiedPost, FeedPlatform } from "@/types/unified.types";
 
 interface PostCardProps {
   post: UnifiedPost;
+  userRole?: string;
   onVerify?: (post: UnifiedPost) => void;
   onSeeding?: (post: UnifiedPost) => void;
   onViewDetail?: (post: UnifiedPost) => void;
@@ -21,7 +22,7 @@ function PlatformIcon({ platform }: { platform: FeedPlatform }) {
   return <FaLinkedin className="text-blue-700 shrink-0" />;
 }
 
-export function PostCard({ post, onVerify, onSeeding, onViewDetail, seeded, verifyStatus }: PostCardProps) {
+export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, seeded, verifyStatus }: PostCardProps) {
   const handleView = () => {
     if (onViewDetail) {
       onViewDetail(post);
@@ -93,9 +94,11 @@ export function PostCard({ post, onVerify, onSeeding, onViewDetail, seeded, veri
             )}
           </div>
 
-          <span className="text-[11px] text-slate-400 shrink-0 font-medium">
-            {post.crawl_date ? new Date(post.crawl_date).toLocaleDateString("vi-VN") : ""}
-            {post.posted_at ? ` • ${new Date(post.posted_at).toLocaleTimeString("vi-VN", {hour: '2-digit', minute:'2-digit'})}` : ""}
+          <span className="text-[11px] text-slate-400 shrink-0 font-medium text-right leading-tight">
+            <span className="block">
+              {post.crawl_date ? new Date(post.crawl_date).toLocaleDateString("vi-VN") : ""}
+              {post.posted_at ? ` • ${new Date(post.posted_at).toLocaleTimeString("vi-VN", {hour: '2-digit', minute:'2-digit'})}` : ""}
+            </span>
           </span>
         </div>
 
@@ -136,6 +139,13 @@ export function PostCard({ post, onVerify, onSeeding, onViewDetail, seeded, veri
             <span className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-600 rounded-md text-[11px] font-bold border border-blue-100/50" title="Lượt chia sẻ">
               🔁 {post.shares?.toLocaleString() || 0}
             </span>
+
+            {(userRole === "admin" || userRole === "leader") && post.crawler_name && (
+              <span className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-500 rounded-md text-[11px] font-medium border border-slate-200/50">
+                👤 {post.crawler_name}
+                {userRole === "admin" && post.crawler_team ? ` - ${post.crawler_team}` : ""}
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
