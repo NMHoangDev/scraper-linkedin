@@ -1,8 +1,14 @@
 "use client";
 
-type CredentialRecord = {
+export type CredentialRecord = {
+  id?: string;
   email: string;
-  password: string;
+  password?: string;
+  name?: string;
+  avatar?: string;
+  status?: "connected" | "disconnected" | "error";
+  phone?: string;
+  platform?: "linkedin" | "facebook" | "zalo";
 };
 
 const EMAIL_COOKIE = "linkedin_email";
@@ -49,4 +55,52 @@ export function writeLinkedInCredentials(
 export function clearLinkedInCredentials(): void {
   writeCookie(EMAIL_COOKIE, "", -1);
   writeCookie(PASSWORD_COOKIE, "", -1);
+}
+
+// Multi-account support
+const ACCOUNTS_STORAGE_KEY = "linkedin_multi_accounts";
+const ACTIVE_ACCOUNT_ID_KEY = "linkedin_active_account_id";
+
+function getAccountsFromStorage(): CredentialRecord[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveAccountsToStorage(accounts: CredentialRecord[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts));
+}
+
+export function getAllLinkedInAccounts(): CredentialRecord[] {
+  return getAccountsFromStorage();
+}
+
+export function saveLinkedInAccount(account: CredentialRecord): void {
+  const accounts = getAccountsFromStorage();
+  const existingIndex = accounts.findIndex((a) => a.email === account.email);
+  if (existingIndex >= 0) {
+    accounts[existingIndex] = { ...accounts[existingIndex], ...account };
+  } else {
+    accounts.push({
+      ...account,
+      id: account.id || Math.random().toString(36).substring(2, 9),
+    });
+  }
+  saveAccountsToStorage(accounts);
+}
+
+export function removeLinkedInAccount(email: string): void {
+  const accounts = getAccountsFromStorage();
+  saveAccountsToStorage(accounts.filter((a) => a.email !== email));
+}
+
+export function setActiveAccount(id: string): void {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(ACTIVE_ACCOUNT_ID_KEY, id);
+  }
 }

@@ -147,3 +147,27 @@ all_platform_router.include_router(
     prefix="/admin/dashboard",
     tags=["All-Platform Admin Dashboard"],
 )
+
+# ── Zalo ───────────────────────────────────────────────────────────────────────
+from app.modules.all_platform.zalo.api.routes.auth import router as zalo_auth_router
+from app.modules.all_platform.zalo.api.routes.crawler import router as zalo_crawl_router
+from app.modules.all_platform.zalo.api.routes.groups import router as zalo_groups_router
+from app.modules.all_platform.zalo.api.routes.jobs import router as zalo_jobs_router
+from app.modules.all_platform.zalo.api.routes.library import router as zalo_library_router
+from app.modules.all_platform.zalo.api.routes.broadcasts import router as zalo_broadcasts_router
+from app.modules.all_platform.zalo.api.routes.maintenance import router as zalo_maintenance_router
+from app.modules.all_platform.zalo.api.routes.listener import router as zalo_listener_router
+from app.modules.all_platform.zalo.api.routes.accounts import router as zalo_accounts_router
+from app.modules.all_platform.zalo.api.routes.conversations import router as zalo_conversations_router
+
+all_platform_router.include_router(zalo_auth_router, prefix="/zalo", tags=["Zalo Auth"])
+all_platform_router.include_router(zalo_crawl_router, prefix="/zalo", tags=["Zalo Crawl"])
+all_platform_router.include_router(zalo_groups_router, prefix="/zalo", tags=["Zalo Groups"])
+all_platform_router.include_router(zalo_jobs_router, prefix="/zalo", tags=["Zalo Jobs"])
+all_platform_router.include_router(zalo_library_router, prefix="/zalo", tags=["Zalo Library"])
+all_platform_router.include_router(zalo_broadcasts_router, prefix="/zalo", tags=["Zalo Broadcasts"])
+all_platform_router.include_router(zalo_maintenance_router, prefix="/zalo", tags=["Zalo Maintenance"])
+all_platform_router.include_router(zalo_listener_router, prefix="/zalo", tags=["Zalo Listener"])
+all_platform_router.include_router(zalo_accounts_router, prefix="/zalo", tags=["Zalo Accounts"])
+all_platform_router.include_router(zalo_conversations_router, prefix="/zalo", tags=["Zalo Conversations"])
+

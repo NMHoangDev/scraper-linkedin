@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
+import sys
 import asyncio
+
+if sys.platform == "win32":
+    try:
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    except AttributeError:
+        pass
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
@@ -91,7 +98,7 @@ async def handle_cors_middleware(request: Request, call_next):
         else:
             response.headers["Access-Control-Allow-Origin"] = origin or "*"
         response.headers["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS, PUT, DELETE, PATCH"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, x-api-key, Authorization"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, x-api-key, Authorization, X-User-ID, X-Session-ID, X-Zalo-Worker-ID"
         return response
 
     response = await call_next(request)
@@ -137,3 +144,4 @@ app.include_router(router)
 app.include_router(linkedin_app_router)
 app.include_router(api_router, prefix="/facebook/api/v1")
 app.include_router(all_platform_router, prefix="/api/all-platform")
+

@@ -5,7 +5,7 @@
 
 // Cấu hình mặc định - không cần user cấu hình gì cả
 const DEFAULT_CONFIG = {
-  apiBaseUrl: "http://localhost:8000",
+  apiBaseUrl: "https://seeding.markeeai.com/api",
   apiKey: ""  // Backend không bắt buộc API key nếu env API_KEY rỗng
 };
 

@@ -3,7 +3,7 @@ import re
 import time
 from pathlib import Path
 from typing import Dict, Any, Optional
-from playwright_stealth import Stealth
+from playwright_stealth import stealth_sync
 import pyotp
 from playwright.sync_api import sync_playwright, Page, BrowserContext, Browser, TimeoutError as PlaywrightTimeoutError
 from .human_behavior import HumanBehavior
@@ -208,7 +208,7 @@ class FacebookAuth:
             }
         """)
         page = context.new_page()
-        Stealth().apply_stealth_sync(page)
+        stealth_sync(page)
         return browser, context, page
 
     def _try_login_with_cookie(self, context: BrowserContext, page: Page, cookie_file: Path) -> bool:

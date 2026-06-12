@@ -83,7 +83,21 @@ export type MaterialSymbolName =
   | "rocket_launch"
   | "travel_explore"
   | "groups"
-  | "group_off";
+  | "group_off"
+  | "send"
+  | "auto_awesome"
+  | "support_agent"
+  | "drag_indicator"
+  | "call"
+  | "arrow_back"
+  | "mood"
+  | "image"
+  | "attach_file"
+  | "videocam"
+  | "support"
+  | "qr_code_scanner"
+  | "description"
+  | "chat";
 
 export interface MaterialIconProps {
   name: MaterialSymbolName;

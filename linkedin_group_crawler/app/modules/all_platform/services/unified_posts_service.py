@@ -586,29 +586,60 @@ def get_unified_posts(
     if all_posts and email:
         try:
             sb = _supabase()
-            user_res = sb.table("app_users").select("id").eq("email", email).limit(1).execute()
+            user_res = sb.table("app_users").select("id, role").eq("email", email).limit(1).execute()
             if user_res.data:
                 id_member = user_res.data[0]["id"]
+                role = user_res.data[0].get("role", "member")
                 post_ids = [p.get("id") for p in all_posts if p.get("id")]
                 if post_ids:
-                    kpi_res = sb.table("seeding_content_kpi").select("id_post, content, verify, link_comment, social_accounts(account_name)").eq("id_member", id_member).in_("id_post", post_ids).execute()
+                    if role in ["admin", "leader"]:
+                        kpi_res = sb.table("seeding_content_kpi").select("id_post, id_member, content, verify, link_comment, social_accounts(account_name)").in_("id_post", post_ids).execute()
+                    else:
+                        kpi_res = sb.table("seeding_content_kpi").select("id_post, id_member, content, verify, link_comment, social_accounts(account_name)").eq("id_member", id_member).in_("id_post", post_ids).execute()
                     
+                    kpi_data = kpi_res.data or []
+                    seeding_member_ids = list(set([k.get("id_member") for k in kpi_data if k.get("id_member")]))
+                    member_name_map = {}
+                    if seeding_member_ids:
+                        mem_res = sb.table("app_users").select("id, name").in_("id", seeding_member_ids).execute()
+                        for m in (mem_res.data or []):
+                            member_name_map[m["id"]] = m.get("name") or "Unknown"
+
                     kpi_map = {}
-                    for kpi in (kpi_res.data or []):
+                    all_seedings_map = {}
+                    
+                    for kpi in kpi_data:
                         pid = kpi.get("id_post")
                         if pid:
                             sa = kpi.get("social_accounts") or {}
-                            kpi_map[pid] = {
+                            s_member_id = kpi.get("id_member")
+                            
+                            seeding_info = {
+                                "member_name": member_name_map.get(s_member_id, "Unknown"),
                                 "seeding_content": kpi.get("content"),
                                 "seeding_name": sa.get("account_name") if isinstance(sa, dict) else None,
                                 "link_comment": kpi.get("link_comment"),
                                 "verify_status": kpi.get("verify")
                             }
+                            
+                            if pid not in all_seedings_map:
+                                all_seedings_map[pid] = []
+                            all_seedings_map[pid].append(seeding_info)
+                            
+                            if s_member_id == id_member or pid not in kpi_map:
+                                kpi_map[pid] = {
+                                    "seeding_content": kpi.get("content"),
+                                    "seeding_name": sa.get("account_name") if isinstance(sa, dict) else None,
+                                    "link_comment": kpi.get("link_comment"),
+                                    "verify_status": kpi.get("verify")
+                                }
                     
                     for p in all_posts:
                         pid = p.get("id")
                         if pid in kpi_map:
                             p.update(kpi_map[pid])
+                        if pid in all_seedings_map:
+                            p["all_seedings"] = all_seedings_map[pid]
         except Exception as e:
             print("Error fetching seeding info:", e)
 

@@ -20,7 +20,7 @@ interface NavItem {
   label: string;
 }
 
-/** Admin: Dashboard → Quản lý Teams → Quản lý groups → Post Feed → Tài khoản → Trang cá nhân → Quản lý danh mục */
+/** Admin: Dashboard → Quản lý Teams → Quản lý groups → Post Feed → Tài khoản → Trang cá nhân → Quản lý danh mục → Cào Zalo */
 const ADMIN_NAV: NavItem[] = [
   { href: "/all-platform/admin/dashboard", icon: "dashboard", label: "Dashboard" },
   { href: "/all-platform/admin/teams-management", icon: "shield_person", label: "Quản lý Teams" },
@@ -29,9 +29,11 @@ const ADMIN_NAV: NavItem[] = [
   { href: "/all-platform/quan-ly-tai-khoan", icon: "account_circle", label: "Tài khoản" },
   { href: "/all-platform/profile", icon: "person", label: "Trang cá nhân" },
   { href: "/all-platform/quan-ly-danh-muc", icon: "category", label: "Quản lý danh mục" },
+  { href: "/all-platform/tai-khoan", icon: "manage_accounts", label: "Quản lý TK Zalo" },
+  { href: "/all-platform/zalo-crawl", icon: "forum", label: "Quản lý Inbox Zalo" },
 ];
 
-/** Leader: Quản lý Team → Quản lý groups → Post Feed → Tài khoản → Trang cá nhân → Quản lý danh mục */
+/** Leader: Quản lý Team → Quản lý groups → Post Feed → Tài khoản → Trang cá nhân → Quản lý danh mục → Cào Zalo */
 const LEADER_NAV: NavItem[] = [
   { href: "/all-platform/leader/team", icon: "groups", label: "Quản lý Team" },
   { href: "/all-platform/quan-ly-nhom", icon: "group", label: "Quản lý groups" },
@@ -39,15 +41,19 @@ const LEADER_NAV: NavItem[] = [
   { href: "/all-platform/quan-ly-tai-khoan", icon: "account_circle", label: "Tài khoản" },
   { href: "/all-platform/profile", icon: "person", label: "Trang cá nhân" },
   { href: "/all-platform/quan-ly-danh-muc", icon: "category", label: "Quản lý danh mục" },
+  { href: "/all-platform/tai-khoan", icon: "manage_accounts", label: "Quản lý TK Zalo" },
+  { href: "/all-platform/zalo-crawl", icon: "forum", label: "Quản lý Inbox Zalo" },
 ];
 
-/** Member: Post Feed → Quản lý groups → Tài khoản → Trang cá nhân → Quản lý danh mục */
+/** Member: Post Feed → Quản lý groups → Tài khoản → Trang cá nhân → Quản lý danh mục → Cào Zalo */
 const MEMBER_NAV: NavItem[] = [
   { href: "/all-platform/post-feed", icon: "radar", label: "Post Feed" },
   { href: "/all-platform/quan-ly-nhom", icon: "group", label: "Quản lý groups" },
   { href: "/all-platform/quan-ly-tai-khoan", icon: "account_circle", label: "Tài khoản" },
   { href: "/all-platform/profile", icon: "person", label: "Trang cá nhân" },
   { href: "/all-platform/quan-ly-danh-muc", icon: "category", label: "Quản lý danh mục" },
+  { href: "/all-platform/tai-khoan", icon: "manage_accounts", label: "Quản lý TK Zalo" },
+  { href: "/all-platform/zalo-crawl", icon: "forum", label: "Quản lý Inbox Zalo" },
 ];
 
 /* ── Component ─────────────────────────────────────────────────────────────── */
@@ -144,3 +150,4 @@ export function AllPlatformSidebar() {
     </aside>
   );
 }
+

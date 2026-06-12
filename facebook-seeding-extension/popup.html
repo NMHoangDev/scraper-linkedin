@@ -138,7 +138,7 @@
   
   <div class="form-group">
     <label>API Base URL</label>
-    <input type="text" id="apiBaseUrl" placeholder="http://localhost:8000">
+    <input type="text" id="apiBaseUrl" placeholder="https://seeding.markeeai.com/api">
     <small>Địa chỉ backend API server</small>
   </div>
   
@@ -176,7 +176,7 @@
     
     // Save settings
     saveBtn.addEventListener('click', () => {
-      const apiBaseUrl = apiBaseUrlInput.value.trim() || 'http://localhost:8000';
+      const apiBaseUrl = apiBaseUrlInput.value.trim() || 'https://seeding.markeeai.com/api';
       const apiKey = apiKeyInput.value.trim();
       
       chrome.storage.sync.set({ apiBaseUrl, apiKey }, () => {
