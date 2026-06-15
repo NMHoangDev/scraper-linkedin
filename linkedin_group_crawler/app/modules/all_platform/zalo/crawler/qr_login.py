@@ -75,16 +75,17 @@ _JS_CANVAS = """
     for (const sel of selectors) {
         const originalCanvas = document.querySelector(sel);
         if (originalCanvas && originalCanvas.width > 100) {
+            const size = Math.max(originalCanvas.width, originalCanvas.height);
             const padding = 40;
             const newCanvas = document.createElement('canvas');
-            newCanvas.width = originalCanvas.width + padding * 2;
-            newCanvas.height = originalCanvas.height + padding * 2;
+            newCanvas.width = size + padding * 2;
+            newCanvas.height = size + padding * 2;
             
             const ctx = newCanvas.getContext('2d');
             ctx.fillStyle = '#FFFFFF';
             ctx.fillRect(0, 0, newCanvas.width, newCanvas.height);
             
-            ctx.drawImage(originalCanvas, padding, padding);
+            ctx.drawImage(originalCanvas, padding, padding, size, size);
             
             const dataUrl = newCanvas.toDataURL('image/png');
             if (dataUrl && dataUrl.length > 1000) {
