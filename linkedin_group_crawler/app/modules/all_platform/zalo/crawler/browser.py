@@ -142,7 +142,7 @@ async def create_browser(user_id: str = "default") -> Tuple[Optional[Browser], B
 
     context_kwargs = {
         "viewport": {"width": 1280, "height": 900},
-        "device_scale_factor": 1,
+        "device_scale_factor": 2.5,
         "user_agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
