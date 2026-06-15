@@ -18,7 +18,6 @@ CANVAS_SELECTORS = [
     "[class*=qr-code] canvas",
     "[class*=QRCode] canvas",
     "[class*=login] canvas",
-    "canvas",
 ]
 
 IMG_SELECTORS = [
@@ -27,7 +26,6 @@ IMG_SELECTORS = [
     "[class*=qr] img",
     "[class*=QR] img",
     "[class*=login] img",
-    "img",
 ]
 
 QR_SCREENSHOT_FALLBACK_SELECTORS = [
@@ -37,7 +35,6 @@ QR_SCREENSHOT_FALLBACK_SELECTORS = [
     "[id*=qr]",
     "[data-id*=QR]",
     "[data-id*=qr]",
-    "svg",
 ]
 
 QR_PRIMARY_SCREENSHOT_SELECTORS = [
@@ -50,9 +47,6 @@ QR_PRIMARY_SCREENSHOT_SELECTORS = [
     "img[class*=QR]",
     "[class*=qr] img",
     "[class*=QR] img",
-    "canvas",
-    "img",
-    "svg",
 ]
 
 ACCOUNT_CONTINUE_SELECTORS = [
