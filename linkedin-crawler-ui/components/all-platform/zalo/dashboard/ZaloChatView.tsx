@@ -1471,7 +1471,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                   <img
                     src={flow.qrBase64.startsWith("data:") ? flow.qrBase64 : `data:image/png;base64,${flow.qrBase64}`}
                     alt="Zalo QR"
-                    className="w-48 h-48 object-contain"
+                    className="w-48 h-48 object-fill"
                   />
                   {flow.authStatus === "waiting_scan" && (
                     <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-[#E3000F] text-white hover:bg-red-700 px-3 py-1 rounded-full text-[10px] font-bold shadow-md animate-pulse whitespace-nowrap">
