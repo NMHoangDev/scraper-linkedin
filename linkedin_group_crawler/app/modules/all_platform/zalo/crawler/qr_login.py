@@ -337,13 +337,34 @@ async def _capture_qr(page: Page) -> str:
             except Exception:
                 continue
 
-    logger.warning("Could not find specific QR element, using full page screenshot as ultimate fallback")
+    logger.warning("Could not find specific QR element, using centered screenshot as ultimate fallback")
     try:
-        # Take a screenshot of the viewport (which contains the QR)
-        shot = await page.screenshot(type="png")
+        # Try to grab the Zalo white card container first
+        card = None
+        for sel in [".zLogin-layout", "[class*='login-wrapper']", "[class*='Login']", ".body-container"]:
+            elements = await page.locator(sel).all()
+            for el in elements:
+                box = await el.bounding_box()
+                if box and box["width"] > 200 and box["height"] > 200:
+                    card = el
+                    break
+            if card: break
+            
+        if card:
+            shot = await card.screenshot(type="png")
+        else:
+            # Math fallback: crop the exact center 400x400 of the viewport
+            v = page.viewport_size
+            if v:
+                cw, ch = 400, 450
+                cx, cy = max(0, (v["width"] - cw) / 2), max(0, (v["height"] - ch) / 2)
+                shot = await page.screenshot(type="png", clip={"x": cx, "y": cy, "width": cw, "height": ch})
+            else:
+                shot = await page.screenshot(type="png")
+
         return "data:image/png;base64," + base64.b64encode(shot).decode()
     except Exception as exc:
-        logger.error(f"Full page screenshot ultimate fallback failed: {exc}")
+        logger.error(f"Centered screenshot ultimate fallback failed: {exc}")
 
     await _save_qr_failure_artifacts(
         page,
