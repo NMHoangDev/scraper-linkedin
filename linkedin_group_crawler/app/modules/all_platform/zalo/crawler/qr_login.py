@@ -73,11 +73,23 @@ ACCOUNT_CONTINUE_SELECTORS = [
 _JS_CANVAS = """
 (selectors) => {
     for (const sel of selectors) {
-        const canvas = document.querySelector(sel);
-        if (canvas && canvas.width > 100) {
-            canvas.style.padding = '40px';
-            canvas.style.backgroundColor = 'white';
-            return sel;
+        const originalCanvas = document.querySelector(sel);
+        if (originalCanvas && originalCanvas.width > 100) {
+            const padding = 40;
+            const newCanvas = document.createElement('canvas');
+            newCanvas.width = originalCanvas.width + padding * 2;
+            newCanvas.height = originalCanvas.height + padding * 2;
+            
+            const ctx = newCanvas.getContext('2d');
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, newCanvas.width, newCanvas.height);
+            
+            ctx.drawImage(originalCanvas, padding, padding);
+            
+            const dataUrl = newCanvas.toDataURL('image/png');
+            if (dataUrl && dataUrl.length > 1000) {
+                return dataUrl;
+            }
         }
     }
     return null;
@@ -217,16 +229,14 @@ def _qr_targets(page: Page) -> List[Tuple[str, Union[Page, Frame]]]:
 async def _canvas_data_url(page: Page) -> Optional[str]:
     for label, target in _qr_targets(page):
         try:
-            matched_selector = await target.evaluate(_JS_CANVAS, CANVAS_SELECTORS)
-            if matched_selector:
-                await page.wait_for_timeout(200)
-                handle = await target.query_selector(matched_selector)
-                if handle:
-                    shot = await handle.screenshot(type="png")
-                    return "data:image/png;base64," + base64.b64encode(shot).decode()
+            data_url = await target.evaluate(_JS_CANVAS, CANVAS_SELECTORS)
+            if data_url:
+                logger.debug(f"QR canvas copied with padding in {label}")
+                return data_url
         except PlaywrightError as exc:
             if "Execution context was destroyed" in str(exc):
                 return None
+            logger.debug(f"QR canvas evaluation error in {label}: {exc}")
         except Exception:
             pass
     return None
