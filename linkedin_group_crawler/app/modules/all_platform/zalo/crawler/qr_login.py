@@ -72,25 +72,13 @@ ACCOUNT_CONTINUE_SELECTORS = [
 
 _JS_CANVAS = """
 (selectors) => {
-    const isVisible = (el) => {
-        if (!el) return false;
-        const style = window.getComputedStyle(el);
-        if (!style) return false;
-        if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) {
-            return false;
-        }
-        const rect = el.getBoundingClientRect();
-        if (rect.width < 140 || rect.height < 140) return false;
-        const ratio = rect.width / rect.height;
-        return ratio > 0.75 && ratio < 1.25;
-    };
     for (const sel of selectors) {
         const canvas = document.querySelector(sel);
-        if (!canvas || !isVisible(canvas) || canvas.width < 140 || canvas.height < 140) continue;
-        try {
-            const dataUrl = canvas.toDataURL('image/png');
-            if (dataUrl && dataUrl.length > 2000) return dataUrl;
-        } catch (_) {}
+        if (canvas && canvas.width > 100) {
+            canvas.style.padding = '40px';
+            canvas.style.backgroundColor = 'white';
+            return sel;
+        }
     }
     return null;
 }
@@ -258,25 +246,8 @@ async def _canvas_data_url(page: Page) -> Optional[str]:
             if "Execution context was destroyed" in str(exc):
                 return None
             logger.debug(f"QR canvas evaluation error in {label}: {exc}")
-        except Exception as exc:
-            logger.debug(f"QR canvas evaluation failed in {label}: {exc}")
-    return None
-
-
-async def _img_src(page: Page) -> Optional[str]:
-    for label, target in _qr_targets(page):
-        try:
-            src = await target.evaluate(_JS_IMG, IMG_SELECTORS)
-            if src:
-                logger.debug(f"QR image found in {label}")
-                return src
-        except PlaywrightError as exc:
-            if "Execution context was destroyed" in str(exc):
-                logger.debug(f"QR image evaluation interrupted by navigation in {label}; will retry")
-                return None
-            logger.debug(f"QR image evaluation error in {label}: {exc}")
-        except Exception as exc:
-            logger.debug(f"QR image evaluation failed in {label}: {exc}")
+        except Exception:
+            pass
     return None
 
 
