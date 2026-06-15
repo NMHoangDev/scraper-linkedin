@@ -5,6 +5,7 @@ websockets>=12.0
 playwright
 python-dotenv
 pydantic
+pydantic-settings
 httpx
 pytest
 google-api-python-client
