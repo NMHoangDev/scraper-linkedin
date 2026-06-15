@@ -224,3 +224,129 @@ body {
     "GRAD" 0,
     "opsz" 24;
 }
+
+/* ==========================================================================
+   Tippy.js — nền trắng, chữ đen, nổi lên trên mọi layer (z-index rất cao)
+   ========================================================================== */
+.tippy-box {
+  position: relative;
+  background-color: #ffffff;
+  color: #0f172a; /* slate-900 */
+  border: 1px solid #e2e8f0; /* slate-200 */
+  box-shadow:
+    0 4px 6px -1px rgb(0 0 0 / 0.08),
+    0 12px 24px -4px rgb(15 23 42 / 0.12);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  padding: 0;
+  z-index: 9999 !important; /* nổi lên trên mọi layer */
+}
+
+.tippy-content {
+  padding: 7px 10px;
+  position: relative;
+  z-index: 1;
+  text-align: left;
+}
+.tippy-box[data-placement^="right"] > .tippy-arrow {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  left: 0;
+  top: 50%;
+  transform: translate(-6px, -50%) rotate(45deg);
+  background: #ffffff;
+  border-left: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+/* Mũi tên trắng cho placement 'top' / 'bottom' */
+.tippy-box[data-placement^="top"] > .tippy-arrow {
+  width: 12px;
+  height: 12px;
+  bottom: 0;
+  left: 50%;
+  transform: translate(-50%, 6px) rotate(45deg);
+  background: #ffffff;
+  border-right: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+}
+.tippy-box[data-placement^="bottom"] > .tippy-arrow {
+  width: 12px;
+  height: 12px;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -6px) rotate(45deg);
+  background: #ffffff;
+  border-left: 1px solid #e2e8f0;
+  border-top: 1px solid #e2e8f0;
+}
+
+/* Backdrop nền mờ nhẹ để tippy nổi bật */
+.tippy-backdrop {
+  background-color: #ffffff;
+}
+.tippy-backdrop[data-state="visible"] {
+  opacity: 0.95;
+}
+
+/* Animation mượt */
+.tippy-box[data-animation="fade"][data-state="hidden"] {
+  opacity: 0;
+  transform: scale(0.96);
+}
+.tippy-box[data-animation="fade"][data-state="visible"] {
+  opacity: 1;
+  transform: scale(1);
+  transition:
+    opacity 180ms ease-out,
+    transform 180ms ease-out;
+}
+
+/* ==========================================================================
+   App Tooltip — tự viết bằng createPortal, không dùng thư viện
+   để tránh React 19 cloneElement ref warning (tippy.js v4 vẫn dùng).
+   Component tự định vị (left/top inline style), CSS chỉ lo style/animation.
+   ========================================================================== */
+.app-tooltip {
+  background-color: #ffffff;
+  color: #0f172a;
+  border: 1px solid #e2e8f0;
+  box-shadow:
+    0 4px 6px -1px rgb(0 0 0 / 0.08),
+    0 12px 24px -4px rgb(15 23 42 / 0.12);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  padding: 7px 10px;
+  max-width: 260px;
+  text-align: left;
+  pointer-events: none; /* tránh hover tooltip làm tooltip biến mất */
+  animation: app-tooltip-fade-in 180ms ease-out;
+}
+
+.app-tooltip-arrow {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #ffffff;
+  border-left: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  top: 50%;
+  left: 0;
+  transform: translate(-5px, -50%) rotate(45deg);
+}
+
+@keyframes app-tooltip-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
+}

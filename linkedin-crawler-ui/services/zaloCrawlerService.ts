@@ -406,6 +406,74 @@ export function buildZaloJobEventsUrl(userId = "default"): string {
   return `${API_BASE_URL}/api/all-platform/zalo/jobs/events?${params.toString()}`;
 }
 
+// ------------------------------------------------------------------------------------
+// Realtime SSE stream cho Zalo messages (mới thêm ở bước 7).
+// Vì EventSource của browser không cho set header, ta truyền user_id + api_key
+// qua query string. Trả về URL đã build sẵn để caller khởi tạo EventSource.
+// ------------------------------------------------------------------------------------
+
+export interface BuildZaloRealtimeStreamOptions {
+  userId?: string;
+  email?: string;
+}
+
+export function buildZaloRealtimeStreamUrl(
+  options: BuildZaloRealtimeStreamOptions = {}
+): string {
+  const params = new URLSearchParams();
+  if (options.userId) params.set("user_id", options.userId);
+  if (options.email) params.set("email", options.email);
+  if (API_KEY) params.set("api_key", API_KEY);
+  const qs = params.toString();
+  return `${API_BASE_URL}/api/all-platform/zalo/events/stream${qs ? `?${qs}` : ""}`;
+}
+
+export interface ZaloShareStatus {
+  admin: boolean;
+  leader: boolean;
+}
+
+export async function getZaloConversationShareStatus(
+  accountId: string,
+  conversationId: string,
+  userId = "default"
+): Promise<ZaloShareStatus> {
+  const params = new URLSearchParams({
+    account_id: accountId,
+    conversation_id: conversationId,
+  });
+  if (API_KEY) params.set("api_key", API_KEY);
+  return requestJson<ZaloShareStatus>(
+    `/api/all-platform/zalo/events/share-status?${params.toString()}`,
+    {
+      method: "GET",
+      headers: buildHeaders({ "X-User-ID": userId }),
+    }
+  );
+}
+
+export async function setZaloConversationShare(
+  accountId: string,
+  conversationId: string,
+  shared: boolean,
+  sharedRole: "admin" | "leader" = "admin",
+  userId = "default"
+): Promise<{ ok: boolean }> {
+  return requestJson<{ ok: boolean }>("/api/all-platform/zalo/events/share", {
+    method: "POST",
+    headers: buildHeaders({
+      "X-User-ID": userId,
+      "Content-Type": "application/json",
+    }),
+    body: JSON.stringify({
+      account_id: accountId,
+      conversation_id: conversationId,
+      shared,
+      shared_role: sharedRole,
+    }),
+  });
+}
+
 export function getZaloCrawledGroups(userId = "default"): Promise<ZaloCrawledGroupsResponse> {
   return requestJson<ZaloCrawledGroupsResponse>("/api/all-platform/zalo/groups/crawled", {
     method: "GET",
@@ -638,6 +706,64 @@ export function markZaloConversationAsRead(
       headers: buildHeaders({
         "X-User-ID": accountId,
       }),
+    },
+  );
+}
+
+export interface ZaloFoundUser {
+  user_id: string;
+  display_name: string;
+  zalo_name?: string | null;
+  avatar_url?: string | null;
+  phone_e164?: string | null;
+  raw?: unknown;
+}
+
+export interface ZaloCreateUserThreadRequest {
+  user_id: string;
+  display_name: string;
+  avatar_url?: string | null;
+}
+
+export interface ZaloCreateUserThreadResponse {
+  ok: boolean;
+  conversation_id: string;
+  user_id: string;
+  display_name: string;
+  thread_type: number;
+}
+
+/** Tìm user Zalo (chưa từng chat) theo SĐT VN hoặc username Zalo. */
+export function findZaloUser(
+  accountId: string,
+  query: string,
+  by: "phone" | "username" = "phone",
+): Promise<ZaloFoundUser> {
+  const params = new URLSearchParams({ q: query, by });
+  return requestJson<ZaloFoundUser>(
+    `/api/all-platform/zalo/conversations/users/find?${params.toString()}`,
+    {
+      method: "GET",
+      headers: {
+        "X-User-ID": accountId,
+      },
+    },
+  );
+}
+
+/** Tạo (hoặc upsert) thread chat với user lạ trong zalo_groups, idempotent. */
+export function createZaloUserThread(
+  accountId: string,
+  payload: ZaloCreateUserThreadRequest,
+): Promise<ZaloCreateUserThreadResponse> {
+  return requestJson<ZaloCreateUserThreadResponse>(
+    "/api/all-platform/zalo/conversations/users/threads",
+    {
+      method: "POST",
+      headers: buildHeaders({
+        "X-User-ID": accountId,
+      }),
+      body: JSON.stringify(payload),
     },
   );
 }

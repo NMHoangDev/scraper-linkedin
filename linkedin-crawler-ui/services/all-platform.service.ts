@@ -16,10 +16,25 @@ import type {
   SocialAccount,
   SocialAccountSummary,
 } from "@/types/unified.types";
-import { API_BASE_URL } from "@/lib/env";
+import { API_BASE_URL, API_KEY } from "@/lib/env";
 
 const BASE = `${API_BASE_URL}/api/all-platform`;
 const authHeaders = () => ({});
+
+/**
+ * Trả về header mặc định cho mọi request — bao gồm:
+ *  - X-API-Key: backend yêu cầu (verify_zalo_api_key), đọc từ NEXT_PUBLIC_LINKEDIN_CRAWLER_API_KEY
+ *  - Có thể bị override bởi `init.headers` nếu caller cần custom
+ */
+function getDefaultHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (API_KEY) {
+    headers["X-API-Key"] = API_KEY;
+  }
+  return headers;
+}
 
 async function requestJson<T = any>(
   path: string,
@@ -30,7 +45,7 @@ async function requestJson<T = any>(
       ...init,
       credentials: "include",
       headers: {
-        "Content-Type": "application/json",
+        ...getDefaultHeaders(),
         ...(init?.headers || {}),
       },
     });
@@ -171,6 +186,21 @@ export const allPlatformKpiService = {
     });
   },
 
+  getZaloInboxProgress: (
+    email: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<ApiResponse<{
+    kpi_inbox_current: number;
+    account_ids: string[];
+    range: { start: string; end: string };
+  }>> => {
+    return requestJson(`${BASE}/kpi/zalo-inbox-progress`, {
+      method: "POST",
+      body: JSON.stringify({ email, start_date: startDate, end_date: endDate }),
+    });
+  },
+
   syncAll: (
     email: string,
     posts: Array<{ post_url: string; reactions?: number; comments?: number; shares?: number }>,
@@ -192,6 +222,100 @@ export const allPlatformKpiService = {
     return requestJson(`${BASE}/kpi/auth/verify-leader-code`, {
       method: "POST",
       body: JSON.stringify({ code }),
+    });
+  },
+};
+
+// ── Zalo Inbox Share (Tin nhắn KPI verification) ─────────────────────────────
+
+export const zaloInboxShareService = {
+  /**
+   * Member bật/tắt share cho 1 conversation.
+   * @param is_active true = bật, false = tắt
+   */
+  toggle: (payload: {
+    account_id: string;
+    conversation_id: string;
+    member_email: string;
+    is_active: boolean;
+    shared_role?: "leader" | "admin";
+    note?: string;
+  }): Promise<ApiResponse<{ is_active: boolean; row: any }>> => {
+    return requestJson(`${BASE}/zalo/inbox-share/toggle`, {
+      method: "POST",
+      body: JSON.stringify({
+        shared_role: "leader",
+        ...payload,
+      }),
+    });
+  },
+
+  /** Liệt kê conversations mà member này đã share. */
+  listMine: (
+    member_email: string,
+    is_active: boolean | null = true,
+  ): Promise<ApiResponse<{ items: any[]; total: number }>> => {
+    return requestJson(`${BASE}/zalo/inbox-share/list`, {
+      method: "POST",
+      body: JSON.stringify({ member_email, is_active }),
+    });
+  },
+
+  /** Liệt kê conversations mà leader có quyền xem (đã join account info). */
+  leaderView: (
+    leader_email: string,
+    member_email?: string,
+  ): Promise<ApiResponse<{ items: any[]; total: number }>> => {
+    return requestJson(`${BASE}/zalo/inbox-share/leader-view`, {
+      method: "POST",
+      body: JSON.stringify({ leader_email, member_email }),
+    });
+  },
+
+  /** Bulk sync (khi member thay đổi nhiều tick cùng lúc). */
+  bulkSync: (
+    member_email: string,
+    shares: Array<{ account_id: string; conversation_id: string; is_active: boolean; note?: string }>,
+  ): Promise<ApiResponse<{ synced: number; failed: number; errors: string[] }>> => {
+    return requestJson(`${BASE}/zalo/inbox-share/bulk-sync`, {
+      method: "POST",
+      body: JSON.stringify({ member_email, shares }),
+    });
+  },
+
+  /** Leader xác minh 1 share → tính KPI inbox. */
+  verify: (row_id: number, leader_email: string, note?: string): Promise<ApiResponse<{ row: any }>> => {
+    return requestJson(`${BASE}/zalo/inbox-share/verify`, {
+      method: "POST",
+      body: JSON.stringify({ row_id, leader_email, note }),
+    });
+  },
+
+  /** Leader thu hồi verify (set verified_at = NULL). */
+  unverify: (row_id: number): Promise<ApiResponse<{ row: any }>> => {
+    return requestJson(`${BASE}/zalo/inbox-share/unverify`, {
+      method: "POST",
+      body: JSON.stringify({ row_id }),
+    });
+  },
+
+  /** Leader đánh dấu tiềm năng (is_lead) */
+  toggleLead: (row_id: number, leader_email: string, is_lead: boolean): Promise<ApiResponse<{ row: any }>> => {
+    return requestJson(`${BASE}/zalo/inbox-share/toggle-lead`, {
+      method: "POST",
+      body: JSON.stringify({ row_id, leader_email, is_lead }),
+    });
+  },
+
+  /** Đếm số share đã verify trong khoảng [start_date, end_date]. */
+  countVerified: (
+    member_email: string,
+    start_date: string,
+    end_date: string,
+  ): Promise<ApiResponse<{ count: number; items: any[] }>> => {
+    return requestJson(`${BASE}/zalo/inbox-share/count-verified`, {
+      method: "POST",
+      body: JSON.stringify({ member_email, start_date, end_date }),
     });
   },
 };

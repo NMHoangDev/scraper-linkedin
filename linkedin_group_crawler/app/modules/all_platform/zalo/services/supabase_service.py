@@ -6,7 +6,7 @@ import posixpath
 import uuid
 import base64
 import hashlib
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
 import httpx
@@ -515,6 +515,236 @@ async def delete_zalo_account(account_id: str) -> None:
         raise
 
 
+# ----------------------------------------------------------------------------
+# Realtime: phân quyền user/role + share conversation
+# ----------------------------------------------------------------------------
+
+async def get_app_user_by_email(email: str) -> Optional[Dict[str, Any]]:
+    """Tra cứu ``public.app_users`` theo email (case-insensitive).
+
+    Trả về dict các cột ``id``, ``email``, ``role``, ``name`` ... hoặc ``None``
+    nếu không tìm thấy / chưa cấu hình Supabase.
+
+    Lưu ý: bảng ``app_users`` nằm ngoài schema zalo, có thể chưa được tạo trên
+    một số môi trường. Hàm fail-soft trả về ``None`` thay vì raise.
+    """
+    if not is_supabase_configured():
+        return None
+    email_norm = (email or "").strip()
+    if not email_norm:
+        return None
+    try:
+        rows = await _rest(
+            "GET",
+            "app_users",
+            params={
+                "select": "id,email,role,name",
+                "email": f"ilike.{email_norm}",
+                "limit": "1",
+            },
+        )
+    except RuntimeError as exc:
+        # Bảng chưa tồn tại — coi như user không tồn tại.
+        if "app_users" in str(exc) or "does not exist" in str(exc):
+            return None
+        raise
+    if not rows:
+        return None
+    row = rows[0]
+    if not isinstance(row, dict):
+        return None
+    return row
+
+
+async def get_user_role(email: str) -> str:
+    """Trả về role từ bảng ``app_users``. Mặc định ``"member"`` nếu không tìm thấy."""
+    user = await get_app_user_by_email(email)
+    if not user:
+        return "member"
+    return str(user.get("role") or "member").strip().lower() or "member"
+
+
+async def get_app_user_id_by_email(email: str) -> Optional[str]:
+    user = await get_app_user_by_email(email)
+    if not user:
+        return None
+    return str(user.get("id") or "").strip() or None
+
+
+async def get_team_member_ids(leader_user_id: str) -> List[str]:
+    """Lấy danh sách app_user.id của các member thuộc team leader.
+
+    Leader → members: thông qua bảng ``member_of_teams`` (cấu trúc đã thấy trong
+    ``supabase_kpi_service``). Trả về list rỗng nếu leader không quản lý ai
+    hoặc thiếu cấu hình.
+    """
+    if not is_supabase_configured() or not leader_user_id:
+        return []
+    try:
+        rows = await _rest(
+            "GET",
+            "member_of_teams",
+            params={
+                "select": "id_member",
+                "id_leader": f"eq.{leader_user_id}",
+            },
+        ) or []
+    except RuntimeError as exc:
+        if "member_of_teams" in str(exc) or "does not exist" in str(exc):
+            return []
+        raise
+    ids: List[str] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        value = str(row.get("id_member") or "").strip()
+        if value and value not in ids:
+            ids.append(value)
+    return ids
+
+
+async def set_conversation_share(
+    account_id: str,
+    conversation_id: str,
+    *,
+    shared: bool,
+    shared_role: str = "admin",
+) -> None:
+    """Bật/tắt share conversation với role (admin/leader).
+
+    - ``shared=True``  → upsert dòng với ``is_active=True``.
+    - ``shared=False`` → update ``is_active=False`` (giữ dòng để audit, không xoá).
+
+    Hàm này fail-soft nếu bảng chưa migrate.
+    """
+    if not is_supabase_configured():
+        return
+    account_id = (account_id or "").strip()
+    conversation_id = (conversation_id or "").strip()
+    if not account_id or not conversation_id:
+        return
+    role = (shared_role or "admin").strip().lower() or "admin"
+
+    now = datetime.utcnow().isoformat()
+    payload = {
+        "account_id": account_id,
+        "conversation_id": conversation_id,
+        "shared_role": role,
+        "is_active": bool(shared),
+        "updated_at": now,
+    }
+    if shared:
+        payload["created_at"] = now
+
+    try:
+        if shared:
+            await _rest(
+                "POST",
+                "zalo_conversation_permissions",
+                json=[payload],
+                params={"on_conflict": "account_id,conversation_id,shared_role"},
+                prefer="resolution=merge-duplicates",
+            )
+        else:
+            # Tắt share: PATCH theo composite key (account_id, conversation_id, shared_role).
+            await _rest(
+                "PATCH",
+                "zalo_conversation_permissions",
+                params={
+                    "account_id": f"eq.{account_id}",
+                    "conversation_id": f"eq.{conversation_id}",
+                    "shared_role": f"eq.{role}",
+                },
+                json={"is_active": False, "updated_at": now},
+            )
+    except RuntimeError as exc:
+        if "zalo_conversation_permissions" in str(exc) or "does not exist" in str(exc):
+            logger.warning(
+                f"zalo_conversation_permissions table not ready; cannot set share: {exc}"
+            )
+            return
+        raise
+
+
+async def list_shared_conversation_ids(
+    account_id: str,
+    shared_role: Optional[str] = None,
+) -> Set[str]:
+    """Trả về set ``conversation_id`` đang được share (is_active=true) cho account.
+
+    Nếu ``shared_role=None`` trả về tất cả role. Hàm fail-soft trả về set rỗng
+    nếu bảng chưa tồn tại.
+    """
+    empty: Set[str] = set()
+    if not is_supabase_configured():
+        return empty
+    account_id = (account_id or "").strip()
+    if not account_id:
+        return empty
+
+    params: Dict[str, Any] = {
+        "select": "conversation_id,shared_role",
+        "account_id": f"eq.{account_id}",
+        "is_active": "eq.true",
+    }
+    if shared_role:
+        params["shared_role"] = f"eq.{shared_role.strip().lower()}"
+
+    try:
+        rows = await _rest("GET", "zalo_conversation_permissions", params=params) or []
+    except RuntimeError as exc:
+        if "zalo_conversation_permissions" in str(exc) or "does not exist" in str(exc):
+            return empty
+        raise
+
+    result: Set[str] = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        cid = str(row.get("conversation_id") or "").strip()
+        if cid:
+            result.add(cid)
+    return result
+
+
+async def get_conversation_share_status(
+    account_id: str,
+    conversation_id: str,
+) -> Dict[str, bool]:
+    """Trả về dict ``{role: is_shared}`` cho 1 conversation cụ thể.
+
+    Dùng cho UI hiển thị trạng thái share hiện tại (đang bật cho ai).
+    """
+    result: Dict[str, bool] = {"admin": False, "leader": False}
+    if not is_supabase_configured():
+        return result
+    account_id = (account_id or "").strip()
+    conversation_id = (conversation_id or "").strip()
+    if not account_id or not conversation_id:
+        return result
+    try:
+        rows = await _rest(
+            "GET",
+            "zalo_conversation_permissions",
+            params={
+                "select": "shared_role,is_active",
+                "account_id": f"eq.{account_id}",
+                "conversation_id": f"eq.{conversation_id}",
+            },
+        ) or []
+    except RuntimeError as exc:
+        if "zalo_conversation_permissions" in str(exc) or "does not exist" in str(exc):
+            return result
+        raise
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        role = str(row.get("shared_role") or "").strip().lower()
+        if role in result and bool(row.get("is_active")):
+            result[role] = True
+    return result
+
+
 async def get_zalo_inbox_report(
     account_ids: Optional[List[str]] = None,
     *,
@@ -650,7 +880,7 @@ async def save_listener_messages(
     if last_message:
         ts_ms = _parse_to_millis(last_message.timestamp) or _parse_to_millis(last_message.time_text)
         if ts_ms > 0:
-            last_message_at_value = datetime.utcfromtimestamp(ts_ms / 1000).isoformat() + "Z"
+            last_message_at_value = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).isoformat().replace("+00:00", "Z")
 
     await upsert_group(
         user_id=user_id,
@@ -901,7 +1131,7 @@ def _normalize_iso_timestamp(val: Any) -> Optional[str]:
     ms = _parse_to_millis(val)
     if ms <= 0:
         return None
-    return datetime.utcfromtimestamp(ms / 1000).isoformat() + "Z"
+    return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def _parse_to_millis(val: Any) -> int:
@@ -1111,10 +1341,15 @@ async def list_conversation_messages(
     resolved_group_name = None
 
     is_numeric_id = conversation_id.isdigit() or (conversation_id.startswith("-") and conversation_id[1:].isdigit())
-    
-    mapping_rows = []
-    try:
-        if is_numeric_id:
+
+    # Conversation ID có thể ở 3 dạng:
+    #   1) group_id Zalo (vd "g123456789" hoặc số user id)
+    #   2) group_name thuần (vd "Hội nhóm bán hàng")
+    #   3) UUID / chuỗi bất kỳ (crawl job, friend thread)
+    # Ta cần thử cả 3 cách resolve để tìm được messages đã lưu.
+    mapping_rows: List[Dict[str, Any]] = []
+    if is_numeric_id:
+        try:
             mapping_rows = await _rest(
                 "GET",
                 "zalo_groups",
@@ -1124,18 +1359,38 @@ async def list_conversation_messages(
                     "group_id": f"eq.{conversation_id}",
                 }
             ) or []
-        else:
+        except Exception as exc:
+            logger.warning(f"Failed to fetch zalo_groups mapping by id in messages view: {exc}")
+    else:
+        # Có thể conversation_id chính là group_id kiểu "gXXXX" — tra theo group_id trước
+        # vì zalo_groups.group_id là khóa chính tra cứu nhanh nhất.
+        try:
             mapping_rows = await _rest(
                 "GET",
                 "zalo_groups",
                 params={
                     "select": "group_id,group_name",
                     "user_id": f"eq.{user_id}",
-                    "group_name": f"eq.{conversation_id}",
+                    "group_id": f"eq.{conversation_id}",
                 }
             ) or []
-    except Exception as exc:
-        logger.warning(f"Failed to fetch zalo_groups mapping in messages view: {exc}")
+        except Exception as exc:
+            logger.warning(f"Failed to fetch zalo_groups mapping by id (non-numeric) in messages view: {exc}")
+
+        # Nếu chưa thấy, thử match theo group_name
+        if not mapping_rows:
+            try:
+                mapping_rows = await _rest(
+                    "GET",
+                    "zalo_groups",
+                    params={
+                        "select": "group_id,group_name",
+                        "user_id": f"eq.{user_id}",
+                        "group_name": f"eq.{conversation_id}",
+                    }
+                ) or []
+            except Exception as exc:
+                logger.warning(f"Failed to fetch zalo_groups mapping by name in messages view: {exc}")
 
     if mapping_rows:
         resolved_group_id = mapping_rows[0].get("group_id")
@@ -1159,26 +1414,49 @@ async def list_conversation_messages(
                     resolved_group_id = conversation_id
                     resolved_group_name = msg_rows[0].get("group_name")
             else:
+                # Ưu tiên tra messages theo group_id trước (covers "gXXXX" Zalo group ids)
                 msg_rows = await _rest(
                     "GET",
                     "zalo_messages",
                     params={
-                        "select": "group_id",
+                        "select": "group_name",
                         "user_id": f"eq.{user_id}",
-                        "group_name": f"eq.{conversation_id}",
-                        "group_id": "not.is.null",
+                        "group_id": f"eq.{conversation_id}",
                         "limit": "1",
                     }
                 ) or []
-                if msg_rows and msg_rows[0].get("group_id"):
-                    resolved_group_id = msg_rows[0].get("group_id")
-                    resolved_group_name = conversation_id
+                if msg_rows and msg_rows[0].get("group_name"):
+                    resolved_group_id = conversation_id
+                    resolved_group_name = msg_rows[0].get("group_name")
+                else:
+                    # Cuối cùng mới thử match theo group_name
+                    msg_rows = await _rest(
+                        "GET",
+                        "zalo_messages",
+                        params={
+                            "select": "group_id",
+                            "user_id": f"eq.{user_id}",
+                            "group_name": f"eq.{conversation_id}",
+                            "group_id": "not.is.null",
+                            "limit": "1",
+                        }
+                    ) or []
+                    if msg_rows and msg_rows[0].get("group_id"):
+                        resolved_group_id = msg_rows[0].get("group_id")
+                        resolved_group_name = conversation_id
         except Exception as exc:
             logger.warning(f"Failed to scan zalo_messages mapping in messages view: {exc}")
 
     if not resolved_group_id and is_numeric_id:
         resolved_group_id = conversation_id
     if not resolved_group_name and not is_numeric_id:
+        resolved_group_name = conversation_id
+
+    # Final defensive fallback: nếu vẫn không resolve được gì cả, thử dùng cả group_id và group_name
+    # khi query messages. Điều này tránh trả về rỗng khi mapping bị thiếu nhưng messages đã được lưu.
+    if not resolved_group_id and not resolved_group_name:
+        # Trường hợp hiếm: dùng conversation_id nguyên bản cho cả 2 phía
+        resolved_group_id = conversation_id
         resolved_group_name = conversation_id
 
     # Query messages using or-filter to aggregate both group_id and group_name
@@ -1191,7 +1469,7 @@ async def list_conversation_messages(
         "offset": str(safe_offset),
     }
 
-    if resolved_group_id and resolved_group_name:
+    if resolved_group_id and resolved_group_name and resolved_group_id != resolved_group_name:
         escaped_name = resolved_group_name.replace('"', '\\"')
         query_params["or"] = f'(group_id.eq.{resolved_group_id},group_name.eq."{escaped_name}")'
     elif resolved_group_id:

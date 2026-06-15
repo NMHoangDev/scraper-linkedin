@@ -9,6 +9,7 @@ import { AdminTeamModal } from "@/components/all-platform/admin/AdminTeamModal";
 import { AdminMemberKpiModal } from "@/components/all-platform/admin/AdminMemberKpiModal";
 import { PlatformStatsRow, PlatformStatCard } from "@/components/features/shared/PlatformStatCard";
 import { FaTrash, FaEdit, FaEye } from "react-icons/fa";
+import { LeaderInboxView } from "@/components/all-platform/leader/LeaderInboxView";
 
 export default function TeamsManagementPage() {
   const { user } = useAppAuth();
@@ -25,7 +26,10 @@ export default function TeamsManagementPage() {
   const [kpiModalOpen, setKpiModalOpen] = useState(false);
   const [selectedTeamForKpi, setSelectedTeamForKpi] = useState<TeamRow | null>(null);
 
-  const isAdmin = user?.role === "admin";
+  const [inboxModalOpen, setInboxModalOpen] = useState(false);
+  const [selectedLeaderForInbox, setSelectedLeaderForInbox] = useState<{ email: string; name: string } | null>(null);
+
+  const isAdmin = (user?.role as string) === "admin" || (user?.role as string) === "superadmin";
 
   const fetchTeams = useCallback(async () => {
     setIsLoading(true);
@@ -196,6 +200,46 @@ export default function TeamsManagementPage() {
         />
       </PlatformStatsRow>
 
+      {/* Inbox Comparison Chart */}
+      {!isLoading && teams.length > 0 && (
+        <div className="bg-white p-5 rounded-xl border border-[#E5E5E5] shadow-sm">
+          <h3 className="text-sm font-bold text-[#1A1A1A] mb-4">So sánh tỷ lệ hoàn thành KPI Inbox các Team</h3>
+          <div className="flex flex-col gap-4">
+            {teams.map(team => {
+              const teamKpis = kpiResultsData.find(r => r.teamId === team.id)?.members || [];
+              const totalMembers = team.members?.length || 0;
+              let achievedMembers = 0;
+              
+              team.members?.forEach(member => {
+                const kpiInfo = teamKpis.find((k: any) => k.id === member.id) || {};
+                const seedingStats = kpiInfo.seeding_stats || {};
+                const target = seedingStats.kpi_inbox || 0;
+                const current = seedingStats.kpi_inbox_current || 0;
+                if (target > 0 && current >= target) {
+                  achievedMembers++;
+                }
+              });
+
+              const percentage = totalMembers > 0 ? Math.min(Math.round((achievedMembers / totalMembers) * 100), 100) : 0;
+              const barColor = percentage >= 100 ? "bg-emerald-500" : percentage >= 50 ? "bg-orange-500" : "bg-red-500";
+              const textColor = percentage >= 100 ? "text-emerald-600" : percentage >= 50 ? "text-orange-600" : "text-red-600";
+              
+              return (
+                <div key={team.id} className="flex flex-col gap-1.5">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-[#1A1A1A]">{team.name_team} <span className="text-[#A0A0A0] font-medium text-[10px] ml-1">({achievedMembers}/{totalMembers} TV hoàn thành)</span></span>
+                    <span className={`font-bold ${textColor}`}>{percentage}%</span>
+                  </div>
+                  <div className="h-2 w-full bg-[#F5F5F5] rounded-full overflow-hidden">
+                    <div className={`h-full ${barColor} transition-all duration-500`} style={{ width: `${percentage}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Message Notifications */}
       {success && (
         <div className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-4 py-3 rounded-xl text-xs font-semibold flex items-center gap-2">
@@ -228,8 +272,10 @@ export default function TeamsManagementPage() {
           </button>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-[#E5E5E5] bg-white shadow-sm">
-          <table className="w-full text-sm">
+        <div className="bg-white rounded-xl border border-[#E5E5E5] shadow-sm overflow-hidden">
+          {/* DESKTOP TABLE VIEW */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-sm">
             <thead className="bg-[#F5F5F5] border-b border-[#E5E5E5] text-[#1A1A1A]">
               <tr>
                 <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider">
@@ -260,31 +306,96 @@ export default function TeamsManagementPage() {
                     {team.number_of_member || 0}
                   </td>
                   <td className="px-4 py-3 align-middle">
-                    <div className="flex items-center justify-center gap-2">
+                    <div className="flex items-center justify-center gap-1.5 flex-wrap">
                       <button
                         onClick={() => handleViewMembers(team)}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#E3000F]/5 text-[#E3000F] hover:bg-[#E3000F]/10 transition text-xs font-bold cursor-pointer shrink-0"
+                        className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-[#E3000F]/5 text-[#E3000F] hover:bg-[#E3000F]/10 transition text-[11px] font-bold cursor-pointer shrink-0"
                       >
-                        <FaEye size={12} /> Xem thành viên
+                        <FaEye size={10} /> Xem TV
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedLeaderForInbox({ 
+                            email: team.leader_email, 
+                            name: team.name_team 
+                          });
+                          setInboxModalOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-orange-50 text-orange-700 hover:bg-orange-100 transition text-[11px] font-bold cursor-pointer shrink-0 border border-orange-100"
+                        title="Xem toàn bộ Inbox của Team này"
+                      >
+                        <MaterialIcon name="forum" className="text-[12px]" /> Inbox
                       </button>
                       <button
                         onClick={() => handleEditTeam(team)}
-                        className="inline-flex items-center gap-1 px-3 py-2 text-[#666666] hover:text-[#1A1A1A] hover:bg-[#F5F5F5] border border-slate-200 rounded-xl transition text-xs font-bold cursor-pointer shrink-0"
+                        className="inline-flex items-center gap-1 px-2 py-1.5 text-[#666666] hover:text-[#1A1A1A] hover:bg-[#F5F5F5] border border-slate-200 rounded-lg transition text-[11px] font-bold cursor-pointer shrink-0"
                       >
-                        <FaEdit size={12} /> Sửa
+                        <FaEdit size={10} /> Sửa
                       </button>
                       <button
                         onClick={() => handleDeleteTeam(team)}
-                        className="inline-flex items-center gap-1 px-3 py-2 text-[#666666] hover:text-[#FF3344] hover:bg-[#FF3344]/5 border border-slate-200 hover:border-red-200 rounded-xl transition text-xs font-bold cursor-pointer shrink-0"
+                        className="inline-flex items-center gap-1 px-2 py-1.5 text-[#666666] hover:text-[#FF3344] hover:bg-[#FF3344]/5 border border-slate-200 hover:border-red-200 rounded-lg transition text-[11px] font-bold cursor-pointer shrink-0"
                       >
-                        <FaTrash size={12} /> Xóa
+                        <FaTrash size={10} /> Xóa
                       </button>
                     </div>
                   </td>
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
+
+          {/* MOBILE CARD VIEW */}
+          <div className="md:hidden flex flex-col divide-y divide-[#E5E5E5]">
+            {teams.map((team) => (
+              <div key={team.id} className="p-4 hover:bg-[#F5F5F5]/30 transition flex flex-col gap-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h3 className="font-bold text-[#1A1A1A] text-sm">{team.name_team}</h3>
+                    <div className="text-xs text-[#666666] mt-1 flex flex-col gap-0.5">
+                      <span className="font-medium text-[#1A1A1A]">{team.leader_name || "Chưa đặt tên"}</span>
+                      <span className="text-[10px] text-[#A0A0A0]">{team.leader_email}</span>
+                    </div>
+                  </div>
+                  <div className="bg-[#F5F5F5] px-3 py-1.5 rounded-lg text-center shrink-0 border border-slate-100 shadow-sm">
+                    <div className="text-[9px] text-[#A0A0A0] uppercase font-bold mb-0.5">Số TV</div>
+                    <div className="text-sm font-black text-[#1A1A1A] leading-none">{team.number_of_member || 0}</div>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100">
+                  <button
+                    onClick={() => handleViewMembers(team)}
+                    className="flex items-center justify-center gap-1.5 p-2 rounded-xl bg-[#E3000F]/5 text-[#E3000F] hover:bg-[#E3000F]/10 transition cursor-pointer shadow-sm active:scale-95"
+                  >
+                    <FaEye size={14} /> <span className="text-[11px] font-bold">Thành viên</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedLeaderForInbox({ email: team.leader_email, name: team.name_team });
+                      setInboxModalOpen(true);
+                    }}
+                    className="flex items-center justify-center gap-1.5 p-2 rounded-xl bg-orange-50 text-orange-700 hover:bg-orange-100 transition cursor-pointer shadow-sm active:scale-95 border border-orange-100"
+                  >
+                    <MaterialIcon name="forum" className="text-[14px]" /> <span className="text-[11px] font-bold">Xem Inbox</span>
+                  </button>
+                  <button
+                    onClick={() => handleEditTeam(team)}
+                    className="flex items-center justify-center gap-1.5 p-2 text-[#666666] hover:text-[#1A1A1A] bg-[#F5F5F5] hover:bg-[#E5E5E5] border border-slate-200 rounded-xl transition cursor-pointer shadow-sm active:scale-95"
+                  >
+                    <FaEdit size={14} /> <span className="text-[11px] font-bold">Sửa Team</span>
+                  </button>
+                  <button
+                    onClick={() => handleDeleteTeam(team)}
+                    className="flex items-center justify-center gap-1.5 p-2 text-[#666666] hover:text-[#FF3344] bg-red-50 hover:bg-red-100 border border-red-100 rounded-xl transition cursor-pointer shadow-sm active:scale-95"
+                  >
+                    <FaTrash size={14} /> <span className="text-[11px] font-bold">Xóa Team</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -312,6 +423,16 @@ export default function TeamsManagementPage() {
         }}
         team={selectedTeamForKpi}
       />
+
+      {/* Admin Inbox View Modal */}
+      {inboxModalOpen && selectedLeaderForInbox && (
+        <LeaderInboxView
+          isOpen={inboxModalOpen}
+          onClose={() => setInboxModalOpen(false)}
+          leaderEmail={selectedLeaderForInbox.email}
+          memberName={`Toàn bộ team ${selectedLeaderForInbox.name}`}
+        />
+      )}
     </div>
   );
 }

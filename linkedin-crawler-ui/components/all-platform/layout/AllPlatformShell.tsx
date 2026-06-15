@@ -3,8 +3,11 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAppAuth } from "@/contexts/AppAuthContext";
+import { useState } from "react";
+import { FaBars } from "react-icons/fa";
 import { AppPlatformProvider, useAppPlatform } from "@/components/providers/AppPlatformProvider";
 import { AllPlatformSidebar } from "./AllPlatformSidebar";
+import { MaterialIcon } from "@/components/ui";
 import { GlobalCrawlNotification } from "../components/global-crawl-notification";
 
 /**
@@ -20,6 +23,7 @@ function AllPlatformShellInner({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAppAuth();
   const { platform, setPlatform } = useAppPlatform();
   const router = useRouter();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Force platform to "general" for all-platform routes
   useEffect(() => {
@@ -47,9 +51,24 @@ function AllPlatformShellInner({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated) return null;
 
   return (
-    <div className="min-h-screen bg-background text-on-background">
-      <AllPlatformSidebar />
-      <main className="p-lg lg:ml-64">
+    <div className="min-h-screen bg-[#F8F9FA] text-on-background flex flex-col lg:flex-row">
+      {/* Mobile Top Header */}
+      <div className="lg:hidden flex items-center justify-between bg-white border-b border-slate-200 px-4 py-3 sticky top-0 z-30 shadow-sm">
+        <div className="flex items-center gap-2">
+          <img src="https://markeeai.com/logo.svg" alt="Logo" className="w-8 h-8 object-contain" />
+          <span className="font-black text-slate-900 text-lg">MarkeeAi</span>
+        </div>
+        <button 
+          onClick={() => setSidebarOpen(true)} 
+          className="p-2 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+        >
+          <FaBars size={20} />
+        </button>
+      </div>
+
+      <AllPlatformSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      
+      <main className="flex-1 w-full lg:ml-64 p-3 sm:p-5 lg:p-8 min-w-0 transition-all">
         <GlobalCrawlNotification />
         {children}
       </main>

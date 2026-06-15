@@ -10,8 +10,10 @@ from app.modules.all_platform.services.supabase_seeding_service import (
 )
 from app.modules.all_platform.services.supabase_kpi_service import (
     assign_kpi,
+    compute_kpi_inbox_progress,
     get_all_kpis_for_leader,
     get_kpi_by_email,
+    get_kpi_inbox_progress_by_email,
     sync_kpi_progress,
     check_permission,
     verify_leader_code,

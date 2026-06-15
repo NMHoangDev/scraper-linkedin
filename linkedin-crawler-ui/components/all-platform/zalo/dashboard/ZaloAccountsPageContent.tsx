@@ -12,7 +12,8 @@ export function ZaloAccountsPageContent() {
     if (accountId !== flow.userId) {
       flow.switchAccount(accountId);
     }
-    router.push("/all-platform/zalo-crawl");
+    // Navigate tới trang chat full-screen (không có sidebar menu)
+    router.push("/zalo-chat");
   }
 
   return (

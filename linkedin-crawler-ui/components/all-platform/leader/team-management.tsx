@@ -10,6 +10,7 @@ import { PlatformStatsRow, PlatformStatCard } from "@/components/features/shared
 import { AssignKpiModal } from "./AssignKpiModal";
 import { TeamModal } from "./TeamModal";
 import { SeedingModal } from "./SeedingModal";
+import { LeaderInboxView } from "./LeaderInboxView";
 import { toast } from "sonner";
 
 export function TeamManagement() {
@@ -23,21 +24,29 @@ export function TeamManagement() {
   
   const [seedingModalOpen, setSeedingModalOpen] = useState(false);
   const [selectedMemberSeeding, setSelectedMemberSeeding] = useState<any>(null);
-  
+
+  // Inbox KPI verification modal
+  const [inboxModalOpen, setInboxModalOpen] = useState(false);
+  const [inboxMember, setInboxMember] = useState<{ email: string; name: string } | null>(null);
+
   // Team Management Modals
   const [teamModalOpen, setTeamModalOpen] = useState(false);
   const [isEditingTeam, setIsEditingTeam] = useState(false);
 
   const fetchData = useCallback(async () => {
-    if (!user?.id || user.role !== "leader") return;
+    if (!user?.id || !["leader", "admin", "superadmin"].includes(user.role || "")) return;
     setIsLoading(true);
     try {
-      // 1. Fetch all teams and filter for this leader
+      // 1. Fetch all teams and filter for this leader (or all if admin)
       const teamsRes = await teamsService.getAll();
       let myTeams: TeamRow[] = [];
       let activeTeamId = selectedTeamId;
       if (teamsRes.success && teamsRes.data) {
-        myTeams = teamsRes.data.filter(t => t.id_leader === user.id);
+        if ((user.role as string) === "admin" || (user.role as string) === "superadmin") {
+          myTeams = teamsRes.data;
+        } else {
+          myTeams = teamsRes.data.filter(t => t.id_leader === user.id);
+        }
         setTeams(myTeams);
         if (myTeams.length > 0 && !selectedTeamId) {
           activeTeamId = myTeams[0].id;
@@ -46,11 +55,13 @@ export function TeamManagement() {
       }
 
       // 2. Fetch KPI data for all members of this leader (scoped by selected team)
-      if (user.email) {
-        const kpiRes = await allPlatformKpiService.getAll(user.email, activeTeamId || undefined);
+      if (user.email && activeTeamId) {
+        const kpiRes = await allPlatformKpiService.getAll(user.email, activeTeamId);
         if (kpiRes.success && kpiRes.data?.members) {
           setKpiData(kpiRes.data.members);
         }
+      } else if (user.email && !activeTeamId) {
+        setKpiData([]);
       }
     } catch (err) {
       console.error(err);
@@ -95,6 +106,9 @@ export function TeamManagement() {
         kpiPostCurrent: stats.kpi_post_current || 0,
         kpiLeadTarget: stats.kpi_lead || 0,
         kpiLeadCurrent: stats.kpi_lead_current || 0,
+        kpiInboxTarget: stats.kpi_inbox || 0,
+        kpiInboxCurrent: stats.kpi_inbox_current || 0,
+        kpiInboxRange: stats.kpi_inbox_range || null,
         seedingItems: kpiInfo.seeding_items || [],
       };
     });
@@ -106,8 +120,8 @@ export function TeamManagement() {
     let sumCurrent = 0;
     let sumTarget = 0;
     membersWithKpi.forEach(m => {
-      sumCurrent += m.kpiCommentCurrent + m.kpiPostCurrent + m.kpiLeadCurrent;
-      sumTarget += m.kpiCommentTarget + m.kpiPostTarget + m.kpiLeadTarget;
+      sumCurrent += m.kpiCommentCurrent + m.kpiPostCurrent + m.kpiLeadCurrent + m.kpiInboxCurrent;
+      sumTarget += m.kpiCommentTarget + m.kpiPostTarget + m.kpiLeadTarget + m.kpiInboxTarget;
     });
     if (sumTarget === 0) return 0;
     return Math.min(100, Math.round((sumCurrent / sumTarget) * 100));
@@ -191,6 +205,20 @@ export function TeamManagement() {
           </div>
 
           <div className="flex items-center gap-2">
+            {((user?.role as string) === "admin" || (user?.role as string) === "superadmin") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setInboxMember({ email: "", name: "Toàn bộ" });
+                  setInboxModalOpen(true);
+                }}
+                className="inline-flex items-center justify-center gap-1.5 bg-orange-50 hover:bg-orange-100 text-orange-700 font-bold px-4 py-2 rounded-xl text-xs transition cursor-pointer shadow-sm active:scale-95 border border-orange-100"
+              >
+                <MaterialIcon name="forum" className="text-[16px]" />
+                Xem Tất Cả Inbox
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => {
@@ -230,14 +258,17 @@ export function TeamManagement() {
         </div>
 
         <div className="w-full">
-          <table className="w-full text-left text-[13px]">
-            <thead className="bg-slate-50/75 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+          <table className="w-full text-left text-[12px]">
+            <thead className="bg-slate-50/75 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
               <tr>
                 <th className="px-2 py-3 whitespace-nowrap">Tên</th>
                 <th className="px-2 py-3 whitespace-nowrap">Email</th>
                 <th className="px-1 py-3 text-center whitespace-nowrap">Comment</th>
                 <th className="px-1 py-3 text-center whitespace-nowrap">Post</th>
                 <th className="px-1 py-3 text-center whitespace-nowrap">Lead</th>
+                <th className="px-1 py-3 text-center whitespace-nowrap">
+                  Inbox
+                </th>
                 <th className="px-2 py-3 text-center whitespace-nowrap">Tiến độ</th>
                 <th className="px-2 py-3 text-center whitespace-nowrap">Hành động</th>
               </tr>
@@ -245,7 +276,7 @@ export function TeamManagement() {
             <tbody className="divide-y divide-slate-50">
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="px-3 py-12 text-center text-slate-400">
+                  <td colSpan={8} className="px-3 py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <div className="w-6 h-6 border-2 border-[#E3000F] border-t-transparent rounded-full animate-spin" />
                       <span className="text-sm font-medium">Đang tải dữ liệu KPI...</span>
@@ -254,14 +285,22 @@ export function TeamManagement() {
                 </tr>
               ) : membersWithKpi.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-3 py-12 text-center text-slate-400 italic">
+                  <td colSpan={8} className="px-3 py-12 text-center text-slate-400 italic">
                     Chưa có thành viên nào trong team này.
                   </td>
                 </tr>
               ) : (
                 membersWithKpi.map(member => {
-                  const totalTarget = member.kpiCommentTarget + member.kpiPostTarget + member.kpiLeadTarget;
-                  const totalCurrent = member.kpiCommentCurrent + member.kpiPostCurrent + member.kpiLeadCurrent;
+                  const totalTarget =
+                    member.kpiCommentTarget +
+                    member.kpiPostTarget +
+                    member.kpiLeadTarget +
+                    member.kpiInboxTarget;
+                  const totalCurrent =
+                    member.kpiCommentCurrent +
+                    member.kpiPostCurrent +
+                    member.kpiLeadCurrent +
+                    member.kpiInboxCurrent;
                   const percent = totalTarget === 0 ? 0 : Math.min(100, Math.round((totalCurrent / totalTarget) * 100));
 
                   return (
@@ -270,24 +309,35 @@ export function TeamManagement() {
                         <div className="font-bold text-slate-800 whitespace-nowrap">{member.name || "N/A"}</div>
                       </td>
                       <td className="px-2 py-3">
-                        <div className="text-slate-500 font-medium text-xs max-w-[150px] truncate" title={member.email}>{member.email}</div>
+                        <div className="text-slate-500 font-medium text-[11px] max-w-[130px] truncate" title={member.email}>{member.email}</div>
                       </td>
-                      <td className="px-1 py-3 text-center font-mono">
+                      <td className="px-1 py-3 text-center font-mono text-[11px]">
                         <span className="font-bold text-slate-800">{member.kpiCommentCurrent}</span>
                         <span className="text-slate-400"> / {member.kpiCommentTarget}</span>
                       </td>
-                      <td className="px-1 py-3 text-center font-mono">
+                      <td className="px-1 py-3 text-center font-mono text-[11px]">
                         <span className="font-bold text-slate-800">{member.kpiPostCurrent}</span>
                         <span className="text-slate-400"> / {member.kpiPostTarget}</span>
                       </td>
-                      <td className="px-1 py-3 text-center font-mono">
+                      <td className="px-1 py-3 text-center font-mono text-[11px]">
                         <span className="font-bold text-slate-800">{member.kpiLeadCurrent}</span>
                         <span className="text-slate-400"> / {member.kpiLeadTarget}</span>
+                      </td>
+                      <td className="px-1 py-3 text-center font-mono text-[11px]">
+                        <span className={cn(
+                          "font-bold",
+                          member.kpiInboxCurrent >= member.kpiInboxTarget && member.kpiInboxTarget > 0
+                            ? "text-emerald-600"
+                            : "text-slate-800"
+                        )}>
+                          {member.kpiInboxCurrent}
+                        </span>
+                        <span className="text-slate-400"> / {member.kpiInboxTarget}</span>
                       </td>
                       <td className="px-2 py-3 text-center">
                         <div className="flex flex-col items-center gap-1.5 w-full max-w-[80px] mx-auto">
                           <div className={cn(
-                            "text-xs font-bold px-2 py-0.5 rounded-full w-full",
+                            "text-[10px] font-bold px-2 py-0.5 rounded-full w-full",
                             percent >= 100 ? "bg-green-100 text-green-700" :
                             percent > 50 ? "bg-amber-100 text-amber-700" :
                             "bg-slate-100 text-slate-600"
@@ -295,7 +345,7 @@ export function TeamManagement() {
                             {percent}%
                           </div>
                           <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                            <div 
+                            <div
                               className={cn("h-full transition-all duration-500", percent >= 100 ? "bg-green-500" : percent > 50 ? "bg-amber-500" : "bg-[#E3000F]")}
                               style={{ width: `${percent}%` }}
                             />
@@ -303,21 +353,36 @@ export function TeamManagement() {
                         </div>
                       </td>
                       <td className="px-2 py-3 text-center">
-                        <div className="flex items-center justify-center gap-2">
+                        <div className="flex items-center justify-center gap-1.5">
                           <button
                             type="button"
                             onClick={() => handleViewSeeding(member)}
-                            className="inline-flex items-center justify-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-2 py-1.5 rounded-lg text-xs transition cursor-pointer border border-blue-100"
+                            className="inline-flex items-center justify-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-1.5 py-1 rounded-md text-[10px] transition cursor-pointer border border-blue-100"
                           >
-                            <MaterialIcon name="visibility" className="text-[16px]" />
+                            <MaterialIcon name="visibility" className="text-[14px]" />
                             Xem Seeding
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleAssignKpi(member)}
-                            className="inline-flex items-center justify-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-2 py-1.5 rounded-lg text-xs transition cursor-pointer"
+                            onClick={() => {
+                              setInboxMember({
+                                email: member.email,
+                                name: member.name || member.email,
+                              });
+                              setInboxModalOpen(true);
+                            }}
+                            className="inline-flex items-center justify-center gap-1 bg-orange-50 hover:bg-orange-100 text-orange-700 font-bold px-1.5 py-1 rounded-md text-[10px] transition cursor-pointer border border-orange-100"
+                            title="Xem các hội thoại Zalo mà member đã share & xác minh (Tin nhắn KPI)"
                           >
-                            <MaterialIcon name="assignment" className="text-[16px]" />
+                            <MaterialIcon name="forum" className="text-[14px]" />
+                            Xem Inbox
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAssignKpi(member)}
+                            className="inline-flex items-center justify-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-1.5 py-1 rounded-md text-[10px] transition cursor-pointer border border-slate-200"
+                          >
+                            <MaterialIcon name="assignment" className="text-[14px]" />
                             Giao KPI
                           </button>
                         </div>
@@ -346,6 +411,16 @@ export function TeamManagement() {
           isOpen={seedingModalOpen}
           onClose={() => setSeedingModalOpen(false)}
           member={selectedMemberSeeding}
+        />
+      )}
+
+      {inboxModalOpen && inboxMember && (
+        <LeaderInboxView
+          isOpen={inboxModalOpen}
+          onClose={() => setInboxModalOpen(false)}
+          memberEmail={inboxMember.email}
+          memberName={inboxMember.name}
+          onStatusChange={fetchData}
         />
       )}
 

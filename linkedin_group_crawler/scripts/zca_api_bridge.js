@@ -836,6 +836,22 @@ async function main() {
     return;
   }
 
+  if (args.command === "find-user-by-phone") {
+    const phone = String(args.phone || "").trim();
+    if (!phone) throw new Error("Missing --phone");
+    const user = await api.findUser(phone);
+    emitAndExit({ ok: true, user: user || null }, 0);
+    return;
+  }
+
+  if (args.command === "find-user-by-username") {
+    const username = String(args.username || "").trim();
+    if (!username) throw new Error("Missing --username");
+    const user = await api.findUserByUsername(username);
+    emitAndExit({ ok: true, user: user || null }, 0);
+    return;
+  }
+
   if (args.command === "group-history") {
   const groupId = args["group-id"] || input.group_id || input.groupId;
   const count = Math.max(50, Math.min(Number(args.count || input.count || 1000), 3000));

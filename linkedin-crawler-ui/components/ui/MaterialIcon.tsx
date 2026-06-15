@@ -91,13 +91,16 @@ export type MaterialSymbolName =
   | "call"
   | "arrow_back"
   | "mood"
+  | "bolt"
   | "image"
   | "attach_file"
   | "videocam"
   | "support"
   | "qr_code_scanner"
   | "description"
-  | "chat";
+  | "chat"
+  | "star"
+  | "star_border";
 
 export interface MaterialIconProps {
   name: MaterialSymbolName;

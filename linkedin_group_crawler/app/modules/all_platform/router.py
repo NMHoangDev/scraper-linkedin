@@ -159,6 +159,9 @@ from app.modules.all_platform.zalo.api.routes.maintenance import router as zalo_
 from app.modules.all_platform.zalo.api.routes.listener import router as zalo_listener_router
 from app.modules.all_platform.zalo.api.routes.accounts import router as zalo_accounts_router
 from app.modules.all_platform.zalo.api.routes.conversations import router as zalo_conversations_router
+from app.modules.all_platform.zalo.api.routes.events import router as zalo_events_router
+from app.modules.all_platform.zalo.api.routes.inbox_share import router as zalo_inbox_share_router
+from app.modules.all_platform.zalo.api.proxy import router as zalo_proxy_router
 
 all_platform_router.include_router(zalo_auth_router, prefix="/zalo", tags=["Zalo Auth"])
 all_platform_router.include_router(zalo_crawl_router, prefix="/zalo", tags=["Zalo Crawl"])
@@ -170,4 +173,7 @@ all_platform_router.include_router(zalo_maintenance_router, prefix="/zalo", tags
 all_platform_router.include_router(zalo_listener_router, prefix="/zalo", tags=["Zalo Listener"])
 all_platform_router.include_router(zalo_accounts_router, prefix="/zalo", tags=["Zalo Accounts"])
 all_platform_router.include_router(zalo_conversations_router, prefix="/zalo", tags=["Zalo Conversations"])
+all_platform_router.include_router(zalo_events_router, prefix="/zalo", tags=["Zalo Events"])
+all_platform_router.include_router(zalo_inbox_share_router, prefix="/zalo", tags=["Zalo Inbox Share"])
+all_platform_router.include_router(zalo_proxy_router, prefix="/zalo", tags=["Zalo Proxy"])
 

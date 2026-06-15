@@ -575,7 +575,9 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
     setIsLoadingAccounts(true);
     setAccountsError(null);
     try {
-      const response = await getZaloAccounts(ZALO_ACCOUNT_OWNER_ID);
+      const linkedInEmail = window?.localStorage?.getItem("linkedin_crawler_email");
+      const currentOwnerId = linkedInEmail ? normalizeZaloUserId(linkedInEmail) : "default";
+      const response = await getZaloAccounts(currentOwnerId);
       setAccounts(response.accounts ?? []);
     } catch (error) {
       setAccountsError(error instanceof Error ? error.message : "Không thể tải danh sách tài khoản Zalo.");
@@ -668,9 +670,11 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
     setAccountsError(null);
     try {
       const accountId = normalizeZaloUserId(cleanLabel);
+      const linkedInEmail = window?.localStorage?.getItem("linkedin_crawler_email");
+      const currentOwnerId = linkedInEmail ? normalizeZaloUserId(linkedInEmail) : "default";
       await createZaloAccount({
         account_id: accountId,
-        owner_id: ZALO_ACCOUNT_OWNER_ID,
+        owner_id: currentOwnerId,
         label: cleanLabel,
         phone: phone?.trim() || undefined,
       });

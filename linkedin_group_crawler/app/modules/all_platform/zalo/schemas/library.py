@@ -29,6 +29,8 @@ class ZaloLibraryMessage(BaseModel):
     is_sent: bool = False
     is_deleted: bool = False
     assets: List[ZaloMessageAsset] = Field(default_factory=list)
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
 
 class ZaloLibraryMessageCreate(BaseModel):

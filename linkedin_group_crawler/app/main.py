@@ -55,6 +55,24 @@ async def lifespan(_: FastAPI):
     if settings.playwright_warmup_on_startup:
         warmup_task = asyncio.create_task(_warmup_background())
 
+    # ── Auto-start ZCA persistent listeners cho mọi user đã có auth trong disk ──
+    # Không có hook này thì listener chỉ được start khi user mới login QR.
+    # Khi BE restart hoặc restore session cũ, listener không tự chạy → không có
+    # realtime push. Chạy nền (background) để không block startup.
+    async def _start_zca_listeners_background() -> None:
+        try:
+            from app.modules.all_platform.zalo.services.zca_persistent_listener import (
+                start_persisted_listeners,
+            )
+            await start_persisted_listeners()
+            logger.info("ZCA persistent listeners auto-start finished")
+        except Exception:
+            logger.exception(
+                "ZCA persistent listeners auto-start failed — sẽ thử lại khi user login lại",
+            )
+
+    zca_listeners_task = asyncio.create_task(_start_zca_listeners_background())
+
     try:
         yield
     finally:
@@ -64,6 +82,19 @@ async def lifespan(_: FastAPI):
                 await warmup_task
             except asyncio.CancelledError:
                 pass
+        if not zca_listeners_task.done():
+            zca_listeners_task.cancel()
+            try:
+                await zca_listeners_task
+            except asyncio.CancelledError:
+                pass
+        try:
+            from app.modules.all_platform.zalo.services.zca_persistent_listener import (
+                shutdown_persistent_listeners,
+            )
+            await shutdown_persistent_listeners()
+        except Exception:
+            logger.exception("ZCA persistent listeners shutdown failed")
         await asyncio.to_thread(shutdown_playwright_pool)
 
 

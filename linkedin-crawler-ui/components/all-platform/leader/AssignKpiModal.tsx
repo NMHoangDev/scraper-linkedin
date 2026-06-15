@@ -22,6 +22,7 @@ export function AssignKpiModal({ isOpen, onClose, member, teamId, onSuccess }: A
   const [kpiComment, setKpiComment] = useState<number>(member.kpiCommentTarget || 0);
   const [kpiPost, setKpiPost] = useState<number>(member.kpiPostTarget || 0);
   const [kpiLead, setKpiLead] = useState<number>(member.kpiLeadTarget || 0);
+  const [kpiInbox, setKpiInbox] = useState<number>(member.kpiInboxTarget || member.kpi_inbox_target || 0);
   
   // Generate weeks for current year
   const generateWeeks = () => {
@@ -76,6 +77,7 @@ export function AssignKpiModal({ isOpen, onClose, member, teamId, onSuccess }: A
       setKpiComment(member.kpiCommentTarget || 0);
       setKpiPost(member.kpiPostTarget || 0);
       setKpiLead(member.kpiLeadTarget || 0);
+      setKpiInbox(member.kpiInboxTarget || member.kpi_inbox_target || 0);
       setSelectedWeek(getCurrentWeek());
       setError(null);
     }
@@ -103,7 +105,7 @@ export function AssignKpiModal({ isOpen, onClose, member, teamId, onSuccess }: A
           kpi_comment: kpiComment,
           kpi_post: kpiPost,
           kpi_lead: kpiLead,
-          kpi_inbox: 0, // default
+          kpi_inbox: kpiInbox,
         }],
         platform: "All"
       };
@@ -254,12 +256,32 @@ export function AssignKpiModal({ isOpen, onClose, member, teamId, onSuccess }: A
                   <div className="text-[10px] text-slate-500 font-medium">Tìm kiếm khách hàng</div>
                 </div>
               </div>
-              <input 
-                type="number" 
+              <input
+                type="number"
                 min="0"
                 value={kpiLead}
                 onChange={(e) => setKpiLead(parseInt(e.target.value) || 0)}
                 className="w-20 text-center font-bold bg-slate-50 border border-slate-200 rounded-lg py-1.5 text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 outline-none transition"
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-4 p-3 rounded-xl border border-slate-100 bg-white shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center">
+                  <MaterialIcon name="chat" className="text-[18px]" />
+                </div>
+                <div>
+                  <div className="text-sm font-bold text-slate-800">KPI Tin nhắn</div>
+                  <div className="text-[10px] text-slate-500 font-medium">Số inbox phải xử lý / tuần</div>
+                </div>
+              </div>
+              <input
+                type="number"
+                min="0"
+                value={kpiInbox}
+                onChange={(e) => setKpiInbox(parseInt(e.target.value) || 0)}
+                className="w-20 text-center font-bold bg-slate-50 border border-slate-200 rounded-lg py-1.5 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition"
+                title="Mục tiêu số tin nhắn inbox Zalo mà member này phải xử lý trong tuần"
               />
             </div>
           </div>

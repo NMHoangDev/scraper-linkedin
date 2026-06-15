@@ -381,39 +381,74 @@ class ZcaPersistentListenerManager:
 
         await self._refresh_group_names(state)
 
-        proc = await asyncio.create_subprocess_exec(
+        import sys
+        import subprocess
+
+        cmd = [
             "node",
             str(script),
             "--user-id",
             state.user_id,
             "--old-message-interval-ms",
             str(int(getattr(settings, "zca_old_message_interval_ms", 60000))),
-            cwd=str(_backend_root()),
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env={**os.environ},
-        )
-        state.proc = proc
-        state.pid = proc.pid
+        ]
+
+        if sys.platform == "win32":
+            from app.modules.all_platform.zalo.services.zca_qr_bridge import WindowsSubprocessWrapper
+            stdin_payload = json.dumps(
+                {"auth": state.auth, "user_id": state.user_id}
+            ).encode("utf-8")
+            proc = WindowsSubprocessWrapper(
+                cmd,
+                cwd=str(_backend_root()),
+                env={**os.environ},
+                stdin_input=stdin_payload,
+            )
+            state.proc = proc
+            state.pid = proc._proc.pid
+        else:
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                cwd=str(_backend_root()),
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env={**os.environ},
+            )
+            state.proc = proc
+            state.pid = proc.pid
+            
+            if proc.stdin:
+                proc.stdin.write(json.dumps({"auth": state.auth, "user_id": state.user_id}).encode("utf-8"))
+                await proc.stdin.drain()
+                proc.stdin.close()
+
         state.last_event_at = _now_iso()
         state.last_error = None
-        logger.info(f"Started ZCA persistent listener user={state.user_id} pid={proc.pid}")
+        logger.info(f"Started ZCA persistent listener user={state.user_id} pid={state.pid}")
 
-        if proc.stdin:
-            proc.stdin.write(json.dumps({"auth": state.auth, "user_id": state.user_id}).encode("utf-8"))
-            await proc.stdin.drain()
-            proc.stdin.close()
+
 
         stderr_task = asyncio.create_task(self._read_stderr(state, proc))
         try:
             if not proc.stdout:
                 raise RuntimeError("listener_stdout_missing")
+            line_count = 0
             while state.desired:
                 line = await proc.stdout.readline()
                 if not line:
+                    logger.info(
+                        f"ZCA listener stdout closed user={state.user_id} after {line_count} lines"
+                    )
                     break
-                await self._handle_event(state, line.decode("utf-8", errors="replace").strip())
+                line_count += 1
+                decoded = line.decode("utf-8", errors="replace").strip()
+                # Log từng line để debug (chỉ log event quan trọng, tránh spam message).
+                if line_count <= 5 or line_count % 50 == 0:
+                    logger.info(
+                        f"ZCA listener stdout line#{line_count} user={state.user_id}: {decoded[:200]}"
+                    )
+                await self._handle_event(state, decoded)
             await proc.wait()
         finally:
             stderr_task.cancel()
@@ -544,6 +579,42 @@ class ZcaPersistentListenerManager:
                 state.last_error = f"save_listener_messages_failed:{type(exc).__name__}: {exc}"
                 logger.warning(
                     f"Could not save listener messages user={state.user_id} group={group_id}: {exc}"
+                )
+                continue
+
+            # ── Realtime push (additive, fail-soft) ─────────────────────────
+            # Sau khi lưu DB thành công, đẩy event vào in-memory bus để FE nhận
+            # qua SSE. Nếu lỗi thì log warning, KHÔNG ảnh hưởng listener loop.
+            try:
+                from app.modules.all_platform.zalo.services.message_events import (
+                    publish_zalo_message_event,
+                    register_account_owner,
+                )
+                from app.modules.all_platform.zalo.services.supabase_service import (
+                    list_shared_conversation_ids,
+                )
+
+                # Cache owner để filter SSE subscribers.
+                register_account_owner(state.user_id, state.user_id)
+
+                # Lấy danh sách conversation đã share để filter cho admin/leader.
+                shared_ids = await list_shared_conversation_ids(state.user_id)
+
+                event = {
+                    "type": "new_messages",
+                    "account_id": state.user_id,
+                    "group_id": group_id,
+                    "group_name": group_name,
+                    "messages": [message.model_dump() for message in messages],
+                }
+                await publish_zalo_message_event(
+                    state.user_id,
+                    event,
+                    shared_conversation_ids=shared_ids,
+                )
+            except Exception as exc:
+                logger.warning(
+                    f"Realtime publish failed for user={state.user_id} group={group_id}: {exc}"
                 )
 
 

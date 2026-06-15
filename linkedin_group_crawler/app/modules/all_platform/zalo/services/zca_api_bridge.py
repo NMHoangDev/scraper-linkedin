@@ -36,7 +36,7 @@ def _looks_like_auth_expired(detail_text: str) -> bool:
 
 
 def _backend_root() -> Path:
-    return Path(__file__).resolve().parents[4]
+    return Path(__file__).resolve().parents[5]
 
 
 def zca_api_script_path() -> Path:
@@ -59,21 +59,45 @@ async def _run_zca_command(
     if payload:
         input_payload.update(payload)
 
-    proc = await asyncio.create_subprocess_exec(
-        "node",
-        str(script),
-        command,
-        *(args or []),
-        cwd=str(_backend_root()),
-        stdin=asyncio.subprocess.PIPE,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        env={**os.environ},
-    )
-    stdout, stderr = await asyncio.wait_for(
-        proc.communicate(json.dumps(input_payload).encode("utf-8")),
-        timeout=timeout_seconds,
-    )
+    input_data = json.dumps(input_payload).encode("utf-8")
+    cmd = ["node", str(script), command, *(args or [])]
+
+    import sys
+    import subprocess
+
+    if sys.platform == "win32":
+        proc = subprocess.Popen(
+            cmd,
+            cwd=str(_backend_root()),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env={**os.environ},
+        )
+        def _communicate():
+            return proc.communicate(input=input_data)
+        
+        try:
+            stdout, stderr = await asyncio.wait_for(asyncio.to_thread(_communicate), timeout=timeout_seconds)
+            returncode = proc.returncode
+        except asyncio.TimeoutError:
+            proc.kill()
+            raise
+    else:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            cwd=str(_backend_root()),
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env={**os.environ},
+        )
+        stdout, stderr = await asyncio.wait_for(
+            proc.communicate(input_data),
+            timeout=timeout_seconds,
+        )
+        returncode = proc.returncode
+
     stderr_text = stderr.decode("utf-8", errors="replace").strip()
     if stderr_text:
         logger.warning(f"ZCA API helper stderr: {stderr_text[:1000]}")
@@ -260,4 +284,34 @@ async def remove_zca_unread_mark(
         args=["--thread-id", thread_id, "--type", str(thread_type)],
         timeout_seconds=30,
     )
+
+
+async def find_zca_user_by_phone(auth: Dict[str, Any], phone_e164: str) -> Dict[str, Any]:
+    """Gọi zca-js findUser(phone). Trả về dict user hoặc raise RuntimeError.
+
+    Số điện thoại phải ở dạng E.164 (vd: +84939108906). Dùng ``app.core.phone.vn_phone_to_e164``
+    để chuẩn hoá trước khi gọi.
+
+    Raises:
+        RuntimeError: khi ZCA trả lỗi (user không tồn tại, không nhận tin từ người lạ, rate limit...)
+        ZcaAuthExpiredError: khi session Zalo đã hết hạn.
+    """
+    result = await _run_zca_command(
+        "find-user-by-phone",
+        auth,
+        args=["--phone", phone_e164],
+        timeout_seconds=30,
+    )
+    return result.get("user") or {}
+
+
+async def find_zca_user_by_username(auth: Dict[str, Any], username: str) -> Dict[str, Any]:
+    """Gọi zca-js findUserByUsername(username)."""
+    result = await _run_zca_command(
+        "find-user-by-username",
+        auth,
+        args=["--username", username],
+        timeout_seconds=30,
+    )
+    return result.get("user") or {}
 

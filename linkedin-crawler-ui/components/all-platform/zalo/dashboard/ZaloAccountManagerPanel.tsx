@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { useRouter } from "next/navigation";
 import { MaterialIcon } from "@/components/ui";
 import type { ZaloCrawlerFlowValue } from "@/hooks/useZaloCrawlerFlow";
 import { getZaloInboxReport } from "@/services/zaloCrawlerService";
@@ -28,6 +29,7 @@ function formatTime(value?: string | null) {
 }
 
 export function ZaloAccountManagerPanel({ flow }: ZaloAccountManagerPanelProps) {
+  const router = useRouter();
   const [label, setLabel] = useState("");
   const [phone, setPhone] = useState("");
   const [report, setReport] = useState<ZaloInboxReportResponse | null>(null);
@@ -169,6 +171,22 @@ export function ZaloAccountManagerPanel({ flow }: ZaloAccountManagerPanelProps) 
                   </button>
                   <button
                     type="button"
+                    onClick={() => {
+                      // Chọn account trước rồi navigate tới trang chat full-screen
+                      if (account.account_id !== flow.userId) {
+                        flow.switchAccount(account.account_id);
+                      }
+                      router.push("/zalo-chat");
+                    }}
+                    disabled={!account.has_auth}
+                    className="flex-1 bg-[#E3000F] hover:bg-[#C40009] disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl px-4 py-2.5 text-sm font-bold transition-all shadow-sm active:scale-95 flex items-center justify-center gap-1.5"
+                    title={account.has_auth ? "Mở Zalo Chat ở trang full-screen" : "Cần đăng nhập tài khoản trước"}
+                  >
+                    <MaterialIcon name="open_in_new" className="text-[18px]" />
+                    Mở chat
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => void flow.deleteAccount(account.account_id, false)}
                     className="bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 rounded-xl px-4 py-2.5 text-sm font-bold transition-all active:scale-95 flex items-center justify-center gap-1.5"
                   >
@@ -197,15 +215,27 @@ export function ZaloAccountManagerPanel({ flow }: ZaloAccountManagerPanelProps) 
               {selectedAccount ? ` Đang xem: ${selectedAccount.label}.` : ""}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => void loadReport()}
-            disabled={isLoadingReport}
-            className="bg-white border border-slate-200 inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition shadow-sm disabled:opacity-60"
-          >
-            <MaterialIcon name="refresh" className="text-[18px]" />
-            Tải lại
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => router.push("/zalo-chat")}
+              disabled={!flow.isLoggedIn}
+              className="bg-[#E3000F] hover:bg-[#C40009] disabled:bg-slate-300 disabled:cursor-not-allowed text-white inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition shadow-sm"
+              title="Mở trang Zalo Chat full-screen"
+            >
+              <MaterialIcon name="open_in_new" className="text-[18px]" />
+              Mở chat Full Screen
+            </button>
+            <button
+              type="button"
+              onClick={() => void loadReport()}
+              disabled={isLoadingReport}
+              className="bg-white border border-slate-200 inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50 transition shadow-sm disabled:opacity-60"
+            >
+              <MaterialIcon name="refresh" className="text-[18px]" />
+              Tải lại
+            </button>
+          </div>
         </div>
 
         {reportError ? (

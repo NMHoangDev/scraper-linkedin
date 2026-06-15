@@ -20,18 +20,50 @@ import sys
 import subprocess
 
 class WindowsSubprocessWrapper:
-    def __init__(self, cmd: List[str], cwd: str, env: Dict[str, str]):
+    def __init__(
+        self,
+        cmd: List[str],
+        cwd: str,
+        env: Dict[str, str],
+        stdin_input: Optional[bytes] = None,
+    ):
         self._proc = subprocess.Popen(
             cmd,
             cwd=cwd,
+            stdin=subprocess.PIPE if stdin_input is not None else None,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             env=env,
         )
         self.stdout = self
+        if stdin_input is not None and self._proc.stdin is not None:
+            try:
+                self._proc.stdin.write(stdin_input)
+                self._proc.stdin.flush()
+            except Exception:
+                pass
+            finally:
+                try:
+                    self._proc.stdin.close()
+                except Exception:
+                    pass
+
+    @property
+    def returncode(self) -> Optional[int]:
+        self._proc.poll()
+        return self._proc.returncode
 
     async def readline(self) -> bytes:
         return await asyncio.to_thread(self._proc.stdout.readline)
+
+    async def wait(self) -> int:
+        return await asyncio.to_thread(self._proc.wait)
+
+    def terminate(self):
+        try:
+            self._proc.terminate()
+        except Exception:
+            pass
 
     def kill(self):
         try:

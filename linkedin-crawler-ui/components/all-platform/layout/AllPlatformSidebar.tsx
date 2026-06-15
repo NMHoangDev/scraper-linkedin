@@ -28,12 +28,10 @@ const ADMIN_NAV: NavItem[] = [
   { href: "/all-platform/post-feed", icon: "radar", label: "Post Feed" },
   { href: "/all-platform/quan-ly-tai-khoan", icon: "account_circle", label: "Tài khoản" },
   { href: "/all-platform/profile", icon: "person", label: "Trang cá nhân" },
-  { href: "/all-platform/quan-ly-danh-muc", icon: "category", label: "Quản lý danh mục" },
-  { href: "/all-platform/tai-khoan", icon: "manage_accounts", label: "Quản lý TK Zalo" },
-  { href: "/all-platform/zalo-crawl", icon: "forum", label: "Quản lý Inbox Zalo" },
+  { href: "/all-platform/quan-ly-danh-muc", icon: "category", label: "Quản lý danh mục" }
 ];
 
-/** Leader: Quản lý Team → Quản lý groups → Post Feed → Tài khoản → Trang cá nhân → Quản lý danh mục → Cào Zalo */
+/** Leader: Quản lý Team → Quản lý groups → Post Feed → Tài khoản → Trang cá nhân → Quản lý danh mục */
 const LEADER_NAV: NavItem[] = [
   { href: "/all-platform/leader/team", icon: "groups", label: "Quản lý Team" },
   { href: "/all-platform/quan-ly-nhom", icon: "group", label: "Quản lý groups" },
@@ -42,10 +40,9 @@ const LEADER_NAV: NavItem[] = [
   { href: "/all-platform/profile", icon: "person", label: "Trang cá nhân" },
   { href: "/all-platform/quan-ly-danh-muc", icon: "category", label: "Quản lý danh mục" },
   { href: "/all-platform/tai-khoan", icon: "manage_accounts", label: "Quản lý TK Zalo" },
-  { href: "/all-platform/zalo-crawl", icon: "forum", label: "Quản lý Inbox Zalo" },
 ];
 
-/** Member: Post Feed → Quản lý groups → Tài khoản → Trang cá nhân → Quản lý danh mục → Cào Zalo */
+/** Member: Post Feed → Quản lý groups → Tài khoản → Trang cá nhân → Quản lý danh mục */
 const MEMBER_NAV: NavItem[] = [
   { href: "/all-platform/post-feed", icon: "radar", label: "Post Feed" },
   { href: "/all-platform/quan-ly-nhom", icon: "group", label: "Quản lý groups" },
@@ -53,11 +50,10 @@ const MEMBER_NAV: NavItem[] = [
   { href: "/all-platform/profile", icon: "person", label: "Trang cá nhân" },
   { href: "/all-platform/quan-ly-danh-muc", icon: "category", label: "Quản lý danh mục" },
   { href: "/all-platform/tai-khoan", icon: "manage_accounts", label: "Quản lý TK Zalo" },
-  { href: "/all-platform/zalo-crawl", icon: "forum", label: "Quản lý Inbox Zalo" },
 ];
 
 /* ── Component ─────────────────────────────────────────────────────────────── */
-export function AllPlatformSidebar() {
+export function AllPlatformSidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }) {
   const { user, logout } = useAppAuth();
   const pathname = usePathname();
   const router = useRouter();
@@ -82,7 +78,28 @@ export function AllPlatformSidebar() {
   };
 
   return (
-    <aside className="fixed top-0 left-0 z-40 hidden h-screen w-64 flex-col border-r border-slate-200 bg-white pt-20 lg:flex dark:border-zinc-800 dark:bg-zinc-900">
+    <>
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden backdrop-blur-sm" 
+          onClick={onClose} 
+        />
+      )}
+      
+      <aside className={cn(
+        "fixed top-0 left-0 z-50 h-screen w-64 flex-col border-r border-slate-200 bg-white pt-6 lg:pt-20 transition-transform duration-300 dark:border-zinc-800 dark:bg-zinc-900",
+        isOpen ? "translate-x-0 flex" : "-translate-x-full lg:translate-x-0 flex"
+      )}>
+        {/* Mobile Close Button */}
+        {isOpen && (
+          <button 
+            onClick={onClose} 
+            className="absolute top-4 right-4 p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg lg:hidden cursor-pointer"
+          >
+            <MaterialIcon name="close" />
+          </button>
+        )}
       {/* ── Logo & Workspace Label ── */}
       <div className="mb-8 flex items-center gap-3 px-6">
         <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-white ring-1 ring-black/5">
@@ -148,6 +165,7 @@ export function AllPlatformSidebar() {
         </div>
       </div>
     </aside>
+    </>
   );
 }
 

@@ -2,6 +2,26 @@
 
 const { Zalo, ThreadType } = require("zca-js");
 
+// Đảm bảo mọi emit ra stdout được flush ngay lập tức (không buffer).
+// Trên Windows, pipe Popen có buffer ~4KB, nếu không flush kịp sẽ block Node process.
+if (process.stdout._handle && typeof process.stdout._handle.setBlocking === "function") {
+  process.stdout._handle.setBlocking(true);
+}
+process.stdout.write = new Proxy(process.stdout.write.bind(process.stdout), {
+  apply(target, thisArg, args) {
+    const result = target(...args);
+    // Force flush ngay sau mỗi write.
+    try {
+      if (thisArg._handle && typeof thisArg._handle.flush === "function") {
+        thisArg._handle.flush();
+      }
+    } catch (_) {
+      /* ignore */
+    }
+    return result;
+  },
+});
+
 function safeJson(value) {
   try {
     return JSON.stringify(value);
@@ -11,7 +31,8 @@ function safeJson(value) {
 }
 
 function emit(payload) {
-  process.stdout.write(`${JSON.stringify({ ts: Date.now(), ...payload })}\n`);
+  const line = `${JSON.stringify({ ts: Date.now(), ...payload })}\n`;
+  process.stdout.write(line);
 }
 
 function serializeError(error) {
@@ -33,6 +54,11 @@ function serializeError(error) {
     };
   }
   return { name: "Error", message: String(error), code: null };
+}
+
+// ── Debug logs ra stderr (Python sẽ capture và log lên) ─────────────────────
+function debugLog(stage, extra = {}) {
+  emit({ event: "debug", stage, ...extra });
 }
 
 function readStdinJson() {
@@ -223,13 +249,31 @@ async function main() {
   const oldMessageIntervalMs = Number(args["old-message-interval-ms"] || 300000);
   const auth = input.auth || input.zca_auth || input;
 
-  emit({ event: "starting", user_id: userId });
-  const api = await login(auth);
+  emit({ event: "starting", user_id: userId, old_message_interval_ms: oldMessageIntervalMs });
+  debugLog("auth_received", {
+    has_cookies: Boolean(auth && auth.cookies),
+    has_imei: Boolean(auth && auth.imei),
+    has_userAgent: Boolean(auth && auth.userAgent),
+  });
+
+  let api;
+  try {
+    api = await login(auth);
+    emit({ event: "login_ok", user_id: userId });
+  } catch (error) {
+    emit({ event: "login_failed", user_id: userId, error: "login_error", error_detail: serializeError(error) });
+    setTimeout(() => process.exit(2), 250).unref();
+    return;
+  }
+
   const ownId = typeof api.getOwnId === "function" ? api.getOwnId() : null;
   const listener = api.listener;
   if (!listener || typeof listener.start !== "function") {
-    throw new Error("ZCA listener is not available");
+    emit({ event: "error", user_id: userId, error: "no_listener", error_detail: "ZCA listener is not available" });
+    setTimeout(() => process.exit(3), 250).unref();
+    return;
   }
+  emit({ event: "listener_ready", user_id: userId, own_id: ownId });
 
   let stopping = false;
   let oldMessageTimer = null;
@@ -249,6 +293,13 @@ async function main() {
 
   process.on("SIGTERM", () => stop("SIGTERM"));
   process.on("SIGINT", () => stop("SIGINT"));
+  process.on("uncaughtException", (error) => {
+    emit({ event: "fatal", error: "uncaught_exception", error_detail: serializeError(error) });
+    setTimeout(() => process.exit(99), 250).unref();
+  });
+  process.on("unhandledRejection", (reason) => {
+    emit({ event: "fatal", error: "unhandled_rejection", error_detail: serializeError(reason) });
+  });
 
   listener.on("connected", () => {
     emit({ event: "connected", user_id: userId, own_id: typeof api.getOwnId === "function" ? api.getOwnId() : null });
@@ -266,13 +317,34 @@ async function main() {
   listener.on("error", (error) => {
     emit({ event: "error", user_id: userId, error: "listener_error", error_detail: serializeError(error) });
   });
+  let totalMessageEvents = 0;
+  let totalOldMessageEvents = 0;
+  const byThread = new Map();
+  function trackThread(threadId) {
+    if (!threadId) return null;
+    const entry = byThread.get(threadId) || { thread_id: threadId, count: 0, last_seen: 0 };
+    entry.count += 1;
+    entry.last_seen = Date.now();
+    byThread.set(threadId, entry);
+    return entry;
+  }
+
   listener.on("message", (message) => {
+    totalMessageEvents += 1;
+    debugLog("message_received", {
+      type: message && message.constructor && message.constructor.name,
+      total: totalMessageEvents,
+    });
     const normalized = normalizeMessage(message, 0, ownId);
     if (normalized.thread_id && normalized.message_id) {
+      trackThread(normalized.thread_id);
       emit({ event: "message", user_id: userId, message: normalized });
+    } else {
+      debugLog("message_dropped", { reason: "missing_ids", thread_id: normalized.thread_id, message_id: normalized.message_id });
     }
   });
   listener.on("old_messages", (messages, type) => {
+    totalOldMessageEvents += 1;
     const numericType = Number(type);
     if (
       numericType !== Number(ThreadType.Group) &&
@@ -283,11 +355,43 @@ async function main() {
     const normalized = valuesFromUnknown(messages)
       .map((message, index) => normalizeMessage(message, index, ownId))
       .filter((message) => message.thread_id && message.message_id);
+    for (const m of normalized) trackThread(m.thread_id);
+    debugLog("old_messages_received", { type, count: normalized.length, total: totalOldMessageEvents });
     emit({ event: "old_messages", user_id: userId, type, messages: normalized });
   });
 
-  listener.start({ retryOnClose: true });
-  emit({ event: "ready", user_id: userId, pid: process.pid });
+  // Mỗi 30s in ra thống kê: tổng event đã nhận + top 10 thread.
+  setInterval(() => {
+    const top = Array.from(byThread.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+    emit({
+      event: "stats",
+      user_id: userId,
+      total_message_events: totalMessageEvents,
+      total_old_message_events: totalOldMessageEvents,
+      distinct_threads: byThread.size,
+      top_threads: top,
+    });
+  }, 30000);
+
+  // Heartbeat mỗi 10s để Python biết Node còn sống (kể cả khi không có event).
+  const heartbeatTimer = setInterval(() => {
+    emit({ event: "heartbeat", user_id: userId, pid: process.pid, uptime_s: Math.floor(process.uptime()) });
+  }, 10000);
+
+  try {
+    listener.start({ retryOnClose: true });
+    emit({ event: "ready", user_id: userId, pid: process.pid });
+  } catch (error) {
+    emit({ event: "fatal", error: "listener_start_failed", error_detail: serializeError(error) });
+    setTimeout(() => process.exit(4), 250).unref();
+  }
+
+  // Cleanup heartbeat khi stop.
+  process.on("exit", () => {
+    clearInterval(heartbeatTimer);
+  });
 }
 
 main().catch((error) => {
