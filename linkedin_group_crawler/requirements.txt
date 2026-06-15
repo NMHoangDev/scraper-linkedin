@@ -6,6 +6,7 @@ playwright
 python-dotenv
 pydantic
 pydantic-settings
+python-multipart
 httpx
 pytest
 google-api-python-client
