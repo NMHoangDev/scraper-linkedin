@@ -18,6 +18,7 @@ CANVAS_SELECTORS = [
     "[class*=qr-code] canvas",
     "[class*=QRCode] canvas",
     "[class*=login] canvas",
+    "canvas",
 ]
 
 IMG_SELECTORS = [
@@ -26,6 +27,7 @@ IMG_SELECTORS = [
     "[class*=qr] img",
     "[class*=QR] img",
     "[class*=login] img",
+    "img",
 ]
 
 QR_SCREENSHOT_FALLBACK_SELECTORS = [
@@ -35,6 +37,7 @@ QR_SCREENSHOT_FALLBACK_SELECTORS = [
     "[id*=qr]",
     "[data-id*=QR]",
     "[data-id*=qr]",
+    "svg",
 ]
 
 QR_PRIMARY_SCREENSHOT_SELECTORS = [
@@ -47,6 +50,9 @@ QR_PRIMARY_SCREENSHOT_SELECTORS = [
     "img[class*=QR]",
     "[class*=qr] img",
     "[class*=QR] img",
+    "canvas",
+    "img",
+    "svg",
 ]
 
 ACCOUNT_CONTINUE_SELECTORS = [
@@ -331,12 +337,20 @@ async def _capture_qr(page: Page) -> str:
             except Exception:
                 continue
 
+    logger.warning("Could not find specific QR element, using full page screenshot as ultimate fallback")
+    try:
+        # Take a screenshot of the viewport (which contains the QR)
+        shot = await page.screenshot(type="png")
+        return "data:image/png;base64," + base64.b64encode(shot).decode()
+    except Exception as exc:
+        logger.error(f"Full page screenshot ultimate fallback failed: {exc}")
+
     await _save_qr_failure_artifacts(
         page,
         "qr-capture-failed",
         {
             "stage": "capture_qr",
-            "message": "Could not locate a QR canvas or image element",
+            "message": "Could not locate a QR canvas or image element, and full page screenshot failed",
         },
     )
     raise RuntimeError("Could not extract QR from canvas or image")
@@ -471,6 +485,16 @@ async def navigate_and_get_qr(page: Page) -> str:
     logger.info(f"Navigating to {ZALO_WEB_URL}")
     await page.goto(ZALO_WEB_URL, wait_until="domcontentloaded", timeout=60000)
     await _try_continue_from_account_page(page)
+
+    # Thử click vào tab "Với Mã QR" nếu nó đang ở tab số điện thoại
+    try:
+        qr_tab = page.locator("text='Với mã QR'")
+        if await qr_tab.count() > 0:
+            await qr_tab.first.click(timeout=2000)
+            logger.info("Switched to QR tab")
+            await page.wait_for_timeout(1000)
+    except Exception as exc:
+        logger.debug(f"Could not click QR tab: {exc}")
 
     if await check_login_status(page) == "confirmed":
         raise ZaloAlreadyLoggedInError("Zalo is already logged in")
