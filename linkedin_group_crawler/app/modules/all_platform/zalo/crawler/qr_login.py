@@ -18,6 +18,7 @@ CANVAS_SELECTORS = [
     "[class*=qr-code] canvas",
     "[class*=QRCode] canvas",
     "[class*=login] canvas",
+    "canvas",
 ]
 
 IMG_SELECTORS = [
@@ -26,6 +27,7 @@ IMG_SELECTORS = [
     "[class*=qr] img",
     "[class*=QR] img",
     "[class*=login] img",
+    "img",
 ]
 
 QR_SCREENSHOT_FALLBACK_SELECTORS = [
@@ -35,6 +37,7 @@ QR_SCREENSHOT_FALLBACK_SELECTORS = [
     "[id*=qr]",
     "[data-id*=QR]",
     "[data-id*=qr]",
+    "svg",
 ]
 
 QR_PRIMARY_SCREENSHOT_SELECTORS = [
@@ -47,6 +50,9 @@ QR_PRIMARY_SCREENSHOT_SELECTORS = [
     "img[class*=QR]",
     "[class*=qr] img",
     "[class*=QR] img",
+    "canvas",
+    "img",
+    "svg",
 ]
 
 ACCOUNT_CONTINUE_SELECTORS = [
@@ -394,31 +400,12 @@ async def _capture_qr_if_ready(page: Page) -> Optional[str]:
         logger.warning(f"Could not fetch img src {src}: {exc}")
 
     try:
-        card = None
-        for sel in [".zLogin-layout", "[class*='login-wrapper']", "[class*='Login']", ".body-container"]:
-            elements = await page.locator(sel).all()
-            for el in elements:
-                box = await el.bounding_box()
-                if box and box["width"] > 200 and box["height"] > 200:
-                    card = el
-                    break
-            if card: break
-            
-        if card:
-            shot = await card.screenshot(type="png")
-        else:
-            v = page.viewport_size
-            if v:
-                cw, ch = 400, 450
-                cx, cy = max(0, (v["width"] - cw) / 2), max(0, (v["height"] - ch) / 2)
-                shot = await page.screenshot(type="png", clip={"x": cx, "y": cy, "width": cw, "height": ch})
-            else:
-                shot = await page.screenshot(type="png")
-        return "data:image/png;base64," + base64.b64encode(shot).decode()
-    except Exception:
-        pass
-
-    return None
+        resp = await page.request.get(src)
+        b64 = base64.b64encode(await resp.body()).decode()
+        return "data:image/png;base64," + b64
+    except Exception as exc:
+        logger.warning(f"Could not fetch img src {src}: {exc}")
+        return None
 async def _save_qr_failure_artifacts(page: Page, name: str, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, str]:
     debug_metadata: Dict[str, Any] = dict(metadata or {})
     try:
