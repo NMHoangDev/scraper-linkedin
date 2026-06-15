@@ -229,13 +229,33 @@ def _qr_targets(page: Page) -> List[Tuple[str, Union[Page, Frame]]]:
 async def _canvas_data_url(page: Page) -> Optional[str]:
     for label, target in _qr_targets(page):
         try:
-            data_url = await target.evaluate(_JS_CANVAS, CANVAS_SELECTORS)
-            if data_url:
-                logger.debug(f"QR canvas found in {label}")
-                return data_url
+            # Inject CSS to give the canvas a 30px white padding (Quiet Zone) 
+            # and force white background so the camera can scan it perfectly.
+            js_force_padding = """
+            (selectors) => {
+                for (const sel of selectors) {
+                    const canvas = document.querySelector(sel);
+                    if (canvas && canvas.width > 100) {
+                        canvas.style.padding = '30px';
+                        canvas.style.backgroundColor = 'white';
+                        canvas.style.display = 'block';
+                        return sel; // return the selector that worked
+                    }
+                }
+                return null;
+            }
+            """
+            matched_selector = await target.evaluate(js_force_padding, CANVAS_SELECTORS)
+            if matched_selector:
+                # Give it a tiny moment to render the CSS
+                await page.wait_for_timeout(100)
+                handle = await target.query_selector(matched_selector)
+                if handle:
+                    shot = await handle.screenshot(type="png")
+                    logger.debug(f"QR canvas screenshot captured with padding in {label}")
+                    return "data:image/png;base64," + base64.b64encode(shot).decode()
         except PlaywrightError as exc:
             if "Execution context was destroyed" in str(exc):
-                logger.debug(f"QR canvas evaluation interrupted by navigation in {label}; will retry")
                 return None
             logger.debug(f"QR canvas evaluation error in {label}: {exc}")
         except Exception as exc:
