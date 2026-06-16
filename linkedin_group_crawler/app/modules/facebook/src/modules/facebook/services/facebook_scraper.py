@@ -77,11 +77,11 @@ class FacebookScraper:
                 cookie = get_cookie_vps_default()
                 if cookie is None:
                     browser.close()
-                    raise ValueError("LOGIN_FAILED")
+                    raise ValueError("Lỗi không có cookie")
                 
             except Exception as e:
                 browser.close()
-                raise ValueError("LOGIN_FAILED")
+                raise ValueError("Lỗi kết nối database")
 
             context = browser.new_context(storage_state=cookie, **context_args)
 
@@ -113,7 +113,7 @@ class FacebookScraper:
                 except Exception as db_err:
                     pass # Hoặc log lỗi DB ra
                 browser.close()
-                raise ValueError("LOGIN_FAILED")
+                raise ValueError("Lỗi cập nhật cookie")
             HumanBehavior.act_like_reading(page) 
             # ── [THÊM MỚI] XỬ LÝ MÀN HÌNH CHỌN TÀI KHOẢN (ACCOUNT CHOOSER) ──────
             try:
@@ -139,22 +139,27 @@ class FacebookScraper:
                 is_logged_in = False
 
             if not is_logged_in:
-                if custom_email:
-                    # Nếu có email FE mà cookie hết hạn (không vào được feed) -> Thử login lại bằng thông tin FE gửi
-                    #logger.info(f"⚠️ Cookie của {custom_email} hết hạn. Đang thử login lại...")
-                    login_success = self.auth.login(
-                        page=page, context=context, 
-                        custom_email=custom_email, custom_pass=custom_pass, custom_2fa=custom_2fa
-                    )
-                else:
+                
                     # Nếu không có email FE -> Gọi hàm LOGIN MẶC ĐỊNH
                     #logger.info("⚠️ Chưa đăng nhập tài khoản hệ thống. Đang login mặc định...")
-                    login_success = self.auth.default_login(page=page, context=context)
+                login_success = self.auth.default_login(page=page, context=context)
                 
                 if not login_success:
                     #logger.error("🛑 Đăng nhập thất bại. Kết thúc.")
+
                     browser.close()
-                    raise ValueError("LOGIN_FAILED")
+                    try:
+                    
+                        update_vps(self.config.ID_VPS, 
+                        {
+                            "status": False, 
+                            "cookie": None  # Xóa cookie hoặc set chuỗi rỗng tùy schema DB của bạn
+                        })
+                        
+                    
+                    except Exception as db_err:
+                        pass # Hoặc log lỗi DB ra
+                    raise ValueError("Lỗi login lại")
             else:
                 #logger.info("✅ Đã đăng nhập sẵn (Cookie còn hiệu lực).")
                 pass

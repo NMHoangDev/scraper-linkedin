@@ -79,7 +79,7 @@ class ConnectionManager:
         if email in self.active_connections:
             del self.active_connections[email]
 
-    async def send_json(self, email: str, safe_message: dict):
+    async def send_json(self,safe_message: dict, email: str):
         if email in self.active_connections:
             try:
                 await self.active_connections[email].send_json(safe_message)
@@ -417,7 +417,7 @@ async def receive_webhook_result(payload: WebhookResponse):
                     # mes = telegram.format_daily_telegram_report(summaries=summaries)
                     # telegram.send_message(mes)
             except Exception as e:
-                logger.error(f"❌ Lỗi khi lưu Google Sheets cho {client_id}: {e}")
+                logger.error(f"❌ Lỗi khi lưu supabase cho {client_id}: {e}")
         
             # DỌN DẸP THÔNG MINH:
             if client_id == "CRON_24H":

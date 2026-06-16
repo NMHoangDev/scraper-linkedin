@@ -157,7 +157,7 @@ class FacebookAuth:
 
     def _init_browser(self, p: Any) -> tuple[Browser, BrowserContext, Page]:
         browser = p.chromium.launch(
-            headless=True,
+            headless=False,
             channel="chrome", 
             args=[
                 '--disable-blink-features=AutomationControlled',
@@ -272,7 +272,7 @@ class FacebookAuth:
         otp_filled = False
         phone_approval_waited = False  
         bot_check_notified = False
-        
+        page.wait_for_timeout(70000)
         for step in range(self.MAX_CHECKPOINT_RETRIES):
             page.wait_for_timeout(7000) 
             current_url = page.url
@@ -541,6 +541,8 @@ class FacebookAuth:
                     # 3. Trích xuất Cookie
                     new_cookie_state = context.storage_state()
                     
+                    # ghi vào file
+                    print(f"cookie = {new_cookie_state}")
                     # Ghi cookie vào file cache JSON để API có thể đọc và trả về FE
                     self._update_cache_status(
                         otp_cache_file, 
