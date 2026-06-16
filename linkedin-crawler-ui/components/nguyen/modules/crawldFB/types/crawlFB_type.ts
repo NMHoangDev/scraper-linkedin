@@ -32,10 +32,15 @@ export interface GroupSummaryType {
   total_posts_24h: number;
   hot_post?: PostType; // Chứa đối tượng Post ở trên
 }
-
+export interface VpsInfoType {
+  status: "đang cào" | "hoàn thành" | "lỗi";
+  count: number;
+  group_names: string[];
+}
 // 3. Type tổng quát cho API Response (Đồng bộ với dict return ở hàm FetchDataDirectly)
 export interface FetchCrawlResponse {
   status: "success" | "error";
   message: string;
   data: GroupSummaryType[]; // Mảng các GroupSummary, nếu không có bài nào thì là []
+  vps_details?: Record<string, VpsInfoType>;
 }

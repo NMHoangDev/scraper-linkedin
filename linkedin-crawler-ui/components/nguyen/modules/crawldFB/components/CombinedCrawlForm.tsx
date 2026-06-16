@@ -590,7 +590,7 @@ function FacebookForm({ onSuccess }: { onSuccess?: () => void }) {
     { name: string; url: string; id: string,id_intent:string|undefined,id_member:string ,group_name:string}[]
   >([]);
   const { user } = useAuthContext();
-  const { isLoading, loadingMsg, submitCrawlData, result, cancelCrawl } =
+  const { isLoading, loadingMsg, submitCrawlData, result, cancelCrawl,vpsDetails } =
     useCrawlFB(onSuccess);
 
   const {
@@ -656,6 +656,7 @@ function FacebookForm({ onSuccess }: { onSuccess?: () => void }) {
         <FullScreenLoading
           title="Tiến trình đang chạy"
           content={loadingMsg}
+          vpsDetails={vpsDetails}
           onCancel={cancelCrawl}
         />
       )}

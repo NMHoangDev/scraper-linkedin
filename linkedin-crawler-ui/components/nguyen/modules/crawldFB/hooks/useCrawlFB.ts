@@ -8,12 +8,20 @@ import {
   getFacebookCrawlWsUrl,
 } from "../lib/facebook-api-base";
 
+// Định nghĩa Type cho dữ liệu giám sát VPS
+export interface VpsInfoType {
+  status: "đang cào" | "hoàn thành" | "lỗi";
+  count: number;
+  group_names: string[];
+}
+
 export const useCrawlFB = (onSuccessCallback?: () => void) => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [loadingMsg, setLoadingMsg] = useState<string>(
-    "Đang kết nối đến máy chủ...",
-  );
+  const [loadingMsg, setLoadingMsg] = useState<string>("Đang kết nối đến máy chủ...");
   const [result, setResult] = useState<GroupSummaryType[] | null>();
+  
+  // State mới để lưu trạng thái chi tiết của từng VPS phục vụ UI Realtime
+  const [vpsDetails, setVpsDetails] = useState<Record<string, VpsInfoType> | null>(null);
 
   // Dùng ref để lưu trữ instance WebSocket nhằm gọi đóng kết nối (Hủy) khi cần
   const wsRef = useRef<WebSocket | null>(null);
@@ -23,19 +31,39 @@ export const useCrawlFB = (onSuccessCallback?: () => void) => {
       status?: string;
       message?: string;
       data?: GroupSummaryType[];
+      vps_details?: Record<string, VpsInfoType>;
     },
     ws: WebSocket | null,
   ) => {
-    if (response.status === "queued" || response.status === "processing") {
+    // ==========================================
+    // 1. CÁC TRẠNG THÁI TRUNG GIAN (KHÔNG ĐÓNG WS)
+    // ==========================================
+    if (response.status === "queued" || response.status === "processing" || response.status === "info") {
       setLoadingMsg(response.message || "Đang xử lý…");
       toast.info(response.message || "Đang xử lý…", { id: "ws-status" });
       return;
     }
+
+    if (response.status === "partial_success") {
+      setLoadingMsg(response.message || "Đang nhận dữ liệu...");
+      toast.success(response.message || "Vừa nhận dữ liệu từ 1 máy chủ", { id: "ws-status" });
+      return;
+    }
+
+    if (response.status === "warning") {
+      setLoadingMsg(response.message || "Có máy chủ báo lỗi...");
+      toast.warning(response.message || "Máy chủ báo lỗi", { id: "ws-status" });
+      return;
+    }
+
+    // ==========================================
+    // 2. CÁC TRẠNG THÁI CHUNG CUỘC (ĐÓNG WS)
+    // ==========================================
     if (response.status === "success") {
       setIsLoading(false);
       if (response.data && response.data.length > 0) {
         setResult(response.data);
-        toast.success("Crawl thành công!", { id: "ws-status" });
+        toast.success("Hoàn tất toàn bộ quá trình!", { id: "ws-status" });
       } else {
         setResult([]);
         toast.info("Crawl xong nhưng không có dữ liệu mới.", { id: "ws-status" });
@@ -44,26 +72,28 @@ export const useCrawlFB = (onSuccessCallback?: () => void) => {
       ws?.close();
       return;
     }
+
     if (
       response.status === "error" ||
       response.status === "fail" ||
       response.status === "canceled"
     ) {
       setIsLoading(false);
-      toast.error(response.message || "Lỗi crawl từ server", { id: "ws-status" });
+      toast.error(response.message || "Lỗi hoặc quá trình bị hủy", { id: "ws-status" });
       ws?.close();
     }
   };
 
   const submitCrawlData = async (data: CrawlFb_form) => {
-    // Tạo định danh duy nhất (email) cho kết nối WS
     const emailId = data.isDefaultAccount
       ? `default_user_${Date.now()}`
       : data.userName || "anonymous";
 
+    // Reset toàn bộ state khi bắt đầu phiên mới
     setIsLoading(true);
     setLoadingMsg("Đang kết nối đến máy chủ...");
     setResult(null);
+    setVpsDetails(null); 
 
     const payload: CrawlFBRequest = {
       groups: data.rows,
@@ -86,23 +116,12 @@ export const useCrawlFB = (onSuccessCallback?: () => void) => {
 
       if (!healthCheck.ok) {
         setIsLoading(false);
-        toast.error(
-          `Backend error: ${healthCheck.status}. Please check backend is running on ${apiBaseUrl}`,
-        );
-        console.error(
-          "Backend health check failed:",
-          healthCheck.status,
-          healthCheck.statusText,
-        );
+        toast.error(`Backend error: ${healthCheck.status}. Please check backend is running on ${apiBaseUrl}`);
         return;
       }
-      console.log("Backend is healthy - HTTP 200 OK");
     } catch (err: any) {
       setIsLoading(false);
-      toast.error(
-        `Cannot connect to backend: ${err.message}\nCheck backend is running on: ${apiBaseUrl}`,
-      );
-      console.error("Backend health check error:", err);
+      toast.error(`Cannot connect to backend: ${err.message}\nCheck backend is running on: ${apiBaseUrl}`);
       return;
     }
 
@@ -122,13 +141,13 @@ export const useCrawlFB = (onSuccessCallback?: () => void) => {
             status: response.status,
             message: response.message,
             data: response.data,
+            vps_details: response.vps_details, // Kế thừa nếu HTTP có trả về
           },
           null,
         );
       } catch (err) {
         setIsLoading(false);
-        const msg =
-          err instanceof Error ? err.message : "Không crawl được qua HTTP";
+        const msg = err instanceof Error ? err.message : "Không crawl được qua HTTP";
         toast.error(msg, { id: "ws-status" });
       }
     };
@@ -143,16 +162,14 @@ export const useCrawlFB = (onSuccessCallback?: () => void) => {
     const connectTimeout = window.setTimeout(() => {
       if (!wsOpened && ws.readyState !== WebSocket.OPEN) {
         ws.close();
-        void runHttpFallback(
-          "WebSocket không kết nối được — thử HTTP (có thể mất vài phút).",
-        );
+        void runHttpFallback("WebSocket không kết nối được — thử HTTP (có thể mất vài phút).");
       }
     }, 8000);
 
     ws.onopen = () => {
       wsOpened = true;
       window.clearTimeout(connectTimeout);
-      setLoadingMsg("Đã kết nối, đang gửi dữ liệu…");
+      setLoadingMsg("Đã kết nối, đang phân bổ công việc…");
       ws.send(JSON.stringify(payload));
     };
 
@@ -162,11 +179,19 @@ export const useCrawlFB = (onSuccessCallback?: () => void) => {
           status?: string;
           message?: string;
           data?: GroupSummaryType[];
+          vps_details?: Record<string, VpsInfoType>;
         };
-        if (response.status === "heartbeat") {
-          setLoadingMsg(response.message || "Đang crawl…");
-          return;
+
+        // BẮT LIỀN DỮ LIỆU VPS (Nếu có) CHO MỌI TRẠNG THÁI
+        if (response.vps_details) {
+          setVpsDetails(response.vps_details);
         }
+
+        if (response.status === "heartbeat") {
+          setLoadingMsg("Hệ thống đang thu thập dữ liệu...");
+          return; // Heartbeat chỉ cập nhật state ở trên, không gọi handleCrawlResponse
+        }
+
         handleCrawlResponse(response, ws);
       } catch (error) {
         setIsLoading(false);
@@ -178,18 +203,14 @@ export const useCrawlFB = (onSuccessCallback?: () => void) => {
     ws.onerror = () => {
       window.clearTimeout(connectTimeout);
       if (!wsOpened) {
-        void runHttpFallback(
-          "WebSocket lỗi — chuyển sang HTTP. Kiểm tra backend đang chạy port 8000.",
-        );
+        void runHttpFallback("WebSocket lỗi — chuyển sang HTTP. Kiểm tra backend đang chạy port 8000.");
       }
     };
 
     ws.onclose = (event) => {
       window.clearTimeout(connectTimeout);
       if (!wsOpened && event.code === 1006) {
-        void runHttpFallback(
-          "WebSocket đóng bất thường (1006) — thử HTTP. Restart backend sau khi sửa .env.",
-        );
+        void runHttpFallback("WebSocket đóng bất thường (1006) — thử HTTP. Restart backend sau khi sửa .env.");
         return;
       }
       if (!wsOpened) {
@@ -198,22 +219,16 @@ export const useCrawlFB = (onSuccessCallback?: () => void) => {
       }
       if (!event.wasClean && event.code !== 1000) {
         setIsLoading(false);
-        toast.error(
-          event.reason ||
-            `WebSocket đóng (mã ${event.code}). Tiến trình có thể đã dừng.`,
-          { id: "ws-status" },
-        );
+        toast.error(event.reason || `WebSocket đóng (mã ${event.code}). Tiến trình có thể đã dừng.`, { id: "ws-status" });
       }
     };
   };
 
   const cancelCrawl = () => {
     if (wsRef.current) {
-      // Đóng WebSocket từ phía client sẽ gọi WebSocketDisconnect phía Backend (ngắt Playwright)
       wsRef.current.close();
       wsRef.current = null;
-
-      toast.error("Crawl process cancelled!");
+      toast.error("Đã hủy tiến trình thu thập dữ liệu!");
       setIsLoading(false);
     }
   };
@@ -224,5 +239,6 @@ export const useCrawlFB = (onSuccessCallback?: () => void) => {
     submitCrawlData,
     result,
     cancelCrawl,
+    vpsDetails, // Export state mới ra ngoài để truyền vào FullScreenLoading
   };
 };

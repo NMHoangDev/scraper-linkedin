@@ -11,7 +11,8 @@ export function getFacebookHttpBase(): string {
 
 /** ``ws://host:8000/facebook/api/v1/ws/CrawlFbForFE/{email}`` */
 export function getFacebookCrawlWsUrl(email: string): string {
-  const httpBase = getFacebookHttpBase();
+  //const httpBase = "http://localhost:8003/facebook";
+  const httpBase = "http://10.30.50.29:8081/facebook";
   const wsRoot = httpBase.replace(/^https:/, "wss:").replace(/^http:/, "ws:");
   return `${wsRoot}/api/v1/ws/CrawlFbForFE/${encodeURIComponent(email)}`;
 }
