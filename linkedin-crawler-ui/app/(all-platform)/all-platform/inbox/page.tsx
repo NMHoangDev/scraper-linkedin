@@ -442,6 +442,7 @@ export default function InboxPage() {
     .map(x => x.c);
   // Nhãn chip = TÊN NHÂN VIÊN (map từ owner id). Fallback: label cũ -> fb_id. Để admin/leader biết acc CỦA AI.
   const accLabel = (s: Session) => (s.owner && ownerNames[s.owner]) || s.label || s.user_id;
+  const accOnline = sessions.find(s => s.user_id === acc)?.status === "online";
 
   return (
     <div className="p-6 w-full">
@@ -549,9 +550,18 @@ export default function InboxPage() {
             <>
               <div className="max-h-[430px] overflow-auto mb-3 space-y-2 p-1">
                 {loadingChat && msgs.length === 0
-                  ? <div className="text-sm text-[#A0A0A0]">Đang tải hội thoại (worker đang mở Messenger)...</div>
+                  ? <div className="text-sm text-[#A0A0A0]">Đang tải hội thoại (extension đang mở Messenger quét)... lần đầu có thể chờ 30–60s.</div>
                   : msgs.length === 0
-                    ? <div className="text-sm text-[#A0A0A0]">Chưa có nội dung — đợi thêm vài giây.</div>
+                    ? <div className="text-sm rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5 text-amber-800 space-y-2">
+                        {needRelogin
+                          ? <div>🔑 Cookie tài khoản đã hết hạn — vào tab <b>Tài khoản</b> đăng nhập lại rồi mở lại hội thoại.</div>
+                          : !accOnline
+                            ? <div>💤 Tài khoản đang <b>offline</b> — nhân viên cần mở máy + extension và giữ 1 tab Messenger để lấy được tin.</div>
+                            : <div>Chưa lấy được tin nhắn. Đảm bảo extension đang bật và mở 1 tab <b>Messenger</b> trên máy nhân viên, rồi bấm <b>Quét lại</b>.</div>}
+                        {accOnline && !needRelogin && (
+                          <button onClick={() => openChat(openConv)} className="text-xs px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold transition">↻ Quét lại hội thoại</button>
+                        )}
+                      </div>
                     : msgs.map((m, i) => {
                         const mt = m.text.match(/^Tin nhắn do .+? gửi lúc (.+?):\s*([\s\S]*)$/i);
                         let content = mt ? (mt[2] || "").trim() : m.text;
@@ -574,8 +584,10 @@ export default function InboxPage() {
               </div>
               <div className="flex gap-2">
                 <input value={reply} onChange={e => setReply(e.target.value)} onKeyDown={e => { if (e.key === "Enter") sendReply(); }}
-                  placeholder="Nhập trả lời..." className="flex-1 border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A]" />
-                <button onClick={sendReply} className="px-4 py-2 rounded-lg bg-[#E3000F] text-white text-sm font-bold hover:bg-[#C40009] transition">Gửi</button>
+                  disabled={!accOnline || needRelogin}
+                  placeholder={needRelogin ? "Cookie hết hạn — đăng nhập lại để gửi" : !accOnline ? "Tài khoản offline — không gửi được" : "Nhập trả lời..."}
+                  className="flex-1 border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A] disabled:bg-[#F5F5F5] disabled:cursor-not-allowed" />
+                <button onClick={sendReply} disabled={!accOnline || needRelogin} className="px-4 py-2 rounded-lg bg-[#E3000F] text-white text-sm font-bold hover:bg-[#C40009] transition disabled:opacity-50 disabled:cursor-not-allowed">Gửi</button>
               </div>
             </>
           )}

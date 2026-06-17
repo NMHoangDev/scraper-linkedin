@@ -49,8 +49,26 @@ def _role(user: dict[str, Any]) -> str:
 
 
 def _allowed_owners(user: dict[str, Any]) -> set[str] | None:
-    """Return None meaning all FB accounts are workspace-shared (visible to every authenticated user)."""
-    return None
+    """Phạm vi tài khoản FB mỗi user được xem:
+      - admin  -> None (xem HẾT)
+      - leader -> chính mình + toàn bộ thành viên team mình quản lý
+      - member -> CHỈ tài khoản của chính mình
+    """
+    user_id = str(user.get("id") or "")
+    role = _role(user)
+    if role == "admin":
+        return None
+    if role == "leader":
+        ids = {user_id}
+        try:
+            for m in get_team_members(user_id) or []:
+                mid = m.get("id")
+                if mid:
+                    ids.add(str(mid))
+        except Exception:
+            pass
+        return ids
+    return {user_id}
 
 
 def _scope_query(user: dict[str, Any]) -> dict[str, str]:
