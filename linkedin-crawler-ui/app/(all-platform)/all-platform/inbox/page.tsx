@@ -46,6 +46,10 @@ export default function InboxPage() {
   const [connErr, setConnErr] = useState(false);
   const openConvRef = useRef("");
   const msgsRef = useRef<Msg[]>([]);
+  // Client-side cache: conv_id → msgs (tồn tại trong session, tránh load lại khi mở lại hội thoại)
+  const clientCacheRef = useRef<Map<string, Msg[]>>(new Map());
+  // Track conv_ids đã prefetch ngầm (tránh fetch trùng)
+  const prefetchedRef = useRef<Set<string>>(new Set());
 
   const showToast = (msg: string, ok: boolean) => { setToast({ msg, ok }); setTimeout(() => setToast(null), 3500); };
 
@@ -230,19 +234,32 @@ export default function InboxPage() {
 
   async function openChat(conv_id: string) {
     setOpenConv(conv_id); openConvRef.current = conv_id; setMsgs([]); msgsRef.current = []; setLoadingChat(true);
+
+    // 1. Hiện client cache NGAY LẬP TỨC nếu có (không cần request server)
+    const clientCached = clientCacheRef.current.get(conv_id);
+    if (clientCached?.length) {
+      setMsgs(clientCached); msgsRef.current = clientCached; setLoadingChat(false); setLoadingFresh(true);
+    }
+
     let prevLoadedAt: string | null = null;
     try {
-      // Lấy cache cũ: hiện NGAY để user không thấy trắng, đồng thời lưu loaded_at để detect bản mới
+      // 2. Lấy server cache (để có loaded_at + fallback nếu client cache rỗng)
       const r0 = await fbFetch(`/inbox/thread?user_id=${encodeURIComponent(acc)}&conv_id=${encodeURIComponent(conv_id)}`);
       const d0 = await r0.json().catch(() => ({}));
       if (openConvRef.current !== conv_id) return;
       prevLoadedAt = d0.loaded_at || null;
-      if (d0.messages?.length) { setMsgs(d0.messages); msgsRef.current = d0.messages; setLoadingChat(false); setLoadingFresh(true); } // hiện cache ngay, đánh dấu đang chờ fresh
+      if (d0.messages?.length) {
+        // Chỉ hiện server cache nếu nhiều tin hơn client cache (tránh overwrite tin optimistic mới gửi)
+        if (d0.messages.length >= msgsRef.current.length) {
+          setMsgs(d0.messages); msgsRef.current = d0.messages;
+          clientCacheRef.current.set(conv_id, d0.messages);
+        }
+        setLoadingChat(false); setLoadingFresh(true);
+      }
     } catch { /* ignore */ }
     try {
-      // Yêu cầu extension tải LẠI bản mới nhất (có thể acc offline → không ai nhận → vẫn thấy cache)
+      // 3. Yêu cầu extension tải bản mới nhất
       const r = await fbFetch("/inbox/thread", { method: "POST", headers: fbHeaders(), body: JSON.stringify({ user_id: acc, conv_id }) });
-      const d = await r.json().catch(() => ({}));
       if (!r.ok) { setLoadingChat(false); setLoadingFresh(false); return; }
       pollFreshThread(conv_id, prevLoadedAt, 12);
     } catch { setLoadingChat(false); setLoadingFresh(false); }
@@ -255,7 +272,9 @@ export default function InboxPage() {
       const r = await fbFetch(`/inbox/thread?user_id=${encodeURIComponent(acc)}&conv_id=${encodeURIComponent(conv_id)}`);
       const d = await r.json();
       if (d.loaded_at && d.loaded_at !== prevLoadedAt) {
-        const fresh = d.messages || []; setMsgs(fresh); msgsRef.current = fresh; setLoadingChat(false); setLoadingFresh(false); return;
+        const fresh = d.messages || []; setMsgs(fresh); msgsRef.current = fresh;
+        clientCacheRef.current.set(conv_id, fresh);
+        setLoadingChat(false); setLoadingFresh(false); return;
       }
     } catch { /* ignore, thử lại */ }
     if (attemptsLeft <= 1) { setLoadingChat(false); setLoadingFresh(false); return; }
@@ -268,8 +287,10 @@ export default function InboxPage() {
       const r = await fbFetch(`/inbox/thread?user_id=${encodeURIComponent(acc)}&conv_id=${encodeURIComponent(conv_id)}`);
       const d = await r.json();
       const fetched: Msg[] = d.messages || [];
-      // Chỉ replace nếu server có >= tin hiện tại — tránh xóa optimistic msg khi server chưa cập nhật kịp
-      if (fetched.length >= msgsRef.current.length) { setMsgs(fetched); msgsRef.current = fetched; }
+      if (fetched.length >= msgsRef.current.length) {
+        setMsgs(fetched); msgsRef.current = fetched;
+        clientCacheRef.current.set(conv_id, fetched);
+      }
     } catch { /* ignore */ }
   }
 
@@ -283,7 +304,7 @@ export default function InboxPage() {
         const r = await fbFetch(`/inbox/thread?user_id=${encodeURIComponent(acc)}&conv_id=${encodeURIComponent(openConv)}&since_n=${n}`);
         const d = await r.json();
         if (Array.isArray(d.messages) && d.messages.length > 0) {
-          setMsgs(prev => { const next = [...prev, ...d.messages]; msgsRef.current = next; return next; });
+          setMsgs(prev => { const next = [...prev, ...d.messages]; msgsRef.current = next; clientCacheRef.current.set(openConv, next); return next; });
         }
       } catch { /* ignore */ }
     }, 8000);
@@ -317,7 +338,7 @@ export default function InboxPage() {
       const r = await fbFetch(`/inbox/reply_status?command_id=${encodeURIComponent(cmd)}`);
       const d = await r.json();
       if (d.done) {
-        if (d.sent) { setStatus("Đã gửi ✓"); showToast("Đã gửi tin thành công", true); setTimeout(() => fetchThread(openConvRef.current), 7000); }
+        if (d.sent) { setStatus("Đã gửi ✓"); clientCacheRef.current.set(openConvRef.current, msgsRef.current); showToast("Đã gửi tin thành công", true); setTimeout(() => fetchThread(openConvRef.current), 7000); }
         else { setStatus("✗ Gửi thất bại"); showToast("FB chưa gửi được — thử lại", false); }
         return;
       }
