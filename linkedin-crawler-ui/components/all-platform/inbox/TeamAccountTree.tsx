@@ -128,13 +128,14 @@ export default function TeamAccountTree({ sessions, ownerNames, selectedAcc, onS
 
   const AccBtn = ({ s }: { s: TreeSession }) => {
     const u = unread[s.user_id] || 0;
+    const sel = selectedAcc === s.user_id;
     return (
       <button onClick={() => onSelect(s.user_id)}
         title={s.status === "online" ? "Đang online" : "Offline — chỉ xem tin cũ"}
-        className={`w-full text-left inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium border transition ${selectedAcc === s.user_id ? "bg-[#E3000F] text-white border-[#E3000F]" : "border-transparent hover:bg-[#F5F5F5] text-[#1A1A1A]"}`}>
+        className={`w-full text-left inline-flex items-center gap-1.5 pl-2 pr-2.5 py-1.5 rounded-md text-sm font-medium border-l-2 transition ${sel ? "bg-[#FFF0F0] text-[#C40009] border-[#E3000F]" : "border-transparent hover:bg-[#F5F5F5] text-[#1A1A1A]"}`}>
         {dot(s)}<span className="truncate">{accName(s)}</span>
-        {u > 0 && <span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${selectedAcc === s.user_id ? "bg-white/25 text-white" : "bg-red-100 text-red-700"}`}>{u}</span>}
-        {s.status !== "online" && <span className={`text-[10px] opacity-60 ${u > 0 ? "" : "ml-auto"}`}>offline</span>}
+        {u > 0 && <span className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700">{u}</span>}
+        {s.status !== "online" && <span className={`text-[10px] text-[#A0A0A0] ${u > 0 ? "" : "ml-auto"}`}>offline</span>}
       </button>
     );
   };

@@ -36,6 +36,7 @@ export default function InboxPage() {
   const [ownerNames, setOwnerNames] = useState<Record<string, string>>({});
   const [extInstalled, setExtInstalled] = useState<boolean | null>(null);
   const [convs, setConvs] = useState<Conv[]>([]);
+  const [loadingConvs, setLoadingConvs] = useState(false); // đang nạp hộp thư của acc vừa chọn
   const [filter, setFilter] = useState<"all" | "unread" | "customer" | "need_reply">("all");
   const [openConv, setOpenConv] = useState("");
   const [msgs, setMsgs] = useState<Msg[]>([]);
@@ -68,6 +69,15 @@ export default function InboxPage() {
 
   // Dọn cache thread cũ (>30 ngày) 1 lần khi vào trang để IndexedDB không phình mãi.
   useEffect(() => { void idbPruneOld(); }, []);
+
+  // Chọn 1 tài khoản: xóa NGAY hộp thư + chat của acc cũ và bật loading (tránh "trơ trơ" hiện data cũ).
+  const selectAcc = (uid: string) => {
+    if (!uid || uid === acc) return;
+    setAcc(uid);
+    setOpenConv(""); openConvRef.current = "";
+    setMsgs([]); msgsRef.current = [];
+    setConvs([]); setLoadingConvs(true);
+  };
 
   // Tính phạm vi xem inbox theo role + map tên nhân viên:
   //  - admin  -> "" (xem HẾT) + lấy tên từ /users/all-profiles
@@ -161,6 +171,7 @@ export default function InboxPage() {
       setNeedRelogin(!!d.needs_relogin);
       void idbSetConvs(acc, list); // lưu để F5 hiện hộp thư ngay
     } catch { /* ignore */ }
+    finally { setLoadingConvs(false); }
   }, [acc]);
 
   // Khi đổi acc: nạp cache BỀN từ IndexedDB → mở hội thoại tức thì + hiện hộp thư ngay (trước fetch mạng).
@@ -477,21 +488,23 @@ export default function InboxPage() {
           <span className="text-sm text-[#A0A0A0]">{extInstalled === false ? 'Chưa thấy extension. Hãy cài + mở extension trên trình duyệt này.' : 'Chưa có tài khoản nào. Nhân viên cài extension + đăng nhập Facebook để tài khoản hiện ra.'}</span>
         ) : (role === "admin" || role === "leader") ? (
           // Admin/Leader: cây Team → thành viên → tài khoản (xem inbox theo team)
-          <TeamAccountTree
-            sessions={sessions}
-            ownerNames={ownerNames}
-            selectedAcc={acc}
-            role={role}
-            owner={owner}
-            onSelect={(uid) => { setAcc(uid); setOpenConv(""); openConvRef.current = ""; setMsgs([]); }}
-          />
+          <div className="max-w-md">
+            <TeamAccountTree
+              sessions={sessions}
+              ownerNames={ownerNames}
+              selectedAcc={acc}
+              role={role}
+              owner={owner}
+              onSelect={selectAcc}
+            />
+          </div>
         ) : (
           // Member: danh sách chip đơn giản (tài khoản của chính mình)
           <div className="flex flex-wrap gap-2">
             {sessions.map(s => {
               const isOnline = s.status === "online";
               return (
-                <button key={s.user_id} onClick={() => { setAcc(s.user_id); setOpenConv(""); openConvRef.current = ""; setMsgs([]); }}
+                <button key={s.user_id} onClick={() => selectAcc(s.user_id)}
                   title={isOnline ? "Đang online — đọc/trả lời được" : "Offline (nhân viên tắt máy) — chỉ xem tin cũ"}
                   className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold border transition ${acc === s.user_id ? "bg-[#E3000F] text-white border-[#E3000F]" : `border-[#E5E5E5] hover:border-[#E3000F] ${isOnline ? "text-[#1A1A1A]" : "text-[#A0A0A0]"}`}`}>
                   <span className={`inline-block w-2 h-2 rounded-full ${isOnline ? "bg-green-500" : "bg-gray-300"}`} />{accLabel(s)}{!isOnline && <span className="text-[10px] opacity-70">(offline)</span>}
@@ -516,7 +529,9 @@ export default function InboxPage() {
             </select>
           </div>
           <div className="space-y-2 max-h-[520px] overflow-auto">
-            {filtered.length === 0 ? <div className="text-center text-[#A0A0A0] py-10 text-sm">Chưa có hội thoại. Chọn tài khoản rồi bấm &quot;Quét ngay&quot;.</div> :
+            {loadingConvs && filtered.length === 0
+              ? <div className="text-center text-[#A0A0A0] py-10 text-sm animate-pulse">Đang tải hộp thư của tài khoản...</div>
+              : filtered.length === 0 ? <div className="text-center text-[#A0A0A0] py-10 text-sm">Chưa có hội thoại. Chọn tài khoản rồi bấm &quot;Quét ngay&quot;.</div> :
               filtered.map(c => (
                 <div key={c.conv_id} className={`border rounded-lg p-3 transition ${openConv === c.conv_id ? "border-[#E3000F] bg-[#FFF5F5]" : "border-[#E5E5E5]"}`}>
                   <div onClick={() => openChat(c.conv_id)} title="Bấm để mở hội thoại" className="flex justify-between gap-2 cursor-pointer">
