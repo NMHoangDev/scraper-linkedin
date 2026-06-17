@@ -92,7 +92,7 @@ export function createZaloAccount(payload: {
   label: string;
   phone?: string;
 }) {
-  return requestJson("/api/all-platform/zalo/accounts", {
+  return requestJson<{ account_id: string; message?: string }>("/api/all-platform/zalo/accounts", {
     method: "POST",
     body: JSON.stringify(payload),
   });
