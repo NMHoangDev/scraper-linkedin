@@ -40,10 +40,12 @@ export default function InboxPage() {
   const [reply, setReply] = useState("");
   const [scanning, setScanning] = useState(false);
   const [loadingChat, setLoadingChat] = useState(false);
+  const [loadingFresh, setLoadingFresh] = useState(false); // đang chờ extension push bản mới (có cache rồi)
   const [needRelogin, setNeedRelogin] = useState(false);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [connErr, setConnErr] = useState(false);
   const openConvRef = useRef("");
+  const msgsRef = useRef<Msg[]>([]);
 
   const showToast = (msg: string, ok: boolean) => { setToast({ msg, ok }); setTimeout(() => setToast(null), 3500); };
 
@@ -167,14 +169,53 @@ export default function InboxPage() {
     return () => clearInterval(t);
   }, [acc, sessions]);
 
+  // Phát hiện KHÁCH mới nhắn → badge tab + sound + browser notification
+  const prevConvIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!convs.length) return;
+    const customerUnread = convs.filter(c => !c.deleted && c.unread && c.is_customer);
+    const newCustomers = customerUnread.filter(c => !prevConvIdsRef.current.has(c.conv_id));
+    if (newCustomers.length > 0 && prevConvIdsRef.current.size > 0) {
+      // Sound notification (Web Audio API)
+      try {
+        const ctx = new AudioContext();
+        [0, 0.18].forEach(delay => {
+          const osc = ctx.createOscillator(); const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.frequency.value = delay === 0 ? 784 : 1047; osc.type = "sine";
+          gain.gain.setValueAtTime(0.25, ctx.currentTime + delay);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.3);
+          osc.start(ctx.currentTime + delay); osc.stop(ctx.currentTime + delay + 0.3);
+        });
+      } catch { /* ignore */ }
+      // Browser notification
+      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+        newCustomers.forEach(c => new Notification(`Khách nhắn: ${c.name || ""}`, { body: c.preview || "Có tin nhắn mới", icon: "/favicon.ico", tag: c.conv_id }));
+      } else if (typeof Notification !== "undefined" && Notification.permission === "default") {
+        Notification.requestPermission();
+      }
+    }
+    prevConvIdsRef.current = new Set(convs.map(c => c.conv_id));
+    // Tab title badge — chỉ đếm khách chưa đọc
+    const count = customerUnread.length;
+    document.title = count > 0 ? `(${count}) Khách mới — Inbox` : "Inbox FB — Seeding";
+    return () => { document.title = "Seeding"; };
+  }, [convs]);
+
   async function scan() {
     if (!acc) return showToast("Chưa chọn tài khoản", false);
     setScanning(true);
     try {
-      const r = await fbFetch("/inbox/scan", { method: "POST", headers: fbHeaders(), body: JSON.stringify({ user_id: acc }) });
+      // Quét sâu: lấy danh sách + nội dung thread 3 ngày gần nhất
+      const r = await fbFetch("/inbox/scan_deep", { method: "POST", headers: fbHeaders(), body: JSON.stringify({ user_id: acc }) });
       const d = await r.json().catch(() => ({}));
-      if (r.ok) { showToast("Đang quét... vài giây nữa danh sách sẽ cập nhật.", true); setTimeout(loadConvs, 6000); setTimeout(loadConvs, 12000); }
-      else showToast(d.detail || "Lỗi quét", false);
+      if (r.ok) {
+        showToast("Đang quét sâu... extension tải nội dung tin nhắn 3 ngày gần nhất (1-2 phút).", true);
+        // Poll nhiều lần để bắt kết quả từng thread khi extension gửi về dần
+        [8000, 16000, 30000, 45000, 60000].forEach(ms => setTimeout(loadConvs, ms));
+      } else {
+        showToast(d.detail || "Lỗi quét", false);
+      }
     } catch { showToast("Không kết nối được Markee", false); }
     setScanning(false);
   }
@@ -188,36 +229,36 @@ export default function InboxPage() {
   }
 
   async function openChat(conv_id: string) {
-    setOpenConv(conv_id); openConvRef.current = conv_id; setMsgs([]); setLoadingChat(true);
+    setOpenConv(conv_id); openConvRef.current = conv_id; setMsgs([]); msgsRef.current = []; setLoadingChat(true);
     let prevLoadedAt: string | null = null;
     try {
-      // Chỉ LẤY mốc thời gian bản cũ (KHÔNG hiện tin cũ — tránh nhấp nháy tin lỗi thời)
+      // Lấy cache cũ: hiện NGAY để user không thấy trắng, đồng thời lưu loaded_at để detect bản mới
       const r0 = await fbFetch(`/inbox/thread?user_id=${encodeURIComponent(acc)}&conv_id=${encodeURIComponent(conv_id)}`);
       const d0 = await r0.json().catch(() => ({}));
       if (openConvRef.current !== conv_id) return;
       prevLoadedAt = d0.loaded_at || null;
+      if (d0.messages?.length) { setMsgs(d0.messages); msgsRef.current = d0.messages; setLoadingChat(false); setLoadingFresh(true); } // hiện cache ngay, đánh dấu đang chờ fresh
     } catch { /* ignore */ }
     try {
-      // Yêu cầu extension tải LẠI bản mới nhất
+      // Yêu cầu extension tải LẠI bản mới nhất (có thể acc offline → không ai nhận → vẫn thấy cache)
       const r = await fbFetch("/inbox/thread", { method: "POST", headers: fbHeaders(), body: JSON.stringify({ user_id: acc, conv_id }) });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) { showToast(d.detail || "Lỗi tải hội thoại", false); setLoadingChat(false); return; }
-      // Chờ bản MỚI (loaded_at đổi so với cache) — giữ trạng thái loading, không hiện tin cũ
-      pollFreshThread(conv_id, prevLoadedAt, 15);
-    } catch { showToast("Không kết nối được", false); setLoadingChat(false); }
+      if (!r.ok) { setLoadingChat(false); setLoadingFresh(false); return; }
+      pollFreshThread(conv_id, prevLoadedAt, 12);
+    } catch { setLoadingChat(false); setLoadingFresh(false); }
   }
 
-  // Hỏi lại mỗi 3s tới khi extension trả bản MỚI (loaded_at đổi). Hiện cache trong lúc chờ.
+  // Hỏi lại mỗi 3s tới khi extension trả bản MỚI (loaded_at đổi). Cache đã hiện, chỉ update khi có fresh.
   async function pollFreshThread(conv_id: string, prevLoadedAt: string | null, attemptsLeft: number) {
     if (openConvRef.current !== conv_id) return;
     try {
       const r = await fbFetch(`/inbox/thread?user_id=${encodeURIComponent(acc)}&conv_id=${encodeURIComponent(conv_id)}`);
       const d = await r.json();
       if (d.loaded_at && d.loaded_at !== prevLoadedAt) {
-        setMsgs(d.messages || []); setLoadingChat(false); return; // bản mới đã về
+        const fresh = d.messages || []; setMsgs(fresh); msgsRef.current = fresh; setLoadingChat(false); setLoadingFresh(false); return;
       }
     } catch { /* ignore, thử lại */ }
-    if (attemptsLeft <= 1) { setLoadingChat(false); return; }
+    if (attemptsLeft <= 1) { setLoadingChat(false); setLoadingFresh(false); return; }
     setTimeout(() => pollFreshThread(conv_id, prevLoadedAt, attemptsLeft - 1), 3000);
   }
 
@@ -226,9 +267,28 @@ export default function InboxPage() {
     try {
       const r = await fbFetch(`/inbox/thread?user_id=${encodeURIComponent(acc)}&conv_id=${encodeURIComponent(conv_id)}`);
       const d = await r.json();
-      setMsgs(d.messages || []); setLoadingChat(false);
+      const fetched: Msg[] = d.messages || [];
+      // Chỉ replace nếu server có >= tin hiện tại — tránh xóa optimistic msg khi server chưa cập nhật kịp
+      if (fetched.length >= msgsRef.current.length) { setMsgs(fetched); msgsRef.current = fetched; }
     } catch { /* ignore */ }
   }
+
+  // Poll tin mới incremental khi đang xem hội thoại (append delta thay vì reload full)
+  useEffect(() => {
+    if (!openConv || !acc) return;
+    const t = setInterval(async () => {
+      const n = msgsRef.current.length;
+      if (n === 0) return;
+      try {
+        const r = await fbFetch(`/inbox/thread?user_id=${encodeURIComponent(acc)}&conv_id=${encodeURIComponent(openConv)}&since_n=${n}`);
+        const d = await r.json();
+        if (Array.isArray(d.messages) && d.messages.length > 0) {
+          setMsgs(prev => { const next = [...prev, ...d.messages]; msgsRef.current = next; return next; });
+        }
+      } catch { /* ignore */ }
+    }, 8000);
+    return () => clearInterval(t);
+  }, [openConv, acc]);
 
   async function sendReply() {
     const text = reply.trim();
@@ -257,7 +317,7 @@ export default function InboxPage() {
       const r = await fbFetch(`/inbox/reply_status?command_id=${encodeURIComponent(cmd)}`);
       const d = await r.json();
       if (d.done) {
-        if (d.sent) { setStatus("Đã gửi ✓"); showToast("Đã gửi tin thành công", true); setTimeout(() => fetchThread(openConvRef.current), 2500); }
+        if (d.sent) { setStatus("Đã gửi ✓"); showToast("Đã gửi tin thành công", true); setTimeout(() => fetchThread(openConvRef.current), 7000); }
         else { setStatus("✗ Gửi thất bại"); showToast("FB chưa gửi được — thử lại", false); }
         return;
       }
@@ -266,7 +326,7 @@ export default function InboxPage() {
     setTimeout(() => pollReplyStatus(cmd, setStatus, attemptsLeft - 1), 2000);
   }
 
-  const filtered = convs.filter(c => filter === "unread" ? c.unread : filter === "customer" ? c.is_customer : true);
+  const filtered = convs.filter(c => !c.deleted && (filter === "unread" ? c.unread : filter === "customer" ? c.is_customer : true));
   // Nhãn chip = TÊN NHÂN VIÊN (map từ owner id). Fallback: label cũ -> fb_id. Để admin/leader biết acc CỦA AI.
   const accLabel = (s: Session) => (s.owner && ownerNames[s.owner]) || s.label || s.user_id;
 
@@ -346,7 +406,7 @@ export default function InboxPage() {
                     <button onClick={() => mark(c.conv_id, "is_customer", !c.is_customer)} className="text-xs px-2.5 py-1 rounded-lg border border-[#E5E5E5] hover:border-[#E3000F] text-[#1A1A1A] font-semibold transition">{c.is_customer ? "Bỏ khách" : "✓ Là khách"}</button>
                     {c.is_customer && <button onClick={() => openChat(c.conv_id)} className="text-xs px-2.5 py-1 rounded-lg border border-[#E5E5E5] hover:border-[#E3000F] text-[#1A1A1A] font-semibold transition">Mở chat</button>}
                     {c.is_customer && <button onClick={() => mark(c.conv_id, "pushed_to_zalo", !c.pushed_to_zalo)} className="text-xs px-2.5 py-1 rounded-lg border border-[#E5E5E5] hover:border-[#E3000F] text-[#1A1A1A] font-semibold transition">{c.pushed_to_zalo ? "Bỏ Zalo" : "Đã đẩy Zalo"}</button>}
-                    <button onClick={() => mark(c.conv_id, "deleted", true)} className="text-xs px-2.5 py-1 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 font-semibold transition">Xóa</button>
+                    <button onClick={() => { if (window.confirm(`Xóa "${c.name || "hội thoại này"}" khỏi danh sách? (không ảnh hưởng Messenger)`)) mark(c.conv_id, "deleted", true); }} className="text-xs px-2.5 py-1 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 font-semibold transition">Xóa</button>
                   </div>
                 </div>
               ))}
@@ -359,24 +419,29 @@ export default function InboxPage() {
           {!openConv ? <div className="text-center text-[#A0A0A0] py-10 text-sm">Chọn 1 khách đã đánh dấu để xem hội thoại.</div> : (
             <>
               <div className="max-h-[430px] overflow-auto mb-3 space-y-2 p-1">
-                {loadingChat && msgs.length === 0 ? <div className="text-sm text-[#A0A0A0]">Đang tải hội thoại (worker đang mở Messenger)...</div> :
-                  msgs.length === 0 ? <div className="text-sm text-[#A0A0A0]">Chưa có nội dung — đợi thêm vài giây.</div> :
-                    msgs.map((m, i) => {
-                      // Tách prefix "Tin nhắn do <ai> gửi lúc <giờ>: <nội dung>" -> chỉ giữ nội dung + giờ.
-                      const mt = m.text.match(/^Tin nhắn do .+? gửi lúc (.+?):\s*([\s\S]*)$/i);
-                      // Tách prefix raw dạng "39ch: hello" / "42sáng: chào bạn" từ Markee API
-                      const mt2 = !mt ? m.text.match(/^(\d{1,3}(?:ch|sáng)):\s*([\s\S]*)$/i) : null;
-                      const content = mt ? (mt[2] || "").trim() : mt2 ? (mt2[2] || "").trim() : m.text;
-                      const time = mt ? (mt[1] || "").trim() : mt2 ? (mt2[1] || "").trim() : (m.time || "");
-                      return (
-                        <div key={i} className={`flex ${m.from === "me" ? "justify-end" : "justify-start"}`}>
-                          <div className={`max-w-[78%] flex flex-col ${m.from === "me" ? "items-end" : "items-start"}`}>
-                            <div className={`px-3 py-2 rounded-lg text-sm ${m.from === "me" ? "bg-[#E3000F] text-white" : "bg-[#F5F5F5] text-[#1A1A1A]"}`}>{content}</div>
-                            {time && <div className="text-[10px] text-[#A0A0A0] mt-0.5 px-1">{time}</div>}
+                {loadingChat && msgs.length === 0
+                  ? <div className="text-sm text-[#A0A0A0]">Đang tải hội thoại (worker đang mở Messenger)...</div>
+                  : msgs.length === 0
+                    ? <div className="text-sm text-[#A0A0A0]">Chưa có nội dung — đợi thêm vài giây.</div>
+                    : msgs.map((m, i) => {
+                        const mt = m.text.match(/^Tin nhắn do .+? gửi lúc (.+?):\s*([\s\S]*)$/i);
+                        let content = mt ? (mt[2] || "").trim() : m.text;
+                        const time = mt ? (mt[1] || "").trim() : (m.time || "");
+                        if (content) {
+                          // Strip time format VN đầu content: "03sáng: text", "47ch: text", "8:47chiều\ntext"
+                          const stripped = content.replace(/^(?:(?:Thứ\s+\S+\s+)?\d{1,2}(?::\d{2})?(?:sáng|chiều|ch|sa|CH|SA|AM|PM)?)\s*[:\n]+\s*/i, "").trim();
+                          if (stripped) content = stripped;
+                        }
+                        return (
+                          <div key={i} className={`flex ${m.from === "me" ? "justify-end" : "justify-start"}`}>
+                            <div className={`max-w-[78%] flex flex-col ${m.from === "me" ? "items-end" : "items-start"}`}>
+                              <div className={`px-3 py-2 rounded-lg text-sm ${m.from === "me" ? "bg-[#E3000F] text-white" : "bg-[#F5F5F5] text-[#1A1A1A]"}`}>{content}</div>
+                              {time && <div className="text-[10px] text-[#A0A0A0] mt-0.5 px-1">{time}</div>}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                {loadingFresh && <div className="text-[11px] text-[#A0A0A0] text-center pt-1 animate-pulse">Đang cập nhật tin mới nhất...</div>}
               </div>
               <div className="flex gap-2">
                 <input value={reply} onChange={e => setReply(e.target.value)} onKeyDown={e => { if (e.key === "Enter") sendReply(); }}
