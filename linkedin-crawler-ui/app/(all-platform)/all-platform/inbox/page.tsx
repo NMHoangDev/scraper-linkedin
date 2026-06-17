@@ -363,10 +363,11 @@ export default function InboxPage() {
                   msgs.length === 0 ? <div className="text-sm text-[#A0A0A0]">Chưa có nội dung — đợi thêm vài giây.</div> :
                     msgs.map((m, i) => {
                       // Tách prefix "Tin nhắn do <ai> gửi lúc <giờ>: <nội dung>" -> chỉ giữ nội dung + giờ.
-                      // Bên trái/phải đã cho biết AI gửi nên bỏ phần "Tin nhắn do X gửi".
                       const mt = m.text.match(/^Tin nhắn do .+? gửi lúc (.+?):\s*([\s\S]*)$/i);
-                      const content = mt ? (mt[2] || "").trim() : m.text;
-                      const time = mt ? (mt[1] || "").trim() : (m.time || "");
+                      // Tách prefix raw dạng "39ch: hello" / "42sáng: chào bạn" từ Markee API
+                      const mt2 = !mt ? m.text.match(/^(\d{1,3}(?:ch|sáng)):\s*([\s\S]*)$/i) : null;
+                      const content = mt ? (mt[2] || "").trim() : mt2 ? (mt2[2] || "").trim() : m.text;
+                      const time = mt ? (mt[1] || "").trim() : mt2 ? (mt2[1] || "").trim() : (m.time || "");
                       return (
                         <div key={i} className={`flex ${m.from === "me" ? "justify-end" : "justify-start"}`}>
                           <div className={`max-w-[78%] flex flex-col ${m.from === "me" ? "items-end" : "items-start"}`}>
