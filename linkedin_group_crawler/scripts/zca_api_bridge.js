@@ -89,8 +89,34 @@ function parseArgs(argv) {
 
 function normalizeCookieJar(cookies) {
   if (!cookies) return null;
-  if (typeof cookies === "string") return JSON.parse(cookies);
-  return cookies;
+  let parsed = typeof cookies === "string" ? JSON.parse(cookies) : cookies;
+  
+  // If it's an array of cookies (from Extension or Playwright)
+  if (Array.isArray(parsed)) {
+    parsed = parsed.map(c => {
+      // Fix 'expires' field if it is in seconds (like from chrome.cookies)
+      let e = c.expires || c.expirationDate;
+      if (typeof e === 'number') {
+        // Playwright/Chrome cookies use seconds since epoch. 
+        // tough-cookie treats numbers as milliseconds, causing 1970 expiration.
+        c.expires = new Date(e * 1000).toISOString();
+      }
+      return c;
+    });
+    return parsed;
+  }
+  
+  if (parsed && Array.isArray(parsed.cookies)) {
+    parsed.cookies = parsed.cookies.map(c => {
+      let e = c.expires || c.expirationDate;
+      if (typeof e === 'number') {
+        c.expires = new Date(e * 1000).toISOString();
+      }
+      return c;
+    });
+  }
+  
+  return parsed;
 }
 
 async function login(auth, options = {}) {
@@ -531,11 +557,35 @@ async function relatedGroupIds(api, groupId) {
   };
 }
 
-function normalizeMessage(raw, index) {
+function normalizeMessage(raw, index, ownId = null) {
   const data = raw && raw.data ? raw.data : raw || {};
   const content = data.content ?? data.message ?? data.msg ?? raw.content ?? raw.message;
   const imageUrls = collectUrls(content).concat(collectUrls(data.attachments || data.attachment || data.photos));
   const msgType = String(data.msgType || data.type || raw.type || "text");
+  
+  const senderId = String(data.uidFrom || raw.uidFrom || raw.senderId || raw.sender_id || "");
+  const isSent = Boolean(raw.isSelf || data.isSelf || (ownId && String(senderId) === String(ownId)));
+  
+  let threadId = String(
+    raw.threadId ||
+    data.threadId ||
+    data.groupId ||
+    raw.groupId ||
+    ""
+  );
+
+  if (!threadId) {
+    const idTo = String(data.idTo || raw.idTo || "");
+    if (ownId && idTo === String(ownId)) {
+      threadId = senderId;
+    } else {
+      threadId = idTo;
+    }
+    if (!threadId) {
+      threadId = senderId;
+    }
+  }
+
   const messageId = String(
     data.msgId ||
       data.cliMsgId ||
@@ -566,7 +616,7 @@ function normalizeMessage(raw, index) {
 
   return {
     message_id: messageId,
-    sender_id: String(data.uidFrom || raw.uidFrom || raw.senderId || raw.sender_id || ""),
+    sender_id: senderId || null,
     sender_name: data.dName || data.displayName || raw.senderName || raw.sender_name || null,
     timestamp: timestamp ? String(timestamp) : null,
     time_text: timestamp ? new Date(Number(timestamp)).toISOString() : null,
@@ -575,8 +625,8 @@ function normalizeMessage(raw, index) {
     image_urls: Array.from(new Set(imageUrls)),
     reply_to_id: data.quote?.msgId || data.quoteMsgId || null,
     is_deleted: msgType === "chat.delete" || msgType === "recalled",
-    is_sent: Boolean(raw.isSelf || data.isSelf),
-    group_id: String(raw.threadId || raw.data?.idTo || raw.data?.threadId || "") || null,
+    is_sent: isSent,
+    group_id: threadId || null,
     raw,
   };
 }
@@ -649,16 +699,16 @@ function extractMessageList(response) {
   return [];
 }
 
-function normalizeHistory(response) {
+function normalizeHistory(response, ownId = null) {
   const list = extractMessageList(response);
   const normalized = list
-    .map((item, index) => normalizeMessage(item, index))
+    .map((item, index) => normalizeMessage(item, index, ownId))
     .filter((msg) => msg && msg.message_id);
 
   return sortMessagesOldToNew(normalized);
 }
 
-async function syncOldMessages(auth, threadType, threadId, count, timeoutMs) {
+async function syncOldMessages(auth, threadType, threadId, count, timeoutMs, ownId = null) {
   const api = await login(auth, { selfListen: true });
   const listener = api.listener;
   if (!listener || typeof listener.start !== "function") {
@@ -681,7 +731,7 @@ async function syncOldMessages(auth, threadType, threadId, count, timeoutMs) {
       if (rawThreadId) threadCounts[rawThreadId] = (threadCounts[rawThreadId] || 0) + 1;
       if (wantedThreadId && rawThreadId !== wantedThreadId) continue;
       
-      const normalized = normalizeMessage(raw, collected.length);
+      const normalized = normalizeMessage(raw, collected.length, ownId);
       if (!normalized.message_id || seen.has(normalized.message_id)) continue;
       seen.add(normalized.message_id);
       collected.push(normalized);
@@ -831,6 +881,7 @@ async function main() {
       name: String(f.displayName || f.zaloName || ""),
       avatar_url: String(f.avatar || f.avatarUrl || ""),
       unread_count: 0,
+      is_friend: true,
     }));
     emitAndExit({ ok: true, friends: normalized }, 0);
     return;
@@ -859,7 +910,7 @@ async function main() {
   if (!groupId) throw new Error("Missing --group-id");
 
   const response = await api.getGroupChatHistory(String(groupId), count);
-  const messages = normalizeHistory(response);
+  const messages = normalizeHistory(response, typeof api.getOwnId === "function" ? api.getOwnId() : null);
 
   emitAndExit({
     ok: true,
@@ -885,9 +936,99 @@ async function main() {
     const count = Number(args.count || input.count || 500);
     const timeoutMs = Number(args.timeout || input.timeout_ms || input.timeoutMs || 35000);
     // threadId can be empty or undefined for global synchronization
-    const result = await syncOldMessages(auth, type, threadId ? String(threadId) : "", count, timeoutMs);
+    const result = await syncOldMessages(auth, type, threadId ? String(threadId) : "", count, timeoutMs, typeof api.getOwnId === "function" ? api.getOwnId() : null);
     emitAndExit({ ok: true, ...result, source: "listener.requestOldMessages" }, 0);
     return;
+  }
+
+  if (args.command === "first-time-sync") {
+    // First-time sync: list top groups + fetch history of recent N groups + friends.
+    // Trả về { groups: [], friends: [], messages: [], total_groups, total_messages, errors }.
+    try {
+      const messagesPerChat = Number(args["messages-per-chat"] || input.messages_per_chat || 50);
+      const groupLimit = Number(args["group-limit"] || input.group_limit || 25);
+      const includeFriends = args["include-friends"] !== "false";
+
+      const api = await login(auth);
+      const summary = { groups: [], friends: [], messages: [], errors: [], total_groups: 0, total_messages: 0 };
+
+      // 1. List groups
+      let groupsResult = { groups: [] };
+      try {
+        groupsResult = await listGroups(api);
+        summary.total_groups = (groupsResult.groups || []).length;
+      } catch (err) {
+        summary.errors.push(`list_groups: ${err && err.message ? err.message : String(err)}`);
+      }
+      const groups = (groupsResult.groups || []).slice(0, groupLimit);
+      summary.groups = groups;
+
+      // 2. List friends (optional)
+      const friendsSet = new Set();
+      if (includeFriends) {
+        try {
+          const friends = await api.getAllFriends();
+          summary.friends = (Array.isArray(friends) ? friends : []).slice(0, groupLimit).map((f) => {
+            const gid = String(f.userId || "");
+            friendsSet.add(gid);
+            return {
+              group_id: gid,
+              name: String(f.displayName || f.zaloName || ""),
+              avatar_url: String(f.avatar || f.avatarUrl || ""),
+              is_friend: true,
+            };
+          });
+        } catch (err) {
+          summary.errors.push(`list_friends: ${err && err.message ? err.message : String(err)}`);
+        }
+      }
+
+      // 3. Fetch history CHỈ cho groups (không cho friends — DM history qua getGroupChatHistory
+      //    trả 136/permission-denied vì ZCA API này chỉ dành cho group, không phải DM).
+      //    Lịch sử DM sẽ được lấy qua listener stream real-time.
+      const CONCURRENCY = 3;
+      let processed = 0;
+      const groupIds = groups.map((g) => g.group_id).filter(Boolean);
+      for (let i = 0; i < groupIds.length; i += CONCURRENCY) {
+        const chunk = groupIds.slice(i, i + CONCURRENCY);
+        const results = await Promise.allSettled(
+          chunk.map(async (gid) => {
+            const resp = await api.getGroupChatHistory(gid, messagesPerChat);
+            return { gid, resp };
+          }),
+        );
+        for (const r of results) {
+          if (r.status === "rejected") {
+            summary.errors.push(`history_${r.reason && r.reason.message ? r.reason.message : String(r.reason)}`);
+            continue;
+          }
+          const { gid, resp } = r.value;
+          try {
+            const list = (resp && (resp.messages || resp.groupMsgs || (resp.data && resp.data.messages))) || [];
+            const msgs = normalizeHistory(list, typeof api.getOwnId === "function" ? api.getOwnId() : null);
+            for (const m of msgs) {
+              m.group_id = gid;
+              m.thread_id = gid;
+              summary.messages.push(m);
+              summary.total_messages++;
+              processed++;
+            }
+          } catch (parseErr) {
+            summary.errors.push(`parse_${gid}: ${parseErr && parseErr.message ? parseErr.message : String(parseErr)}`);
+          }
+        }
+      }
+
+      emitAndExit({ ok: true, ...summary, source: "extension.firstTimeSync" }, 0);
+      return;
+    } catch (err) {
+      emitAndExit({
+        ok: false,
+        error: err && err.message ? err.message : String(err),
+        error_detail: serializeError(err),
+      }, 1);
+      return;
+    }
   }
 
   if (args.command === "send-message") {

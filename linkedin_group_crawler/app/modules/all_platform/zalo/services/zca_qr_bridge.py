@@ -19,6 +19,19 @@ def zca_script_path() -> Path:
 import sys
 import subprocess
 
+class _AsyncReaderWrapper:
+    def __init__(self, stream):
+        self._stream = stream
+        
+    async def readline(self) -> bytes:
+        if not self._stream:
+            return b""
+        try:
+            return await asyncio.to_thread(self._stream.readline)
+        except Exception:
+            return b""
+
+
 class WindowsSubprocessWrapper:
     def __init__(
         self,
@@ -35,7 +48,9 @@ class WindowsSubprocessWrapper:
             stderr=subprocess.PIPE,
             env=env,
         )
-        self.stdout = self
+        self._stdout_override = self
+        self._stderr_override = _AsyncReaderWrapper(self._proc.stderr)
+        
         if stdin_input is not None and self._proc.stdin is not None:
             try:
                 self._proc.stdin.write(stdin_input)
@@ -52,6 +67,22 @@ class WindowsSubprocessWrapper:
     def returncode(self) -> Optional[int]:
         self._proc.poll()
         return self._proc.returncode
+
+    @property
+    def stderr(self) -> Any:
+        return self._stderr_override
+
+    @stderr.setter
+    def stderr(self, value: Any) -> None:
+        self._stderr_override = value
+
+    @property
+    def stdout(self) -> Any:
+        return self._stdout_override
+
+    @stdout.setter
+    def stdout(self, value: Any) -> None:
+        self._stdout_override = value
 
     async def readline(self) -> bytes:
         return await asyncio.to_thread(self._proc.stdout.readline)

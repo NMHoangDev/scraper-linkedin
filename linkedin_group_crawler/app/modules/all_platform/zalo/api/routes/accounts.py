@@ -16,6 +16,7 @@ from app.modules.all_platform.zalo.services.supabase_service import (
     get_zalo_inbox_report,
     list_zalo_accounts,
     upsert_zalo_account,
+    upsert_zalo_user,
 )
 
 
@@ -98,6 +99,10 @@ async def create_account(body: ZaloAccountCreate):
             phone=body.phone,
             status="not_logged_in",
         )
+        await upsert_zalo_user(
+            account_id,
+            status="not_logged_in",
+        )
     except SupabaseNotConfigured:
         pass
     return {
@@ -120,6 +125,10 @@ async def update_account(account_id: str, body: ZaloAccountUpdate):
             owner_id=_normalize_id(body.owner_id) if body.owner_id else "default",
             label=body.label or safe_account_id,
             phone=body.phone,
+            status=body.status or "unknown",
+        )
+        await upsert_zalo_user(
+            safe_account_id,
             status=body.status or "unknown",
         )
     except SupabaseNotConfigured:

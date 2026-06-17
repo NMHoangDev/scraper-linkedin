@@ -13,4 +13,5 @@ class Group(BaseModel):
     last_message_type: Optional[str] = None
     unread_count: int = 0
     is_pinned: bool = False
+    is_friend: bool = False  # True nếu là chat cá nhân (DM) thay vì group
 

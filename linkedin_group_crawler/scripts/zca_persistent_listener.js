@@ -98,8 +98,30 @@ function parseArgs(argv) {
 
 function normalizeCookieJar(cookies) {
   if (!cookies) return null;
-  if (typeof cookies === "string") return JSON.parse(cookies);
-  return cookies;
+  let parsed = typeof cookies === "string" ? JSON.parse(cookies) : cookies;
+  
+  if (Array.isArray(parsed)) {
+    parsed = parsed.map(c => {
+      let e = c.expires || c.expirationDate;
+      if (typeof e === 'number') {
+        c.expires = new Date(e * 1000).toISOString();
+      }
+      return c;
+    });
+    return parsed;
+  }
+  
+  if (parsed && Array.isArray(parsed.cookies)) {
+    parsed.cookies = parsed.cookies.map(c => {
+      let e = c.expires || c.expirationDate;
+      if (typeof e === 'number') {
+        c.expires = new Date(e * 1000).toISOString();
+      }
+      return c;
+    });
+  }
+  
+  return parsed;
 }
 
 function valuesFromUnknown(value) {
@@ -161,20 +183,63 @@ function collectUrls(value, out = []) {
   return Array.from(new Set(out));
 }
 
+function toTimestampMs(value) {
+  if (value == null || value === "") return 0;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return 0;
+    return value < 10000000000 ? Math.floor(value * 1000) : Math.floor(value);
+  }
+  const text = String(value).trim();
+  if (!text) return 0;
+  if (/^\d+$/.test(text)) {
+    const n = Number(text);
+    if (!Number.isFinite(n)) return 0;
+    return n < 10000000000 ? Math.floor(n * 1000) : Math.floor(n);
+  }
+  const parsed = Date.parse(text);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function firstTimestampMs(...values) {
+  for (const value of values) {
+    const ts = toTimestampMs(value);
+    if (ts > 0) return ts;
+  }
+  return 0;
+}
+
 function normalizeMessage(raw, index, ownId = null) {
   const data = raw && raw.data ? raw.data : raw || {};
   const content = data.content ?? data.message ?? data.msg ?? raw.content ?? raw.message;
   const imageUrls = collectUrls(content).concat(collectUrls(data.attachments || data.attachment || data.photos));
   const msgType = String(data.msgType || data.type || raw.type || "text");
-  const threadId = String(
+  
+  const senderId = String(data.uidFrom || raw.uidFrom || raw.senderId || raw.sender_id || "");
+  const isSent = Boolean(raw.isSelf || data.isSelf || (ownId && String(senderId) === String(ownId)));
+  
+  let threadId = String(
     raw.threadId ||
-      data.idTo ||
-      data.threadId ||
-      raw.idTo ||
-      data.groupId ||
-      raw.groupId ||
-      ""
+    data.threadId ||
+    data.groupId ||
+    raw.groupId ||
+    ""
   );
+
+  if (!threadId) {
+    const idTo = String(data.idTo || raw.idTo || "");
+    if (ownId && idTo === String(ownId)) {
+      // Received a personal message sent TO ME
+      threadId = senderId;
+    } else {
+      // I sent a personal message, OR someone sent a group message, OR I sent a group message
+      threadId = idTo;
+    }
+    // Fallback if idTo was empty
+    if (!threadId) {
+      threadId = senderId;
+    }
+  }
+
   const messageId = String(
     data.msgId ||
       data.cliMsgId ||
@@ -184,7 +249,17 @@ function normalizeMessage(raw, index, ownId = null) {
       raw.id ||
       `${data.ts || Date.now()}-${index}`
   );
-  const timestamp = data.ts || raw.timestamp || raw.ts || raw.time || null;
+  const timestampMs = firstTimestampMs(
+    data.ts,
+    data.time,
+    data.timestamp,
+    raw.timestamp,
+    raw.ts,
+    raw.time,
+    raw.createdAt,
+    data.createdAt
+  );
+  const timestamp = timestampMs || null;
   let contentText = textOf(content);
   if (imageUrls.length > 0 && contentText) {
     const trimmed = contentText.trim();
@@ -192,12 +267,11 @@ function normalizeMessage(raw, index, ownId = null) {
       contentText = "";
     }
   }
-  const senderId = String(data.uidFrom || raw.uidFrom || raw.senderId || raw.sender_id || "");
 
   return {
-    thread_id: threadId,
+    thread_id: threadId || null,
     message_id: messageId,
-    sender_id: senderId,
+    sender_id: senderId || null,
     sender_name: data.dName || data.displayName || raw.senderName || raw.sender_name || null,
     timestamp: timestamp ? String(timestamp) : null,
     time_text: timestamp ? new Date(Number(timestamp)).toISOString() : null,
@@ -206,7 +280,8 @@ function normalizeMessage(raw, index, ownId = null) {
     image_urls: Array.from(new Set(imageUrls)),
     reply_to_id: data.quote?.msgId || data.quoteMsgId || null,
     is_deleted: msgType === "chat.delete" || msgType === "recalled",
-    is_sent: Boolean(raw.isSelf || data.isSelf || (ownId && String(senderId) === String(ownId))),
+    is_sent: isSent,
+    raw,
   };
 }
 

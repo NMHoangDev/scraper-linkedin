@@ -32,7 +32,6 @@ from app.modules.all_platform.zalo.services.browser_operation_lock import zalo_b
 from app.modules.all_platform.zalo.services.zca_auth_store import ensure_session_zca_auth, load_zca_auth
 from app.modules.all_platform.zalo.services.zca_api_bridge import (
     get_zca_group_related_ids,
-    get_zca_group_history,
     list_zca_groups,
     sync_zca_group_old_messages,
 )
@@ -250,12 +249,19 @@ async def _crawl_zca_messages_with_best_group_id(
                 if safe_count not in history_counts:
                     history_counts.append(safe_count)
 
+            thread_type = 1 if str(candidate_id).startswith("g") else 0
             for history_count in history_counts:
-                messages = await get_zca_group_history(auth, candidate_id, count=history_count)
+                messages = await sync_zca_group_old_messages(
+                    auth, 
+                    candidate_id, 
+                    thread_type=thread_type,
+                    count=history_count,
+                    timeout_ms=35000
+                )
                 if messages:
                     logger.info(
                         f"ZCA selected group_id={candidate_id!r} for group={group_name!r} "
-                        f"via getGroupChatHistory count={history_count} messages={len(messages)} candidates={candidates}"
+                        f"via sync_zca_group_old_messages count={history_count} messages={len(messages)} candidates={candidates}"
                     )
                     return candidate_id, messages[:count]
 
@@ -273,23 +279,7 @@ async def _crawl_zca_messages_with_best_group_id(
                     f"Could not append related ZCA ids during crawl for candidate_id={candidate_id!r}: {exc}"
                 )
 
-            logger.warning(
-                f"ZCA history returned no messages for candidate_id={candidate_id!r} "
-                f"group={group_name!r}; trying listener sync"
-            )
-            messages = await sync_zca_group_old_messages(
-                auth,
-                candidate_id,
-                count=count,
-                timeout_ms=35000,
-            )
-            if messages:
-                logger.info(
-                    f"ZCA selected group_id={candidate_id!r} for group={group_name!r} "
-                    f"via listener sync messages={len(messages)} candidates={candidates}"
-                )
-                return candidate_id, messages
-            errors.append(f"{candidate_id}:empty")
+            # No listener sync fallback needed, we already used sync_zca_group_old_messages
         except Exception as exc:
             errors.append(f"{candidate_id}:{type(exc).__name__}:{exc}")
             logger.warning(

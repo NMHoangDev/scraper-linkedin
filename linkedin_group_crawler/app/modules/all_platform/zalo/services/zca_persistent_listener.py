@@ -16,25 +16,37 @@ from app.modules.all_platform.zalo.services.supabase_service import (
     save_listener_messages,
 )
 from app.modules.all_platform.zalo.config import settings
-from app.modules.all_platform.zalo.services.zca_api_bridge import list_zca_groups, get_zca_group_history, list_zca_friends
+from app.modules.all_platform.zalo.services.zca_api_bridge import (
+    get_zca_group_history,
+    list_zca_groups,
+    list_zca_friends,
+)
 from app.modules.all_platform.zalo.services.zca_auth_store import list_zca_auth_users, load_zca_auth
+
+# Cache tên từ Supabase để fallback khi ZCA không có (tránh hiển thị mã số).
+# Key: (user_id, group_id) → group_name
+_supabase_group_name_cache: Dict[Tuple[str, str], str] = {}
 
 
 _CACHE_LIMIT_PER_GROUP = 1000
 _RESTART_BACKOFFS = [3, 8, 20, 45, 90]
-_STARTUP_SYNC_GROUP_LIMIT = 12
-_STARTUP_SYNC_MESSAGE_COUNT = 80
+_STARTUP_SYNC_GROUP_LIMIT = 5  # giảm từ 12 → 5 để tránh Zalo rate-limit (429)
+_STARTUP_SYNC_MESSAGE_COUNT = 30  # giảm từ 80 → 30
 _STARTUP_SYNC_TIMEOUT_MS = 25000
+_STARTUP_SYNC_PER_GROUP_DELAY_S = 1.5  # delay giữa các group, tránh spam Zalo API
 
 # Marker cho biết cookie/session Zalo đã hết hạn — không cố restart vô ích nữa.
 _AUTH_EXPIRED_MARKERS = (
     "đăng nhập thất bại",
     "logincookie",
     "login failed",
+    "login_failed",
     "session expired",
     "not logged in",
     "invalid cookie",
     "cookie expired",
+    "error_code",
+    "improperly submitted",
 )
 
 
@@ -112,6 +124,8 @@ def _to_message(row: Dict[str, Any]) -> Message:
         reply_to_id=row.get("reply_to_id") or None,
         is_deleted=bool(row.get("is_deleted")),
         is_sent=bool(row.get("is_sent")),
+        # thread_id / group_id từ raw row (dùng khi resolve group_name).
+        group_id=str(row.get("thread_id") or row.get("group_id") or "") or None,
     )
 
 
@@ -267,7 +281,7 @@ class ZcaPersistentListenerManager:
 
                 logger.info(f"ZCA listener startup sync user={state.user_id} groups={group_ids}")
 
-                for group_id in group_ids:
+                for idx, group_id in enumerate(group_ids):
                     try:
                         # Ưu tiên getGroupChatHistory vì nó lấy đúng lịch sử của 1 group cụ thể.
                         messages = await get_zca_group_history(
@@ -312,6 +326,12 @@ class ZcaPersistentListenerManager:
                         logger.warning(
                             f"Startup sync failed for user={state.user_id} group={group_id}: {exc}"
                         )
+
+                    # Delay giữa các group để tránh Zalo rate-limit (429).
+                    # Listener vẫn nhận message realtime qua socket nên delay
+                    # này không ảnh hưởng UX, chỉ làm chậm first-time backfill.
+                    if idx < len(group_ids) - 1:
+                        await asyncio.sleep(_STARTUP_SYNC_PER_GROUP_DELAY_S)
             finally:
                 state.reconnect_sync_task = None
 
@@ -362,9 +382,22 @@ class ZcaPersistentListenerManager:
             # Cookie hết hạn: dừng hẳn, không restart vô ích. Chờ user đăng nhập lại bằng QR.
             if state.auth_expired:
                 state.desired = False
+                reason = state.last_error or "unknown"
                 logger.warning(
                     f"ZCA session expired for user={state.user_id} — stopping listener until re-login (QR)"
                 )
+                # Publish auth-expired event để auth SSE endpoint push về FE ngay lập tức.
+                try:
+                    from app.modules.all_platform.zalo.services.message_events import (
+                        publish_auth_expired,
+                    )
+                    delivered = await publish_auth_expired(state.user_id, reason)
+                    logger.info(
+                        f"Published auth_expired event for user={state.user_id}: "
+                        f"delivered_to_subscriber={delivered}"
+                    )
+                except Exception as exc:
+                    logger.warning(f"Could not publish auth_expired event for user={state.user_id}: {exc}")
                 return
 
             state.restart_attempt += 1
@@ -474,6 +507,29 @@ class ZcaPersistentListenerManager:
             )
 
     async def _refresh_group_names(self, state: ListenerState) -> None:
+        # 1. Load từ Supabase trước (nguồn tin cậy nhất sau sync-recent).
+        #    Đặt vào global cache để _record_messages có thể dùng khi ZCA chưa load.
+        try:
+            from app.modules.all_platform.zalo.services.supabase_service import _rest
+            rows = await _rest(
+                "GET",
+                "zalo_groups",
+                params={
+                    "select": "group_id,group_name",
+                    "user_id": f"eq.{state.user_id}",
+                    "limit": "5000",
+                },
+            ) or []
+            for row in rows:
+                g_id = str(row.get("group_id") or "").strip()
+                g_name = str(row.get("group_name") or "").strip()
+                if g_id and g_name and not g_name.startswith("Conversation ") and g_name != g_id:
+                    _supabase_group_name_cache[(state.user_id, g_id)] = g_name
+            logger.info(f"Loaded {len(rows)} group names from Supabase cache for listener user={state.user_id}")
+        except Exception as exc:
+            logger.warning(f"Could not load group names from Supabase for listener: {exc}")
+
+        # 2. Load từ ZCA API (group + friends) — cập nhật vào state.group_names.
         try:
             groups = await list_zca_groups(state.auth or {})
             try:
@@ -481,11 +537,11 @@ class ZcaPersistentListenerManager:
             except Exception as e:
                 logger.warning(f"Could not load ZCA friends for listener name preload: {e}")
                 friends = []
-            
+
             state.group_names = {
                 chat.group_id: chat.name
                 for chat in (groups + friends)
-                if chat.group_id
+                if chat.group_id and chat.name and chat.name != chat.group_id
             }
 
             logger.info(f"Loaded {len(state.group_names)} ZCA group/friend names for listener user={state.user_id}")
@@ -495,10 +551,19 @@ class ZcaPersistentListenerManager:
     async def _handle_event(self, state: ListenerState, raw_line: str) -> None:
         if not raw_line:
             return
+
+        # ZCA JS emit một số dòng không phải JSON thuần (có prefix).
+        # Strip prefix để parse được JSON phía sau.
+        cleaned = raw_line
+        for prefix in ("TEST_LOGIN_DATA: ", "TEST_SERVER_INFO: ", "WARN: ", "ERROR: "):
+            if cleaned.startswith(prefix):
+                cleaned = cleaned[len(prefix):]
+                break
+
         try:
-            event = json.loads(raw_line)
+            event = json.loads(cleaned)
         except json.JSONDecodeError:
-            logger.warning(f"Invalid ZCA listener JSON for user={state.user_id}: {raw_line[:500]}")
+            logger.debug(f"Non-JSON line from ZCA listener for user={state.user_id}: {raw_line[:200]}")
             return
 
         state.last_event_at = _now_iso()
@@ -515,7 +580,7 @@ class ZcaPersistentListenerManager:
         if event_name in {"disconnected", "closed", "stopping"}:
             state.connected = False
             return
-        if event_name in {"error", "fatal"}:
+        if event_name in {"error", "fatal", "login_failed"}:
             detail = event.get("error_detail") or event.get("error") or event
             state.last_error = json.dumps(detail, ensure_ascii=False)[:1000]
             if _looks_like_auth_expired(state.last_error):
@@ -571,7 +636,21 @@ class ZcaPersistentListenerManager:
             return
 
         for group_id, messages in grouped.items():
-            group_name = state.group_names.get(group_id) or f"Conversation {group_id}"
+            # Resolve group_name với 3 mức ưu tiên:
+            # 1. Tên từ ZCA API (ưu tiên cao nhất, realtime).
+            # 2. Tên từ Supabase cache (được load bởi _refresh_group_names).
+            # 3. sender_name từ message đầu tiên (personal chat, sender_name = tên người gửi).
+            # KHÔNG BAO GIỜ dùng "Conversation {group_id}" vì nó gây confusion trên UI.
+            group_name = state.group_names.get(group_id)
+            if not group_name:
+                group_name = _supabase_group_name_cache.get((state.user_id, group_id))
+            if not group_name:
+                # Personal chat: lấy tên từ sender của message đầu tiên.
+                first_msg = messages[0]
+                if first_msg.sender_name and first_msg.sender_name not in {"__me__", "me", "ban", "bạn"}:
+                    group_name = first_msg.sender_name
+                else:
+                    group_name = f"Conversation {group_id}"
 
             try:
                 await save_listener_messages(state.user_id, group_id, group_name, messages, increment_unread=increment_unread)

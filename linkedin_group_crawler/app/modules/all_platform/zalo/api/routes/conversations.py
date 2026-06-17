@@ -152,6 +152,12 @@ async def sync_recent_conversations(
     except SupabaseNotConfigured as exc:
         raise HTTPException(status_code=503, detail=str(exc))
     except Exception as exc:
+        err_msg = str(exc).lower()
+        if "429" in err_msg or "too many" in err_msg or "rate limit" in err_msg:
+            raise HTTPException(
+                status_code=429,
+                detail="Zalo đang giới hạn tốc độ yêu cầu (quá nhiều thao tác). Vui lòng đợi 1-2 phút rồi thử lại."
+            )
         raise HTTPException(status_code=500, detail=f"Không thể tải danh sách hội thoại Zalo: {exc}")
 
     groups_to_sync = []
@@ -174,7 +180,6 @@ async def sync_recent_conversations(
             from app.modules.all_platform.zalo.services.zca_persistent_listener import _timestamp_ms
             db_ms = _timestamp_ms(db_ts_str)
             api_ms = _timestamp_ms(api_ts_str)
-            # Nếu tin nhắn mới nhất trên Zalo trùng hoặc cũ hơn DB, ta bỏ qua không cào lại nhóm này
             if api_ms > db_ms:
                 groups_to_sync.append(group)
             else:
@@ -189,6 +194,38 @@ async def sync_recent_conversations(
         except Exception:
             groups_to_sync.append(group)
 
+    # Also sync personal chat threads (friends) — bug fix: previously only `groups` were processed.
+    # Personal chats have no unread_count concept via ZCA list API, so always sync friends.
+    friends_to_sync: List[Any] = []
+    friends_skipped: List[SyncRecentGroupResult] = []
+    for friend in friends:
+        meta = existing_meta.get(friend.group_id)
+        if not meta:
+            friends_to_sync.append(friend)
+            continue
+        db_ts_str = meta.get("last_message_at")
+        api_ts_str = friend.last_message_at
+        if not db_ts_str or not api_ts_str:
+            friends_to_sync.append(friend)
+            continue
+        try:
+            from app.modules.all_platform.zalo.services.zca_persistent_listener import _timestamp_ms
+            db_ms = _timestamp_ms(db_ts_str)
+            api_ms = _timestamp_ms(api_ts_str)
+            if api_ms > db_ms:
+                friends_to_sync.append(friend)
+            else:
+                friends_skipped.append(
+                    SyncRecentGroupResult(
+                        group_id=friend.group_id,
+                        group_name=friend.name,
+                        messages_saved=0,
+                        status="skipped",
+                    )
+                )
+        except Exception:
+            friends_to_sync.append(friend)
+
     results: List[SyncRecentGroupResult] = []
     total_saved = 0
     groups_with_messages = 0
@@ -200,9 +237,11 @@ async def sync_recent_conversations(
     async def _sync_one_group(group) -> SyncRecentGroupResult:
         async with semaphore:
             try:
-                messages = await get_zca_group_history(
+                thread_type = 0 if getattr(group, "is_friend", False) else 1
+                messages = await sync_zca_group_old_messages(
                     auth,
                     group.group_id,
+                    thread_type=thread_type,
                     count=per_group_count,
                 )
                 if not messages:
@@ -236,7 +275,8 @@ async def sync_recent_conversations(
                 )
 
     sync_results = await asyncio.gather(*[_sync_one_group(group) for group in groups_to_sync])
-    results = skipped_results + list(sync_results)
+    friends_results = await asyncio.gather(*[_sync_one_group(friend) for friend in friends_to_sync])
+    results = skipped_results + list(sync_results) + list(friends_results)
 
     for item in results:
         total_saved += item.messages_saved
@@ -247,7 +287,7 @@ async def sync_recent_conversations(
 
     return SyncRecentResponse(
         account_id=user_id,
-        scanned=len(groups),
+        scanned=len(groups) + len(friends),
         groups_with_messages=groups_with_messages,
         messages_saved=total_saved,
         errors=errors,
@@ -257,17 +297,44 @@ async def sync_recent_conversations(
 
 async def _background_sync_conversation_messages(account_id: str, conversation_id: str):
     from app.modules.all_platform.zalo.services.zca_auth_store import load_zca_auth
-    from app.modules.all_platform.zalo.services.zca_api_bridge import get_zca_group_history
-    from app.modules.all_platform.zalo.services.supabase_service import save_listener_messages
+    from app.modules.all_platform.zalo.services.zca_api_bridge import sync_zca_group_old_messages
+    from app.modules.all_platform.zalo.services.supabase_service import save_listener_messages, _rest
     try:
         auth = await load_zca_auth(account_id)
         if not auth: return
-        messages = await get_zca_group_history(auth, conversation_id, count=20)
+
+        # Resolve group_name từ Supabase trước khi dùng conversation_id.
+        group_name = conversation_id
+        try:
+            rows = await _rest(
+                "GET",
+                "zalo_groups",
+                params={
+                    "select": "group_name",
+                    "user_id": f"eq.{account_id}",
+                    "group_id": f"eq.{conversation_id}",
+                    "limit": "1",
+                },
+            ) or []
+            if rows and rows[0].get("group_name"):
+                resolved = str(rows[0]["group_name"]).strip()
+                if resolved and not resolved.startswith("Conversation ") and resolved != conversation_id:
+                    group_name = resolved
+        except Exception:
+            pass  # Fallback vẫn dùng conversation_id
+
+        thread_type = 1 if conversation_id.strip().startswith("g") else 0
+        messages = await sync_zca_group_old_messages(
+            auth, 
+            conversation_id, 
+            thread_type=thread_type, 
+            count=50
+        )
         if messages:
             await save_listener_messages(
                 user_id=account_id,
                 group_id=conversation_id,
-                group_name=conversation_id,
+                group_name=group_name,
                 messages=messages,
                 increment_unread=False,
             )

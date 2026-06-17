@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional
 import asyncio
 import base64
 import re
@@ -33,7 +33,7 @@ from app.modules.all_platform.zalo.services.session_store import (
     get_session,
     save_session,
 )
-from app.modules.all_platform.zalo.services.supabase_service import upsert_zalo_user
+from app.modules.all_platform.zalo.services.supabase_service import upsert_zalo_user, upsert_zalo_account
 from app.modules.all_platform.zalo.services.zca_auth_store import (
     delete_zca_auth,
     ensure_session_zca_auth,
@@ -156,11 +156,25 @@ def _build_session_id(user_id: str) -> str:
     return f"{user_id}--{uuid.uuid4().hex}"
 
 
-async def _remember_zalo_user(user_id: str, status: str, worker_id: Optional[str] = None) -> None:
+async def _remember_zalo_user(
+    user_id: str, 
+    status: str, 
+    worker_id: Optional[str] = None, 
+    cookie: Optional[str] = None,
+    owner_id: Optional[str] = None
+) -> None:
     try:
-        await upsert_zalo_user(user_id, status=status, assigned_worker_id=worker_id)
+        await upsert_zalo_user(user_id, status=status, assigned_worker_id=worker_id, cookie=cookie)
     except Exception as exc:
         logger.warning(f"Could not upsert Zalo user metadata for user={user_id}: {exc}")
+    try:
+        await upsert_zalo_account(
+            account_id=user_id,
+            owner_id=owner_id or user_id,
+            status=status
+        )
+    except Exception as exc:
+        logger.warning(f"Could not upsert Zalo account metadata for account={user_id}: {exc}")
 
 
 def _serialize_login_state(request: Request, user_id: str, session: Optional[SessionData], status: str) -> dict:
@@ -260,14 +274,20 @@ async def _build_current_status_payload(request: Request, user_id: str) -> dict:
     if await ensure_session_zca_auth(session):
         # Trong zca mode, file auth vẫn tồn tại kể cả khi cookie đã chết.
         # Nếu persistent listener báo phiên hết hạn => yêu cầu đăng nhập lại bằng QR.
+        # Lưu ý: KHÔNG xóa auth ngay khi người dùng vào /current-status. Cookie có thể vẫn
+        # còn dùng được cho các API không yêu cầu listener stream (list-groups, group-history).
+        # Chỉ set session status = "session_expired" để FE hiển thị nút đăng nhập lại.
+        # Auth sẽ được ghi đè khi user login QR mới.
         if settings.qr_login_mode.strip().lower() == "zca":
             listener = get_listener_status(user_id)
             if listener.get("auth_expired"):
-                logger.warning(f"ZCA session expired for user={user_id} — cleaning up ZCA auth and prompting re-login")
-                await delete_zca_auth(user_id)
-                session.status = "session_expired"
-                session.zca_auth = None
-                await save_session(session)
+                if session.status != "session_expired":
+                    logger.warning(
+                        f"ZCA session expired for user={user_id} — keeping auth file but marking session_expired; user must re-login QR to refresh"
+                    )
+                    session.status = "session_expired"
+                    session.last_used = datetime.utcnow()
+                    await save_session(session)
                 return _serialize_login_state(request, user_id, session, "session_expired")
         if session.status != "confirmed":
             session.status = "confirmed"
@@ -395,7 +415,14 @@ async def _handle_zca_qr_events(session_id: str) -> None:
                 await start_listener(session.user_id, auth, force_restart=True)
             except Exception as exc:
                 logger.warning(f"Could not start ZCA persistent listener for user={session.user_id}: {exc}")
-            await _remember_zalo_user(session.user_id, "confirmed")
+            
+            # Construct cookie string for DB backward compatibility
+            cookies = auth.get("cookies")
+            cookie_str = None
+            if isinstance(cookies, list):
+                cookie_str = "; ".join(f"{c.get('key')}={c.get('value')}" for c in cookies if c.get("key") and c.get("value") is not None)
+                
+            await _remember_zalo_user(session.user_id, "confirmed", cookie=cookie_str)
             logger.info(f"ZCA QR login success for session {session_id}")
             return
 
@@ -918,26 +945,69 @@ async def auth_status_events(
     request: Request,
     user_id: str = Query("default"),
 ):
+    from app.modules.all_platform.zalo.services.message_events import (
+        publish_auth_expired,
+        wait_for_auth_expired,
+    )
+
     normalized_user_id = _normalize_user_id(user_id)
     # FIX H-2: Đặt deadline 10 phút để tránh SSE stream chạy vĩnh viễn
     # sau khi client ngắt kết nối hoặc sau khi đã xác nhận đăng nhập.
     _SSE_MAX_SECONDS = 600
+    _POLL_INTERVAL = 2.0  # giây giữa mỗi lần poll status
 
     async def _event_stream():
         last_payload = ""
         deadline = asyncio.get_event_loop().time() + _SSE_MAX_SECONDS
+        confirmed_and_streaming = False
+
         while asyncio.get_event_loop().time() < deadline:
             if await request.is_disconnected():
                 logger.info(f"SSE client disconnected for user={normalized_user_id}")
                 break
+
+            # 1. Kiểm tra auth_expired event từ ZCA listener (chờ tối đa _POLL_INTERVAL giây).
+            expired_event = await wait_for_auth_expired(timeout=_POLL_INTERVAL)
+            if expired_event is not None and expired_event[0] == normalized_user_id:
+                # Dọn dẹp auth và build payload "session_expired" để push ngay về FE.
+                try:
+                    from app.modules.all_platform.zalo.services.zca_auth_store import delete_zca_auth
+                    session = await get_latest_session_for_user(normalized_user_id)
+                    if session:
+                        session.status = "session_expired"
+                        session.zca_auth = None
+                        await save_session(session)
+                    await delete_zca_auth(normalized_user_id)
+                except Exception as cleanup_exc:
+                    logger.warning(f"Could not cleanup expired auth for user={normalized_user_id}: {cleanup_exc}")
+
+                payload = {
+                    "session_id": session.session_id if session else None,
+                    "status": "session_expired",
+                    "is_logged_in": False,
+                    "can_crawl": False,
+                    "session_expired": True,
+                    "login_url": None,
+                    "manual_viewer_url": None,
+                    "qr_base64": None,
+                    "message": expired_event[1] or "Phiên Zalo đã hết hạn. Vui lòng đăng nhập lại bằng mã QR.",
+                }
+                yield f"event: auth-status\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+                logger.info(f"Pushed session_expired to SSE for user={normalized_user_id}")
+                continue
+
+            # 2. Không có auth_expired → poll status bình thường.
             try:
                 payload = await _build_current_status_payload(request, normalized_user_id)
                 payload_json = json.dumps(payload, ensure_ascii=False)
                 if payload_json != last_payload:
                     last_payload = payload_json
                     yield f"event: auth-status\ndata: {payload_json}\n\n"
-                    # FIX H-2: Dừng stream ngay khi đã xác nhận đăng nhập
-                    if payload.get("is_logged_in"):
+                    if payload.get("is_logged_in") and not confirmed_and_streaming:
+                        confirmed_and_streaming = True
+                        # Đã xác nhận: chờ thêm một chu kỳ rồi mới đóng
+                        # để FE kịp nhận event cuối cùng.
+                        await asyncio.sleep(_POLL_INTERVAL)
                         logger.info(f"SSE stream closing — user={normalized_user_id} confirmed login")
                         yield "event: close\ndata: {}\n\n"
                         return
@@ -946,7 +1016,7 @@ async def auth_status_events(
             except Exception as exc:
                 logger.warning(f"SSE auth status stream error for user={normalized_user_id}: {exc}")
                 yield "event: error\ndata: {\"message\":\"status_stream_error\"}\n\n"
-            await asyncio.sleep(2)
+            await asyncio.sleep(_POLL_INTERVAL)
         # Hết deadline hoặc thoát vòng lặp
         yield "event: close\ndata: {\"reason\":\"timeout\"}\n\n"
 
@@ -1079,5 +1149,410 @@ async def logout_all_sessions(x_user_id: str = Header("default", alias="X-User-I
         "zca_auth_removed": zca_auth_removed,
         "profile_cleared": profile_cleared,
     }
+@router.post("/import-session")
+async def import_session_from_extension(
+    request: Request,
+    x_user_id: str = Header("default", alias="X-User-ID"),
+    x_zalo_worker_id: Optional[str] = Header(None, alias="X-Zalo-Worker-ID"),
+):
+    """Import Zalo session cookies from Chrome Extension.
 
+    The extension captures cookies from ``chat.zalo.me`` after a successful QR
+    scan in the user's real browser.  Those cookies are sent here so the
+    backend can create a confirmed ``SessionData`` and start the ZCA persistent
+    listener — exactly as if the user had logged in through the built-in QR
+    flow.
+
+    Expected JSON body::
+
+        {
+            "user_id": "agent-zalo-1",   // optional, falls back to X-User-ID header
+            "cookies": [
+                {"key": "zppsid",  "value": "...", "domain": "chat.zalo.me", ...},
+                {"key": "zppwsid", "value": "...", "domain": "chat.zalo.me", ...},
+                {"key": "zpsid",   "value": "...", "domain": "chat.zalo.me", ...},
+                {"key": "zphpsid", "value": "...", "domain": "chat.zalo.me", ...},
+                {"key": "_ga",     "value": "...", "domain": ".zalo.me",      ...}
+            ],
+            "imei":         "optional — zca-js requires a truthy IMEI (auto-generated if missing)",
+            "user_agent":   "Mozilla/5.0 ...",
+            "owner_id":     "optional — defaults to X-User-ID"
+        }
+
+    Validation:
+        * Phải có đủ 5 key cookies bắt buộc: zppsid, zppwsid, zpsid, zphpsid, _ga
+        * Mỗi cookie phải có key + value
+        * user_agent bắt buộc (Chrome thật), không chấp nhận default
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    if not isinstance(body, dict):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Body must be a JSON object. Send cookies inside the 'cookies' field, "
+                "not as the top-level body."
+            ),
+        )
+
+    raw_user_id = body.get("account_id") or body.get("user_id") or x_user_id
+    user_id = _normalize_user_id(raw_user_id)
+    owner_id = _normalize_user_id(body.get("owner_id") or x_user_id)
+
+    # ── Parse cookies: accept 4 formats ────────────────────────────────
+    #   1. List of {key, value, domain, ...}  (Chrome extension native format)
+    #   2. JSON string of list  (e.g. '[{"key":"...","value":"..."}]')
+    #   3. JSON string of object  (e.g. '{"cookies":[{...}]}')  ← extension v1.0.x
+    #   4. Plain "k=v; k=v" string             (legacy, NOT recommended)
+    cookies_raw = body.get("cookies")
+    if not cookies_raw:
+        raise HTTPException(status_code=400, detail="Missing 'cookies' field")
+
+    parsed_cookies: List[Dict[str, Any]] = []
+    if isinstance(cookies_raw, list):
+        for c in cookies_raw:
+            if isinstance(c, dict) and c.get("key") and c.get("value") is not None:
+                parsed_cookies.append(c)
+    elif isinstance(cookies_raw, str):
+        stripped = cookies_raw.strip()
+        if stripped.startswith("["):
+            # JSON string of array
+            try:
+                arr = json.loads(stripped)
+                for c in arr:
+                    if isinstance(c, dict) and c.get("key") and c.get("value") is not None:
+                        parsed_cookies.append(c)
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"cookies is JSON string but invalid: {exc}",
+                )
+        elif stripped.startswith("{"):
+            # JSON string of object: try to extract "cookies" field
+            try:
+                obj = json.loads(stripped)
+                inner = obj.get("cookies") if isinstance(obj, dict) else None
+                if isinstance(inner, list):
+                    for c in inner:
+                        if isinstance(c, dict) and c.get("key") and c.get("value") is not None:
+                            parsed_cookies.append(c)
+                elif isinstance(inner, str) and inner.strip().startswith("["):
+                    arr = json.loads(inner)
+                    for c in arr:
+                        if isinstance(c, dict) and c.get("key") and c.get("value") is not None:
+                            parsed_cookies.append(c)
+            except Exception as exc:
+                logger.warning(f"Failed to parse cookies JSON object: {exc}")
+        else:
+            # Plain "k=v; k=v" format
+            for part in stripped.split(";"):
+                part = part.strip()
+                if "=" in part:
+                    k, v = part.split("=", 1)
+                    parsed_cookies.append({
+                        "key": k.strip(),
+                        "value": v.strip(),
+                        "domain": "chat.zalo.me",
+                        "path": "/",
+                    })
+
+    if not parsed_cookies:
+        raise HTTPException(
+            status_code=400,
+            detail="Could not parse any cookies. Expected Chrome-cookie array (key/value/domain) or 'k=v; k=v' string.",
+        )
+
+    # ── Validate required keys ─────────────────────────────────────────
+    # ZCA-JS hiện đại yêu cầu cookies mới zppsid/zppwsid/zphpsid
+    # (Zalo API session mới), không chỉ cookies web cũ (zpsid/zpw_sek).
+    # Extension phải lấy được bộ cookies này từ Zalo web sau khi QR login.
+    REQUIRED_KEYS = ["zppsid", "zppwsid", "zpsid", "zphpsid"]
+    cookie_keys = {c.get("key", "").strip().lower() for c in parsed_cookies}
+    missing = [k for k in REQUIRED_KEYS if k not in cookie_keys]
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Thiếu cookies bắt buộc: {', '.join(missing)}. "
+                f"Đã có: {sorted(cookie_keys)}. "
+                "Hãy đăng nhập lại bằng QR trong extension để lấy cookies đầy đủ."
+            ),
+        )
+
+    # ── Validate user_agent (phải là Chrome thật, không dùng default) ─
+    user_agent = (body.get("user_agent") or "").strip()
+    if not user_agent or "Mozilla" not in user_agent:
+        raise HTTPException(
+            status_code=400,
+            detail="user_agent bắt buộc và phải là Chrome thật (có 'Mozilla'). Hãy gửi navigator.userAgent của trình duyệt.",
+        )
+
+    # ── IMEI: yêu cầu, nếu thiếu thì tự sinh (vẫn pass) ───────────────
+    import uuid
+    imei = (body.get("imei") or "").strip() or str(uuid.uuid4())
+
+    # ── Build a ZCA-compatible auth dict from extension cookies ──────
+    # ZCA expects cookies as either array or {cookies: [...]} object.
+    # Dùng array trực tiếp (chuẩn nhất cho zca-js hiện tại).
+    auth = {
+        "cookies": parsed_cookies,
+        "imei": imei,
+        "userAgent": user_agent,
+        "zaloId": user_id,
+        "ownerId": owner_id,
+        "source": "extension",
+    }
+
+    # ── Delete any stale sessions and create a fresh confirmed one ───
+    profile_lock = await get_profile_lock(user_id)
+    async with profile_lock:
+        await delete_sessions_for_user(user_id)
+
+    session_id = _build_session_id(user_id)
+    session = SessionData(
+        session_id=session_id,
+        user_id=user_id,
+        browser=None,
+        context=None,
+        page=None,
+        status="confirmed",
+        qr_base64=None,
+        qr_signature=None,
+        zca_auth=auth,
+        created_at=datetime.utcnow(),
+        last_used=datetime.utcnow(),
+    )
+    await save_session(session)
+    await save_zca_auth(user_id, auth)
+    
+    try:
+        await start_listener(user_id, auth, force_restart=True)
+    except Exception as exc:
+        logger.warning(f"Could not start ZCA persistent listener for user={user_id} after extension import: {exc}")
+
+    cookie_str = "; ".join(f"{c.get('key')}={c.get('value')}" for c in parsed_cookies if c.get("key") and c.get("value") is not None)
+    await _remember_zalo_user(user_id, "confirmed", x_zalo_worker_id, cookie=cookie_str, owner_id=owner_id)
+
+    cookie_keys_str = ", ".join(sorted(cookie_keys))
+    logger.info(
+        f"Imported extension session for user={user_id}, "
+        f"session={session_id}, cookies={len(parsed_cookies)} keys=[{cookie_keys_str}]"
+    )
+
+    # ── Background: first-time sync then start persistent listener ───
+    async def _background_extension_sync(uid: str, uauth: dict):
+        import time as _time
+        t0 = _time.time()
+        try:
+            logger.info(f"Extension import: [1/2] starting first-time sync for user={uid}...")
+            from app.modules.all_platform.zalo.services.zca_api_bridge import first_time_sync
+            # Giảm messages_per_chat 50→20 và group_limit default 25→8 để
+            # tránh Zalo rate-limit (429) ngay sau khi login. Listener vẫn
+            # đảm bảo nhận message realtime qua socket; first-time sync chỉ
+            # là backfill messages gần đây.
+            result = await first_time_sync(
+                auth=uauth,
+                zalo_account_id=uid,
+                messages_per_chat=50,
+                group_limit=8,
+                include_friends=True,
+            )
+            dt = _time.time() - t0
+            logger.info(
+                f"Extension import: [1/2] first-time sync done for {uid} in {dt:.1f}s: {result}"
+            )
+        except Exception as sync_exc:
+            dt = _time.time() - t0
+            logger.warning(
+                f"Extension import: [1/2] first-time sync FAILED for {uid} after {dt:.1f}s: {sync_exc}. "
+                f"Tiếp tục start listener để user có thể retry."
+            )
+        finally:
+            t1 = _time.time()
+            try:
+                logger.info(f"Extension import: [2/2] starting persistent listener for user={uid}...")
+                await start_listener(uid, uauth, force_restart=True)
+                dt = _time.time() - t1
+                logger.info(
+                    f"Extension import: [2/2] persistent listener started for user={uid} in {dt:.1f}s. "
+                    f"Total time: {_time.time() - t0:.1f}s."
+                )
+            except Exception as start_exc:
+                dt = _time.time() - t1
+                logger.warning(
+                    f"Extension import: [2/2] could not start listener for user={uid} after {dt:.1f}s: {start_exc}"
+                )
+
+    asyncio.create_task(_background_extension_sync(user_id, auth))
+
+    return {
+        "user_id": user_id,
+        "session_id": session_id,
+        "status": "confirmed",
+        "source": "extension",
+        "cookies_count": len(parsed_cookies),
+        "cookies_keys": sorted(cookie_keys),
+        "imei": bool(body.get("imei")),
+        "message": f"Imported {len(parsed_cookies)} cookies, keys=[{cookie_keys_str}]. Listener sẽ khởi động nền.",
+    }
+
+
+@router.post("/delete-account-full")
+async def delete_account_full(
+    request: Request,
+    x_user_id: str = Header("default", alias="X-User-ID"),
+):
+    """Xoá HOÀN TOÀN một tài khoản Zalo:
+    * File auth local: ``artifacts/zca-auth/{user_id}.json``
+    * Supabase: ``zalo_accounts``, ``zalo_sessions``, ``zalo_users``,
+      ``zalo_groups``, ``zalo_messages`` (xoá theo user_id / account_id)
+    * Dừng listener process
+    * Xoá sessions in-memory
+
+    Body JSON::
+        {
+            "account_id": "h-nguvbhj"      // bắt buộc
+            "owner_id":   "owner@x.com"    // optional
+        }
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    raw_account_id = (body.get("account_id") or x_user_id or "").strip()
+    if not raw_account_id:
+        raise HTTPException(status_code=400, detail="Missing 'account_id'")
+    account_id = _normalize_user_id(raw_account_id)
+    owner_id = _normalize_user_id(body.get("owner_id") or x_user_id)
+
+    result: Dict[str, Any] = {
+        "account_id": account_id,
+        "owner_id": owner_id,
+        "auth_file_deleted": False,
+        "listener_stopped": False,
+        "supabase": {
+            "zalo_accounts": 0,
+            "zalo_sessions": 0,
+            "zalo_users": 0,
+            "zalo_groups": 0,
+            "zalo_messages": 0,
+        },
+        "in_memory_sessions_cleared": 0,
+    }
+
+    # 1. Stop listener (nếu đang chạy)
+    try:
+        from app.modules.all_platform.zalo.services.zca_persistent_listener import (
+            stop_listener as _stop_listener,
+        )
+        await _stop_listener(account_id)
+        result["listener_stopped"] = True
+    except Exception as exc:
+        result["listener_stop_error"] = str(exc)
+
+    # 2. Xoá file auth local
+    try:
+        result["auth_file_deleted"] = bool(await delete_zca_auth(account_id))
+    except Exception as exc:
+        result["auth_file_error"] = str(exc)
+
+    # 3. Xoá sessions in-memory của user
+    try:
+        result["in_memory_sessions_cleared"] = int(await delete_sessions_for_user(account_id))
+    except Exception as exc:
+        result["in_memory_sessions_error"] = str(exc)
+
+    # 4. Xoá Supabase: zalo_accounts, zalo_sessions, zalo_users, zalo_groups, zalo_messages
+    try:
+        from app.modules.all_platform.zalo.services.supabase_service import (
+            hard_delete_zalo_account_data,
+        )
+        deleted = await hard_delete_zalo_account_data(account_id)
+        for k, v in deleted.items():
+            if k in result["supabase"]:
+                result["supabase"][k] = v
+        if deleted.get("_errors", 0) > 0:
+            result["supabase"]["_errors"] = deleted["_errors"]
+    except Exception as exc:
+        result["supabase_error"] = str(exc)
+
+    logger.info(
+        f"delete_account_full: account={account_id} owner={owner_id} "
+        f"auth_file={result['auth_file_deleted']} listener={result['listener_stopped']} "
+        f"db_deleted={result['supabase']}"
+    )
+    return {"success": True, "data": result}
+
+
+@router.post("/cleanup-orphan-accounts")
+async def cleanup_orphan_accounts(x_user_id: str = Header("default", alias="X-User-ID")):
+    """Dọn các account Zalo trong Supabase mà KHÔNG có auth file local tương ứng.
+
+    Mục đích: sau khi user xoá auth trên máy local, DB vẫn còn account rác.
+    Endpoint này xoá các rows trong ``zalo_accounts`` mà file auth tương ứng không tồn tại.
+    Cẩn thận: chỉ xoá các account KHÔNG có auth và KHÔNG có listener đang chạy.
+    """
+    from app.modules.all_platform.zalo.services.zca_persistent_listener import (
+        get_listener_status,
+    )
+    from app.modules.all_platform.zalo.services.supabase_service import (
+        _rest,
+        hard_delete_zalo_account_data,
+    )
+
+    accounts_resp = await _rest(
+        "GET",
+        "zalo_accounts",
+        params={"select": "account_id,owner_id,is_active", "is_active": "eq.true"},
+    )
+    items = []
+    if isinstance(accounts_resp, list):
+        items = accounts_resp
+    elif isinstance(accounts_resp, dict):
+        items = accounts_resp.get("data") or []
+
+    deleted: List[Dict[str, Any]] = []
+    kept: List[Dict[str, Any]] = []
+    for acc in items:
+        if not isinstance(acc, dict):
+            continue
+        aid = str(acc.get("account_id") or "").strip()
+        if not aid:
+            continue
+        # Nếu có auth file local → keep
+        auth_present = False
+        try:
+            auth_data = await load_zca_auth(aid)
+            auth_present = bool(auth_data)
+        except Exception:
+            auth_present = False
+        if auth_present:
+            kept.append({"account_id": aid, "reason": "has_auth_file"})
+            continue
+        # Nếu listener đang chạy → keep
+        try:
+            st = get_listener_status(aid)
+            if st.get("running") or st.get("connected"):
+                kept.append({"account_id": aid, "reason": "listener_running"})
+                continue
+        except Exception:
+            pass
+        # Xoá tất cả dữ liệu liên quan (5 bảng)
+        try:
+            del_info = await hard_delete_zalo_account_data(aid)
+            deleted.append({"account_id": aid, "reason": "no_auth_no_listener", "deleted": del_info})
+        except Exception as exc:
+            kept.append({"account_id": aid, "reason": f"delete_error: {exc}"})
+
+    return {
+        "success": True,
+        "deleted": deleted,
+        "deleted_count": len(deleted),
+        "kept": kept,
+        "kept_count": len(kept),
+    }
 

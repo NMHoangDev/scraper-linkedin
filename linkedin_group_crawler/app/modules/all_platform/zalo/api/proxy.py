@@ -11,7 +11,7 @@ from app.modules.all_platform.zalo.services.worker_pool import (
 
 
 router = APIRouter(
-    prefix="/api/zalo",
+    prefix="",
     tags=["zalo-proxy"],
     dependencies=[Depends(verify_zalo_api_key)],
 )

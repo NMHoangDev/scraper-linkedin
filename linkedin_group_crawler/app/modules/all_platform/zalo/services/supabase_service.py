@@ -234,6 +234,7 @@ async def upsert_zalo_user(
     status: str,
     assigned_worker_id: Optional[str] = None,
     display_name: Optional[str] = None,
+    cookie: Optional[str] = None,
 ) -> None:
     if not is_supabase_configured():
         return
@@ -251,6 +252,8 @@ async def upsert_zalo_user(
         payload["assigned_worker_id"] = assigned_worker_id
     if display_name:
         payload["display_name"] = display_name
+    if cookie is not None:
+        payload["cookie"] = cookie
 
     await _rest(
         "POST",
@@ -310,7 +313,8 @@ async def upsert_group(
                 }
             )
             if existing and existing[0].get("group_name"):
-                old_name = existing[0]["group_name"]
+                old_name = str(existing[0]["group_name"]).strip()
+                # Chỉ dùng tên cũ nếu nó là tên thật (không phải số, không phải mã nhóm, không phải placeholder).
                 if old_name and not (old_name.startswith("Conversation ") or old_name.isdigit() or old_name == group_id):
                     resolved_name = old_name
         except Exception:
@@ -368,7 +372,7 @@ async def upsert_groups(user_id: str, groups: Iterable[Dict[str, Any]]) -> int:
             "GET",
             "zalo_groups",
             params={
-                "select": "group_id,avatar_url,unread_count,last_message_at,last_message_content,last_sender_id,last_sender_name,last_message_type",
+                "select": "group_id,group_name,avatar_url,unread_count,last_message_at,last_message_content,last_sender_id,last_sender_name,last_message_type",
                 "user_id": f"eq.{user_id}",
                 "limit": "5000",
             },
@@ -380,6 +384,13 @@ async def upsert_groups(user_id: str, groups: Iterable[Dict[str, Any]]) -> int:
     rows: List[Dict[str, Any]] = []
     for group_id, group_name, group in candidates:
         existing = existing_map.get(group_id, {})
+        
+        # Preserve existing group_name if new one is just an ID or generic
+        old_name = str(existing.get("group_name") or "").strip()
+        if old_name and (group_name.startswith("Conversation ") or group_name.isdigit() or group_name == group_id):
+            if not (old_name.startswith("Conversation ") or old_name.isdigit() or old_name == group_id):
+                group_name = old_name
+
         last_msg_at_raw = group.get("last_message_at")
         new_last_msg_at = _normalize_iso_timestamp(last_msg_at_raw) if last_msg_at_raw is not None else None
         row = {
@@ -513,6 +524,55 @@ async def delete_zalo_account(account_id: str) -> None:
         if "zalo_accounts" in str(exc):
             return
         raise
+
+
+async def hard_delete_zalo_account_data(account_id: str) -> Dict[str, int]:
+    """Xoá thật sự (hard delete) toàn bộ dữ liệu của 1 account Zalo trong Supabase.
+
+    Xoá rows theo ``user_id = account_id`` (và ``account_id = account_id`` cho bảng ``zalo_accounts``)
+    trong 5 bảng: zalo_sessions, zalo_users, zalo_accounts, zalo_groups, zalo_messages.
+
+    Trả về dict ``{table: deleted_count}``. Bảng nào lỗi sẽ bị bỏ qua và ghi vào key ``_errors``.
+    """
+    if not is_supabase_configured():
+        return {}
+
+    result: Dict[str, int] = {}
+
+    def _count(resp: Any) -> int:
+        if isinstance(resp, list):
+            return len(resp)
+        if isinstance(resp, dict):
+            d = resp.get("data")
+            if isinstance(d, list):
+                return len(d)
+        return 0
+
+    targets = [
+        ("zalo_sessions", {"user_id": f"eq.{account_id}"}),
+        ("zalo_users", {"user_id": f"eq.{account_id}"}),
+        ("zalo_accounts", {"account_id": f"eq.{account_id}"}),
+        ("zalo_groups", {"user_id": f"eq.{account_id}"}),
+        ("zalo_messages", {"user_id": f"eq.{account_id}"}),
+    ]
+    for table, params in targets:
+        try:
+            resp = await _rest("DELETE", table, params=params, prefer="return=representation")
+            result[table] = _count(resp)
+        except RuntimeError as exc:
+            # Table không tồn tại hoặc lỗi → ghi log nhưng KHÔNG raise để các bảng khác vẫn xoá được
+            msg = str(exc)
+            if "Could not find" in msg or "does not exist" in msg or "404" in msg or "PGRST" in msg:
+                result[table] = 0
+            else:
+                result.setdefault("_errors", 0)
+                result["_errors"] += 1
+                logger.warning(f"hard_delete_zalo_account_data: failed to delete {table}: {msg}")
+        except Exception as exc:
+            logger.warning(f"hard_delete_zalo_account_data: unexpected error on {table}: {exc}")
+            result[table] = 0
+
+    return result
 
 
 # ----------------------------------------------------------------------------

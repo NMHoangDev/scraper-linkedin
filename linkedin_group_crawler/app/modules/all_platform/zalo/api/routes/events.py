@@ -192,6 +192,7 @@ async def stream_zalo_events(
                 account_ids,
                 role=caller_role,
                 email=caller_email,
+                caller_id=caller_id,
             ):
                 if await request.is_disconnected():
                     break
@@ -290,3 +291,41 @@ async def get_share_status(
     )
 
     return await get_conversation_share_status(account_id, conversation_id)
+
+
+@router.post("/test-publish")
+async def test_publish_event(
+    account_id: str = Query(...),
+    sender_name: str = Query("Test Sender"),
+    message_text: str = Query("Hello from test"),
+    conversation_id: str = Query("test-conv-001"),
+):
+    """Debug-only endpoint to publish a fake Zalo message event for SSE latency testing."""
+    from app.modules.all_platform.zalo.services.message_events import (
+        publish_zalo_message_event,
+        register_account_owner,
+    )
+
+    # Auto-register owner for permission filter if not yet registered
+    register_account_owner(account_id, "test-caller")
+
+    event = {
+        "type": "zalo-message",
+        "account_id": account_id,
+        "group_id": conversation_id,
+        "group_name": "Test Conversation",
+        "messages": [
+            {
+                "message_id": f"test-{int(__import__('time').time() * 1000)}",
+                "sender_id": "test-sender-id",
+                "sender_name": sender_name,
+                "timestamp": int(__import__('time').time() * 1000),
+                "content": message_text,
+                "type": "text",
+                "is_sent": False,
+                "group_id": conversation_id,
+            }
+        ],
+    }
+    delivered = await publish_zalo_message_event(account_id, event)
+    return {"ok": True, "delivered": delivered, "event_size_bytes": len(__import__('json').dumps(event))}

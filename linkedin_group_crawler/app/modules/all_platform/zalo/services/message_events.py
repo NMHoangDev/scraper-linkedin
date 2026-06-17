@@ -33,6 +33,30 @@ _subscribers: DefaultDict[str, List[Subscriber]] = defaultdict(list)
 # listener khởi động. Dùng để SSE endpoint check ownership nhanh (không query DB).
 _account_owners: Dict[str, str] = {}
 
+# ══════════════════════════════════════════════════════════════════════════════
+# Auth-expired event bus: khi ZCA listener phát hiện auth hết hạn,
+# publish event vào đây để auth SSE endpoint nhận và push ngay về FE.
+# ══════════════════════════════════════════════════════════════════════════════
+_AuthExpiredEvent = Tuple[str, str]  # (account_id, reason)
+_auth_expired_queue: asyncio.Queue[_AuthExpiredEvent] = asyncio.Queue(maxsize=100)
+
+
+async def publish_auth_expired(account_id: str, reason: str) -> bool:
+    """Đẩy auth-expired event vào bus. Trả True nếu có ai đang chờ nhận."""
+    try:
+        _auth_expired_queue.put_nowait((account_id, reason))
+        return True
+    except asyncio.QueueFull:
+        return False
+
+
+async def wait_for_auth_expired(timeout: float = 60.0) -> Optional[_AuthExpiredEvent]:
+    """Chờ event auth-expired, hoặc None nếu timeout."""
+    try:
+        return await asyncio.wait_for(_auth_expired_queue.get(), timeout=timeout)
+    except asyncio.TimeoutError:
+        return None
+
 
 # ----------------------------------------------------------------------------
 # Helpers
@@ -139,6 +163,8 @@ async def publish_zalo_message_event(
     account = _normalize(account_id)
     payload = json.dumps(event, ensure_ascii=False)
     delivered = 0
+    owner_id = get_account_owner(account)
+    
     for queue, meta in list(_subscribers.get(account, set())):
         if not isinstance(meta, dict):
             meta = {}
@@ -152,9 +178,20 @@ async def publish_zalo_message_event(
         # Filter conversation share cho admin/leader
         role = str(meta.get("role") or "member").lower()
         if role in _PRIVILEGED_ROLES and shared_conversation_ids is not None:
-            group_id = str(event.get("group_id") or "").strip()
-            if group_id and group_id not in shared_conversation_ids:
-                continue
+            caller_id = meta.get("caller_id")
+            
+            # Neu admin/leader chinh la chu so huu cua account nay, thi khong bi filter boi shared_conversation_ids
+            is_owner = False
+            if owner_id and caller_id and owner_id == caller_id:
+                is_owner = True
+            elif owner_id and owner_id == _normalize(meta.get("email", "")):
+                # Fallback if owner_id was registered as email
+                is_owner = True
+                
+            if not is_owner:
+                group_id = str(event.get("group_id") or "").strip()
+                if group_id and group_id not in shared_conversation_ids:
+                    continue
 
         try:
             queue.put_nowait(payload)
@@ -178,6 +215,7 @@ async def subscribe_zalo_events(
     *,
     role: str = "member",
     email: Optional[str] = None,
+    caller_id: Optional[str] = None,
 ) -> AsyncIterator[str]:
     """SSE generator: subscribe nhiều account, phát event ``zalo-message`` và
     heartbeat mỗi 20 giây.
@@ -197,6 +235,9 @@ async def subscribe_zalo_events(
         "role": (role or "member").strip().lower(),
         "email": (email or "").strip().lower(),
     }
+    if caller_id:
+        meta["caller_id"] = _normalize(caller_id)
+        
     for raw_id in account_ids or []:
         account = _normalize(raw_id)
         queue = _make_subscriber_queue()

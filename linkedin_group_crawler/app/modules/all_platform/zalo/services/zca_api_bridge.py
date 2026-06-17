@@ -128,10 +128,19 @@ async def _run_zca_command(
     return result
 
 
-def _to_group(row: Dict[str, Any]) -> Group:
+def _to_group(row: Dict[str, Any], *, is_friend: bool = False) -> Group:
+    # Ưu tiên: name > group_name > display_name > số điện thoại > group_id.
+    # Không bao giờ dùng group_id làm fallback name vì nó gây confusion trên UI.
+    raw_name = row.get("name") or row.get("group_name") or row.get("display_name") or ""
+    safe_name = str(raw_name).strip() if raw_name else ""
+    group_id = str(row.get("group_id") or row.get("id") or "").strip()
+    # Nếu name chỉ toàn số (số điện thoại) hoặc trùng với group_id, bỏ qua
+    if safe_name.isdigit() or safe_name == group_id:
+        safe_name = ""
+    resolved_name = safe_name if safe_name else (f"Conversation {group_id}" if group_id else "Unknown")
     return Group(
-        group_id=str(row.get("group_id") or row.get("id") or row.get("name") or ""),
-        name=str(row.get("name") or row.get("group_name") or row.get("group_id") or ""),
+        group_id=group_id,
+        name=resolved_name,
         avatar_url=row.get("avatar_url"),
         last_message=row.get("last_message"),
         last_message_at=str(row["last_message_at"]) if row.get("last_message_at") else None,
@@ -140,6 +149,7 @@ def _to_group(row: Dict[str, Any]) -> Group:
         last_message_type=row.get("last_message_type") or None,
         unread_count=int(row.get("unread_count") or 0),
         is_pinned=bool(row.get("is_pinned") or row.get("pinned") or False),
+        is_friend=bool(is_friend or row.get("is_friend") or False),
     )
 
 
@@ -162,13 +172,13 @@ def _to_message(row: Dict[str, Any]) -> Message:
 
 async def list_zca_groups(auth: Dict[str, Any]) -> List[Group]:
     result = await _run_zca_command("list-groups", auth, timeout_seconds=120)
-    groups = [_to_group(row) for row in result.get("groups") or []]
+    groups = [_to_group(row, is_friend=False) for row in result.get("groups") or []]
     return [group for group in groups if group.group_id and group.name]
 
 
 async def list_zca_friends(auth: Dict[str, Any]) -> List[Group]:
     result = await _run_zca_command("list-friends", auth, timeout_seconds=120)
-    friends = [_to_group(row) for row in result.get("friends") or []]
+    friends = [_to_group(row, is_friend=True) for row in result.get("friends") or []]
     return [friend for friend in friends if friend.group_id and friend.name]
 
 
@@ -314,4 +324,57 @@ async def find_zca_user_by_username(auth: Dict[str, Any], username: str) -> Dict
         timeout_seconds=30,
     )
     return result.get("user") or {}
+
+
+async def first_time_sync(
+    auth: Dict[str, Any],
+    *,
+    zalo_account_id: str,
+    messages_per_chat: int = 50,
+    group_limit: int = 25,
+    include_friends: bool = True,
+) -> Dict[str, Any]:
+    """First-time sync: list top groups + fetch recent messages từ mỗi group + friends.
+
+    Args:
+        auth: ZCA auth dict (cookies/imei/userAgent).
+        zalo_account_id: owner user_id (chỉ để log).
+        messages_per_chat: số tin lấy từ mỗi conversation.
+        group_limit: giới hạn số group sync.
+        include_friends: có sync personal chat với bạn bè không.
+
+    Returns:
+        Dict với keys: ok, groups, friends, messages, total_groups, total_messages, errors.
+
+    Raises:
+        ZcaAuthExpiredError: khi session Zalo đã hết hạn.
+        RuntimeError: các lỗi khác.
+    """
+    args = [
+        "--messages-per-chat", str(messages_per_chat),
+        "--group-limit", str(group_limit),
+        "--include-friends", "true" if include_friends else "false",
+    ]
+    # Timeout dài vì first-time sync có thể mất vài phút với nhiều group.
+    timeout = 60 + (group_limit * 10)
+    try:
+        result = await _run_zca_command(
+            "first-time-sync",
+            auth,
+            args=args,
+            timeout_seconds=timeout,
+        )
+        logger.info(
+            f"ZCA first-time sync done for user={zalo_account_id}: "
+            f"groups={result.get('total_groups', 0)}, "
+            f"messages={result.get('total_messages', 0)}, "
+            f"errors={len(result.get('errors') or [])}"
+        )
+        return result
+    except Exception as exc:
+        logger.warning(
+            f"ZCA first-time sync failed for user={zalo_account_id}: {exc}"
+        )
+        # Re-raise để caller quyết định — listener sẽ vẫn start dù sync fail.
+        raise
 

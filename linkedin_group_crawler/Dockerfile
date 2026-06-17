@@ -5,6 +5,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     dbus-daemon \
     libdbus-1-3 \
     ca-certificates \
+    curl \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -14,15 +17,19 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PORT=8000 \
     HEADLESS=true \
     STATE_PATH=/app/storage/linkedin_state.json \
-    PLAYWRIGHT_CHROMIUM_LAUNCH_ARGS="--disable-gpu --disable-web-resources --disable-dev-shm-usage --no-sandbox --disable-setuid-sandbox --disable-infobars --disable-crash-reporter" \
+    PLAYWRIGHT_CHROMIUM_LAUNCH_ARGS="--disable-dev-shm-usage --no-sandbox --disable-setuid-sandbox --disable-infobars --disable-crash-reporter" \
     PLAYWRIGHT_DOWNLOAD_HOST=https://github.com
 
 WORKDIR /app
 
 COPY requirements.txt ./
 
-RUN pip install --upgrade pip setuptools wheel \
-    && pip install -r requirements.txt
+# Cài setuptools trước để đảm bảo pkg_resources có sẵn cho playwright-stealth==1.0.6
+# (setuptools>=70 đã drop pkg_resources — phải pin <70)
+RUN pip install --upgrade pip \
+    && pip install "setuptools<70" wheel \
+    && pip install -r requirements.txt \
+    && pip install "setuptools<70"
 
 COPY . .
 

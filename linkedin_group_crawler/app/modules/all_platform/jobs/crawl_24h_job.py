@@ -96,7 +96,7 @@ async def execute_all_platform_crawl_workflow():
     Luồng cào tự động 24h cho All-Platform.
     Chạy mỗi phút để kiểm tra nhóm nào có giờ cào khớp với hiện tại.
     """
-    logger.info("🚀 [ALL-PLATFORM] KIỂM TRA LỊCH CÀO DỮ LIỆU TỰ ĐỘNG...")
+    # logger.info("🚀 [ALL-PLATFORM] KIỂM TRA LỊCH CÀO DỮ LIỆU TỰ ĐỘNG...")
     supabase = get_supabase_client()
     
     try:
