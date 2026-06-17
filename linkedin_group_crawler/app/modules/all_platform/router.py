@@ -23,6 +23,7 @@ from app.modules.all_platform.routers.groups_linkedin import linkedin_groups_rou
 from app.modules.all_platform.routers.crawl_linkedin import crawl_linkedin_router
 from app.modules.all_platform.routers.linkedin_legacy import router as linkedin_legacy_router
 from app.modules.all_platform.routers.crawl_facebook import crawl_facebook_router
+from app.modules.all_platform.routers.fb import router as fb_automation_router
 from app.modules.all_platform.routers.websocket import router as websocket_router
 
 all_platform_router = APIRouter()
@@ -53,6 +54,11 @@ all_platform_router.include_router(
     crawl_facebook_router,
     prefix="/facebook",
     tags=["All-Platform Facebook Crawl"],
+)
+all_platform_router.include_router(
+    fb_automation_router,
+    prefix="/fb",
+    tags=["All-Platform Facebook Automation"],
 )
 
 # ── LinkedIn ───────────────────────────────────────────────────────────────────
