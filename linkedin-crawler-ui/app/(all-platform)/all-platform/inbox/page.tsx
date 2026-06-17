@@ -15,6 +15,8 @@ import { MaterialIcon } from "@/components/ui";
 import { provisionExtension, pingExtension } from "@/lib/markee-ext-provision";
 import { fbFetch, fbHeaders, getFbProvisionConfig } from "@/lib/markee-fb-api";
 import { API_BASE_URL } from "@/lib/env";
+import { idbSetThread, idbGetAllThreadsForAcc, idbSetConvs, idbGetConvs } from "@/lib/inbox-cache";
+import TeamAccountTree from "@/components/all-platform/inbox/TeamAccountTree";
 
 interface Session { user_id: string; fb_user_id?: string; label?: string; owner?: string; online?: boolean; status?: string; }
 interface Conv { conv_id: string; name: string; preview: string; unread: boolean; time: string; is_customer: boolean; pushed_to_zalo: boolean; deleted: boolean; }
@@ -34,7 +36,7 @@ export default function InboxPage() {
   const [ownerNames, setOwnerNames] = useState<Record<string, string>>({});
   const [extInstalled, setExtInstalled] = useState<boolean | null>(null);
   const [convs, setConvs] = useState<Conv[]>([]);
-  const [filter, setFilter] = useState<"all" | "unread" | "customer">("all");
+  const [filter, setFilter] = useState<"all" | "unread" | "customer" | "need_reply">("all");
   const [openConv, setOpenConv] = useState("");
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [reply, setReply] = useState("");
@@ -46,12 +48,23 @@ export default function InboxPage() {
   const [connErr, setConnErr] = useState(false);
   const openConvRef = useRef("");
   const msgsRef = useRef<Msg[]>([]);
-  // Client-side cache: conv_id → msgs (tồn tại trong session, tránh load lại khi mở lại hội thoại)
+  // Client-side cache: conv_id → msgs (RAM); được backup BỀN xuống IndexedDB qua saveThreadCache.
   const clientCacheRef = useRef<Map<string, Msg[]>>(new Map());
-  // Track conv_ids đã prefetch ngầm (tránh fetch trùng)
-  const prefetchedRef = useRef<Set<string>>(new Set());
+  // conv_id → loaded_at gần nhất (để biết dữ liệu mới tới mức nào → quyết định có quét lại không)
+  const loadedAtRef = useRef<Map<string, string | null>>(new Map());
+  // Chống chồng lệnh silent scan (1 lệnh đang chạy thì bỏ qua lần kế)
+  const scanInFlightRef = useRef(false);
 
   const showToast = (msg: string, ok: boolean) => { setToast({ msg, ok }); setTimeout(() => setToast(null), 3500); };
+
+  // Lưu cache thread vào CẢ RAM (clientCacheRef) lẫn IndexedDB (bền qua reload).
+  // loadedAt: nếu không truyền, giữ lại loaded_at đã biết của hội thoại đó.
+  const saveThreadCache = useCallback((convId: string, list: Msg[], loadedAt?: string | null) => {
+    clientCacheRef.current.set(convId, list);
+    const la = loadedAt === undefined ? (loadedAtRef.current.get(convId) ?? null) : loadedAt;
+    loadedAtRef.current.set(convId, la);
+    void idbSetThread(acc, convId, list, la);
+  }, [acc]);
 
   // Tính phạm vi xem inbox theo role + map tên nhân viên:
   //  - admin  -> "" (xem HẾT) + lấy tên từ /users/all-profiles
@@ -140,9 +153,33 @@ export default function InboxPage() {
     try {
       const r = await fbFetch(`/inbox/conversations?user_id=${encodeURIComponent(acc)}`);
       const d = await r.json();
-      setConvs(d.conversations || []);
+      const list: Conv[] = d.conversations || [];
+      setConvs(list);
       setNeedRelogin(!!d.needs_relogin);
+      void idbSetConvs(acc, list); // lưu để F5 hiện hộp thư ngay
     } catch { /* ignore */ }
+  }, [acc]);
+
+  // Khi đổi acc: nạp cache BỀN từ IndexedDB → mở hội thoại tức thì + hiện hộp thư ngay (trước fetch mạng).
+  useEffect(() => {
+    if (!acc) return;
+    let cancelled = false;
+    clientCacheRef.current = new Map();
+    loadedAtRef.current = new Map();
+    (async () => {
+      const [threads, cachedConvs] = await Promise.all([
+        idbGetAllThreadsForAcc<Msg>(acc),
+        idbGetConvs<Conv>(acc),
+      ]);
+      if (cancelled) return;
+      for (const [cid, t] of Object.entries(threads)) {
+        clientCacheRef.current.set(cid, t.messages || []);
+        loadedAtRef.current.set(cid, t.loaded_at ?? null);
+      }
+      // Chỉ hiện convs cache nếu list hiện chưa có (chưa kịp fetch mạng) — tránh đè dữ liệu mới.
+      if (cachedConvs?.length) setConvs(prev => (prev.length ? prev : cachedConvs));
+    })();
+    return () => { cancelled = true; };
   }, [acc]);
 
   useEffect(() => {
@@ -166,7 +203,11 @@ export default function InboxPage() {
     const isOnline = sessions.find(s => s.user_id === acc)?.status === "online";
     if (!isOnline) return; // acc offline -> chỉ xem tin cũ, không quét
     const silentScan = () => {
-      fbFetch("/inbox/scan", { method: "POST", headers: fbHeaders(), body: JSON.stringify({ user_id: acc }) }).catch(() => {});
+      if (scanInFlightRef.current) return; // đang có lệnh quét chạy → bỏ qua, tránh chồng lệnh
+      scanInFlightRef.current = true;
+      fbFetch("/inbox/scan", { method: "POST", headers: fbHeaders(), body: JSON.stringify({ user_id: acc }) })
+        .catch(() => {})
+        .finally(() => { scanInFlightRef.current = false; });
     };
     silentScan(); // quét ngay khi chọn acc
     const t = setInterval(silentScan, 30000); // và mỗi 30s
@@ -248,15 +289,22 @@ export default function InboxPage() {
       const d0 = await r0.json().catch(() => ({}));
       if (openConvRef.current !== conv_id) return;
       prevLoadedAt = d0.loaded_at || null;
+      loadedAtRef.current.set(conv_id, prevLoadedAt);
       if (d0.messages?.length) {
         // Chỉ hiện server cache nếu nhiều tin hơn client cache (tránh overwrite tin optimistic mới gửi)
         if (d0.messages.length >= msgsRef.current.length) {
           setMsgs(d0.messages); msgsRef.current = d0.messages;
-          clientCacheRef.current.set(conv_id, d0.messages);
+          saveThreadCache(conv_id, d0.messages, prevLoadedAt);
         }
         setLoadingChat(false); setLoadingFresh(true);
       }
     } catch { /* ignore */ }
+    // Nếu dữ liệu vừa được quét gần đây (loaded_at < 25s) thì KHỎI ép extension quét lại —
+    // poll incremental 8s sẽ tự kéo tin mới. Giảm mạnh số lần quét, đỡ chồng lệnh.
+    const la = prevLoadedAt ? Date.parse(prevLoadedAt) : NaN;
+    if (!Number.isNaN(la) && Date.now() - la < 25000) {
+      setLoadingChat(false); setLoadingFresh(false); return;
+    }
     try {
       // 3. Yêu cầu extension tải bản mới nhất
       const r = await fbFetch("/inbox/thread", { method: "POST", headers: fbHeaders(), body: JSON.stringify({ user_id: acc, conv_id }) });
@@ -273,7 +321,7 @@ export default function InboxPage() {
       const d = await r.json();
       if (d.loaded_at && d.loaded_at !== prevLoadedAt) {
         const fresh = d.messages || []; setMsgs(fresh); msgsRef.current = fresh;
-        clientCacheRef.current.set(conv_id, fresh);
+        saveThreadCache(conv_id, fresh, d.loaded_at);
         setLoadingChat(false); setLoadingFresh(false); return;
       }
     } catch { /* ignore, thử lại */ }
@@ -289,7 +337,7 @@ export default function InboxPage() {
       const fetched: Msg[] = d.messages || [];
       if (fetched.length >= msgsRef.current.length) {
         setMsgs(fetched); msgsRef.current = fetched;
-        clientCacheRef.current.set(conv_id, fetched);
+        saveThreadCache(conv_id, fetched, d.loaded_at ?? undefined);
       }
     } catch { /* ignore */ }
   }
@@ -304,12 +352,12 @@ export default function InboxPage() {
         const r = await fbFetch(`/inbox/thread?user_id=${encodeURIComponent(acc)}&conv_id=${encodeURIComponent(openConv)}&since_n=${n}`);
         const d = await r.json();
         if (Array.isArray(d.messages) && d.messages.length > 0) {
-          setMsgs(prev => { const next = [...prev, ...d.messages]; msgsRef.current = next; clientCacheRef.current.set(openConv, next); return next; });
+          setMsgs(prev => { const next = [...prev, ...d.messages]; msgsRef.current = next; saveThreadCache(openConv, next, d.loaded_at ?? undefined); return next; });
         }
       } catch { /* ignore */ }
     }, 8000);
     return () => clearInterval(t);
-  }, [openConv, acc]);
+  }, [openConv, acc, saveThreadCache]);
 
   async function sendReply() {
     const text = reply.trim();
@@ -338,7 +386,7 @@ export default function InboxPage() {
       const r = await fbFetch(`/inbox/reply_status?command_id=${encodeURIComponent(cmd)}`);
       const d = await r.json();
       if (d.done) {
-        if (d.sent) { setStatus("Đã gửi ✓"); clientCacheRef.current.set(openConvRef.current, msgsRef.current); showToast("Đã gửi tin thành công", true); setTimeout(() => fetchThread(openConvRef.current), 7000); }
+        if (d.sent) { setStatus("Đã gửi ✓"); saveThreadCache(openConvRef.current, msgsRef.current); showToast("Đã gửi tin thành công", true); setTimeout(() => fetchThread(openConvRef.current), 7000); }
         else { setStatus("✗ Gửi thất bại"); showToast("FB chưa gửi được — thử lại", false); }
         return;
       }
@@ -347,7 +395,25 @@ export default function InboxPage() {
     setTimeout(() => pollReplyStatus(cmd, setStatus, attemptsLeft - 1), 2000);
   }
 
-  const filtered = convs.filter(c => !c.deleted && (filter === "unread" ? c.unread : filter === "customer" ? c.is_customer : true));
+  // "Cần trả lời" = tin CUỐI trong hội thoại là của khách. Nếu đã có thread cache → xét tin cuối;
+  // chưa có cache → tạm dựa vào cờ unread (chưa đọc thường là khách vừa nhắn).
+  const needsReply = (c: Conv): boolean => {
+    const cached = clientCacheRef.current.get(c.conv_id);
+    if (cached?.length) return cached[cached.length - 1]?.from === "them";
+    return c.unread;
+  };
+  const visible = convs.filter(c => !c.deleted && (
+    filter === "unread" ? c.unread :
+    filter === "customer" ? c.is_customer :
+    filter === "need_reply" ? needsReply(c) :
+    true
+  ));
+  // Nổi ưu tiên lên đầu: cần trả lời > chưa đọc > khách; giữ thứ tự gốc trong cùng nhóm.
+  const rank = (c: Conv) => (needsReply(c) ? 4 : 0) + (c.unread ? 2 : 0) + (c.is_customer ? 1 : 0);
+  const filtered = visible
+    .map((c, i) => ({ c, i }))
+    .sort((a, b) => rank(b.c) - rank(a.c) || a.i - b.i)
+    .map(x => x.c);
   // Nhãn chip = TÊN NHÂN VIÊN (map từ owner id). Fallback: label cũ -> fb_id. Để admin/leader biết acc CỦA AI.
   const accLabel = (s: Session) => (s.owner && ownerNames[s.owner]) || s.label || s.user_id;
 
@@ -380,9 +446,22 @@ export default function InboxPage() {
             {scanning ? "Đang quét..." : "Quét ngay"}
           </button>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {sessions.length === 0 ? <span className="text-sm text-[#A0A0A0]">{extInstalled === false ? 'Chưa thấy extension. Hãy cài + mở extension trên trình duyệt này.' : 'Chưa có tài khoản nào. Nhân viên cài extension + đăng nhập Facebook để tài khoản hiện ra.'}</span> :
-            sessions.map(s => {
+        {sessions.length === 0 ? (
+          <span className="text-sm text-[#A0A0A0]">{extInstalled === false ? 'Chưa thấy extension. Hãy cài + mở extension trên trình duyệt này.' : 'Chưa có tài khoản nào. Nhân viên cài extension + đăng nhập Facebook để tài khoản hiện ra.'}</span>
+        ) : (role === "admin" || role === "leader") ? (
+          // Admin/Leader: cây Team → thành viên → tài khoản (xem inbox theo team)
+          <TeamAccountTree
+            sessions={sessions}
+            ownerNames={ownerNames}
+            selectedAcc={acc}
+            role={role}
+            owner={owner}
+            onSelect={(uid) => { setAcc(uid); setOpenConv(""); openConvRef.current = ""; setMsgs([]); }}
+          />
+        ) : (
+          // Member: danh sách chip đơn giản (tài khoản của chính mình)
+          <div className="flex flex-wrap gap-2">
+            {sessions.map(s => {
               const isOnline = s.status === "online";
               return (
                 <button key={s.user_id} onClick={() => { setAcc(s.user_id); setOpenConv(""); openConvRef.current = ""; setMsgs([]); }}
@@ -392,7 +471,8 @@ export default function InboxPage() {
                 </button>
               );
             })}
-        </div>
+          </div>
+        )}
         <div className="text-xs text-[#A0A0A0] mt-2">Acc <b>online</b> (chấm xanh): đọc + trả lời tin realtime. Acc <b>offline</b> (nhân viên tắt máy): vẫn xem được tin cũ, không quét/trả lời tới khi máy bật lại.</div>
       </div>
 
@@ -401,8 +481,9 @@ export default function InboxPage() {
         <div className="bg-white rounded-lg border border-[#E5E5E5] p-5">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-base font-bold text-[#1A1A1A]">Hộp thư</h2>
-            <select value={filter} onChange={e => setFilter(e.target.value as "all" | "unread" | "customer")} className="text-sm border border-[#E5E5E5] rounded-lg px-2 py-1 outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A] bg-white">
+            <select value={filter} onChange={e => setFilter(e.target.value as "all" | "unread" | "customer" | "need_reply")} className="text-sm border border-[#E5E5E5] rounded-lg px-2 py-1 outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A] bg-white">
               <option value="all">Tất cả</option>
+              <option value="need_reply">Cần trả lời</option>
               <option value="unread">Chưa đọc</option>
               <option value="customer">Đã đánh dấu khách</option>
             </select>
@@ -419,8 +500,9 @@ export default function InboxPage() {
                     <div className="text-xs text-[#A0A0A0] whitespace-nowrap">{c.time}</div>
                   </div>
                   <div className="flex flex-wrap gap-1.5 mt-2">
+                    {needsReply(c) && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-bold">↩ cần trả lời</span>}
                     {c.unread && <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold">chưa đọc</span>}
-                    {c.is_customer && <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-bold">khách</span>}
+                    {c.is_customer && <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-bold">⭐ khách</span>}
                     {c.pushed_to_zalo && <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold">đã đẩy Zalo</span>}
                   </div>
                   <div className="flex flex-wrap gap-1.5 mt-2">
