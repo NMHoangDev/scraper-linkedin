@@ -42,7 +42,13 @@ ensure_directory(settings.session_storage_dir)
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     warmup_task: asyncio.Task[None] | None = None
-    setup_all_platform_jobs()
+    # An toàn khi chạy dev/local: đặt env DISABLE_SCHEDULER=1 để KHÔNG bật scheduler tự cào
+    # (tránh cào bằng acc production khi dev). Production không set -> chạy như cũ.
+    import os as _os
+    if _os.getenv("DISABLE_SCHEDULER", "").strip() in ("1", "true", "True"):
+        logger.warning("⏸️ DISABLE_SCHEDULER bật -> KHÔNG khởi động scheduler tự cào (chế độ dev).")
+    else:
+        setup_all_platform_jobs()
     async def _warmup_background() -> None:
         try:
             await asyncio.to_thread(warmup_playwright_pool)
@@ -118,7 +124,14 @@ async def handle_cors_middleware(request: Request, call_next):
         "http://localhost:8080",
         "http://127.0.0.1:8080",
     }
-    
+    # Thêm origin từ env CORS_ORIGINS (ngăn cách dấu phẩy) — cho phép cấu hình domain deploy
+    # mà không hardcode vào code (vd seeding.zenithglobal.dev khi chạy bản demo).
+    import os as _os
+    for _o in (_os.getenv("CORS_ORIGINS", "") or "").split(","):
+        _o = _o.strip()
+        if _o:
+            allowed_origins.add(_o)
+
     is_allowed = origin in allowed_origins or origin.startswith("chrome-extension://")
 
     if request.method == "OPTIONS":
