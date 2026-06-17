@@ -4,11 +4,14 @@
  * Cây chọn tài khoản FB cho ADMIN / LEADER ở trang Inbox:
  *   Team → thành viên → tài khoản FB (lọc theo session.owner === member.id).
  * Bấm 1 tài khoản → onSelect(user_id) (tái dùng toàn bộ logic inbox của trang).
+ * - Tự mở team chứa tài khoản đang chọn.
+ * - Hiện số hội thoại CHƯA ĐỌC trên mỗi tài khoản & tổng trên mỗi team (fetch khi mở team).
  * Member không dùng component này (giữ danh sách chip đơn giản).
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { teamsService, type TeamRow } from "@/services/all-platform.service";
+import { fbFetch } from "@/lib/markee-fb-api";
 
 export interface TreeSession {
   user_id: string;
@@ -33,6 +36,7 @@ export default function TeamAccountTree({ sessions, ownerNames, selectedAcc, onS
   const [teams, setTeams] = useState<TeamRow[]>([]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [q, setQ] = useState("");
+  const [unread, setUnread] = useState<Record<string, number>>({}); // user_id -> số hội thoại chưa đọc
 
   useEffect(() => {
     let cancelled = false;
@@ -83,21 +87,57 @@ export default function TeamAccountTree({ sessions, ownerNames, selectedAcc, onS
     return { tree, orphan };
   }, [teams, sessions]);
 
-  const toggle = (id: string) => setExpanded(p => ({ ...p, [id]: !p[id] }));
+  // Đếm hội thoại chưa đọc cho 1 loạt tài khoản (gọi khi mở team / mục Khác).
+  const fetchUnread = useCallback((accs: TreeSession[]) => {
+    accs.forEach(async (s) => {
+      try {
+        const r = await fbFetch(`/inbox/conversations?user_id=${encodeURIComponent(s.user_id)}`);
+        const d = await r.json();
+        const n = Array.isArray(d.conversations) ? d.conversations.filter((c: { unread?: boolean; deleted?: boolean }) => c.unread && !c.deleted).length : 0;
+        setUnread(prev => ({ ...prev, [s.user_id]: n }));
+      } catch { /* ignore */ }
+    });
+  }, []);
+
+  const toggle = (id: string, accs?: TreeSession[]) => {
+    setExpanded(p => {
+      const next = { ...p, [id]: !p[id] };
+      if (!p[id] && accs?.length) fetchUnread(accs); // vừa mở → nạp số chưa đọc
+      return next;
+    });
+  };
+
+  // Tự mở team (hoặc mục Khác) chứa tài khoản đang chọn.
+  useEffect(() => {
+    if (!selectedAcc) return;
+    const team = tree.find(t => t.members.some(m => m.accounts.some(a => a.user_id === selectedAcc)));
+    if (team) {
+      setExpanded(p => (p[team.id] ? p : { ...p, [team.id]: true }));
+      fetchUnread(team.members.flatMap(m => m.accounts));
+    } else if (orphan.some(a => a.user_id === selectedAcc)) {
+      setExpanded(p => (p["__orphan__"] ? p : { ...p, __orphan__: true }));
+      fetchUnread(orphan);
+    }
+  }, [selectedAcc, tree, orphan, fetchUnread]);
 
   const matchQ = (s: TreeSession) => !q.trim() || accName(s).toLowerCase().includes(q.trim().toLowerCase());
   const dot = (s: TreeSession) => (
     <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${s.status === "online" ? "bg-green-500" : "bg-gray-300"}`} />
   );
+  const teamUnread = (t: TeamNode) => t.members.reduce((s, m) => s + m.accounts.reduce((x, a) => x + (unread[a.user_id] || 0), 0), 0);
 
-  const AccBtn = ({ s }: { s: TreeSession }) => (
-    <button onClick={() => onSelect(s.user_id)}
-      title={s.status === "online" ? "Đang online" : "Offline — chỉ xem tin cũ"}
-      className={`w-full text-left inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium border transition ${selectedAcc === s.user_id ? "bg-[#E3000F] text-white border-[#E3000F]" : "border-transparent hover:bg-[#F5F5F5] text-[#1A1A1A]"}`}>
-      {dot(s)}<span className="truncate">{accName(s)}</span>
-      {s.status !== "online" && <span className="text-[10px] opacity-60 ml-auto">offline</span>}
-    </button>
-  );
+  const AccBtn = ({ s }: { s: TreeSession }) => {
+    const u = unread[s.user_id] || 0;
+    return (
+      <button onClick={() => onSelect(s.user_id)}
+        title={s.status === "online" ? "Đang online" : "Offline — chỉ xem tin cũ"}
+        className={`w-full text-left inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium border transition ${selectedAcc === s.user_id ? "bg-[#E3000F] text-white border-[#E3000F]" : "border-transparent hover:bg-[#F5F5F5] text-[#1A1A1A]"}`}>
+        {dot(s)}<span className="truncate">{accName(s)}</span>
+        {u > 0 && <span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${selectedAcc === s.user_id ? "bg-white/25 text-white" : "bg-red-100 text-red-700"}`}>{u}</span>}
+        {s.status !== "online" && <span className={`text-[10px] opacity-60 ${u > 0 ? "" : "ml-auto"}`}>offline</span>}
+      </button>
+    );
+  };
 
   return (
     <div className="text-sm">
@@ -107,33 +147,39 @@ export default function TeamAccountTree({ sessions, ownerNames, selectedAcc, onS
         {tree.length === 0 && orphan.length === 0 && (
           <div className="text-[#A0A0A0] text-xs py-4 text-center">Chưa có team / tài khoản nào.</div>
         )}
-        {tree.map(team => (
-          <div key={team.id} className="border border-[#E5E5E5] rounded-lg">
-            <button onClick={() => toggle(team.id)} className="w-full flex items-center justify-between px-3 py-2 font-bold text-[#1A1A1A]">
-              <span className="truncate flex items-center gap-1.5">
-                <span className="text-[#A0A0A0]">{expanded[team.id] ? "▾" : "▸"}</span>{team.name}
-              </span>
-              <span className="text-[11px] text-[#A0A0A0] font-semibold">{team.accountCount} acc</span>
-            </button>
-            {expanded[team.id] && (
-              <div className="px-2 pb-2 space-y-1">
-                {team.members.map(m => {
-                  const accs = m.accounts.filter(matchQ);
-                  if (q.trim() && accs.length === 0) return null;
-                  return (
-                    <div key={m.id} className="pl-2">
-                      <div className="text-xs font-semibold text-[#666666] px-1 py-0.5">{m.name}{m.accounts.length === 0 && <span className="text-[#C0C0C0] font-normal"> · chưa có tài khoản</span>}</div>
-                      <div className="space-y-0.5">{accs.map(s => <AccBtn key={s.user_id} s={s} />)}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        ))}
+        {tree.map(team => {
+          const tu = teamUnread(team);
+          return (
+            <div key={team.id} className="border border-[#E5E5E5] rounded-lg">
+              <button onClick={() => toggle(team.id, team.members.flatMap(m => m.accounts))} className="w-full flex items-center justify-between px-3 py-2 font-bold text-[#1A1A1A]">
+                <span className="truncate flex items-center gap-1.5">
+                  <span className="text-[#A0A0A0]">{expanded[team.id] ? "▾" : "▸"}</span>{team.name}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  {tu > 0 && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700">{tu} chưa đọc</span>}
+                  <span className="text-[11px] text-[#A0A0A0] font-semibold">{team.accountCount} acc</span>
+                </span>
+              </button>
+              {expanded[team.id] && (
+                <div className="px-2 pb-2 space-y-1">
+                  {team.members.map(m => {
+                    const accs = m.accounts.filter(matchQ);
+                    if (q.trim() && accs.length === 0) return null;
+                    return (
+                      <div key={m.id} className="pl-2">
+                        <div className="text-xs font-semibold text-[#666666] px-1 py-0.5">{m.name}{m.accounts.length === 0 && <span className="text-[#C0C0C0] font-normal"> · chưa có tài khoản</span>}</div>
+                        <div className="space-y-0.5">{accs.map(s => <AccBtn key={s.user_id} s={s} />)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
         {orphan.filter(matchQ).length > 0 && (
           <div className="border border-[#E5E5E5] rounded-lg">
-            <button onClick={() => toggle("__orphan__")} className="w-full flex items-center justify-between px-3 py-2 font-bold text-[#1A1A1A]">
+            <button onClick={() => toggle("__orphan__", orphan)} className="w-full flex items-center justify-between px-3 py-2 font-bold text-[#1A1A1A]">
               <span className="flex items-center gap-1.5"><span className="text-[#A0A0A0]">{expanded["__orphan__"] ? "▾" : "▸"}</span>Khác / chưa thuộc team</span>
               <span className="text-[11px] text-[#A0A0A0] font-semibold">{orphan.length} acc</span>
             </button>

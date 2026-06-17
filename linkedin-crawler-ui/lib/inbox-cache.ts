@@ -128,6 +128,31 @@ export async function idbSetConvs<C = unknown>(acc: string, conversations: C[]):
   } catch { /* ignore */ }
 }
 
+/**
+ * Dọn thread cũ để IndexedDB không phình mãi. Xóa các thread có savedAt cũ hơn maxAgeMs
+ * (mặc định 30 ngày). Gọi 1 lần khi vào trang.
+ */
+export async function idbPruneOld(maxAgeMs = 30 * 24 * 3600 * 1000): Promise<void> {
+  if (!hasIDB()) return;
+  try {
+    const db = await openDB();
+    const cutoff = Date.now() - maxAgeMs;
+    await new Promise<void>((resolve) => {
+      const tx = db.transaction(STORE_THREADS, "readwrite");
+      const req = tx.objectStore(STORE_THREADS).openCursor();
+      req.onsuccess = () => {
+        const c = req.result;
+        if (!c) return;
+        const v = c.value as CachedThread | undefined;
+        if (!v || typeof v.savedAt !== "number" || v.savedAt < cutoff) c.delete();
+        c.continue();
+      };
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    });
+  } catch { /* ignore */ }
+}
+
 /** Đọc danh sách hội thoại đã cache (null nếu chưa có). */
 export async function idbGetConvs<C = unknown>(acc: string): Promise<C[] | null> {
   if (!hasIDB() || !acc) return null;

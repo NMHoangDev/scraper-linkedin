@@ -15,7 +15,7 @@ import { MaterialIcon } from "@/components/ui";
 import { provisionExtension, pingExtension } from "@/lib/markee-ext-provision";
 import { fbFetch, fbHeaders, getFbProvisionConfig } from "@/lib/markee-fb-api";
 import { API_BASE_URL } from "@/lib/env";
-import { idbSetThread, idbGetAllThreadsForAcc, idbSetConvs, idbGetConvs } from "@/lib/inbox-cache";
+import { idbSetThread, idbGetAllThreadsForAcc, idbSetConvs, idbGetConvs, idbPruneOld } from "@/lib/inbox-cache";
 import TeamAccountTree from "@/components/all-platform/inbox/TeamAccountTree";
 
 interface Session { user_id: string; fb_user_id?: string; label?: string; owner?: string; online?: boolean; status?: string; }
@@ -65,6 +65,9 @@ export default function InboxPage() {
     loadedAtRef.current.set(convId, la);
     void idbSetThread(acc, convId, list, la);
   }, [acc]);
+
+  // Dọn cache thread cũ (>30 ngày) 1 lần khi vào trang để IndexedDB không phình mãi.
+  useEffect(() => { void idbPruneOld(); }, []);
 
   // Tính phạm vi xem inbox theo role + map tên nhân viên:
   //  - admin  -> "" (xem HẾT) + lấy tên từ /users/all-profiles
@@ -201,7 +204,7 @@ export default function InboxPage() {
   useEffect(() => {
     if (!acc) return;
     const isOnline = sessions.find(s => s.user_id === acc)?.status === "online";
-    if (!isOnline) return; // acc offline -> chỉ xem tin cũ, không quét
+    if (!isOnline || needRelogin) return; // offline / cookie hết hạn -> chỉ xem tin cũ, không quét
     const silentScan = () => {
       if (scanInFlightRef.current) return; // đang có lệnh quét chạy → bỏ qua, tránh chồng lệnh
       scanInFlightRef.current = true;
@@ -212,7 +215,7 @@ export default function InboxPage() {
     silentScan(); // quét ngay khi chọn acc
     const t = setInterval(silentScan, 30000); // và mỗi 30s
     return () => clearInterval(t);
-  }, [acc, sessions]);
+  }, [acc, sessions, needRelogin]);
 
   // Phát hiện KHÁCH mới nhắn → badge tab + sound + browser notification
   const prevConvIdsRef = useRef<Set<string>>(new Set());
@@ -357,20 +360,21 @@ export default function InboxPage() {
   useEffect(() => {
     if (!openConv || !acc) return;
     const t = setInterval(async () => {
-      const n = msgsRef.current.length;
+      const reqN = msgsRef.current.length; // số tin lúc gửi request — để khử trùng nếu list đổi giữa chừng
       try {
         // Còn trống → lấy FULL để bắt lô tin đầu (extension quét lần đầu chậm). Có rồi → lấy delta.
-        const url = n === 0
+        const url = reqN === 0
           ? `/inbox/thread?user_id=${encodeURIComponent(acc)}&conv_id=${encodeURIComponent(openConv)}`
-          : `/inbox/thread?user_id=${encodeURIComponent(acc)}&conv_id=${encodeURIComponent(openConv)}&since_n=${n}`;
+          : `/inbox/thread?user_id=${encodeURIComponent(acc)}&conv_id=${encodeURIComponent(openConv)}&since_n=${reqN}`;
         const r = await fbFetch(url);
         const d = await r.json();
-        if (Array.isArray(d.messages) && d.messages.length > 0) {
-          if (n === 0) {
-            setMsgs(d.messages); msgsRef.current = d.messages; saveThreadCache(openConv, d.messages, d.loaded_at ?? undefined);
-          } else {
-            setMsgs(prev => { const next = [...prev, ...d.messages]; msgsRef.current = next; saveThreadCache(openConv, next, d.loaded_at ?? undefined); return next; });
-          }
+        if (!Array.isArray(d.messages) || d.messages.length === 0) return;
+        // Nếu list đã thay đổi (poll chính vừa thay) thì bỏ delta cũ này — vòng sau sẽ bắt lại đúng since_n.
+        if (msgsRef.current.length !== reqN) return;
+        if (reqN === 0) {
+          setMsgs(d.messages); msgsRef.current = d.messages; saveThreadCache(openConv, d.messages, d.loaded_at ?? undefined);
+        } else {
+          setMsgs(prev => { const next = [...prev, ...d.messages]; msgsRef.current = next; saveThreadCache(openConv, next, d.loaded_at ?? undefined); return next; });
         }
       } catch { /* ignore */ }
     }, 8000);
@@ -380,6 +384,10 @@ export default function InboxPage() {
   async function sendReply() {
     const text = reply.trim();
     if (!text || !openConv) return;
+    // Chặn gửi khi tài khoản offline / cookie hết hạn — lệnh sẽ không ai xử lý, tránh kẹt "chưa rõ kết quả".
+    const accOnline = sessions.find(s => s.user_id === acc)?.status === "online";
+    if (!accOnline) { showToast("Tài khoản đang offline (máy nhân viên chưa mở) — chưa gửi được.", false); return; }
+    if (needRelogin) { showToast("Cookie tài khoản đã hết hạn — đăng nhập lại trước khi gửi.", false); return; }
     setReply("");
     // Optimistic: hiện NGAY tin mình vừa gửi trong khung chat (đỡ cảm giác "gửi xong chả biết")
     const optimistic: Msg = { from: "me", text, time: "Đang gửi..." };
@@ -509,8 +517,8 @@ export default function InboxPage() {
           <div className="space-y-2 max-h-[520px] overflow-auto">
             {filtered.length === 0 ? <div className="text-center text-[#A0A0A0] py-10 text-sm">Chưa có hội thoại. Chọn tài khoản rồi bấm &quot;Quét ngay&quot;.</div> :
               filtered.map(c => (
-                <div key={c.conv_id} className="border border-[#E5E5E5] rounded-lg p-3">
-                  <div className="flex justify-between gap-2">
+                <div key={c.conv_id} className={`border rounded-lg p-3 transition ${openConv === c.conv_id ? "border-[#E3000F] bg-[#FFF5F5]" : "border-[#E5E5E5]"}`}>
+                  <div onClick={() => openChat(c.conv_id)} title="Bấm để mở hội thoại" className="flex justify-between gap-2 cursor-pointer">
                     <div className="min-w-0">
                       <div className={`truncate ${c.unread ? "font-extrabold" : "font-semibold"} text-[#1A1A1A]`}>{c.name}</div>
                       <div className="text-xs text-[#A0A0A0] truncate">{c.preview || "(không có preview)"}</div>
@@ -524,8 +532,8 @@ export default function InboxPage() {
                     {c.pushed_to_zalo && <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold">đã đẩy Zalo</span>}
                   </div>
                   <div className="flex flex-wrap gap-1.5 mt-2">
+                    <button onClick={() => openChat(c.conv_id)} className="text-xs px-2.5 py-1 rounded-lg border border-[#E5E5E5] hover:border-[#E3000F] text-[#1A1A1A] font-semibold transition">Mở chat</button>
                     <button onClick={() => mark(c.conv_id, "is_customer", !c.is_customer)} className="text-xs px-2.5 py-1 rounded-lg border border-[#E5E5E5] hover:border-[#E3000F] text-[#1A1A1A] font-semibold transition">{c.is_customer ? "Bỏ khách" : "✓ Là khách"}</button>
-                    {c.is_customer && <button onClick={() => openChat(c.conv_id)} className="text-xs px-2.5 py-1 rounded-lg border border-[#E5E5E5] hover:border-[#E3000F] text-[#1A1A1A] font-semibold transition">Mở chat</button>}
                     {c.is_customer && <button onClick={() => mark(c.conv_id, "pushed_to_zalo", !c.pushed_to_zalo)} className="text-xs px-2.5 py-1 rounded-lg border border-[#E5E5E5] hover:border-[#E3000F] text-[#1A1A1A] font-semibold transition">{c.pushed_to_zalo ? "Bỏ Zalo" : "Đã đẩy Zalo"}</button>}
                     <button onClick={() => { if (window.confirm(`Xóa "${c.name || "hội thoại này"}" khỏi danh sách? (không ảnh hưởng Messenger)`)) mark(c.conv_id, "deleted", true); }} className="text-xs px-2.5 py-1 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 font-semibold transition">Xóa</button>
                   </div>
