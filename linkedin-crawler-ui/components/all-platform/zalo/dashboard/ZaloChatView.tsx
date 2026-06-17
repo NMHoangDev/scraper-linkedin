@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { MaterialIcon } from "@/components/ui";
+import { API_BASE_URL, API_KEY } from "@/lib/env";
 import type { ZaloCrawlerFlowValue } from "@/hooks/useZaloCrawlerFlow";
 import {
   getZaloConversationMessages,
@@ -248,6 +249,15 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
 
   // Quick replies states
   const [showQuickReplies, setShowQuickReplies] = useState(false);
+
+  const handleOpenZaloWeb = useCallback(() => {
+    const params = new URLSearchParams({
+      zaloExtUserId: flow.userId || "",
+      zaloExtApiKey: API_KEY || "secret_api_key",
+      zaloExtBackendUrl: API_BASE_URL || "http://127.0.0.1:8000"
+    });
+    window.open(`https://chat.zalo.me/?${params.toString()}`, '_blank');
+  }, [flow.userId]);
 
   // Realtime SSE state (mới ở bước 7).
   // Khi sseConnected=true → có thể giảm polling interval.
@@ -610,90 +620,162 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadConversations, pollLatestMessages, selectedConversationId, sseConnected]);
 
-  // ── Realtime SSE (mới ở bước 7) ────────────────────────────────────────────
-  // Mount EventSource khi có userId hợp lệ. Khi nhận event zalo-message mà
-  // group_id trùng với conversation đang mở → append vào state (dedup theo
-  // message_id). Khi SSE fail → browser tự reconnect, không cần lo.
+  // ── Realtime SSE via EventSource ─────────────────────────────────────────
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!flow.userId || flow.userId === "default") {
-      console.info("[zalo-sse] skip mount: userId not ready", { userId: flow.userId });
+    if (!flow.userId || flow.userId === "default" || !flow.isLoggedIn || flow.sessionExpired) {
       setSseConnected(false);
       return;
     }
 
     let cancelled = false;
-    let source: EventSource | null = null;
-    const url = buildZaloRealtimeStreamUrl({ userId: flow.userId });
-    console.info("[zalo-sse] mounting EventSource", { url, userId: flow.userId });
+    let es: EventSource | null = null;
+    let reconnectTimer: number | null = null;
 
-    try {
-      source = new EventSource(url);
-    } catch (err) {
-      // Browser không hỗ trợ EventSource hoặc URL lỗi — fallback polling.
-      console.warn("[zalo-sse] cannot open EventSource", err);
-      setSseConnected(false);
-      return;
-    }
-
-    source.addEventListener("ready", (e) => {
-      if (!cancelled) {
-        console.info("[zalo-sse] ready", e.data);
-        setSseConnected(true);
-      }
-    });
-
-    source.addEventListener("heartbeat", () => {
-      if (!cancelled) setSseConnected(true);
-    });
-
-    source.addEventListener("zalo-message", (e: MessageEvent) => {
+    const connect = () => {
       if (cancelled) return;
-      try {
-        const event = JSON.parse(e.data);
-        console.info("[zalo-sse] zalo-message", event);
-        if (!event || event.type !== "new_messages") return;
-        const groupId = String(event.group_id || "").trim();
-        if (!groupId) return;
-        // Chỉ append khi đang mở đúng group (không chuyển tab tự động).
-        if (groupId !== lastLoadedConversationIdRef.current) {
-          // Vẫn refresh sidebar (loadConversations sẽ tự chạy qua polling).
-          return;
-        }
-        const newMessages = Array.isArray(event.messages) ? event.messages : [];
-        if (newMessages.length === 0) return;
-        setMessages((prev) => {
-          const seen = new Set(prev.map((m) => m.id));
-          const additions = newMessages.filter(
-            (m: ZaloLibraryMessage) => m?.id && !seen.has(m.id)
-          );
-          if (additions.length === 0) return prev;
-          return [...prev, ...additions];
-        });
-      } catch (err) {
-        console.warn("[zalo-sse] failed to parse event", err);
+
+      // Đóng kết nối cũ trước khi tạo mới.
+      if (es) {
+        es.close();
+        es = null;
       }
-    });
 
-    source.addEventListener("error", (e: Event) => {
-      // Browser EventSource tự động reconnect. Chỉ set state để UI biết.
-      console.warn("[zalo-sse] error event", { readyState: source?.readyState, event: e });
-      if (!cancelled) setSseConnected(false);
-    });
+      const url = buildZaloRealtimeStreamUrl({ userId: flow.userId, email: flow.email });
+      console.info("[zalo-sse] connecting to", url);
+      setSseConnected(false);
 
-    source.onopen = () => {
-      console.info("[zalo-sse] connection open", { url });
+      try {
+        es = new EventSource(url);
+      } catch (err) {
+        console.warn("[zalo-sse] cannot open EventSource", err);
+        scheduleReconnect();
+        return;
+      }
+
+      es.onopen = () => {
+        if (!cancelled) {
+          console.info("[zalo-sse] connection open");
+          setSseConnected(true);
+        }
+      };
+
+      es.addEventListener("ready", (e: MessageEvent) => {
+        if (cancelled) return;
+        try {
+          const meta = JSON.parse(e.data);
+          console.info("[zalo-sse] stream ready", meta);
+          setSseConnected(true);
+        } catch {
+          setSseConnected(true);
+        }
+      });
+
+      // Nhận realtime tin nhắn từ Python persistent_listener → SSE bus.
+      es.addEventListener("zalo-message", (e: MessageEvent) => {
+        if (cancelled) return;
+        try {
+          const payload = JSON.parse(e.data);
+          // Payload format: { type, account_id, group_id, group_name, messages: [] }
+          if (payload.type !== "new_messages") return;
+
+          const groupId = String(payload.group_id || "").trim();
+          if (groupId !== selectedConversationId) return;
+
+          const msgs: any[] = Array.isArray(payload.messages) ? payload.messages : [];
+          if (!msgs.length) return;
+
+          const lastMsg = msgs[msgs.length - 1];
+
+          setMessages((prev) => {
+            const seen = new Set(prev.map(messageKey));
+            const newOnes: ZaloLibraryMessage[] = [];
+
+            for (const rawMsg of msgs) {
+              const sourceMsgId = rawMsg.message_id || rawMsg.source_message_id;
+              if (!sourceMsgId || seen.has(messageKey({
+                id: sourceMsgId,
+                source_message_id: sourceMsgId,
+                user_id: rawMsg.user_id || flow.userId || "",
+                group_id: groupId,
+                sender_id: rawMsg.sender_id,
+                sender_name: rawMsg.sender_name,
+                timestamp_text: rawMsg.timestamp,
+                time_text: rawMsg.time_text,
+                type: rawMsg.type || "text",
+                content: rawMsg.content,
+                is_sent: Boolean(rawMsg.is_sent),
+                is_deleted: Boolean(rawMsg.is_deleted),
+                assets: (rawMsg.image_urls || []).map((url: string) => ({
+                  source_url: url, status: "uploaded", storage_url: url,
+                })),
+              }))) {
+                continue;
+              }
+              newOnes.push({
+                id: sourceMsgId,
+                source_message_id: sourceMsgId,
+                user_id: rawMsg.user_id || flow.userId || "",
+                group_id: groupId,
+                sender_id: rawMsg.sender_id,
+                sender_name: rawMsg.sender_name,
+                timestamp_text: rawMsg.timestamp,
+                time_text: rawMsg.time_text,
+                type: rawMsg.type || "text",
+                content: rawMsg.content,
+                is_sent: Boolean(rawMsg.is_sent),
+                is_deleted: Boolean(rawMsg.is_deleted),
+                assets: (rawMsg.image_urls || []).map((url: string) => ({
+                  source_url: url, status: "uploaded", storage_url: url,
+                })),
+              });
+            }
+
+            if (!newOnes.length) return prev;
+
+            const shouldStickToBottom = isNearBottom(messageListRef.current);
+            if (shouldStickToBottom) pendingScrollRef.current = "bottom";
+            else setNewMessageCount(c => c + 1);
+
+            return [...prev, ...newOnes];
+          });
+
+          // Cập nhật last message preview trong conversation list.
+          if (lastMsg) {
+            setConversations(prev => prev.map(c =>
+              c.conversation_id === groupId
+                ? { ...c, last_message: lastMsg.content || lastMsg.type || "Tin nhắn mới", last_message_at: lastMsg.timestamp || lastMsg.time_text }
+                : c
+            ));
+          }
+        } catch (err) {
+          console.warn("[zalo-sse] failed to parse zalo-message event", err);
+        }
+      });
+
+      es.onerror = (e: Event) => {
+        console.warn("[zalo-sse] error", e);
+        setSseConnected(false);
+        if (!cancelled) scheduleReconnect();
+      };
     };
+
+    const scheduleReconnect = () => {
+      if (cancelled) return;
+      if (reconnectTimer) return;
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = null;
+        connect();
+      }, 5000);
+    };
+
+    connect();
 
     return () => {
       cancelled = true;
       setSseConnected(false);
-      try {
-        source?.close();
-        console.info("[zalo-sse] closed EventSource", { userId: flow.userId });
-      } catch (_) {
-        /* ignore */
-      }
+      if (reconnectTimer) window.clearTimeout(reconnectTimer);
+      if (es) es.close();
     };
   }, [flow.userId]);
 
@@ -886,7 +968,12 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
         await loadLatestMessages(conversationIdToSend, { silent: true });
       }
     } catch (err) {
-      setDirectSendError(err instanceof Error ? err.message : "Không thể gửi tin nhắn.");
+      if (isSessionExpiredError(err)) {
+        setDirectSendError("Phiên đăng nhập Zalo đã hết hạn. Vui lòng đăng nhập lại để tiếp tục gửi tin.");
+        void flow.refreshLoginStatus();
+      } else {
+        setDirectSendError(err instanceof Error ? err.message : "Không thể gửi tin nhắn.");
+      }
       setInputText(textToSend);
       setSelectedMedia(mediaToSend);
     } finally {
@@ -903,7 +990,12 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
       await sendZaloMessage(flow.userId, selectedConversationId, { text });
       await loadLatestMessages(selectedConversationId, { silent: true });
     } catch (err) {
-      setDirectSendError(err instanceof Error ? err.message : "Không thể gửi tin nhắn nhanh.");
+      if (isSessionExpiredError(err)) {
+        setDirectSendError("Phiên đăng nhập Zalo đã hết hạn. Vui lòng đăng nhập lại để tiếp tục gửi tin.");
+        void flow.refreshLoginStatus();
+      } else {
+        setDirectSendError(err instanceof Error ? err.message : "Không thể gửi tin nhắn nhanh.");
+      }
     } finally {
       setIsSendingDirect(false);
     }
@@ -1514,22 +1606,21 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
             ) : (
               <>
                 <div className="text-[#E3000F] text-4xl mb-4">
-                  <MaterialIcon name="qr_code_scanner" className="text-inherit" />
+                  <MaterialIcon name="login" className="text-inherit" />
                 </div>
                 <h3 className="text-base font-bold text-slate-800 mb-2.5 text-center">Tài khoản chưa đăng nhập</h3>
                 <div 
                   className="text-slate-500 text-[11px] text-center leading-relaxed mb-5"
                   style={{ minWidth: "280px", maxWidth: "100%", width: "100%" }}
                 >
-                  <p>Bạn cần kết nối tài khoản Zalo này qua mã QR để hệ thống có thể đọc tin nhắn và thực hiện các tác vụ tự động.</p>
+                  <p>Bấm vào nút bên dưới để mở Zalo Web và đăng nhập. Sau khi đăng nhập xong, hệ thống sẽ tự động đồng bộ tài khoản của bạn.</p>
                 </div>
                 <button
-                  onClick={() => void flow.startSession()}
-                  disabled={flow.isStartingSession}
-                  className="bg-[#E3000F] hover:bg-red-600 text-white px-5 py-2 rounded-lg text-[12px] font-bold transition-all shadow-md shadow-red-100 active:scale-95 disabled:opacity-50 flex items-center gap-1.5 disabled:active:scale-100"
+                  onClick={handleOpenZaloWeb}
+                  className="bg-[#E3000F] hover:bg-red-600 text-white px-5 py-2 rounded-lg text-[12px] font-bold transition-all shadow-md shadow-red-100 active:scale-95 flex items-center gap-1.5"
                 >
-                  <MaterialIcon name="qr_code_scanner" className="text-sm" />
-                  {flow.isStartingSession ? "Đang tạo..." : "Tạo mã QR Đăng Nhập"}
+                  <MaterialIcon name="open_in_new" className="text-sm" />
+                  Tiến hành đăng nhập
                 </button>
               </>
             )}
@@ -1545,7 +1636,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
             isLoggedIn={flow.isLoggedIn ?? false}
             isLoading={isSyncingRecent}
             onSync={() => void syncRecentConversations()}
-            onLogin={() => void flow.startSession?.()}
+            onLogin={handleOpenZaloWeb}
           />
         )}
       </section>

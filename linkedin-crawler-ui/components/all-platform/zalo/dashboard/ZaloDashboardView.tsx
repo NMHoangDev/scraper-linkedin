@@ -301,21 +301,50 @@ export function ZaloDashboardView({ flow, onEnterChat }: ZaloDashboardViewProps)
 
               {/* Action buttons */}
               <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center gap-1.5">
-                <button
-                  onClick={() => onEnterChat(account.account_id)}
-                  className="flex-1 h-8 bg-[#E3000F] text-white flex items-center justify-center gap-1 rounded-lg text-[12px] font-semibold transition-all duration-200 hover:bg-[#C2000D] hover:shadow-sm shadow-red-500/20 active:scale-95"
-                  title="Mở Zalo Chat ở trang full-screen"
-                >
-                  <MaterialIcon name="open_in_new" className="text-[14px]" />
-                  Mở chat
-                </button>
-                <button
-                  onClick={() => flow.deleteAccount(account.account_id, false)}
-                  className="h-8 w-8 bg-slate-50 text-slate-500 flex items-center justify-center rounded-lg transition-all duration-200 hover:bg-red-50 hover:text-[#E3000F] border border-slate-200 hover:border-red-200 active:scale-95"
-                  title="Ngắt kết nối"
-                >
-                  <MaterialIcon name="logout" className="text-[16px]" />
-                </button>
+                {account.listener?.auth_expired ? (
+                  <>
+                    <button
+                      onClick={() => {
+                        // Chuyển sang account này rồi gọi startSession (QR login)
+                        if (account.account_id !== flow.userId) {
+                          flow.switchAccount(account.account_id);
+                        }
+                        void flow.startSession();
+                      }}
+                      className="flex-1 h-8 bg-[#E3000F] text-white flex items-center justify-center gap-1 rounded-lg text-[12px] font-semibold transition-all duration-200 hover:bg-[#C2000D] hover:shadow-sm shadow-red-500/20 active:scale-95 animate-pulse"
+                      title="Phiên đã hết hạn — bấm để đăng nhập lại bằng QR"
+                    >
+                      <MaterialIcon name="login" className="text-[14px]" />
+                      Đăng nhập lại
+                    </button>
+                    <button
+                      onClick={() => onEnterChat(account.account_id)}
+                      className="h-8 w-8 bg-slate-100 text-slate-400 flex items-center justify-center rounded-lg cursor-not-allowed opacity-50"
+                      title="Cần đăng nhập lại trước"
+                      disabled
+                    >
+                      <MaterialIcon name="chat" className="text-[14px]" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => onEnterChat(account.account_id)}
+                      className="flex-1 h-8 bg-[#E3000F] text-white flex items-center justify-center gap-1 rounded-lg text-[12px] font-semibold transition-all duration-200 hover:bg-[#C2000D] hover:shadow-sm shadow-red-500/20 active:scale-95"
+                      title="Mở Zalo Chat ở trang full-screen"
+                    >
+                      <MaterialIcon name="open_in_new" className="text-[14px]" />
+                      Mở chat
+                    </button>
+                    <button
+                      onClick={() => flow.deleteAccount(account.account_id, false)}
+                      className="h-8 w-8 bg-slate-50 text-slate-500 flex items-center justify-center rounded-lg transition-all duration-200 hover:bg-red-50 hover:text-[#E3000F] border border-slate-200 hover:border-red-200 active:scale-95"
+                      title="Ngắt kết nối"
+                    >
+                      <MaterialIcon name="logout" className="text-[16px]" />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           );

@@ -100,7 +100,8 @@ export type MaterialSymbolName =
   | "description"
   | "chat"
   | "star"
-  | "star_border";
+  | "star_border"
+  | "login";
 
 export interface MaterialIconProps {
   name: MaterialSymbolName;

@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { API_BASE_URL, API_KEY } from "@/lib/env";
+import { useAppAuth } from "@/contexts/AppAuthContext";
 import {
   buildZaloJobEventsUrl,
   createZaloAccount,
   deleteAllZaloSessions,
   deleteZaloAccount,
+  deleteZaloAccountFull,
   getDefaultZaloWorkerId,
   getZaloAccounts,
   getZaloCrawledGroups,
@@ -22,6 +24,11 @@ import {
   verifyZaloGroups,
   updateZaloAccount,
 } from "@/services/zaloCrawlerService";
+import {
+  importZaloSessionViaExtension,
+  isZaloExtensionAvailable,
+  ZaloExtensionError,
+} from "@/services/zaloExtension";
 import type {
   ZaloAccountInfo,
   ZaloAuthStatus,
@@ -115,6 +122,7 @@ export interface ZaloCrawlerSummary {
 
 export interface ZaloCrawlerFlowValue {
   userId: string;
+  email: string | null;
   selectedWorkerId: string;
   workers: ZaloWorkerInfo[];
   accounts: ZaloAccountInfo[];
@@ -419,8 +427,15 @@ function readStableZaloUserId(): string {
   return userId;
 }
 
+function readLinkedInEmail(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(LINKEDIN_EMAIL_STORAGE_KEY) ?? null;
+}
+
 export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
+  const { user: appUser } = useAppAuth();
   const [userId, setUserId] = useState("default");
+  const [email, setEmail] = useState<string | null>(null);
   const [selectedWorkerId, setSelectedWorkerIdState] = useState(getDefaultZaloWorkerId());
   const [workers, setWorkers] = useState<ZaloWorkerInfo[]>([
     {
@@ -484,6 +499,7 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
   useEffect(() => {
     queueMicrotask(() => {
       setUserId(readStableZaloUserId());
+      setEmail(readLinkedInEmail());
       setIsUserIdReady(true);
     });
   }, [userId]);
@@ -577,14 +593,14 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
     try {
       const linkedInEmail = window?.localStorage?.getItem("linkedin_crawler_email");
       const currentOwnerId = linkedInEmail ? normalizeZaloUserId(linkedInEmail) : "default";
-      const response = await getZaloAccounts(currentOwnerId);
+      const response = await getZaloAccounts(currentOwnerId, appUser?.id);
       setAccounts(response.accounts ?? []);
     } catch (error) {
       setAccountsError(error instanceof Error ? error.message : "Không thể tải danh sách tài khoản Zalo.");
     } finally {
       setIsLoadingAccounts(false);
     }
-  }, []);
+  }, [appUser?.id]);
 
   useEffect(() => {
     if (!isUserIdReady) return;
@@ -672,16 +688,19 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
       const accountId = normalizeZaloUserId(cleanLabel);
       const linkedInEmail = window?.localStorage?.getItem("linkedin_crawler_email");
       const currentOwnerId = linkedInEmail ? normalizeZaloUserId(linkedInEmail) : "default";
-      await createZaloAccount({
+      const response = await createZaloAccount({
         account_id: accountId,
         owner_id: currentOwnerId,
+        id_member: appUser?.id,
         label: cleanLabel,
         phone: phone?.trim() || undefined,
       });
       await loadAccounts();
-      switchAccount(accountId);
+      switchAccount(response.account_id || accountId);
     } catch (error) {
-      setAccountsError(error instanceof Error ? error.message : "Không thể tạo tài khoản Zalo.");
+      const msg = error instanceof Error ? error.message : "Không thể tạo tài khoản Zalo.";
+      setAccountsError(msg);
+      setErrorMessage(msg);
     }
   }, [loadAccounts, switchAccount]);
 
@@ -694,7 +713,9 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
         switchAccount("default");
       }
     } catch (error) {
-      setAccountsError(error instanceof Error ? error.message : "Không thể xóa tài khoản Zalo.");
+      const msg = error instanceof Error ? error.message : "Không thể xóa tài khoản Zalo.";
+      setAccountsError(msg);
+      setErrorMessage(msg);
     }
   }, [loadAccounts, switchAccount, userId]);
 
@@ -1412,7 +1433,18 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
     setErrorMessage(null);
     setWarningMessage(null);
     try {
-      await deleteAllZaloSessions(userId);
+      // Xoá HOÀN TOÀN: file auth local + 5 bảng Supabase (zalo_accounts, zalo_sessions,
+      // zalo_users, zalo_groups, zalo_messages) + dừng listener + clear sessions in-memory.
+      // Đây là bước QUAN TRỌNG để khi user đăng nhập lại bằng extension, không còn dữ liệu rác.
+      let deleteSummary: { auth_file_deleted: boolean; listener_stopped: boolean; supabase: Record<string, number> } | null = null;
+      try {
+        const result = await deleteZaloAccountFull(userId);
+        deleteSummary = result.data;
+      } catch (fullDelErr) {
+        // Fallback: thử deleteAllZaloSessions (legacy) nếu endpoint mới lỗi
+        console.warn("[zalo] deleteZaloAccountFull failed, fallback to deleteAllZaloSessions:", fullDelErr);
+        await deleteAllZaloSessions(userId);
+      }
       resetAuthState();
       setJobsByRow({});
       const viewerWindow = manualViewerWindowRef.current;
@@ -1424,7 +1456,10 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
         }
       }
       manualViewerWindowRef.current = null;
-      setFeedbackMessage(MSG_SESSION_ENDED);
+      const summaryMsg = deleteSummary
+        ? `Đã xoá auth + ${Object.values(deleteSummary.supabase).reduce((a, b) => a + b, 0)} rows trong DB. ${MSG_SESSION_ENDED}`
+        : MSG_SESSION_ENDED;
+      setFeedbackMessage(summaryMsg);
       void pollAuthStatus();
     } catch (error) {
       setWarningMessage(
@@ -1439,18 +1474,105 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
 
   const hasConfirmedSession = canCrawl && Boolean(sessionId);
 
+  /**
+   * Khi bấm "Đăng nhập lại":
+   *   1. Thử gọi Chrome Extension để lấy cookies mới hoàn chỉnh.
+   *      Nếu user đã login Zalo trong Chrome thật → extension tự lấy cookies + gửi backend.
+   *   2. Nếu extension không có / lỗi → fallback QR flow.
+   *   3. Nếu đã confirmed → xoá auth cũ trước (endSession), rồi mới gọi extension.
+   *
+   * Lưu ý: mỗi bước đều có feedback message để user biết đang ở bước nào,
+   * và timeout rõ ràng (15s ping, 30s import) để không bao giờ treo vô thời hạn.
+   */
   const restartSession = useCallback(async () => {
-    if (hasConfirmedSession) {
-      await endSession();
-      await startSession();
-      return;
-    }
-
+    console.log("[zalo] restartSession() called", { hasConfirmedSession, sessionId, userId });
     setErrorMessage(null);
     setWarningMessage(null);
     setIsStartingSession(true);
+    setFeedbackMessage("🔄 Đang khởi động lại phiên Zalo...");
+
+    // Helper timeout wrapper
+    const withTimeout = <T,>(p: Promise<T>, ms: number, label: string): Promise<T> =>
+      Promise.race([
+        p,
+        new Promise<T>((_, reject) =>
+          setTimeout(() => reject(new Error(`${label} timeout sau ${Math.round(ms / 1000)}s`)), ms),
+        ),
+      ]);
+
     try {
-      const response = await refreshZaloLoginQr(userId);
+      // 1) Nếu đã có session cũ → xoá sạch trước (file + DB)
+      if (hasConfirmedSession || sessionId) {
+        setFeedbackMessage("🗑️ Đang xoá phiên cũ...");
+        try {
+          await withTimeout(deleteZaloAccountFull(userId), 15000, "Xoá phiên cũ");
+        } catch (e) {
+          console.warn("[zalo] pre-restart cleanup failed:", e);
+          setFeedbackMessage("⚠️ Xoá phiên cũ thất bại, tiếp tục...");
+        }
+        resetAuthState();
+      }
+
+      // 2) Thử gọi extension
+      setFeedbackMessage("🔌 Đang kiểm tra Chrome Extension...");
+      let extAvailable = false;
+      try {
+        extAvailable = await withTimeout(isZaloExtensionAvailable(), 5000, "Ping extension");
+        console.log("[zalo] extension ping result:", extAvailable);
+      } catch (e) {
+        extAvailable = false;
+        console.warn("[zalo] extension ping failed:", e);
+        setFeedbackMessage(`⚠️ Ping extension lỗi: ${e instanceof Error ? e.message : String(e)}`);
+      }
+
+      if (extAvailable) {
+        setFeedbackMessage("🍪 Đang lấy cookies Zalo từ Chrome...");
+        try {
+          const result = await withTimeout(
+            importZaloSessionViaExtension({
+              account_id: userId,
+              user_id: userId,
+              owner_id: userId,
+            }),
+            45000,
+            "Import session",
+          );
+          if (result.backend && result.backend.status === "confirmed") {
+            setSessionId(result.backend.session_id || "");
+            setAuthStatus("confirmed");
+            setIsLoggedIn(true);
+            setCanCrawl(true);
+            setQrBase64(null);
+            setQrImageUrl(null);
+            setFeedbackMessage(
+              `✅ Đăng nhập lại thành công (${result.cookies_count} cookies: ${result.keys.join(", ")}). Listener đang khởi động nền...`,
+            );
+            void pollAuthStatus();
+            return;
+          }
+          // Backend trả về nhưng status != confirmed (ví dụ login failed)
+          setWarningMessage(
+            `Extension import trả về: ${JSON.stringify(result.backend?.detail || result.backend?.message || "unknown")}. Thử lại hoặc dùng QR.`,
+          );
+        } catch (extErr) {
+          const msg =
+            extErr instanceof ZaloExtensionError
+              ? extErr.message
+              : extErr instanceof Error
+                ? extErr.message
+                : String(extErr);
+          setWarningMessage(`Extension import thất bại: ${msg}. Fallback về QR...`);
+          // Fall through to QR flow
+        }
+      } else {
+        setWarningMessage(
+          "⚠️ Chưa cài Chrome Extension lấy Zalo cookies. Mở chrome://extensions/, load unpacked thư mục facebook-seeding-extension, rồi reload trang web. Sau đó bấm 'Đăng nhập lại' lần nữa.",
+        );
+      }
+
+      // 3) Fallback: QR flow
+      setFeedbackMessage("📱 Đang tạo QR đăng nhập...");
+      const response = await withTimeout(initZaloAuthSession(userId), 30000, "Init QR session");
       const qrBase64 = getDisplayableQrBase64(response.status, response.qr_base64);
       setSessionId(response.session_id);
       setAuthStatus(response.status);
@@ -1461,15 +1583,13 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
       setFeedbackMessage(response.status === "confirmed" ? null : MSG_QR_READY);
       void pollAuthStatus();
     } catch (error) {
-      setWarningMessage(
-        error instanceof Error
-          ? `${MSG_CHECK_LOGIN_ERROR} ${error.message}`
-          : MSG_CHECK_LOGIN_ERROR,
-      );
+      const msg = error instanceof Error ? error.message : String(error);
+      setWarningMessage(`Lỗi: ${msg}. Vui lòng thử lại.`);
+      setErrorMessage(`${MSG_CHECK_LOGIN_ERROR} ${msg}`);
     } finally {
       setIsStartingSession(false);
     }
-  }, [endSession, hasConfirmedSession, pollAuthStatus, startSession, userId]);
+  }, [endSession, hasConfirmedSession, pollAuthStatus, resetAuthState, sessionId, startSession, userId]);
 
   const summary = useMemo<ZaloCrawlerSummary>(() => {
     const total = jobs.length;
@@ -1502,6 +1622,7 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
 
   return {
     userId,
+    email,
     selectedWorkerId,
     workers,
     accounts,

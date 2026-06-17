@@ -235,6 +235,7 @@ async def upsert_zalo_user(
     assigned_worker_id: Optional[str] = None,
     display_name: Optional[str] = None,
     cookie: Optional[str] = None,
+    id_member: Optional[str] = None,
 ) -> None:
     if not is_supabase_configured():
         return
@@ -246,6 +247,8 @@ async def upsert_zalo_user(
         "last_seen_at": now,
         "updated_at": now,
     }
+    if id_member:
+        payload["id_member"] = id_member
     if status == "confirmed":
         payload["last_login_at"] = now
     if assigned_worker_id:
@@ -464,6 +467,7 @@ async def upsert_zalo_account(
     zalo_id: Optional[str] = None,
     avatar_url: Optional[str] = None,
     is_active: bool = True,
+    id_member: Optional[str] = None,
 ) -> None:
     if not is_supabase_configured():
         return
@@ -481,6 +485,8 @@ async def upsert_zalo_account(
         "last_seen_at": now,
         "updated_at": now,
     }
+    if id_member:
+        payload["id_member"] = id_member
     if status == "confirmed":
         payload["last_login_at"] = now
 
@@ -499,12 +505,25 @@ async def upsert_zalo_account(
         raise
 
 
-async def list_zalo_accounts(owner_id: Optional[str] = None) -> List[Dict[str, Any]]:
+async def get_zalo_account_by_id(account_id: str) -> Optional[Dict[str, Any]]:
+    if not is_supabase_configured():
+        return None
+    try:
+        rows = await _rest("GET", "zalo_accounts", params={"account_id": f"eq.{account_id}", "limit": "1"})
+        return rows[0] if rows else None
+    except Exception as exc:
+        logger.warning(f"Could not get zalo_account {account_id}: {exc}")
+        return None
+
+
+async def list_zalo_accounts(owner_id: Optional[str] = None, id_member: Optional[str] = None) -> List[Dict[str, Any]]:
     if not is_supabase_configured():
         return []
 
     params: Dict[str, Any] = {"select": "*", "is_active": "eq.true", "order": "updated_at.desc"}
-    if owner_id:
+    if id_member:
+        params["id_member"] = f"eq.{id_member}"
+    elif owner_id:
         params["owner_id"] = f"eq.{owner_id}"
     try:
         return await _rest("GET", "zalo_accounts", params=params) or []

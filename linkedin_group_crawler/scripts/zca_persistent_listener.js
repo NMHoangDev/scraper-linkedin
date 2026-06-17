@@ -222,11 +222,20 @@ function normalizeMessage(raw, index, ownId = null) {
     data.threadId ||
     data.groupId ||
     raw.groupId ||
+    data.grid ||
+    raw.grid ||
+    ""
+  );
+
+  const idTo = String(
+    data.idTo || raw.idTo || 
+    data.toUid || raw.toUid || 
+    data.receiverId || raw.receiverId || 
+    data.destId || raw.destId || 
     ""
   );
 
   if (!threadId) {
-    const idTo = String(data.idTo || raw.idTo || "");
     if (ownId && idTo === String(ownId)) {
       // Received a personal message sent TO ME
       threadId = senderId;
@@ -237,6 +246,16 @@ function normalizeMessage(raw, index, ownId = null) {
     // Fallback if idTo was empty
     if (!threadId) {
       threadId = senderId;
+    }
+  }
+
+  // Fix DM: nếu threadId trùng với ownId → Zalo đã trả nhầm ID của chính mình
+  // làm threadId cho cuộc chat cá nhân. Phải lấy lại ID đối phương.
+  if (ownId && threadId === String(ownId)) {
+    if (idTo && idTo !== String(ownId)) {
+      threadId = idTo;        // Tôi gửi → thread = người nhận
+    } else if (senderId && senderId !== String(ownId)) {
+      threadId = senderId;    // Người khác gửi cho tôi → thread = người gửi
     }
   }
 

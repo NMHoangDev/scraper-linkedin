@@ -50,16 +50,16 @@ export function ZaloEmptyChat({
           Đăng nhập Zalo để bắt đầu
         </h3>
         <p className="text-sm text-zinc-500 mb-6 text-center max-w-sm leading-relaxed">
-          Quét mã QR bằng ứng dụng Zalo trên điện thoại để kết nối tài khoản.
-          Tin nhắn sẽ được đồng bộ tự động ngay sau khi đăng nhập.
+          Bấm nút bên dưới để mở Zalo Web và tiến hành đăng nhập.
+          Tin nhắn sẽ được đồng bộ tự động ngay sau khi đăng nhập thành công.
         </p>
         {onLogin && (
           <button
             onClick={onLogin}
-            className="bg-[#E3000F] hover:bg-red-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold transition-all shadow-md hover:shadow-lg active:scale-95"
+            className="bg-[#E3000F] hover:bg-red-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold transition-all shadow-md hover:shadow-lg active:scale-95 flex items-center justify-center gap-2"
           >
-            <MaterialIcon name="qr_code_scanner" className="mr-2" />
-            Đăng nhập bằng QR
+            <MaterialIcon name="open_in_new" className="text-base" />
+            Tiến hành đăng nhập
           </button>
         )}
       </div>

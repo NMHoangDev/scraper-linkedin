@@ -571,11 +571,20 @@ function normalizeMessage(raw, index, ownId = null) {
     data.threadId ||
     data.groupId ||
     raw.groupId ||
+    data.grid ||
+    raw.grid ||
+    ""
+  );
+
+  const idTo = String(
+    data.idTo || raw.idTo || 
+    data.toUid || raw.toUid || 
+    data.receiverId || raw.receiverId || 
+    data.destId || raw.destId || 
     ""
   );
 
   if (!threadId) {
-    const idTo = String(data.idTo || raw.idTo || "");
     if (ownId && idTo === String(ownId)) {
       threadId = senderId;
     } else {
@@ -583,6 +592,16 @@ function normalizeMessage(raw, index, ownId = null) {
     }
     if (!threadId) {
       threadId = senderId;
+    }
+  }
+
+  // Fix DM: nếu threadId trùng với ownId → Zalo đã trả nhầm ID của chính mình
+  // làm threadId cho cuộc chat cá nhân. Phải lấy lại ID đối phương.
+  if (ownId && threadId === String(ownId)) {
+    if (idTo && idTo !== String(ownId)) {
+      threadId = idTo;        // Tôi gửi → thread = người nhận
+    } else if (senderId && senderId !== String(ownId)) {
+      threadId = senderId;    // Người khác gửi cho tôi → thread = người gửi
     }
   }
 
@@ -732,6 +751,14 @@ async function syncOldMessages(auth, threadType, threadId, count, timeoutMs, own
       if (wantedThreadId && rawThreadId !== wantedThreadId) continue;
       
       const normalized = normalizeMessage(raw, collected.length, ownId);
+      
+      // Override threadId if we know the exact wantedThreadId and normalizeMessage failed to get it
+      // (which often happens in DM history because idTo is missing)
+      if (wantedThreadId && (!normalized.thread_id || normalized.thread_id === String(ownId))) {
+        normalized.thread_id = wantedThreadId;
+        normalized.group_id = wantedThreadId;
+      }
+
       if (!normalized.message_id || seen.has(normalized.message_id)) continue;
       seen.add(normalized.message_id);
       collected.push(normalized);
@@ -983,11 +1010,12 @@ async function main() {
         }
       }
 
-      // 3. Fetch history CHỈ cho groups (không cho friends — DM history qua getGroupChatHistory
-      //    trả 136/permission-denied vì ZCA API này chỉ dành cho group, không phải DM).
-      //    Lịch sử DM sẽ được lấy qua listener stream real-time.
+      // 3. Fetch history cho cả groups VÀ friends (DM / cá nhân).
       const CONCURRENCY = 3;
       let processed = 0;
+      const ownId = typeof api.getOwnId === "function" ? api.getOwnId() : null;
+
+      // 3a. Group history via getGroupChatHistory
       const groupIds = groups.map((g) => g.group_id).filter(Boolean);
       for (let i = 0; i < groupIds.length; i += CONCURRENCY) {
         const chunk = groupIds.slice(i, i + CONCURRENCY);
@@ -1005,7 +1033,7 @@ async function main() {
           const { gid, resp } = r.value;
           try {
             const list = (resp && (resp.messages || resp.groupMsgs || (resp.data && resp.data.messages))) || [];
-            const msgs = normalizeHistory(list, typeof api.getOwnId === "function" ? api.getOwnId() : null);
+            const msgs = normalizeHistory(list, ownId);
             for (const m of msgs) {
               m.group_id = gid;
               m.thread_id = gid;
@@ -1015,6 +1043,43 @@ async function main() {
             }
           } catch (parseErr) {
             summary.errors.push(`parse_${gid}: ${parseErr && parseErr.message ? parseErr.message : String(parseErr)}`);
+          }
+        }
+      }
+
+      // 3b. DM (cá nhân) history cho từng friend
+      if (includeFriends && summary.friends.length > 0) {
+        const friendIds = summary.friends.map((f) => f.group_id).filter(Boolean);
+        for (let i = 0; i < friendIds.length; i += CONCURRENCY) {
+          const chunk = friendIds.slice(i, i + CONCURRENCY);
+          const results = await Promise.allSettled(
+            chunk.map(async (fid) => {
+              // ZCA getGroupChatHistory cũng dùng được cho DM nếu truyền đúng userId
+              const resp = await api.getGroupChatHistory(fid, messagesPerChat);
+              return { fid, resp };
+            }),
+          );
+          for (const r of results) {
+            if (r.status === "rejected") {
+              // DM history có thể bị 136/permission-denied — bỏ qua im lặng
+              continue;
+            }
+            const { fid, resp } = r.value;
+            try {
+              const list = (resp && (resp.messages || resp.groupMsgs || (resp.data && resp.data.messages))) || [];
+              const msgs = normalizeHistory(list, ownId);
+              for (const m of msgs) {
+                // Ép cứng thread = friend ID, giống block 3a ép cứng gid cho group.
+                // Đảm bảo DM luôn thuộc đúng conversation của đối phương.
+                m.group_id = fid;
+                m.thread_id = fid;
+                summary.messages.push(m);
+                summary.total_messages++;
+                processed++;
+              }
+            } catch (_parseErr) {
+              // Lỗi parse DM — bỏ qua im lặng, không chặn luồng
+            }
           }
         }
       }

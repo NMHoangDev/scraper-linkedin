@@ -355,8 +355,8 @@ async def first_time_sync(
         "--group-limit", str(group_limit),
         "--include-friends", "true" if include_friends else "false",
     ]
-    # Timeout dài vì first-time sync có thể mất vài phút với nhiều group.
-    timeout = 60 + (group_limit * 10)
+    # Timeout dài vì first-time sync có thể mất vài phút với nhiều group + DM friends.
+    timeout = 90 + (group_limit * 12)
     try:
         result = await _run_zca_command(
             "first-time-sync",

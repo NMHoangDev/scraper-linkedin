@@ -1,5 +1,6 @@
 from typing import List, Optional
 import re
+import secrets
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from loguru import logger
@@ -17,6 +18,8 @@ from app.modules.all_platform.zalo.services.supabase_service import (
     list_zalo_accounts,
     upsert_zalo_account,
     upsert_zalo_user,
+    hard_delete_zalo_account_data,
+    get_zalo_account_by_id,
 )
 
 
@@ -36,12 +39,14 @@ def _normalize_id(value: Optional[str], default: str = "default") -> str:
 class ZaloAccountCreate(BaseModel):
     account_id: Optional[str] = None
     owner_id: str = "default"
+    id_member: Optional[str] = None
     label: str = Field(min_length=1)
     phone: Optional[str] = None
 
 
 class ZaloAccountUpdate(BaseModel):
     owner_id: Optional[str] = None
+    id_member: Optional[str] = None
     label: Optional[str] = None
     phone: Optional[str] = None
     status: Optional[str] = None
@@ -50,10 +55,11 @@ class ZaloAccountUpdate(BaseModel):
 @router.get("")
 async def list_accounts(
     owner_id: Optional[str] = Query(None),
+    id_member: Optional[str] = Query(None),
     x_user_id: str = Header("default", alias="X-User-ID"),
 ):
     owner = _normalize_id(owner_id or x_user_id)
-    db_accounts = await list_zalo_accounts(owner)
+    db_accounts = await list_zalo_accounts(owner_id=owner, id_member=id_member)
     auth_users = set(await list_zca_auth_users())
     by_id = {str(row.get("account_id")): dict(row) for row in db_accounts if row.get("account_id")}
 
@@ -89,20 +95,38 @@ async def list_accounts(
 
 @router.post("")
 async def create_account(body: ZaloAccountCreate):
-    account_id = _normalize_id(body.account_id or body.label)
     owner_id = _normalize_id(body.owner_id)
+    
+    # Generate random unique account_id
+    while True:
+        random_id = f"zl_{secrets.token_hex(4)}"
+        existing = await get_zalo_account_by_id(random_id)
+        if not existing:
+            account_id = random_id
+            break
+
     try:
         await upsert_zalo_account(
             account_id,
             owner_id=owner_id,
+            id_member=body.id_member,
             label=body.label.strip(),
             phone=body.phone,
             status="not_logged_in",
         )
         await upsert_zalo_user(
             account_id,
+            id_member=body.id_member,
             status="not_logged_in",
         )
+    except RuntimeError as exc:
+        msg = str(exc)
+        if "zalo_users_id_member_fkey" in msg or "zalo_accounts_id_member_fkey" in msg:
+            raise HTTPException(
+                status_code=400,
+                detail="Lỗi tạo tài khoản: Không tìm thấy người dùng trên hệ thống (id_member không hợp lệ). Hãy tải lại trang hoặc đăng nhập lại."
+            )
+        raise HTTPException(status_code=400, detail=f"Lỗi cơ sở dữ liệu: {msg}")
     except SupabaseNotConfigured:
         pass
     return {
@@ -119,16 +143,19 @@ async def create_account(body: ZaloAccountCreate):
 @router.patch("/{account_id}")
 async def update_account(account_id: str, body: ZaloAccountUpdate):
     safe_account_id = _normalize_id(account_id)
+    owner_id = _normalize_id(body.owner_id) if body.owner_id else "default"
     try:
         await upsert_zalo_account(
             safe_account_id,
-            owner_id=_normalize_id(body.owner_id) if body.owner_id else "default",
+            owner_id=owner_id,
+            id_member=body.id_member,
             label=body.label or safe_account_id,
             phone=body.phone,
             status=body.status or "unknown",
         )
         await upsert_zalo_user(
             safe_account_id,
+            id_member=body.id_member,
             status=body.status or "unknown",
         )
     except SupabaseNotConfigured:
@@ -153,6 +180,11 @@ async def remove_account(account_id: str, delete_auth: bool = Query(False)):
                 profile_cleared = clear_user_profile_data(safe_account_id)
         except Exception as exc:
             logger.warning(f"Failed to clear profile data for user={safe_account_id} after deletion: {exc}")
+        
+        try:
+            await hard_delete_zalo_account_data(safe_account_id)
+        except Exception as exc:
+            logger.warning(f"Failed to hard delete Supabase data for user={safe_account_id}: {exc}")
             
     await delete_zalo_account(safe_account_id)
     return {
@@ -162,6 +194,7 @@ async def remove_account(account_id: str, delete_auth: bool = Query(False)):
         "sessions_removed": sessions_removed,
         "profile_cleared": profile_cleared,
     }
+
 
 
 @router.post("/{account_id}/listener/restart")

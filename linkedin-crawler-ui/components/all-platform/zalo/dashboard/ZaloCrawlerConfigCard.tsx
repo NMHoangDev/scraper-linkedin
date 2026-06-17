@@ -248,6 +248,7 @@ export function ZaloCrawlerConfigCard({ flow }: ZaloCrawlerConfigCardProps) {
             className="border-outline-variant bg-surface hover:bg-surface-container-high rounded-lg border px-lg py-sm text-sm font-bold uppercase disabled:cursor-not-allowed disabled:opacity-60"
             onClick={() => void flow.restartSession()}
             disabled={hasBlockingAction || flow.isSubmittingGroups}
+            title="Bấm sẽ tự gọi Chrome Extension lấy cookies Zalo. Nếu chưa cài extension sẽ fallback về QR."
           >
             Đăng nhập lại
           </button>

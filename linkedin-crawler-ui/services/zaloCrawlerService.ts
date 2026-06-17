@@ -74,8 +74,9 @@ export function getZaloWorkers(userId = "default"): Promise<ZaloWorkersResponse>
   }, 7000);
 }
 
-export function getZaloAccounts(ownerId = "default"): Promise<ZaloAccountsResponse> {
+export function getZaloAccounts(ownerId = "default", idMember?: string): Promise<ZaloAccountsResponse> {
   const params = new URLSearchParams({ owner_id: ownerId });
+  if (idMember) params.append("id_member", idMember);
   return requestJson<ZaloAccountsResponse>(`/api/all-platform/zalo/accounts?${params.toString()}`, {
     method: "GET",
     headers: {
@@ -87,6 +88,7 @@ export function getZaloAccounts(ownerId = "default"): Promise<ZaloAccountsRespon
 export function createZaloAccount(payload: {
   account_id?: string;
   owner_id?: string;
+  id_member?: string;
   label: string;
   phone?: string;
 }) {
@@ -357,6 +359,56 @@ export function deleteAllZaloSessions(
   });
 }
 
+/**
+ * Xoá HOÀN TOÀN 1 account Zalo: file auth local + 5 bảng Supabase
+ * (zalo_accounts, zalo_sessions, zalo_users, zalo_groups, zalo_messages).
+ *
+ * Body: { account_id, owner_id? }
+ */
+export function deleteZaloAccountFull(
+  accountId: string,
+  ownerId?: string,
+): Promise<{ success: boolean; data: { account_id: string; auth_file_deleted: boolean; listener_stopped: boolean; supabase: Record<string, number>; in_memory_sessions_cleared: number; } }> {
+  return requestJson<{
+    success: boolean;
+    data: { account_id: string; auth_file_deleted: boolean; listener_stopped: boolean; supabase: Record<string, number>; in_memory_sessions_cleared: number; };
+  }>("/api/all-platform/zalo/auth/delete-account-full", {
+    method: "POST",
+    headers: buildHeaders({
+      "X-User-ID": ownerId || accountId,
+      "Content-Type": "application/json",
+    }),
+    body: JSON.stringify({
+      account_id: accountId,
+      owner_id: ownerId || accountId,
+    }),
+  });
+}
+
+/**
+ * Dọn account rác trong Supabase (không có auth file + không có listener).
+ */
+export function cleanupZaloOrphanAccounts(): Promise<{
+  success: boolean;
+  deleted: any[];
+  deleted_count: number;
+  kept: any[];
+  kept_count: number;
+}> {
+  return requestJson<{
+    success: boolean;
+    deleted: any[];
+    deleted_count: number;
+    kept: any[];
+    kept_count: number;
+  }>("/api/all-platform/zalo/auth/cleanup-orphan-accounts", {
+    method: "POST",
+    headers: buildHeaders({
+      "X-User-ID": "admin",
+    }),
+  });
+}
+
 export function startZaloCrawl(
   payload: ZaloStartCrawlRequest,
 ): Promise<ZaloStartCrawlResponse> {
@@ -414,7 +466,22 @@ export function buildZaloJobEventsUrl(userId = "default"): string {
 
 export interface BuildZaloRealtimeStreamOptions {
   userId?: string;
-  email?: string;
+  email?: string | null;
+}
+
+export function buildZaloRealtimeWebSocketUrl(
+  groupId: string,
+  options: BuildZaloRealtimeStreamOptions = {}
+): string {
+  const params = new URLSearchParams();
+  if (options.userId) params.set("user_id", options.userId);
+  if (options.email) params.set("email", options.email);
+  if (API_KEY) params.set("api_key", API_KEY);
+  const qs = params.toString();
+  
+  // Convert http:// to ws:// and https:// to wss://
+  const wsBaseUrl = API_BASE_URL.replace(/^http/, 'ws');
+  return `${wsBaseUrl}/api/zalo/realtime/ws/${encodeURIComponent(groupId)}${qs ? `?${qs}` : ""}`;
 }
 
 export function buildZaloRealtimeStreamUrl(
