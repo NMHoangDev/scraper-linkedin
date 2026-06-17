@@ -164,7 +164,19 @@ export default function TaiKhoanFbPage() {
           </button>
         </div>
         {status && <div className="mt-3 text-sm text-[#666666] bg-[#F5F5F5] rounded-lg px-3 py-2">{status}</div>}
-        {extInstalled === false && <div className="mt-3 text-xs text-amber-600">⚠️ Chưa phát hiện extension trên trình duyệt này. Cài extension Markee để thêm được tài khoản.</div>}
+        {extInstalled === false && (
+          <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+            <div className="text-xs text-amber-700">
+              <span className="font-semibold">Chưa phát hiện extension Markee trên trình duyệt này.</span>
+              <span className="block mt-0.5 text-amber-600">Tải extension → giải nén → vào <code className="bg-amber-100 px-1 rounded">chrome://extensions</code> → bật Developer mode → Load unpacked → chọn thư mục vừa giải nén.</span>
+            </div>
+            <a href="/markee-extension.zip" download
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition">
+              <MaterialIcon name="download" className="text-[16px]" />
+              Tải extension
+            </a>
+          </div>
+        )}
 
         <div className="mt-4 pt-4 border-t border-[#E5E5E5]">
           <div className="flex items-center justify-between flex-wrap gap-2">
