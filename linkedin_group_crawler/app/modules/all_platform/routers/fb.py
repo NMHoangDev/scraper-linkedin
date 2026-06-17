@@ -49,17 +49,8 @@ def _role(user: dict[str, Any]) -> str:
 
 
 def _allowed_owners(user: dict[str, Any]) -> set[str] | None:
-    """Return None for admin (all owners), otherwise the exact owner ids."""
-    user_id = str(user.get("id") or "")
-    role = _role(user)
-    if role == "admin":
-        return None
-    if role == "leader":
-        members = get_team_members(user_id)
-        ids = {user_id}
-        ids.update(str(m.get("id")) for m in members if m.get("id"))
-        return ids
-    return {user_id}
+    """Return None meaning all FB accounts are workspace-shared (visible to every authenticated user)."""
+    return None
 
 
 def _scope_query(user: dict[str, Any]) -> dict[str, str]:
