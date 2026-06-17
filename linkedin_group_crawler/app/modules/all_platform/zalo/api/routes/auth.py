@@ -9,7 +9,7 @@ import time
 import json
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import Response, StreamingResponse, JSONResponse
 from loguru import logger
 from playwright.async_api import Error as PlaywrightError
 
@@ -1149,6 +1149,18 @@ async def logout_all_sessions(x_user_id: str = Header("default", alias="X-User-I
         "zca_auth_removed": zca_auth_removed,
         "profile_cleared": profile_cleared,
     }
+@router.options("/import-session")
+async def import_session_options():
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+        },
+    )
+
+
 @router.post("/import-session")
 async def import_session_from_extension(
     request: Request,
@@ -1388,16 +1400,21 @@ async def import_session_from_extension(
 
     asyncio.create_task(_background_extension_sync(user_id, auth))
 
-    return {
-        "user_id": user_id,
-        "session_id": session_id,
-        "status": "confirmed",
-        "source": "extension",
-        "cookies_count": len(parsed_cookies),
-        "cookies_keys": sorted(cookie_keys),
-        "imei": bool(body.get("imei")),
-        "message": f"Imported {len(parsed_cookies)} cookies, keys=[{cookie_keys_str}]. Listener sẽ khởi động nền.",
-    }
+    return JSONResponse(
+        content={
+            "user_id": user_id,
+            "session_id": session_id,
+            "status": "confirmed",
+            "source": "extension",
+            "cookies_count": len(parsed_cookies),
+            "cookies_keys": sorted(cookie_keys),
+            "imei": bool(body.get("imei")),
+            "message": f"Imported {len(parsed_cookies)} cookies, keys=[{cookie_keys_str}]. Listener sẽ khởi động nền.",
+        },
+        headers={
+            "Access-Control-Allow-Origin": "*",
+        },
+    )
 
 
 @router.post("/delete-account-full")
