@@ -15,6 +15,7 @@ import { useAppAuth } from "@/contexts/AppAuthContext";
 import { MaterialIcon } from "@/components/ui";
 import { provisionExtension, pingExtension, addAccountViaExtension } from "@/lib/markee-ext-provision";
 import { fbFetch, fbHeaders, getFbProvisionConfig } from "@/lib/markee-fb-api";
+import { usersService } from "@/services/all-platform.service";
 
 interface Session {
   user_id: string; fb_user_id?: string; label?: string; owner?: string; email?: string; note?: string;
@@ -32,6 +33,7 @@ export default function TaiKhoanFbPage() {
   const [pairCode, setPairCode] = useState("");
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [connErr, setConnErr] = useState(false);
+  const [ownerNames, setOwnerNames] = useState<Record<string, string>>({});
 
   const showToast = (msg: string, ok: boolean) => { setToast({ msg, ok }); setTimeout(() => setToast(null), 3500); };
 
@@ -43,10 +45,24 @@ export default function TaiKhoanFbPage() {
       setExtInstalled(installed);
       if (installed) {
         const cfg = await getFbProvisionConfig();
-        await provisionExtension({ serverUrl: cfg.serverUrl, owner, apiKey: cfg.extensionApiKey });
+        await provisionExtension({ serverUrl: cfg.serverUrl, owner, apiKey: cfg.extensionApiKey, label: user?.name || user?.email || owner });
       }
     })();
-  }, [owner]);
+  }, [owner, user?.email, user?.name]);
+
+  useEffect(() => {
+    if (!owner) return;
+    const fallbackName = user?.name || user?.email || owner;
+    setOwnerNames({ [owner]: fallbackName });
+    usersService.getAllProfiles().then(res => {
+      if (!res.success || !Array.isArray(res.data)) return;
+      const next: Record<string, string> = { [owner]: fallbackName };
+      for (const row of res.data) {
+        if (row.id) next[row.id] = row.name || row.email || row.id;
+      }
+      setOwnerNames(next);
+    }).catch(() => {});
+  }, [owner, user?.email, user?.name]);
 
   const load = useCallback(async () => {
     try {
@@ -73,7 +89,7 @@ export default function TaiKhoanFbPage() {
     setStatus("⏳ Đang mở Facebook... Hãy đăng nhập tài khoản cần thêm trong tab mới. Hệ thống tự lưu khi xong.");
     // Đảm bảo owner đã gắn trước khi login
     const cfg = await getFbProvisionConfig();
-    await provisionExtension({ serverUrl: cfg.serverUrl, owner, apiKey: cfg.extensionApiKey });
+    await provisionExtension({ serverUrl: cfg.serverUrl, owner, apiKey: cfg.extensionApiKey, label: user?.name || user?.email || owner });
     const res = await addAccountViaExtension();
     setAdding(false);
     if (res.success) {
@@ -107,7 +123,22 @@ export default function TaiKhoanFbPage() {
     } catch { showToast("Lỗi xóa", false); }
   }
 
-  const accLabel = (s: Session) => s.label || s.user_id;
+  const shortFbId = (id: string) => {
+    const raw = id.replace(/^fb_/, "");
+    return raw.length > 10 ? `fb ${raw.slice(0, 4)}...${raw.slice(-4)}` : id;
+  };
+  const ownerLabel = (s: Session) => (s.owner && ownerNames[s.owner]) || "";
+  const accLabel = (s: Session) => {
+    const explicit = (s.label || "").trim();
+    if (explicit && explicit !== s.user_id) return explicit;
+    return s.email || ownerLabel(s) || "Tài khoản Facebook";
+  };
+  const accMeta = (s: Session) => {
+    const parts = [shortFbId(s.user_id)];
+    const ownerName = ownerLabel(s);
+    if (ownerName && ownerName !== accLabel(s)) parts.push(`của ${ownerName}`);
+    return parts.join(" · ");
+  };
 
   // Sửa email + ghi chú gợi nhắc (KHÔNG lưu mật khẩu).
   async function editMeta(s: Session) {
@@ -129,7 +160,7 @@ export default function TaiKhoanFbPage() {
   async function genPairCode() {
     try {
       const cfg = await getFbProvisionConfig();
-      const payload = JSON.stringify({ serverUrl: cfg.serverUrl, owner, apiKey: cfg.extensionApiKey });
+      const payload = JSON.stringify({ serverUrl: cfg.serverUrl, owner, apiKey: cfg.extensionApiKey, label: user?.name || user?.email || owner });
       const code = btoa(unescape(encodeURIComponent(payload)));
       setPairCode(code);
     } catch { showToast("Không tạo được mã", false); }
@@ -212,6 +243,7 @@ export default function TaiKhoanFbPage() {
                       <div className="font-semibold text-[#1A1A1A] truncate">{accLabel(s)}
                         <button onClick={() => rename(s.user_id, accLabel(s))} title="Đổi tên" className="ml-1.5 text-[11px] text-[#A0A0A0] hover:text-[#E3000F]">✎</button>
                       </div>
+                      <div className="mt-0.5 truncate font-mono text-[11px] text-[#A0A0A0]" title={s.user_id}>{accMeta(s)}</div>
                       <div className="text-xs text-[#A0A0A0]">
                         {ready ? <span className="text-green-600 font-semibold">🟢 Sẵn sàng</span> : <span className="text-red-500 font-semibold">🔴 Cần đăng nhập lại</span>}
                         {s.online && ready ? " · đang online" : ""}

@@ -8,6 +8,7 @@ user's scope, then forwards allowed calls to Markee.
 from __future__ import annotations
 
 import os
+import time
 from typing import Any
 
 import httpx
@@ -23,6 +24,7 @@ MARKEE_BASE_URL = (os.getenv("MARKEE_FB_BASE_URL") or "https://auto-fb.zenithglo
 MARKEE_ADMIN_API_KEY = (os.getenv("MARKEE_FB_API_KEY") or "").strip()
 MARKEE_EXTENSION_API_KEY = (os.getenv("MARKEE_FB_EXTENSION_API_KEY") or "").strip()
 _TIMEOUT = httpx.Timeout(45.0, connect=10.0)
+_RECENT_INBOX_SCAN: dict[str, float] = {}
 
 
 def _current_user(request: Request, authorization: str | None = None) -> dict[str, Any]:
@@ -272,7 +274,24 @@ async def fb_inbox_scan(data: dict, request: Request, authorization: str | None 
     user = _current_user(request, authorization)
     uid = str(data.get("user_id") or "")
     await _require_fb_account_scope(user, uid)
+    now = time.monotonic()
+    last = _RECENT_INBOX_SCAN.get(uid, 0.0)
+    if now - last < 25.0:
+        return _json_response(200, {"success": True, "user_id": uid, "scanning": True, "throttled": True})
+    _RECENT_INBOX_SCAN[uid] = now
+    if len(_RECENT_INBOX_SCAN) > 500:
+        for key in list(_RECENT_INBOX_SCAN.keys())[:-500]:
+            _RECENT_INBOX_SCAN.pop(key, None)
     status, payload = await _markee_json("POST", "/inbox/scan", json_body=data)
+    return _json_response(status, payload)
+
+
+@router.post("/inbox/scan_deep")
+async def fb_inbox_scan_deep(data: dict, request: Request, authorization: str | None = Header(None)) -> JSONResponse:
+    user = _current_user(request, authorization)
+    uid = str(data.get("user_id") or "")
+    await _require_fb_account_scope(user, uid)
+    status, payload = await _markee_json("POST", "/inbox/scan_deep", json_body=data)
     return _json_response(status, payload)
 
 
@@ -281,7 +300,46 @@ async def fb_inbox_mark(data: dict, request: Request, authorization: str | None 
     user = _current_user(request, authorization)
     uid = str(data.get("user_id") or "")
     await _require_fb_account_scope(user, uid)
+    data = {
+        **data,
+        "actor_id": user.get("id") or "",
+        "actor_name": user.get("name") or user.get("email") or user.get("id") or "",
+    }
     status, payload = await _markee_json("POST", "/inbox/mark", json_body=data)
+    return _json_response(status, payload)
+
+
+@router.get("/inbox/archive")
+async def fb_inbox_archive_list(request: Request, authorization: str | None = Header(None)) -> JSONResponse:
+    user = _current_user(request, authorization)
+    uid = str(request.query_params.get("user_id") or "")
+    await _require_fb_account_scope(user, uid)
+    params = dict(request.query_params)
+    status, payload = await _markee_json("GET", "/inbox/archive", params=params)
+    return _json_response(status, payload)
+
+
+@router.post("/inbox/archive")
+async def fb_inbox_archive_save(data: dict, request: Request, authorization: str | None = Header(None)) -> JSONResponse:
+    user = _current_user(request, authorization)
+    uid = str(data.get("user_id") or "")
+    await _require_fb_account_scope(user, uid)
+    data = {
+        **data,
+        "actor_id": user.get("id") or "",
+        "actor_name": user.get("name") or user.get("email") or user.get("id") or "",
+    }
+    status, payload = await _markee_json("POST", "/inbox/archive", json_body=data)
+    return _json_response(status, payload)
+
+
+@router.get("/inbox/archive/thread")
+async def fb_inbox_archive_thread_get(request: Request, authorization: str | None = Header(None)) -> JSONResponse:
+    user = _current_user(request, authorization)
+    uid = str(request.query_params.get("user_id") or "")
+    await _require_fb_account_scope(user, uid)
+    params = dict(request.query_params)
+    status, payload = await _markee_json("GET", "/inbox/archive/thread", params=params)
     return _json_response(status, payload)
 
 
@@ -315,7 +373,10 @@ async def fb_inbox_reply(data: dict, request: Request, authorization: str | None
 
 @router.get("/inbox/reply_status")
 async def fb_inbox_reply_status(request: Request, authorization: str | None = Header(None)) -> JSONResponse:
-    _current_user(request, authorization)
+    user = _current_user(request, authorization)
+    uid = str(request.query_params.get("user_id") or "")
+    if uid:
+        await _require_fb_account_scope(user, uid)
     params = dict(request.query_params)
     status, payload = await _markee_json("GET", "/inbox/reply_status", params=params)
     return _json_response(status, payload)

@@ -11,7 +11,7 @@
  */
 
 const DB_NAME = "markee-fb-inbox";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_THREADS = "threads"; // key: `${acc}::${conv_id}` -> { messages, loaded_at, savedAt }
 const STORE_CONVS = "convs"; // key: acc -> { conversations, savedAt }
 
@@ -32,8 +32,12 @@ function openDB(): Promise<IDBDatabase> {
   if (_dbPromise) return _dbPromise;
   _dbPromise = new Promise((resolve, reject) => {
     const req = window.indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
+    req.onupgradeneeded = (event) => {
       const db = req.result;
+      if ((event.oldVersion || 0) > 0) {
+        if (db.objectStoreNames.contains(STORE_THREADS)) db.deleteObjectStore(STORE_THREADS);
+        if (db.objectStoreNames.contains(STORE_CONVS)) db.deleteObjectStore(STORE_CONVS);
+      }
       if (!db.objectStoreNames.contains(STORE_THREADS)) db.createObjectStore(STORE_THREADS);
       if (!db.objectStoreNames.contains(STORE_CONVS)) db.createObjectStore(STORE_CONVS);
     };
