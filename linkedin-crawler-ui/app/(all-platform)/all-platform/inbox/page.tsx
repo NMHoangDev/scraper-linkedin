@@ -299,32 +299,43 @@ export default function InboxPage() {
         setLoadingChat(false); setLoadingFresh(true);
       }
     } catch { /* ignore */ }
-    // Nếu dữ liệu vừa được quét gần đây (loaded_at < 25s) thì KHỎI ép extension quét lại —
-    // poll incremental 8s sẽ tự kéo tin mới. Giảm mạnh số lần quét, đỡ chồng lệnh.
+    // Bỏ ép quét lại CHỈ KHI đã có sẵn tin VÀ dữ liệu vừa quét gần đây (loaded_at < 25s).
+    // Hội thoại trống (extension mới thêm, chưa có nội dung) thì PHẢI quét — đừng skip.
     const la = prevLoadedAt ? Date.parse(prevLoadedAt) : NaN;
-    if (!Number.isNaN(la) && Date.now() - la < 25000) {
+    if (msgsRef.current.length > 0 && !Number.isNaN(la) && Date.now() - la < 25000) {
       setLoadingChat(false); setLoadingFresh(false); return;
     }
     try {
       // 3. Yêu cầu extension tải bản mới nhất
       const r = await fbFetch("/inbox/thread", { method: "POST", headers: fbHeaders(), body: JSON.stringify({ user_id: acc, conv_id }) });
       if (!r.ok) { setLoadingChat(false); setLoadingFresh(false); return; }
-      pollFreshThread(conv_id, prevLoadedAt, 12);
+      pollFreshThread(conv_id, prevLoadedAt, 20);
     } catch { setLoadingChat(false); setLoadingFresh(false); }
   }
 
-  // Hỏi lại mỗi 3s tới khi extension trả bản MỚI (loaded_at đổi). Cache đã hiện, chỉ update khi có fresh.
+  // Hỏi lại mỗi 3s tới khi extension trả nội dung. Hiện tin NGAY khi có (theo số tin tăng),
+  // dừng hẳn khi loaded_at đổi (extension báo quét xong). Trống lâu → quét lại 1 lần giữa chừng.
   async function pollFreshThread(conv_id: string, prevLoadedAt: string | null, attemptsLeft: number) {
     if (openConvRef.current !== conv_id) return;
     try {
       const r = await fbFetch(`/inbox/thread?user_id=${encodeURIComponent(acc)}&conv_id=${encodeURIComponent(conv_id)}`);
       const d = await r.json();
+      const fresh: Msg[] = d.messages || [];
+      // Có nhiều tin hơn hiện tại → hiện ngay (kể cả khi loaded_at chưa đổi)
+      if (fresh.length > msgsRef.current.length) {
+        setMsgs(fresh); msgsRef.current = fresh;
+        saveThreadCache(conv_id, fresh, d.loaded_at ?? undefined);
+        setLoadingChat(false);
+      }
+      // loaded_at đổi = extension đã quét xong → chốt
       if (d.loaded_at && d.loaded_at !== prevLoadedAt) {
-        const fresh = d.messages || []; setMsgs(fresh); msgsRef.current = fresh;
-        saveThreadCache(conv_id, fresh, d.loaded_at);
         setLoadingChat(false); setLoadingFresh(false); return;
       }
     } catch { /* ignore, thử lại */ }
+    // Vẫn trống sau ~30s → đẩy lại 1 lệnh quét (extension lần đầu hay rớt lệnh)
+    if (attemptsLeft === 10 && msgsRef.current.length === 0) {
+      fbFetch("/inbox/thread", { method: "POST", headers: fbHeaders(), body: JSON.stringify({ user_id: acc, conv_id }) }).catch(() => {});
+    }
     if (attemptsLeft <= 1) { setLoadingChat(false); setLoadingFresh(false); return; }
     setTimeout(() => pollFreshThread(conv_id, prevLoadedAt, attemptsLeft - 1), 3000);
   }
@@ -347,12 +358,19 @@ export default function InboxPage() {
     if (!openConv || !acc) return;
     const t = setInterval(async () => {
       const n = msgsRef.current.length;
-      if (n === 0) return;
       try {
-        const r = await fbFetch(`/inbox/thread?user_id=${encodeURIComponent(acc)}&conv_id=${encodeURIComponent(openConv)}&since_n=${n}`);
+        // Còn trống → lấy FULL để bắt lô tin đầu (extension quét lần đầu chậm). Có rồi → lấy delta.
+        const url = n === 0
+          ? `/inbox/thread?user_id=${encodeURIComponent(acc)}&conv_id=${encodeURIComponent(openConv)}`
+          : `/inbox/thread?user_id=${encodeURIComponent(acc)}&conv_id=${encodeURIComponent(openConv)}&since_n=${n}`;
+        const r = await fbFetch(url);
         const d = await r.json();
         if (Array.isArray(d.messages) && d.messages.length > 0) {
-          setMsgs(prev => { const next = [...prev, ...d.messages]; msgsRef.current = next; saveThreadCache(openConv, next, d.loaded_at ?? undefined); return next; });
+          if (n === 0) {
+            setMsgs(d.messages); msgsRef.current = d.messages; saveThreadCache(openConv, d.messages, d.loaded_at ?? undefined);
+          } else {
+            setMsgs(prev => { const next = [...prev, ...d.messages]; msgsRef.current = next; saveThreadCache(openConv, next, d.loaded_at ?? undefined); return next; });
+          }
         }
       } catch { /* ignore */ }
     }, 8000);
