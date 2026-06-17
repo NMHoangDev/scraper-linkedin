@@ -12,6 +12,12 @@ from app.modules.facebook.src.modules.telegram.services.telegram_service import 
 
 logger = logging.getLogger(__name__)
 
+# ── CỜ CHỐNG CÀO CHỒNG LUỒNG ──────────────────────────────────────────────────
+# Bug: scheduler chạy mỗi phút, nếu lượt cào trước CHƯA XONG mà lượt sau đã chạy
+# thì 1 token bị mở nhiều luồng cùng lúc -> Facebook khóa token (treo acc).
+# Giải pháp: chỉ cho 1 lượt cào chạy tại một thời điểm. Lượt mới đến mà đang cào -> bỏ qua.
+_is_crawling: bool = False
+
 def get_vietnam_now() -> datetime:
     """Lấy thời gian hiện tại theo múi giờ Việt Nam (UTC+7)."""
     return datetime.now(timezone(timedelta(hours=7)))
@@ -20,8 +26,19 @@ def get_vietnam_now() -> datetime:
 async def run_crawl_task_background(groups: List[Dict[str, Any]], user_id: str, involved_users_list: List[str]):
     """
     Tiến trình chạy nền thực hiện việc cào dữ liệu cho một danh sách nhóm cụ thể.
+    Luôn nhả cờ _is_crawling khi kết thúc (dù thành công hay lỗi) để lượt sau chạy được.
     """
+    global _is_crawling
     logger.info(f"▶️ Bắt đầu tiến trình chạy nền cào {len(groups)} nhóm cho user {user_id}")
+    try:
+        await _do_crawl(groups, user_id, involved_users_list)
+    finally:
+        _is_crawling = False
+        logger.info("🏁 Đã nhả cờ cào (sẵn sàng cho lượt tiếp theo).")
+
+
+async def _do_crawl(groups: List[Dict[str, Any]], user_id: str, involved_users_list: List[str]):
+    """Phần thực thi cào (tách ra để run_crawl_task_background bọc finally nhả cờ)."""
     
     # Bắn socket báo bắt đầu cào
     asyncio.create_task(manager.broadcast({
@@ -97,6 +114,13 @@ async def execute_all_platform_crawl_workflow():
     Chạy mỗi phút để kiểm tra nhóm nào có giờ cào khớp với hiện tại.
     """
     logger.info("🚀 [ALL-PLATFORM] KIỂM TRA LỊCH CÀO DỮ LIỆU TỰ ĐỘNG...")
+
+    # Chống cào chồng: nếu lượt trước CHƯA XONG thì bỏ qua lượt này (tránh 1 token mở nhiều luồng -> FB khóa).
+    global _is_crawling
+    if _is_crawling:
+        logger.warning("⏭️ Lượt cào trước CHƯA XONG -> bỏ qua lượt này (chống cào chồng luồng).")
+        return
+
     supabase = get_supabase_client()
     
     try:
@@ -162,6 +186,9 @@ async def execute_all_platform_crawl_workflow():
         # 2. Đẩy luồng cào duy nhất ra background task
         logger.info(f"Phát hiện {len(all_target_groups)} nhóm cần cào. Đang gom vào 1 luồng duy nhất.")
         involved_users_list = list(all_involved_users)
+        # Bật cờ NGAY TẠI ĐÂY (trước create_task) để lượt scheduler kế tiếp thấy "đang cào" mà bỏ qua,
+        # tránh race condition nếu set cờ bên trong task (task có thể chạy sau lượt scheduler tiếp theo).
+        _is_crawling = True
         asyncio.create_task(run_crawl_task_background(all_target_groups, "00000000-0000-0000-0000-000000000000", involved_users_list))
 
     except Exception as e:
@@ -190,10 +217,10 @@ def setup_all_platform_jobs():
     scheduler.add_job(
         func=execute_all_platform_crawl_workflow,
         trigger='cron',
-        minute='*', # Chạy mỗi phút
+        minute='*', # Chạy mỗi phút (chỉ KIỂM TRA lịch; việc cào thật được cờ _is_crawling chống chồng)
         id='all_platform_daily_facebook_crawl',
         replace_existing=True,
-        max_instances=10  # Dự phòng nếu script loop chạy lâu hơn 1 phút do độ trễ lấy DB
+        max_instances=1  # CHỈ 1 lượt cào tại một thời điểm (chống 1 token mở nhiều luồng -> FB khóa acc)
     )
 
     # Chuyển job weekly backup từ module cũ sang để không làm đứt gãy logic
