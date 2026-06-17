@@ -296,7 +296,7 @@ export default function InboxPage() {
     setReply("");
     // Optimistic: hiện NGAY tin mình vừa gửi trong khung chat (đỡ cảm giác "gửi xong chả biết")
     const optimistic: Msg = { from: "me", text, time: "Đang gửi..." };
-    setMsgs(prev => [...prev, optimistic]);
+    setMsgs(prev => { const next = [...prev, optimistic]; msgsRef.current = next; return next; });
     const setStatus = (t: string) => setMsgs(prev => prev.map(m => m === optimistic ? { ...m, time: t } : m));
     try {
       const r = await fbFetch("/inbox/reply", { method: "POST", headers: fbHeaders(), body: JSON.stringify({ user_id: acc, conv_id: openConv, text }) });
