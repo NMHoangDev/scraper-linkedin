@@ -25,6 +25,24 @@ interface TeamRow { id?: string; name_team?: string; id_leader?: string; leader_
 
 const ACTIVE_INBOX_DAYS = 7;
 
+async function fetchJsonWithRetry(url: string, attempts = 3): Promise<Record<string, unknown>> {
+  let lastData: Record<string, unknown> | null = null;
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      const res = await fetch(url, { credentials: "include" });
+      const data = await res.json().catch(() => null) as Record<string, unknown> | null;
+      if (data) lastData = data;
+      if (res.ok && data && data.success !== false) return data;
+    } catch {
+      lastData = null;
+    }
+    if (i < attempts - 1) {
+      await new Promise(resolve => window.setTimeout(resolve, 350 * (i + 1)));
+    }
+  }
+  return lastData || {};
+}
+
 function foldVietnamese(value: string): string {
   return (value || "")
     .normalize("NFD")
@@ -157,11 +175,11 @@ export default function InboxPage() {
       if (role === "admin") {
         try {
           const [usersRes, teamsRes] = await Promise.all([
-            fetch(`${API_BASE_URL}/api/all-platform/users/all-profiles`, { credentials: "include" }),
-            fetch(`${API_BASE_URL}/api/all-platform/teams`, { credentials: "include" }),
+            fetchJsonWithRetry(`${API_BASE_URL}/api/all-platform/users/all-profiles`, 2),
+            fetchJsonWithRetry(`${API_BASE_URL}/api/all-platform/teams`, 4),
           ]);
-          const usersData = await usersRes.json().catch(() => ({}));
-          const teamsData = await teamsRes.json().catch(() => ({}));
+          const usersData = usersRes || {};
+          const teamsData = teamsRes || {};
           if (!cancelled) {
             setOwnerNames(buildMap(Array.isArray(usersData?.data) ? usersData.data : []));
             setTeams(Array.isArray(teamsData?.data) ? teamsData.data : []);

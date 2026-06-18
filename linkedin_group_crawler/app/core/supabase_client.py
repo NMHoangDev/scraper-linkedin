@@ -14,6 +14,12 @@ if TYPE_CHECKING:
 _supabase_client: Client | None = None
 
 
+def reset_supabase_client() -> None:
+    """Drop the cached Supabase client after a broken HTTP connection."""
+    global _supabase_client
+    _supabase_client = None
+
+
 def get_supabase_client() -> Client:
     """Return a singleton Supabase client.
 

@@ -2,9 +2,20 @@
 
 from __future__ import annotations
 
+import time
+
 from supabase import Client
 
-from app.core.supabase_client import get_supabase_client
+from app.core.supabase_client import get_supabase_client, reset_supabase_client
+
+
+_TEAMS_CACHE: dict[str, object] = {"expires_at": 0.0, "data": []}
+_TEAMS_CACHE_TTL_SECONDS = 60.0
+
+
+def _is_transient_supabase_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return any(part in msg for part in ("server disconnected", "remoteprotocolerror", "timed out", "timeout"))
 
 
 def get_user(email: str) -> dict:
@@ -161,8 +172,7 @@ def _resolve_user_id(supabase: Client, identifier: str) -> str:
     raise ValueError(f"Không tìm thấy user với email: {identifier}")
 
 
-def get_all_teams() -> list[dict]:
-    """Get all teams from the teams table, enriched with user names and members via member_of_teams."""
+def _load_all_teams() -> list[dict]:
     supabase: Client = get_supabase_client()
 
     # Fetch teams
@@ -241,6 +251,34 @@ def get_all_teams() -> list[dict]:
         })
 
     return teams_list
+
+
+def get_all_teams() -> list[dict]:
+    """Get all teams, with short cache/retry to survive flaky Supabase HTTP/2 connections."""
+    now = time.monotonic()
+    cached = _TEAMS_CACHE.get("data")
+    if isinstance(cached, list) and cached and float(_TEAMS_CACHE.get("expires_at") or 0) > now:
+        return cached
+
+    last_exc: Exception | None = None
+    for attempt in range(3):
+        try:
+            data = _load_all_teams()
+            _TEAMS_CACHE["data"] = data
+            _TEAMS_CACHE["expires_at"] = time.monotonic() + _TEAMS_CACHE_TTL_SECONDS
+            return data
+        except Exception as exc:
+            last_exc = exc
+            reset_supabase_client()
+            if not _is_transient_supabase_error(exc) or attempt == 2:
+                break
+            time.sleep(0.25 * (attempt + 1))
+
+    if isinstance(cached, list) and cached:
+        return cached
+    if last_exc:
+        raise last_exc
+    return []
 
 
 def create_team(name_team: str, leader_email_or_id: str, member_emails_or_ids: list[str]) -> list[dict]:
