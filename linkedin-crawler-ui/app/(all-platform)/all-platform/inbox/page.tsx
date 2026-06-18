@@ -75,6 +75,79 @@ function convListSignature(conv: Conv): string {
   return `${conv.conv_id}|${conv.preview || ""}|${conv.time || ""}|${conv.unread ? 1 : 0}`;
 }
 
+function normalizeMsgText(value: string): string {
+  return (value || "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function exactMsgKey(message: Msg): string {
+  return `${message.from}|${normalizeMsgText(message.text)}|${(message.time || "").trim()}`;
+}
+
+function isSendingStatus(time: string): boolean {
+  const raw = (time || "").toLowerCase();
+  const value = foldVietnamese(time || "");
+  return (
+    raw.includes("đang gửi") ||
+    raw.includes("đã gửi") ||
+    raw.includes("dang gui") ||
+    raw.includes("da gui") ||
+    raw.includes("sent") ||
+    value.includes("dang gui") ||
+    value.includes("da gui") ||
+    value.includes("sent")
+  );
+}
+
+function isOppositeEcho(current: Msg, previous: Msg): boolean {
+  if (!current.text || !previous.text || current.from === previous.from) return false;
+  if (normalizeMsgText(current.text) !== normalizeMsgText(previous.text)) return false;
+  return isSendingStatus(current.time) || isSendingStatus(previous.time) || !current.time || !previous.time;
+}
+
+function normalizeThreadMessages(list: Msg[]): Msg[] {
+  const out: Msg[] = [];
+  const exact = new Set<string>();
+
+  for (const raw of list || []) {
+    const msg: Msg = {
+      from: raw?.from === "me" ? "me" : "them",
+      text: (raw?.text || "").trim(),
+      time: raw?.time || "",
+    };
+    if (!msg.text) continue;
+
+    const exactKey = exactMsgKey(msg);
+    if (exact.has(exactKey)) continue;
+
+    let echoIndex = -1;
+    for (let i = out.length - 1; i >= 0; i -= 1) {
+      if (isOppositeEcho(msg, out[i])) {
+        echoIndex = i;
+        break;
+      }
+    }
+    if (echoIndex >= 0) {
+      if (msg.from === "me" && out[echoIndex]?.from === "them") {
+        exact.delete(exactMsgKey(out[echoIndex]));
+        out[echoIndex] = msg;
+        exact.add(exactKey);
+      }
+      continue;
+    }
+
+    out.push(msg);
+    exact.add(exactKey);
+  }
+
+  return out;
+}
+
+function mergeThreadMessages(current: Msg[], incoming: Msg[]): Msg[] {
+  if (!current?.length) return normalizeThreadMessages(incoming || []);
+  if (!incoming?.length) return normalizeThreadMessages(current || []);
+  return normalizeThreadMessages([...(current || []), ...(incoming || [])]);
+}
+
 export default function InboxPage() {
   const { user } = useAppAuth();
   const owner = user?.id || "";
@@ -124,6 +197,7 @@ export default function InboxPage() {
   const sessionsErrorStreakRef = useRef(0);
   const convsErrorStreakRef = useRef(0);
   const convsAbortRef = useRef<AbortController | null>(null);
+  const replyInFlightRef = useRef(false);
 
   const showToast = (msg: string, ok: boolean) => { setToast({ msg, ok }); setTimeout(() => setToast(null), 3500); };
 
@@ -151,14 +225,15 @@ export default function InboxPage() {
   // Lưu cache thread vào CẢ RAM (clientCacheRef) lẫn IndexedDB (bền qua reload).
   // loadedAt: nếu không truyền, giữ lại loaded_at đã biết của hội thoại đó.
   const saveThreadCache = useCallback((convId: string, list: Msg[], loadedAt?: string | null) => {
-    clientCacheRef.current.set(convId, list);
-    const lastFrom = list[list.length - 1]?.from;
+    const cleanList = normalizeThreadMessages(list);
+    clientCacheRef.current.set(convId, cleanList);
+    const lastFrom = cleanList[cleanList.length - 1]?.from;
     if (lastFrom) {
       setThreadLastFrom(prev => prev[convId] === lastFrom ? prev : { ...prev, [convId]: lastFrom });
     }
     const la = loadedAt === undefined ? (loadedAtRef.current.get(convId) ?? null) : loadedAt;
     loadedAtRef.current.set(convId, la);
-    void idbSetThread(acc, convId, list, la);
+    void idbSetThread(acc, convId, cleanList, la);
   }, [acc]);
 
   // Dọn cache thread cũ (>30 ngày) 1 lần khi vào trang để IndexedDB không phình mãi.
@@ -549,7 +624,7 @@ export default function InboxPage() {
       const r = await fbFetch(`/inbox/archive/thread?user_id=${encodeURIComponent(accountId)}&conv_id=${encodeURIComponent(conv_id)}`);
       const d = await r.json();
       if (selectedAccRef.current !== accountId || threadRequestSeqRef.current !== requestSeq || openConvRef.current !== conv_id) return;
-      const archivedMsgs: Msg[] = d.messages || [];
+      const archivedMsgs = normalizeThreadMessages(d.messages || []);
       setMsgs(archivedMsgs); msgsRef.current = archivedMsgs;
     } catch { showToast("Không tải được bản lưu", false); }
     finally {
@@ -568,8 +643,9 @@ export default function InboxPage() {
       const fresh: Msg[] = d.messages || [];
       // Có nhiều tin hơn hiện tại → hiện ngay (kể cả khi loaded_at chưa đổi)
       if (fresh.length > msgsRef.current.length) {
-        setMsgs(fresh); msgsRef.current = fresh;
-        saveThreadCache(conv_id, fresh, d.loaded_at ?? undefined);
+        const merged = mergeThreadMessages(msgsRef.current, fresh);
+        setMsgs(merged); msgsRef.current = merged;
+        saveThreadCache(conv_id, merged, d.loaded_at ?? undefined);
         setLoadingChat(false);
       }
       if (d.loaded_at && d.loaded_at !== prevLoadedAt) {
@@ -608,8 +684,9 @@ export default function InboxPage() {
       if (d0.messages?.length) {
         // Chỉ hiện server cache nếu nhiều tin hơn client cache (tránh overwrite tin optimistic mới gửi)
         if (d0.messages.length >= msgsRef.current.length) {
-          setMsgs(d0.messages); msgsRef.current = d0.messages;
-          saveThreadCache(conv_id, d0.messages, prevLoadedAt);
+          const merged = mergeThreadMessages(msgsRef.current, d0.messages);
+          setMsgs(merged); msgsRef.current = merged;
+          saveThreadCache(conv_id, merged, prevLoadedAt);
         }
         setLoadingChat(false); setLoadingFresh(true);
       }
@@ -640,8 +717,9 @@ export default function InboxPage() {
       if (selectedAccRef.current !== accountId || openConvRef.current !== conv_id) return;
       const fetched: Msg[] = d.messages || [];
       if (fetched.length >= msgsRef.current.length) {
-        setMsgs(fetched); msgsRef.current = fetched;
-        saveThreadCache(conv_id, fetched, d.loaded_at ?? undefined);
+        const merged = mergeThreadMessages(msgsRef.current, fetched);
+        setMsgs(merged); msgsRef.current = merged;
+        saveThreadCache(conv_id, merged, d.loaded_at ?? undefined);
       }
     } catch { /* ignore */ }
   }
@@ -660,9 +738,15 @@ export default function InboxPage() {
         // Nếu list đã thay đổi (poll chính vừa thay) thì bỏ delta cũ này — vòng sau sẽ bắt lại đúng since_n.
         if (msgsRef.current.length !== reqN) return;
         if (reqN === 0) {
-          setMsgs(d.messages); msgsRef.current = d.messages; saveThreadCache(openConv, d.messages, d.loaded_at ?? undefined);
+          const fresh = normalizeThreadMessages(d.messages);
+          setMsgs(fresh); msgsRef.current = fresh; saveThreadCache(openConv, fresh, d.loaded_at ?? undefined);
         } else {
-          setMsgs(prev => { const next = [...prev, ...d.messages]; msgsRef.current = next; saveThreadCache(openConv, next, d.loaded_at ?? undefined); return next; });
+          setMsgs(prev => {
+            const next = mergeThreadMessages(prev, d.messages);
+            msgsRef.current = next;
+            saveThreadCache(openConv, next, d.loaded_at ?? undefined);
+            return next;
+          });
         }
       } catch { /* ignore */ }
     }, THREAD_DELTA_POLL_MS);
@@ -688,6 +772,7 @@ export default function InboxPage() {
   async function sendReply() {
     const text = reply.trim();
     if (!text || !openConv) return;
+    if (replyInFlightRef.current) { showToast("Tin truoc dang gui, doi xac nhan roi gui tiep.", false); return; }
     if (archiveReading) { showToast("Đang xem bản lưu trữ, mở inbox live để trả lời", false); return; }
     const convIdForSend = openConv;
     const selectedSession = sessions.find(s => s.user_id === acc);
@@ -695,26 +780,41 @@ export default function InboxPage() {
     if (selectedSession?.status === "paused") { showToast("Inbox realtime đang tạm dừng trên extension — bật lại trước khi gửi.", false); return; }
     if (!accOnline) { showToast("Tài khoản đang offline (máy nhân viên chưa mở) — chưa gửi được.", false); return; }
     if (needRelogin) { showToast("Cookie tài khoản đã hết hạn — đăng nhập lại trước khi gửi.", false); return; }
+    replyInFlightRef.current = true;
     setReply("");
+    const normText = normalizeMsgText(text);
     const optimistic: Msg = { from: "me", text, time: "Đang gửi..." };
-    setMsgs(prev => { const next = [...prev, optimistic]; msgsRef.current = next; return next; });
+    setMsgs(prev => {
+      const next = normalizeThreadMessages([...prev, optimistic]);
+      msgsRef.current = next;
+      return next;
+    });
     const setStatus = (t: string) => {
       if (openConvRef.current !== convIdForSend) return;
-      setMsgs(prev => prev.map(m => m === optimistic ? { ...m, time: t } : m));
+      setMsgs(prev => {
+        const next = normalizeThreadMessages(prev.map(m => {
+          const sameOptimistic = m === optimistic;
+          const samePendingText = m.from === "me" && normalizeMsgText(m.text) === normText && isSendingStatus(m.time);
+          return sameOptimistic || samePendingText ? { ...m, time: t } : m;
+        }));
+        msgsRef.current = next;
+        return next;
+      });
     };
     try {
       const r = await fbFetch("/inbox/reply", { method: "POST", headers: fbHeaders(), body: JSON.stringify({ user_id: acc, conv_id: convIdForSend, text }) });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) { showToast(d.detail || "Lỗi gửi", false); setStatus("✗ Gửi lỗi"); return; }
+      if (!r.ok) { showToast(d.detail || "Lỗi gửi", false); setStatus("✗ Gửi lỗi"); replyInFlightRef.current = false; return; }
       const cmd = d.command_id;
-      if (!cmd) { setStatus("Đã gửi (đang xác nhận)"); return; }
-      pollReplyStatus(cmd, setStatus, 12, acc, convIdForSend);
+      if (!cmd) { setStatus("Đã gửi (đang xác nhận)"); replyInFlightRef.current = false; return; }
+      pollReplyStatus(cmd, setStatus, 12, acc, convIdForSend, () => { replyInFlightRef.current = false; });
     } catch {
       showToast("Không kết nối được", false); setStatus("✗ Gửi lỗi");
+      replyInFlightRef.current = false;
     }
   }
 
-  async function pollReplyStatus(cmd: string, setStatus: (t: string) => void, attemptsLeft: number, accountId: string, convId: string) {
+  async function pollReplyStatus(cmd: string, setStatus: (t: string) => void, attemptsLeft: number, accountId: string, convId: string, finish: () => void) {
     try {
       const r = await fbFetch(`/inbox/reply_status?command_id=${encodeURIComponent(cmd)}&user_id=${encodeURIComponent(accountId)}`);
       const d = await r.json();
@@ -728,11 +828,12 @@ export default function InboxPage() {
           showToast("Đã gửi tin thành công", true);
         }
         else { setStatus("✗ Gửi thất bại"); showToast("FB chưa gửi được — thử lại", false); }
+        finish();
         return;
       }
     } catch { /* ignore, thử lại */ }
-    if (attemptsLeft <= 1) { setStatus("Đã gửi (chưa rõ kết quả)"); return; }
-    setTimeout(() => pollReplyStatus(cmd, setStatus, attemptsLeft - 1, accountId, convId), 2000);
+    if (attemptsLeft <= 1) { setStatus("Đã gửi (chưa rõ kết quả)"); finish(); return; }
+    setTimeout(() => pollReplyStatus(cmd, setStatus, attemptsLeft - 1, accountId, convId, finish), 2000);
   }
 
   // chưa có cache → tạm dựa vào cờ unread (chưa đọc thường là khách vừa nhắn).

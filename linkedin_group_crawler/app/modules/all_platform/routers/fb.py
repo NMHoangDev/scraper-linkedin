@@ -32,6 +32,8 @@ _OWNED_USER_IDS_CACHE_TTL = 60.0
 _MARKEE_RESPONSE_CACHE: dict[str, tuple[float, int, Any]] = {}
 _MARKEE_INFLIGHT: dict[str, asyncio.Task[tuple[int, Any]]] = {}
 _MARKEE_CACHE_LIMIT = 1000
+_THREAD_LOAD_RECENT: dict[str, tuple[float, dict[str, Any]]] = {}
+_THREAD_LOAD_RECENT_TTL = 12.0
 
 
 def _current_user(request: Request, authorization: str | None = None) -> dict[str, Any]:
@@ -437,8 +439,23 @@ async def fb_inbox_archive_thread_get(request: Request, authorization: str | Non
 async def fb_inbox_thread_load(data: dict, request: Request, authorization: str | None = Header(None)) -> JSONResponse:
     user = _current_user(request, authorization)
     uid = str(data.get("user_id") or "")
+    conv_id = str(data.get("conv_id") or "")
     await _require_fb_account_scope(user, uid)
+    recent_key = f"{uid}:{conv_id}"
+    now = time.monotonic()
+    cached = _THREAD_LOAD_RECENT.get(recent_key)
+    if cached and cached[0] > now:
+        payload = dict(cached[1])
+        payload["deduped"] = True
+        return _json_response(200, payload)
+    if cached:
+        _THREAD_LOAD_RECENT.pop(recent_key, None)
     status, payload = await _markee_json("POST", "/inbox/thread", json_body=data)
+    if status < 500 and isinstance(payload, dict):
+        _THREAD_LOAD_RECENT[recent_key] = (time.monotonic() + _THREAD_LOAD_RECENT_TTL, dict(payload))
+        if len(_THREAD_LOAD_RECENT) > 1000:
+            for key in list(_THREAD_LOAD_RECENT.keys())[:-1000]:
+                _THREAD_LOAD_RECENT.pop(key, None)
     _clear_markee_cache("/inbox/conversations", "/inbox/thread")
     return _json_response(status, payload)
 
