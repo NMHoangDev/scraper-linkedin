@@ -34,6 +34,7 @@ _STARTUP_SYNC_GROUP_LIMIT = 5  # giảm từ 12 → 5 để tránh Zalo rate-lim
 _STARTUP_SYNC_MESSAGE_COUNT = 30  # giảm từ 80 → 30
 _STARTUP_SYNC_TIMEOUT_MS = 25000
 _STARTUP_SYNC_PER_GROUP_DELAY_S = 1.5  # delay giữa các group, tránh spam Zalo API
+_SUBPROCESS_STREAM_LIMIT = 8 * 1024 * 1024
 
 # Marker cho biết cookie/session Zalo đã hết hạn — không cố restart vô ích nữa.
 _AUTH_EXPIRED_MARKERS = (
@@ -447,6 +448,7 @@ class ZcaPersistentListenerManager:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env={**os.environ},
+                limit=_SUBPROCESS_STREAM_LIMIT,
             )
             state.proc = proc
             state.pid = proc.pid
