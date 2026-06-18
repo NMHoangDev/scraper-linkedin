@@ -2,25 +2,49 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
 from typing import Dict, List, Any
-from supabase import Client
-from app.core.supabase_client import get_supabase_client
+import time
+from app.core.supabase_client import execute_supabase_query, get_supabase_client
+
+_CACHE_TTL_SECONDS = 30.0
+_CACHE: dict[str, tuple[float, Any]] = {}
+
+
+def _get_cached(key: str) -> Any | None:
+    item = _CACHE.get(key)
+    if not item:
+        return None
+    expires_at, value = item
+    if expires_at > time.monotonic():
+        return value
+    _CACHE.pop(key, None)
+    return None
+
+
+def _set_cached(key: str, value: Any) -> Any:
+    _CACHE[key] = (time.monotonic() + _CACHE_TTL_SECONDS, value)
+    return value
 
 
 def get_top_stats() -> Dict[str, Any]:
     """Calculate top dashboard stats: crawled posts, seeding count, approval rate, KPI rate."""
-    supabase: Client = get_supabase_client()
+    cached = _get_cached("top_stats")
+    if cached is not None:
+        return cached
 
     # 1. Total crawled posts (FB + LI)
     try:
-        fb_res = supabase.table("facebook_posts").select("id", count="exact").limit(1).execute()
+        fb_res = execute_supabase_query(
+            lambda: get_supabase_client().table("facebook_posts").select("id", count="exact").limit(1).execute()
+        )
         fb_count = fb_res.count if fb_res.count is not None else len(fb_res.data or [])
     except Exception:
         fb_count = 0
 
     try:
-        li_res = supabase.table("linkedin_posts").select("id", count="exact").limit(1).execute()
+        li_res = execute_supabase_query(
+            lambda: get_supabase_client().table("linkedin_posts").select("id", count="exact").limit(1).execute()
+        )
         li_count = li_res.count if li_res.count is not None else len(li_res.data or [])
     except Exception:
         li_count = 0
@@ -29,14 +53,23 @@ def get_top_stats() -> Dict[str, Any]:
 
     # 2. Total Seeding Comments
     try:
-        seeding_res = supabase.table("seeding_content_kpi").select("id", count="exact").limit(1).execute()
+        seeding_res = execute_supabase_query(
+            lambda: get_supabase_client().table("seeding_content_kpi").select("id", count="exact").limit(1).execute()
+        )
         total_seeding = seeding_res.count if seeding_res.count is not None else len(seeding_res.data or [])
     except Exception:
         total_seeding = 0
 
     # 3. Approval Rate
     try:
-        approved_res = supabase.table("seeding_content_kpi").select("id", count="exact").eq("verify", "yes").limit(1).execute()
+        approved_res = execute_supabase_query(
+            lambda: get_supabase_client()
+            .table("seeding_content_kpi")
+            .select("id", count="exact")
+            .eq("verify", "yes")
+            .limit(1)
+            .execute()
+        )
         approved_count = approved_res.count if approved_res.count is not None else len(approved_res.data or [])
     except Exception:
         approved_count = 0
@@ -45,12 +78,16 @@ def get_top_stats() -> Dict[str, Any]:
 
     # 4. Average KPI completion rate across active KPIs
     try:
-        kpis = supabase.table("kpi_tracker").select("*").eq("status", "active").execute().data or []
+        kpis = execute_supabase_query(
+            lambda: get_supabase_client().table("kpi_tracker").select("*").eq("status", "active").execute()
+        ).data or []
         if not kpis:
             kpi_rate = 0.0
         else:
             # Load all seeding contents to calculate actual achievements
-            seeding_data = supabase.table("seeding_content_kpi").select("id_member, current_day").execute().data or []
+            seeding_data = execute_supabase_query(
+                lambda: get_supabase_client().table("seeding_content_kpi").select("id_member, current_day").execute()
+            ).data or []
             
             total_target = 0
             total_actual = 0
@@ -83,25 +120,31 @@ def get_top_stats() -> Dict[str, Any]:
     except Exception:
         kpi_rate = 0.0
 
-    return {
+    return _set_cached("top_stats", {
         "total_crawled_posts": total_crawled_posts,
         "total_seeding_comments": total_seeding,
         "approval_rate": approval_rate,
         "kpi_rate": kpi_rate,
-    }
+    })
 
 
 def get_kpi_performance() -> List[Dict[str, Any]]:
     """Get KPI performance target vs actual progress for all teams."""
-    supabase: Client = get_supabase_client()
+    cached = _get_cached("kpi_performance")
+    if cached is not None:
+        return cached
     try:
         # Load teams
-        teams = supabase.table("teams").select("id, name_team").execute().data or []
+        teams = execute_supabase_query(
+            lambda: get_supabase_client().table("teams").select("id, name_team").execute()
+        ).data or []
         if not teams:
             return []
 
         # Load member_of_teams associations
-        mot_rows = supabase.table("member_of_teams").select("id_teams, id_member").execute().data or []
+        mot_rows = execute_supabase_query(
+            lambda: get_supabase_client().table("member_of_teams").select("id_teams, id_member").execute()
+        ).data or []
         team_members = {}
         for mot in mot_rows:
             tid = str(mot["id_teams"])
@@ -111,10 +154,14 @@ def get_kpi_performance() -> List[Dict[str, Any]]:
             team_members[tid].append(mid)
 
         # Load active KPIs
-        kpis = supabase.table("kpi_tracker").select("*").eq("status", "active").execute().data or []
+        kpis = execute_supabase_query(
+            lambda: get_supabase_client().table("kpi_tracker").select("*").eq("status", "active").execute()
+        ).data or []
         
         # Load seeding records
-        seeding_data = supabase.table("seeding_content_kpi").select("id_member, current_day").execute().data or []
+        seeding_data = execute_supabase_query(
+            lambda: get_supabase_client().table("seeding_content_kpi").select("id_member, current_day").execute()
+        ).data or []
 
         # Group data by team name
         team_performance = {}
@@ -146,26 +193,30 @@ def get_kpi_performance() -> List[Dict[str, Any]]:
                         )
                         team_performance[tname]["actual"] += actual
 
-        return [
+        return _set_cached("kpi_performance", [
             {"team_name": name, "target": stats["target"], "actual": stats["actual"]}
             for name, stats in team_performance.items()
-        ]
+        ])
     except Exception:
         return []
 
 
 def get_leaderboards() -> Dict[str, List[Dict[str, Any]]]:
     """Get top 5 seeders and top 5 groups with highest interaction."""
-    supabase: Client = get_supabase_client()
+    cached = _get_cached("leaderboards")
+    if cached is not None:
+        return cached
     
     # 1. Top Seeders
     top_seeders = []
     try:
-        seeding_res = (
-            supabase.table("seeding_content_kpi")
-            .select("id_member")
-            .eq("verify", "yes")
-            .execute()
+        seeding_res = execute_supabase_query(
+            lambda: (
+                get_supabase_client().table("seeding_content_kpi")
+                .select("id_member")
+                .eq("verify", "yes")
+                .execute()
+            )
         )
         seeding_list = seeding_res.data or []
         
@@ -178,7 +229,9 @@ def get_leaderboards() -> Dict[str, List[Dict[str, Any]]]:
         sorted_mids = sorted(counts.items(), key=lambda x: x[1], reverse=True)[:5]
         if sorted_mids:
             uids = [m[0] for m in sorted_mids]
-            users_res = supabase.table("app_users").select("id, email, name").in_("id", uids).execute()
+            users_res = execute_supabase_query(
+                lambda: get_supabase_client().table("app_users").select("id, email, name").in_("id", uids).execute()
+            )
             user_map = {str(u["id"]): u for u in (users_res.data or [])}
             
             for mid, count in sorted_mids:
@@ -194,7 +247,9 @@ def get_leaderboards() -> Dict[str, List[Dict[str, Any]]]:
     # 2. Top Groups by crawl/interaction count in facebook_posts
     top_groups = []
     try:
-        fb_posts = supabase.table("facebook_posts").select("group_id, reactions, comments").execute().data or []
+        fb_posts = execute_supabase_query(
+            lambda: get_supabase_client().table("facebook_posts").select("group_id, reactions, comments").execute()
+        ).data or []
         
         group_interactions = {}
         for p in fb_posts:
@@ -209,7 +264,9 @@ def get_leaderboards() -> Dict[str, List[Dict[str, Any]]]:
         
         if sorted_gids:
             gids = [item[0] for item in sorted_gids]
-            groups_res = supabase.table("facebook_groups").select("id, group_name, group_url").in_("id", gids).execute().data or []
+            groups_res = execute_supabase_query(
+                lambda: get_supabase_client().table("facebook_groups").select("id, group_name, group_url").in_("id", gids).execute()
+            ).data or []
             groups_map = {g["id"]: g for g in groups_res}
             
             for gid, count in sorted_gids:
@@ -224,7 +281,7 @@ def get_leaderboards() -> Dict[str, List[Dict[str, Any]]]:
     except Exception:
         pass
 
-    return {
+    return _set_cached("leaderboards", {
         "top_seeders": top_seeders,
         "top_groups": top_groups
-    }
+    })

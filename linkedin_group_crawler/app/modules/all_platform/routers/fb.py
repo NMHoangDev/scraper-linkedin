@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import time
+import asyncio
 from typing import Any
 
 import httpx
@@ -25,6 +26,8 @@ MARKEE_ADMIN_API_KEY = (os.getenv("MARKEE_FB_API_KEY") or "").strip()
 MARKEE_EXTENSION_API_KEY = (os.getenv("MARKEE_FB_EXTENSION_API_KEY") or "").strip()
 _TIMEOUT = httpx.Timeout(45.0, connect=10.0)
 _RECENT_INBOX_SCAN: dict[str, float] = {}
+_OWNED_USER_IDS_CACHE: dict[str, tuple[float, set[str]]] = {}
+_OWNED_USER_IDS_CACHE_TTL = 15.0
 
 
 def _current_user(request: Request, authorization: str | None = None) -> dict[str, Any]:
@@ -40,7 +43,10 @@ def _current_user(request: Request, authorization: str | None = None) -> dict[st
     if not payload or not payload.get("sub"):
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-    user = get_user_by_id(str(payload["sub"]))
+    try:
+        user = get_user_by_id(str(payload["sub"]))
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Auth service temporarily unavailable") from exc
     if not user or not user.get("is_active", True):
         raise HTTPException(status_code=401, detail="User not found or inactive")
     return user
@@ -101,17 +107,25 @@ async def _markee_json(
     json_body: Any | None = None,
 ) -> tuple[int, Any]:
     url = f"{MARKEE_BASE_URL}{path}"
-    async with httpx.AsyncClient(timeout=_TIMEOUT, follow_redirects=True) as client:
-        try:
-            resp = await client.request(
-                method,
-                url,
-                params=params,
-                json=json_body,
-                headers=_auth_headers(json_body=json_body is not None),
-            )
-        except httpx.HTTPError as exc:
-            raise HTTPException(status_code=502, detail=f"Markee service unavailable: {exc}") from exc
+    last_exc: httpx.HTTPError | None = None
+    for attempt in range(3):
+        async with httpx.AsyncClient(timeout=_TIMEOUT, follow_redirects=True) as client:
+            try:
+                resp = await client.request(
+                    method,
+                    url,
+                    params=params,
+                    json=json_body,
+                    headers=_auth_headers(json_body=json_body is not None),
+                )
+                break
+            except httpx.HTTPError as exc:
+                last_exc = exc
+                if attempt >= 2:
+                    raise HTTPException(status_code=502, detail=f"Markee service unavailable: {exc}") from exc
+                await asyncio.sleep(0.2 * (attempt + 1))
+    else:
+        raise HTTPException(status_code=502, detail=f"Markee service unavailable: {last_exc}")
     try:
         payload = resp.json()
     except ValueError:
@@ -132,6 +146,12 @@ async def _owned_user_ids(user: dict[str, Any]) -> set[str] | None:
         return None
 
     params = _scope_query(user)
+    cache_key = f"{user.get('id') or ''}:{'&'.join(f'{k}={v}' for k, v in sorted(params.items()))}"
+    cached = _OWNED_USER_IDS_CACHE.get(cache_key)
+    now = time.monotonic()
+    if cached and cached[0] > now:
+        return set(cached[1])
+
     ids: set[str] = set()
     for path, key in (("/sessions", "sessions"), ("/extensions", "extensions")):
         status, payload = await _markee_json("GET", path, params=params)
@@ -141,6 +161,10 @@ async def _owned_user_ids(user: dict[str, Any]) -> set[str] | None:
             uid = item.get("user_id")
             if uid:
                 ids.add(str(uid))
+    _OWNED_USER_IDS_CACHE[cache_key] = (now + _OWNED_USER_IDS_CACHE_TTL, set(ids))
+    if len(_OWNED_USER_IDS_CACHE) > 500:
+        for old_key in list(_OWNED_USER_IDS_CACHE.keys())[:-500]:
+            _OWNED_USER_IDS_CACHE.pop(old_key, None)
     return ids
 
 
