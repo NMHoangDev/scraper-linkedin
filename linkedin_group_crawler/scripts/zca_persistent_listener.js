@@ -371,10 +371,12 @@ async function main() {
 
   let stopping = false;
   let oldMessageTimer = null;
+  let oldMessageKickoffTimer = null;
 
   const stop = (signal) => {
     if (stopping) return;
     stopping = true;
+    if (oldMessageKickoffTimer) clearTimeout(oldMessageKickoffTimer);
     if (oldMessageTimer) clearInterval(oldMessageTimer);
     emit({ event: "stopping", user_id: userId, signal });
     try {
@@ -397,9 +399,12 @@ async function main() {
 
   listener.on("connected", () => {
     emit({ event: "connected", user_id: userId, own_id: typeof api.getOwnId === "function" ? api.getOwnId() : null });
-    requestOldMessages(listener);
-    if (!oldMessageTimer) {
-      oldMessageTimer = setInterval(() => requestOldMessages(listener), oldMessageIntervalMs);
+    if (!oldMessageTimer && !oldMessageKickoffTimer) {
+      oldMessageKickoffTimer = setTimeout(() => {
+        oldMessageKickoffTimer = null;
+        requestOldMessages(listener);
+        oldMessageTimer = setInterval(() => requestOldMessages(listener), oldMessageIntervalMs);
+      }, oldMessageIntervalMs);
     }
   });
   listener.on("disconnected", (code, reason) => {

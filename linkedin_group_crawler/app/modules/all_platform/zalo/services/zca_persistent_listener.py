@@ -424,7 +424,7 @@ class ZcaPersistentListenerManager:
             "--user-id",
             state.user_id,
             "--old-message-interval-ms",
-            str(int(getattr(settings, "zca_old_message_interval_ms", 60000))),
+            str(int(getattr(settings, "zca_old_message_interval_ms", 300000))),
         ]
 
         if sys.platform == "win32":
