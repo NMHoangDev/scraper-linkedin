@@ -177,6 +177,147 @@ function messageAssets(message: ZaloLibraryMessage) {
   return deduped;
 }
 
+type RealtimeRawMessage = Record<string, unknown>;
+
+interface ZaloRealtimePayload {
+  type?: unknown;
+  account_id?: unknown;
+  group_id?: unknown;
+  conversation_id?: unknown;
+  group_name?: unknown;
+  messages?: unknown;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function compactText(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const text = String(value).trim();
+  return text ? text : null;
+}
+
+function collectRealtimeAssetUrls(rawMsg: RealtimeRawMessage): string[] {
+  const urls = new Set<string>();
+  const imageUrls = Array.isArray(rawMsg.image_urls) ? rawMsg.image_urls : [];
+  const assetUrls = Array.isArray(rawMsg.asset_urls) ? rawMsg.asset_urls : [];
+  for (const url of [...imageUrls, ...assetUrls]) {
+    const text = compactText(url);
+    if (text) urls.add(text);
+  }
+  if (Array.isArray(rawMsg.assets)) {
+    for (const asset of rawMsg.assets) {
+      if (!isRecord(asset)) continue;
+      const url = compactText(asset.storage_url) || compactText(asset.source_url);
+      if (url) urls.add(url);
+    }
+  }
+  return Array.from(urls);
+}
+
+function normalizeRealtimeMessage(
+  rawMsg: RealtimeRawMessage,
+  groupId: string,
+  accountId: string,
+): ZaloLibraryMessage | null {
+  const sourceMessageId = compactText(rawMsg.message_id) || compactText(rawMsg.source_message_id) || compactText(rawMsg.id);
+  const timestampText = compactText(rawMsg.timestamp_text) || compactText(rawMsg.timestamp) || compactText(rawMsg.time_text) || compactText(rawMsg.created_at);
+  const content = compactText(rawMsg.content);
+  const assets = collectRealtimeAssetUrls(rawMsg).map((url) => ({
+    source_url: url,
+    storage_url: url,
+    status: "uploaded",
+  }));
+  const id = sourceMessageId || `${groupId}-${timestampText || Date.now()}-${compactText(rawMsg.sender_id) || ""}-${content || assets.map((asset) => asset.storage_url).join("|")}`;
+  if (!id) return null;
+
+  return {
+    id,
+    source_message_id: sourceMessageId,
+    user_id: compactText(rawMsg.user_id) || accountId,
+    group_id: groupId,
+    group_name: compactText(rawMsg.group_name),
+    sender_id: compactText(rawMsg.sender_id),
+    sender_name: compactText(rawMsg.sender_name),
+    timestamp_text: timestampText,
+    time_text: compactText(rawMsg.time_text),
+    type: compactText(rawMsg.type) || (assets.length ? "image" : "text"),
+    content,
+    is_sent: Boolean(rawMsg.is_sent),
+    is_deleted: Boolean(rawMsg.is_deleted),
+    assets,
+  };
+}
+
+function realtimePreview(message: ZaloLibraryMessage) {
+  if (message.content) return message.content;
+  if (message.assets?.length) return "Đã nhận tệp đính kèm";
+  return message.type || "Tin nhắn mới";
+}
+
+function upsertRealtimeConversation(
+  list: ZaloConversationSummary[],
+  accountId: string,
+  groupId: string,
+  groupName: string | null,
+  incoming: ZaloLibraryMessage[],
+  isCurrentConversation: boolean,
+) {
+  const lastMsg = incoming[incoming.length - 1];
+  if (!lastMsg) return list;
+
+  const receivedCount = incoming.filter((msg) => !msg.is_sent).length;
+  const sentCount = incoming.filter((msg) => msg.is_sent).length;
+  const imageCount = incoming.filter((msg) => msg.assets?.length || msg.type === "image").length;
+  const latestAt = lastMsg.timestamp_text || lastMsg.time_text || new Date().toISOString();
+  const latestContent = realtimePreview(lastMsg);
+  let found = false;
+
+  const next = list.map((conversation) => {
+    if (conversation.conversation_id !== groupId) return conversation;
+    found = true;
+    return {
+      ...conversation,
+      conversation_name:
+        groupName && isFallbackName(conversation.conversation_name, groupId)
+          ? groupName
+          : conversation.conversation_name,
+      latest_content: latestContent,
+      latest_message_at: latestAt,
+      latest_sender_name: lastMsg.sender_name ?? conversation.latest_sender_name ?? null,
+      message_count: (conversation.message_count || 0) + incoming.length,
+      image_count: (conversation.image_count || 0) + imageCount,
+      sent_count: (conversation.sent_count || 0) + sentCount,
+      received_count: (conversation.received_count || 0) + receivedCount,
+      unread_count: isCurrentConversation ? 0 : (conversation.unread_count || 0) + receivedCount,
+      has_messages: true,
+      sync_status: "has_messages",
+    };
+  });
+
+  if (!found) {
+    next.push({
+      conversation_id: groupId,
+      conversation_name: groupName || groupId,
+      account_id: accountId,
+      message_count: incoming.length,
+      image_count: imageCount,
+      sent_count: sentCount,
+      received_count: receivedCount,
+      latest_message_at: latestAt,
+      latest_content: latestContent,
+      latest_sender_name: lastMsg.sender_name ?? null,
+      has_messages: true,
+      sync_status: "has_messages",
+      unread_count: isCurrentConversation ? 0 : receivedCount,
+      is_pinned: false,
+    });
+  }
+
+  return sortConversationsLikeZalo(next);
+}
+
 interface SelectedMedia {
   file: File;
   previewUrl?: string;
@@ -281,6 +422,16 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
   // when the user switches groups faster than the API responds.
   const messagesRequestIdRef = useRef(0);
   const lastLoadedConversationIdRef = useRef<string | null>(null);
+  const selectedConversationIdRef = useRef<string | null>(null);
+  const flowUserIdRef = useRef(flow.userId);
+
+  useEffect(() => {
+    selectedConversationIdRef.current = selectedConversationId;
+  }, [selectedConversationId]);
+
+  useEffect(() => {
+    flowUserIdRef.current = flow.userId;
+  }, [flow.userId]);
 
   // Click outside listener for emoji picker & quick replies
   useEffect(() => {
@@ -675,60 +826,44 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
       es.addEventListener("zalo-message", (e: MessageEvent) => {
         if (cancelled) return;
         try {
-          const payload = JSON.parse(e.data);
-          // Payload format: { type, account_id, group_id, group_name, messages: [] }
-          if (payload.type !== "new_messages") return;
+          const payload = JSON.parse(e.data) as ZaloRealtimePayload;
+          const payloadType = String(payload.type || "new_messages");
+          if (payloadType !== "new_messages" && payloadType !== "zalo-message") return;
 
-          const groupId = String(payload.group_id || "").trim();
-          if (groupId !== selectedConversationId) return;
+          const groupId = String(payload.group_id || payload.conversation_id || "").trim();
+          if (!groupId) return;
 
-          const msgs: any[] = Array.isArray(payload.messages) ? payload.messages : [];
+          const msgs: RealtimeRawMessage[] = Array.isArray(payload.messages)
+            ? payload.messages.filter(isRecord)
+            : [];
           if (!msgs.length) return;
 
-          const lastMsg = msgs[msgs.length - 1];
+          const accountId = String(payload.account_id || flowUserIdRef.current || flow.userId || "").trim();
+          const groupName = compactText(payload.group_name);
+          const normalized = msgs
+            .map((rawMsg) => normalizeRealtimeMessage(rawMsg, groupId, accountId))
+            .filter((msg): msg is ZaloLibraryMessage => Boolean(msg));
+          if (!normalized.length) return;
+
+          const currentConversationId = selectedConversationIdRef.current;
+          const isCurrentConversation = groupId === currentConversationId;
+          setConversations((prev) =>
+            upsertRealtimeConversation(prev, accountId, groupId, groupName, normalized, isCurrentConversation)
+          );
+
+          if (!isCurrentConversation) return;
 
           setMessages((prev) => {
             const seen = new Set(prev.map(messageKey));
             const newOnes: ZaloLibraryMessage[] = [];
 
-            for (const rawMsg of msgs) {
-              const sourceMsgId = rawMsg.message_id || rawMsg.source_message_id;
-              if (!sourceMsgId || seen.has(messageKey({
-                id: sourceMsgId,
-                source_message_id: sourceMsgId,
-                user_id: rawMsg.user_id || flow.userId || "",
-                group_id: groupId,
-                sender_id: rawMsg.sender_id,
-                sender_name: rawMsg.sender_name,
-                timestamp_text: rawMsg.timestamp,
-                time_text: rawMsg.time_text,
-                type: rawMsg.type || "text",
-                content: rawMsg.content,
-                is_sent: Boolean(rawMsg.is_sent),
-                is_deleted: Boolean(rawMsg.is_deleted),
-                assets: (rawMsg.image_urls || []).map((url: string) => ({
-                  source_url: url, status: "uploaded", storage_url: url,
-                })),
-              }))) {
+            for (const msg of normalized) {
+              const key = messageKey(msg);
+              if (seen.has(key)) {
                 continue;
               }
-              newOnes.push({
-                id: sourceMsgId,
-                source_message_id: sourceMsgId,
-                user_id: rawMsg.user_id || flow.userId || "",
-                group_id: groupId,
-                sender_id: rawMsg.sender_id,
-                sender_name: rawMsg.sender_name,
-                timestamp_text: rawMsg.timestamp,
-                time_text: rawMsg.time_text,
-                type: rawMsg.type || "text",
-                content: rawMsg.content,
-                is_sent: Boolean(rawMsg.is_sent),
-                is_deleted: Boolean(rawMsg.is_deleted),
-                assets: (rawMsg.image_urls || []).map((url: string) => ({
-                  source_url: url, status: "uploaded", storage_url: url,
-                })),
-              });
+              seen.add(key);
+              newOnes.push(msg);
             }
 
             if (!newOnes.length) return prev;
@@ -740,14 +875,6 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
             return [...prev, ...newOnes];
           });
 
-          // Cập nhật last message preview trong conversation list.
-          if (lastMsg) {
-            setConversations(prev => prev.map(c =>
-              c.conversation_id === groupId
-                ? { ...c, last_message: lastMsg.content || lastMsg.type || "Tin nhắn mới", last_message_at: lastMsg.timestamp || lastMsg.time_text }
-                : c
-            ));
-          }
         } catch (err) {
           console.warn("[zalo-sse] failed to parse zalo-message event", err);
         }
@@ -756,6 +883,10 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
       es.onerror = (e: Event) => {
         console.warn("[zalo-sse] error", e);
         setSseConnected(false);
+        if (es) {
+          es.close();
+          es = null;
+        }
         if (!cancelled) scheduleReconnect();
       };
     };
@@ -777,7 +908,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
       if (reconnectTimer) window.clearTimeout(reconnectTimer);
       if (es) es.close();
     };
-  }, [flow.userId]);
+  }, [flow.email, flow.isLoggedIn, flow.sessionExpired, flow.userId]);
 
   const handleToggleSelectMessage = (messageId: string) => {
     setSelectedMessageIds(prev => 

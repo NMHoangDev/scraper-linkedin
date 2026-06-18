@@ -43,7 +43,7 @@ import type {
   ZaloWorkerInfo,
 } from "@/types/zalo-api";
 
-const AUTH_POLL_INTERVAL_MS = 2000;
+const AUTH_POLL_INTERVAL_MS = 10000;
 const JOB_POLL_INTERVAL_MS = 2500;
 const JOB_STALL_TIMEOUT_MS = 45000;
 const RESUME_RETRY_ATTEMPTS = 20;
@@ -825,14 +825,22 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
         // ignore malformed payload
       }
     };
+    const onClose = () => {
+      eventSource.close();
+      if (authEventSourceRef.current === eventSource) {
+        authEventSourceRef.current = null;
+      }
+    };
 
     eventSource.addEventListener("auth-status", onAuthStatus);
+    eventSource.addEventListener("close", onClose);
     eventSource.onerror = () => {
       // keep polling fallback active
     };
 
     return () => {
       eventSource.removeEventListener("auth-status", onAuthStatus);
+      eventSource.removeEventListener("close", onClose);
       clearAuthEventStream();
     };
   }, [applyAuthStatus, clearAuthEventStream, isUserIdReady, userId]);
