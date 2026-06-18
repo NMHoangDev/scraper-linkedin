@@ -24,6 +24,8 @@ services:
     restart: unless-stopped
     env_file:
       - ./linkedin_group_crawler/.env
+    environment:
+      DISABLE_ZCA_LISTENERS: "1"
     expose:
       - "8000"
     volumes:
