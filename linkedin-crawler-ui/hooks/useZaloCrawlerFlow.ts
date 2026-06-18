@@ -487,8 +487,8 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
   );
   const [maxMessagesPerGroup, setMaxMessagesPerGroupState] = useState(50);
   const ownerId = useMemo(
-    () => normalizeZaloUserId(appUser?.id || appUser?.email || email || ""),
-    [appUser?.email, appUser?.id, email],
+    () => normalizeZaloUserId(appUser?.id || ""),
+    [appUser?.id],
   );
 
   const authIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
