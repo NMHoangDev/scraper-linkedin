@@ -9,6 +9,11 @@ RUN npm ci
 
 COPY . .
 
+ARG NEXT_PUBLIC_LINKEDIN_CRAWLER_API_URL
+ARG NEXT_PUBLIC_API_FACEBOOK_BASE_URL
+ENV NEXT_PUBLIC_LINKEDIN_CRAWLER_API_URL=${NEXT_PUBLIC_LINKEDIN_CRAWLER_API_URL}
+ENV NEXT_PUBLIC_API_FACEBOOK_BASE_URL=${NEXT_PUBLIC_API_FACEBOOK_BASE_URL}
+
 RUN sed -i 's|basePath: "/minhhoang-scraper"|basePath: ""|' next.config.ts \
   && sed -i 's|assetPrefix: "/minhhoang-scraper"|assetPrefix: ""|' next.config.ts
 

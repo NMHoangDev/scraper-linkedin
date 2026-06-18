@@ -3,6 +3,9 @@ services:
     build:
       context: ./linkedin-crawler-ui
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_LINKEDIN_CRAWLER_API_URL: https://seeding.markeeai.com
+        NEXT_PUBLIC_API_FACEBOOK_BASE_URL: https://seeding.markeeai.com
     image: scraper-linkedin-frontend:latest
     container_name: seeding-frontend
     restart: unless-stopped
