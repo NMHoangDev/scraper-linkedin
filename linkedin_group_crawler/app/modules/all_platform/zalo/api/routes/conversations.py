@@ -30,6 +30,7 @@ from app.modules.all_platform.zalo.services.supabase_service import (
     upsert_groups,
     upsert_group,
     mark_conversation_as_read,
+    resolve_thread_type,
 )
 from app.modules.all_platform.zalo.services.zca_auth_store import load_zca_auth
 from app.modules.all_platform.zalo.services.zca_api_bridge import (
@@ -244,6 +245,13 @@ async def sync_recent_conversations(
                     thread_type=thread_type,
                     count=per_group_count,
                 )
+                if not messages and thread_type == 1:
+                    messages = await sync_zca_group_old_messages(
+                        auth,
+                        group.group_id,
+                        thread_type=0,
+                        count=per_group_count,
+                    )
                 if not messages:
                     return SyncRecentGroupResult(
                         group_id=group.group_id,
@@ -295,9 +303,13 @@ async def sync_recent_conversations(
     )
 
 
+
+
+
 async def _background_sync_conversation_messages(account_id: str, conversation_id: str):
+    """Background sync: dùng group-history thay vì sync-old-messages để tránh lỗi getOwnId null."""
     from app.modules.all_platform.zalo.services.zca_auth_store import load_zca_auth
-    from app.modules.all_platform.zalo.services.zca_api_bridge import sync_zca_group_old_messages
+    from app.modules.all_platform.zalo.services.zca_api_bridge import get_zca_group_history
     from app.modules.all_platform.zalo.services.supabase_service import save_listener_messages, _rest
     try:
         auth = await load_zca_auth(account_id)
@@ -323,13 +335,21 @@ async def _background_sync_conversation_messages(account_id: str, conversation_i
         except Exception:
             pass  # Fallback vẫn dùng conversation_id
 
-        thread_type = 1 if conversation_id.strip().startswith("g") else 0
+        # Chạy sync_zca_group_old_messages để đồng bộ tin nhắn
+        ttype = await resolve_thread_type(account_id, conversation_id)
         messages = await sync_zca_group_old_messages(
             auth, 
             conversation_id, 
-            thread_type=thread_type, 
+            thread_type=ttype, 
             count=50
         )
+        if not messages and ttype == 1:
+            messages = await sync_zca_group_old_messages(
+                auth, 
+                conversation_id, 
+                thread_type=0, 
+                count=50
+            )
         if messages:
             await save_listener_messages(
                 user_id=account_id,
@@ -352,9 +372,10 @@ async def get_conversation_messages(
 ):
     user_id = _normalize_user_id(account_id or x_user_id)
     
-    # Trigger a real-time fetch in the background so that subsequent polls/refreshes show the very latest
-    if offset == 0:
-        background_tasks.add_task(_background_sync_conversation_messages, user_id, conversation_id)
+    # User requested to NOT auto-sync old messages on load. 
+    # They will click the sync button manually if needed.
+    # if offset == 0:
+    #     background_tasks.add_task(_background_sync_conversation_messages, user_id, conversation_id)
         
     try:
         rows, total = await list_conversation_messages(
@@ -418,7 +439,7 @@ async def send_message_to_conversation(
     if body.thread_type is not None:
         thread_type = body.thread_type
     else:
-        thread_type = 1 if conversation_id.strip().startswith("g") else 0
+        thread_type = await resolve_thread_type(user_id, conversation_id.strip())
 
     try:
         result = await send_zca_message(
@@ -471,7 +492,7 @@ async def send_media_to_conversation(
     if thread_type is not None:
         ttype = thread_type
     else:
-        ttype = 1 if conversation_id.strip().startswith("g") else 0
+        ttype = await resolve_thread_type(user_id, conversation_id.strip())
 
     temp_paths: List[str] = []
     try:
@@ -586,7 +607,7 @@ async def mark_conversation_read(
         logger.warning(f"Could not update unread count in Supabase for user={user_id} conversation={conversation_id}: {exc}")
 
     # 2. Inform Zalo via ZCA if auth is available (trong background để tránh treo request)
-    thread_type = 1 if conversation_id.strip().startswith("g") else 0
+    thread_type = await resolve_thread_type(user_id, conversation_id.strip())
     background_tasks.add_task(_background_remove_zca_unread, user_id, conversation_id.strip(), thread_type)
 
     return MarkReadResponse(

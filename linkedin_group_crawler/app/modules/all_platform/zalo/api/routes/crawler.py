@@ -33,7 +33,7 @@ from app.modules.all_platform.zalo.services.zca_auth_store import ensure_session
 from app.modules.all_platform.zalo.services.zca_api_bridge import (
     get_zca_group_related_ids,
     list_zca_groups,
-    sync_zca_group_old_messages,
+    get_zca_group_history,
 )
 from app.modules.all_platform.zalo.services.zca_persistent_listener import get_cached_messages, start_listener, stop_listener
 from app.modules.all_platform.zalo.api.security import verify_zalo_api_key
@@ -249,15 +249,21 @@ async def _crawl_zca_messages_with_best_group_id(
                 if safe_count not in history_counts:
                     history_counts.append(safe_count)
 
-            thread_type = 1 if str(candidate_id).startswith("g") else 0
             for history_count in history_counts:
+                ttype = await resolve_thread_type(user_id, candidate_id)
                 messages = await sync_zca_group_old_messages(
                     auth, 
                     candidate_id, 
-                    thread_type=thread_type,
-                    count=history_count,
-                    timeout_ms=35000
+                    thread_type=ttype,
+                    count=history_count
                 )
+                if not messages and ttype == 1:
+                    messages = await sync_zca_group_old_messages(
+                        auth, 
+                        candidate_id, 
+                        thread_type=0,
+                        count=history_count
+                    )
                 if messages:
                     logger.info(
                         f"ZCA selected group_id={candidate_id!r} for group={group_name!r} "
@@ -537,7 +543,7 @@ async def _run_crawl(job_id: str, session_id: str, user_id: str, body: CrawlRequ
                     "trying ZCA listener old-message sync"
                 )
                 try:
-                    messages = await sync_zca_group_old_messages(
+                    messages = await get_zca_group_history(
                         zca_auth,
                         resolved_group_id,
                         count=body.max_messages,

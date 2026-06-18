@@ -671,10 +671,13 @@ class ZcaPersistentListenerManager:
                 )
                 from app.modules.all_platform.zalo.services.supabase_service import (
                     list_shared_conversation_ids,
+                    get_zalo_account_by_id,
                 )
 
                 # Cache owner để filter SSE subscribers.
-                register_account_owner(state.user_id, state.user_id)
+                acc = await get_zalo_account_by_id(state.user_id)
+                owner_id = acc.get("owner_id") if acc else state.user_id
+                register_account_owner(state.user_id, owner_id)
 
                 # Lấy danh sách conversation đã share để filter cho admin/leader.
                 shared_ids = await list_shared_conversation_ids(state.user_id)

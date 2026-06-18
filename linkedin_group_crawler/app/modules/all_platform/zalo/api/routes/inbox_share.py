@@ -112,15 +112,17 @@ class CountVerifiedRequest(BaseModel):
 async def _background_fetch_20_messages(account_id: str, conversation_id: str):
     from app.modules.all_platform.zalo.services.zca_auth_store import load_zca_auth
     from app.modules.all_platform.zalo.services.zca_api_bridge import sync_zca_group_old_messages
-    from app.modules.all_platform.zalo.services.supabase_service import save_listener_messages
+    from app.modules.all_platform.zalo.services.supabase_service import save_listener_messages, resolve_thread_type
     from loguru import logger
     
     try:
         auth = await load_zca_auth(account_id)
         if not auth:
             return
-        thread_type = 1 if str(conversation_id).startswith("g") else 0
-        messages = await sync_zca_group_old_messages(auth, conversation_id, thread_type=thread_type, count=50)
+        ttype = await resolve_thread_type(account_id, conversation_id)
+        messages = await sync_zca_group_old_messages(auth, conversation_id, thread_type=ttype, count=50)
+        if not messages and ttype == 1:
+            messages = await sync_zca_group_old_messages(auth, conversation_id, thread_type=0, count=50)
         if messages:
             await save_listener_messages(
                 user_id=account_id,

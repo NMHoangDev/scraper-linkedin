@@ -735,6 +735,7 @@ async function syncOldMessages(auth, threadType, threadId, count, timeoutMs, own
   }
 
   const wantedThreadId = String(threadId || "");
+  const resolvedOwnId = ownId || (typeof api.getOwnId === "function" ? api.getOwnId() : null);
   const collected = [];
   const seen = new Set();
   const threadCounts = {};
@@ -750,7 +751,7 @@ async function syncOldMessages(auth, threadType, threadId, count, timeoutMs, own
       if (rawThreadId) threadCounts[rawThreadId] = (threadCounts[rawThreadId] || 0) + 1;
       if (wantedThreadId && rawThreadId !== wantedThreadId) continue;
       
-      const normalized = normalizeMessage(raw, collected.length, ownId);
+      const normalized = normalizeMessage(raw, collected.length, resolvedOwnId);
       
       // Override threadId if we know the exact wantedThreadId and normalizeMessage failed to get it
       // (which often happens in DM history because idTo is missing)
@@ -853,6 +854,7 @@ async function syncOldMessages(auth, threadType, threadId, count, timeoutMs, own
     listener.on("message", (message) => {
       const messageThreadId = String(message.threadId || message.data?.idTo || "");
       if (wantedThreadId && messageThreadId !== wantedThreadId) return;
+      
       addMessages([message]);
       if (collected.length >= count) done();
     });
@@ -938,6 +940,12 @@ async function main() {
 
   const response = await api.getGroupChatHistory(String(groupId), count);
   const messages = normalizeHistory(response, typeof api.getOwnId === "function" ? api.getOwnId() : null);
+  
+  // Ép cứng thread = groupId để tránh lỗi Zalo trả nhầm threadId (đặc biệt là tin cá nhân)
+  messages.forEach(m => {
+    m.group_id = String(groupId);
+    m.thread_id = String(groupId);
+  });
 
   emitAndExit({
     ok: true,
@@ -963,7 +971,7 @@ async function main() {
     const count = Number(args.count || input.count || 500);
     const timeoutMs = Number(args.timeout || input.timeout_ms || input.timeoutMs || 35000);
     // threadId can be empty or undefined for global synchronization
-    const result = await syncOldMessages(auth, type, threadId ? String(threadId) : "", count, timeoutMs, typeof api.getOwnId === "function" ? api.getOwnId() : null);
+    const result = await syncOldMessages(auth, type, threadId ? String(threadId) : "", count, timeoutMs, api && typeof api.getOwnId === "function" ? api.getOwnId() : null);
     emitAndExit({ ok: true, ...result, source: "listener.requestOldMessages" }, 0);
     return;
   }

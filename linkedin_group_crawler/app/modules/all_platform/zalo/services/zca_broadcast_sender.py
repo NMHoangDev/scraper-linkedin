@@ -7,7 +7,7 @@ import tempfile
 
 from loguru import logger
 
-from app.modules.all_platform.zalo.services.supabase_service import download_asset_bytes
+from app.modules.all_platform.zalo.services.supabase_service import download_asset_bytes, resolve_thread_type
 from app.modules.all_platform.zalo.services.zca_api_bridge import send_zca_images, send_zca_message
 
 
@@ -78,7 +78,7 @@ async def send_zca_broadcast_to_targets(
             await log_callback(campaign_id, group_name, "failed", "Missing group_id for ZCA send", None)
             continue
 
-        thread_type = 1 if group_id.startswith("g") else 0
+        thread_type = await resolve_thread_type(user_id, group_id)
         await log_callback(campaign_id, group_name, "opened", f"Using ZCA API target (thread_type={thread_type})")
         for message in messages:
             message_id = message["id"]

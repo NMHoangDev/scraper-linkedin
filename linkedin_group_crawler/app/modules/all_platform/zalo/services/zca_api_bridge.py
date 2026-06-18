@@ -257,12 +257,24 @@ async def send_zca_message(
     *,
     thread_type: int = 1,
 ) -> Dict[str, Any]:
-    return await _run_zca_command(
-        "send-message",
-        auth,
-        args=["--thread-id", thread_id, "--type", str(thread_type), "--text", text],
-        timeout_seconds=90,
-    )
+    try:
+        return await _run_zca_command(
+            "send-message",
+            auth,
+            args=["--thread-id", thread_id, "--type", str(thread_type), "--text", text],
+            timeout_seconds=90,
+        )
+    except RuntimeError as exc:
+        msg = str(exc).lower()
+        if thread_type == 1 and ("không tồn tại" in msg or "161" in msg or "not exist" in msg):
+            logger.info(f"Fallback to thread_type=0 for send-message thread={thread_id}")
+            return await _run_zca_command(
+                "send-message",
+                auth,
+                args=["--thread-id", thread_id, "--type", "0", "--text", text],
+                timeout_seconds=90,
+            )
+        raise
 
 
 async def send_zca_images(
@@ -273,13 +285,26 @@ async def send_zca_images(
     text: str = "",
     thread_type: int = 1,
 ) -> Dict[str, Any]:
-    return await _run_zca_command(
-        "send-images",
-        auth,
-        args=["--thread-id", thread_id, "--type", str(thread_type)],
-        payload={"file_paths": file_paths, "text": text},
-        timeout_seconds=180,
-    )
+    try:
+        return await _run_zca_command(
+            "send-images",
+            auth,
+            args=["--thread-id", thread_id, "--type", str(thread_type)],
+            payload={"file_paths": file_paths, "text": text},
+            timeout_seconds=180,
+        )
+    except RuntimeError as exc:
+        msg = str(exc).lower()
+        if thread_type == 1 and ("không tồn tại" in msg or "161" in msg or "not exist" in msg):
+            logger.info(f"Fallback to thread_type=0 for send-images thread={thread_id}")
+            return await _run_zca_command(
+                "send-images",
+                auth,
+                args=["--thread-id", thread_id, "--type", "0"],
+                payload={"file_paths": file_paths, "text": text},
+                timeout_seconds=180,
+            )
+        raise
 
 
 async def remove_zca_unread_mark(
@@ -288,12 +313,24 @@ async def remove_zca_unread_mark(
     *,
     thread_type: int = 1,
 ) -> Dict[str, Any]:
-    return await _run_zca_command(
-        "remove-unread",
-        auth,
-        args=["--thread-id", thread_id, "--type", str(thread_type)],
-        timeout_seconds=30,
-    )
+    try:
+        return await _run_zca_command(
+            "remove-unread",
+            auth,
+            args=["--thread-id", thread_id, "--type", str(thread_type)],
+            timeout_seconds=30,
+        )
+    except RuntimeError as exc:
+        msg = str(exc).lower()
+        if thread_type == 1 and ("không tồn tại" in msg or "161" in msg or "not exist" in msg):
+            logger.info(f"Fallback to thread_type=0 for remove-unread thread={thread_id}")
+            return await _run_zca_command(
+                "remove-unread",
+                auth,
+                args=["--thread-id", thread_id, "--type", "0"],
+                timeout_seconds=30,
+            )
+        raise
 
 
 async def find_zca_user_by_phone(auth: Dict[str, Any], phone_e164: str) -> Dict[str, Any]:

@@ -80,6 +80,34 @@ async def _rest(
     return response.json()
 
 
+async def resolve_thread_type(account_id: str, conversation_id: str) -> int:
+    """Tra cứu zalo_groups để xác định thread_type.
+
+    - Nếu group có is_friend=true → type 0 (cá nhân).
+    - Nếu group_name trùng group_id hoặc là tên người → type 0.
+    - Mặc định type 1 (nhóm) nếu không xác định được.
+    """
+    try:
+        rows = await _rest(
+            "GET",
+            "zalo_groups",
+            params={
+                "select": "group_name",
+                "user_id": f"eq.{account_id}",
+                "group_id": f"eq.{conversation_id}",
+                "limit": "1",
+            },
+        ) or []
+        if rows:
+            row = rows[0]
+            name = str(row.get("group_name") or "").strip()
+            if name == conversation_id or name.startswith("Conversation "):
+                return 1
+    except Exception:
+        pass
+    return 1
+
+
 async def _rest_with_count(
     path: str,
     *,
@@ -1543,18 +1571,18 @@ async def list_conversation_messages(
         "select": "*,assets:zalo_message_assets(*)",
         "user_id": f"eq.{user_id}",
         "is_deleted": "eq.false",
-        "order": "created_at.desc",
+        "order": "timestamp_text.desc",
         "limit": str(safe_limit),
         "offset": str(safe_offset),
     }
 
-    if resolved_group_id and resolved_group_name and resolved_group_id != resolved_group_name:
-        escaped_name = resolved_group_name.replace('"', '\\"')
-        query_params["or"] = f'(group_id.eq.{resolved_group_id},group_name.eq."{escaped_name}")'
-    elif resolved_group_id:
+    if resolved_group_id:
         query_params["group_id"] = f"eq.{resolved_group_id}"
-    else:
+    elif resolved_group_name:
         query_params["group_name"] = f"eq.{resolved_group_name}"
+    else:
+        # Fallback to conversation_id if somehow both are empty
+        query_params["group_id"] = f"eq.{conversation_id}"
 
     rows, total = await _rest_with_count("zalo_messages", params=query_params)
     hydrated_rows = await hydrate_message_groups_from_jobs(user_id, rows or [])
