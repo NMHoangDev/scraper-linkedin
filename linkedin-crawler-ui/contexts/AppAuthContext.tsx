@@ -25,6 +25,23 @@ interface AppAuthContextType {
 }
 
 const AppAuthContext = createContext<AppAuthContextType | undefined>(undefined);
+const AUTH_CHECK_TIMEOUT_MS = 6000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error("Auth check timeout")), ms);
+    promise.then(
+      value => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      error => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
 
 export function AppAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
@@ -32,7 +49,7 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
 
   const refreshUser = useCallback(async () => {
     try {
-      const res = await authService.me();
+      const res = await withTimeout(authService.me(), AUTH_CHECK_TIMEOUT_MS);
       if (res.success && res.data) {
         setUser(res.data as AppUser);
       } else {
@@ -45,6 +62,8 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
 
   /** Cookie-based session; no localStorage session needed */
   const setLwuuSession = useCallback((_email: string, _remember: boolean) => {
+    void _email;
+    void _remember;
     // no-op (kept for backward compatibility with AuthPage)
   }, []);
 
@@ -55,7 +74,16 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
 
   /** On mount: attempt to load current user from cookie */
   useEffect(() => {
-    void refreshUser().finally(() => setIsLoading(false));
+    let alive = true;
+    const timer = window.setTimeout(() => {
+      void refreshUser().finally(() => {
+        if (alive) setIsLoading(false);
+      });
+    }, 0);
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+    };
   }, [refreshUser]);
 
   const login = useCallback(async (email: string, password: string) => {

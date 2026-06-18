@@ -86,6 +86,10 @@ export default function InboxPage() {
   const lastScrollConvRef = useRef("");
   const openConvListSigRef = useRef("");
   const autoThreadRefreshAtRef = useRef<Record<string, number>>({});
+  const selectedAccRef = useRef("");
+  const convsRequestSeqRef = useRef(0);
+  const archivesRequestSeqRef = useRef(0);
+  const threadRequestSeqRef = useRef(0);
   const clientCacheRef = useRef<Map<string, Msg[]>>(new Map());
   const loadedAtRef = useRef<Map<string, string | null>>(new Map());
   // Chống chồng lệnh silent scan (1 lệnh đang chạy thì bỏ qua lần kế)
@@ -93,6 +97,24 @@ export default function InboxPage() {
   const lastSilentScanAtRef = useRef<Record<string, number>>({});
 
   const showToast = (msg: string, ok: boolean) => { setToast({ msg, ok }); setTimeout(() => setToast(null), 3500); };
+
+  const resetAccountView = (uid: string) => {
+    selectedAccRef.current = uid;
+    convsRequestSeqRef.current += 1;
+    archivesRequestSeqRef.current += 1;
+    threadRequestSeqRef.current += 1;
+    setOpenConv(""); openConvRef.current = "";
+    openConvListSigRef.current = "";
+    lastScrollConvRef.current = "";
+    setArchiveReading(false);
+    setMsgs([]); msgsRef.current = [];
+    setReply("");
+    setThreadLastFrom({});
+    setConvs([]); setArchives([]);
+    setNeedRelogin(false);
+    setLoadingChat(false); setLoadingFresh(false); setLoadingArchives(false);
+    setLoadingConvs(!!uid);
+  };
 
   // Lưu cache thread vào CẢ RAM (clientCacheRef) lẫn IndexedDB (bền qua reload).
   // loadedAt: nếu không truyền, giữ lại loaded_at đã biết của hội thoại đó.
@@ -114,12 +136,7 @@ export default function InboxPage() {
   const selectAcc = (uid: string) => {
     if (uid === acc) return;
     setAcc(uid);
-    setOpenConv(""); openConvRef.current = "";
-    openConvListSigRef.current = "";
-    setArchiveReading(false);
-    setMsgs([]); msgsRef.current = [];
-    setThreadLastFrom({});
-    setConvs([]); setArchives([]); setLoadingConvs(!!uid);
+    resetAccountView(uid);
   };
 
   useEffect(() => {
@@ -229,16 +246,14 @@ export default function InboxPage() {
       setConnErr(false);
       // Tự chọn: ưu tiên giữ acc đang chọn; nếu chưa có thì chọn acc ONLINE đầu, không có online thì acc đầu
       setAcc(prev => {
-        if (prev && list.some(e => e.user_id === prev)) return prev;
+        if (prev && (list.length === 0 || list.some(e => e.user_id === prev))) {
+          selectedAccRef.current = prev;
+          return prev;
+        }
         const firstOnline = list.find(e => e.status === "online");
         const next = (firstOnline || list[0])?.user_id || "";
         if (next !== prev) {
-          setOpenConv(""); openConvRef.current = "";
-          openConvListSigRef.current = "";
-          setArchiveReading(false);
-          setMsgs([]); msgsRef.current = [];
-          setThreadLastFrom({});
-          setConvs([]); setArchives([]); setLoadingConvs(!!next);
+          resetAccountView(next);
         }
         return next;
       });
@@ -247,7 +262,10 @@ export default function InboxPage() {
 
   const loadConvs = useCallback(async () => {
     if (!acc) return;
-    if (!sessions.some(s => s.user_id === acc)) {
+    const requestAcc = acc;
+    const requestSeq = ++convsRequestSeqRef.current;
+    if (sessions.length > 0 && !sessions.some(s => s.user_id === requestAcc)) {
+      if (selectedAccRef.current !== requestAcc || convsRequestSeqRef.current !== requestSeq) return;
       setConvs([]);
       setOpenConv(""); openConvRef.current = "";
       setMsgs([]); msgsRef.current = [];
@@ -255,25 +273,37 @@ export default function InboxPage() {
       return;
     }
     try {
-      const r = await fbFetch(`/inbox/conversations?user_id=${encodeURIComponent(acc)}`);
+      const r = await fbFetch(`/inbox/conversations?user_id=${encodeURIComponent(requestAcc)}`);
       const d = await r.json();
+      if (selectedAccRef.current !== requestAcc || convsRequestSeqRef.current !== requestSeq) return;
       const list: Conv[] = d.conversations || [];
       setConvs(list);
       setNeedRelogin(!!d.needs_relogin);
-      void idbSetConvs(acc, list);
+      void idbSetConvs(requestAcc, list);
     } catch { /* ignore */ }
-    finally { setLoadingConvs(false); }
+    finally {
+      if (selectedAccRef.current === requestAcc && convsRequestSeqRef.current === requestSeq) {
+        setLoadingConvs(false);
+      }
+    }
   }, [acc, sessions]);
 
   const loadArchives = useCallback(async () => {
     if (!acc) return;
+    const requestAcc = acc;
+    const requestSeq = ++archivesRequestSeqRef.current;
     setLoadingArchives(true);
     try {
-      const r = await fbFetch(`/inbox/archive?user_id=${encodeURIComponent(acc)}&limit=200`);
+      const r = await fbFetch(`/inbox/archive?user_id=${encodeURIComponent(requestAcc)}&limit=200`);
       const d = await r.json();
+      if (selectedAccRef.current !== requestAcc || archivesRequestSeqRef.current !== requestSeq) return;
       setArchives(d.archives || []);
     } catch { /* ignore */ }
-    finally { setLoadingArchives(false); }
+    finally {
+      if (selectedAccRef.current === requestAcc && archivesRequestSeqRef.current === requestSeq) {
+        setLoadingArchives(false);
+      }
+    }
   }, [acc]);
 
   useEffect(() => {
@@ -430,15 +460,22 @@ export default function InboxPage() {
   }
 
   async function openArchive(conv_id: string) {
+    const accountId = selectedAccRef.current || acc;
+    const requestSeq = ++threadRequestSeqRef.current;
     setArchiveReading(true);
     setOpenConv(conv_id); openConvRef.current = conv_id; openConvListSigRef.current = ""; setMsgs([]); msgsRef.current = []; setLoadingChat(true); setLoadingFresh(false);
     try {
-      const r = await fbFetch(`/inbox/archive/thread?user_id=${encodeURIComponent(acc)}&conv_id=${encodeURIComponent(conv_id)}`);
+      const r = await fbFetch(`/inbox/archive/thread?user_id=${encodeURIComponent(accountId)}&conv_id=${encodeURIComponent(conv_id)}`);
       const d = await r.json();
+      if (selectedAccRef.current !== accountId || threadRequestSeqRef.current !== requestSeq || openConvRef.current !== conv_id) return;
       const archivedMsgs: Msg[] = d.messages || [];
       setMsgs(archivedMsgs); msgsRef.current = archivedMsgs;
     } catch { showToast("Không tải được bản lưu", false); }
-    finally { setLoadingChat(false); }
+    finally {
+      if (selectedAccRef.current === accountId && threadRequestSeqRef.current === requestSeq && openConvRef.current === conv_id) {
+        setLoadingChat(false);
+      }
+    }
   }
 
   // Hỏi lại mỗi 3s tới khi extension trả nội dung. Hiện tin NGAY khi có (theo số tin tăng),
@@ -467,6 +504,8 @@ export default function InboxPage() {
 
 
   async function openChat(conv_id: string) {
+    const accountId = selectedAccRef.current || acc;
+    const requestSeq = ++threadRequestSeqRef.current;
     setArchiveReading(false);
     setOpenConv(conv_id); openConvRef.current = conv_id;
     const currentConv = convs.find(c => c.conv_id === conv_id);
@@ -480,9 +519,9 @@ export default function InboxPage() {
 
     let prevLoadedAt: string | null = null;
     try {
-      const r0 = await fbFetch(`/inbox/thread?user_id=${encodeURIComponent(acc)}&conv_id=${encodeURIComponent(conv_id)}`);
+      const r0 = await fbFetch(`/inbox/thread?user_id=${encodeURIComponent(accountId)}&conv_id=${encodeURIComponent(conv_id)}`);
       const d0 = await r0.json().catch(() => ({}));
-      if (openConvRef.current !== conv_id) return;
+      if (selectedAccRef.current !== accountId || threadRequestSeqRef.current !== requestSeq || openConvRef.current !== conv_id) return;
       prevLoadedAt = d0.loaded_at || null;
       loadedAtRef.current.set(conv_id, prevLoadedAt);
       if (d0.messages?.length) {
@@ -500,7 +539,8 @@ export default function InboxPage() {
       setLoadingChat(false); setLoadingFresh(false); return;
     }
     try {
-      const r = await fbFetch("/inbox/thread", { method: "POST", headers: fbHeaders(), body: JSON.stringify({ user_id: acc, conv_id }) });
+      const r = await fbFetch("/inbox/thread", { method: "POST", headers: fbHeaders(), body: JSON.stringify({ user_id: accountId, conv_id }) });
+      if (selectedAccRef.current !== accountId || threadRequestSeqRef.current !== requestSeq || openConvRef.current !== conv_id) return;
       if (!r.ok) {
         const d = await r.json().catch(() => ({}));
         showToast(d.detail || "Không tải được hội thoại", false);
@@ -512,9 +552,11 @@ export default function InboxPage() {
 
   async function fetchThread(conv_id: string) {
     if (openConvRef.current !== conv_id) return;
+    const accountId = selectedAccRef.current || acc;
     try {
-      const r = await fbFetch(`/inbox/thread?user_id=${encodeURIComponent(acc)}&conv_id=${encodeURIComponent(conv_id)}`);
+      const r = await fbFetch(`/inbox/thread?user_id=${encodeURIComponent(accountId)}&conv_id=${encodeURIComponent(conv_id)}`);
       const d = await r.json();
+      if (selectedAccRef.current !== accountId || openConvRef.current !== conv_id) return;
       const fetched: Msg[] = d.messages || [];
       if (fetched.length >= msgsRef.current.length) {
         setMsgs(fetched); msgsRef.current = fetched;
