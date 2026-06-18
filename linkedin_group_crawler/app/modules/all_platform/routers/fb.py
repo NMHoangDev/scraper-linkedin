@@ -8,6 +8,9 @@ user's scope, then forwards allowed calls to Markee.
 from __future__ import annotations
 
 import os
+import time
+import asyncio
+import copy
 from typing import Any
 
 import httpx
@@ -23,6 +26,14 @@ MARKEE_BASE_URL = (os.getenv("MARKEE_FB_BASE_URL") or "https://auto-fb.zenithglo
 MARKEE_ADMIN_API_KEY = (os.getenv("MARKEE_FB_API_KEY") or "").strip()
 MARKEE_EXTENSION_API_KEY = (os.getenv("MARKEE_FB_EXTENSION_API_KEY") or "").strip()
 _TIMEOUT = httpx.Timeout(45.0, connect=10.0)
+_RECENT_INBOX_SCAN: dict[str, float] = {}
+_OWNED_USER_IDS_CACHE: dict[str, tuple[float, set[str]]] = {}
+_OWNED_USER_IDS_CACHE_TTL = 60.0
+_MARKEE_RESPONSE_CACHE: dict[str, tuple[float, int, Any]] = {}
+_MARKEE_INFLIGHT: dict[str, asyncio.Task[tuple[int, Any]]] = {}
+_MARKEE_CACHE_LIMIT = 1000
+_THREAD_LOAD_RECENT: dict[str, tuple[float, dict[str, Any]]] = {}
+_THREAD_LOAD_RECENT_TTL = 12.0
 
 
 def _current_user(request: Request, authorization: str | None = None) -> dict[str, Any]:
@@ -38,7 +49,10 @@ def _current_user(request: Request, authorization: str | None = None) -> dict[st
     if not payload or not payload.get("sub"):
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-    user = get_user_by_id(str(payload["sub"]))
+    try:
+        user = get_user_by_id(str(payload["sub"]))
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Auth service temporarily unavailable") from exc
     if not user or not user.get("is_active", True):
         raise HTTPException(status_code=401, detail="User not found or inactive")
     return user
@@ -91,31 +105,89 @@ def _auth_headers(*, json_body: bool = False, content_type: str | None = None) -
     return headers
 
 
+def _clear_markee_cache(*path_fragments: str) -> None:
+    if not path_fragments:
+        _MARKEE_RESPONSE_CACHE.clear()
+        return
+    for key in list(_MARKEE_RESPONSE_CACHE.keys()):
+        if any(fragment in key for fragment in path_fragments):
+            _MARKEE_RESPONSE_CACHE.pop(key, None)
+
+
 async def _markee_json(
     method: str,
     path: str,
     *,
     params: dict[str, Any] | None = None,
     json_body: Any | None = None,
+    cache_ttl: float = 0.0,
 ) -> tuple[int, Any]:
-    url = f"{MARKEE_BASE_URL}{path}"
-    async with httpx.AsyncClient(timeout=_TIMEOUT, follow_redirects=True) as client:
-        try:
-            resp = await client.request(
-                method,
-                url,
-                params=params,
-                json=json_body,
-                headers=_auth_headers(json_body=json_body is not None),
-            )
-        except httpx.HTTPError as exc:
-            raise HTTPException(status_code=502, detail=f"Markee service unavailable: {exc}") from exc
-    try:
-        payload = resp.json()
-    except ValueError:
-        payload = {"detail": resp.text}
-    return resp.status_code, payload
+    cache_key = ""
+    if cache_ttl > 0 and method.upper() == "GET" and json_body is None:
+        param_key = tuple(sorted((str(k), str(v)) for k, v in (params or {}).items()))
+        cache_key = repr((method.upper(), path, param_key))
+        cached = _MARKEE_RESPONSE_CACHE.get(cache_key)
+        now = time.monotonic()
+        if cached and cached[0] > now:
+            return cached[1], copy.deepcopy(cached[2])
+        if cached:
+            _MARKEE_RESPONSE_CACHE.pop(cache_key, None)
+        inflight = _MARKEE_INFLIGHT.get(cache_key)
+        if inflight and not inflight.done():
+            status_code, payload = await inflight
+            return status_code, copy.deepcopy(payload)
 
+    async def _request() -> tuple[int, Any]:
+        url = f"{MARKEE_BASE_URL}{path}"
+        last_exc: httpx.HTTPError | None = None
+        for attempt in range(3):
+            async with httpx.AsyncClient(timeout=_TIMEOUT, follow_redirects=True) as client:
+                try:
+                    resp = await client.request(
+                        method,
+                        url,
+                        params=params,
+                        json=json_body,
+                        headers=_auth_headers(json_body=json_body is not None),
+                    )
+                    break
+                except httpx.HTTPError as exc:
+                    last_exc = exc
+                    if attempt >= 2:
+                        raise HTTPException(status_code=502, detail=f"Markee service unavailable: {exc}") from exc
+                    await asyncio.sleep(0.2 * (attempt + 1))
+        else:
+            raise HTTPException(status_code=502, detail=f"Markee service unavailable: {last_exc}")
+        try:
+            payload = resp.json()
+        except ValueError:
+            payload = {"detail": resp.text}
+        return resp.status_code, payload
+
+    if cache_key:
+        task = _MARKEE_INFLIGHT.get(cache_key)
+        owner = False
+        if not task or task.done():
+            task = asyncio.create_task(_request())
+            _MARKEE_INFLIGHT[cache_key] = task
+            owner = True
+        try:
+            status_code, payload = await task
+        finally:
+            if owner:
+                _MARKEE_INFLIGHT.pop(cache_key, None)
+        if status_code < 500:
+            _MARKEE_RESPONSE_CACHE[cache_key] = (
+                time.monotonic() + cache_ttl,
+                status_code,
+                copy.deepcopy(payload),
+            )
+            if len(_MARKEE_RESPONSE_CACHE) > _MARKEE_CACHE_LIMIT:
+                for old_key in list(_MARKEE_RESPONSE_CACHE.keys())[:-_MARKEE_CACHE_LIMIT]:
+                    _MARKEE_RESPONSE_CACHE.pop(old_key, None)
+        return status_code, copy.deepcopy(payload)
+
+    return await _request()
 
 def _json_response(status_code: int, payload: Any) -> JSONResponse:
     return JSONResponse(status_code=status_code, content=payload)
@@ -130,15 +202,30 @@ async def _owned_user_ids(user: dict[str, Any]) -> set[str] | None:
         return None
 
     params = _scope_query(user)
+    cache_key = f"{user.get('id') or ''}:{'&'.join(f'{k}={v}' for k, v in sorted(params.items()))}"
+    cached = _OWNED_USER_IDS_CACHE.get(cache_key)
+    now = time.monotonic()
+    if cached and cached[0] > now:
+        return set(cached[1])
+
     ids: set[str] = set()
     for path, key in (("/sessions", "sessions"), ("/extensions", "extensions")):
-        status, payload = await _markee_json("GET", path, params=params)
+        status, payload = await _markee_json(
+            "GET",
+            path,
+            params=params,
+            cache_ttl=5.0 if path == "/sessions" else 10.0,
+        )
         if status >= 400:
             continue
         for item in payload.get(key, []) if isinstance(payload, dict) else []:
             uid = item.get("user_id")
             if uid:
                 ids.add(str(uid))
+    _OWNED_USER_IDS_CACHE[cache_key] = (now + _OWNED_USER_IDS_CACHE_TTL, set(ids))
+    if len(_OWNED_USER_IDS_CACHE) > 500:
+        for old_key in list(_OWNED_USER_IDS_CACHE.keys())[:-500]:
+            _OWNED_USER_IDS_CACHE.pop(old_key, None)
     return ids
 
 
@@ -171,21 +258,21 @@ async def fb_config(request: Request, authorization: str | None = Header(None)) 
 @router.get("/health")
 async def fb_health(request: Request, authorization: str | None = Header(None)) -> JSONResponse:
     _current_user(request, authorization)
-    status, payload = await _markee_json("GET", "/health")
+    status, payload = await _markee_json("GET", "/health", cache_ttl=5.0)
     return _json_response(status, payload)
 
 
 @router.get("/sessions")
 async def fb_sessions(request: Request, authorization: str | None = Header(None)) -> JSONResponse:
     user = _current_user(request, authorization)
-    status, payload = await _markee_json("GET", "/sessions", params=_scope_query(user))
+    status, payload = await _markee_json("GET", "/sessions", params=_scope_query(user), cache_ttl=5.0)
     return _json_response(status, payload)
 
 
 @router.get("/extensions")
 async def fb_extensions(request: Request, authorization: str | None = Header(None)) -> JSONResponse:
     user = _current_user(request, authorization)
-    status, payload = await _markee_json("GET", "/extensions", params=_scope_query(user))
+    status, payload = await _markee_json("GET", "/extensions", params=_scope_query(user), cache_ttl=10.0)
     return _json_response(status, payload)
 
 
@@ -237,6 +324,7 @@ async def fb_extension_label(user_id: str, data: dict, request: Request, authori
     user = _current_user(request, authorization)
     await _require_fb_account_scope(user, user_id)
     status, payload = await _markee_json("POST", f"/extensions/{user_id}/label", json_body=data)
+    _clear_markee_cache("/extensions", "/sessions")
     return _json_response(status, payload)
 
 
@@ -245,6 +333,7 @@ async def fb_delete_session(user_id: str, request: Request, authorization: str |
     user = _current_user(request, authorization)
     await _require_fb_account_scope(user, user_id)
     status, payload = await _markee_json("DELETE", f"/session/cookie/{user_id}")
+    _clear_markee_cache("/sessions", "/extensions", "/inbox/conversations", "/inbox/thread")
     return _json_response(status, payload)
 
 
@@ -254,6 +343,7 @@ async def fb_session_meta(data: dict, request: Request, authorization: str | Non
     uid = str(data.get("user_id") or "")
     await _require_fb_account_scope(user, uid)
     status, payload = await _markee_json("POST", "/session/meta", json_body=data)
+    _clear_markee_cache("/sessions", "/extensions")
     return _json_response(status, payload)
 
 
@@ -263,7 +353,7 @@ async def fb_inbox_conversations(request: Request, authorization: str | None = H
     uid = str(request.query_params.get("user_id") or "")
     await _require_fb_account_scope(user, uid)
     params = dict(request.query_params)
-    status, payload = await _markee_json("GET", "/inbox/conversations", params=params)
+    status, payload = await _markee_json("GET", "/inbox/conversations", params=params, cache_ttl=3.0)
     return _json_response(status, payload)
 
 
@@ -272,7 +362,26 @@ async def fb_inbox_scan(data: dict, request: Request, authorization: str | None 
     user = _current_user(request, authorization)
     uid = str(data.get("user_id") or "")
     await _require_fb_account_scope(user, uid)
+    now = time.monotonic()
+    last = _RECENT_INBOX_SCAN.get(uid, 0.0)
+    if now - last < 25.0:
+        return _json_response(200, {"success": True, "user_id": uid, "scanning": True, "throttled": True})
+    _RECENT_INBOX_SCAN[uid] = now
+    if len(_RECENT_INBOX_SCAN) > 500:
+        for key in list(_RECENT_INBOX_SCAN.keys())[:-500]:
+            _RECENT_INBOX_SCAN.pop(key, None)
     status, payload = await _markee_json("POST", "/inbox/scan", json_body=data)
+    _clear_markee_cache("/inbox/conversations")
+    return _json_response(status, payload)
+
+
+@router.post("/inbox/scan_deep")
+async def fb_inbox_scan_deep(data: dict, request: Request, authorization: str | None = Header(None)) -> JSONResponse:
+    user = _current_user(request, authorization)
+    uid = str(data.get("user_id") or "")
+    await _require_fb_account_scope(user, uid)
+    status, payload = await _markee_json("POST", "/inbox/scan_deep", json_body=data)
+    _clear_markee_cache("/inbox/conversations", "/inbox/thread")
     return _json_response(status, payload)
 
 
@@ -281,7 +390,48 @@ async def fb_inbox_mark(data: dict, request: Request, authorization: str | None 
     user = _current_user(request, authorization)
     uid = str(data.get("user_id") or "")
     await _require_fb_account_scope(user, uid)
+    data = {
+        **data,
+        "actor_id": user.get("id") or "",
+        "actor_name": user.get("name") or user.get("email") or user.get("id") or "",
+    }
     status, payload = await _markee_json("POST", "/inbox/mark", json_body=data)
+    _clear_markee_cache("/inbox/conversations", "/inbox/thread", "/inbox/archive")
+    return _json_response(status, payload)
+
+
+@router.get("/inbox/archive")
+async def fb_inbox_archive_list(request: Request, authorization: str | None = Header(None)) -> JSONResponse:
+    user = _current_user(request, authorization)
+    uid = str(request.query_params.get("user_id") or "")
+    await _require_fb_account_scope(user, uid)
+    params = dict(request.query_params)
+    status, payload = await _markee_json("GET", "/inbox/archive", params=params)
+    return _json_response(status, payload)
+
+
+@router.post("/inbox/archive")
+async def fb_inbox_archive_save(data: dict, request: Request, authorization: str | None = Header(None)) -> JSONResponse:
+    user = _current_user(request, authorization)
+    uid = str(data.get("user_id") or "")
+    await _require_fb_account_scope(user, uid)
+    data = {
+        **data,
+        "actor_id": user.get("id") or "",
+        "actor_name": user.get("name") or user.get("email") or user.get("id") or "",
+    }
+    status, payload = await _markee_json("POST", "/inbox/archive", json_body=data)
+    _clear_markee_cache("/inbox/conversations", "/inbox/archive", "/inbox/thread")
+    return _json_response(status, payload)
+
+
+@router.get("/inbox/archive/thread")
+async def fb_inbox_archive_thread_get(request: Request, authorization: str | None = Header(None)) -> JSONResponse:
+    user = _current_user(request, authorization)
+    uid = str(request.query_params.get("user_id") or "")
+    await _require_fb_account_scope(user, uid)
+    params = dict(request.query_params)
+    status, payload = await _markee_json("GET", "/inbox/archive/thread", params=params)
     return _json_response(status, payload)
 
 
@@ -289,8 +439,24 @@ async def fb_inbox_mark(data: dict, request: Request, authorization: str | None 
 async def fb_inbox_thread_load(data: dict, request: Request, authorization: str | None = Header(None)) -> JSONResponse:
     user = _current_user(request, authorization)
     uid = str(data.get("user_id") or "")
+    conv_id = str(data.get("conv_id") or "")
     await _require_fb_account_scope(user, uid)
+    recent_key = f"{uid}:{conv_id}"
+    now = time.monotonic()
+    cached = _THREAD_LOAD_RECENT.get(recent_key)
+    if cached and cached[0] > now:
+        payload = dict(cached[1])
+        payload["deduped"] = True
+        return _json_response(200, payload)
+    if cached:
+        _THREAD_LOAD_RECENT.pop(recent_key, None)
     status, payload = await _markee_json("POST", "/inbox/thread", json_body=data)
+    if status < 500 and isinstance(payload, dict):
+        _THREAD_LOAD_RECENT[recent_key] = (time.monotonic() + _THREAD_LOAD_RECENT_TTL, dict(payload))
+        if len(_THREAD_LOAD_RECENT) > 1000:
+            for key in list(_THREAD_LOAD_RECENT.keys())[:-1000]:
+                _THREAD_LOAD_RECENT.pop(key, None)
+    _clear_markee_cache("/inbox/conversations", "/inbox/thread")
     return _json_response(status, payload)
 
 
@@ -300,7 +466,7 @@ async def fb_inbox_thread_get(request: Request, authorization: str | None = Head
     uid = str(request.query_params.get("user_id") or "")
     await _require_fb_account_scope(user, uid)
     params = dict(request.query_params)
-    status, payload = await _markee_json("GET", "/inbox/thread", params=params)
+    status, payload = await _markee_json("GET", "/inbox/thread", params=params, cache_ttl=2.0)
     return _json_response(status, payload)
 
 
@@ -310,12 +476,16 @@ async def fb_inbox_reply(data: dict, request: Request, authorization: str | None
     uid = str(data.get("user_id") or "")
     await _require_fb_account_scope(user, uid)
     status, payload = await _markee_json("POST", "/inbox/reply", json_body=data)
+    _clear_markee_cache("/inbox/conversations", "/inbox/thread", "/inbox/reply_status")
     return _json_response(status, payload)
 
 
 @router.get("/inbox/reply_status")
 async def fb_inbox_reply_status(request: Request, authorization: str | None = Header(None)) -> JSONResponse:
-    _current_user(request, authorization)
+    user = _current_user(request, authorization)
+    uid = str(request.query_params.get("user_id") or "")
+    if uid:
+        await _require_fb_account_scope(user, uid)
     params = dict(request.query_params)
     status, payload = await _markee_json("GET", "/inbox/reply_status", params=params)
     return _json_response(status, payload)

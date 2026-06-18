@@ -20,6 +20,17 @@ def setup_logging() -> None:
         format=LOG_FORMAT,
         handlers=[logging.StreamHandler(sys.stdout)],
     )
+    for noisy_logger in (
+        "httpx",
+        "httpcore",
+        "hpack",
+        "postgrest",
+        "supabase",
+        "gotrue",
+        "storage3",
+        "realtime",
+    ):
+        logging.getLogger(noisy_logger).setLevel(logging.WARNING)
 
 
 def get_logger(name: str) -> logging.Logger:

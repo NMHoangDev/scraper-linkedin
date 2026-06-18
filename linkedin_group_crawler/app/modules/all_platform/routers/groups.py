@@ -31,7 +31,10 @@ def _get_user_from_header(authorization: str | None, request: Request | None = N
     user_id = payload.get("sub")
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token payload")
-    user = get_user_by_id(user_id)
+    try:
+        user = get_user_by_id(user_id)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Auth service temporarily unavailable") from exc
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
     return user

@@ -2,17 +2,15 @@
 
 from __future__ import annotations
 
-from supabase import Client
-
-from app.core.supabase_client import get_supabase_client
+from app.core.supabase_client import execute_supabase_query, get_supabase_client
 
 
 def get_social_accounts(app_user_id: str, platform: str | None = None) -> list[dict]:
     """Get all social accounts for an app user, optionally filtered by platform slug."""
-    supabase: Client = get_supabase_client()
-    
     # Map platforms
-    plat_res = supabase.table("platforms").select("id, name").execute()
+    plat_res = execute_supabase_query(
+        lambda: get_supabase_client().table("platforms").select("id, name").execute()
+    )
     plat_map = {p["id"]: p.get("name", "").strip().lower() for p in (plat_res.data or [])}
     
     target_id = None
@@ -24,11 +22,13 @@ def get_social_accounts(app_user_id: str, platform: str | None = None) -> list[d
         if target_id is None:
             return []
             
-    query = supabase.table("social_accounts").select("*").eq("app_user_id", app_user_id)
-    if target_id is not None:
-        query = query.eq("id_platform", target_id)
-        
-    result = query.order("created_at", desc=True).execute()
+    def _load_accounts():
+        query = get_supabase_client().table("social_accounts").select("*").eq("app_user_id", app_user_id)
+        if target_id is not None:
+            query = query.eq("id_platform", target_id)
+        return query.order("created_at", desc=True).execute()
+
+    result = execute_supabase_query(_load_accounts)
     
     items = result.data or []
     for item in items:
@@ -38,22 +38,23 @@ def get_social_accounts(app_user_id: str, platform: str | None = None) -> list[d
 
 def get_social_account_by_id(account_id: str, app_user_id: str) -> dict | None:
     """Get a specific social account (must belong to user)."""
-    supabase: Client = get_supabase_client()
-    result = (
-        supabase.table("social_accounts")
-        .select("*")
-        .eq("id", account_id)
-        .eq("app_user_id", app_user_id)
-        .execute()
+    result = execute_supabase_query(
+        lambda: (
+            get_supabase_client().table("social_accounts")
+            .select("*")
+            .eq("id", account_id)
+            .eq("app_user_id", app_user_id)
+            .execute()
+        )
     )
     return result.data[0] if result.data else None
 
 
 def get_primary_account(app_user_id: str, platform: str) -> dict | None:
     """Get the primary social account for a platform slug."""
-    supabase: Client = get_supabase_client()
-    
-    plat_res = supabase.table("platforms").select("id, name").execute()
+    plat_res = execute_supabase_query(
+        lambda: get_supabase_client().table("platforms").select("id, name").execute()
+    )
     target_id = None
     for p in (plat_res.data or []):
         if p.get("name", "").lower() == platform:
@@ -63,14 +64,16 @@ def get_primary_account(app_user_id: str, platform: str) -> dict | None:
     if target_id is None:
         return None
         
-    result = (
-        supabase.table("social_accounts")
-        .select("*")
-        .eq("app_user_id", app_user_id)
-        .eq("id_platform", target_id)
-        .eq("is_primary", True)
-        .eq("is_active", True)
-        .execute()
+    result = execute_supabase_query(
+        lambda: (
+            get_supabase_client().table("social_accounts")
+            .select("*")
+            .eq("app_user_id", app_user_id)
+            .eq("id_platform", target_id)
+            .eq("is_primary", True)
+            .eq("is_active", True)
+            .execute()
+        )
     )
     
     item = result.data[0] if result.data else None
@@ -91,11 +94,11 @@ def create_social_account(
     notes: str | None = None,
 ) -> dict:
     """Create a new social account."""
-    supabase: Client = get_supabase_client()
-
     # Auto-resolve id_platform if not provided
     if id_platform is None:
-        plat_res = supabase.table("platforms").select("id, name").execute()
+        plat_res = execute_supabase_query(
+            lambda: get_supabase_client().table("platforms").select("id, name").execute()
+        )
         for p in (plat_res.data or []):
             if p.get("name", "").strip().lower() == platform:
                 id_platform = p["id"]
@@ -113,7 +116,9 @@ def create_social_account(
         "is_active": True,
     }
 
-    result = supabase.table("social_accounts").insert(insert_data).execute()
+    result = execute_supabase_query(
+        lambda: get_supabase_client().table("social_accounts").insert(insert_data).execute()
+    )
     if not result.data:
         raise ValueError("Failed to create social account")
     item = result.data[0]
@@ -127,8 +132,6 @@ def update_social_account(
     updates: dict,
 ) -> dict:
     """Update a social account (must belong to user)."""
-    supabase: Client = get_supabase_client()
-
     # Verify ownership
     existing = get_social_account_by_id(account_id, app_user_id)
     if not existing:
@@ -142,43 +145,46 @@ def update_social_account(
     safe_updates = {k: v for k, v in updates.items() if k in allowed_fields}
     safe_updates["updated_at"] = "now()"
 
-    result = (
-        supabase.table("social_accounts")
-        .update(safe_updates)
-        .eq("id", account_id)
-        .eq("app_user_id", app_user_id)
-        .execute()
+    result = execute_supabase_query(
+        lambda: (
+            get_supabase_client().table("social_accounts")
+            .update(safe_updates)
+            .eq("id", account_id)
+            .eq("app_user_id", app_user_id)
+            .execute()
+        )
     )
     return result.data[0] if result.data else {}
 
 
 def delete_social_account(account_id: str, app_user_id: str) -> dict:
     """Delete a social account (must belong to user)."""
-    supabase: Client = get_supabase_client()
-    result = (
-        supabase.table("social_accounts")
-        .delete()
-        .eq("id", account_id)
-        .eq("app_user_id", app_user_id)
-        .execute()
+    result = execute_supabase_query(
+        lambda: (
+            get_supabase_client().table("social_accounts")
+            .delete()
+            .eq("id", account_id)
+            .eq("app_user_id", app_user_id)
+            .execute()
+        )
     )
     return {"deleted": len(result.data) if result.data else 0}
 
 
 def set_primary_account(account_id: str, app_user_id: str) -> dict:
     """Set an account as primary (others of same platform auto-set to false via DB trigger)."""
-    supabase: Client = get_supabase_client()
-
     existing = get_social_account_by_id(account_id, app_user_id)
     if not existing:
         raise ValueError("Social account not found")
 
-    result = (
-        supabase.table("social_accounts")
-        .update({"is_primary": True, "updated_at": "now()"})
-        .eq("id", account_id)
-        .eq("app_user_id", app_user_id)
-        .execute()
+    result = execute_supabase_query(
+        lambda: (
+            get_supabase_client().table("social_accounts")
+            .update({"is_primary": True, "updated_at": "now()"})
+            .eq("id", account_id)
+            .eq("app_user_id", app_user_id)
+            .execute()
+        )
     )
     return result.data[0] if result.data else {}
 

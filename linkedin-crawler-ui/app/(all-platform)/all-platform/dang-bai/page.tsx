@@ -14,9 +14,12 @@ import { useAppAuth } from "@/contexts/AppAuthContext";
 import { provisionExtension, pingExtension } from "@/lib/markee-ext-provision";
 import { fbFetch, fbHeaders, getFbProvisionConfig } from "@/lib/markee-fb-api";
 import { MaterialIcon } from "@/components/ui";
+import { allPlatformGroupsService } from "@/services/all-platform.service";
+import type { FacebookGroup } from "@/types/unified.types";
 
-interface Ext { user_id: string; owner?: string; label?: string; status: string; }
-interface Grp { id: string; name: string; url: string; }
+interface Ext { user_id: string; owner?: string; label?: string; email?: string; note?: string; status: string; }
+interface FbSession { user_id: string; owner?: string; label?: string; email?: string; note?: string; }
+interface Grp { id: string; name: string; url: string; team?: string; intent?: string; }
 interface Job { user_id?: string; content?: string; status?: string; target_type?: string; post_url?: string; error?: string; updated_at?: string; created_at?: string; }
 
 export default function DangBaiPage() {
@@ -46,21 +49,31 @@ export default function DangBaiPage() {
       setExtInstalled(installed);
       if (installed) {
         const cfg = await getFbProvisionConfig();
-        await provisionExtension({ serverUrl: cfg.serverUrl, owner, apiKey: cfg.extensionApiKey });
+        await provisionExtension({ serverUrl: cfg.serverUrl, owner, apiKey: cfg.extensionApiKey, label: user?.name || user?.email || owner });
       }
     })();
-  }, [owner]);
+  }, [owner, user?.email, user?.name]);
 
   const refresh = useCallback(async () => {
     if (!owner) return;
     try {
-      const [e, g, j] = await Promise.all([
+      const [e, s, g, j] = await Promise.all([
         fbFetch("/extensions").then(r => r.json()).catch(() => ({})),
-        fbFetch("/groups").then(r => r.json()).catch(() => ({})),
+        fbFetch("/sessions").then(r => r.json()).catch(() => ({})),
+        allPlatformGroupsService.getAll("facebook").catch(() => ({ success: false, data: [] as FacebookGroup[] })),
         fbFetch("/jobs").then(r => r.json()).catch(() => ({})),
       ]);
-      setExts(e.extensions || []);
-      setGroups(g.groups || []);
+      const sessionMap = new Map<string, FbSession>((s.sessions || []).map((item: FbSession) => [item.user_id, item]));
+      setExts((e.extensions || []).map((ext: Ext) => ({ ...(sessionMap.get(ext.user_id) || {}), ...ext })));
+      setGroups(((g.data || []) as FacebookGroup[])
+        .filter(group => group.group_url)
+        .map(group => ({
+          id: group.id,
+          name: group.group_name || group.group_url,
+          url: group.group_url,
+          team: group.team_name || group.team,
+          intent: group.intent_name || group.intent,
+        })));
       // lịch sử: chỉ hiện job của các acc thuộc owner này
       const myUsers = new Set((e.extensions || []).map((x: Ext) => x.user_id));
       setJobs((j.jobs || []).filter((job: Job) => myUsers.has(job.user_id || "")).slice().reverse().slice(0, 10));
@@ -82,7 +95,15 @@ export default function DangBaiPage() {
     else next.add(uid);
     setSelected(next);
   };
-  const labelOf = (e: Ext) => e.label || e.user_id;
+  const shortFbId = (id: string) => {
+    const raw = id.replace(/^fb_/, "");
+    return raw.length > 10 ? `fb ${raw.slice(0, 4)}...${raw.slice(-4)}` : id;
+  };
+  const labelOf = (e: Ext) => {
+    const explicit = (e.label || "").trim();
+    if (explicit && explicit !== e.user_id) return explicit;
+    return e.email || "Tài khoản Facebook";
+  };
 
   async function renameAcc(uid: string, current: string) {
     const name = window.prompt("Đặt tên cho tài khoản này:", current);
@@ -156,8 +177,12 @@ export default function DangBaiPage() {
                 online.map(e => (
                   <span key={e.user_id}
                     className={`inline-flex items-center gap-1.5 pl-3 pr-2 py-2 rounded-full text-sm font-semibold border transition ${selected.has(e.user_id) ? "bg-[#E3000F] text-white border-[#E3000F]" : "border-[#E5E5E5] text-[#1A1A1A] hover:border-[#E3000F]"}`}>
-                    <button onClick={() => toggle(e.user_id)} className="flex items-center gap-1.5">
-                      <span className="inline-block w-2 h-2 rounded-full bg-green-500 align-middle" />{labelOf(e)}
+                    <button onClick={() => toggle(e.user_id)} className="flex min-w-0 items-center gap-1.5">
+                      <span className="inline-block w-2 h-2 rounded-full bg-green-500 align-middle" />
+                      <span className="min-w-0 text-left">
+                        <span className="block max-w-[150px] truncate leading-4">{labelOf(e)}</span>
+                        <span className={`block max-w-[150px] truncate text-[10px] leading-3 ${selected.has(e.user_id) ? "text-white/75" : "text-[#A0A0A0]"}`}>{shortFbId(e.user_id)}</span>
+                      </span>
                     </button>
                     <button onClick={() => renameAcc(e.user_id, labelOf(e))} title="Đổi tên"
                       className={`text-[11px] opacity-60 hover:opacity-100 ${selected.has(e.user_id) ? "text-white" : "text-[#666666]"}`}>✎</button>
@@ -177,12 +202,17 @@ export default function DangBaiPage() {
 
           {targetType === "group" && (
             <div>
-              <label className="text-xs font-bold text-[#666666] block mb-1">Chọn group (thư viện)</label>
+              <label className="text-xs font-bold text-[#666666] block mb-1">Chọn group từ Quản lý nhóm</label>
               <select value={groupUrl} onChange={ev => setGroupUrl(ev.target.value)} className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A] bg-white">
-                <option value="">-- Chọn từ thư viện --</option>
-                {groups.map(g => <option key={g.id} value={g.url}>{g.name}</option>)}
+                <option value="">-- Chọn từ danh sách Quản lý nhóm --</option>
+                {groups.length === 0 && <option disabled value="">Chưa có group Facebook trong Quản lý nhóm</option>}
+                {groups.map(g => (
+                  <option key={g.id} value={g.url}>
+                    {g.name}{g.team ? ` - ${g.team}` : ""}{g.intent ? ` - ${g.intent}` : ""}
+                  </option>
+                ))}
               </select>
-              <p className="text-xs text-[#A0A0A0] mt-1">Tài khoản phải là thành viên group đó.</p>
+              <p className="text-xs text-[#A0A0A0] mt-1">Danh sách này dùng chung dữ liệu với trang Quản lý nhóm. Tài khoản phải là thành viên group đó.</p>
             </div>
           )}
 
@@ -218,7 +248,12 @@ export default function DangBaiPage() {
                   const txt = j.status === "success" ? "✅ Thành công" : j.status === "failed" ? "❌ Thất bại" : "⏳ Đang xử lý";
                   return (<tr key={i} className="border-b border-[#E5E5E5] align-top">
                     <td className="py-2 whitespace-nowrap text-[#666666]">{j.updated_at ? new Date(j.updated_at).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" }) : "-"}</td>
-                    <td className="font-semibold text-[#1A1A1A]">{(exts.find(e => e.user_id === j.user_id)?.label) || j.user_id}{j.target_type === "group" ? " [group]" : ""}</td>
+                    <td className="font-semibold text-[#1A1A1A]">
+                      {(() => {
+                        const ext = exts.find(e => e.user_id === j.user_id);
+                        return ext ? labelOf(ext) : shortFbId(j.user_id || "");
+                      })()}{j.target_type === "group" ? " [group]" : ""}
+                    </td>
                     <td className="max-w-[260px] truncate text-[#1A1A1A]" title={j.content}>{j.content}</td>
                     <td><span className={`text-[11px] px-2.5 py-1 rounded-full font-bold ${cls}`}>{txt}</span>
                       {j.status === "success" && j.post_url && <div className="mt-1"><a href={j.post_url} target="_blank" rel="noopener" className="text-xs text-[#E3000F] font-semibold">🔗 Xem bài</a></div>}
