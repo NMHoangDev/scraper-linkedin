@@ -23,6 +23,34 @@ interface Msg { from: "me" | "them"; text: string; time: string; }
 interface UserRow { id?: string; email?: string; name?: string; }
 interface TeamRow { id?: string; name_team?: string; id_leader?: string; leader_name?: string; leader_email?: string; members?: UserRow[]; }
 
+const ACTIVE_INBOX_DAYS = 7;
+
+function foldVietnamese(value: string): string {
+  return (value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase();
+}
+
+function isRecentMessengerTime(time: string, days = ACTIVE_INBOX_DAYS): boolean {
+  const s = foldVietnamese(time.trim());
+  if (!s) return true;
+  if (/(vua xong|just now|hom qua|yesterday)/i.test(s)) return true;
+  if (/^\d+\s*(m|min|phut|h|gio|hour)$/i.test(s)) return true;
+  const m = s.match(/(\d+)\s*(ngay|day|d|tuan|week|w|thg|thang|month|nam|year)\b/i);
+  if (!m) return false;
+  const n = Number(m[1] || 0);
+  const unit = m[2] || "";
+  if (["ngay", "day", "d"].includes(unit)) return n <= days;
+  return false;
+}
+
+function convListSignature(conv: Conv): string {
+  return `${conv.conv_id}|${conv.preview || ""}|${conv.time || ""}|${conv.unread ? 1 : 0}`;
+}
+
 export default function InboxPage() {
   const { user } = useAppAuth();
   const owner = user?.id || "";
@@ -56,6 +84,8 @@ export default function InboxPage() {
   const msgsRef = useRef<Msg[]>([]);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const lastScrollConvRef = useRef("");
+  const openConvListSigRef = useRef("");
+  const autoThreadRefreshAtRef = useRef<Record<string, number>>({});
   const clientCacheRef = useRef<Map<string, Msg[]>>(new Map());
   const loadedAtRef = useRef<Map<string, string | null>>(new Map());
   // Chống chồng lệnh silent scan (1 lệnh đang chạy thì bỏ qua lần kế)
@@ -85,6 +115,7 @@ export default function InboxPage() {
     if (uid === acc) return;
     setAcc(uid);
     setOpenConv(""); openConvRef.current = "";
+    openConvListSigRef.current = "";
     setArchiveReading(false);
     setMsgs([]); msgsRef.current = [];
     setThreadLastFrom({});
@@ -203,6 +234,7 @@ export default function InboxPage() {
         const next = (firstOnline || list[0])?.user_id || "";
         if (next !== prev) {
           setOpenConv(""); openConvRef.current = "";
+          openConvListSigRef.current = "";
           setArchiveReading(false);
           setMsgs([]); msgsRef.current = [];
           setThreadLastFrom({});
@@ -270,21 +302,18 @@ export default function InboxPage() {
   }, [acc]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadSessions();
     const t = setInterval(loadSessions, 6000);
     return () => clearInterval(t);
   }, [loadSessions]);
   useEffect(() => {
     if (!acc) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadConvs();
     const t = setInterval(loadConvs, 3000);
     return () => clearInterval(t);
   }, [acc, loadConvs]);
   useEffect(() => {
     if (!acc || viewMode !== "archive") return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadArchives();
   }, [acc, viewMode, loadArchives]);
 
@@ -393,7 +422,7 @@ export default function InboxPage() {
         return [entry, ...prev.filter(x => x.conv_id !== conv_id)];
       });
       if (hide && openConvRef.current === conv_id) {
-        setOpenConv(""); openConvRef.current = ""; setArchiveReading(false); setMsgs([]); msgsRef.current = [];
+        setOpenConv(""); openConvRef.current = ""; openConvListSigRef.current = ""; setArchiveReading(false); setMsgs([]); msgsRef.current = [];
       }
       showToast(hide ? "Đã ẩn khỏi hộp thư và lưu trữ" : "Đã lưu khách vào kho lưu trữ", true);
       if (viewMode === "archive") loadArchives();
@@ -402,7 +431,7 @@ export default function InboxPage() {
 
   async function openArchive(conv_id: string) {
     setArchiveReading(true);
-    setOpenConv(conv_id); openConvRef.current = conv_id; setMsgs([]); msgsRef.current = []; setLoadingChat(true); setLoadingFresh(false);
+    setOpenConv(conv_id); openConvRef.current = conv_id; openConvListSigRef.current = ""; setMsgs([]); msgsRef.current = []; setLoadingChat(true); setLoadingFresh(false);
     try {
       const r = await fbFetch(`/inbox/archive/thread?user_id=${encodeURIComponent(acc)}&conv_id=${encodeURIComponent(conv_id)}`);
       const d = await r.json();
@@ -412,9 +441,37 @@ export default function InboxPage() {
     finally { setLoadingChat(false); }
   }
 
+  // Hỏi lại mỗi 3s tới khi extension trả nội dung. Hiện tin NGAY khi có (theo số tin tăng),
+  const pollFreshThread = useCallback(async function pollFreshThreadInner(conv_id: string, prevLoadedAt: string | null, attemptsLeft: number) {
+    if (openConvRef.current !== conv_id) return;
+    try {
+      const r = await fbFetch(`/inbox/thread?user_id=${encodeURIComponent(acc)}&conv_id=${encodeURIComponent(conv_id)}`);
+      const d = await r.json();
+      const fresh: Msg[] = d.messages || [];
+      // Có nhiều tin hơn hiện tại → hiện ngay (kể cả khi loaded_at chưa đổi)
+      if (fresh.length > msgsRef.current.length) {
+        setMsgs(fresh); msgsRef.current = fresh;
+        saveThreadCache(conv_id, fresh, d.loaded_at ?? undefined);
+        setLoadingChat(false);
+      }
+      if (d.loaded_at && d.loaded_at !== prevLoadedAt) {
+        setLoadingChat(false); setLoadingFresh(false); return;
+      }
+    } catch { /* ignore, thử lại */ }
+    if (attemptsLeft === 10 && msgsRef.current.length === 0) {
+      fbFetch("/inbox/thread", { method: "POST", headers: fbHeaders(), body: JSON.stringify({ user_id: acc, conv_id }) }).catch(() => {});
+    }
+    if (attemptsLeft <= 1) { setLoadingChat(false); setLoadingFresh(false); return; }
+    setTimeout(() => pollFreshThreadInner(conv_id, prevLoadedAt, attemptsLeft - 1), 3000);
+  }, [acc, saveThreadCache]);
+
+
   async function openChat(conv_id: string) {
     setArchiveReading(false);
-    setOpenConv(conv_id); openConvRef.current = conv_id; setMsgs([]); msgsRef.current = []; setLoadingChat(true);
+    setOpenConv(conv_id); openConvRef.current = conv_id;
+    const currentConv = convs.find(c => c.conv_id === conv_id);
+    openConvListSigRef.current = currentConv ? convListSignature(currentConv) : "";
+    setMsgs([]); msgsRef.current = []; setLoadingChat(true);
 
     const clientCached = clientCacheRef.current.get(conv_id);
     if (clientCached?.length) {
@@ -451,30 +508,6 @@ export default function InboxPage() {
       }
       pollFreshThread(conv_id, prevLoadedAt, 20);
     } catch { setLoadingChat(false); setLoadingFresh(false); }
-  }
-
-  // Hỏi lại mỗi 3s tới khi extension trả nội dung. Hiện tin NGAY khi có (theo số tin tăng),
-  async function pollFreshThread(conv_id: string, prevLoadedAt: string | null, attemptsLeft: number) {
-    if (openConvRef.current !== conv_id) return;
-    try {
-      const r = await fbFetch(`/inbox/thread?user_id=${encodeURIComponent(acc)}&conv_id=${encodeURIComponent(conv_id)}`);
-      const d = await r.json();
-      const fresh: Msg[] = d.messages || [];
-      // Có nhiều tin hơn hiện tại → hiện ngay (kể cả khi loaded_at chưa đổi)
-      if (fresh.length > msgsRef.current.length) {
-        setMsgs(fresh); msgsRef.current = fresh;
-        saveThreadCache(conv_id, fresh, d.loaded_at ?? undefined);
-        setLoadingChat(false);
-      }
-      if (d.loaded_at && d.loaded_at !== prevLoadedAt) {
-        setLoadingChat(false); setLoadingFresh(false); return;
-      }
-    } catch { /* ignore, thử lại */ }
-    if (attemptsLeft === 10 && msgsRef.current.length === 0) {
-      fbFetch("/inbox/thread", { method: "POST", headers: fbHeaders(), body: JSON.stringify({ user_id: acc, conv_id }) }).catch(() => {});
-    }
-    if (attemptsLeft <= 1) { setLoadingChat(false); setLoadingFresh(false); return; }
-    setTimeout(() => pollFreshThread(conv_id, prevLoadedAt, attemptsLeft - 1), 3000);
   }
 
   async function fetchThread(conv_id: string) {
@@ -581,10 +614,19 @@ export default function InboxPage() {
 
   // chưa có cache → tạm dựa vào cờ unread (chưa đọc thường là khách vừa nhắn).
   const needsReply = (c: Conv): boolean => {
+    if (c.unread) return true;
     if (threadLastFrom[c.conv_id]) return threadLastFrom[c.conv_id] === "them";
     return c.unread;
   };
-  const visible = convs.filter(c => !c.deleted && (
+
+  const isActiveInboxConv = (c: Conv): boolean =>
+    c.is_customer ||
+    c.pushed_to_zalo ||
+    c.conv_id === openConv ||
+    isRecentMessengerTime(c.time || "");
+
+  const activeConvs = convs.filter(c => !c.deleted && isActiveInboxConv(c));
+  const visible = activeConvs.filter(c => (
     filter === "unread" ? c.unread :
     filter === "customer" ? c.is_customer :
     filter === "need_reply" ? needsReply(c) :
@@ -601,6 +643,35 @@ export default function InboxPage() {
   const selectedSession = sessions.find(s => s.user_id === acc);
   const accOnline = selectedSession?.status === "online";
   const accPaused = selectedSession?.status === "paused";
+
+  useEffect(() => {
+    if (!openConv || archiveReading) return;
+    const current = convs.find(c => c.conv_id === openConv);
+    if (!current) return;
+    const sig = convListSignature(current);
+    const previousSig = openConvListSigRef.current;
+    openConvListSigRef.current = sig;
+    if (!previousSig || previousSig === sig) return;
+
+    if (!accOnline || needRelogin) return;
+
+    const now = Number(new Date());
+    const last = autoThreadRefreshAtRef.current[openConv] || 0;
+    if (now - last < 12000) return;
+    autoThreadRefreshAtRef.current[openConv] = now;
+    const prevLoadedAt = loadedAtRef.current.get(openConv) ?? null;
+    setLoadingFresh(true);
+    fbFetch("/inbox/thread", {
+      method: "POST",
+      headers: fbHeaders(),
+      body: JSON.stringify({ user_id: acc, conv_id: openConv }),
+    })
+      .then(r => {
+        if (r.ok) pollFreshThread(openConv, prevLoadedAt, 8);
+        else setLoadingFresh(false);
+      })
+      .catch(() => setLoadingFresh(false));
+  }, [convs, openConv, archiveReading, accOnline, needRelogin, acc, pollFreshThread]);
 
   return (
     <div className="p-6 w-full">
@@ -702,7 +773,7 @@ export default function InboxPage() {
                 ))
             ) : (loadingConvs && filtered.length === 0
               ? <div className="text-center text-[#A0A0A0] py-10 text-sm animate-pulse">Đang tải hộp thư của tài khoản...</div>
-              : filtered.length === 0 ? <div className="text-center text-[#A0A0A0] py-10 text-sm">Chưa có hội thoại. Chọn tài khoản rồi bấm &quot;Quét ngay&quot;.</div> :
+              : filtered.length === 0 ? <div className="text-center text-[#A0A0A0] py-10 text-sm">Chưa có hội thoại gần đây. Tin cũ nên lưu khách hoặc để ở lưu trữ.</div> :
               filtered.map(c => (
                 <div key={c.conv_id} className={`border rounded-lg p-3 transition ${openConv === c.conv_id && !archiveReading ? "border-[#E3000F] bg-[#FFF5F5]" : "border-[#E5E5E5]"}`}>
                   <div onClick={() => openChat(c.conv_id)} title="Bấm để mở hội thoại" className="flex justify-between gap-2 cursor-pointer">
