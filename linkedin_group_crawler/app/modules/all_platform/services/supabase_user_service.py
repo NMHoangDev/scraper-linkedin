@@ -2,15 +2,40 @@
 
 from __future__ import annotations
 
+import copy
 import time
 
 from supabase import Client
 
-from app.core.supabase_client import get_supabase_client, reset_supabase_client
+from app.core.supabase_client import execute_supabase_query, get_supabase_client, reset_supabase_client
 
 
 _TEAMS_CACHE: dict[str, object] = {"expires_at": 0.0, "data": []}
 _TEAMS_CACHE_TTL_SECONDS = 60.0
+_TEAM_MEMBERS_CACHE: dict[str, tuple[float, list[dict]]] = {}
+_ALL_USERS_CACHE: dict[str, object] = {"expires_at": 0.0, "data": []}
+_USER_LIST_CACHE_TTL_SECONDS = 60.0
+
+
+def _clone_rows(rows: list[dict]) -> list[dict]:
+    return copy.deepcopy(rows)
+
+
+def _clear_people_caches() -> None:
+    _TEAMS_CACHE["expires_at"] = 0.0
+    _TEAMS_CACHE["data"] = []
+    _TEAM_MEMBERS_CACHE.clear()
+    _ALL_USERS_CACHE["expires_at"] = 0.0
+    _ALL_USERS_CACHE["data"] = []
+
+
+def _clear_auth_cache(user_id: str | None = None, email: str | None = None) -> None:
+    try:
+        from app.modules.all_platform.services.auth_service import clear_user_cache
+
+        clear_user_cache(user_id=user_id, email=email)
+    except Exception:
+        pass
 
 
 def _is_transient_supabase_error(exc: Exception) -> bool:
@@ -50,6 +75,8 @@ def upsert_user(payload: dict) -> dict:
         .upsert(upsert_data, on_conflict="email")
         .execute()
     )
+    _clear_people_caches()
+    _clear_auth_cache(email=payload.get("email"))
     return result.data[0] if result.data else {}
 
 
@@ -63,6 +90,8 @@ def update_user_slug(email: str, slug: str) -> dict:
         .eq("email", email)
         .execute()
     )
+    _clear_people_caches()
+    _clear_auth_cache(email=email)
     return result.data[0] if result.data else {}
 
 
@@ -76,33 +105,52 @@ def update_user_role(email: str, role: str) -> dict:
         .eq("email", email)
         .execute()
     )
+    _clear_people_caches()
+    _clear_auth_cache(email=email)
     return result.data[0] if result.data else {}
 
 
 def get_team_members(leader_id: str) -> list[dict]:
     """Get all members of a leader's team by leader user id."""
-    supabase: Client = get_supabase_client()
+    cache_key = str(leader_id)
+    now = time.monotonic()
+    cached = _TEAM_MEMBERS_CACHE.get(cache_key)
+    if cached and cached[0] > now:
+        return _clone_rows(cached[1])
 
     # Get all teams led by this leader
-    teams_res = supabase.table("teams").select("id").eq("id_leader", leader_id).execute()
+    teams_res = execute_supabase_query(
+        lambda: get_supabase_client().table("teams").select("id").eq("id_leader", leader_id).execute()
+    )
     team_ids = [t["id"] for t in (teams_res.data or [])]
     if not team_ids:
+        _TEAM_MEMBERS_CACHE[cache_key] = (time.monotonic() + _USER_LIST_CACHE_TTL_SECONDS, [])
         return []
 
     # Get all member IDs of those teams
-    mot_res = supabase.table("member_of_teams").select("id_member").in_("id_teams", team_ids).execute()
+    mot_res = execute_supabase_query(
+        lambda: get_supabase_client().table("member_of_teams").select("id_member").in_("id_teams", team_ids).execute()
+    )
     member_ids = list(set([r["id_member"] for r in (mot_res.data or []) if r.get("id_member")]))
 
     if not member_ids:
+        _TEAM_MEMBERS_CACHE[cache_key] = (time.monotonic() + _USER_LIST_CACHE_TTL_SECONDS, [])
         return []
 
-    users_result = (
-        supabase.table("app_users")
-        .select("*")
-        .in_("id", member_ids)
-        .execute()
+    users_result = execute_supabase_query(
+        lambda: (
+            get_supabase_client().table("app_users")
+            .select("*")
+            .in_("id", member_ids)
+            .execute()
+        )
     )
-    return users_result.data or []
+    rows = users_result.data or []
+    _TEAM_MEMBERS_CACHE[cache_key] = (time.monotonic() + _USER_LIST_CACHE_TTL_SECONDS, _clone_rows(rows))
+    if len(_TEAM_MEMBERS_CACHE) > 500:
+        for key in list(_TEAM_MEMBERS_CACHE.keys())[:-500]:
+            _TEAM_MEMBERS_CACHE.pop(key, None)
+    return _clone_rows(rows)
 
 
 def add_team_member(leader_id: str, member_id: str) -> dict:
@@ -126,15 +174,22 @@ def add_team_member(leader_id: str, member_id: str) -> dict:
         .insert({"id_teams": team_id, "id_member": member_id})
         .execute()
     )
+    _clear_people_caches()
     return result.data[0] if result.data else {}
 
 
 def get_all_users() -> list[dict]:
     """Get all users."""
-    supabase: Client = get_supabase_client()
+    now = time.monotonic()
+    cached = _ALL_USERS_CACHE.get("data")
+    if isinstance(cached, list) and cached and float(_ALL_USERS_CACHE.get("expires_at") or 0) > now:
+        return _clone_rows(cached)
 
-    result = supabase.table("app_users").select("*").execute()
-    return result.data or []
+    result = execute_supabase_query(lambda: get_supabase_client().table("app_users").select("*").execute())
+    rows = result.data or []
+    _ALL_USERS_CACHE["data"] = _clone_rows(rows)
+    _ALL_USERS_CACHE["expires_at"] = time.monotonic() + _USER_LIST_CACHE_TTL_SECONDS
+    return _clone_rows(rows)
 
 
 def get_users_by_role(role: str) -> list[dict]:
@@ -316,6 +371,7 @@ def create_team(name_team: str, leader_email_or_id: str, member_emails_or_ids: l
     if mot_records:
         supabase.table("member_of_teams").insert(mot_records).execute()
 
+    _clear_people_caches()
     return [new_team]
 
 
@@ -356,6 +412,7 @@ def update_team(team_name: str, leader_email_or_id: str, member_emails_or_ids: l
     if mot_records:
         supabase.table("member_of_teams").insert(mot_records).execute()
 
+    _clear_people_caches()
     return [{"id": team_id, "name_team": team_name, "id_leader": leader_id}]
 
 
@@ -376,4 +433,5 @@ def delete_team(team_name: str, leader_email_or_id: str) -> int:
 
     # 3. Delete the team
     res = supabase.table("teams").delete().eq("id", team_id).execute()
+    _clear_people_caches()
     return len(res.data) if res.data else 0

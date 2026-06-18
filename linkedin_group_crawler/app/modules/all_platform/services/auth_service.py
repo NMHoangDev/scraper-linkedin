@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+import time
 from threading import Thread
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -15,6 +16,51 @@ from app.core.config import settings
 from app.core.supabase_client import execute_supabase_query, get_supabase_client
 
 _USER_PUBLIC_FIELDS = "id, email, name, role, is_active, created_at, updated_at"
+_USER_CACHE_TTL_SECONDS = 30.0
+_USER_BY_ID_CACHE: dict[str, tuple[float, dict]] = {}
+_USER_BY_EMAIL_CACHE: dict[str, tuple[float, dict]] = {}
+
+
+def _copy_user(user: dict) -> dict:
+    clean = dict(user)
+    clean.pop("password", None)
+    return clean
+
+
+def _cache_user(user: dict) -> dict:
+    clean = _copy_user(user)
+    expires_at = time.monotonic() + _USER_CACHE_TTL_SECONDS
+    user_id = str(clean.get("id") or "")
+    email = str(clean.get("email") or "").lower().strip()
+    if user_id:
+        _USER_BY_ID_CACHE[user_id] = (expires_at, clean)
+    if email:
+        _USER_BY_EMAIL_CACHE[email] = (expires_at, clean)
+    if len(_USER_BY_ID_CACHE) > 1000:
+        for key in list(_USER_BY_ID_CACHE.keys())[:-1000]:
+            _USER_BY_ID_CACHE.pop(key, None)
+    if len(_USER_BY_EMAIL_CACHE) > 1000:
+        for key in list(_USER_BY_EMAIL_CACHE.keys())[:-1000]:
+            _USER_BY_EMAIL_CACHE.pop(key, None)
+    return dict(clean)
+
+
+def _cached_user(cache: dict[str, tuple[float, dict]], key: str) -> Optional[dict]:
+    cached = cache.get(key)
+    if not cached:
+        return None
+    expires_at, user = cached
+    if expires_at <= time.monotonic():
+        cache.pop(key, None)
+        return None
+    return dict(user)
+
+
+def clear_user_cache(user_id: str | None = None, email: str | None = None) -> None:
+    if user_id:
+        _USER_BY_ID_CACHE.pop(str(user_id), None)
+    if email:
+        _USER_BY_EMAIL_CACHE.pop(str(email).lower().strip(), None)
 
 
 def _hash_password(password: str) -> str:
@@ -86,16 +132,17 @@ def register_user(email: str, password: str, name: Optional[str] = None) -> dict
         raise ValueError("Failed to create user")
 
     user = result.data[0]
+    cached_user = _cache_user(user)
     access_token = create_access_token(user["id"], user["email"], user["role"])
 
     _store_session_async(user["id"], access_token)
 
     return {
         "user": {
-            "id": user["id"],
-            "email": user["email"],
-            "name": user.get("name"),
-            "role": user["role"],
+            "id": cached_user["id"],
+            "email": cached_user["email"],
+            "name": cached_user.get("name"),
+            "role": cached_user["role"],
         },
         "access_token": access_token,
     }
@@ -120,16 +167,17 @@ def login_user(email: str, password: str) -> dict:
     if not _verify_password(password, user["password"]):
         raise ValueError("Sai mật khẩu")
 
+    cached_user = _cache_user(user)
     access_token = create_access_token(user["id"], user["email"], user["role"])
 
     _store_session_async(user["id"], access_token)
 
     return {
         "user": {
-            "id": user["id"],
-            "email": user["email"],
-            "name": user.get("name"),
-            "role": user.get("role", "member"),
+            "id": cached_user["id"],
+            "email": cached_user["email"],
+            "name": cached_user.get("name"),
+            "role": cached_user.get("role", "member"),
         },
         "access_token": access_token,
     }
@@ -187,25 +235,29 @@ def _store_session(user_id: str, token: str, user_agent: Optional[str] = None, i
 
 def get_user_by_id(user_id: str) -> Optional[dict]:
     """Get user by ID."""
+    user_key = str(user_id)
+    cached = _cached_user(_USER_BY_ID_CACHE, user_key)
+    if cached:
+        return cached
     result = execute_supabase_query(
-        lambda: get_supabase_client().table("app_users").select(_USER_PUBLIC_FIELDS).eq("id", user_id).execute()
+        lambda: get_supabase_client().table("app_users").select(_USER_PUBLIC_FIELDS).eq("id", user_key).execute()
     )
     if result.data:
-        user = result.data[0]
-        user.pop("password", None)
-        return user
+        return _cache_user(result.data[0])
     return None
 
 
 def get_user_by_email(email: str) -> Optional[dict]:
     """Get user by email."""
+    email_key = email.lower().strip()
+    cached = _cached_user(_USER_BY_EMAIL_CACHE, email_key)
+    if cached:
+        return cached
     result = execute_supabase_query(
-        lambda: get_supabase_client().table("app_users").select(_USER_PUBLIC_FIELDS).eq("email", email.lower().strip()).execute()
+        lambda: get_supabase_client().table("app_users").select(_USER_PUBLIC_FIELDS).eq("email", email_key).execute()
     )
     if result.data:
-        user = result.data[0]
-        user.pop("password", None)
-        return user
+        return _cache_user(result.data[0])
     return None
 
 
@@ -217,8 +269,8 @@ def update_user_profile(user_id: str, updates: dict) -> dict:
         lambda: get_supabase_client().table("app_users").update(safe_updates).eq("id", user_id).execute()
     )
     if result.data:
-        result.data[0].pop("password", None)
-        return result.data[0]
+        clear_user_cache(user_id=user_id)
+        return _cache_user(result.data[0])
     return {}
 
 
@@ -357,6 +409,7 @@ def deactivate_account(user_id: str, password: str) -> None:
         .eq("id", user_id)
         .execute()
     )
+    clear_user_cache(user_id=user_id)
     # Also delete all sessions
     delete_all_sessions(user_id)
 
@@ -384,6 +437,7 @@ def change_password(user_id: str, current_password: str, new_password: str) -> N
         .eq("id", user_id)
         .execute()
     )
+    clear_user_cache(user_id=user_id)
     delete_all_sessions(user_id)
 
 
@@ -403,6 +457,7 @@ def reset_password_without_old(email: str, new_password: str) -> None:
         .eq("id", user_id)
         .execute()
     )
+    clear_user_cache(user_id=user_id, email=email)
     delete_all_sessions(user_id)
 
 
@@ -422,6 +477,7 @@ def promote_to_leader(user_id: str, leader_code: str) -> dict:
     )
     if not result.data:
         raise ValueError("User not found")
+    clear_user_cache(user_id=user_id)
 
     code_id = code_check.get("code_id")
     if code_id:
