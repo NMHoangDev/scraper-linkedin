@@ -20,6 +20,7 @@ import { API_BASE_URL, API_KEY } from "@/lib/env";
 
 const BASE = `${API_BASE_URL}/api/all-platform`;
 const authHeaders = () => ({});
+const AUTH_SUBMIT_TIMEOUT_MS = 12000;
 
 /**
  * Trả về header mặc định cho mọi request — bao gồm:
@@ -55,6 +56,31 @@ async function requestJson<T = any>(
       success: false,
       message: err instanceof Error ? err.message : "Network error",
     };
+  }
+}
+
+async function requestJsonWithTimeout<T = any>(
+  path: string,
+  init: RequestInit | undefined,
+  timeoutMs: number,
+  timeoutMessage: string,
+): Promise<ApiResponse<T>> {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await requestJson<T>(path, {
+      ...init,
+      signal: controller.signal,
+    });
+    if (!res.success && controller.signal.aborted) {
+      return {
+        ...res,
+        message: timeoutMessage,
+      };
+    }
+    return res;
+  } finally {
+    window.clearTimeout(timer);
   }
 }
 
@@ -548,17 +574,27 @@ export const authService = {
     password: string;
     name?: string;
   }): Promise<ApiResponse<AuthLoginResponse>> => {
-    return requestJson(`${BASE}/auth/register`, {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
+    return requestJsonWithTimeout(
+      `${BASE}/auth/register`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+      AUTH_SUBMIT_TIMEOUT_MS,
+      "Đăng ký quá lâu, vui lòng thử lại.",
+    );
   },
 
   login: (payload: { email: string; password: string }): Promise<ApiResponse<AuthLoginResponse>> => {
-    return requestJson(`${BASE}/auth/login`, {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
+    return requestJsonWithTimeout(
+      `${BASE}/auth/login`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+      AUTH_SUBMIT_TIMEOUT_MS,
+      "Đăng nhập quá lâu, vui lòng thử lại.",
+    );
   },
 
   logout: (): Promise<ApiResponse<void>> => {
