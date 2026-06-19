@@ -122,6 +122,7 @@ export interface ZaloCrawlerSummary {
 
 export interface ZaloCrawlerFlowValue {
   userId: string;
+  ownerId: string;
   email: string | null;
   selectedWorkerId: string;
   workers: ZaloWorkerInfo[];
@@ -593,14 +594,18 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
     try {
       const linkedInEmail = window?.localStorage?.getItem("linkedin_crawler_email");
       const currentOwnerId = linkedInEmail ? normalizeZaloUserId(linkedInEmail) : "default";
-      const response = await getZaloAccounts(currentOwnerId, appUser?.id);
+      const response = await getZaloAccounts(currentOwnerId, {
+        idMember: appUser?.id,
+        email: appUser?.email || undefined,
+        role: appUser?.role || undefined,
+      });
       setAccounts(response.accounts ?? []);
     } catch (error) {
       setAccountsError(error instanceof Error ? error.message : "Không thể tải danh sách tài khoản Zalo.");
     } finally {
       setIsLoadingAccounts(false);
     }
-  }, [appUser?.id]);
+  }, [appUser?.email, appUser?.id, appUser?.role]);
 
   useEffect(() => {
     if (!isUserIdReady) return;
@@ -1622,6 +1627,7 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
 
   return {
     userId,
+    ownerId: userId,
     email,
     selectedWorkerId,
     workers,

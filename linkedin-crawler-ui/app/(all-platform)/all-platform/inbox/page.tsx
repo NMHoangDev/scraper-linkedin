@@ -203,6 +203,8 @@ export default function InboxPage() {
   const [extInstalled, setExtInstalled] = useState<boolean | null>(null);
   const [convs, setConvs] = useState<Conv[]>([]);
   const [archives, setArchives] = useState<ArchiveConv[]>([]);
+  const [customerNotes, setCustomerNotes] = useState<Record<string, string>>({});
+  const [savingNoteConv, setSavingNoteConv] = useState("");
   const [loadingConvs, setLoadingConvs] = useState(false);
   const [filter, setFilter] = useState<"all" | "unread" | "customer" | "need_reply">("all");
   const [viewMode, setViewMode] = useState<"inbox" | "archive">("inbox");
@@ -258,6 +260,7 @@ export default function InboxPage() {
     setReply("");
     setThreadLastFrom({});
     setConvs([]); setArchives([]);
+    setCustomerNotes({});
     setNeedRelogin(false);
     setLoadingChat(false); setLoadingFresh(false); setLoadingArchives(false);
     setLoadingConvs(!!uid);
@@ -472,7 +475,15 @@ export default function InboxPage() {
       const r = await fbFetch(`/inbox/archive?user_id=${encodeURIComponent(requestAcc)}&limit=200`);
       const d = await r.json();
       if (selectedAccRef.current !== requestAcc || archivesRequestSeqRef.current !== requestSeq) return;
-      setArchives(d.archives || []);
+      const list: ArchiveConv[] = d.archives || [];
+      setArchives(list);
+      setCustomerNotes(prev => {
+        const next = { ...prev };
+        for (const item of list) {
+          if (item?.conv_id && typeof item.note === "string") next[item.conv_id] = item.note;
+        }
+        return next;
+      });
     } catch { /* ignore */ }
     finally {
       if (selectedAccRef.current === requestAcc && archivesRequestSeqRef.current === requestSeq) {
@@ -539,6 +550,10 @@ export default function InboxPage() {
       if (timer) clearTimeout(timer);
     };
   }, [acc, loadConvs]);
+  useEffect(() => {
+    if (!acc) return;
+    loadArchives();
+  }, [acc, loadArchives]);
   useEffect(() => {
     if (!acc || viewMode !== "archive") return;
     loadArchives();
@@ -639,6 +654,7 @@ export default function InboxPage() {
           archive_reason: hide ? "hidden_from_inbox" : "saved_customer",
           mark_customer: !hide,
           hide,
+          note: customerNotes[conv_id] || undefined,
         }),
       });
       const d = await r.json().catch(() => ({}));
@@ -649,12 +665,70 @@ export default function InboxPage() {
         if (!entry) return prev;
         return [entry, ...prev.filter(x => x.conv_id !== conv_id)];
       });
+      if (typeof (d.archive as ArchiveConv | undefined)?.note === "string") {
+        setCustomerNotes(prev => ({ ...prev, [conv_id]: (d.archive as ArchiveConv).note || "" }));
+      }
       if (hide && openConvRef.current === conv_id) {
         setOpenConv(""); openConvRef.current = ""; openConvListSigRef.current = ""; setArchiveReading(false); setMsgs([]); msgsRef.current = [];
       }
       showToast(hide ? "Đã ẩn khỏi hộp thư và lưu trữ" : "Đã lưu khách vào kho lưu trữ", true);
       if (viewMode === "archive") loadArchives();
     } catch { showToast("Không kết nối được", false); }
+  }
+
+  async function saveCustomerNote(conv_id: string, note: string) {
+    const accountId = selectedAccRef.current || acc;
+    if (!accountId || !conv_id) return;
+    const previous = customerNotes[conv_id] || "";
+    const cleanNote = note.trim();
+    setSavingNoteConv(conv_id);
+    setCustomerNotes(prev => ({ ...prev, [conv_id]: cleanNote }));
+    try {
+      const currentConv = convs.find(c => c.conv_id === conv_id);
+      const currentArchive = archives.find(a => a.conv_id === conv_id);
+      const r = await fbFetch("/inbox/archive", {
+        method: "POST",
+        headers: fbHeaders(),
+        body: JSON.stringify({
+          user_id: accountId,
+          conv_id,
+          archive_reason: currentArchive?.archive_reason || "customer_note",
+          mark_customer: false,
+          hide: false,
+          note: cleanNote,
+        }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setCustomerNotes(prev => ({ ...prev, [conv_id]: previous }));
+        showToast(d.detail || "Không lưu được ghi chú", false);
+        return;
+      }
+      const entry = d.archive as ArchiveConv | undefined;
+      setArchives(prev => {
+        const fallback: ArchiveConv = {
+          ...(currentArchive || {}),
+          conv_id,
+          name: currentArchive?.name || currentConv?.name || conv_id,
+          preview: currentArchive?.preview || currentConv?.preview || "",
+          time: currentArchive?.time || currentConv?.time || "",
+          archive_reason: currentArchive?.archive_reason || "customer_note",
+          note: cleanNote,
+          last_saved_at: new Date().toISOString(),
+          is_customer: currentArchive?.is_customer ?? currentConv?.is_customer,
+          pushed_to_zalo: currentArchive?.pushed_to_zalo ?? currentConv?.pushed_to_zalo,
+        };
+        const saved = entry || fallback;
+        return [saved, ...prev.filter(x => x.conv_id !== conv_id)];
+      });
+      setCustomerNotes(prev => ({ ...prev, [conv_id]: typeof entry?.note === "string" ? entry.note : cleanNote }));
+      showToast(cleanNote ? "Đã lưu ghi chú khách" : "Đã xóa ghi chú khách", true);
+    } catch {
+      setCustomerNotes(prev => ({ ...prev, [conv_id]: previous }));
+      showToast("Không kết nối được", false);
+    } finally {
+      setSavingNoteConv(prev => prev === conv_id ? "" : prev);
+    }
   }
 
   async function openArchive(conv_id: string) {
@@ -970,6 +1044,8 @@ export default function InboxPage() {
         openConv={openConv}
         msgs={msgs}
         reply={reply}
+        customerNotes={customerNotes}
+        savingNoteConv={savingNoteConv}
         toast={toast}
         chatScrollRef={chatScrollRef}
         selectAcc={selectAcc}
@@ -982,6 +1058,7 @@ export default function InboxPage() {
         openArchive={openArchive}
         mark={mark}
         saveArchive={saveArchive}
+        saveCustomerNote={saveCustomerNote}
         sendReply={sendReply}
         needsReply={needsReply}
         accLabel={accLabel}

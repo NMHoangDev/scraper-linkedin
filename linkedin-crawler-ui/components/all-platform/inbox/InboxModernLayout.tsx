@@ -42,6 +42,8 @@ interface Props {
   openConv: string;
   msgs: Msg[];
   reply: string;
+  customerNotes: Record<string, string>;
+  savingNoteConv: string;
   toast: { msg: string; ok: boolean } | null;
   chatScrollRef: RefObject<HTMLDivElement | null>;
   selectAcc: (uid: string) => void;
@@ -54,6 +56,7 @@ interface Props {
   openArchive: (convId: string) => void;
   mark: (convId: string, field: string, value: boolean) => void;
   saveArchive: (convId: string, hide?: boolean) => void;
+  saveCustomerNote: (convId: string, note: string) => void;
   sendReply: () => void;
   needsReply: (conv: Conv) => boolean;
   accLabel: (session: Session) => string;
@@ -146,6 +149,8 @@ export default function InboxModernLayout(props: Props) {
     openConv,
     msgs,
     reply,
+    customerNotes,
+    savingNoteConv,
     toast,
     chatScrollRef,
     selectAcc,
@@ -158,6 +163,7 @@ export default function InboxModernLayout(props: Props) {
     openArchive,
     mark,
     saveArchive,
+    saveCustomerNote,
     sendReply,
     needsReply,
     accLabel,
@@ -171,7 +177,13 @@ export default function InboxModernLayout(props: Props) {
   const selectedArchive = archives.find(a => a.conv_id === openConv);
   const selectedName = archiveReading ? selectedArchive?.name : selectedConv?.name;
   const selectedPreview = archiveReading ? selectedArchive?.preview : selectedConv?.preview;
+  const selectedNote = openConv ? (customerNotes[openConv] ?? selectedArchive?.note ?? "") : "";
   const activeTemplateGroup = QUICK_REPLY_GROUPS.find(group => group.id === templateGroupId) || QUICK_REPLY_GROUPS[0];
+  const [noteDraftState, setNoteDraftState] = useState({ convId: "", value: "" });
+  const noteDraft = noteDraftState.convId === openConv ? noteDraftState.value : selectedNote;
+  const setNoteDraft = (value: string) => setNoteDraftState({ convId: openConv, value });
+
+  const noteChanged = noteDraft.trim() !== selectedNote.trim();
 
   const stats = useMemo(() => {
     const unread = activeConvs.filter(c => c.unread).length;
@@ -507,6 +519,34 @@ export default function InboxModernLayout(props: Props) {
                       <div className="text-xs font-bold uppercase text-[#A0A0A0]">Tên hội thoại</div>
                       <div className="mt-1 text-sm font-black">{selectedName || openConv}</div>
                       <div className="mt-1 text-xs text-[#A0A0A0]">{selectedPreview || "Chưa có preview"}</div>
+                    </div>
+                    <div className="rounded-lg border border-[#E5E5E5] bg-[#FFFDF7] p-3">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <div>
+                          <div className="text-xs font-bold uppercase text-[#A0A0A0]">Ghi chú nhu cầu</div>
+                          <div className="text-[11px] text-[#A0A0A0]">Lưu điểm cần nhớ về khách này.</div>
+                        </div>
+                        {selectedNote && !noteChanged && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">đã lưu</span>}
+                      </div>
+                      <textarea
+                        value={noteDraft}
+                        onChange={e => setNoteDraft(e.target.value)}
+                        disabled={!openConv || savingNoteConv === openConv}
+                        rows={5}
+                        maxLength={1000}
+                        placeholder="VD: khách cần app booking, muốn báo giá trong tuần, đã xin Zalo..."
+                        className="w-full resize-none rounded-lg border border-[#E5E5E5] bg-white px-3 py-2 text-sm leading-relaxed outline-none transition focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 disabled:cursor-not-allowed disabled:bg-[#F5F5F5]"
+                      />
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-[#A0A0A0]">{noteDraft.trim().length}/1000</span>
+                        <button
+                          onClick={() => saveCustomerNote(openConv, noteDraft)}
+                          disabled={!openConv || savingNoteConv === openConv || !noteChanged}
+                          className="rounded-lg bg-[#E3000F] px-3 py-1.5 text-xs font-black text-white transition hover:bg-[#C40009] disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {savingNoteConv === openConv ? "Đang lưu..." : "Lưu ghi chú"}
+                        </button>
+                      </div>
                     </div>
                     {selectedConv && !archiveReading && (
                       <div className="grid gap-2">
