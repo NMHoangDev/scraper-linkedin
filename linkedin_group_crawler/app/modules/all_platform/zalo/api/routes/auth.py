@@ -33,7 +33,11 @@ from app.modules.all_platform.zalo.services.session_store import (
     get_session,
     save_session,
 )
-from app.modules.all_platform.zalo.services.supabase_service import upsert_zalo_user, upsert_zalo_account
+from app.modules.all_platform.zalo.services.supabase_service import (
+    get_zalo_account_by_id,
+    upsert_zalo_account,
+    upsert_zalo_user,
+)
 from app.modules.all_platform.zalo.services.zca_auth_store import (
     delete_zca_auth,
     ensure_session_zca_auth,
@@ -161,17 +165,30 @@ async def _remember_zalo_user(
     status: str, 
     worker_id: Optional[str] = None, 
     cookie: Optional[str] = None,
-    owner_id: Optional[str] = None
+    owner_id: Optional[str] = None,
+    id_member: Optional[str] = None,
 ) -> None:
     try:
-        await upsert_zalo_user(user_id, status=status, assigned_worker_id=worker_id, cookie=cookie)
+        await upsert_zalo_user(
+            user_id,
+            status=status,
+            assigned_worker_id=worker_id,
+            cookie=cookie,
+            id_member=id_member,
+        )
     except Exception as exc:
         logger.warning(f"Could not upsert Zalo user metadata for user={user_id}: {exc}")
     try:
+        existing = await get_zalo_account_by_id(user_id) or {}
+        resolved_owner_id = owner_id or existing.get("owner_id") or user_id
+        resolved_member_id = id_member or existing.get("id_member")
         await upsert_zalo_account(
             account_id=user_id,
-            owner_id=owner_id or user_id,
-            status=status
+            owner_id=resolved_owner_id,
+            id_member=resolved_member_id,
+            label=existing.get("label") or user_id,
+            phone=existing.get("phone"),
+            status=status,
         )
     except Exception as exc:
         logger.warning(f"Could not upsert Zalo account metadata for account={user_id}: {exc}")
@@ -1213,6 +1230,7 @@ async def import_session_from_extension(
     raw_user_id = body.get("account_id") or body.get("user_id") or x_user_id
     user_id = _normalize_user_id(raw_user_id)
     owner_id = _normalize_user_id(body.get("owner_id") or x_user_id)
+    id_member = _normalize_user_id(body.get("id_member") or owner_id)
 
     # ── Parse cookies: accept 4 formats ────────────────────────────────
     #   1. List of {key, value, domain, ...}  (Chrome extension native format)
@@ -1315,6 +1333,7 @@ async def import_session_from_extension(
         "userAgent": user_agent,
         "zaloId": user_id,
         "ownerId": owner_id,
+        "idMember": id_member,
         "source": "extension",
     }
 
@@ -1346,7 +1365,14 @@ async def import_session_from_extension(
         logger.warning(f"Could not start ZCA persistent listener for user={user_id} after extension import: {exc}")
 
     cookie_str = "; ".join(f"{c.get('key')}={c.get('value')}" for c in parsed_cookies if c.get("key") and c.get("value") is not None)
-    await _remember_zalo_user(user_id, "confirmed", x_zalo_worker_id, cookie=cookie_str, owner_id=owner_id)
+    await _remember_zalo_user(
+        user_id,
+        "confirmed",
+        x_zalo_worker_id,
+        cookie=cookie_str,
+        owner_id=owner_id,
+        id_member=id_member,
+    )
 
     cookie_keys_str = ", ".join(sorted(cookie_keys))
     logger.info(

@@ -376,10 +376,12 @@ async function main() {
 
   let stopping = false;
   let oldMessageTimer = null;
+  let oldMessageKickoffTimer = null;
 
   const stop = (signal) => {
     if (stopping) return;
     stopping = true;
+    if (oldMessageKickoffTimer) clearTimeout(oldMessageKickoffTimer);
     if (oldMessageTimer) clearInterval(oldMessageTimer);
     emit({ event: "stopping", user_id: userId, signal });
     try {
@@ -402,12 +404,22 @@ async function main() {
 
   listener.on("connected", () => {
     emit({ event: "connected", user_id: userId, own_id: typeof api.getOwnId === "function" ? api.getOwnId() : null });
+<<<<<<< HEAD
     // NOTE: requestOldMessages DISABLED - Python startup sync (_sync_recent_groups_after_connect)
     // handles old message loading with rate-limiting. Calling it here floods Zalo WebSocket
     // and causes "Separator is found" crashes from massive message bursts.
     // if (!oldMessageTimer) {
     //   oldMessageTimer = setInterval(() => requestOldMessages(listener), oldMessageIntervalMs);
     // }
+=======
+    if (!oldMessageTimer && !oldMessageKickoffTimer) {
+      oldMessageKickoffTimer = setTimeout(() => {
+        oldMessageKickoffTimer = null;
+        requestOldMessages(listener);
+        oldMessageTimer = setInterval(() => requestOldMessages(listener), oldMessageIntervalMs);
+      }, oldMessageIntervalMs);
+    }
+>>>>>>> 75f597e4d99d89a561e46550fe81736418598d71
   });
   listener.on("disconnected", (code, reason) => {
     emit({ event: "disconnected", user_id: userId, code, reason: reason ? String(reason) : null });

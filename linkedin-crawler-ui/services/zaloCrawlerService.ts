@@ -102,6 +102,7 @@ export function updateZaloAccount(
   accountId: string,
   payload: {
     owner_id?: string;
+    id_member?: string;
     label?: string;
     phone?: string;
     status?: string;
@@ -113,10 +114,12 @@ export function updateZaloAccount(
   });
 }
 
-export function deleteZaloAccount(accountId: string, deleteAuth = false) {
+export function deleteZaloAccount(accountId: string, deleteAuth = false, ownerId?: string) {
   const params = new URLSearchParams({ delete_auth: String(deleteAuth) });
+  if (ownerId) params.set("owner_id", ownerId);
   return requestJson(`/api/all-platform/zalo/accounts/${encodeURIComponent(accountId)}?${params.toString()}`, {
     method: "DELETE",
+    headers: ownerId ? { "X-User-ID": ownerId } : undefined,
   });
 }
 

@@ -15,11 +15,12 @@ import { fbFetch, fbHeaders, getFbProvisionConfig } from "@/lib/markee-fb-api";
 import { API_BASE_URL } from "@/lib/env";
 import { idbSetThread, idbGetAllThreadsForAcc, idbSetConvs, idbGetConvs, idbPruneOld } from "@/lib/inbox-cache";
 import TeamAccountTree from "@/components/all-platform/inbox/TeamAccountTree";
+import InboxModernLayout from "@/components/all-platform/inbox/InboxModernLayout";
 
 interface Session { user_id: string; fb_user_id?: string; label?: string; owner?: string; online?: boolean; inbox_enabled?: boolean; status?: string; }
 interface Conv { conv_id: string; name: string; preview: string; unread: boolean; time: string; is_customer: boolean; pushed_to_zalo: boolean; deleted: boolean; archived?: boolean; archived_at?: string; }
 interface ArchiveConv { conv_id: string; name: string; preview?: string; time?: string; archived_at?: string; last_saved_at?: string; archive_reason?: string; outcome?: string; note?: string; messages_count?: number; archived_by_name?: string; is_customer?: boolean; pushed_to_zalo?: boolean; }
-interface Msg { from: "me" | "them"; text: string; time: string; }
+interface Msg { from: "me" | "them"; text: string; time: string; clientId?: string; }
 interface UserRow { id?: string; email?: string; name?: string; }
 interface TeamRow { id?: string; name_team?: string; id_leader?: string; leader_name?: string; leader_email?: string; members?: UserRow[]; }
 
@@ -80,7 +81,7 @@ function normalizeMsgText(value: string): string {
 }
 
 function exactMsgKey(message: Msg): string {
-  return `${message.from}|${normalizeMsgText(message.text)}|${(message.time || "").trim()}`;
+  return `${message.from}|${normalizeMsgText(message.text)}|${(message.time || "").trim()}|${message.clientId || ""}`;
 }
 
 function isSendingStatus(time: string): boolean {
@@ -104,6 +105,21 @@ function isOppositeEcho(current: Msg, previous: Msg): boolean {
   return isSendingStatus(current.time) || isSendingStatus(previous.time) || !current.time || !previous.time;
 }
 
+function isSameDirectionPendingEcho(current: Msg, previous: Msg): boolean {
+  if (!current.text || !previous.text || current.from !== previous.from) return false;
+  if (normalizeMsgText(current.text) !== normalizeMsgText(previous.text)) return false;
+  if (current.clientId && previous.clientId && current.clientId !== previous.clientId) return false;
+  if (current.clientId || previous.clientId) return true;
+  return !current.time || !previous.time;
+}
+
+function preferCurrentThreadMessage(current: Msg, previous: Msg): boolean {
+  const currentStable = !!current.time && !isSendingStatus(current.time);
+  const previousStable = !!previous.time && !isSendingStatus(previous.time);
+  if (currentStable !== previousStable) return currentStable;
+  return !previous.clientId && !!current.clientId;
+}
+
 function normalizeThreadMessages(list: Msg[]): Msg[] {
   const out: Msg[] = [];
   const exact = new Set<string>();
@@ -118,6 +134,22 @@ function normalizeThreadMessages(list: Msg[]): Msg[] {
 
     const exactKey = exactMsgKey(msg);
     if (exact.has(exactKey)) continue;
+
+    let sameDirectionIndex = -1;
+    for (let i = out.length - 1; i >= 0; i -= 1) {
+      if (isSameDirectionPendingEcho(msg, out[i])) {
+        sameDirectionIndex = i;
+        break;
+      }
+    }
+    if (sameDirectionIndex >= 0) {
+      if (preferCurrentThreadMessage(msg, out[sameDirectionIndex])) {
+        exact.delete(exactMsgKey(out[sameDirectionIndex]));
+        out[sameDirectionIndex] = msg;
+        exact.add(exactKey);
+      }
+      continue;
+    }
 
     let echoIndex = -1;
     for (let i = out.length - 1; i >= 0; i -= 1) {
@@ -508,6 +540,7 @@ export default function InboxPage() {
     const isOnline = sessions.find(s => s.user_id === acc)?.status === "online";
     if (!isOnline || needRelogin) return;
     const silentScan = () => {
+      if (document.hidden) return;
       if (scanInFlightRef.current) return;
       const now = Date.now();
       const last = lastSilentScanAtRef.current[acc] || 0;
@@ -727,6 +760,7 @@ export default function InboxPage() {
   useEffect(() => {
     if (!openConv || !acc) return;
     const t = setInterval(async () => {
+      if (document.hidden) return;
       const reqN = msgsRef.current.length;
       try {
         const url = reqN === 0
@@ -782,8 +816,8 @@ export default function InboxPage() {
     if (needRelogin) { showToast("Cookie tài khoản đã hết hạn — đăng nhập lại trước khi gửi.", false); return; }
     replyInFlightRef.current = true;
     setReply("");
-    const normText = normalizeMsgText(text);
-    const optimistic: Msg = { from: "me", text, time: "Đang gửi..." };
+    const clientId = `reply-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const optimistic: Msg = { from: "me", text, time: "Đang gửi...", clientId };
     setMsgs(prev => {
       const next = normalizeThreadMessages([...prev, optimistic]);
       msgsRef.current = next;
@@ -793,9 +827,8 @@ export default function InboxPage() {
       if (openConvRef.current !== convIdForSend) return;
       setMsgs(prev => {
         const next = normalizeThreadMessages(prev.map(m => {
-          const sameOptimistic = m === optimistic;
-          const samePendingText = m.from === "me" && normalizeMsgText(m.text) === normText && isSendingStatus(m.time);
-          return sameOptimistic || samePendingText ? { ...m, time: t } : m;
+          const sameOptimistic = m === optimistic || m.clientId === clientId;
+          return sameOptimistic ? { ...m, time: t } : m;
         }));
         msgsRef.current = next;
         return next;
@@ -896,6 +929,53 @@ export default function InboxPage() {
       })
       .catch(() => setLoadingFresh(false));
   }, [convs, openConv, archiveReading, accOnline, needRelogin, acc, pollFreshThread]);
+
+  if (process.env.NEXT_PUBLIC_INBOX_LEGACY_UI !== "1") {
+    return (
+      <InboxModernLayout
+        role={role}
+        owner={owner}
+        sessions={sessions}
+        ownerNames={ownerNames}
+        teams={teams}
+        acc={acc}
+        accOnline={!!accOnline}
+        accPaused={!!accPaused}
+        needRelogin={needRelogin}
+        connErr={connErr}
+        extInstalled={extInstalled}
+        scanning={scanning}
+        loadingConvs={loadingConvs}
+        loadingArchives={loadingArchives}
+        loadingChat={loadingChat}
+        loadingFresh={loadingFresh}
+        archiveReading={archiveReading}
+        viewMode={viewMode}
+        filter={filter}
+        activeConvs={activeConvs}
+        filtered={filtered}
+        archives={archives}
+        openConv={openConv}
+        msgs={msgs}
+        reply={reply}
+        toast={toast}
+        chatScrollRef={chatScrollRef}
+        selectAcc={selectAcc}
+        scan={scan}
+        setViewMode={setViewMode}
+        setArchiveReading={setArchiveReading}
+        setFilter={setFilter}
+        setReply={setReply}
+        openChat={openChat}
+        openArchive={openArchive}
+        mark={mark}
+        saveArchive={saveArchive}
+        sendReply={sendReply}
+        needsReply={needsReply}
+        accLabel={accLabel}
+      />
+    );
+  }
 
   return (
     <div className="p-6 w-full">

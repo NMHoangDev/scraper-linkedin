@@ -113,7 +113,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("ZALO_ASSET_CLEANUP_BATCH_SIZE", "ASSET_CLEANUP_BATCH_SIZE"),
     )
     zca_old_message_interval_ms: int = Field(
-        default=60000,
+        default=300000,
         validation_alias=AliasChoices("ZALO_ZCA_OLD_MESSAGE_INTERVAL_MS", "ZCA_OLD_MESSAGE_INTERVAL_MS"),
     )
 

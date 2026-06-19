@@ -18,6 +18,7 @@ from app.modules.all_platform.zalo.services.supabase_service import (
 from app.modules.all_platform.zalo.config import settings
 from app.modules.all_platform.zalo.services.zca_api_bridge import (
     get_zca_group_history,
+    get_zca_user_history,
     list_zca_groups,
     list_zca_friends,
 )
@@ -29,11 +30,120 @@ _supabase_group_name_cache: Dict[Tuple[str, str], str] = {}
 
 
 _CACHE_LIMIT_PER_GROUP = 1000
-_RESTART_BACKOFFS = [3, 8, 20, 45, 90]
-_STARTUP_SYNC_GROUP_LIMIT = 5  # giảm từ 12 → 5 để tránh Zalo rate-limit (429)
-_STARTUP_SYNC_MESSAGE_COUNT = 30  # giảm từ 80 → 30
+_RESTART_BACKOFFS = [5, 15, 45, 120, 300]
+_STARTUP_SYNC_GROUP_LIMIT = 20
+_STARTUP_SYNC_MESSAGE_COUNT = 50
 _STARTUP_SYNC_TIMEOUT_MS = 25000
-_STARTUP_SYNC_PER_GROUP_DELAY_S = 1.5  # delay giữa các group, tránh spam Zalo API
+_STARTUP_SYNC_PER_GROUP_DELAY_S = 2.0  # tăng từ 1.5 → 2.0 cho ổn định hơn
+
+# Global semaphore: giới hạn concurrent Zalo API calls để tránh burst overload.
+_ZALO_API_SEMAPHORE = asyncio.Semaphore(2)
+
+
+def _is_rate_limited(exc_text: str) -> bool:
+    """Detect rate limit (429) errors from various error message formats."""
+    lowered = exc_text.lower()
+    return any(marker in lowered for marker in ("429", "too many requests", "rate limit", "rate_limit", "ratelimit"))
+
+
+class AdaptiveRateLimiter:
+    """Adaptive rate limiter tự điều chỉnh delay dựa trên phản hồi Zalo API.
+
+    Cơ chế:
+    - Base delay: 4s (khoảng cách tối thiểu giữa 2 API call)
+    - Khi bị 429: delay x2 (tối đa 120s) + cooldown period 60-300s
+    - Khi thành công liên tục: delay giảm dần về base (mỗi 5 success giảm 20%)
+    - Jitter: thêm ±30% random để tránh synchronized bursts
+    """
+
+    def __init__(self, base_delay: float = 4.0, max_delay: float = 120.0) -> None:
+        self._base_delay = base_delay
+        self._max_delay = max_delay
+        self._current_delay = base_delay
+        self._consecutive_success = 0
+        self._consecutive_429 = 0
+        self._total_429 = 0
+        self._cooldown_until: float = 0.0  # epoch timestamp
+        self._lock = asyncio.Lock()
+
+    @property
+    def stats(self) -> Dict[str, Any]:
+        import time
+        cooldown_remaining = max(0, self._cooldown_until - time.time())
+        return {
+            "current_delay_s": round(self._current_delay, 1),
+            "consecutive_success": self._consecutive_success,
+            "consecutive_429": self._consecutive_429,
+            "total_429": self._total_429,
+            "cooldown_remaining_s": round(cooldown_remaining, 1),
+        }
+
+    async def wait(self) -> float:
+        """Wait the adaptive delay before making the next API call. Returns actual delay used."""
+        import random
+        import time
+
+        async with self._lock:
+            # Nếu đang trong cooldown period, chờ hết cooldown.
+            now = time.time()
+            if now < self._cooldown_until:
+                cooldown_wait = self._cooldown_until - now
+                logger.info(
+                    f"AdaptiveRateLimiter: in cooldown, waiting {cooldown_wait:.0f}s "
+                    f"(total_429={self._total_429})"
+                )
+                await asyncio.sleep(cooldown_wait)
+
+            # Jitter ±30%
+            jitter_factor = 1.0 + random.uniform(-0.3, 0.3)
+            delay = self._current_delay * jitter_factor
+            delay = max(self._base_delay * 0.5, min(delay, self._max_delay))
+
+        await asyncio.sleep(delay)
+        return delay
+
+    async def record_success(self) -> None:
+        """Record a successful API call."""
+        async with self._lock:
+            self._consecutive_success += 1
+            self._consecutive_429 = 0
+            # Mỗi 5 success liên tục → giảm delay 20%, floor = base_delay
+            if self._consecutive_success >= 5:
+                self._current_delay = max(self._base_delay, self._current_delay * 0.8)
+                self._consecutive_success = 0
+
+    async def record_rate_limit(self) -> None:
+        """Record a 429 rate limit error. Increases delay significantly."""
+        import time
+
+        async with self._lock:
+            self._consecutive_429 += 1
+            self._total_429 += 1
+            self._consecutive_success = 0
+
+            # Delay x2 mỗi lần bị 429 (tối đa max_delay)
+            self._current_delay = min(self._max_delay, self._current_delay * 2.0)
+
+            # Cooldown period: 60s cho lần 429 đầu, tăng dần tối đa 300s
+            cooldown_s = min(300, 60 * self._consecutive_429)
+            self._cooldown_until = time.time() + cooldown_s
+
+            logger.warning(
+                f"AdaptiveRateLimiter: 429 detected! "
+                f"delay={self._current_delay:.0f}s, cooldown={cooldown_s}s, "
+                f"consecutive_429={self._consecutive_429}, total_429={self._total_429}"
+            )
+
+    async def record_error(self) -> None:
+        """Record a non-rate-limit error. Slightly increases delay."""
+        async with self._lock:
+            self._consecutive_success = 0
+            # Tăng nhẹ delay (+25%) cho lỗi thường
+            self._current_delay = min(self._max_delay, self._current_delay * 1.25)
+
+
+# Global rate limiter — shared giữa startup sync và background backfill.
+_RATE_LIMITER = AdaptiveRateLimiter(base_delay=4.0, max_delay=120.0)
 
 # Marker cho biết cookie/session Zalo đã hết hạn — không cố restart vô ích nữa.
 _AUTH_EXPIRED_MARKERS = (
@@ -145,6 +255,7 @@ class ListenerState:
     auth_expired: bool = False
     group_names: Dict[str, str] = field(default_factory=dict)
     reconnect_sync_task: Optional[asyncio.Task] = None
+    backfill_task: Optional[asyncio.Task] = None
 
 
 class ZcaPersistentListenerManager:
@@ -271,24 +382,37 @@ class ZcaPersistentListenerManager:
                     if str(group_id).strip()
                 ]
 
-                group_ids = list(dict.fromkeys([*cached_group_ids, *known_group_ids]))[:
-                    _STARTUP_SYNC_GROUP_LIMIT
+                group_ids = list(dict.fromkeys([*cached_group_ids, *known_group_ids]))[
+                    :_STARTUP_SYNC_GROUP_LIMIT
                 ]
 
                 if not group_ids:
                     logger.info(f"ZCA listener startup sync skipped user={state.user_id}: no known groups")
                     return
 
-                logger.info(f"ZCA listener startup sync user={state.user_id} groups={group_ids}")
+                logger.info(
+                    f"ZCA listener startup sync user={state.user_id} "
+                    f"groups={group_ids} rate_limiter={_RATE_LIMITER.stats}"
+                )
 
                 for idx, group_id in enumerate(group_ids):
+                    if not state.desired or not state.connected:
+                        break
                     try:
-                        # Ưu tiên getGroupChatHistory vì nó lấy đúng lịch sử của 1 group cụ thể.
-                        messages = await get_zca_group_history(
-                            state.auth or {},
-                            group_id,
-                            count=_STARTUP_SYNC_MESSAGE_COUNT,
-                        )
+                        is_group = group_id.strip().startswith("g")
+                        async with _ZALO_API_SEMAPHORE:
+                            if is_group:
+                                messages = await get_zca_group_history(
+                                    state.auth or {},
+                                    group_id,
+                                    count=_STARTUP_SYNC_MESSAGE_COUNT,
+                                )
+                            else:
+                                messages = await get_zca_user_history(
+                                    state.auth or {},
+                                    group_id,
+                                    count=_STARTUP_SYNC_MESSAGE_COUNT,
+                                )
 
                         messages = _sort_messages_old_to_new(messages)
 
@@ -322,24 +446,193 @@ class ZcaPersistentListenerManager:
                             logger.info(
                                 f"ZCA listener startup sync empty user={state.user_id} group={group_id}"
                             )
+                        await _RATE_LIMITER.record_success()
                     except Exception as exc:
-                        logger.warning(
-                            f"Startup sync failed for user={state.user_id} group={group_id}: {exc}"
-                        )
+                        err_str = str(exc).lower()
+                        if _is_rate_limited(err_str):
+                            await _RATE_LIMITER.record_rate_limit()
+                            logger.warning(
+                                f"Startup sync rate-limited for user={state.user_id} "
+                                f"group={group_id}, will use adaptive delay"
+                            )
+                        elif _looks_like_auth_expired(err_str):
+                            state.auth_expired = True
+                            logger.warning(f"Auth expired during startup sync for user={state.user_id}")
+                            return
+                        else:
+                            await _RATE_LIMITER.record_error()
+                            logger.warning(
+                                f"Startup sync failed for user={state.user_id} group={group_id}: {exc}"
+                            )
 
-                    # Delay giữa các group để tránh Zalo rate-limit (429).
-                    # Listener vẫn nhận message realtime qua socket nên delay
-                    # này không ảnh hưởng UX, chỉ làm chậm first-time backfill.
+                    # Adaptive delay giữa các group (thay vì fixed delay).
                     if idx < len(group_ids) - 1:
-                        await asyncio.sleep(_STARTUP_SYNC_PER_GROUP_DELAY_S)
+                        delay = await _RATE_LIMITER.wait()
+                        logger.debug(
+                            f"Startup sync delay={delay:.1f}s before next group "
+                            f"(rate_limiter={_RATE_LIMITER.stats})"
+                        )
             finally:
                 state.reconnect_sync_task = None
+                if state.desired and state.connected:
+                    if state.backfill_task and not state.backfill_task.done():
+                        state.backfill_task.cancel()
+                    state.backfill_task = asyncio.create_task(
+                        self._run_background_backfill(state, exclude_group_ids=group_ids)
+                    )
 
         state.reconnect_sync_task = asyncio.create_task(_run())
+
+    async def _run_background_backfill(self, state: ListenerState, exclude_group_ids: List[str]) -> None:
+        from app.modules.all_platform.zalo.services.supabase_service import _rest
+
+        logger.info(
+            f"Starting low-priority background backfill for user={state.user_id} "
+            f"rate_limiter={_RATE_LIMITER.stats}"
+        )
+        try:
+            rows = await _rest(
+                "GET",
+                "zalo_groups",
+                params={
+                    "select": "group_id,group_name,latest_message_at",
+                    "user_id": f"eq.{state.user_id}",
+                    "limit": "5000",
+                },
+            ) or []
+
+            def _parse_time(t: Any) -> float:
+                if not t:
+                    return 0.0
+                try:
+                    return datetime.fromisoformat(str(t).replace("Z", "+00:00")).timestamp()
+                except Exception:
+                    return 0.0
+
+            conversations = sorted(
+                rows,
+                key=lambda r: _parse_time(r.get("latest_message_at")),
+                reverse=True,
+            )
+
+            group_ids = [
+                str(r["group_id"]).strip()
+                for r in conversations
+                if r.get("group_id") and str(r["group_id"]).strip() not in exclude_group_ids
+            ]
+
+            logger.info(f"Background backfill queue for user={state.user_id}: {len(group_ids)} groups pending.")
+
+            for idx, group_id in enumerate(group_ids):
+                if not state.desired or not state.connected:
+                    logger.info(
+                        f"Stopping backfill for user={state.user_id} "
+                        f"(desired={state.desired}, connected={state.connected})"
+                    )
+                    break
+
+                is_group = group_id.strip().startswith("g")
+
+                if (idx + 1) % 20 == 0:
+                    logger.info(
+                        f"Backfill progress [{idx + 1}/{len(group_ids)}] "
+                        f"user={state.user_id} rate_limiter={_RATE_LIMITER.stats}"
+                    )
+
+                retry_count = 0
+                max_retries = 3
+                while retry_count < max_retries:
+                    if not state.desired or not state.connected:
+                        break
+                    try:
+                        async with _ZALO_API_SEMAPHORE:
+                            if is_group:
+                                messages = await get_zca_group_history(
+                                    state.auth or {},
+                                    group_id,
+                                    count=30,
+                                )
+                            else:
+                                messages = await get_zca_user_history(
+                                    state.auth or {},
+                                    group_id,
+                                    count=30,
+                                )
+
+                        messages = _sort_messages_old_to_new(messages)
+                        if messages:
+                            await self._record_messages(
+                                state,
+                                [
+                                    {
+                                        "thread_id": group_id,
+                                        "message_id": message.message_id,
+                                        "sender_id": message.sender_id,
+                                        "sender_name": message.sender_name,
+                                        "timestamp": message.timestamp,
+                                        "time_text": message.time_text,
+                                        "type": message.type,
+                                        "content": message.content,
+                                        "image_urls": message.image_urls,
+                                        "reply_to_id": message.reply_to_id,
+                                        "is_deleted": message.is_deleted,
+                                        "is_sent": message.is_sent,
+                                    }
+                                    for message in messages
+                                ],
+                                increment_unread=False,
+                            )
+                        await _RATE_LIMITER.record_success()
+                        break
+                    except Exception as exc:
+                        err_str = str(exc).lower()
+                        if _is_rate_limited(err_str):
+                            await _RATE_LIMITER.record_rate_limit()
+                            retry_count += 1
+                            if retry_count < max_retries:
+                                logger.warning(
+                                    f"Backfill rate-limited user={state.user_id} "
+                                    f"group={group_id} retry={retry_count}/{max_retries}. "
+                                    f"Waiting for adaptive cooldown..."
+                                )
+                                # Cooldown is handled inside _RATE_LIMITER.wait() below
+                            else:
+                                logger.warning(
+                                    f"Backfill skipping group={group_id} after {max_retries} "
+                                    f"rate-limit retries for user={state.user_id}"
+                                )
+                        elif _looks_like_auth_expired(err_str):
+                            logger.warning(f"Auth expired during backfill for user={state.user_id}: {exc}")
+                            state.auth_expired = True
+                            return
+                        else:
+                            await _RATE_LIMITER.record_error()
+                            logger.warning(f"Backfill failed for user={state.user_id} group={group_id}: {exc}")
+                            break
+
+                # Adaptive delay: thay vì fixed random(6, 12), dùng rate limiter thông minh
+                delay = await _RATE_LIMITER.wait()
+                if (idx + 1) % 10 == 0:
+                    logger.debug(f"Backfill adaptive delay={delay:.1f}s after group [{idx + 1}/{len(group_ids)}]")
+
+            logger.info(
+                f"Finished background backfill for user={state.user_id} "
+                f"rate_limiter={_RATE_LIMITER.stats}"
+            )
+        except Exception as e:
+            logger.error(f"Error in background backfill loop for user={state.user_id}: {e}")
 
     async def _stop_state(self, state: ListenerState) -> None:
         state.desired = False
         state.connected = False
+        
+        if state.backfill_task and not state.backfill_task.done():
+            state.backfill_task.cancel()
+            try:
+                await state.backfill_task
+            except asyncio.CancelledError:
+                pass
+
         proc = state.proc
         if proc and proc.returncode is None:
             try:
@@ -401,8 +694,23 @@ class ZcaPersistentListenerManager:
                 return
 
             state.restart_attempt += 1
+            
+            # Safety: if crashed more than 10 times in a row, stop entirely.
+            # This prevents resource leaks from cascading crashes (e.g. ZCA buffer overflow).
+            if state.restart_attempt > 10:
+                logger.error(
+                    f"ZCA listener for user={state.user_id} crashed {state.restart_attempt} times "
+                    f"in a row (last error: {state.last_error}) — STOPPING. "
+                    f"Manual restart via /api/zalo/listener/restart required."
+                )
+                state.desired = False
+                return
+            
             delay = _RESTART_BACKOFFS[min(state.restart_attempt - 1, len(_RESTART_BACKOFFS) - 1)]
-            logger.warning(f"Restarting ZCA listener for user={state.user_id} in {delay}s")
+            logger.warning(
+                f"Restarting ZCA listener for user={state.user_id} in {delay}s "
+                f"(attempt {state.restart_attempt})"
+            )
             await asyncio.sleep(delay)
 
     async def _run_once(self, state: ListenerState) -> None:
@@ -482,12 +790,31 @@ class ZcaPersistentListenerManager:
                         f"ZCA listener stdout line#{line_count} user={state.user_id}: {decoded[:200]}"
                     )
                 await self._handle_event(state, decoded)
+            # Drain any remaining buffered stdout so stale data doesn't
+            # corrupt the next listener start.
+            try:
+                import errno
+                while True:
+                    try:
+                        chunk = await asyncio.wait_for(proc.stdout.read(n=8192), timeout=0.5)
+                        if not chunk:
+                            break
+                    except asyncio.TimeoutError:
+                        break
+                    except OSError as e:
+                        if e.errno in (errno.EPIPE, errno.ENOTCONN, errno.EBADF):
+                            break
+                        raise
+            except Exception:
+                pass
             await proc.wait()
         finally:
             stderr_task.cancel()
             try:
                 await stderr_task
             except asyncio.CancelledError:
+                pass
+            except Exception:
                 pass
             state.connected = False
             state.pid = None
@@ -572,7 +899,18 @@ class ZcaPersistentListenerManager:
             return
         if event_name == "connected":
             state.connected = True
-            state.restart_attempt = 0
+            # Only reset crash counter if we've been running stably for 60s
+            # This prevents premature reset from crashing immediately after startup
+            if state.last_event_at:
+                try:
+                    last_ts = datetime.fromisoformat(state.last_event_at.replace("Z", "+00:00"))
+                    age_s = (datetime.now(timezone.utc) - last_ts).total_seconds()
+                    if age_s > 60:
+                        state.restart_attempt = 0
+                except Exception:
+                    # Fallback: reset on first successful connect after any startup
+                    if state.restart_attempt > 0:
+                        state.restart_attempt = 0
             state.last_error = None
             logger.info(f"ZCA listener connected user={state.user_id} pid={state.pid}")
             await self._sync_recent_groups_after_connect(state)
@@ -671,19 +1009,16 @@ class ZcaPersistentListenerManager:
                 )
                 from app.modules.all_platform.zalo.services.supabase_service import (
                     list_shared_conversation_ids,
-                    get_zalo_account_by_id,
                 )
 
                 # Cache owner để filter SSE subscribers.
-                acc = await get_zalo_account_by_id(state.user_id)
-                owner_id = acc.get("owner_id") if acc else state.user_id
-                register_account_owner(state.user_id, owner_id)
+                register_account_owner(state.user_id, state.user_id)
 
                 # Lấy danh sách conversation đã share để filter cho admin/leader.
                 shared_ids = await list_shared_conversation_ids(state.user_id)
 
                 event = {
-                    "type": "new_messages",
+                    "type": "zalo-message",
                     "account_id": state.user_id,
                     "group_id": group_id,
                     "group_name": group_name,

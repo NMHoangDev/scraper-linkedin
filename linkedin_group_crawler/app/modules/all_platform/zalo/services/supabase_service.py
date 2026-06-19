@@ -549,7 +549,9 @@ async def list_zalo_accounts(owner_id: Optional[str] = None, id_member: Optional
         return []
 
     params: Dict[str, Any] = {"select": "*", "is_active": "eq.true", "order": "updated_at.desc"}
-    if id_member:
+    if owner_id and id_member:
+        params["or"] = f"(owner_id.eq.{owner_id},id_member.eq.{id_member})"
+    elif id_member:
         params["id_member"] = f"eq.{id_member}"
     elif owner_id:
         params["owner_id"] = f"eq.{owner_id}"

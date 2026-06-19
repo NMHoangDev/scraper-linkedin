@@ -7,7 +7,7 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 from app.modules.all_platform.zalo.api.security import verify_zalo_api_key
-from app.modules.all_platform.zalo.services.zca_auth_store import delete_zca_auth, list_zca_auth_users
+from app.modules.all_platform.zalo.services.zca_auth_store import delete_zca_auth, list_zca_auth_users, load_zca_auth
 from app.modules.all_platform.zalo.services.zca_persistent_listener import get_listener_status, restart_listener, stop_listener
 from app.modules.all_platform.zalo.services.session_store import delete_sessions_for_user, get_profile_lock
 from app.modules.all_platform.zalo.crawler.browser import clear_user_profile_data
@@ -59,16 +59,40 @@ async def list_accounts(
     x_user_id: str = Header("default", alias="X-User-ID"),
 ):
     owner = _normalize_id(owner_id or x_user_id)
-    db_accounts = await list_zalo_accounts(owner_id=owner, id_member=id_member)
+    member = _normalize_id(id_member, "") if id_member else None
+    if member and member != owner:
+        logger.warning(f"Ignoring mismatched Zalo account id_member={member} for owner={owner}")
+        member = None
+
+    db_accounts = await list_zalo_accounts(owner_id=owner, id_member=member)
     auth_users = set(await list_zca_auth_users())
     by_id = {str(row.get("account_id")): dict(row) for row in db_accounts if row.get("account_id")}
+    owner_candidates = {item for item in {owner, member} if item and item != "default"}
 
     for auth_user in auth_users:
+        if auth_user in by_id:
+            continue
+
+        auth_owner = ""
+        try:
+            auth = await load_zca_auth(auth_user)
+            if isinstance(auth, dict):
+                auth_owner = _normalize_id(
+                    str(auth.get("ownerId") or auth.get("owner_id") or ""),
+                    "",
+                )
+        except Exception as exc:
+            logger.warning(f"Could not inspect ZCA auth owner for account={auth_user}: {exc}")
+
+        if not auth_owner or auth_owner not in owner_candidates:
+            continue
+
         by_id.setdefault(
             auth_user,
             {
                 "account_id": auth_user,
-                "owner_id": owner,
+                "owner_id": auth_owner,
+                "id_member": member or auth_owner,
                 "label": auth_user,
                 "status": "confirmed",
                 "is_active": True,
@@ -143,20 +167,22 @@ async def create_account(body: ZaloAccountCreate):
 @router.patch("/{account_id}")
 async def update_account(account_id: str, body: ZaloAccountUpdate):
     safe_account_id = _normalize_id(account_id)
-    owner_id = _normalize_id(body.owner_id) if body.owner_id else "default"
+    existing = await get_zalo_account_by_id(safe_account_id) or {}
+    owner_id = _normalize_id(body.owner_id) if body.owner_id else _normalize_id(existing.get("owner_id"), "default")
+    id_member = body.id_member if body.id_member is not None else existing.get("id_member")
     try:
         await upsert_zalo_account(
             safe_account_id,
             owner_id=owner_id,
-            id_member=body.id_member,
-            label=body.label or safe_account_id,
-            phone=body.phone,
-            status=body.status or "unknown",
+            id_member=id_member,
+            label=body.label if body.label is not None else existing.get("label") or safe_account_id,
+            phone=body.phone if body.phone is not None else existing.get("phone"),
+            status=body.status if body.status is not None else existing.get("status") or "unknown",
         )
         await upsert_zalo_user(
             safe_account_id,
-            id_member=body.id_member,
-            status=body.status or "unknown",
+            id_member=id_member,
+            status=body.status if body.status is not None else existing.get("status") or "unknown",
         )
     except SupabaseNotConfigured:
         pass
@@ -164,8 +190,23 @@ async def update_account(account_id: str, body: ZaloAccountUpdate):
 
 
 @router.delete("/{account_id}")
-async def remove_account(account_id: str, delete_auth: bool = Query(False)):
+async def remove_account(
+    account_id: str,
+    delete_auth: bool = Query(False),
+    owner_id: Optional[str] = Query(None),
+    x_user_id: str = Header("default", alias="X-User-ID"),
+):
     safe_account_id = _normalize_id(account_id)
+    requester = _normalize_id(owner_id or x_user_id)
+    existing = await get_zalo_account_by_id(safe_account_id)
+    if existing and requester != "default":
+        allowed = {
+            _normalize_id(existing.get("owner_id"), ""),
+            _normalize_id(existing.get("id_member"), ""),
+        }
+        if requester not in allowed:
+            raise HTTPException(status_code=403, detail="Zalo account does not belong to current user")
+
     await stop_listener(safe_account_id)
     
     sessions_removed = 0

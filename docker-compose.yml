@@ -1,0 +1,64 @@
+services:
+  frontend:
+    build:
+      context: ./linkedin-crawler-ui
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_LINKEDIN_CRAWLER_API_URL: https://seeding.markeeai.com
+        NEXT_PUBLIC_API_FACEBOOK_BASE_URL: https://seeding.markeeai.com
+    image: scraper-linkedin-frontend:latest
+    container_name: seeding-frontend
+    restart: unless-stopped
+    env_file:
+      - ./linkedin-crawler-ui/.env
+    expose:
+      - "3000"
+    networks:
+      seeding-net:
+        aliases:
+          - frontend
+
+  backend:
+    build:
+      context: ./linkedin_group_crawler
+      dockerfile: Dockerfile
+    image: scraper-linkedin-backend:latest
+    container_name: seeding-backend
+    restart: unless-stopped
+    env_file:
+      - ./linkedin_group_crawler/.env
+    environment:
+      DISABLE_ZCA_LISTENERS: "1"
+    expose:
+      - "8000"
+    volumes:
+      - backend-storage:/app/storage
+      - backend-data:/app/data
+    networks:
+      seeding-net:
+        aliases:
+          - backend
+
+  router:
+    image: nginx:alpine
+    container_name: seeding-router
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - backend
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./nginx-router/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      seeding-net:
+        aliases:
+          - router
+
+volumes:
+  backend-storage:
+  backend-data:
+
+networks:
+  seeding-net:
+    name: scraper-linkedin_seeding-net

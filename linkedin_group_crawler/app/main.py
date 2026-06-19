@@ -42,6 +42,7 @@ ensure_directory(settings.session_storage_dir)
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     warmup_task: asyncio.Task[None] | None = None
+    zca_listeners_task: asyncio.Task[None] | None = None
     # An toàn khi chạy dev/local: đặt env DISABLE_SCHEDULER=1 để KHÔNG bật scheduler tự cào
     # (tránh cào bằng acc production khi dev). Production không set -> chạy như cũ.
     import os as _os
@@ -77,7 +78,10 @@ async def lifespan(_: FastAPI):
                 "ZCA persistent listeners auto-start failed — sẽ thử lại khi user login lại",
             )
 
-    zca_listeners_task = asyncio.create_task(_start_zca_listeners_background())
+    if _os.getenv("DISABLE_ZCA_LISTENERS", "").strip() in ("1", "true", "True"):
+        logger.warning("DISABLE_ZCA_LISTENERS is enabled -> skip ZCA persistent listeners in this backend.")
+    else:
+        zca_listeners_task = asyncio.create_task(_start_zca_listeners_background())
 
     try:
         yield
@@ -88,7 +92,7 @@ async def lifespan(_: FastAPI):
                 await warmup_task
             except asyncio.CancelledError:
                 pass
-        if not zca_listeners_task.done():
+        if zca_listeners_task is not None and not zca_listeners_task.done():
             zca_listeners_task.cancel()
             try:
                 await zca_listeners_task
