@@ -107,7 +107,13 @@ def can_view_account(
     account = _normalize(account_id)
     caller = _normalize(caller_user_id)
 
-    if role in _PRIVILEGED_ROLES:
+    # Admin: xem mọi account không cần share.
+    # Leader: chỉ xem account được share.
+    if role == "admin":
+        return True
+
+    # Leader: xem account được share.
+    if role == "leader":
         return bool(is_shared)
 
     # Staff/member: chỉ xem của mình, không quan tâm share.
@@ -175,23 +181,23 @@ async def publish_zalo_message_event(
             if email and email not in allowed_viewer_emails:
                 continue
 
-        # Filter conversation share cho admin/leader
+        # Filter conversation share cho leader. Admin luôn nhận mọi event.
         role = str(meta.get("role") or "member").lower()
-        if role in _PRIVILEGED_ROLES and shared_conversation_ids is not None:
+        if role == "leader" and shared_conversation_ids is not None:
             caller_id = meta.get("caller_id")
-            
-            # Neu admin/leader chinh la chu so huu cua account nay, thi khong bi filter boi shared_conversation_ids
+
+            # Neu leader chinh la chu so huu cua account nay, thi khong bi filter boi shared_conversation_ids
             is_owner = False
             if owner_id and caller_id and owner_id == caller_id:
                 is_owner = True
             elif owner_id and owner_id == _normalize(meta.get("email", "")):
-                # Fallback if owner_id was registered as email
                 is_owner = True
-                
+
             if not is_owner:
                 group_id = str(event.get("group_id") or "").strip()
                 if group_id and group_id not in shared_conversation_ids:
                     continue
+        # Admin: always receives all events, no filtering.
 
         try:
             queue.put_nowait(payload)
