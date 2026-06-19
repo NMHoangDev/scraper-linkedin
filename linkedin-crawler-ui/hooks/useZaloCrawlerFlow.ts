@@ -163,6 +163,7 @@ export interface ZaloCrawlerFlowValue {
   setMaxMessagesPerGroup: (value: number) => void;
   switchWorker: (workerId: string) => void;
   switchAccount: (accountId: string) => void;
+  refreshAccounts: () => Promise<void>;
   refreshLoginStatus: () => Promise<void>;
   createAccount: (label: string, phone?: string) => Promise<void>;
   deleteAccount: (accountId: string, deleteAuth?: boolean) => Promise<void>;
@@ -600,7 +601,11 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
     setIsLoadingAccounts(true);
     setAccountsError(null);
     try {
-      const response = await getZaloAccounts(ownerId, appUser?.id || ownerId);
+      const response = await getZaloAccounts(ownerId, {
+        idMember: appUser?.id,
+        email: appUser?.email,
+        role: appUser?.role,
+      });
       const nextAccounts = response.accounts ?? [];
       setAccounts(nextAccounts);
       setUserId((current) => {
@@ -709,6 +714,7 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
         account_id: accountId,
         owner_id: ownerId,
         id_member: appUser?.id || ownerId,
+        email: appUser?.email,
         label: cleanLabel,
         phone: phone?.trim() || undefined,
       });
@@ -1700,6 +1706,7 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
     setMaxMessagesPerGroup,
     switchWorker,
     switchAccount,
+    refreshAccounts: loadAccounts,
     refreshLoginStatus: pollAuthStatus,
     createAccount,
     deleteAccount,

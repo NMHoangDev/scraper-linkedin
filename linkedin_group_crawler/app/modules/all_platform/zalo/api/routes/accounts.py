@@ -14,6 +14,9 @@ from app.modules.all_platform.zalo.crawler.browser import clear_user_profile_dat
 from app.modules.all_platform.zalo.services.supabase_service import (
     SupabaseNotConfigured,
     delete_zalo_account,
+    get_app_user_id_by_email,
+    get_team_member_ids,
+    get_user_role,
     get_zalo_inbox_report,
     list_zalo_accounts,
     upsert_zalo_account,
@@ -36,12 +39,55 @@ def _normalize_id(value: Optional[str], default: str = "default") -> str:
     return raw or default
 
 
+async def _resolve_accounts_for_role(
+    caller_user_id: Optional[str],
+    caller_email: Optional[str],
+    role_override: Optional[str],
+) -> tuple[Optional[str], Optional[str]]:
+    """Xác định owner_id và id_member filter dựa trên role của caller.
+
+    Returns (owner_id, id_member) để truyền vào list_zalo_accounts().
+
+    Rules:
+        * admin   → owner_id=None, id_member=None  (xem tất cả)
+        * leader  → owner_id=None, id_member=leader_id (xem accounts của mình + team members)
+        * member  → owner_id=None, id_member=caller_id  (chỉ xem tài khoản của mình)
+    """
+    user_id = _normalize_id(caller_user_id or "", "default")
+    email = (caller_email or "").strip().lower()
+
+    if role_override:
+        role = role_override.strip().lower()
+    elif email:
+        role = await get_user_role(email)
+    else:
+        role = "member"
+
+    if role == "admin":
+        return None, None
+
+    if role == "leader":
+        if email:
+            leader_id = await get_app_user_id_by_email(email)
+            if leader_id:
+                return None, leader_id
+        return user_id, user_id
+
+    # member: chỉ tài khoản của chính mình
+    if email:
+        member_id = await get_app_user_id_by_email(email)
+        if member_id:
+            return None, member_id
+    return user_id, user_id
+
+
 class ZaloAccountCreate(BaseModel):
     account_id: Optional[str] = None
     owner_id: str = "default"
     id_member: Optional[str] = None
     label: str = Field(min_length=1)
     phone: Optional[str] = None
+    email: Optional[str] = None  # dùng để auto-resolve id_member nếu không truyền
 
 
 class ZaloAccountUpdate(BaseModel):
@@ -50,24 +96,33 @@ class ZaloAccountUpdate(BaseModel):
     label: Optional[str] = None
     phone: Optional[str] = None
     status: Optional[str] = None
+    email: Optional[str] = None  # dùng để auto-resolve id_member nếu không truyền
 
 
 @router.get("")
 async def list_accounts(
     owner_id: Optional[str] = Query(None),
     id_member: Optional[str] = Query(None),
+    email: Optional[str] = Query(None, description="Email của caller — dùng để tra role từ app_users"),
+    role: Optional[str] = Query(None, description="Override role (admin/leader/member) — chỉ dùng cho test nội bộ"),
     x_user_id: str = Header("default", alias="X-User-ID"),
 ):
-    owner = _normalize_id(owner_id or x_user_id)
-    member = _normalize_id(id_member, "") if id_member else None
-    if member and member != owner:
-        logger.warning(f"Ignoring mismatched Zalo account id_member={member} for owner={owner}")
-        member = None
+    # Role-based filtering: xác định owner/id_member filter dựa trên role của caller.
+    # admin → xem tất cả; leader → xem team members; member → xem của mình.
+    rule_owner, rule_member = await _resolve_accounts_for_role(x_user_id, email, role)
 
-    db_accounts = await list_zalo_accounts(owner_id=owner, id_member=member)
+    if rule_owner is None and rule_member is None:
+        # admin: xem tất cả accounts
+        db_accounts = await list_zalo_accounts()
+    elif rule_owner is not None and rule_member is not None and rule_owner == rule_member:
+        # member: chỉ xem của mình qua id_member
+        db_accounts = await list_zalo_accounts(id_member=rule_member)
+    else:
+        # leader: xem qua id_member (bao gồm mình + team members)
+        db_accounts = await list_zalo_accounts(id_member=rule_member)
+
     auth_users = set(await list_zca_auth_users())
     by_id = {str(row.get("account_id")): dict(row) for row in db_accounts if row.get("account_id")}
-    owner_candidates = {item for item in {owner, member} if item and item != "default"}
 
     for auth_user in auth_users:
         if auth_user in by_id:
@@ -84,7 +139,14 @@ async def list_accounts(
         except Exception as exc:
             logger.warning(f"Could not inspect ZCA auth owner for account={auth_user}: {exc}")
 
-        if not auth_owner or auth_owner not in owner_candidates:
+        # Chỉ bổ sung account ZCA vào kết quả nếu nó thuộc phạm vi caller được xem.
+        should_include = False
+        if rule_owner is None and rule_member is None:
+            should_include = True
+        elif auth_owner == rule_member:
+            should_include = True
+
+        if not should_include:
             continue
 
         by_id.setdefault(
@@ -92,7 +154,7 @@ async def list_accounts(
             {
                 "account_id": auth_user,
                 "owner_id": auth_owner,
-                "id_member": member or auth_owner,
+                "id_member": rule_member or auth_owner,
                 "label": auth_user,
                 "status": "confirmed",
                 "is_active": True,
@@ -114,13 +176,19 @@ async def list_accounts(
         accounts.append(account)
 
     accounts.sort(key=lambda item: (not bool(item.get("has_auth")), str(item.get("label") or item.get("account_id"))))
-    return {"owner_id": owner, "accounts": accounts}
+    resolved_owner = rule_member or rule_owner or x_user_id
+    return {"owner_id": resolved_owner, "accounts": accounts}
 
 
 @router.post("")
 async def create_account(body: ZaloAccountCreate):
     owner_id = _normalize_id(body.owner_id)
-    
+
+    # Auto-resolve id_member từ email nếu không truyền trực tiếp.
+    resolved_id_member = body.id_member
+    if not resolved_id_member and body.email:
+        resolved_id_member = await get_app_user_id_by_email(body.email.strip().lower())
+
     # Generate random unique account_id
     while True:
         random_id = f"zl_{secrets.token_hex(4)}"
@@ -133,14 +201,14 @@ async def create_account(body: ZaloAccountCreate):
         await upsert_zalo_account(
             account_id,
             owner_id=owner_id,
-            id_member=body.id_member,
+            id_member=resolved_id_member,
             label=body.label.strip(),
             phone=body.phone,
             status="not_logged_in",
         )
         await upsert_zalo_user(
             account_id,
-            id_member=body.id_member,
+            id_member=resolved_id_member,
             status="not_logged_in",
         )
     except RuntimeError as exc:
@@ -169,7 +237,15 @@ async def update_account(account_id: str, body: ZaloAccountUpdate):
     safe_account_id = _normalize_id(account_id)
     existing = await get_zalo_account_by_id(safe_account_id) or {}
     owner_id = _normalize_id(body.owner_id) if body.owner_id else _normalize_id(existing.get("owner_id"), "default")
-    id_member = body.id_member if body.id_member is not None else existing.get("id_member")
+
+    # Auto-resolve id_member từ email nếu body.id_member không truyền và chưa có trong DB.
+    id_member = body.id_member
+    if id_member is None:
+        if body.email:
+            id_member = await get_app_user_id_by_email(body.email.strip().lower())
+        if id_member is None:
+            id_member = existing.get("id_member")
+
     try:
         await upsert_zalo_account(
             safe_account_id,

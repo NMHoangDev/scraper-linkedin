@@ -74,9 +74,18 @@ export function getZaloWorkers(userId = "default"): Promise<ZaloWorkersResponse>
   }, 7000);
 }
 
-export function getZaloAccounts(ownerId = "default", idMember?: string): Promise<ZaloAccountsResponse> {
+export function getZaloAccounts(
+  ownerId = "default",
+  options: {
+    idMember?: string;
+    email?: string;
+    role?: string;
+  } = {}
+): Promise<ZaloAccountsResponse> {
   const params = new URLSearchParams({ owner_id: ownerId });
-  if (idMember) params.append("id_member", idMember);
+  if (options.idMember) params.append("id_member", options.idMember);
+  if (options.email) params.append("email", options.email);
+  if (options.role) params.append("role", options.role);
   return requestJson<ZaloAccountsResponse>(`/api/all-platform/zalo/accounts?${params.toString()}`, {
     method: "GET",
     headers: {
@@ -89,6 +98,7 @@ export function createZaloAccount(payload: {
   account_id?: string;
   owner_id?: string;
   id_member?: string;
+  email?: string;
   label: string;
   phone?: string;
 }) {
@@ -103,6 +113,7 @@ export function updateZaloAccount(
   payload: {
     owner_id?: string;
     id_member?: string;
+    email?: string;
     label?: string;
     phone?: string;
     status?: string;
