@@ -544,17 +544,23 @@ async def get_zalo_account_by_id(account_id: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-async def list_zalo_accounts(owner_id: Optional[str] = None, id_member: Optional[str] = None) -> List[Dict[str, Any]]:
+async def list_zalo_accounts(
+    owner_id: Optional[str] = None,
+    id_member: Optional[str | List[str]] = None,
+) -> List[Dict[str, Any]]:
     if not is_supabase_configured():
         return []
 
     params: Dict[str, Any] = {"select": "*", "is_active": "eq.true", "order": "updated_at.desc"}
 
-    # Khi co id_member (UUID), uu tien dung id_member lam filter.
-    # owner_id la fallback cho cac account cu chua co id_member (migrated accounts).
-    if id_member:
-        # Chi dung id_member vi day la UUID - dam bao type matching.
-        params["id_member"] = f"eq.{id_member}"
+    # id_member có thể là string (1 user) hoặc list[str] (leader + team members).
+    # owner_id là fallback cho các account cũ chưa có id_member.
+    if id_member is not None:
+        if isinstance(id_member, list):
+            if id_member:
+                params["id_member"] = f"in.({','.join(id_member)})"
+        else:
+            params["id_member"] = f"eq.{id_member}"
     elif owner_id:
         params["owner_id"] = f"eq.{owner_id}"
 

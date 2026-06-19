@@ -43,14 +43,15 @@ async def _resolve_accounts_for_role(
     caller_user_id: Optional[str],
     caller_email: Optional[str],
     role_override: Optional[str],
-) -> tuple[Optional[str], Optional[str]]:
+) -> tuple[Optional[str], Optional[str] | list[str]]:
     """Xác định owner_id và id_member filter dựa trên role của caller.
 
     Returns (owner_id, id_member) để truyền vào list_zalo_accounts().
+    id_member có thể là string (1 user) hoặc list[str] (leader + team members).
 
     Rules:
         * admin   → owner_id=None, id_member=None  (xem tất cả)
-        * leader  → owner_id=None, id_member=leader_id (xem accounts của mình + team members)
+        * leader  → owner_id=None, id_member=[leader_id, ...team_member_ids] (xem accounts của mình + team members)
         * member  → owner_id=None, id_member=caller_id  (chỉ xem tài khoản của mình)
     """
     user_id = _normalize_id(caller_user_id or "", "default")
@@ -70,8 +71,11 @@ async def _resolve_accounts_for_role(
         if email:
             leader_id = await get_app_user_id_by_email(email)
             if leader_id:
-                return None, leader_id
-        return user_id, user_id
+                # Leader thấy tài khoản của mình + của các member trong team
+                team_ids = await get_team_member_ids(leader_id)
+                team_ids.append(leader_id)  # include leader itself
+                return None, team_ids  # type: ignore[arg-type]
+        return user_id, [user_id]
 
     # member: chỉ tài khoản của chính mình
     if email:
@@ -114,11 +118,8 @@ async def list_accounts(
     if rule_owner is None and rule_member is None:
         # admin: xem tất cả accounts
         db_accounts = await list_zalo_accounts()
-    elif rule_owner is not None and rule_member is not None and rule_owner == rule_member:
-        # member: chỉ xem của mình qua id_member
-        db_accounts = await list_zalo_accounts(id_member=rule_member)
     else:
-        # leader: xem qua id_member (bao gồm mình + team members)
+        # member hoặc leader: xem qua id_member (string hoặc list)
         db_accounts = await list_zalo_accounts(id_member=rule_member)
 
     auth_users = set(await list_zca_auth_users())
@@ -143,6 +144,8 @@ async def list_accounts(
         should_include = False
         if rule_owner is None and rule_member is None:
             should_include = True
+        elif isinstance(rule_member, list):
+            should_include = auth_owner in rule_member
         elif auth_owner == rule_member:
             should_include = True
 
