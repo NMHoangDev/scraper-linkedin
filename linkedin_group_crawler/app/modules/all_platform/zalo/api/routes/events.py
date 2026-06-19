@@ -98,7 +98,14 @@ async def _resolve_accounts_for_caller(
     # va gia tri can query la app_users.id (UUID) - tuong thich voi id_member.
     member_uuid = caller_user_id
     if caller_email:
-        member_uuid = await get_app_user_id_by_email(caller_email) or caller_user_id
+        resolved = await get_app_user_id_by_email(caller_email)
+        if resolved:
+            member_uuid = resolved
+    elif caller_user_id:
+        # Neu khong co email, thu resolve caller_user_id nhu email.
+        resolved = await get_app_user_id_by_email(caller_user_id)
+        if resolved:
+            member_uuid = resolved
     return await list_zalo_accounts(id_member=member_uuid)
 
 
