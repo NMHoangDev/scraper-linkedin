@@ -198,6 +198,23 @@ async def get_zca_group_history(
     return [message for message in messages if message.message_id]
 
 
+async def get_zca_user_history(
+    auth: Dict[str, Any],
+    user_id: str,
+    *,
+    count: int = 500,
+) -> List[Message]:
+    """Fetch message history with a specific Zalo user (friend thread)."""
+    result = await _run_zca_command(
+        "user-history",
+        auth,
+        args=["--user-id", user_id, "--count", str(count)],
+        timeout_seconds=180,
+    )
+    messages = [_to_message(row) for row in result.get("messages") or []]
+    return [message for message in messages if message.message_id]
+
+
 async def get_zca_group_related_ids(
     auth: Dict[str, Any],
     group_id: str,
