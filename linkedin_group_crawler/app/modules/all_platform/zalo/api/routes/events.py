@@ -94,10 +94,12 @@ async def _resolve_accounts_for_caller(
         return unique
 
     # Member/staff: chỉ accounts do chính caller sở hữu.
-    owner_id = caller_user_id
+    # Luu y: dung id_member thay vi owner_id vi owner_id la UUID column,
+    # va gia tri can query la app_users.id (UUID) - tuong thich voi id_member.
+    member_uuid = caller_user_id
     if caller_email:
-        owner_id = await get_app_user_id_by_email(caller_email) or caller_user_id
-    return await list_zalo_accounts(owner_id=owner_id)
+        member_uuid = await get_app_user_id_by_email(caller_email) or caller_user_id
+    return await list_zalo_accounts(id_member=member_uuid)
 
 
 @router.get("/stream")
