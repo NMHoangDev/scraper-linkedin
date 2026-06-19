@@ -84,6 +84,8 @@ function exactMsgKey(message: Msg): string {
   return `${message.from}|${normalizeMsgText(message.text)}|${(message.time || "").trim()}|${message.clientId || ""}`;
 }
 
+const MESSAGE_ECHO_LOOKBACK = 8;
+
 function isSendingStatus(time: string): boolean {
   const raw = (time || "").toLowerCase();
   const value = foldVietnamese(time || "");
@@ -99,10 +101,14 @@ function isSendingStatus(time: string): boolean {
   );
 }
 
-function isOppositeEcho(current: Msg, previous: Msg): boolean {
+function isOppositeEcho(current: Msg, previous: Msg, isAdjacent: boolean): boolean {
   if (!current.text || !previous.text || current.from === previous.from) return false;
   if (normalizeMsgText(current.text) !== normalizeMsgText(previous.text)) return false;
-  return isSendingStatus(current.time) || isSendingStatus(previous.time) || !current.time || !previous.time;
+  if (current.clientId || previous.clientId) return true;
+  if (isSendingStatus(current.time) || isSendingStatus(previous.time) || !current.time || !previous.time) return true;
+  // Messenger/extension can echo our just-sent text back as an incoming bubble.
+  // When the same text appears immediately after our outgoing bubble, keep the outgoing one.
+  return previous.from === "me" && current.from === "them" && isAdjacent;
 }
 
 function isSameDirectionPendingEcho(current: Msg, previous: Msg): boolean {
@@ -129,6 +135,7 @@ function normalizeThreadMessages(list: Msg[]): Msg[] {
       from: raw?.from === "me" ? "me" : "them",
       text: (raw?.text || "").trim(),
       time: raw?.time || "",
+      clientId: raw?.clientId,
     };
     if (!msg.text) continue;
 
@@ -136,7 +143,7 @@ function normalizeThreadMessages(list: Msg[]): Msg[] {
     if (exact.has(exactKey)) continue;
 
     let sameDirectionIndex = -1;
-    for (let i = out.length - 1; i >= 0; i -= 1) {
+    for (let i = out.length - 1, looked = 0; i >= 0 && looked < MESSAGE_ECHO_LOOKBACK; i -= 1, looked += 1) {
       if (isSameDirectionPendingEcho(msg, out[i])) {
         sameDirectionIndex = i;
         break;
@@ -145,15 +152,16 @@ function normalizeThreadMessages(list: Msg[]): Msg[] {
     if (sameDirectionIndex >= 0) {
       if (preferCurrentThreadMessage(msg, out[sameDirectionIndex])) {
         exact.delete(exactMsgKey(out[sameDirectionIndex]));
-        out[sameDirectionIndex] = msg;
-        exact.add(exactKey);
+        const replacement = { ...msg, clientId: msg.clientId || out[sameDirectionIndex].clientId };
+        out[sameDirectionIndex] = replacement;
+        exact.add(exactMsgKey(replacement));
       }
       continue;
     }
 
     let echoIndex = -1;
-    for (let i = out.length - 1; i >= 0; i -= 1) {
-      if (isOppositeEcho(msg, out[i])) {
+    for (let i = out.length - 1, looked = 0; i >= 0 && looked < MESSAGE_ECHO_LOOKBACK; i -= 1, looked += 1) {
+      if (isOppositeEcho(msg, out[i], i === out.length - 1)) {
         echoIndex = i;
         break;
       }
@@ -161,8 +169,9 @@ function normalizeThreadMessages(list: Msg[]): Msg[] {
     if (echoIndex >= 0) {
       if (msg.from === "me" && out[echoIndex]?.from === "them") {
         exact.delete(exactMsgKey(out[echoIndex]));
-        out[echoIndex] = msg;
-        exact.add(exactKey);
+        const replacement = { ...msg, clientId: msg.clientId || out[echoIndex].clientId };
+        out[echoIndex] = replacement;
+        exact.add(exactMsgKey(replacement));
       }
       continue;
     }
@@ -827,8 +836,11 @@ export default function InboxPage() {
       if (openConvRef.current !== convIdForSend) return;
       setMsgs(prev => {
         const next = normalizeThreadMessages(prev.map(m => {
-          const sameOptimistic = m === optimistic || m.clientId === clientId;
-          return sameOptimistic ? { ...m, time: t } : m;
+          const sameOptimistic =
+            m === optimistic ||
+            m.clientId === clientId ||
+            (m.from === "me" && normalizeMsgText(m.text) === normalizeMsgText(text) && isSendingStatus(m.time));
+          return sameOptimistic ? { ...m, time: t, clientId: m.clientId || clientId } : m;
         }));
         msgsRef.current = next;
         return next;
