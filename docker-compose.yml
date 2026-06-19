@@ -28,12 +28,13 @@ services:
     env_file:
       - ./linkedin_group_crawler/.env
     environment:
-      DISABLE_ZCA_LISTENERS: "1"
+      DISABLE_ZCA_LISTENERS: "0"
     expose:
       - "8000"
     volumes:
       - backend-storage:/app/storage
       - backend-data:/app/data
+      - backend-artifacts:/app/artifacts
     networks:
       seeding-net:
         aliases:
