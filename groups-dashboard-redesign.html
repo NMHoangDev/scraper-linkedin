@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CrawlerPro — Groups</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;background:#f0f2f5;color:#1a1d23;height:100vh;overflow:hidden}
+.app{display:flex;height:100vh;overflow:hidden}
+
+/* ── SIDEBAR ── */
+.sidebar{width:220px;min-width:220px;background:#0e1117;display:flex;flex-direction:column;height:100vh;overflow-y:auto}
+.sb-brand{padding:18px 16px 14px;border-bottom:1px solid #1e2235;display:flex;align-items:center;gap:10px}
+.sb-logo{width:36px;height:36px;background:linear-gradient(135deg,#4f6ef7,#7c3aed);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.sb-brand-name{font-size:14px;font-weight:800;color:#fff;letter-spacing:-.3px}
+.sb-brand-sub{font-size:10px;color:#4a5180;text-transform:uppercase;letter-spacing:.6px}
+
+.sb-section-label{padding:14px 14px 5px;font-size:9px;font-weight:700;color:#2e3555;text-transform:uppercase;letter-spacing:1px}
+
+.sb-platform{padding:8px 12px;margin:0 8px 8px}
+.platform-toggle{display:flex;background:#1a1f35;border-radius:7px;padding:3px;gap:2px}
+.pt-btn{flex:1;padding:6px 4px;border-radius:5px;text-align:center;font-size:11px;font-weight:600;cursor:pointer;color:#5a6490;transition:.15s;border:none;background:transparent}
+.pt-btn.active{background:#4f6ef7;color:#fff}
+
+.nav-item{display:flex;align-items:center;gap:9px;padding:9px 12px;margin:1px 8px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:500;color:#5a6490;transition:.15s;position:relative}
+.nav-item:hover{background:#1a1f35;color:#a0a8c8}
+.nav-item.active{background:#1e274a;color:#fff}
+.nav-item.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:18px;background:#4f6ef7;border-radius:0 3px 3px 0}
+.nav-icon{font-size:14px;width:18px;text-align:center;flex-shrink:0}
+.nav-badge{margin-left:auto;background:#ef4444;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px}
+
+.sb-footer{margin-top:auto;padding:12px;border-top:1px solid #1e2235}
+.sb-login{font-size:10px;color:#2e3555;text-align:center;cursor:pointer;padding:6px;border-radius:6px;transition:.15s}
+.sb-login:hover{background:#1a1f35;color:#5a6490}
+
+/* ── MAIN ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+
+/* TOPBAR */
+.topbar{background:#fff;border-bottom:1px solid #e8eaef;padding:0 24px;height:52px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+.topbar-title{font-size:14px;font-weight:700;flex:1}
+.topbar-sub{font-size:11px;color:#8a90a8;font-weight:400;margin-left:5px}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:.15s;font-family:inherit;white-space:nowrap}
+.btn-primary{background:#4f6ef7;color:#fff}.btn-primary:hover{background:#3d5ce0}
+.btn-ghost{background:transparent;color:#4f6ef7;border:1.5px solid #4f6ef7}.btn-ghost:hover{background:#eef2ff}
+.btn-sm{padding:5px 10px;font-size:11px}
+.btn-danger{background:#fee2e2;color:#dc2626;border:none}
+
+/* CONTENT */
+.content{flex:1;overflow-y:auto;padding:20px 24px}
+
+/* STATS */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:13px;margin-bottom:18px}
+.stat-card{background:#fff;border-radius:11px;padding:14px 16px;border:1px solid #e8eaef;position:relative;overflow:hidden}
+.stat-card::after{content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:var(--ac,#4f6ef7);border-radius:3px 0 0 3px}
+.stat-label{font-size:10px;color:#8a90a8;font-weight:600;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
+.stat-value{font-size:26px;font-weight:800;line-height:1;margin-bottom:3px}
+.stat-change{font-size:11px;font-weight:600}
+.up{color:#22c55e}.dn{color:#ef4444}.nt{color:#8a90a8}
+
+/* FILTER BAR */
+.filter-section{background:#fff;border-radius:11px;border:1px solid #e8eaef;padding:12px 16px;margin-bottom:14px}
+.filter-section-title{font-size:10px;font-weight:700;color:#8a90a8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.filter-rows{display:flex;flex-direction:column;gap:8px}
+.filter-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.filter-label{font-size:11px;font-weight:600;color:#6b7280;min-width:70px;flex-shrink:0}
+.fchip{padding:4px 10px;border-radius:20px;font-size:11px;border:1.5px solid #e5e7eb;background:#f8f9fb;cursor:pointer;color:#6b7280;transition:.15s;font-weight:500}
+.fchip:hover{border-color:#4f6ef7;color:#4f6ef7}
+.fchip.active{border-color:#4f6ef7;background:#eef2ff;color:#3d5ce0;font-weight:700}
+.filter-actions{margin-left:auto;display:flex;gap:6px;flex-shrink:0}
+.filter-result{font-size:11px;color:#8a90a8;padding-left:78px}
+
+/* TABLE CARD */
+.table-card{background:#fff;border-radius:11px;border:1px solid #e8eaef;overflow:hidden}
+.table-header{padding:14px 18px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #f0f1f5;flex-wrap:wrap}
+.table-title{font-size:13px;font-weight:700;flex:1}
+.search-input{padding:7px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:12px;width:200px;outline:none;transition:.15s}
+.search-input:focus{border-color:#4f6ef7}
+.table-select{padding:7px 11px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:12px;background:#fff;outline:none;cursor:pointer}
+
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{background:#f8f9fb;padding:9px 13px;text-align:left;font-size:10px;font-weight:700;color:#8a90a8;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e8eaef;white-space:nowrap}
+td{padding:11px 13px;border-bottom:1px solid #f0f1f5;vertical-align:middle;font-size:12.5px}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#fafbff}
+
+/* TABLE ELEMENTS */
+.group-name{font-weight:700;color:#1a1d23;margin-bottom:1px}
+.group-url{font-size:10px;color:#b0b6c8;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.platform-pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600}
+.pf-fb{color:#1877f2}.pf-li{color:#0a66c2}
+
+.health-wrap{display:flex;align-items:center;gap:6px}
+.health-bar{width:50px;height:5px;background:#e8eaef;border-radius:3px;overflow:hidden;flex-shrink:0}
+.health-fill{height:100%;border-radius:3px}
+.health-num{font-size:12px;font-weight:700}
+
+.status-pill{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700}
+.sp-alive{background:#dcfce7;color:#16a34a}
+.sp-dead{background:#fee2e2;color:#dc2626}
+.sp-low{background:#fef9c3;color:#92400e}
+
+/* Taxonomy tags in table */
+.tax-tags{display:flex;flex-wrap:wrap;gap:3px;max-width:180px}
+.ttag{padding:2px 6px;border-radius:4px;font-size:9px;font-weight:700;white-space:nowrap}
+.tt-ind{background:#dbeafe;color:#1d4ed8}
+.tt-team{background:#dcfce7;color:#15803d}
+.tt-tier1{background:#fee2e2;color:#dc2626}
+.tt-tier2{background:#fef9c3;color:#92400e}
+.tt-tier3{background:#f1f5f9;color:#64748b}
+.tt-empty{background:#f8f9fb;color:#9ca3af;font-style:italic}
+
+.action-btns{display:flex;gap:5px;align-items:center}
+.act-btn{padding:5px 10px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid transparent;transition:.15s;font-family:inherit}
+.act-view{border-color:#e5e7eb;color:#374151;background:#fff}.act-view:hover{border-color:#4f6ef7;color:#4f6ef7}
+.act-edit{border-color:#e5e7eb;color:#374151;background:#fff}.act-edit:hover{border-color:#f59e0b;color:#d97706;background:#fffbeb}
+.act-disable{border-color:#fca5a5;color:#ef4444;background:#fff}.act-disable:hover{background:#fee2e2}
+
+/* PAGINATION */
+.pagination{padding:12px 18px;display:flex;align-items:center;gap:5px;border-top:1px solid #f0f1f5;font-size:12px;color:#6b7280}
+.pg-info{flex:1}
+.pg-btn{width:30px;height:30px;border-radius:7px;border:1.5px solid #e5e7eb;background:#fff;cursor:pointer;font-size:12px;font-weight:600;color:#374151;display:flex;align-items:center;justify-content:center;transition:.15s}
+.pg-btn:hover{border-color:#4f6ef7;color:#4f6ef7}
+.pg-btn.active{background:#4f6ef7;color:#fff;border-color:#4f6ef7}
+.pg-btn.disabled{opacity:.4;cursor:not-allowed}
+
+/* ── EDIT DRAWER ── */
+.drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:50;display:none;align-items:stretch;justify-content:flex-end}
+.drawer-overlay.open{display:flex}
+.drawer{width:520px;max-width:95vw;background:#fff;height:100vh;overflow-y:auto;box-shadow:-6px 0 32px rgba(0,0,0,.15);display:flex;flex-direction:column}
+.drawer-header{padding:18px 20px;border-bottom:1px solid #f0f1f5;display:flex;align-items:center;gap:10px;flex-shrink:0;background:#fff;position:sticky;top:0;z-index:2}
+.drawer-title{font-size:14px;font-weight:800;flex:1}
+.drawer-close{width:30px;height:30px;border-radius:7px;border:1.5px solid #e5e7eb;background:#fff;cursor:pointer;font-size:16px;color:#6b7280;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.drawer-close:hover{border-color:#ef4444;color:#ef4444}
+.drawer-body{padding:20px;flex:1}
+.drawer-footer{padding:14px 20px;border-top:1px solid #f0f1f5;display:flex;gap:10px;justify-content:flex-end;flex-shrink:0;background:#fff;position:sticky;bottom:0}
+
+/* FORM ELEMENTS */
+.form-section{margin-bottom:20px}
+.form-section-title{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:#4f6ef7;margin-bottom:12px;padding-bottom:6px;border-bottom:1.5px solid #eef2ff;display:flex;align-items:center;gap:5px}
+.form-group{margin-bottom:13px}
+.form-label{font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.4px;display:flex;align-items:center;gap:4px;margin-bottom:5px}
+.req{color:#ef4444}.opt{color:#9ca3af;font-weight:400;font-size:10px}
+.form-input{width:100%;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:9px;font-size:13px;color:#1a1d23;font-family:inherit;outline:none;transition:.15s;background:#fff}
+.form-input:focus{border-color:#4f6ef7;box-shadow:0 0 0 3px rgba(79,110,247,.1)}
+.form-input::placeholder{color:#b0b6c8}
+.form-select{width:100%;padding:9px 12px;border:1.5px solid #e5e7eb;border-radius:9px;font-size:13px;color:#1a1d23;font-family:inherit;outline:none;background:#fff;cursor:pointer;transition:.15s}
+.form-select:focus{border-color:#4f6ef7;box-shadow:0 0 0 3px rgba(79,110,247,.1)}
+.form-grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* TIER RADIO */
+.tier-opts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
+.tier-opt{border:1.5px solid #e5e7eb;border-radius:9px;padding:9px 8px;cursor:pointer;transition:.15s;text-align:center;background:#fff}
+.tier-opt:hover{border-color:#4f6ef7}
+.tier-opt.sel{border-color:#4f6ef7;background:#eef2ff}
+.tier-opt input{display:none}
+.tier-icon{font-size:16px;margin-bottom:2px}
+.tier-title{font-size:11px;font-weight:700}
+.tier-sub{font-size:10px;color:#8a90a8;margin-top:1px}
+
+/* MULTI CHIPS */
+.mchips{display:flex;flex-wrap:wrap;gap:5px;padding:8px;border:1.5px solid #e5e7eb;border-radius:9px;min-height:42px;cursor:pointer;transition:.15s;background:#fff}
+.mchips:hover{border-color:#4f6ef7}
+.mc{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;transition:.15s;border:1.5px solid #e5e7eb;background:#f8f9fb;color:#374151}
+.mc.sel-team{background:#dcfce7;color:#15803d;border-color:#86efac}
+.mc.sel-icp{background:#ede9fe;color:#5b21b6;border-color:#c4b5fd}
+
+/* HEALTH DISPLAY */
+.health-display{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f8f9fb;border-radius:9px;border:1px solid #e5e7eb}
+.health-big{font-size:22px;font-weight:800}
+.health-bar-big{flex:1;height:8px;background:#e8eaef;border-radius:4px;overflow:hidden}
+.health-fill-big{height:100%;border-radius:4px;background:#22c55e}
+
+/* CALLOUT */
+.callout{border-radius:8px;padding:10px 13px;font-size:12px;line-height:1.6;margin-bottom:12px;display:flex;gap:8px;align-items:flex-start}
+.callout.warn{background:#fffbeb;border-left:3px solid #f59e0b;color:#92400e}
+.callout.info{background:#eff6ff;border-left:3px solid #3b82f6;color:#1e40af}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#d0d4e8;border-radius:10px}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ═══ SIDEBAR ═══ -->
+<nav class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-logo">🕷️</div>
+    <div>
+      <div class="sb-brand-name">CrawlerPro</div>
+      <div class="sb-brand-sub">Facebook Workspace</div>
+    </div>
+  </div>
+
+  <div style="padding:10px 8px 0">
+    <div class="sb-section-label" style="padding:0 6px 5px">NỀN TẢNG</div>
+    <div class="platform-toggle">
+      <button class="pt-btn" onclick="switchPlatform(this,'li')">LinkedIn</button>
+      <button class="pt-btn active" onclick="switchPlatform(this,'fb')">Facebook</button>
+    </div>
+  </div>
+
+  <div style="margin-top:8px">
+    <div class="nav-item" onclick="nav(this)"><span class="nav-icon">📰</span> Post Feed</div>
+    <div class="nav-item active" onclick="nav(this)"><span class="nav-icon">🗂️</span> Groups <span class="nav-badge">21</span></div>
+    <div class="nav-item" onclick="nav(this)"><span class="nav-icon">🕷️</span> Crawl Data</div>
+    <div class="nav-item" onclick="nav(this)"><span class="nav-icon">💬</span> Interaction</div>
+  </div>
+
+  <div class="sb-footer">
+    <div class="sb-login">🔑 ĐĂNG NHẬP / TÀI KHOẢN FACEBOOK</div>
+  </div>
+</nav>
+
+<!-- ═══ MAIN ═══ -->
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-title">Groups <span class="topbar-sub">Quản lý & phân loại tất cả groups</span></div>
+    <button class="btn btn-primary" onclick="openDrawer('new')">＋ Thêm Group Mới</button>
+  </div>
+
+  <div class="content">
+
+    <!-- STATS -->
+    <div class="stats-row">
+      <div class="stat-card" style="--ac:#4f6ef7">
+        <div class="stat-label">Tổng Groups</div>
+        <div class="stat-value">43</div>
+        <div class="stat-change up">↑ tuần này</div>
+      </div>
+      <div class="stat-card" style="--ac:#22c55e">
+        <div class="stat-label">Đang Sống</div>
+        <div class="stat-value">4</div>
+        <div class="stat-change up">↑ 2 tuần trước</div>
+      </div>
+      <div class="stat-card" style="--ac:#f59e0b">
+        <div class="stat-label">Post Mới / Tuần</div>
+        <div class="stat-value">43</div>
+        <div class="stat-change nt">↑</div>
+      </div>
+      <div class="stat-card" style="--ac:#ef4444">
+        <div class="stat-label">Cần Check</div>
+        <div class="stat-value">21</div>
+        <div class="stat-change dn">↑ 1 hôm nay</div>
+      </div>
+    </div>
+
+    <!-- FILTER BAR -->
+    <div class="filter-section">
+      <div class="filter-section-title">🏷️ Lọc theo taxonomy <span style="font-size:10px;color:#b0b6c8;font-weight:400;margin-left:4px">— Bấm nhiều filter để kết hợp</span></div>
+      <div class="filter-rows">
+        <div class="filter-row">
+          <span class="filter-label">🏭 Ngành</span>
+          <span class="fchip active" onclick="toggleFilter(this)">Tất cả</span>
+          <span class="fchip" onclick="toggleFilter(this)">💻 Công Nghệ</span>
+          <span class="fchip" onclick="toggleFilter(this)">📣 Marketing</span>
+          <span class="fchip" onclick="toggleFilter(this)">🛒 Ecommerce</span>
+          <span class="fchip" onclick="toggleFilter(this)">🚀 Startup</span>
+          <span class="fchip" onclick="toggleFilter(this)">👥 HR</span>
+          <span class="fchip" onclick="toggleFilter(this)">📂 Khác</span>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">👥 Team</span>
+          <span class="fchip active" onclick="toggleFilter(this)">Tất cả</span>
+          <span class="fchip" onclick="toggleFilter(this)">Sales</span>
+          <span class="fchip" onclick="toggleFilter(this)">Marketing</span>
+          <span class="fchip" onclick="toggleFilter(this)">Content</span>
+          <span class="fchip" onclick="toggleFilter(this)">BD</span>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">🔥 Tier</span>
+          <span class="fchip active" onclick="toggleFilter(this)">Tất cả</span>
+          <span class="fchip" onclick="toggleFilter(this)">🔥 Tier 1</span>
+          <span class="fchip" onclick="toggleFilter(this)">⚡ Tier 2</span>
+          <span class="fchip" onclick="toggleFilter(this)">👁️ Tier 3</span>
+          <div class="filter-actions">
+            <button class="btn btn-ghost btn-sm" onclick="clearFilters()">✕ Xoá filter</button>
+          </div>
+        </div>
+        <div class="filter-result" id="filterResult">Hiển thị tất cả 43 groups</div>
+      </div>
+    </div>
+
+    <!-- TABLE -->
+    <div class="table-card">
+      <div class="table-header">
+        <div class="table-title">Danh sách Groups</div>
+        <input class="search-input" placeholder="🔍 Tìm group..." oninput="filterSearch(this.value)">
+        <select class="table-select">
+          <option>Tất cả platform</option>
+          <option>Facebook</option>
+          <option>LinkedIn</option>
+        </select>
+        <select class="table-select">
+          <option>Tất cả trạng thái</option>
+          <option>Đang sống</option>
+          <option>Ít HĐ</option>
+          <option>Đã chết</option>
+        </select>
+      </div>
+
+      <div class="table-wrap">
+        <table id="groupsTable">
+          <thead>
+            <tr>
+              <th>Tên Group</th>
+              <th>Platform</th>
+              <th>Ngành · Team · Tier</th>
+              <th>Thành Viên</th>
+              <th>Post/Tuần</th>
+              <th>Health Score</th>
+              <th>Trạng Thái</th>
+              <th>Crawl Gần Nhất</th>
+              <th>Hành Động</th>
+            </tr>
+          </thead>
+          <tbody id="groupsBody">
+
+            <tr>
+              <td>
+                <div class="group-name">Tuyển dụng Thực tập sinh IT</div>
+                <div class="group-url">www.facebook.com/groups/32794002009214...</div>
+              </td>
+              <td><span class="platform-pill pf-fb">🟦 Facebook</span></td>
+              <td>
+                <div class="tax-tags">
+                  <span class="ttag tt-ind">💻 Công Nghệ</span>
+                  <span class="ttag tt-team">Sales</span>
+                  <span class="ttag tt-tier1">🔥 Tier 1</span>
+                </div>
+              </td>
+              <td>12</td>
+              <td>3</td>
+              <td>
+                <div class="health-wrap">
+                  <div class="health-bar"><div class="health-fill" style="width:90%;background:#22c55e"></div></div>
+                  <span class="health-num" style="color:#22c55e">553</span>
+                </div>
+              </td>
+              <td><span class="status-pill sp-alive">● Sống</span></td>
+              <td><span style="color:#8a90a8">14 giờ trước</span></td>
+              <td>
+                <div class="action-btns">
+                  <button class="act-btn act-view">Xem</button>
+                  <button class="act-btn act-edit" onclick="openDrawer('edit1')">✏️ Sửa</button>
+                </div>
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                <div class="group-name">Việc làm CNTT Đà Nẵng - New</div>
+                <div class="group-url">www.facebook.com/groups/vieclamcnttdanang...</div>
+              </td>
+              <td><span class="platform-pill pf-fb">🟦 Facebook</span></td>
+              <td>
+                <div class="tax-tags">
+                  <span class="ttag tt-ind">💻 Công Nghệ</span>
+                  <span class="ttag tt-empty">⚠️ Chưa có team</span>
+                </div>
+              </td>
+              <td>12</td>
+              <td>1</td>
+              <td>
+                <div class="health-wrap">
+                  <div class="health-bar"><div class="health-fill" style="width:18%;background:#ef4444"></div></div>
+                  <span class="health-num" style="color:#ef4444">100</span>
+                </div>
+              </td>
+              <td><span class="status-pill sp-dead">● Chết</span></td>
+              <td><span style="color:#8a90a8">3 ngày trước</span></td>
+              <td>
+                <div class="action-btns">
+                  <button class="act-btn act-edit" onclick="openDrawer('edit2')" style="border-color:#fde047;color:#ca8a04;background:#fffbeb">⚠️ Cập nhật</button>
+                  <button class="act-btn act-disable">Vô hiệu</button>
+                </div>
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                <div class="group-name">Việc làm CNTT Đà Nẵng</div>
+                <div class="group-url">www.facebook.com/groups/vieclamcnttdn/</div>
+              </td>
+              <td><span class="platform-pill pf-fb">🟦 Facebook</span></td>
+              <td>
+                <div class="tax-tags">
+                  <span class="ttag tt-ind">💻 Công Nghệ</span>
+                  <span class="ttag tt-team">BD</span>
+                  <span class="ttag tt-tier2">⚡ Tier 2</span>
+                </div>
+              </td>
+              <td>12</td>
+              <td>1</td>
+              <td>
+                <div class="health-wrap">
+                  <div class="health-bar"><div class="health-fill" style="width:20%;background:#ef4444"></div></div>
+                  <span class="health-num" style="color:#ef4444">172</span>
+                </div>
+              </td>
+              <td><span class="status-pill sp-dead">● Chết</span></td>
+              <td><span style="color:#8a90a8">3 ngày trước</span></td>
+              <td>
+                <div class="action-btns">
+                  <button class="act-btn act-view">Xem</button>
+                  <button class="act-btn act-edit" onclick="openDrawer('edit3')">✏️ Sửa</button>
+                  <button class="act-btn act-disable">Vô hiệu</button>
+                </div>
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                <div class="group-name">Marketing Việt Nam Pro</div>
+                <div class="group-url">www.facebook.com/groups/marketingvnpro/</div>
+              </td>
+              <td><span class="platform-pill pf-fb">🟦 Facebook</span></td>
+              <td>
+                <div class="tax-tags">
+                  <span class="ttag tt-ind">📣 Marketing</span>
+                  <span class="ttag tt-team">Sales</span>
+                  <span class="ttag tt-team">Marketing</span>
+                  <span class="ttag tt-tier1">🔥 Tier 1</span>
+                </div>
+              </td>
+              <td>48,200</td>
+              <td>62</td>
+              <td>
+                <div class="health-wrap">
+                  <div class="health-bar"><div class="health-fill" style="width:88%;background:#22c55e"></div></div>
+                  <span class="health-num" style="color:#22c55e">88</span>
+                </div>
+              </td>
+              <td><span class="status-pill sp-alive">● Sống</span></td>
+              <td><span style="color:#8a90a8">2 giờ trước</span></td>
+              <td>
+                <div class="action-btns">
+                  <button class="act-btn act-view">Xem</button>
+                  <button class="act-btn act-edit" onclick="openDrawer('edit4')">✏️ Sửa</button>
+                </div>
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                <div class="group-name">Việc làm IT-CNTT Đà Nẵng</div>
+                <div class="group-url">www.facebook.com/groups/908998129562912</div>
+              </td>
+              <td><span class="platform-pill pf-fb">🟦 Facebook</span></td>
+              <td>
+                <div class="tax-tags">
+                  <span class="ttag tt-ind">💻 Công Nghệ</span>
+                  <span class="ttag tt-team">Sales</span>
+                  <span class="ttag tt-tier3">👁️ Tier 3</span>
+                </div>
+              </td>
+              <td>12</td>
+              <td>0</td>
+              <td>
+                <div class="health-wrap">
+                  <div class="health-bar"><div class="health-fill" style="width:5%;background:#ef4444"></div></div>
+                  <span class="health-num" style="color:#ef4444">23</span>
+                </div>
+              </td>
+              <td><span class="status-pill sp-dead">● Chết</span></td>
+              <td><span style="color:#8a90a8">728 ngày trước</span></td>
+              <td>
+                <div class="action-btns">
+                  <button class="act-btn act-edit" onclick="openDrawer('edit5')">✏️ Sửa</button>
+                  <button class="act-btn act-disable">Vô hiệu</button>
+                </div>
+              </td>
+            </tr>
+
+            <tr>
+              <td>
+                <div class="group-name">Tuyển dụng CNTT Đà Nẵng</div>
+                <div class="group-url">www.facebook.com/groups/tddn1/</div>
+              </td>
+              <td><span class="platform-pill pf-fb">🟦 Facebook</span></td>
+              <td>
+                <div class="tax-tags">
+                  <span class="ttag tt-ind">💻 Công Nghệ</span>
+                  <span class="ttag tt-team">HR</span>
+                  <span class="ttag tt-tier2">⚡ Tier 2</span>
+                </div>
+              </td>
+              <td>12</td>
+              <td>0</td>
+              <td>
+                <div class="health-wrap">
+                  <div class="health-bar"><div class="health-fill" style="width:5%;background:#ef4444"></div></div>
+                  <span class="health-num" style="color:#ef4444">23</span>
+                </div>
+              </td>
+              <td><span class="status-pill sp-dead">● Chết</span></td>
+              <td><span style="color:#8a90a8">727 ngày trước</span></td>
+              <td>
+                <div class="action-btns">
+                  <button class="act-btn act-edit" onclick="openDrawer('edit6')">✏️ Sửa</button>
+                  <button class="act-btn act-disable">Vô hiệu</button>
+                </div>
+              </td>
+            </tr>
+
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pagination">
+        <div class="pg-info">Hiển thị 1–6 trong số 43 groups</div>
+        <button class="pg-btn disabled">Trước</button>
+        <button class="pg-btn active">1</button>
+        <button class="pg-btn">2</button>
+        <button class="pg-btn">3</button>
+        <button class="pg-btn">4</button>
+        <button class="pg-btn">5</button>
+        <button class="pg-btn">Sau</button>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+</div><!-- /app -->
+
+
+<!-- ═══ EDIT DRAWER ═══ -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="if(event.target===this)closeDrawer()">
+  <div class="drawer" id="drawerPanel">
+    <div class="drawer-header">
+      <div>
+        <div class="drawer-title" id="drawerTitle">Chỉnh sửa Group</div>
+        <div style="font-size:11px;color:#8a90a8;margin-top:1px" id="drawerSub">Cập nhật thông tin & phân loại taxonomy</div>
+      </div>
+      <button class="drawer-close" onclick="closeDrawer()">✕</button>
+    </div>
+
+    <div class="drawer-body">
+
+      <!-- Health display (read-only) -->
+      <div id="healthSection" class="form-section">
+        <div class="form-section-title">📊 Thông số hiện tại</div>
+        <div class="health-display">
+          <div>
+            <div style="font-size:10px;color:#8a90a8;margin-bottom:2px">HEALTH SCORE</div>
+            <div class="health-big" id="drawerHealth" style="color:#22c55e">88</div>
+          </div>
+          <div style="flex:1">
+            <div class="health-bar-big"><div class="health-fill-big" id="drawerHealthBar" style="width:88%"></div></div>
+            <div style="display:flex;justify-content:space-between;margin-top:4px">
+              <span style="font-size:10px;color:#8a90a8">Thành viên: <b id="drawerMembers" style="color:#374151">48,200</b></span>
+              <span style="font-size:10px;color:#8a90a8">Post/tuần: <b id="drawerPosts" style="color:#374151">62</b></span>
+              <span style="font-size:10px;color:#8a90a8">Crawl: <b id="drawerCrawl" style="color:#374151">2g trước</b></span>
+            </div>
+          </div>
+          <div><span class="status-pill" id="drawerStatus">● Sống</span></div>
+        </div>
+      </div>
+
+      <!-- Basic Info -->
+      <div class="form-section">
+        <div class="form-section-title">🔗 Thông tin cơ bản</div>
+        <div class="form-group">
+          <label class="form-label">Tên group <span class="req">*</span></label>
+          <input class="form-input" id="dName" type="text" value="Marketing Việt Nam Pro">
+        </div>
+        <div class="form-group">
+          <label class="form-label">URL Group <span class="req">*</span></label>
+          <input class="form-input" id="dUrl" type="url" value="https://facebook.com/groups/marketingvnpro/">
+        </div>
+        <div class="form-grid2">
+          <div class="form-group">
+            <label class="form-label">Platform <span class="req">*</span></label>
+            <select class="form-select" id="dPlatform">
+              <option value="facebook" selected>🟦 Facebook</option>
+              <option value="linkedin">🔵 LinkedIn</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Trạng thái</label>
+            <select class="form-select" id="dStatus">
+              <option value="active" selected>✅ Đang hoạt động</option>
+              <option value="inactive">⚠️ Ít hoạt động</option>
+              <option value="disabled">🚫 Vô hiệu hoá</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Taxonomy -->
+      <div class="form-section">
+        <div class="form-section-title">🏷️ Phân loại Taxonomy</div>
+
+        <div class="callout info">💡 Thông tin này giúp hệ thống tự động assign task đúng team và AI generate comment phù hợp đối tượng.</div>
+
+        <div class="form-group">
+          <label class="form-label">🏭 Ngành / Lĩnh vực <span class="req">*</span></label>
+          <select class="form-select" id="dIndustry">
+            <option value="">-- Chọn ngành --</option>
+            <option value="cong_nghe">💻 Công Nghệ & IT</option>
+            <option value="marketing" selected>📣 Marketing & Growth</option>
+            <option value="ecommerce">🛒 Ecommerce & Sales</option>
+            <option value="startup">🚀 Startup & Business</option>
+            <option value="hr">👥 HR & Tuyển dụng</option>
+            <option value="tai_chinh">💰 Tài chính & Đầu tư</option>
+            <option value="content">✍️ Content & Creator</option>
+            <option value="other">📂 Khác</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">🔥 Tier ưu tiên <span class="req">*</span></label>
+          <div class="tier-opts">
+            <label class="tier-opt sel" onclick="selTier(this,1)">
+              <input type="radio" name="dTier" value="1" checked>
+              <div class="tier-icon">🔥</div>
+              <div class="tier-title">Tier 1</div>
+              <div class="tier-sub">Seed hàng ngày</div>
+            </label>
+            <label class="tier-opt" onclick="selTier(this,2)">
+              <input type="radio" name="dTier" value="2">
+              <div class="tier-icon">⚡</div>
+              <div class="tier-title">Tier 2</div>
+              <div class="tier-sub">3 lần / tuần</div>
+            </label>
+            <label class="tier-opt" onclick="selTier(this,3)">
+              <input type="radio" name="dTier" value="3">
+              <div class="tier-icon">👁️</div>
+              <div class="tier-title">Tier 3</div>
+              <div class="tier-sub">Theo dõi thôi</div>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">👥 Team phụ trách <span class="req">*</span> <span class="opt">chọn nhiều</span></label>
+          <div class="mchips" id="teamChips">
+            <span class="mc sel-team" onclick="toggleMC(this,'team')">✓ Sales</span>
+            <span class="mc sel-team" onclick="toggleMC(this,'team')">✓ Marketing</span>
+            <span class="mc" onclick="toggleMC(this,'team')">Content</span>
+            <span class="mc" onclick="toggleMC(this,'team')">BD</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">🎯 Đối tượng ICP <span class="opt">tối đa 3, AI dùng để chọn tone comment</span></label>
+          <div class="mchips" id="icpChips">
+            <span class="mc" onclick="toggleMC(this,'icp')">CEO/Founder</span>
+            <span class="mc sel-icp" onclick="toggleMC(this,'icp')">✓ Marketing Mgr</span>
+            <span class="mc" onclick="toggleMC(this,'icp')">Sales/BD</span>
+            <span class="mc" onclick="toggleMC(this,'icp')">Developer</span>
+            <span class="mc" onclick="toggleMC(this,'icp')">SME Owner</span>
+            <span class="mc" onclick="toggleMC(this,'icp')">Content Creator</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">📝 Mô tả đối tượng <span class="opt">AI dùng để generate comment phù hợp hơn</span></label>
+          <textarea class="form-input" id="dIcpDesc" rows="3" style="resize:vertical;font-size:12px" placeholder="VD: Marketer senior, quan tâm đến performance marketing, tool analytics và chiến lược growth hack...">Marketer và người làm marketing tại VN, quan tâm công cụ và chiến lược tăng trưởng.</textarea>
+        </div>
+      </div>
+
+      <!-- Crawl Settings -->
+      <div class="form-section">
+        <div class="form-section-title">⚙️ Cài đặt Crawl</div>
+        <div class="form-grid2">
+          <div class="form-group">
+            <label class="form-label">Tần suất crawl</label>
+            <select class="form-select">
+              <option selected>Mỗi 2 giờ</option>
+              <option>Mỗi 4 giờ</option>
+              <option>Mỗi 6 giờ</option>
+              <option>Hàng ngày</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Số bài tối đa / ngày</label>
+            <input class="form-input" type="number" value="20">
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:#f8f9fb;border-radius:9px;border:1px solid #e5e7eb">
+          <span style="font-size:12px;font-weight:600">Auto crawl khi có bài mới</span>
+          <label style="position:relative;width:34px;height:18px;display:inline-block">
+            <input type="checkbox" checked style="opacity:0;width:0;height:0">
+            <span style="position:absolute;inset:0;background:#4f6ef7;border-radius:20px;cursor:pointer;transition:.2s"></span>
+            <span style="position:absolute;width:12px;height:12px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;transform:translateX(16px)"></span>
+          </label>
+        </div>
+      </div>
+
+    </div><!-- /drawer-body -->
+
+    <div class="drawer-footer">
+      <button class="btn btn-ghost" onclick="closeDrawer()">Huỷ</button>
+      <button class="btn btn-primary" onclick="saveGroup()">💾 Lưu thay đổi</button>
+    </div>
+  </div><!-- /drawer -->
+</div><!-- /overlay -->
+
+<script>
+function nav(el) {
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  el.classList.add('active');
+}
+function switchPlatform(el,val) {
+  document.querySelectorAll('.pt-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelector('.sb-brand-sub').textContent = val==='fb'?'Facebook Workspace':'LinkedIn Workspace';
+}
+function toggleFilter(el) {
+  const isTatCa = el.textContent.trim().startsWith('Tất cả');
+  const row = el.closest('.filter-row');
+  if (isTatCa) {
+    row.querySelectorAll('.fchip').forEach(c=>c.classList.remove('active'));
+    el.classList.add('active');
+  } else {
+    row.querySelector('.fchip:first-child').classList.remove('active');
+    el.classList.toggle('active');
+    if (!row.querySelector('.fchip:not(:first-child).active')) {
+      row.querySelector('.fchip:first-child').classList.add('active');
+    }
+  }
+  updateFilterResult();
+}
+function updateFilterResult() {
+  const activeFilters = document.querySelectorAll('.fchip.active:not(:first-child)').length;
+  const el = document.getElementById('filterResult');
+  if (activeFilters === 0) {
+    el.textContent = 'Hiển thị tất cả 43 groups';
+    el.style.color = '#8a90a8';
+  } else {
+    el.textContent = `→ Đang lọc với ${activeFilters} điều kiện — tìm thấy 12 groups phù hợp`;
+    el.style.color = '#4f6ef7';
+  }
+}
+function clearFilters() {
+  document.querySelectorAll('.filter-row').forEach(row=>{
+    row.querySelectorAll('.fchip').forEach(c=>c.classList.remove('active'));
+    const first = row.querySelector('.fchip');
+    if (first) first.classList.add('active');
+  });
+  updateFilterResult();
+}
+function filterSearch(val) {
+  const rows = document.querySelectorAll('#groupsBody tr');
+  rows.forEach(r=>{
+    const name = r.querySelector('.group-name')?.textContent.toLowerCase()||'';
+    const url = r.querySelector('.group-url')?.textContent.toLowerCase()||'';
+    r.style.display = (!val || name.includes(val.toLowerCase()) || url.includes(val.toLowerCase())) ? '' : 'none';
+  });
+}
+
+// DRAWER
+const drawerData = {
+  new:   {title:'Thêm Group Mới', sub:'Nhập thông tin và phân loại taxonomy', name:'', url:'https://', health:null, members:'—', posts:'—', crawl:'—', status:''},
+  edit1: {title:'Sửa: Tuyển dụng Thực tập sinh IT', sub:'ID #1 · Đang sống', name:'Tuyển dụng Thực tập sinh IT', url:'https://www.facebook.com/groups/32794002009214', health:553, members:'12', posts:'3', crawl:'14g trước', status:'sp-alive'},
+  edit2: {title:'Sửa: Việc làm CNTT Đà Nẵng - New', sub:'ID #2 · ⚠️ Chưa có taxonomy!', name:'Việc làm CNTT Đà Nẵng - New', url:'https://www.facebook.com/groups/vieclamcnttdanang', health:100, members:'12', posts:'1', crawl:'3 ngày trước', status:'sp-dead'},
+  edit3: {title:'Sửa: Việc làm CNTT Đà Nẵng', sub:'ID #3 · Đã chết', name:'Việc làm CNTT Đà Nẵng', url:'https://www.facebook.com/groups/vieclamcnttdn/', health:172, members:'12', posts:'1', crawl:'3 ngày trước', status:'sp-dead'},
+  edit4: {title:'Sửa: Marketing Việt Nam Pro', sub:'ID #4 · Đang sống', name:'Marketing Việt Nam Pro', url:'https://facebook.com/groups/marketingvnpro/', health:88, members:'48,200', posts:'62', crawl:'2g trước', status:'sp-alive'},
+  edit5: {title:'Sửa: Việc làm IT-CNTT Đà Nẵng', sub:'ID #5 · Đã chết', name:'Việc làm IT-CNTT Đà Nẵng', url:'https://www.facebook.com/groups/908998129562912', health:23, members:'12', posts:'0', crawl:'728 ngày trước', status:'sp-dead'},
+  edit6: {title:'Sửa: Tuyển dụng CNTT Đà Nẵng', sub:'ID #6 · Đã chết', name:'Tuyển dụng CNTT Đà Nẵng', url:'https://www.facebook.com/groups/tddn1/', health:23, members:'12', posts:'0', crawl:'727 ngày trước', status:'sp-dead'}
+};
+
+function openDrawer(key) {
+  const d = drawerData[key] || drawerData.new;
+  document.getElementById('drawerTitle').textContent = d.title;
+  document.getElementById('drawerSub').textContent = d.sub;
+  document.getElementById('dName').value = d.name;
+  document.getElementById('dUrl').value = d.url;
+  document.getElementById('drawerMembers').textContent = d.members;
+  document.getElementById('drawerPosts').textContent = d.posts;
+  document.getElementById('drawerCrawl').textContent = d.crawl;
+  const healthSection = document.getElementById('healthSection');
+  if (d.health !== null) {
+    healthSection.style.display = '';
+    const h = d.health;
+    const color = h>200?'#22c55e':h>100?'#f59e0b':'#ef4444';
+    const pct = Math.min(100,Math.round(h/600*100));
+    document.getElementById('drawerHealth').textContent = h;
+    document.getElementById('drawerHealth').style.color = color;
+    document.getElementById('drawerHealthBar').style.width = pct+'%';
+    document.getElementById('drawerHealthBar').style.background = color;
+    const sp = document.getElementById('drawerStatus');
+    sp.className = 'status-pill ' + (d.status||'sp-dead');
+    sp.textContent = d.status==='sp-alive'?'● Sống':'● Chết';
+  } else {
+    healthSection.style.display = 'none';
+  }
+  // Warn if edit2 (missing taxonomy)
+  const existingWarn = document.querySelector('.drawer-body .callout.warn');
+  if (existingWarn) existingWarn.remove();
+  if (key === 'edit2') {
+    const warn = document.createElement('div');
+    warn.className = 'callout warn';
+    warn.innerHTML = '⚠️ Group này <strong>chưa có taxonomy</strong>. Vui lòng điền đầy đủ Ngành, Team và Tier.';
+    document.querySelector('.form-section:nth-child(2) .form-section-title').after(warn);
+  }
+  document.getElementById('drawerOverlay').classList.add('open');
+}
+
+function closeDrawer() {
+  document.getElementById('drawerOverlay').classList.remove('open');
+}
+
+function selTier(el, tier) {
+  el.closest('.tier-opts').querySelectorAll('.tier-opt').forEach(o=>o.classList.remove('sel'));
+  el.classList.add('sel');
+}
+
+function toggleMC(el, type) {
+  const selClass = type==='team'?'sel-team':'sel-icp';
+  const isSelected = el.classList.contains(selClass);
+  if (!isSelected) {
+    // Check ICP limit
+    if (type==='icp') {
+      const count = document.querySelectorAll('#icpChips .sel-icp').length;
+      if (count>=3) { alert('Tối đa 3 ICP tags!'); return; }
+    }
+    el.classList.add(selClass);
+    el.textContent = '✓ ' + el.textContent.replace('✓ ','');
+  } else {
+    el.classList.remove(selClass);
+    el.textContent = el.textContent.replace('✓ ','');
+  }
+}
+
+function saveGroup() {
+  const btn = event.target;
+  btn.textContent = '⏳ Đang lưu...';
+  btn.disabled = true;
+  setTimeout(()=>{
+    btn.textContent = '✅ Đã lưu!';
+    btn.style.background = '#22c55e';
+    setTimeout(()=>closeDrawer(), 800);
+  }, 1000);
+}
+</script>
+</body>
+</html>

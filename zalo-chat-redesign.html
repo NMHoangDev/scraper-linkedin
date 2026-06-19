@@ -1,0 +1,1472 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CrawlerPro — Zalo Inbox Redesign</title>
+<!-- Tailwind CSS V3 CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- Material Icons & Google Fonts -->
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          brand: {
+            red: '#E3000F',
+            redHover: '#b8000c',
+            dark: '#0e1117',
+            darkBg: '#f0f2f5',
+            border: '#e8eaef',
+            zalo: '#0068ff'
+          }
+        },
+        fontFamily: {
+          sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        }
+      }
+    }
+  }
+</script>
+
+<style type="text/css">
+  /* Custom scrollbar matching original app */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+  /* Custom styles for layout transitions */
+  .transition-all-300 {
+    transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .role-tag-client {
+    background-color: #fee2e2;
+    color: #dc2626;
+  }
+  .role-tag-leader {
+    background-color: #f1f5f9;
+    color: #475569;
+  }
+  .role-tag-staff {
+    background-color: #f8fafc;
+    color: #64748b;
+  }
+</style>
+</head>
+<body class="bg-brand-darkBg text-slate-900 h-screen overflow-hidden font-sans">
+<div class="flex h-screen w-screen overflow-hidden">
+
+  <!-- ═══ SIDEBAR (Preserved from groups-dashboard-redesign.html) ═══ -->
+  <aside class="w-[220px] min-w-[220px] bg-brand-dark flex flex-col h-full overflow-y-auto shrink-0 border-r border-[#1e2235]">
+    <div class="p-4 border-b border-[#1e2235] flex items-center gap-3">
+      <div class="w-9 h-9 bg-gradient-to-br from-brand-red to-red-600 rounded-lg flex items-center justify-center text-lg text-white">💬</div>
+      <div>
+        <div class="text-sm font-extrabold text-white leading-tight">CrawlerPro</div>
+        <div class="text-[10px] text-[#4a5180] font-bold uppercase tracking-wider">Zalo Workspace</div>
+      </div>
+    </div>
+
+    <!-- Navigation Menu Items -->
+    <div class="mt-4 flex-1">
+      <div class="text-[9px] font-bold text-[#2e3555] uppercase tracking-widest px-4 py-2">Hệ thống</div>
+      <a href="#" class="flex items-center gap-2 px-4 py-2 mx-2 rounded-lg text-xs font-semibold text-[#5a6490] hover:bg-[#1a1f35] hover:text-[#a0a8c8] transition-colors">
+        <span class="material-icons text-base">dashboard</span>
+        Bảng điều khiển
+      </a>
+      <a href="#" class="flex items-center gap-2 px-4 py-2 mx-2 rounded-lg text-xs font-semibold text-[#5a6490] hover:bg-[#1a1f35] hover:text-[#a0a8c8] transition-colors">
+        <span class="material-icons text-base">groups</span>
+        Quản lý nhóm
+      </a>
+      
+      <div class="text-[9px] font-bold text-[#2e3555] uppercase tracking-widest px-4 py-2 mt-3">Hội thoại</div>
+      <a href="#" class="flex items-center gap-2 px-4 py-2 mx-2 rounded-lg text-xs font-bold text-white bg-[#1e274a] transition-all relative">
+        <div class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-[18px] bg-brand-red rounded-r"></div>
+        <span class="material-icons text-base text-brand-red">chat</span>
+        Zalo Inbox
+        <span class="ml-auto bg-red-500 text-white font-bold text-[9px] px-1.5 py-0.5 rounded-full">3</span>
+      </a>
+      <a href="#" class="flex items-center gap-2 px-4 py-2 mx-2 rounded-lg text-xs font-semibold text-[#5a6490] hover:bg-[#1a1f35] hover:text-[#a0a8c8] transition-colors">
+        <span class="material-icons text-base">campaign</span>
+        Gửi hàng loạt
+      </a>
+
+      <div class="text-[9px] font-bold text-[#2e3555] uppercase tracking-widest px-4 py-2 mt-3">Cài đặt</div>
+      <a href="#" class="flex items-center gap-2 px-4 py-2 mx-2 rounded-lg text-xs font-semibold text-[#5a6490] hover:bg-[#1a1f35] hover:text-[#a0a8c8] transition-colors">
+        <span class="material-icons text-base">vpn_key</span>
+        Tài khoản Zalo
+      </a>
+      <a href="#" class="flex items-center gap-2 px-4 py-2 mx-2 rounded-lg text-xs font-semibold text-[#5a6490] hover:bg-[#1a1f35] hover:text-[#a0a8c8] transition-colors">
+        <span class="material-icons text-base">settings</span>
+        Cấu hình
+      </a>
+    </div>
+
+    <!-- Sidebar footer -->
+    <div class="p-3 border-t border-[#1e2235] mt-auto">
+      <div class="text-[10px] text-[#2e3555] text-center hover:bg-[#1a1f35] hover:text-[#5a6490] rounded-lg p-2 cursor-pointer transition-colors font-bold uppercase tracking-wider">
+        👤 seeder_account
+      </div>
+    </div>
+  </aside>
+
+  <!-- ═══ MAIN WORKSPACE ═══ -->
+  <main class="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+    
+    <!-- TOP BAR -->
+    <header class="bg-white border-b border-brand-border px-6 h-[52px] flex items-center shrink-0">
+      <div class="flex items-center gap-2">
+        <h1 class="text-sm font-bold flex items-center gap-2">
+          Zalo Inbox 
+          <span class="text-xs text-slate-400 font-normal">/ Quản lý và trực chat thời gian thực</span>
+        </h1>
+      </div>
+      
+      <!-- Connection Status indicator -->
+      <div class="ml-auto flex items-center gap-4">
+        <div class="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200 text-[11px] font-semibold">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>Zalo PC Active</span>
+        </div>
+        <div class="flex items-center gap-1.5 bg-sky-50 text-[#0068ff] px-2 py-0.5 rounded-full border border-sky-200 text-[11px] font-semibold">
+          <span class="material-icons text-xs">sync</span>
+          <span>SSE: Connected</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- CONTENT WRAPPER -->
+    <div class="flex-1 flex flex-col min-h-0">
+      
+      <!-- [P2] STATS BAR (Horizontal row at the top) -->
+      <section class="grid grid-cols-4 gap-4 px-6 py-2 border-b border-brand-border bg-white shrink-0 shadow-sm">
+        
+        <!-- Card 1: Zalo Conversations -->
+        <div class="bg-white rounded-xl py-1.5 px-3 border border-brand-border flex items-center justify-between relative overflow-hidden transition-all hover:shadow-md">
+          <div class="absolute top-0 left-0 w-[4px] h-full bg-[#0068ff]"></div>
+          <div class="pl-2">
+            <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Zalo Hội thoại</span>
+            <span class="text-xl font-extrabold leading-none text-slate-800" id="stat-total-chats">161</span>
+          </div>
+          <div class="bg-blue-50 text-[#0068ff] text-[9px] font-bold px-2 py-0.5 rounded border border-blue-100 uppercase">
+            Tổng nhóm
+          </div>
+        </div>
+
+        <!-- Card 2: Awaiting Reply -->
+        <div class="bg-white rounded-xl py-1.5 px-3 border border-brand-border flex items-center justify-between relative overflow-hidden transition-all hover:shadow-md">
+          <div class="absolute top-0 left-0 w-[4px] h-full bg-red-500"></div>
+          <div class="pl-2">
+            <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Chờ phản hồi</span>
+            <span class="text-xl font-extrabold leading-none text-red-600" id="stat-waiting">14</span>
+          </div>
+          <div class="bg-red-50 text-red-600 text-[9px] font-bold px-2 py-0.5 rounded border border-red-100 uppercase animate-pulse">
+            Cần trả lời
+          </div>
+        </div>
+
+        <!-- Card 3: FB + Zalo combined total -->
+        <div class="bg-white rounded-xl py-1.5 px-3 border border-brand-border flex items-center justify-between relative overflow-hidden transition-all hover:shadow-md">
+          <div class="absolute top-0 left-0 w-[4px] h-full bg-slate-400"></div>
+          <div class="pl-2">
+            <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">FB + Zalo Tổng</span>
+            <span class="text-xl font-extrabold leading-none text-slate-700" id="stat-combined">342</span>
+          </div>
+          <div class="bg-slate-100 text-slate-600 text-[9px] font-bold px-2 py-0.5 rounded border border-slate-200 uppercase">
+            Đa nền tảng
+          </div>
+        </div>
+
+        <!-- Card 4: Bridge Status -->
+        <div class="bg-white rounded-xl py-1.5 px-3 border border-brand-border flex items-center justify-between relative overflow-hidden transition-all hover:shadow-md">
+          <div class="absolute top-0 left-0 w-[4px] h-full bg-slate-400"></div>
+          <div class="pl-2">
+            <span class="text-[9px] font-bold text-slate-400 tracking-wider block uppercase">Bridge Status</span>
+            <span class="text-sm font-extrabold leading-tight text-slate-700 uppercase flex items-center gap-1">
+              <span class="material-icons text-xs">check_circle</span> Sync OK
+            </span>
+          </div>
+          <div class="bg-slate-100 text-slate-600 text-[9px] font-bold px-2 py-0.5 rounded border border-slate-200">
+            PC-seeder1
+          </div>
+        </div>
+
+      </section>
+
+      <!-- CORE INBOX LAYOUT (Conversations, Chat Area, Campaign Sidebar) -->
+      <div class="flex-1 flex min-h-0 overflow-hidden relative">
+
+        <!-- [P3] CONVERSATION LIST PANEL (Left, Width 320px) -->
+        <section id="chat-list-panel" class="w-[320px] min-w-[200px] max-w-[500px] bg-white border-r border-brand-border flex flex-col h-full overflow-hidden shrink-0 relative">
+          <!-- Resize Handle for Dragging -->
+          <div id="drag-handle" class="absolute right-0 top-0 w-1.5 h-full cursor-col-resize hover:bg-red-400 active:bg-brand-red transition-colors z-30"></div>
+          
+          <!-- Search & Controls Header -->
+          <div class="p-3 border-b border-brand-border space-y-2.5 shrink-0 bg-slate-50/50">
+            
+            <!-- Search bar -->
+            <div class="relative flex items-center">
+              <span class="material-icons absolute left-3 text-slate-400 text-lg">search</span>
+              <input type="text" id="chat-search" placeholder="Tìm kiếm hội thoại..." 
+                class="w-full pl-9 pr-4 py-1.5 border border-brand-border rounded-lg text-xs outline-none focus:border-[#E3000F] transition-colors bg-white">
+            </div>
+
+            <!-- Segmented Pill Button Tabs for Filter -->
+            <div class="flex p-0.5 bg-slate-100 rounded-lg text-[11px] font-semibold text-slate-500">
+              <button onclick="switchTab('all')" id="tab-all" class="flex-1 py-1 rounded-md bg-white text-[#E3000F] font-bold shadow-sm transition-all">Tất cả</button>
+              <button onclick="switchTab('unread')" id="tab-unread" class="flex-1 py-1 rounded-md hover:bg-white/50 transition-all flex items-center justify-center gap-1">
+                Chưa đọc
+                <span class="w-1.5 h-1.5 rounded-full bg-red-500" id="unread-dot"></span>
+              </button>
+              <button onclick="switchTab('inactive')" id="tab-inactive" class="flex-1 py-1 rounded-md hover:bg-white/50 transition-all">Chưa HD</button>
+            </div>
+
+            <!-- Tag Filter Dropdown (Gộp từ 2 hàng filter tag của phiên bản cũ) -->
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Bộ lọc Tag:</span>
+              <div class="relative flex-1">
+                <select id="tag-filter-dropdown" onchange="filterByDropdownTag(this.value)" 
+                  class="w-full bg-white border border-brand-border rounded-lg px-2.5 py-1 text-xs outline-none cursor-pointer focus:border-[#E3000F] appearance-none pr-7 font-medium">
+                  <option value="all">📁 Tất cả các tag</option>
+                  <option value="new">🟢 Trạng thái: Mới (New)</option>
+                  <option value="chatting">🔵 Trạng thái: Đang chat</option>
+                  <option value="followup">🟡 Trạng thái: Follow-up</option>
+                  <option value="inactive">⚪ Trạng thái: Không HĐ</option>
+                </select>
+                <span class="material-icons absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">arrow_drop_down</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Conversations Scroll Area -->
+          <div class="flex-1 overflow-y-auto" id="conversations-container">
+            <!-- Rendered list items by Javascript dynamically -->
+          </div>
+
+        </section>
+
+        <!-- CHAT AREA (Middle, Flexible Width) -->
+        <section class="flex-1 flex flex-col h-full bg-slate-50 min-w-0 relative">
+          
+          <!-- [P4] CHAT HEADER -->
+          <header class="bg-white border-b border-brand-border px-5 h-[52px] flex items-center justify-between shrink-0 shadow-sm relative z-10">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-full bg-[#0068ff] text-white flex items-center justify-center font-bold text-sm" id="active-chat-avatar">TT</div>
+              <div>
+                <h3 class="text-xs font-bold text-slate-800" id="active-chat-title">Thanh Tùng</h3>
+                <!-- Sync status sublabel (New requirement) -->
+                <p class="text-[10px] text-slate-400 font-semibold flex items-center gap-1.5" id="active-chat-sublabel">
+                  <span class="text-[#0068ff]">Zalo</span>
+                  <span class="w-1 h-1 rounded-full bg-slate-300"></span>
+                  <span>Bridge: PC của seeder1</span>
+                  <span class="w-1 h-1 rounded-full bg-slate-300"></span>
+                  <span class="text-emerald-600 flex items-center gap-0.5 font-bold"><span class="material-icons text-[10px]">sync</span> Sync OK</span>
+                </p>
+              </div>
+            </div>
+
+            <!-- Header buttons -->
+            <div class="flex items-center gap-2">
+              <!-- Sync connection button -->
+              <button onclick="triggerSync()" class="bg-white hover:bg-slate-50 border border-brand-border text-slate-600 text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors">
+                <span class="material-icons text-sm animate-spin" id="sync-icon" style="animation-duration: 2.5s;">sync</span>
+                <span>Đồng bộ tin mới</span>
+              </button>
+              <!-- Back button -->
+              <button onclick="alert('Quay lại danh sách tài khoản')" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-600 border border-brand-border">
+                <span class="material-icons text-lg">arrow_back</span>
+              </button>
+            </div>
+          </header>
+
+          <!-- MESSAGES CONTAINER -->
+          <div class="flex-1 overflow-y-auto p-5 space-y-4" id="messages-container">
+            <!-- Messages rendered dynamically by JS -->
+          </div>
+
+          <!-- [P5] QUICK REPLY PILLS ROW (Above input area, horizontally scrollable) -->
+          <div class="bg-white border-t border-brand-border px-4 py-2 flex items-center gap-2 overflow-x-auto whitespace-nowrap shrink-0">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1 shrink-0">Trả lời nhanh:</span>
+            
+            <button onclick="insertQuickReply('chao_hoi')" class="px-3 py-1 border border-brand-red/30 bg-red-50/50 hover:bg-red-50 text-[#E3000F] rounded-full text-xs font-semibold transition-all shrink-0">
+              👋 Chào hỏi
+            </button>
+            <button onclick="insertQuickReply('bao_gia')" class="px-3 py-1 border border-brand-red/30 bg-red-50/50 hover:bg-red-50 text-[#E3000F] rounded-full text-xs font-semibold transition-all shrink-0">
+              💰 Báo giá dịch vụ
+            </button>
+            <button onclick="insertQuickReply('book_demo')" class="px-3 py-1 border border-brand-red/30 bg-red-50/50 hover:bg-red-50 text-[#E3000F] rounded-full text-xs font-semibold transition-all shrink-0">
+              📅 Đặt lịch Demo
+            </button>
+            <button onclick="insertQuickReply('xin_info')" class="px-3 py-1 border border-brand-red/30 bg-red-50/50 hover:bg-red-50 text-[#E3000F] rounded-full text-xs font-semibold transition-all shrink-0">
+              📞 Xin thông tin liên hệ
+            </button>
+          </div>
+
+          <!-- CHAT INPUT BAR (Preserving layout and auto-growing textarea) -->
+          <footer class="bg-white border-t border-brand-border p-3 flex items-end gap-2 shrink-0 relative">
+            
+            <!-- [P3.5] Slash Autocomplete Menu (Popup menu showing when typing '/') -->
+            <div id="slash-popup" class="absolute left-4 bottom-full mb-2 w-80 bg-white border border-brand-border rounded-xl shadow-xl z-50 overflow-hidden hidden transition-all">
+              <div class="bg-slate-50 border-b border-brand-border px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                <span>Mẫu tin nhanh (Gõ để tìm kiếm)</span>
+                <span class="text-[9px] bg-slate-200 text-slate-500 rounded px-1">↑↓ để chọn, Enter để điền</span>
+              </div>
+              <ul class="max-h-60 overflow-y-auto divide-y divide-slate-100" id="slash-list">
+                <!-- Slash options rendered dynamically by JS -->
+              </ul>
+            </div>
+
+            <!-- Emoji button -->
+            <button onclick="toggleEmojiPicker()" class="w-9 h-9 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 border border-brand-border shrink-0">
+              <span class="material-icons text-xl">sentiment_satisfied_alt</span>
+            </button>
+
+            <!-- Attachment upload file -->
+            <button onclick="triggerFileUpload()" class="w-9 h-9 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 border border-brand-border shrink-0">
+              <span class="material-icons text-xl">attach_file</span>
+            </button>
+            <input type="file" id="file-uploader" class="hidden" multiple onchange="handleFileSelect(event)">
+
+            <!-- Text area container with growing layout -->
+            <div class="flex-1 relative">
+              <textarea id="chat-input" rows="1" placeholder="Nhập tin nhắn... (Gõ / để hiện mẫu trả lời)" 
+                class="w-full border border-brand-border rounded-lg px-3 py-2 text-xs outline-none focus:border-brand-red resize-none max-h-32 min-h-[36px] overflow-y-auto transition-all"
+                oninput="autoGrowTextarea(this)" onkeydown="handleInputKeydown(event)"></textarea>
+            </div>
+
+            <!-- Send button -->
+            <button onclick="sendMessage()" class="bg-brand-red hover:bg-brand-redHover text-white w-9 h-9 rounded-lg flex items-center justify-center shrink-0 transition-colors">
+              <span class="material-icons text-lg">send</span>
+            </button>
+          </footer>
+
+          <!-- EMOJI POPUP WINDOW -->
+          <div id="emoji-picker" class="absolute bottom-16 left-4 w-72 bg-white border border-brand-border rounded-xl shadow-xl z-50 p-3 hidden">
+            <div class="flex justify-between items-center mb-2 border-b border-brand-border pb-1">
+              <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Emoji nhanh</span>
+              <button onclick="toggleEmojiPicker()" class="text-xs text-slate-400 hover:text-red-500">✕</button>
+            </div>
+            <div class="flex flex-col gap-2 max-h-56 overflow-y-auto" id="emoji-list-container">
+              <!-- Emojis loaded here -->
+            </div>
+          </div>
+
+        </section>
+
+        <!-- [P1] AUTO SEND DRAWER (Slide-out campaign sidebar) -->
+        
+        <!-- Toggle button pinned to the right edge -->
+        <button onclick="toggleAutoSendDrawer()" 
+          class="absolute right-0 top-1/3 z-50 w-9 h-12 bg-gradient-to-l from-brand-red to-red-600 hover:from-brand-redHover hover:to-red-700 text-white rounded-l-xl shadow-lg flex flex-col items-center justify-center border-l border-y border-white/20 transition-all"
+          title="Mở chiến dịch gửi hàng loạt">
+          <span class="material-icons text-lg" id="toggle-drawer-icon">campaign</span>
+          <span class="text-[8px] font-extrabold uppercase scale-90 -mt-1 tracking-tighter">Auto</span>
+        </button>
+
+        <!-- The actual panel drawer, slide-out behavior -->
+        <div id="auto-send-drawer" class="absolute right-0 top-0 h-full w-[450px] bg-white border-l border-brand-border shadow-2xl z-40 transition-transform duration-300 ease-in-out translate-x-full flex flex-col">
+          
+          <!-- Drawer Header -->
+          <div class="p-4 border-b border-brand-border flex items-center justify-between bg-slate-50 shrink-0">
+            <div class="flex items-center gap-2">
+              <span class="material-icons text-[#E3000F]">campaign</span>
+              <div>
+                <h2 class="text-xs font-bold text-slate-800">Bảng chiến dịch gửi hàng loạt (Auto)</h2>
+                <p class="text-[10px] text-slate-400">Chọn tin mẫu đã lưu, người nhận để gửi nhanh</p>
+              </div>
+            </div>
+            <button onclick="toggleAutoSendDrawer()" class="w-8 h-8 rounded-lg hover:bg-slate-200 border border-brand-border flex items-center justify-center text-slate-500">
+              <span class="material-icons text-base">close</span>
+            </button>
+          </div>
+
+          <!-- Drawer Scroll Area -->
+          <div class="flex-1 overflow-y-auto p-4 space-y-4">
+            
+            <!-- Error panel if any -->
+            <div id="drawer-error" class="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 rounded-lg hidden"></div>
+
+            <!-- Section 1: Content Mode Selection -->
+            <div class="border border-brand-border rounded-xl p-3 bg-white space-y-2">
+              <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Chế độ nội dung</label>
+              <div class="grid grid-cols-3 gap-2">
+                <button onclick="setCampaignMode('both')" id="mode-both" class="py-1.5 rounded-lg border border-brand-red bg-red-50 text-[#E3000F] text-xs font-semibold transition-all">Text + Ảnh</button>
+                <button onclick="setCampaignMode('text')" id="mode-text" class="py-1.5 rounded-lg border border-brand-border text-slate-600 hover:border-brand-red text-xs font-semibold transition-all">Chỉ Text</button>
+                <button onclick="setCampaignMode('image')" id="mode-image" class="py-1.5 rounded-lg border border-brand-border text-slate-600 hover:border-brand-red text-xs font-semibold transition-all">Chỉ Ảnh</button>
+              </div>
+              <p class="text-[10px] text-slate-400 font-medium mt-1">Đã chọn 1 tin nhắn trực quan từ chat.</p>
+            </div>
+
+            <!-- Section 2: Recipients input -->
+            <div class="border border-brand-border rounded-xl p-3 bg-white space-y-3">
+              <div class="flex items-center justify-between">
+                <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Nhập người nhận thủ công</label>
+                <span class="text-[9px] text-slate-400">Mỗi dòng một tên/ID</span>
+              </div>
+              <textarea id="manual-recipients" rows="3" placeholder="Nhập tên group hoặc cá nhân..." 
+                class="w-full border border-brand-border rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-brand-red resize-none"></textarea>
+
+              <hr class="border-slate-100">
+
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Chọn người nhận từ hệ thống</span>
+                <button onclick="loadTargets()" id="btn-load-targets" class="bg-brand-red hover:bg-brand-redHover text-white text-[10px] font-bold px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 shrink-0">
+                  <span class="material-icons text-xs">refresh</span> Tải danh sách
+                </button>
+              </div>
+
+              <!-- Search recipient lists -->
+              <div class="relative flex items-center" id="search-targets-wrapper" style="display:none;">
+                <span class="material-icons absolute left-2.5 text-slate-400 text-xs">search</span>
+                <input type="text" id="target-search" placeholder="Lọc danh sách nhận..." oninput="filterTargets(this.value)"
+                  class="w-full pl-8 pr-3 py-1 border border-brand-border rounded-lg text-[11px] outline-none focus:border-brand-red bg-white">
+              </div>
+
+              <!-- List of groups fetched -->
+              <div class="max-h-40 overflow-y-auto border border-slate-100 rounded-lg p-2 space-y-1.5 bg-slate-50" id="recipient-list" style="display:none;">
+                <!-- Target lists loaded via JS -->
+              </div>
+            </div>
+
+            <!-- Section 3: Preview Box -->
+            <div class="border border-brand-border rounded-xl p-3 bg-white space-y-2">
+              <div class="flex items-center justify-between">
+                <div>
+                  <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Bản xem trước chiến dịch</span>
+                  <span class="text-[10px] text-slate-400 font-semibold" id="preview-counts">Chưa cấu hình người nhận</span>
+                </div>
+                <button onclick="generateCampaignPreview()" class="border border-brand-border hover:border-brand-red text-slate-700 hover:text-brand-red text-xs font-bold px-2.5 py-1 rounded-lg transition-all flex items-center gap-1">
+                  <span class="material-icons text-xs">visibility</span> Preview
+                </button>
+              </div>
+
+              <!-- Preview Area Container -->
+              <div id="preview-area" class="bg-slate-50 border border-dashed border-brand-border rounded-lg p-3 text-xs text-slate-400 text-center italic">
+                Bấm nút Preview để xem thử mẫu câu và tệp đính kèm sẽ gửi.
+              </div>
+            </div>
+
+            <!-- Action buttons inside panel -->
+            <div class="pt-2">
+              <button onclick="startAutoSendCampaign()" id="btn-submit-campaign" disabled
+                class="w-full bg-brand-red hover:bg-brand-redHover text-white text-xs font-bold py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                <span class="material-icons text-base">send</span>
+                <span>Bắt đầu gửi hàng loạt</span>
+              </button>
+            </div>
+
+            <!-- Campaign Status Logs -->
+            <div id="campaign-logs-panel" class="border border-brand-border rounded-xl p-3 bg-white space-y-2 hidden">
+              <div class="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider" id="log-campaign-title">Chiến dịch: Camp_981a2</span>
+                <span class="text-[10px] font-bold text-[#E3000F] uppercase" id="log-campaign-status">Đang chạy</span>
+              </div>
+              <div class="max-h-40 overflow-y-auto space-y-1 text-[11px] font-semibold text-slate-500" id="campaign-logs">
+                <!-- Log logs -->
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+</div>
+
+<!-- DATA JAVASCRIPT STATE & LOGIC -->
+<script type="text/javascript">
+  
+  // Emojis categories definition
+  const EMOJI_CATEGORIES = [
+    {
+      name: "Cảm xúc",
+      emojis: ["😊", "😂", "🥰", "😍", "😉", "😘", "😜", "😎", "🤩", "🥳", "😀", "😃", "😄", "😁", "😆", "😅", "🤣", "😇", "🙂", "🙃", "😌", "😋", "😛", "😝", "😜", "🤪", "😏", "😒", "😞", "😔", "😟", "😕", "🙁", "☹️", "😣", "😖", "😫", "😩", "🥺", "😢", "😭", "😤", "😠", "😡", "🤬", "🤯", "😳", "🥵", "🥶", "😱", "😨", "😰", "😥", "😓", "🤔", "🤭", "🤫", "🤥", "😬", "🙄"]
+    },
+    {
+      name: "Cử chỉ",
+      emojis: ["👍", "👎", "👌", "✌️", "🤞", "🤟", "🤘", "🤙", "👈", "👉", "👆", "🖕", "👇", "☝️", "✊", "👊", "🤛", "🤜", "👏", "🙌", "👐", "🤲", "🤝", "🙏", "👋", "🤚", "🖐️", "✋", "🖖", "✍️", "💅", "🤳", "💪"]
+    },
+    {
+      name: "Yêu thích",
+      emojis: ["❤️", "💖", "💘", "💝", "💕", "💞", "💓", "💗", "❣️", "💟", "💌", "💔", "❤️‍🔥", "❤️‍🩹", "🔥", "✨", "⭐", "🌟", "💫", "💥", "💯", "🎉", "🎁", "🎈", "🍻", "☕", "🍕", "🧁", "🍓", "🐱", "🐶", "🌸", "🍀"]
+    }
+  ];
+
+  // Static state data
+  const MOCK_CONVERSATIONS = [
+    {
+      conversation_id: "4580125221169254370",
+      conversation_name: "Thanh Tùng",
+      platform: "zalo",
+      unread_count: 2,
+      latest_message: "phải này kh anh ha",
+      latest_message_at: "10:30",
+      status_tag: "chatting",
+      avatar_url: null,
+      is_pinned: true,
+      last_sender_name: "Thanh Tùng",
+      bridge_name: "PC của seeder1",
+      bridge_status: "Sync OK"
+    },
+    {
+      conversation_id: "7481472185963826110",
+      conversation_name: "Mylife",
+      platform: "zalo",
+      unread_count: 0,
+      latest_message: "@Tiên xem vs bạn T nhen",
+      latest_message_at: "08:26",
+      status_tag: "new",
+      avatar_url: null,
+      is_pinned: false,
+      last_sender_name: "Mylife",
+      bridge_name: "PC của seeder1",
+      bridge_status: "Sync OK"
+    },
+    {
+      conversation_id: "fb_12093049281203",
+      conversation_name: "Việt Anh (BD)",
+      platform: "facebook",
+      unread_count: 0,
+      latest_message: "Dạ vâng để em check lại.",
+      latest_message_at: "Hôm qua",
+      status_tag: "followup",
+      avatar_url: null,
+      is_pinned: false,
+      last_sender_name: "Việt Anh",
+      bridge_name: "Cloud Seeder FB",
+      bridge_status: "Sync OK"
+    },
+    {
+      conversation_id: "272842620640408996",
+      conversation_name: "Anh Hoàng Nguyễn",
+      platform: "zalo",
+      unread_count: 1,
+      latest_message: "Nhờ gửi báo giá tool nhé",
+      latest_message_at: "Hôm qua",
+      status_tag: "new",
+      avatar_url: null,
+      is_pinned: false,
+      last_sender_name: "Anh Hoàng",
+      bridge_name: "PC của seeder2",
+      bridge_status: "Sync OK"
+    },
+    {
+      conversation_id: "5263743933921671777",
+      conversation_name: "Linh Lan Chi",
+      platform: "zalo",
+      unread_count: 0,
+      latest_message: "Cảm ơn bạn nhé.",
+      latest_message_at: "15/06",
+      status_tag: "inactive",
+      avatar_url: null,
+      is_pinned: false,
+      last_sender_name: "Linh Lan Chi",
+      bridge_name: "PC của seeder1",
+      bridge_status: "Sync OK"
+    }
+  ];
+
+  const MOCK_MESSAGES_MAP = {
+    "4580125221169254370": [
+      { sender_id: "3835937771574980950", sender_name: "Thanh Tùng", role: "client", timestamp_text: "08:24", content: "@Mylife e có phần truy cập /admin th á anh còn sheet project plan e kh có anh ạ" },
+      { sender_id: "2294115109366511291", sender_name: "Mylife", role: "leader", timestamp_text: "08:26", content: "ủa sao lại ko có project plan dc nhẩy" },
+      { sender_id: "2294115109366511291", sender_name: "Mylife", role: "leader", timestamp_text: "08:26", content: "@Tiên xem vs bạn T nhen" },
+      { sender_id: "3835937771574980950", sender_name: "Thanh Tùng", role: "client", timestamp_text: "08:27", content: "https://docs.google.com/spreadsheets/d/1z_fax53sCcDKCBxP95lp47474uR6s7oJabtoSRvjUeA/edit?gid=1070177678#gid=1070177678" },
+      { sender_id: "3835937771574980950", sender_name: "Thanh Tùng", role: "client", timestamp_text: "08:28", content: "phải này kh anh ha" }
+    ],
+    "7481472185963826110": [
+      { sender_id: "2294115109366511291", sender_name: "Mylife", role: "leader", timestamp_text: "08:20", content: "Mọi người đã sync được data từ Zalo chưa?" },
+      { sender_id: "3835937771574980950", sender_name: "Tiên Lê", role: "staff", timestamp_text: "08:22", content: "Dạ em đang test luồng auth, đã chạy OK rồi ạ." },
+      { sender_id: "2294115109366511291", sender_name: "Mylife", role: "leader", timestamp_text: "08:26", content: "@Tiên xem vs bạn T nhen" }
+    ],
+    "fb_12093049281203": [
+      { sender_id: "fb_cust", sender_name: "Việt Anh (BD)", role: "client", timestamp_text: "Hôm qua", content: "Chào bạn, mình cần hỗ trợ về gói seeding tự động." },
+      { sender_id: "fb_staff", sender_name: "Lan Anh", role: "staff", timestamp_text: "Hôm qua", content: "Dạ vâng để em check lại và báo giá cho anh nhé." }
+    ],
+    "272842620640408996": [
+      { sender_id: "327635537", sender_name: "Anh Hoàng Nguyễn", role: "client", timestamp_text: "Hôm qua", content: "Nhờ gửi báo giá tool nhé" }
+    ],
+    "5263743933921671777": [
+      { sender_id: "526374393392", sender_name: "Linh Lan Chi", role: "client", timestamp_text: "15/06", content: "Mình đã nhận được tài liệu. Cảm ơn bạn nhé." }
+    ]
+  };
+
+  const MOCK_TARGET_GROUPS = [
+    { group_id: "z_g1", name: "Cộng đồng AI Automation VN" },
+    { group_id: "z_g2", name: "Hội Thiết Kế Website Giá Rẻ" },
+    { group_id: "z_g3", name: "IT Jobs & Việc làm IT miền Trung" },
+    { group_id: "z_g4", name: "Thiết kế Landing Page Performance" },
+    { group_id: "z_g5", name: "SME Việt Nam - Tư vấn tăng trưởng" }
+  ];
+
+  const QUICK_REPLIES = {
+    chao_hoi: "Dạ chào anh/chị, bên em là đơn vị chuyên cung cấp dịch vụ thiết kế Website chuyên nghiệp, chuẩn SEO và tối ưu trải nghiệm người dùng ạ.",
+    bao_gia: "Công ty em hiện gửi anh/chị bảng giá các gói thiết kế Website chuyên nghiệp, tích hợp AI và tối ưu chuyển đổi ạ. (Gói Standard: 5M, Gói Pro: 12M).",
+    book_demo: "Bên em hỗ trợ book lịch demo trực tiếp 1-1 cùng chuyên viên kỹ thuật để trải nghiệm hệ thống tại đây nhé: https://calendly.com/demo-sp",
+    xin_info: "Để tư vấn gói giải pháp phù hợp nhất, em xin phép xin thông tin số điện thoại (Zalo) hoặc Email của anh/chị để gửi tài liệu chi tiết ạ."
+  };
+
+  const SLASH_COMMAND_TEMPLATES = [
+    { shortcut: "/chao", label: "Chào hỏi ban đầu", text: QUICK_REPLIES.chao_hoi },
+    { shortcut: "/baogia", label: "Gửi báo giá dịch vụ", text: QUICK_REPLIES.bao_gia },
+    { shortcut: "/demo", label: "Đặt lịch hẹn demo", text: QUICK_REPLIES.book_demo },
+    { shortcut: "/xinso", label: "Xin thông tin SĐT / Email", text: QUICK_REPLIES.xin_info }
+  ];
+
+  // Global variables
+  let conversations = [...MOCK_CONVERSATIONS];
+  let activeChatId = "4580125221169254370";
+  let activeTab = "all";
+  let activeFilterTag = "all";
+  let campaignMode = "both";
+  let selectedTargetIds = [];
+  let fetchedTargets = [];
+  let isDrawerOpen = false;
+  let showSlashMenu = false;
+  let slashSelectedIndex = 0;
+
+  // Initial load
+  window.addEventListener('DOMContentLoaded', () => {
+    // Load local storage tags
+    const savedTags = localStorage.getItem("zalo_conversation_tags");
+    if (savedTags) {
+      const parsed = JSON.parse(savedTags);
+      conversations.forEach(c => {
+        if (parsed[c.conversation_id]) {
+          c.status_tag = parsed[c.conversation_id];
+        }
+      });
+    }
+
+    renderConversations();
+    renderMessages();
+    renderSlashList();
+    setupEmojiPicker();
+    updateStats();
+
+    // Drag resizing for chat list panel
+    const dragHandle = document.getElementById('drag-handle');
+    const chatListPanel = document.getElementById('chat-list-panel');
+    let isResizing = false;
+
+    dragHandle.addEventListener('mousedown', (e) => {
+      isResizing = true;
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none'; // Prevent text selection
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isResizing) return;
+      const rect = chatListPanel.getBoundingClientRect();
+      const newWidth = e.clientX - rect.left;
+      
+      // Enforce limits [200px, 500px]
+      if (newWidth >= 200 && newWidth <= 500) {
+        chatListPanel.style.width = `${newWidth}px`;
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (isResizing) {
+        isResizing = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    });
+  });
+
+  // UI RENDERING - CONVERSATIONS
+  function renderConversations() {
+    const listContainer = document.getElementById('conversations-container');
+    listContainer.innerHTML = '';
+
+    const searchQuery = document.getElementById('chat-search').value.toLowerCase().trim();
+
+    // Filtering
+    let filtered = conversations.filter(c => {
+      // Search match
+      const nameMatch = c.conversation_name.toLowerCase().includes(searchQuery);
+      const msgMatch = c.latest_message.toLowerCase().includes(searchQuery);
+      if (searchQuery && !nameMatch && !msgMatch) return false;
+
+      // Tab match
+      if (activeTab === "unread" && c.unread_count === 0) return false;
+      if (activeTab === "inactive" && c.status_tag !== "inactive") return false;
+
+      // Dropdown tag match
+      if (activeFilterTag !== "all" && c.status_tag !== activeFilterTag) return false;
+
+      return true;
+    });
+
+    // Sort: pinned first, then last messages
+    filtered.sort((a, b) => {
+      if (a.is_pinned !== b.is_pinned) return b.is_pinned - a.is_pinned;
+      return 1; // keep current list order or sorting
+    });
+
+    if (filtered.length === 0) {
+      listContainer.innerHTML = `
+        <div class="p-8 text-center text-xs text-slate-400 italic">
+          Không tìm thấy hội thoại phù hợp
+        </div>
+      `;
+      return;
+    }
+
+    filtered.forEach(c => {
+      const isActive = c.conversation_id === activeChatId;
+      const unreadCountBadge = c.unread_count > 0 
+        ? `<span class="bg-red-500 text-white font-extrabold text-[9px] w-4.5 h-4.5 rounded-full flex items-center justify-center scale-90 shrink-0">${c.unread_count}</span>` 
+        : '';
+      
+      const pinClass = c.is_pinned ? 'text-[#E3000F] font-bold' : 'text-slate-300';
+      const channelBadge = c.platform === "zalo" 
+        ? `<span class="text-[9px] bg-sky-100 text-[#0068ff] font-bold px-1 py-0.2 rounded border border-sky-200 uppercase shrink-0">Zalo</span>`
+        : `<span class="text-[9px] bg-slate-100 text-slate-600 font-bold px-1 py-0.2 rounded border border-slate-200 uppercase shrink-0">FB</span>`;
+
+      // Resolve tag styling
+      let tagLabel = 'Mới';
+      let tagBg = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      if (c.status_tag === 'chatting') {
+        tagLabel = 'Đang chat';
+        tagBg = 'bg-blue-50 text-blue-700 border-blue-200';
+      } else if (c.status_tag === 'followup') {
+        tagLabel = 'Follow-up';
+        tagBg = 'bg-amber-50 text-amber-700 border-amber-200';
+      } else if (c.status_tag === 'inactive') {
+        tagLabel = 'Không HĐ';
+        tagBg = 'bg-slate-50 text-slate-600 border-slate-200';
+      }
+
+      const item = document.createElement('div');
+      item.className = `group relative border-b border-slate-100 p-3 cursor-pointer transition-all ${isActive ? 'bg-red-50/70 border-l-4 border-[#E3000F] pl-2' : 'hover:bg-slate-50/80 bg-white'}`;
+      item.title = c.conversation_name;
+      item.onclick = () => selectActiveChat(c.conversation_id);
+
+      item.innerHTML = `
+        <div class="flex items-start gap-3">
+          <!-- Avatar -->
+          <div class="w-9 h-9 rounded-full bg-slate-200 flex-shrink-0 flex items-center justify-center font-bold text-slate-600 text-xs relative select-none">
+            ${c.conversation_name.slice(0,2).toUpperCase()}
+            ${c.is_pinned ? '<div class="absolute -top-1 -left-1 text-[10px] text-[#E3000F] font-bold">📌</div>' : ''}
+          </div>
+
+          <!-- Content block -->
+          <div class="flex-1 min-w-0">
+            <!-- Header inline: Name + Badge + Time -->
+            <div class="flex items-center justify-between gap-1 mb-0.5">
+              <span class="text-xs font-bold text-slate-800 truncate">${c.conversation_name}</span>
+              <div class="flex items-center gap-1 shrink-0">
+                ${channelBadge}
+                <span class="text-[9px] text-slate-400 font-medium">${c.latest_message_at}</span>
+              </div>
+            </div>
+
+            <!-- Preview & Status row -->
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-[11px] text-slate-500 truncate flex-1">${c.latest_message}</p>
+              
+              <!-- [P3.4] Tag badge changes directly on click -->
+              <div class="relative inline-block" onclick="event.stopPropagation()">
+                <button onclick="toggleTagMenu('${c.conversation_id}')" class="text-[9px] font-bold border px-1.5 py-0.5 rounded-full scale-90 ${tagBg} cursor-pointer hover:shadow-sm">
+                  ${tagLabel}
+                </button>
+                <!-- Simple popup tag select menu -->
+                <div id="tag-menu-${c.conversation_id}" class="absolute right-0 bottom-6 hidden bg-white border border-brand-border rounded-lg shadow-xl py-1 z-50 w-28 text-left text-xs font-semibold">
+                  <button onclick="changeStatusTag('${c.conversation_id}', 'new')" class="w-full px-3 py-1 hover:bg-slate-100 text-emerald-600 flex items-center gap-1.5">🟢 Mới</button>
+                  <button onclick="changeStatusTag('${c.conversation_id}', 'chatting')" class="w-full px-3 py-1 hover:bg-slate-100 text-blue-600 flex items-center gap-1.5">🔵 Đang chat</button>
+                  <button onclick="changeStatusTag('${c.conversation_id}', 'followup')" class="w-full px-3 py-1 hover:bg-slate-100 text-amber-600 flex items-center gap-1.5">🟡 Follow-up</button>
+                  <button onclick="changeStatusTag('${c.conversation_id}', 'inactive')" class="w-full px-3 py-1 hover:bg-slate-100 text-slate-500 flex items-center gap-1.5">⚪ Không HĐ</button>
+                </div>
+              </div>
+
+              ${unreadCountBadge}
+            </div>
+          </div>
+        </div>
+
+        <!-- [P3.5] Hover Action overlay buttons (con mắt gạch, ghim) -->
+        <div class="absolute right-2 top-2 hidden group-hover:flex items-center gap-1 bg-white/95 border border-brand-border rounded-lg px-1 py-0.5 shadow-sm z-10" onclick="event.stopPropagation()">
+          <!-- Eye slash button (Ẩn) -->
+          <button onclick="toggleHideChat('${c.conversation_id}')" class="w-6 h-6 hover:bg-slate-100 rounded flex items-center justify-center text-slate-500 hover:text-red-500" title="Ẩn/Đánh dấu chưa đọc">
+            <span class="material-icons text-base">visibility_off</span>
+          </button>
+          <!-- Pin button -->
+          <button onclick="togglePinChat('${c.conversation_id}')" class="w-6 h-6 hover:bg-slate-100 rounded flex items-center justify-center ${pinClass}" title="Ghim/Bỏ ghim">
+            <span class="material-icons text-base">push_pin</span>
+          </button>
+        </div>
+      `;
+      listContainer.appendChild(item);
+    });
+  }
+
+  // Active chat selection
+  function selectActiveChat(id) {
+    activeChatId = id;
+    
+    // Clear unread
+    const target = conversations.find(c => c.conversation_id === id);
+    if (target) {
+      target.unread_count = 0;
+    }
+
+    renderConversations();
+    renderMessages();
+    updateStats();
+
+    // Sync header status mapping
+    const titleHeader = document.getElementById('active-chat-title');
+    const avatarHeader = document.getElementById('active-chat-avatar');
+    const sublabelHeader = document.getElementById('active-chat-sublabel');
+
+    if (target) {
+      titleHeader.textContent = target.conversation_name;
+      avatarHeader.textContent = target.conversation_name.slice(0,2).toUpperCase();
+      
+      if (target.platform === "zalo") {
+        avatarHeader.className = "w-9 h-9 rounded-full bg-[#0068ff] text-white flex items-center justify-center font-bold text-sm shrink-0";
+      } else {
+        avatarHeader.className = "w-9 h-9 rounded-full bg-slate-500 text-white flex items-center justify-center font-bold text-sm shrink-0";
+      }
+
+      const channelName = target.platform === "zalo" ? "Zalo" : "Facebook";
+      const channelColor = target.platform === "zalo" ? "text-[#0068ff]" : "text-slate-500";
+      sublabelHeader.innerHTML = `
+        <span class="${channelColor} font-bold">${channelName}</span>
+        <span class="w-1 h-1 rounded-full bg-slate-300"></span>
+        <span>Bridge: ${target.bridge_name}</span>
+        <span class="w-1 h-1 rounded-full bg-slate-300"></span>
+        <span class="text-emerald-600 flex items-center gap-0.5 font-bold"><span class="material-icons text-[10px]">sync</span> ${target.bridge_status}</span>
+      `;
+    }
+  }
+
+  // Action: Toggle Pin Chat
+  function togglePinChat(id) {
+    const target = conversations.find(c => c.conversation_id === id);
+    if (target) {
+      target.is_pinned = !target.is_pinned;
+      renderConversations();
+    }
+  }
+
+  // Action: Toggle Hide / Unread Chat
+  function toggleHideChat(id) {
+    const target = conversations.find(c => c.conversation_id === id);
+    if (target) {
+      if (confirm(`Bạn muốn ẩn cuộc trò chuyện của "${target.conversation_name}" khỏi danh sách tạm thời?`)) {
+        conversations = conversations.filter(c => c.conversation_id !== id);
+        if (activeChatId === id && conversations.length > 0) {
+          activeChatId = conversations[0].conversation_id;
+        }
+        renderConversations();
+        renderMessages();
+        updateStats();
+      }
+    }
+  }
+
+  // Action: Toggle Dropdown Tag Menu
+  let activeOpenTagMenu = null;
+  function toggleTagMenu(id) {
+    // Close other tag menu if open
+    if (activeOpenTagMenu && activeOpenTagMenu !== id) {
+      const el = document.getElementById(`tag-menu-${activeOpenTagMenu}`);
+      if (el) el.classList.add('hidden');
+    }
+
+    const menu = document.getElementById(`tag-menu-${id}`);
+    if (menu) {
+      const isHidden = menu.classList.contains('hidden');
+      if (isHidden) {
+        menu.classList.remove('hidden');
+        activeOpenTagMenu = id;
+      } else {
+        menu.classList.add('hidden');
+        activeOpenTagMenu = null;
+      }
+    }
+  }
+
+  // Action: Change Status Tag Directly
+  function changeStatusTag(id, newTag) {
+    const target = conversations.find(c => c.conversation_id === id);
+    if (target) {
+      target.status_tag = newTag;
+      
+      // Save to localstorage
+      const saved = localStorage.getItem("zalo_conversation_tags");
+      let parsed = saved ? JSON.parse(saved) : {};
+      parsed[id] = newTag;
+      localStorage.setItem("zalo_conversation_tags", JSON.stringify(parsed));
+
+      renderConversations();
+      updateStats();
+    }
+    const menu = document.getElementById(`tag-menu-${id}`);
+    if (menu) menu.classList.add('hidden');
+    activeOpenTagMenu = null;
+  }
+
+  // Tabs filtering
+  function switchTab(tab) {
+    activeTab = tab;
+    
+    // UI tabs update
+    document.querySelectorAll('[id^="tab-"]').forEach(btn => {
+      btn.className = "flex-1 py-1 rounded-md hover:bg-white/50 transition-all text-slate-500";
+    });
+    const activeBtn = document.getElementById(`tab-${tab}`);
+    activeBtn.className = "flex-1 py-1 rounded-md bg-white text-[#E3000F] font-bold shadow-sm transition-all";
+
+    renderConversations();
+  }
+
+  // Dropdown filter
+  function filterByDropdownTag(val) {
+    activeFilterTag = val;
+    renderConversations();
+  }
+
+  // Setup search input listener
+  document.getElementById('chat-search').addEventListener('input', () => {
+    renderConversations();
+  });
+
+  // UI RENDERING - MESSAGES IN STREAM
+  function renderMessages() {
+    const container = document.getElementById('messages-container');
+    container.innerHTML = '';
+
+    const list = MOCK_MESSAGES_MAP[activeChatId] || [];
+
+    if (list.length === 0) {
+      container.innerHTML = `
+        <div class="h-full flex items-center justify-center text-xs text-slate-400 italic">
+          Không có tin nhắn nào trong hội thoại này
+        </div>
+      `;
+      return;
+    }
+
+    list.forEach(m => {
+      // Check if current sender is self (Leader / Staff) or client
+      const isSelf = m.role === "leader" || m.role === "staff";
+      
+      const flexAlignment = isSelf ? "justify-end" : "justify-start";
+      const bubbleBg = isSelf 
+        ? "bg-brand-red text-white rounded-tr-none" 
+        : "bg-white text-slate-800 border border-brand-border rounded-tl-none shadow-sm";
+      
+      // Resolve role tag color
+      let roleLabel = "Khách hàng";
+      let roleColorClass = "role-tag-client";
+      if (m.role === "leader") {
+        roleLabel = "Leader";
+        roleColorClass = "role-tag-leader";
+      } else if (m.role === "staff") {
+        roleLabel = "Staff (Seeder)";
+        roleColorClass = "role-tag-staff";
+      }
+
+      // [P4.2] Message bubble shows sender name + role explicitly above bubble
+      const headerHtml = `
+        <div class="flex items-center gap-1.5 mb-1 px-1 text-[11px] font-semibold text-slate-500 ${isSelf ? 'justify-end' : 'justify-start'}">
+          <span class="text-slate-700">${m.sender_name}</span>
+          <span class="px-1.5 py-0.2 rounded-full text-[9px] font-extrabold tracking-wide uppercase ${roleColorClass}">${roleLabel}</span>
+        </div>
+      `;
+
+      const messageBox = document.createElement('div');
+      messageBox.className = `flex ${flexAlignment} w-full`;
+      messageBox.innerHTML = `
+        <div class="max-w-[70%]">
+          ${headerHtml}
+          <div class="p-3 rounded-2xl text-xs whitespace-pre-wrap leading-relaxed shadow-sm break-words ${bubbleBg}">
+            ${m.content}
+          </div>
+          <div class="text-[9px] text-slate-400 font-semibold px-1.5 mt-0.5 ${isSelf ? 'text-right' : 'text-left'}">
+            ${m.timestamp_text}
+          </div>
+        </div>
+      `;
+      container.appendChild(messageBox);
+    });
+
+    // Auto scroll to bottom
+    container.scrollTop = container.scrollHeight;
+  }
+
+  // [P5] QUICK REPLY PILLS ROW CONTROLLER
+  function insertQuickReply(key) {
+    const text = QUICK_REPLIES[key] || "";
+    if (text) {
+      const input = document.getElementById('chat-input');
+      input.value = text;
+      autoGrowTextarea(input);
+      input.focus();
+    }
+  }
+
+  // AUTO GROW TEXTAREA
+  function autoGrowTextarea(element) {
+    element.style.height = "auto";
+    element.style.height = (element.scrollHeight) + "px";
+
+    // Toggle slash menu if gushed '/'
+    const val = element.value;
+    if (val.trim() === "/") {
+      showSlashAutocomplete();
+    } else if (!val.includes("/")) {
+      hideSlashAutocomplete();
+    } else {
+      // Filter slash menu based on query
+      const query = val.slice(val.lastIndexOf("/") + 1).toLowerCase();
+      filterSlashMenu(query);
+    }
+  }
+
+  // [P4] Sync indicator trigger mock action
+  function triggerSync() {
+    const icon = document.getElementById('sync-icon');
+    icon.classList.add('animate-spin');
+    setTimeout(() => {
+      // Add a mock new message from client
+      const activeMessages = MOCK_MESSAGES_MAP[activeChatId];
+      if (activeMessages) {
+        activeMessages.push({
+          sender_id: "3835937771574980950",
+          sender_name: "Thanh Tùng",
+          role: "client",
+          timestamp_text: "Vừa xong",
+          content: "Dạ em đã gởi thông tin dự án, anh xem qua rồi báo giá cho em nha."
+        });
+        
+        // Also update latest message on chat list
+        const conversation = conversations.find(c => c.conversation_id === activeChatId);
+        if (conversation) {
+          conversation.latest_message = "Dạ em đã gởi thông tin dự án...";
+          conversation.latest_message_at = "Vừa xong";
+        }
+      }
+      renderMessages();
+      renderConversations();
+      alert("Đồng bộ tin nhắn mới thành công!");
+    }, 1200);
+  }
+
+  // Send message controller
+  function sendMessage() {
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+
+    // Add to active chat list
+    const activeMessages = MOCK_MESSAGES_MAP[activeChatId];
+    if (activeMessages) {
+      activeMessages.push({
+        sender_id: "seeder_own",
+        sender_name: "Mylife",
+        role: "leader",
+        timestamp_text: "Vừa xong",
+        content: text
+      });
+
+      // Update latest preview text
+      const conversation = conversations.find(c => c.conversation_id === activeChatId);
+      if (conversation) {
+        conversation.latest_message = text;
+        conversation.latest_message_at = "Vừa xong";
+      }
+    }
+
+    input.value = '';
+    input.style.height = "36px";
+    hideSlashAutocomplete();
+    renderMessages();
+    renderConversations();
+  }
+
+  function handleInputKeydown(event) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      
+      // If slash popup is open, handle selection
+      if (showSlashMenu) {
+        const selectedEl = document.querySelector('#slash-list li.bg-slate-100');
+        if (selectedEl) {
+          selectedEl.click();
+        }
+      } else {
+        sendMessage();
+      }
+    } else if (showSlashMenu) {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        navigateSlashMenu(1);
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        navigateSlashMenu(-1);
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        hideSlashAutocomplete();
+      }
+    }
+  }
+
+  // [P3.5] Slash Command Autocomplete Popover controller
+  function showSlashAutocomplete() {
+    const popup = document.getElementById('slash-popup');
+    popup.classList.remove('hidden');
+    showSlashMenu = true;
+    slashSelectedIndex = 0;
+    highlightSlashOption();
+  }
+
+  function hideSlashAutocomplete() {
+    const popup = document.getElementById('slash-popup');
+    popup.classList.add('hidden');
+    showSlashMenu = false;
+  }
+
+  function renderSlashList() {
+    const ul = document.getElementById('slash-list');
+    ul.innerHTML = '';
+
+    SLASH_COMMAND_TEMPLATES.forEach((tpl, index) => {
+      const li = document.createElement('li');
+      li.className = `px-3 py-2 cursor-pointer transition-colors text-xs hover:bg-slate-50 flex flex-col gap-0.5`;
+      li.onclick = () => selectSlashOption(tpl.text);
+      li.innerHTML = `
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-[#E3000F]">${tpl.shortcut}</span>
+          <span class="text-[10px] text-slate-400">${tpl.label}</span>
+        </div>
+        <p class="text-[11px] text-slate-500 truncate font-semibold">${tpl.text}</p>
+      `;
+      ul.appendChild(li);
+    });
+  }
+
+  function filterSlashMenu(query) {
+    const options = document.querySelectorAll('#slash-list li');
+    let visibleIndex = 0;
+    let hasVisible = false;
+
+    options.forEach((li, idx) => {
+      const shortcut = SLASH_COMMAND_TEMPLATES[idx].shortcut;
+      const label = SLASH_COMMAND_TEMPLATES[idx].label.toLowerCase();
+      
+      const match = shortcut.includes(query) || label.includes(query);
+      if (match) {
+        li.style.display = '';
+        hasVisible = true;
+      } else {
+        li.style.display = 'none';
+      }
+    });
+
+    if (!hasVisible) {
+      hideSlashAutocomplete();
+    } else {
+      showSlashAutocomplete();
+    }
+  }
+
+  function navigateSlashMenu(dir) {
+    const options = Array.from(document.querySelectorAll('#slash-list li')).filter(el => el.style.display !== 'none');
+    if (options.length === 0) return;
+
+    slashSelectedIndex = (slashSelectedIndex + dir + options.length) % options.length;
+    
+    // Highlight
+    document.querySelectorAll('#slash-list li').forEach(el => el.classList.remove('bg-slate-100'));
+    options[slashSelectedIndex].classList.add('bg-slate-100');
+    options[slashSelectedIndex].scrollIntoView({ block: 'nearest' });
+  }
+
+  function highlightSlashOption() {
+    const options = Array.from(document.querySelectorAll('#slash-list li')).filter(el => el.style.display !== 'none');
+    if (options.length === 0) return;
+    
+    document.querySelectorAll('#slash-list li').forEach(el => el.classList.remove('bg-slate-100'));
+    options[slashSelectedIndex].classList.add('bg-slate-100');
+  }
+
+  function selectSlashOption(text) {
+    const input = document.getElementById('chat-input');
+    input.value = text;
+    autoGrowTextarea(input);
+    input.focus();
+    hideSlashAutocomplete();
+  }
+
+  // Stats bar updater
+  function updateStats() {
+    const waitingCount = conversations.filter(c => c.unread_count > 0).length;
+    document.getElementById('stat-waiting').textContent = waitingCount;
+    document.getElementById('stat-total-chats').textContent = conversations.length;
+  }
+
+  // [P1] AUTO SEND DRAWER (Slide-out panel drawer)
+  function toggleAutoSendDrawer() {
+    const drawer = document.getElementById('auto-send-drawer');
+    const toggleIcon = document.getElementById('toggle-drawer-icon');
+    isDrawerOpen = !isDrawerOpen;
+
+    if (isDrawerOpen) {
+      drawer.classList.remove('translate-x-full');
+      toggleIcon.textContent = 'arrow_forward';
+    } else {
+      drawer.classList.add('translate-x-full');
+      toggleIcon.textContent = 'campaign';
+    }
+  }
+
+  function setCampaignMode(mode) {
+    campaignMode = mode;
+    document.querySelectorAll('[id^="mode-"]').forEach(btn => {
+      btn.className = "py-1.5 rounded-lg border border-brand-border text-slate-600 hover:border-brand-red text-xs font-semibold transition-all";
+    });
+    const activeBtn = document.getElementById(`mode-${mode}`);
+    activeBtn.className = "py-1.5 rounded-lg border border-brand-red bg-red-50 text-[#E3000F] text-xs font-semibold transition-all";
+  }
+
+  function loadTargets() {
+    const btn = document.getElementById('btn-load-targets');
+    btn.innerHTML = `<span class="material-icons text-xs animate-spin">sync</span> Loading...`;
+    btn.disabled = true;
+
+    setTimeout(() => {
+      fetchedTargets = [...MOCK_TARGET_GROUPS];
+      renderTargets();
+
+      document.getElementById('search-targets-wrapper').style.display = 'block';
+      document.getElementById('recipient-list').style.display = 'block';
+
+      btn.innerHTML = `<span class="material-icons text-xs">refresh</span> Tải danh sách`;
+      btn.disabled = false;
+
+      // Enable submit campaign button
+      document.getElementById('btn-submit-campaign').disabled = false;
+      updateCampaignCounts();
+    }, 1000);
+  }
+
+  function renderTargets() {
+    const container = document.getElementById('recipient-list');
+    container.innerHTML = '';
+
+    const filterVal = document.getElementById('target-search').value.toLowerCase().trim();
+    const filtered = fetchedTargets.filter(t => t.name.toLowerCase().includes(filterVal));
+
+    if (filtered.length === 0) {
+      container.innerHTML = `
+        <div class="text-[10px] text-slate-400 text-center italic py-2">
+          Không tìm thấy người nhận nào
+        </div>
+      `;
+      return;
+    }
+
+    filtered.forEach(t => {
+      const isChecked = selectedTargetIds.includes(t.group_id);
+      const label = document.createElement('label');
+      label.className = `flex items-center gap-2 p-1.5 rounded-lg border text-xs cursor-pointer select-none transition-all hover:bg-slate-100 ${isChecked ? 'bg-red-50/50 border-brand-red/30 text-[#E3000F]' : 'bg-white border-brand-border'}`;
+      label.innerHTML = `
+        <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleTargetSelect('${t.group_id}', this.checked)" class="rounded text-[#E3000F] border-brand-border w-3.5 h-3.5 focus:ring-0">
+        <span class="font-semibold text-slate-700 truncate">${t.name}</span>
+      `;
+      container.appendChild(label);
+    });
+  }
+
+  function filterTargets(val) {
+    renderTargets();
+  }
+
+  function toggleTargetSelect(id, checked) {
+    if (checked) {
+      if (!selectedTargetIds.includes(id)) selectedTargetIds.push(id);
+    } else {
+      selectedTargetIds = selectedTargetIds.filter(x => x !== id);
+    }
+    renderTargets();
+    updateCampaignCounts();
+  }
+
+  function updateCampaignCounts() {
+    const manualVal = document.getElementById('manual-recipients').value.trim();
+    const manualLines = manualVal ? manualVal.split('\n').filter(Boolean).length : 0;
+    const totalTargets = selectedTargetIds.length + manualLines;
+
+    const summaryText = document.getElementById('preview-counts');
+    summaryText.textContent = `${totalTargets} người nhận sẽ được gửi (Gặp ${selectedTargetIds.length} nhóm hệ thống, ${manualLines} thủ công).`;
+  }
+
+  // Listen to manual input change
+  document.getElementById('manual-recipients').addEventListener('input', () => {
+    updateCampaignCounts();
+  });
+
+  // Generate Campaign Preview Box
+  function generateCampaignPreview() {
+    const activeMsgList = MOCK_MESSAGES_MAP[activeChatId] || [];
+    const lastMessageText = activeMsgList.length > 0 ? activeMsgList[activeMsgList.length - 1].content : "Không có tin nhắn nào.";
+
+    const container = document.getElementById('preview-area');
+    container.className = "bg-slate-50 border border-brand-border rounded-lg p-3 text-xs text-slate-700 whitespace-pre-wrap text-left";
+    
+    let contentHtml = '';
+    if (campaignMode === 'both' || campaignMode === 'text') {
+      contentHtml += `<div class="font-bold text-[#E3000F] mb-1">Text sẽ gửi:</div>`;
+      contentHtml += `<div class="bg-white border border-brand-border rounded-lg p-2 mb-2 italic">"${lastMessageText}"</div>`;
+    }
+
+    if (campaignMode === 'both' || campaignMode === 'image') {
+      contentHtml += `<div class="font-bold text-[#e3000f] mb-1">Ảnh đính kèm:</div>`;
+      contentHtml += `
+        <div class="grid grid-cols-3 gap-2">
+          <div class="w-full aspect-video bg-slate-200 border rounded flex items-center justify-center text-[10px] text-slate-400 font-bold">Image_01.jpg</div>
+          <div class="w-full aspect-video bg-slate-200 border rounded flex items-center justify-center text-[10px] text-slate-400 font-bold">Image_02.jpg</div>
+        </div>
+      `;
+    }
+
+    container.innerHTML = contentHtml || "Chưa có nội dung gửi.";
+  }
+
+  // Submit / Start Campaign Sequence (Mock)
+  function startAutoSendCampaign() {
+    const btn = document.getElementById('btn-submit-campaign');
+    btn.disabled = true;
+    btn.innerHTML = `<span class="material-icons text-base animate-spin">sync</span> Đang gửi...`;
+
+    const logsPanel = document.getElementById('campaign-logs-panel');
+    logsPanel.classList.remove('hidden');
+
+    const logsContainer = document.getElementById('campaign-logs');
+    logsContainer.innerHTML = '';
+
+    const manualVal = document.getElementById('manual-recipients').value.trim();
+    const manualLines = manualVal ? manualVal.split('\n').filter(Boolean) : [];
+    
+    const allTargets = [
+      ...selectedTargetIds.map(id => {
+        const found = fetchedTargets.find(t => t.group_id === id);
+        return found ? found.name : id;
+      }),
+      ...manualLines
+    ];
+
+    let currentIdx = 0;
+    
+    function logNext() {
+      if (currentIdx >= allTargets.length) {
+        document.getElementById('log-campaign-status').textContent = "Hoàn thành";
+        document.getElementById('log-campaign-status').className = "text-[10px] font-bold text-emerald-600 uppercase";
+        btn.innerHTML = `<span class="material-icons text-base">check_circle</span> Hoàn thành`;
+        return;
+      }
+
+      const name = allTargets[currentIdx];
+      const logRow = document.createElement('div');
+      logRow.className = "flex items-center gap-1.5 py-0.5 border-b border-slate-50 last:border-0";
+      logRow.innerHTML = `
+        <span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+        <span class="font-bold text-slate-600 truncate flex-1">Gửi tới: ${name}</span>
+        <span class="text-[9px] text-[#E3000F] uppercase shrink-0 font-bold">Đang gửi...</span>
+      `;
+      logsContainer.appendChild(logRow);
+      logsContainer.scrollTop = logsContainer.scrollHeight;
+
+      setTimeout(() => {
+        logRow.querySelector('span:first-child').className = "w-1.5 h-1.5 rounded-full bg-emerald-500";
+        logRow.querySelector('span:last-child').textContent = "Thành công";
+        logRow.querySelector('span:last-child').className = "text-[9px] text-emerald-600 uppercase shrink-0 font-bold";
+        currentIdx++;
+        logNext();
+      }, 1000);
+    }
+
+    logNext();
+  }
+
+  // Emoji Popover window actions
+  function setupEmojiPicker() {
+    const container = document.getElementById('emoji-list-container');
+    container.innerHTML = '';
+
+    EMOJI_CATEGORIES.forEach(cat => {
+      const block = document.createElement('div');
+      block.innerHTML = `
+        <div class="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">${cat.name}</div>
+        <div class="grid grid-cols-8 gap-1">
+          ${cat.emojis.map(e => `<button onclick="insertEmoji('${e}')" class="w-7 h-7 rounded hover:bg-slate-100 flex items-center justify-center text-sm">${e}</button>`).join('')}
+        </div>
+      `;
+      container.appendChild(block);
+    });
+  }
+
+  function toggleEmojiPicker() {
+    const el = document.getElementById('emoji-picker');
+    el.classList.toggle('hidden');
+  }
+
+  function insertEmoji(emoji) {
+    const input = document.getElementById('chat-input');
+    input.value += emoji;
+    autoGrowTextarea(input);
+    input.focus();
+  }
+
+  function triggerFileUpload() {
+    document.getElementById('file-uploader').click();
+  }
+
+  function handleFileSelect(e) {
+    const files = e.target.files;
+    if (files.length > 0) {
+      alert(`Đã chọn ${files.length} tệp đính kèm. Tiến trình đính kèm sẽ tự động gửi kèm.`);
+    }
+  }
+
+  // Hide popups when clicking elsewhere
+  document.addEventListener('click', (event) => {
+    // Hide emoji picker if clicked outside
+    const emojiPicker = document.getElementById('emoji-picker');
+    const isEmojiBtn = event.target.closest('button[onclick="toggleEmojiPicker()"]');
+    if (emojiPicker && !emojiPicker.classList.contains('hidden') && !event.target.closest('#emoji-picker') && !isEmojiBtn) {
+      emojiPicker.classList.add('hidden');
+    }
+
+    // Hide tag dropdowns on click outside
+    if (activeOpenTagMenu && !event.target.closest('[onclick^="toggleTagMenu"]')) {
+      const el = document.getElementById(`tag-menu-${activeOpenTagMenu}`);
+      if (el) el.classList.add('hidden');
+      activeOpenTagMenu = null;
+    }
+  });
+
+</script>
+</body>
+</html>

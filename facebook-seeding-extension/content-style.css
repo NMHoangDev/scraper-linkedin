@@ -1,0 +1,18 @@
+/* Facebook Seeding KPI Checker - Content Styles */
+/* Các style này đã được inline trong content-script.js */
+/* File này để dự phòng nếu cần mở rộng */
+
+/* Override Facebook styles nếu cần */
+#fb-kpi-overlay * {
+  box-sizing: border-box;
+}
+
+/* Animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+#fb-kpi-overlay .result-section {
+  animation: fadeIn 0.3s ease-out;
+}

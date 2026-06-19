@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FB Seeding KPI - Settings</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      width: 350px;
+      min-height: 200px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+      color: white;
+      padding: 20px;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    
+    .header h1 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    
+    .header p {
+      font-size: 11px;
+      opacity: 0.7;
+    }
+    
+    .form-group {
+      margin-bottom: 16px;
+    }
+    
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      margin-bottom: 6px;
+      opacity: 0.9;
+    }
+    
+    .form-group input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    
+    .form-group input::placeholder {
+      color: rgba(255, 255, 255, 0.5);
+    }
+    
+    .form-group input:focus {
+      border-color: rgba(255, 255, 255, 0.5);
+      background: rgba(255, 255, 255, 0.15);
+    }
+    
+    .form-group small {
+      display: block;
+      font-size: 10px;
+      margin-top: 4px;
+      opacity: 0.6;
+    }
+    
+    .save-btn {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      background: #10b981;
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+    
+    .save-btn:hover {
+      background: #059669;
+    }
+    
+    .save-btn:active {
+      transform: scale(0.98);
+    }
+    
+    .status {
+      margin-top: 16px;
+      padding: 10px;
+      border-radius: 8px;
+      text-align: center;
+      font-size: 12px;
+      display: none;
+    }
+    
+    .status.success {
+      background: rgba(16, 185, 129, 0.3);
+      display: block;
+    }
+    
+    .status.error {
+      background: rgba(239, 68, 68, 0.3);
+      display: block;
+    }
+    
+    .divider {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.1);
+      margin: 20px 0;
+    }
+    
+    .help {
+      font-size: 11px;
+      opacity: 0.7;
+      text-align: center;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📊 Facebook Seeding KPI</h1>
+    <p>Cài đặt Extension</p>
+  </div>
+  
+  <div class="form-group">
+    <label>API Base URL</label>
+    <input type="text" id="apiBaseUrl" placeholder="https://seeding.markeeai.com/api">
+    <small>Địa chỉ backend API server</small>
+  </div>
+  
+  <div class="form-group">
+    <label>API Key</label>
+    <input type="password" id="apiKey" placeholder="Nhập API Key nếu có">
+    <small>Để trống nếu không cần xác thực</small>
+  </div>
+  
+  <button class="save-btn" id="saveBtn">💾 Lưu Cài Đặt</button>
+  
+  <div class="status" id="status"></div>
+  
+  <div class="divider"></div>
+  
+  <div class="help">
+    <strong>Hướng dẫn sử dụng:</strong><br>
+    1. Cài đặt Extension vào Chrome<br>
+    2. Cấu hình API URL & Key<br>
+    3. Nhấn "Tính KPI" trên Dashboard<br>
+    4. Extension sẽ tự động kiểm tra
+  </div>
+  
+  <script>
+    const apiBaseUrlInput = document.getElementById('apiBaseUrl');
+    const apiKeyInput = document.getElementById('apiKey');
+    const saveBtn = document.getElementById('saveBtn');
+    const statusEl = document.getElementById('status');
+    
+    // Load current settings
+    chrome.storage.sync.get(['apiBaseUrl', 'apiKey'], (result) => {
+      if (result.apiBaseUrl) apiBaseUrlInput.value = result.apiBaseUrl;
+      if (result.apiKey) apiKeyInput.value = result.apiKey;
+    });
+    
+    // Save settings
+    saveBtn.addEventListener('click', () => {
+      const apiBaseUrl = apiBaseUrlInput.value.trim() || 'https://seeding.markeeai.com/api';
+      const apiKey = apiKeyInput.value.trim();
+      
+      chrome.storage.sync.set({ apiBaseUrl, apiKey }, () => {
+        statusEl.textContent = '✅ Đã lưu cài đặt!';
+        statusEl.className = 'status success';
+        
+        setTimeout(() => {
+          statusEl.className = 'status';
+        }, 2000);
+      });
+    });
+  </script>
+</body>
+</html>
