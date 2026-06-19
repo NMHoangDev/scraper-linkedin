@@ -69,7 +69,7 @@ function initials(value: string) {
 }
 
 function messageKey(message: ZaloLibraryMessage) {
-  return message.id || message.source_message_id || `${message.group_id}-${message.timestamp_text}-${message.content}`;
+  return message.source_message_id || message.id || `${message.group_id}-${message.timestamp_text}-${message.content}`;
 }
 
 function isNearBottom(element: HTMLDivElement | null) {
@@ -110,6 +110,31 @@ function StatusDot({ tone }: { tone: "success" | "warning" | "muted" }) {
         ? "bg-amber-500"
         : "bg-on-surface-variant/50";
   return <span className={`inline-block h-2.5 w-2.5 rounded-full ${className}`} />;
+}
+
+function conversationTimeMs(conversation: ZaloConversationSummary) {
+  const value = conversation.latest_message_at;
+  if (!value) return 0;
+  const num = Number(value);
+  if (!Number.isNaN(num) && String(num) === String(value).trim()) {
+    return num < 1e11 ? num * 1000 : num;
+  }
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function sortConversationsLikeZalo(list: ZaloConversationSummary[]) {
+  return [...list].sort((a, b) => {
+    const pinA = a.is_pinned ? 1 : 0;
+    const pinB = b.is_pinned ? 1 : 0;
+    if (pinA !== pinB) return pinB - pinA;
+
+    const tA = conversationTimeMs(a);
+    const tB = conversationTimeMs(b);
+    if (tA !== tB) return tB - tA;
+
+    return (a.conversation_name || "").localeCompare(b.conversation_name || "");
+  });
 }
 
 export function ZaloInboxMonitorPanel({ flow }: ZaloInboxMonitorPanelProps) {
@@ -153,7 +178,7 @@ export function ZaloInboxMonitorPanel({ flow }: ZaloInboxMonitorPanelProps) {
     setConversationError(null);
     try {
       const response = await getZaloConversations(flow.userId);
-      const nextConversations = response.conversations ?? [];
+      const nextConversations = sortConversationsLikeZalo(response.conversations ?? []);
       setConversations(nextConversations);
       setSelectedConversationId((current) => {
         if (current && nextConversations.some((item) => item.conversation_id === current)) {
@@ -570,9 +595,30 @@ export function ZaloInboxMonitorPanel({ flow }: ZaloInboxMonitorPanelProps) {
                       </span>
                     </div>
                     <div className="truncate text-body-sm opacity-80">
-                      {hasMessages
-                        ? `${conversation.latest_sender_name ? `${conversation.latest_sender_name}: ` : ""}${conversation.latest_content || "Tin nhắn mới"}`
-                        : "Chưa có tin lưu"}
+                      {hasMessages ? (
+                        <>
+                          {(() => {
+                            const cleanSender = conversation.latest_sender_name?.trim();
+                            if (!cleanSender) return "";
+                            
+                            const lowerName = cleanSender.toLowerCase();
+                            const isSelf = lowerName === "__me__" || lowerName === "me" || lowerName === "bạn" || lowerName === "ban";
+                            if (isSelf) {
+                              return "Bạn: ";
+                            }
+                            
+                            const isGroup = !conversation.conversation_id.startsWith("fb_") && conversation.conversation_id.startsWith("g");
+                            if (isGroup) {
+                              return `${cleanSender}: `;
+                            }
+                            
+                            return "";
+                          })()}
+                          {conversation.latest_content || "Tin nhắn mới"}
+                        </>
+                      ) : (
+                        "Chưa có tin lưu"
+                      )}
                     </div>
                     <div className="mt-xs flex items-center justify-between gap-sm text-xs opacity-75">
                       <span>{formatTime(conversation.latest_message_at)}</span>

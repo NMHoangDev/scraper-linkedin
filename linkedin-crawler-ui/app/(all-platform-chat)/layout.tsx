@@ -9,8 +9,10 @@
  * URL: /zalo-chat (route group (all-platform-chat) ẩn tên group)
  */
 
+import { AllPlatformShell } from "@/components/all-platform/layout/AllPlatformShell";
+
 export default function AllPlatformChatLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  return <>{children}</>;
+  return <AllPlatformShell>{children}</AllPlatformShell>;
 }

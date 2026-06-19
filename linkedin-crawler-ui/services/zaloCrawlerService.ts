@@ -74,18 +74,9 @@ export function getZaloWorkers(userId = "default"): Promise<ZaloWorkersResponse>
   }, 7000);
 }
 
-export function getZaloAccounts(
-  ownerId = "default",
-  options: {
-    idMember?: string;
-    email?: string;
-    role?: string;
-  } = {}
-): Promise<ZaloAccountsResponse> {
+export function getZaloAccounts(ownerId = "default", idMember?: string): Promise<ZaloAccountsResponse> {
   const params = new URLSearchParams({ owner_id: ownerId });
-  if (options.idMember) params.append("id_member", options.idMember);
-  if (options.email) params.append("email", options.email);
-  if (options.role) params.append("role", options.role);
+  if (idMember) params.append("id_member", idMember);
   return requestJson<ZaloAccountsResponse>(`/api/all-platform/zalo/accounts?${params.toString()}`, {
     method: "GET",
     headers: {
@@ -98,7 +89,6 @@ export function createZaloAccount(payload: {
   account_id?: string;
   owner_id?: string;
   id_member?: string;
-  email?: string;
   label: string;
   phone?: string;
 }) {
@@ -112,8 +102,6 @@ export function updateZaloAccount(
   accountId: string,
   payload: {
     owner_id?: string;
-    id_member?: string;
-    email?: string;
     label?: string;
     phone?: string;
     status?: string;
@@ -125,12 +113,10 @@ export function updateZaloAccount(
   });
 }
 
-export function deleteZaloAccount(accountId: string, deleteAuth = false, ownerId?: string) {
+export function deleteZaloAccount(accountId: string, deleteAuth = false) {
   const params = new URLSearchParams({ delete_auth: String(deleteAuth) });
-  if (ownerId) params.set("owner_id", ownerId);
   return requestJson(`/api/all-platform/zalo/accounts/${encodeURIComponent(accountId)}?${params.toString()}`, {
     method: "DELETE",
-    headers: ownerId ? { "X-User-ID": ownerId } : undefined,
   });
 }
 

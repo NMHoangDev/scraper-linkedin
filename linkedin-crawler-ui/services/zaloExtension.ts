@@ -40,7 +40,6 @@ export interface ImportZaloSessionParams {
   account_id: string;
   user_id?: string;
   owner_id?: string;
-  id_member?: string;
 }
 
 export interface ImportZaloSessionResult {

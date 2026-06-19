@@ -8,6 +8,8 @@ import type { ZaloCrawlerFlowValue } from "@/hooks/useZaloCrawlerFlow";
 import { getZaloInboxReport } from "@/services/zaloCrawlerService";
 import type { ZaloInboxReportResponse } from "@/types/zalo-api";
 
+const ACCOUNT_OWNER_ID = "default";
+
 interface ZaloAccountManagerPanelProps {
   flow: ZaloCrawlerFlowValue;
 }
@@ -43,14 +45,14 @@ export function ZaloAccountManagerPanel({ flow }: ZaloAccountManagerPanelProps) 
     setIsLoadingReport(true);
     setReportError(null);
     try {
-      const response = await getZaloInboxReport(flow.ownerId, flow.accounts.map((account) => account.account_id));
+      const response = await getZaloInboxReport(ACCOUNT_OWNER_ID, flow.accounts.map((account) => account.account_id));
       setReport(response);
     } catch (error) {
       setReportError(error instanceof Error ? error.message : "Khong the tai bao cao inbox.");
     } finally {
       setIsLoadingReport(false);
     }
-  }, [flow.accounts, flow.ownerId]);
+  }, [flow.accounts, flow.userId]);
 
   useEffect(() => {
     void loadReport();

@@ -105,7 +105,7 @@ export function SelectPresetGroupsModal({ isOpen, onClose, onSelectGroups }: Sel
                         placeholder="🔍 Tìm kiếm theo tên hoặc URL group..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full max-w-md bg-surface-container-low border border-outline-variant rounded-lg px-md py-1.5 text-sm text-on-surface outline-none focus:border-primary transition-colors disabled:opacity-60"
+                        className="w-full max-w-[450px] bg-surface-container-low border border-outline-variant rounded-lg px-md py-1.5 text-sm text-on-surface outline-none focus:border-primary transition-colors disabled:opacity-60"
                     />
                 </div>
 

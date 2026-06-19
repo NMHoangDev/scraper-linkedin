@@ -49,7 +49,7 @@ export function ZaloEmptyChat({
         <h3 className="text-lg font-semibold text-zinc-900 mb-2 text-center">
           Đăng nhập Zalo để bắt đầu
         </h3>
-        <p className="text-sm text-zinc-500 mb-6 text-center max-w-sm leading-relaxed">
+        <p className="text-sm text-zinc-500 mb-6 text-center max-w-[360px] leading-relaxed">
           Bấm nút bên dưới để mở Zalo Web và tiến hành đăng nhập.
           Tin nhắn sẽ được đồng bộ tự động ngay sau khi đăng nhập thành công.
         </p>
@@ -76,7 +76,7 @@ export function ZaloEmptyChat({
         <h3 className="text-lg font-semibold text-zinc-900 mb-2 text-center">
           Chưa có cuộc hội thoại
         </h3>
-        <p className="text-sm text-zinc-500 mb-6 text-center max-w-sm leading-relaxed">
+        <p className="text-sm text-zinc-500 mb-6 text-center max-w-[360px] leading-relaxed">
           Bấm nút bên dưới để đồng bộ tin nhắn từ Zalo. Lần đầu có thể mất
           1-2 phút tùy số lượng nhóm.
         </p>
@@ -103,7 +103,7 @@ export function ZaloEmptyChat({
       <h3 className="text-lg font-semibold text-zinc-900 mb-2 text-center">
         Chọn một cuộc hội thoại
       </h3>
-      <p className="text-sm text-zinc-500 text-center max-w-sm leading-relaxed">
+      <p className="text-sm text-zinc-500 text-center max-w-[360px] leading-relaxed">
         Chọn nhóm hoặc người từ danh sách bên trái để xem tin nhắn. Bạn cũng có
         thể tìm kiếm theo tên ở ô tìm kiếm phía trên.
       </p>

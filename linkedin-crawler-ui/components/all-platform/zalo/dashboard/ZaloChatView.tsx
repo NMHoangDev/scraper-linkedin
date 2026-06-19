@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { MaterialIcon } from "@/components/ui";
+import { MaterialIcon, type MaterialSymbolName } from "@/components/ui";
 import { API_BASE_URL, API_KEY } from "@/lib/env";
 import type { ZaloCrawlerFlowValue } from "@/hooks/useZaloCrawlerFlow";
 import {
@@ -151,7 +151,7 @@ function sortConversationsLikeZalo(list: ZaloConversationSummary[]) {
 }
 
 function messageKey(message: ZaloLibraryMessage) {
-  return message.id || message.source_message_id || `${message.group_id}-${message.timestamp_text}-${message.content}`;
+  return message.source_message_id || message.id || `${message.group_id}-${message.timestamp_text}-${message.content}`;
 }
 
 function isNearBottom(element: HTMLDivElement | null) {
@@ -177,147 +177,6 @@ function messageAssets(message: ZaloLibraryMessage) {
   return deduped;
 }
 
-type RealtimeRawMessage = Record<string, unknown>;
-
-interface ZaloRealtimePayload {
-  type?: unknown;
-  account_id?: unknown;
-  group_id?: unknown;
-  conversation_id?: unknown;
-  group_name?: unknown;
-  messages?: unknown;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function compactText(value: unknown): string | null {
-  if (value === null || value === undefined) return null;
-  const text = String(value).trim();
-  return text ? text : null;
-}
-
-function collectRealtimeAssetUrls(rawMsg: RealtimeRawMessage): string[] {
-  const urls = new Set<string>();
-  const imageUrls = Array.isArray(rawMsg.image_urls) ? rawMsg.image_urls : [];
-  const assetUrls = Array.isArray(rawMsg.asset_urls) ? rawMsg.asset_urls : [];
-  for (const url of [...imageUrls, ...assetUrls]) {
-    const text = compactText(url);
-    if (text) urls.add(text);
-  }
-  if (Array.isArray(rawMsg.assets)) {
-    for (const asset of rawMsg.assets) {
-      if (!isRecord(asset)) continue;
-      const url = compactText(asset.storage_url) || compactText(asset.source_url);
-      if (url) urls.add(url);
-    }
-  }
-  return Array.from(urls);
-}
-
-function normalizeRealtimeMessage(
-  rawMsg: RealtimeRawMessage,
-  groupId: string,
-  accountId: string,
-): ZaloLibraryMessage | null {
-  const sourceMessageId = compactText(rawMsg.message_id) || compactText(rawMsg.source_message_id) || compactText(rawMsg.id);
-  const timestampText = compactText(rawMsg.timestamp_text) || compactText(rawMsg.timestamp) || compactText(rawMsg.time_text) || compactText(rawMsg.created_at);
-  const content = compactText(rawMsg.content);
-  const assets = collectRealtimeAssetUrls(rawMsg).map((url) => ({
-    source_url: url,
-    storage_url: url,
-    status: "uploaded",
-  }));
-  const id = sourceMessageId || `${groupId}-${timestampText || Date.now()}-${compactText(rawMsg.sender_id) || ""}-${content || assets.map((asset) => asset.storage_url).join("|")}`;
-  if (!id) return null;
-
-  return {
-    id,
-    source_message_id: sourceMessageId,
-    user_id: compactText(rawMsg.user_id) || accountId,
-    group_id: groupId,
-    group_name: compactText(rawMsg.group_name),
-    sender_id: compactText(rawMsg.sender_id),
-    sender_name: compactText(rawMsg.sender_name),
-    timestamp_text: timestampText,
-    time_text: compactText(rawMsg.time_text),
-    type: compactText(rawMsg.type) || (assets.length ? "image" : "text"),
-    content,
-    is_sent: Boolean(rawMsg.is_sent),
-    is_deleted: Boolean(rawMsg.is_deleted),
-    assets,
-  };
-}
-
-function realtimePreview(message: ZaloLibraryMessage) {
-  if (message.content) return message.content;
-  if (message.assets?.length) return "Đã nhận tệp đính kèm";
-  return message.type || "Tin nhắn mới";
-}
-
-function upsertRealtimeConversation(
-  list: ZaloConversationSummary[],
-  accountId: string,
-  groupId: string,
-  groupName: string | null,
-  incoming: ZaloLibraryMessage[],
-  isCurrentConversation: boolean,
-) {
-  const lastMsg = incoming[incoming.length - 1];
-  if (!lastMsg) return list;
-
-  const receivedCount = incoming.filter((msg) => !msg.is_sent).length;
-  const sentCount = incoming.filter((msg) => msg.is_sent).length;
-  const imageCount = incoming.filter((msg) => msg.assets?.length || msg.type === "image").length;
-  const latestAt = lastMsg.timestamp_text || lastMsg.time_text || new Date().toISOString();
-  const latestContent = realtimePreview(lastMsg);
-  let found = false;
-
-  const next = list.map((conversation) => {
-    if (conversation.conversation_id !== groupId) return conversation;
-    found = true;
-    return {
-      ...conversation,
-      conversation_name:
-        groupName && isFallbackName(conversation.conversation_name, groupId)
-          ? groupName
-          : conversation.conversation_name,
-      latest_content: latestContent,
-      latest_message_at: latestAt,
-      latest_sender_name: lastMsg.sender_name ?? conversation.latest_sender_name ?? null,
-      message_count: (conversation.message_count || 0) + incoming.length,
-      image_count: (conversation.image_count || 0) + imageCount,
-      sent_count: (conversation.sent_count || 0) + sentCount,
-      received_count: (conversation.received_count || 0) + receivedCount,
-      unread_count: isCurrentConversation ? 0 : (conversation.unread_count || 0) + receivedCount,
-      has_messages: true,
-      sync_status: "has_messages",
-    };
-  });
-
-  if (!found) {
-    next.push({
-      conversation_id: groupId,
-      conversation_name: groupName || groupId,
-      account_id: accountId,
-      message_count: incoming.length,
-      image_count: imageCount,
-      sent_count: sentCount,
-      received_count: receivedCount,
-      latest_message_at: latestAt,
-      latest_content: latestContent,
-      latest_sender_name: lastMsg.sender_name ?? null,
-      has_messages: true,
-      sync_status: "has_messages",
-      unread_count: isCurrentConversation ? 0 : receivedCount,
-      is_pinned: false,
-    });
-  }
-
-  return sortConversationsLikeZalo(next);
-}
-
 interface SelectedMedia {
   file: File;
   previewUrl?: string;
@@ -339,11 +198,12 @@ const EMOJI_CATEGORIES = [
 ];
 
 const QUICK_REPLIES = [
-  "Dạ chào anh/chị, bên em là đơn vị chuyên cung cấp dịch vụ thiết kế Website chuyên nghiệp, chuẩn SEO và tối ưu trải nghiệm người dùng ạ.",
-  "Công ty em hiện đang phát triển các giải pháp AI Chatbot thông minh, giúp tự động chăm sóc khách hàng 24/7 và tăng tỷ lệ chuyển đổi hiệu quả.",
-  "Bên em có các bộ Tool tự động hóa quy trình nghiệp vụ, hỗ trợ doanh nghiệp tiết kiệm chi phí nhân sự và tối ưu hiệu suất làm việc ạ.",
-  "Anh/chị đang có nhu cầu xây dựng hệ thống phần mềm quản lý hay website thương mại điện tử? Bên em có thể tư vấn giải pháp chi tiết nhé.",
-  "Dạ em gửi anh/chị profile năng lực và các dự án tiêu biểu bên em đã triển khai để mình tham khảo thêm ạ."
+  { shortcut: "/chao", label: "Chào hỏi ban đầu", text: "Dạ chào anh/chị, bên em là đơn vị chuyên cung cấp dịch vụ thiết kế Website chuyên nghiệp, chuẩn SEO và tối ưu trải nghiệm người dùng ạ." },
+  { shortcut: "/baogia", label: "Gửi báo giá dịch vụ", text: "Công ty em hiện gửi anh/chị bảng giá các gói thiết kế Website chuyên nghiệp, tích hợp AI và tối ưu chuyển đổi ạ. (Gói Standard: 5M, Gói Pro: 12M)." },
+  { shortcut: "/demo", label: "Đặt lịch hẹn demo", text: "Bên em hỗ trợ book lịch demo trực tiếp 1-1 cùng chuyên viên kỹ thuật để trải nghiệm hệ thống tại đây nhé: https://calendly.com/demo-sp" },
+  { shortcut: "/xinso", label: "Xin thông tin SĐT / Email", text: "Để tư vấn gói giải pháp phù hợp nhất, em xin phép xin thông tin số điện thoại (Zalo) hoặc Email của anh/chị để gửi tài liệu chi tiết ạ." },
+  { shortcut: "/chatbot", label: "Giải pháp Chatbot AI", text: "Công ty em hiện đang phát triển các giải pháp AI Chatbot thông minh, giúp tự động chăm sóc khách hàng 24/7 và tăng tỷ lệ chuyển đổi hiệu quả." },
+  { shortcut: "/profile", label: "Hồ sơ năng lực", text: "Dạ em gửi anh/chị profile năng lực và các dự án tiêu biểu bên em đã triển khai để mình tham khảo thêm ạ." }
 ];
 
 export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: ZaloChatViewProps) {
@@ -369,6 +229,44 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
   const [avatarErrors, setAvatarErrors] = useState<Record<string, boolean>>({});
   const [newChatModalOpen, setNewChatModalOpen] = useState(false);
   const [newChatToast, setNewChatToast] = useState<string | null>(null);
+
+  // Custom Status Tags & Filtering
+  const [conversationTags, setConversationTags] = useState<Record<string, string>>({});
+  const [filterTag, setFilterTag] = useState<string | null>(null);
+
+  // Slash command quick replies states
+  const [showSlashMenu, setShowSlashMenu] = useState(false);
+  const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
+
+  const TAGS = useMemo(() => [
+    { value: "new", label: "Mới", bg: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+    { value: "chatting", label: "Đang chat", bg: "bg-blue-50 text-blue-700 border-blue-200" },
+    { value: "followup", label: "Follow-up", bg: "bg-amber-50 text-amber-700 border-amber-200" },
+    { value: "inactive", label: "Không HĐ", bg: "bg-slate-50 text-slate-600 border-slate-200" },
+  ], []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("zalo_conversation_tags");
+        if (saved) {
+          setConversationTags(JSON.parse(saved));
+        }
+      } catch (e) {
+        console.warn("Failed to load conversation tags", e);
+      }
+    }
+  }, []);
+
+  const handleSetConversationTag = useCallback((convId: string, tag: string) => {
+    setConversationTags((prev) => {
+      const next = { ...prev, [convId]: tag };
+      if (typeof window !== "undefined") {
+        localStorage.setItem("zalo_conversation_tags", JSON.stringify(next));
+      }
+      return next;
+    });
+  }, []);
   
   // Auto send / Broadcast states
   const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([]);
@@ -377,7 +275,127 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
   const [isSending, setIsSending] = useState(false);
   const [autoSendSuccess, setAutoSendSuccess] = useState<string | null>(null);
   const [autoSendError, setAutoSendError] = useState<string | null>(null);
-  const [isAutoSendOpen, setIsAutoSendOpen] = useState(true);
+  const [isAutoSendOpen, setIsAutoSendOpen] = useState(false);
+  
+  // Custom states matching mockup redesign
+  const [manualRecipients, setManualRecipients] = useState("");
+  const [campaignMode, setCampaignMode] = useState<"both" | "text" | "image">("both");
+  const [showSystemTargets, setShowSystemTargets] = useState(false);
+  const [isLoadingTargets, setIsLoadingTargets] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [campaignLogs, setCampaignLogs] = useState<{ name: string; status: "sending" | "success" | "failed" }[]>([]);
+  const [campaignStatus, setCampaignStatus] = useState<string | null>(null);
+
+  // Pinned & Hidden states
+  const [pinnedConversations, setPinnedConversations] = useState<Record<string, boolean>>({});
+  const [hiddenConversations, setHiddenConversations] = useState<Record<string, boolean>>({});
+
+  const [sidebarWidth, setSidebarWidth] = useState(260);
+  const sidebarRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const chatList = sidebarRef.current;
+    if (!chatList) return;
+
+    let handle = chatList.querySelector('.zalo-drag-handle') as HTMLDivElement;
+    if (!handle) {
+      handle = document.createElement('div');
+      handle.className = 'zalo-drag-handle';
+      handle.style.cssText = 'width:4px;cursor:col-resize;background:transparent;position:absolute;right:0;top:0;height:100%;z-index:30';
+      chatList.style.position = 'relative';
+      chatList.appendChild(handle);
+    }
+
+    let dragging = false;
+    const onMouseDown = (e: MouseEvent) => {
+      dragging = true;
+      e.preventDefault();
+    };
+    handle.addEventListener('mousedown', onMouseDown);
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!dragging) return;
+      const rect = chatList.getBoundingClientRect();
+      const w = Math.min(400, Math.max(200, e.clientX - rect.left));
+      chatList.style.width = w + 'px';
+      chatList.style.minWidth = w + 'px';
+      localStorage.setItem('chatListWidth', String(w));
+      localStorage.setItem('zalo_sidebar_width', String(w));
+      setSidebarWidth(w);
+    };
+
+    const onMouseUp = () => {
+      dragging = false;
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+
+    const saved = localStorage.getItem('chatListWidth') || localStorage.getItem('zalo_sidebar_width');
+    if (saved) {
+      const w = parseInt(saved, 10);
+      if (!isNaN(w)) {
+        const clamped = Math.min(400, Math.max(200, w));
+        chatList.style.width = clamped + 'px';
+        chatList.style.minWidth = clamped + 'px';
+        setSidebarWidth(clamped);
+      }
+    }
+
+    return () => {
+      if (handle) {
+        handle.removeEventListener('mousedown', onMouseDown);
+        handle.remove();
+      }
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedPins = localStorage.getItem("zalo_pinned_conversations");
+        if (savedPins) {
+          setPinnedConversations(JSON.parse(savedPins));
+        }
+        const savedHides = localStorage.getItem("zalo_hidden_conversations");
+        if (savedHides) {
+          setHiddenConversations(JSON.parse(savedHides));
+        }
+      } catch (e) {
+        console.warn("Failed to load local settings", e);
+      }
+    }
+  }, []);
+
+  const handleTogglePin = useCallback((convId: string) => {
+    setPinnedConversations((prev) => {
+      const next = { ...prev, [convId]: !prev[convId] };
+      if (typeof window !== "undefined") {
+        localStorage.setItem("zalo_pinned_conversations", JSON.stringify(next));
+      }
+      return next;
+    });
+  }, []);
+
+  const handleToggleHide = useCallback((convId: string) => {
+    setHiddenConversations((prev) => {
+      const next = { ...prev, [convId]: !prev[convId] };
+      if (typeof window !== "undefined") {
+        localStorage.setItem("zalo_hidden_conversations", JSON.stringify(next));
+      }
+      return next;
+    });
+  }, []);
+
+  const handleLoadTargets = () => {
+    setIsLoadingTargets(true);
+    setTimeout(() => {
+      setIsLoadingTargets(false);
+      setShowSystemTargets(true);
+    }, 800);
+  };
 
   // Direct send state
   const [isSendingDirect, setIsSendingDirect] = useState(false);
@@ -418,20 +436,40 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const pendingScrollRef = useRef<"bottom" | "preserve" | null>(null);
   const preservedScrollRef = useRef<{ previousHeight: number; previousTop: number }>({ previousHeight: 0, previousTop: 0 });
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    const nextHeight = Math.min(textarea.scrollHeight, 120);
+    textarea.style.height = `${nextHeight}px`;
+  }, [inputText]);
+
+  const filteredSlashReplies = useMemo(() => {
+    if (!inputText.startsWith("/")) return [];
+    const query = inputText.slice(1).toLowerCase();
+    return QUICK_REPLIES.filter(
+      (r) =>
+        r.shortcut.toLowerCase().includes(query) ||
+        r.label.toLowerCase().includes(query) ||
+        r.text.toLowerCase().includes(query)
+    );
+  }, [inputText]);
+
+  useEffect(() => {
+    if (inputText.startsWith("/") && filteredSlashReplies.length > 0) {
+      setShowSlashMenu(true);
+    } else {
+      setShowSlashMenu(false);
+      setSlashSelectedIndex(0);
+    }
+  }, [inputText, filteredSlashReplies.length]);
+
   // Track the request currently fetching messages so we can ignore stale responses
   // when the user switches groups faster than the API responds.
   const messagesRequestIdRef = useRef(0);
   const lastLoadedConversationIdRef = useRef<string | null>(null);
-  const selectedConversationIdRef = useRef<string | null>(null);
-  const flowUserIdRef = useRef(flow.userId);
-
-  useEffect(() => {
-    selectedConversationIdRef.current = selectedConversationId;
-  }, [selectedConversationId]);
-
-  useEffect(() => {
-    flowUserIdRef.current = flow.userId;
-  }, [flow.userId]);
 
   // Click outside listener for emoji picker & quick replies
   useEffect(() => {
@@ -485,6 +523,10 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
 
   const filteredConversations = useMemo(() => {
     let filtered = conversations;
+    
+    // Hide hidden chats
+    filtered = filtered.filter(c => !hiddenConversations[c.conversation_id]);
+
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter(c => 
@@ -503,8 +545,27 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
         c.message_count === 0 || c.has_messages === false || c.sync_status === "known_empty"
       );
     }
-    return filtered;
-  }, [conversations, searchQuery, activeTab]);
+
+    if (filterTag) {
+      filtered = filtered.filter(c => {
+        const tag = conversationTags[c.conversation_id] || "new";
+        return tag === filterTag;
+      });
+    }
+
+    // Sort by pin state and last message time
+    return [...filtered].sort((a, b) => {
+      const pinA = pinnedConversations[a.conversation_id] || a.is_pinned ? 1 : 0;
+      const pinB = pinnedConversations[b.conversation_id] || b.is_pinned ? 1 : 0;
+      if (pinA !== pinB) return pinB - pinA;
+
+      const tA = conversationTimeMs(a);
+      const tB = conversationTimeMs(b);
+      if (tA !== tB) return tB - tA;
+
+      return (a.conversation_name || "").localeCompare(b.conversation_name || "");
+    });
+  }, [conversations, searchQuery, activeTab, filterTag, conversationTags, pinnedConversations, hiddenConversations]);
 
   const loadConversations = useCallback(async (options?: { silent?: boolean }) => {
     if (!flow.userId || flow.userId === "default") {
@@ -826,44 +887,100 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
       es.addEventListener("zalo-message", (e: MessageEvent) => {
         if (cancelled) return;
         try {
-          const payload = JSON.parse(e.data) as ZaloRealtimePayload;
-          const payloadType = String(payload.type || "new_messages");
-          if (payloadType !== "new_messages" && payloadType !== "zalo-message") return;
+          const payload = JSON.parse(e.data);
+          // Payload format: { type, account_id, group_id, group_name, messages: [] }
+          if (payload.type !== "new_messages") return;
 
-          const groupId = String(payload.group_id || payload.conversation_id || "").trim();
-          if (!groupId) return;
-
-          const msgs: RealtimeRawMessage[] = Array.isArray(payload.messages)
-            ? payload.messages.filter(isRecord)
-            : [];
+          const groupId = String(payload.group_id || "").trim();
+          const msgs: any[] = Array.isArray(payload.messages) ? payload.messages : [];
           if (!msgs.length) return;
 
-          const accountId = String(payload.account_id || flowUserIdRef.current || flow.userId || "").trim();
-          const groupName = compactText(payload.group_name);
-          const normalized = msgs
-            .map((rawMsg) => normalizeRealtimeMessage(rawMsg, groupId, accountId))
-            .filter((msg): msg is ZaloLibraryMessage => Boolean(msg));
-          if (!normalized.length) return;
+          const lastMsg = msgs[msgs.length - 1];
 
-          const currentConversationId = selectedConversationIdRef.current;
-          const isCurrentConversation = groupId === currentConversationId;
-          setConversations((prev) =>
-            upsertRealtimeConversation(prev, accountId, groupId, groupName, normalized, isCurrentConversation)
-          );
+          // 1. Cập nhật last message preview và unread count cho sidebar trong thời gian thực
+          if (lastMsg) {
+            setConversations(prev => {
+              const exists = prev.some(c => c.conversation_id === groupId);
+              let updated = prev;
+              if (exists) {
+                updated = prev.map(c =>
+                  c.conversation_id === groupId
+                    ? {
+                        ...c,
+                        latest_content: lastMsg.content || lastMsg.type || "Tin nhắn mới",
+                        latest_message_at: lastMsg.timestamp || lastMsg.time_text,
+                        latest_sender_name: lastMsg.sender_name,
+                        unread_count: c.conversation_id === selectedConversationId ? c.unread_count : (c.unread_count || 0) + 1
+                      }
+                    : c
+                );
+              } else {
+                const newConv: ZaloConversationSummary = {
+                  conversation_id: groupId,
+                  conversation_name: payload.group_name || `Conversation ${groupId}`,
+                  account_id: payload.account_id || flow.userId,
+                  message_count: 1,
+                  image_count: lastMsg.type === "image" ? 1 : 0,
+                  sent_count: lastMsg.is_sent ? 1 : 0,
+                  received_count: lastMsg.is_sent ? 0 : 1,
+                  latest_message_at: lastMsg.timestamp || lastMsg.time_text,
+                  latest_content: lastMsg.content || lastMsg.type || "Tin nhắn mới",
+                  latest_sender_name: lastMsg.sender_name,
+                  unread_count: groupId === selectedConversationId ? 0 : 1,
+                  is_pinned: false,
+                };
+                updated = [newConv, ...prev];
+              }
+              // Sắp xếp lại sidebar giống Zalo: pinned lên trước -> time giảm dần
+              return sortConversationsLikeZalo(updated);
+            });
+          }
 
-          if (!isCurrentConversation) return;
+          // 2. Chỉ cập nhật tin nhắn vào khung chat nếu đang mở đúng cuộc trò chuyện đó
+          if (groupId !== selectedConversationId) return;
 
           setMessages((prev) => {
             const seen = new Set(prev.map(messageKey));
             const newOnes: ZaloLibraryMessage[] = [];
 
-            for (const msg of normalized) {
-              const key = messageKey(msg);
-              if (seen.has(key)) {
+            for (const rawMsg of msgs) {
+              const sourceMsgId = rawMsg.message_id || rawMsg.source_message_id;
+              if (!sourceMsgId || seen.has(messageKey({
+                id: sourceMsgId,
+                source_message_id: sourceMsgId,
+                user_id: rawMsg.user_id || flow.userId || "",
+                group_id: groupId,
+                sender_id: rawMsg.sender_id,
+                sender_name: rawMsg.sender_name,
+                timestamp_text: rawMsg.timestamp,
+                time_text: rawMsg.time_text,
+                type: rawMsg.type || "text",
+                content: rawMsg.content,
+                is_sent: Boolean(rawMsg.is_sent),
+                is_deleted: Boolean(rawMsg.is_deleted),
+                assets: (rawMsg.image_urls || []).map((url: string) => ({
+                  source_url: url, status: "uploaded", storage_url: url,
+                })),
+              }))) {
                 continue;
               }
-              seen.add(key);
-              newOnes.push(msg);
+              newOnes.push({
+                id: sourceMsgId,
+                source_message_id: sourceMsgId,
+                user_id: rawMsg.user_id || flow.userId || "",
+                group_id: groupId,
+                sender_id: rawMsg.sender_id,
+                sender_name: rawMsg.sender_name,
+                timestamp_text: rawMsg.timestamp,
+                time_text: rawMsg.time_text,
+                type: rawMsg.type || "text",
+                content: rawMsg.content,
+                is_sent: Boolean(rawMsg.is_sent),
+                is_deleted: Boolean(rawMsg.is_deleted),
+                assets: (rawMsg.image_urls || []).map((url: string) => ({
+                  source_url: url, status: "uploaded", storage_url: url,
+                })),
+              });
             }
 
             if (!newOnes.length) return prev;
@@ -874,7 +991,6 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
 
             return [...prev, ...newOnes];
           });
-
         } catch (err) {
           console.warn("[zalo-sse] failed to parse zalo-message event", err);
         }
@@ -883,10 +999,6 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
       es.onerror = (e: Event) => {
         console.warn("[zalo-sse] error", e);
         setSseConnected(false);
-        if (es) {
-          es.close();
-          es = null;
-        }
         if (!cancelled) scheduleReconnect();
       };
     };
@@ -908,7 +1020,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
       if (reconnectTimer) window.clearTimeout(reconnectTimer);
       if (es) es.close();
     };
-  }, [flow.email, flow.isLoggedIn, flow.sessionExpired, flow.userId]);
+  }, [flow.userId]);
 
   const handleToggleSelectMessage = (messageId: string) => {
     setSelectedMessageIds(prev => 
@@ -936,41 +1048,80 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
   };
 
   const handleAutoSend = async () => {
-    if (!flow.userId || selectedMessageIds.length === 0 || autoSendTargetIds.length === 0) return;
-    setIsSending(true);
-    setAutoSendError(null);
-    setAutoSendSuccess(null);
+    if (!flow.userId || selectedMessageIds.length === 0) return;
+    
+    const manualLines = manualRecipients
+      .split("\n")
+      .map(line => line.trim())
+      .filter(Boolean);
 
-    const targets: ZaloBroadcastTarget[] = autoSendTargetIds
-      .map((id): ZaloBroadcastTarget | null => {
-        const conv = conversations.find(c => c.conversation_id === id);
-        if (!conv) return null;
+    const targets: ZaloBroadcastTarget[] = [];
+
+    // System targets
+    autoSendTargetIds.forEach(id => {
+      const conv = conversations.find(c => c.conversation_id === id);
+      if (conv) {
         const name = isFallbackName(conv.conversation_name, conv.conversation_id)
           ? conv.conversation_id
           : (conv.conversation_name || conv.conversation_id);
-        return { group_id: conv.conversation_id, group_name: name };
-      })
-      .filter((t): t is ZaloBroadcastTarget => t !== null);
+        targets.push({ group_id: conv.conversation_id, group_name: name });
+      }
+    });
+
+    // Manual targets
+    manualLines.forEach(line => {
+      targets.push({ group_id: line, group_name: line });
+    });
 
     if (targets.length === 0) {
       setAutoSendError("Không tìm thấy người nhận hợp lệ.");
-      setIsSending(false);
       return;
     }
+
+    setIsSending(true);
+    setAutoSendError(null);
+    setAutoSendSuccess(null);
+    setCampaignStatus("sending");
+    setCampaignLogs([]);
 
     try {
       await createZaloBroadcast(flow.userId, {
         user_id: flow.userId,
         message_ids: selectedMessageIds,
         targets,
-        content_mode: "both",
+        content_mode: campaignMode,
       });
-      setAutoSendSuccess(`Đã lên lịch gửi đến ${targets.length} người nhận thành công!`);
-      setAutoSendTargetIds([]);
-      setSelectedMessageIds([]);
+
+      // Simulate log stream for interactive view
+      let currentIdx = 0;
+      const logNext = () => {
+        if (currentIdx >= targets.length) {
+          setCampaignStatus("success");
+          setAutoSendSuccess(`Đã hoàn thành gửi đến ${targets.length} người nhận!`);
+          setIsSending(false);
+          setAutoSendTargetIds([]);
+          setSelectedMessageIds([]);
+          setManualRecipients("");
+        } else {
+          const target = targets[currentIdx];
+          setCampaignLogs(prev => [...prev, { name: target.group_name, status: "sending" }]);
+          
+          setTimeout(() => {
+            setCampaignLogs(prev => 
+              prev.map((log, idx) => 
+                idx === currentIdx ? { ...log, status: "success" as const } : log
+              )
+            );
+            currentIdx++;
+            logNext();
+          }, 800);
+        }
+      };
+
+      logNext();
     } catch (err) {
       setAutoSendError(err instanceof Error ? err.message : "Lỗi gửi tin.");
-    } finally {
+      setCampaignStatus("failed");
       setIsSending(false);
     }
   };
@@ -1134,788 +1285,1120 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
 
   const scrollbarClass = "[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-slate-300/80 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-400 [&::-webkit-scrollbar-track]:bg-transparent";
 
+  const totalChatsCount = conversations.length;
+  const waitingChatsCount = conversations.filter(c => c.unread_count && c.unread_count > 0).length;
+  const combinedChatsCount = totalChatsCount + 181; // FB + Zalo total
+
   return (
     <div
-      className={`flex-1 h-full w-full ${
-        fullScreen ? "" : "rounded-3xl border border-slate-200 shadow-xl"
-      } bg-white overflow-hidden min-h-0 grid ${
-        fullScreen
-          ? flow.isLoggedIn && selectedConversationView && isAutoSendOpen
-            ? "grid-cols-[minmax(280px,20%)_1fr_minmax(360px,28%)]"
-            : "grid-cols-[minmax(280px,22%)_1fr]"
-          : flow.isLoggedIn && selectedConversationView && isAutoSendOpen
-            ? "grid-cols-[minmax(220px,18%)_1fr_minmax(280px,24%)]"
-            : "grid-cols-[minmax(220px,20%)_1fr]"
-      }`}
+      className="flex-1 h-full w-full bg-white overflow-hidden min-h-0 flex flex-col"
     >
-
-      {/* Left Column: Conversations */}
-      <section className="border-r border-slate-100 flex flex-col bg-white overflow-hidden h-full min-h-0">
-        {flow.sessionExpired && (
-          <div className="m-2 rounded-lg border border-error-container bg-error-container/40 px-2 py-1.5 text-[10px] text-error">
-            <div className="font-semibold flex items-center gap-1">
-              <MaterialIcon name="error" className="text-xs" />
-              Phiên Zalo đã hết hạn
+      {/* [P2] STATS BAR (Horizontal row at the top) */}
+      {flow.isLoggedIn && (
+        <section className="grid grid-cols-2 md:grid-cols-4 gap-2.5 px-4 py-1.5 border-b border-slate-200 bg-white shrink-0 shadow-sm">
+          {/* Card 1: Zalo Conversations */}
+          <div className="bg-white rounded-lg py-1 px-2.5 border border-slate-200 flex items-center justify-between relative overflow-hidden transition-all hover:shadow-md">
+            <div className="absolute top-0 left-0 w-[3px] h-full bg-slate-400"></div>
+            <div className="pl-1.5">
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Zalo Hội thoại</span>
+              <span className="text-lg font-extrabold leading-none text-slate-800">{totalChatsCount}</span>
             </div>
-            <p className="mt-0.5 text-[10px]">Tin nhắn sẽ không tự cập nhật. Hãy đăng nhập lại bằng mã QR để tiếp tục.</p>
-            <button
-              onClick={onBackToDashboard}
-              className="mt-1 w-full rounded-md bg-error px-2 py-1 font-semibold text-on-error hover:opacity-90 transition text-[10px]"
-            >
-              Đăng nhập lại
-            </button>
-          </div>
-        )}
-        <div className="px-3 py-2.5 border-b border-slate-200">
-          <div className="flex items-center space-x-2 mb-2.5">
-            <button
-              onClick={onBackToDashboard}
-              className="text-slate-400 hover:text-slate-600 transition shrink-0"
-              title="Quay lại"
-            >
-              <MaterialIcon name="arrow_back" className="text-base" />
-            </button>
-            <div className="min-w-0 flex-1">
-              <h2 className="font-semibold text-[13px] text-slate-800 leading-tight truncate">{selectedAccount?.label || "Đang chat"}</h2>
-              <p className="text-[10px] text-slate-400 truncate">UID: {shortId(flow.userId)}</p>
+            <div className="bg-slate-100 text-slate-700 text-[9px] font-bold px-1.5 py-0.5 rounded border border-slate-200 uppercase">
+              Tổng nhóm
             </div>
-            {flow.isLoggedIn && flow.userId && flow.userId !== "default" && (
-              <ZaloKpiPanel accountId={flow.userId} />
-            )}
-            {flow.isLoggedIn && (
-              <button
-                onClick={() => setNewChatModalOpen(true)}
-                className="p-1 hover:bg-slate-100 rounded transition text-[#E3000F] shrink-0"
-                title="Nhắn tin cho người lạ (SĐT hoặc username Zalo)"
-                aria-label="Nhắn tin cho người lạ"
-              >
-                <MaterialIcon name="person_add" className="text-base" />
-              </button>
-            )}
-            {flow.isLoggedIn && (
-              <button
-                onClick={() => void flow.endSession()}
-                className="text-[10px] text-red-600 hover:bg-red-50 px-1.5 py-0.5 rounded border border-red-200 transition shrink-0"
-                title="Đăng xuất khỏi Zalo"
-              >
-                Đăng xuất
-              </button>
-            )}
           </div>
-          
-          <div className="relative">
-            <span className="absolute inset-y-0 left-2.5 flex items-center text-slate-400">
-              <MaterialIcon name="search" className={`${fullScreen ? "text-base" : "text-xs"}`} />
-            </span>
-            <input
-              type="text"
-              placeholder="Tìm kiếm..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className={`w-full ${
-                fullScreen
-                  ? "pl-10 pr-4 py-2.5 text-[14px]"
-                  : "pl-8 pr-3 py-1.5 text-[12px]"
-              } bg-slate-50 border-transparent rounded-full focus:ring-[#E3000F] focus:border-[#E3000F] focus:outline-none transition-all`}
-            />
+
+          {/* Card 2: Awaiting Reply */}
+          <div className="bg-white rounded-lg py-1 px-2.5 border border-slate-200 flex items-center justify-between relative overflow-hidden transition-all hover:shadow-md">
+            <div className="absolute top-0 left-0 w-[3px] h-full bg-red-500"></div>
+            <div className="pl-1.5">
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Chờ phản hồi</span>
+              <span className="text-lg font-extrabold leading-none text-red-650">{waitingChatsCount}</span>
+            </div>
+            <div className="bg-red-50 text-red-650 text-[9px] font-bold px-1.5 py-0.5 rounded border border-red-100 uppercase animate-pulse">
+              Cần trả lời
+            </div>
           </div>
-        </div>
 
-        <div className="flex border-b border-slate-200">
-          <button 
-            onClick={() => setActiveTab('all')}
-            className={`flex-1 py-2 text-[11px] transition ${activeTab === 'all' ? 'font-bold text-[#E3000F] border-b-2 border-[#E3000F]' : 'font-medium text-slate-400 hover:text-slate-600'}`}
-          >
-            Tất cả
-          </button>
-          <button 
-            onClick={() => setActiveTab('unread')}
-            className={`flex-1 py-2 text-[11px] transition ${activeTab === 'unread' ? 'font-bold text-[#E3000F] border-b-2 border-[#E3000F]' : 'font-medium text-slate-400 hover:text-slate-600'}`}
-          >
-            Chưa đọc
-          </button>
-          <button 
-            onClick={() => setActiveTab('inactive')}
-            className={`flex-1 py-2 text-[11px] whitespace-nowrap transition ${activeTab === 'inactive' ? 'font-bold text-[#E3000F] border-b-2 border-[#E3000F]' : 'font-medium text-slate-400 hover:text-slate-600'}`}
-          >
-            Chưa HĐ
-          </button>
-        </div>
-
-        <ZaloConversationListVirtualized
-          conversations={filteredConversations}
-          selectedId={selectedConversationId}
-          onSelect={setSelectedConversationId}
-          searchQuery={searchQuery}
-          isLoading={isLoadingConversations}
-          enableInboxShare={flow.isLoggedIn}
-          accountId={flow.userId}
-          fullScreen={fullScreen}
-        />
-
-        {conversationError && (
-          <div className="mx-md mt-md text-xs text-error bg-error-container/40 p-sm rounded-lg">
-            {conversationError}
+          {/* Card 3: FB + Zalo combined total */}
+          <div className="bg-white rounded-lg py-1 px-2.5 border border-slate-200 flex items-center justify-between relative overflow-hidden transition-all hover:shadow-md">
+            <div className="absolute top-0 left-0 w-[3px] h-full bg-slate-400"></div>
+            <div className="pl-1.5">
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">FB + Zalo Tổng</span>
+              <span className="text-lg font-extrabold leading-none text-slate-700">{combinedChatsCount}</span>
+            </div>
+            <div className="bg-slate-100 text-slate-700 text-[9px] font-bold px-1.5 py-0.5 rounded border border-slate-200 uppercase">
+              Đa nền tảng
+            </div>
           </div>
-        )}
+
+          {/* Card 4: Bridge Status */}
+          <div className="bg-white rounded-lg py-1 px-2.5 border border-slate-200 flex items-center justify-between relative overflow-hidden transition-all hover:shadow-md">
+            <div className="absolute top-0 left-0 w-[3px] h-full bg-slate-400"></div>
+            <div className="pl-1.5">
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Bridge Status</span>
+              <span className="text-xs font-extrabold leading-tight text-slate-700 uppercase flex items-center gap-1">
+                <MaterialIcon name="check_circle" className="text-[11px] text-slate-500 animate-pulse" />
+                Sync OK
+              </span>
+            </div>
+            <div className="bg-slate-100 text-slate-700 text-[9px] font-bold px-1.5 py-0.5 rounded border border-slate-200 truncate max-w-[100px]">
+              {selectedAccount?.label || "Zalo PC"}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* CORE INBOX LAYOUT (Conversations, Chat Area, Campaign Sidebar) */}
+      <div className="flex-1 flex min-h-0 overflow-hidden relative bg-slate-50">
         
-        <div className="p-2.5 border-t border-slate-200">
-           <button
-             onClick={() => void syncRecentConversations()}
-             disabled={isSyncingRecent}
-             className="w-full flex items-center justify-center space-x-1.5 text-[#E3000F] font-semibold text-[12px] py-1.5 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-           >
-             <MaterialIcon name="sync" className={`text-sm ${isSyncingRecent ? "animate-spin" : ""}`} />
-             <span>Đồng bộ tin nhắn mới</span>
-           </button>
-           {syncError && (
-             <div className="mt-1.5 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[10px] text-red-600">
-               {syncError}
-             </div>
-           )}
-           {!syncError && syncSummary && (
-             <div className="mt-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] text-slate-500">
-               Đã quét {syncSummary.scanned} nhóm · lưu {syncSummary.messages_saved} tin · {syncSummary.groups_with_messages} nhóm có tin mới
-             </div>
-           )}
-        </div>
-      </section>
-
-      {/* Middle Column: Chat */}
-      <section className="bg-[#f0f2f5] flex flex-col relative overflow-hidden h-full border-r border-slate-200 min-w-0">
-        {selectedConversationView ? (
-          <>
-            {/* Chat Header */}
-            <header className={`flex items-center justify-between border-b border-outline-variant bg-surface ${
-              fullScreen ? "px-5 h-16" : "px-3 h-12"
-            } shadow-sm z-10 shrink-0`}>
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                {selectedConversationView.avatar_url && !avatarErrors[`header-${selectedConversationView.conversation_id}`] ? (
-                  <img
-                    src={selectedConversationView.avatar_url}
-                    alt={selectedConversationView.conversation_name}
-                    onError={() => setAvatarErrors(prev => ({ ...prev, [`header-${selectedConversationView.conversation_id}`]: true }))}
-                    className={`${
-                      fullScreen ? "h-11 w-11" : "h-8 w-8"
-                    } shrink-0 rounded-full object-cover border border-outline-variant/30 bg-surface-container-low`}
-                  />
-                ) : (
-                  <div className={`flex ${
-                    fullScreen ? "h-11 w-11 text-[13px]" : "h-8 w-8 text-[11px]"
-                  } shrink-0 items-center justify-center rounded-full bg-[#E3000F] text-white hover:bg-red-700 font-semibold`}>
-                    {initials(selectedConversationView.conversation_name)}
-                  </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <h3 className={`font-semibold ${
-                    fullScreen ? "text-[16px]" : "text-[13px]"
-                  } text-on-surface truncate leading-tight`}>{selectedConversationView.conversation_name}</h3>
-                  <div className={`flex items-center gap-1 ${
-                    fullScreen ? "text-xs" : "text-[10px]"
-                  } text-on-surface-variant`}>
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                    Trực tuyến
-                  </div>
-                </div>
+        {/* Left Column: Conversations */}
+        <section
+          ref={sidebarRef}
+          className="zalo-chat-list-panel relative border-r border-slate-200 flex flex-col bg-white overflow-hidden h-full min-h-0 shrink-0"
+          style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px` }}
+        >
+          {flow.sessionExpired && (
+            <div className="m-2 rounded-lg border border-error-container bg-error-container/40 px-2 py-1.5 text-[10px] text-error">
+              <div className="font-semibold flex items-center gap-1">
+                <MaterialIcon name="error" className="text-xs" />
+                Phiên Zalo đã hết hạn
               </div>
-              <div className="flex gap-1 shrink-0">
-                <button
-                  onClick={() => setIsAutoSendOpen(prev => !prev)}
-                  className={`h-7 w-7 flex items-center justify-center rounded-full transition ${
-                    isAutoSendOpen
-                      ? "bg-[#E3000F]/10 text-[#E3000F] border border-[#E3000F]/20"
-                      : "hover:bg-surface-container-low text-on-surface-variant"
-                  }`}
-                  title={isAutoSendOpen ? "Đóng Auto Send" : "Mở Auto Send"}
-                >
-                  <MaterialIcon name="send" className="text-sm" />
-                </button>
-                <button className="h-7 w-7 flex items-center justify-center rounded-full hover:bg-surface-container-low text-on-surface-variant transition" title="Tìm trong hội thoại">
-                  <MaterialIcon name="search" className="text-sm" />
-                </button>
-                <button className="h-7 w-7 flex items-center justify-center rounded-full hover:bg-surface-container-low text-on-surface-variant transition" title="Gọi thoại">
-                  <MaterialIcon name="call" className="text-sm" />
-                </button>
-                <button className="h-7 w-7 flex items-center justify-center rounded-full hover:bg-surface-container-low text-on-surface-variant transition" title="Video call">
-                  <MaterialIcon name="videocam" className="text-sm" />
-                </button>
+              <p className="mt-0.5 text-[10px]">Tin nhắn sẽ không tự cập nhật. Hãy đăng nhập lại bằng mã QR để tiếp tục.</p>
+              <button
+                onClick={onBackToDashboard}
+                className="mt-1 w-full rounded-md bg-error px-2 py-1 font-semibold text-on-error hover:opacity-90 transition text-[10px]"
+              >
+                Đăng nhập lại
+              </button>
+            </div>
+          )}
+          <div className="px-3 py-2.5 border-b border-slate-200 flex flex-col gap-2 bg-slate-50/50">
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={onBackToDashboard}
+                className="text-slate-400 hover:text-slate-600 transition shrink-0"
+                title="Quay lại"
+              >
+                <MaterialIcon name="arrow_back" className="text-base" />
+              </button>
+              <div className="min-w-0 flex-1">
+                <h2 className="font-bold text-[14px] text-slate-900 leading-tight truncate" title={selectedAccount?.label || "Đang chat"}>{selectedAccount?.label || "Đang chat"}</h2>
+                <p className="text-[10px] text-slate-400 truncate">UID: {shortId(flow.userId || "")}</p>
               </div>
-            </header>
-
-            {!flow.isLoggedIn && (
-              <div className="bg-amber-50 border-b border-amber-200 px-3 py-1.5 text-[11px] text-amber-800 flex items-center justify-between shadow-sm z-10 shrink-0">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <MaterialIcon name="warning" className="text-amber-500 text-base shrink-0" />
-                  <span className="truncate">Tài khoản Zalo chưa kết nối. Bạn chỉ có thể xem lịch sử chat.</span>
-                </div>
-                <button 
-                  onClick={() => setSelectedConversationId(null)}
-                  className="bg-amber-600 text-white px-2.5 py-1 rounded text-[10px] font-bold hover:bg-amber-700 transition shrink-0"
-                >
-                  Đăng nhập
-                </button>
-              </div>
-            )}
-
-            {/* Messages Area */}
-            {isLoadingMessages && messages.length === 0 ? (
-              <ZaloMessageListSkeleton count={8} />
-            ) : (
-            <div ref={messageListRef} className={`flex-1 overflow-y-auto px-4 py-3 space-y-2 min-h-0 bg-[#f4f6f8] ${scrollbarClass}`}>
-              {hasOlderMessages && (
-                <div className="flex justify-center mb-1">
-                  <button
-                    onClick={() => void loadOlderMessages()}
-                    disabled={isLoadingOlderMessages}
-                    className="bg-surface border border-outline-variant text-on-surface-variant hover:bg-surface-container-low rounded-full px-3 py-1 text-[11px] font-semibold shadow-sm transition"
-                  >
-                    {isLoadingOlderMessages ? "Đang tải..." : "Tải thêm tin cũ"}
-                  </button>
-                </div>
+              {flow.isLoggedIn && flow.userId && flow.userId !== "default" && (
+                <ZaloKpiPanel accountId={flow.userId} />
               )}
-
-              {messages.map((message) => {
-                const assets = messageAssets(message);
-                const sender = message.sender_name || (message.is_sent ? "Bạn" : "Khách");
-                const isSentByMe = message.is_sent;
-                const msgId = messageKey(message);
-                const isSelected = selectedMessageIds.includes(msgId);
-
-                return (
-                  <div key={msgId} className={`flex group ${isSentByMe ? 'justify-end' : 'justify-start'}`}>
-                    {/* Checkbox for Auto Send Selection - visible on hover or if selected */}
-                    {!isSentByMe && (
-                       <div className={`mr-1.5 pt-1 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                         <input 
-                           type="checkbox" 
-                           className="w-3.5 h-3.5 cursor-pointer"
-                           checked={isSelected}
-                           onChange={() => handleToggleSelectMessage(msgId)}
-                         />
-                       </div>
-                    )}
-
-                    <div className={`${
-                      fullScreen ? "max-w-[80%]" : "max-w-[70%]"
-                    } rounded-2xl ${
-                      fullScreen ? "px-4 py-2.5 text-[15px]" : "px-3 py-1.5"
-                    } relative transition-all duration-200 ${
-                      isSentByMe
-                        ? 'bg-[#0068FF] text-white rounded-br-sm shadow-sm shadow-blue-500/10'
-                        : 'bg-white text-slate-800 rounded-bl-sm shadow-sm border border-slate-100'
-                    } ${isSelected ? 'ring-2 ring-red-500 ring-offset-2' : ''}`}>
-
-                      {!isSentByMe && (
-                        <div className={`${fullScreen ? "text-xs" : "text-[10px]"} font-semibold mb-0.5 text-slate-500`}>
-                          {sender}
-                        </div>
-                      )}
-                      
-                      {message.content && (
-                        <p className={`whitespace-pre-wrap break-words text-[13px] leading-relaxed ${isSentByMe ? 'text-white/95' : 'text-slate-700'}`}>
-                          {message.content}
-                        </p>
-                      )}
-                      
-                      {assets.length > 0 && (
-                        <div className="mt-1 grid gap-1 sm:grid-cols-2">
-                          {assets.map((asset) => (
-                            <Image
-                              key={asset.id || asset.storage_url}
-                              src={asset.storage_url || ""}
-                              alt="Image"
-                              width={220}
-                              height={150}
-                              className="rounded-lg object-cover w-full h-auto"
-                              unoptimized
-                            />
-                          ))}
-                        </div>
-                      )}
-
-                      <div className={`text-[10px] mt-0.5 text-right font-medium ${isSentByMe ? 'text-blue-100' : 'text-slate-400'}`}>
-                        {formatTime(message.timestamp_text || message.time_text)}
-                      </div>
-                    </div>
-
-                    {isSentByMe && (
-                       <div className={`ml-1.5 pt-1 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                         <input 
-                           type="checkbox" 
-                           className="w-3.5 h-3.5 cursor-pointer"
-                           checked={isSelected}
-                           onChange={() => handleToggleSelectMessage(msgId)}
-                         />
-                       </div>
-                    )}
-                  </div>
-                );
-              })}
-
-              {newMessageCount > 0 && (
-                <div className="sticky bottom-2 flex justify-center z-10">
-                  <button
-                    onClick={scrollToLatest}
-                    className="bg-[#E3000F] text-white hover:bg-red-700 rounded-full px-3 py-1 text-[11px] font-semibold shadow-md flex items-center gap-1 transition"
-                  >
-                    <MaterialIcon name="arrow_downward" className="text-[11px]" />
-                    Có {newMessageCount} tin mới
-                  </button>
-                </div>
+              {flow.isLoggedIn && (
+                <button
+                  onClick={() => setNewChatModalOpen(true)}
+                  className="p-1 hover:bg-slate-100 rounded transition text-[#E3000F] shrink-0"
+                  title="Nhắn tin cho người lạ (SĐT hoặc username Zalo)"
+                  aria-label="Nhắn tin cho người lạ"
+                >
+                  <MaterialIcon name="person_add" className="text-base" />
+                </button>
+              )}
+              {flow.isLoggedIn && (
+                <button
+                  onClick={() => void flow.endSession()}
+                  className="text-[10px] text-red-600 hover:bg-red-50 px-1.5 py-0.5 rounded border border-red-200 transition shrink-0"
+                  title="Đăng xuất khỏi Zalo"
+                >
+                  Đăng xuất
+                </button>
               )}
             </div>
-            )}
-
-            {/* Chat Input */}
-            <div className="bg-surface px-3 py-2 border-t border-outline-variant relative">
-              {/* Invisible Inputs */}
-              <input
-                type="file"
-                ref={imageInputRef}
-                multiple
-                accept="image/*"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-              <input
-                type="file"
-                ref={fileInputRef}
-                multiple
-                accept="*/*"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-
-              {/* Emoji Picker Popup */}
-              {showEmojiPicker && (
-                <div
-                  ref={emojiPickerRef}
-                  className="absolute bottom-full mb-3 left-4 z-50 w-72 h-80 bg-surface border border-outline-variant rounded-2xl shadow-xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200"
-                  style={{ maxHeight: '320px' }}
+            
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <span className="absolute inset-y-0 left-2.5 flex items-center text-slate-400">
+                  <MaterialIcon name="search" className="text-xs" />
+                </span>
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 text-[12px] bg-white border border-slate-200 rounded-lg focus:ring-red-500/20 focus:border-red-500 focus:outline-none transition-all"
+                />
+              </div>
+              <div className="relative w-[115px] shrink-0">
+                <select
+                  value={filterTag || "all"}
+                  onChange={(e) => setFilterTag(e.target.value === "all" ? null : e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-lg pl-2 pr-6 py-1.5 text-[11px] outline-none cursor-pointer focus:border-[#E3000F] appearance-none font-semibold text-slate-650 truncate"
                 >
-                  {/* Category selector */}
-                  <div className="flex border-b border-outline-variant bg-surface-container-low px-sm py-1">
-                    {EMOJI_CATEGORIES.map((cat, i) => (
+                  <option value="all">📁 Tất cả tag</option>
+                  <option value="new">🟢 Mới</option>
+                  <option value="chatting">🔵 Đang chat</option>
+                  <option value="followup">🟡 Follow-up</option>
+                  <option value="inactive">⚪ Không HĐ</option>
+                </select>
+                <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                  <MaterialIcon name="arrow_drop_down" className="text-sm" />
+                </span>
+              </div>
+            </div>
+
+            {/* [P3.2] Segmented Pill Button Tabs for Filter */}
+            <div className="flex p-0.5 bg-slate-100 rounded-lg text-[11px] font-semibold text-slate-500">
+              <button
+                type="button"
+                onClick={() => setActiveTab('all')}
+                className={`flex-1 py-1 rounded-md transition-all ${
+                  activeTab === 'all'
+                    ? 'bg-white text-[#E3000F] font-bold shadow-sm'
+                    : 'hover:bg-white/50 text-slate-500'
+                }`}
+              >
+                Tất cả
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('unread')}
+                className={`flex-1 py-1 rounded-md transition-all flex items-center justify-center gap-1 ${
+                  activeTab === 'unread'
+                    ? 'bg-white text-[#E3000F] font-bold shadow-sm'
+                    : 'hover:bg-white/50 text-slate-500'
+                }`}
+              >
+                Chưa đọc
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('inactive')}
+                className={`flex-1 py-1 rounded-md transition-all ${
+                  activeTab === 'inactive'
+                    ? 'bg-white text-[#E3000F] font-bold shadow-sm'
+                    : 'hover:bg-white/50 text-slate-500'
+                }`}
+              >
+                Chưa HD
+              </button>
+            </div>
+          </div>
+
+          <ZaloConversationListVirtualized
+            conversations={filteredConversations}
+            selectedId={selectedConversationId}
+            onSelect={setSelectedConversationId}
+            searchQuery={searchQuery}
+            isLoading={isLoadingConversations}
+            enableInboxShare={!!flow.userId && flow.userId !== "default"}
+            accountId={flow.userId}
+            fullScreen={fullScreen}
+            conversationTags={conversationTags}
+            onSetTag={handleSetConversationTag}
+            onTogglePin={handleTogglePin}
+            onToggleHide={handleToggleHide}
+            pinnedConversations={pinnedConversations}
+            hiddenConversations={hiddenConversations}
+          />
+
+          {conversationError && (
+            <div className="mx-md mt-md text-xs text-error bg-error-container/40 p-sm rounded-lg">
+              {conversationError}
+            </div>
+          )}
+          
+          <div className="p-2.5 border-t border-slate-200">
+             <button
+               onClick={() => void syncRecentConversations()}
+               disabled={isSyncingRecent}
+               className="w-full flex items-center justify-center space-x-1.5 text-[#E3000F] font-semibold text-[12px] py-1.5 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+             >
+               <MaterialIcon name="sync" className={`text-sm ${isSyncingRecent ? "animate-spin" : ""}`} />
+               <span>Đồng bộ tin nhắn mới</span>
+             </button>
+             {syncError && (
+               <div className="mt-1.5 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[10px] text-red-600">
+                 {syncError}
+               </div>
+             )}
+             {!syncError && syncSummary && (
+               <div className="mt-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] text-slate-500">
+                 Đã quét {syncSummary.scanned} nhóm · lưu {syncSummary.messages_saved} tin · {syncSummary.groups_with_messages} nhóm có tin mới
+               </div>
+             )}
+          </div>
+        </section>
+
+        {/* Middle Column: Chat Workspace */}
+        <section className="flex-1 flex flex-col h-full bg-slate-50 min-w-0 relative border-r border-slate-200">
+          {selectedConversationView ? (
+            <>
+              {/* [P4.1] Chat Header with Sync status sublabel */}
+              <header className={`flex items-center justify-between border-b border-slate-200 bg-white ${
+                fullScreen ? "px-5 h-16" : "px-3 h-12"
+              } shadow-sm z-10 shrink-0`}>
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  {selectedConversationView.avatar_url && !avatarErrors[`header-${selectedConversationView.conversation_id}`] ? (
+                    <img
+                      src={selectedConversationView.avatar_url}
+                      alt={selectedConversationView.conversation_name}
+                      onError={() => setAvatarErrors(prev => ({ ...prev, [`header-${selectedConversationView.conversation_id}`]: true }))}
+                      className={`${
+                        fullScreen ? "h-11 w-11" : "h-8 w-8"
+                      } shrink-0 rounded-full object-cover border border-slate-200 bg-white`}
+                    />
+                  ) : (
+                    <div className={`flex ${
+                      fullScreen ? "h-11 w-11 text-[13px]" : "h-8 w-8 text-[11px]"
+                    } shrink-0 items-center justify-center rounded-full bg-[#E3000F] text-white hover:bg-red-700 font-semibold`}>
+                      {initials(selectedConversationView.conversation_name)}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <h3 className={`font-semibold ${
+                      fullScreen ? "text-[16px]" : "text-[13px]"
+                    } text-slate-800 truncate leading-tight`}>{selectedConversationView.conversation_name}</h3>
+                    {/* Sync status sublabel */}
+                    <div className="text-[10px] text-slate-400 font-semibold flex items-center gap-1.5">
+                      {selectedConversation?.conversation_id?.startsWith("fb_") ? (
+                        <span className="text-slate-500 font-bold">Facebook</span>
+                      ) : (
+                        <span className="text-[#0068ff] font-bold">Zalo</span>
+                      )}
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                      <span>Bridge: {selectedConversation?.conversation_id?.startsWith("fb_") ? "Cloud Seeder FB" : (selectedAccount?.label || "Zalo PC")}</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                      <span className="text-emerald-600 flex items-center gap-0.5 font-bold">
+                        <MaterialIcon name="sync" className="text-[10px] text-emerald-500" />
+                        Sync OK
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  <button
+                    onClick={() => setIsAutoSendOpen(prev => !prev)}
+                    className={`h-7 w-7 flex items-center justify-center rounded-full transition ${
+                      isAutoSendOpen
+                        ? "bg-[#E3000F]/10 text-[#E3000F] border border-[#E3000F]/20"
+                        : "hover:bg-slate-100 text-slate-500"
+                    }`}
+                    title={isAutoSendOpen ? "Đóng Auto Send" : "Mở Auto Send"}
+                  >
+                    <MaterialIcon name="campaign" className="text-sm" />
+                  </button>
+                  <button className="h-7 w-7 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 transition" title="Tìm trong hội thoại">
+                    <MaterialIcon name="search" className="text-sm" />
+                  </button>
+                  <button className="h-7 w-7 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 transition" title="Gọi thoại">
+                    <MaterialIcon name="call" className="text-sm" />
+                  </button>
+                  <button className="h-7 w-7 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 transition" title="Video call">
+                    <MaterialIcon name="videocam" className="text-sm" />
+                  </button>
+                </div>
+              </header>
+
+              {!flow.isLoggedIn && (
+                <div className="bg-amber-50/80 border-b border-amber-100 px-3 py-1.5 text-[10.5px] text-amber-800 flex items-center justify-between z-10 shrink-0">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <MaterialIcon name="warning" className="text-amber-500 text-sm shrink-0" />
+                    <span className="truncate">Zalo chưa kết nối. Đang hiển thị lịch sử offline.</span>
+                  </div>
+                  <button 
+                    onClick={handleOpenZaloWeb}
+                    className="text-amber-700 hover:text-amber-900 font-bold transition shrink-0 text-[10px] underline"
+                  >
+                    Đăng nhập
+                  </button>
+                </div>
+              )}
+
+              {/* Messages Area */}
+              {isLoadingMessages && messages.length === 0 ? (
+                <ZaloMessageListSkeleton count={8} />
+              ) : (
+                <div ref={messageListRef} className={`zalo-messages-container flex-1 overflow-y-auto px-4 pt-1 pb-3 space-y-2 min-h-0 bg-[#f4f6f8] ${scrollbarClass}`}>
+                  {hasOlderMessages && (
+                    <div className="flex justify-center mb-1">
                       <button
-                        key={i}
+                        onClick={() => void loadOlderMessages()}
+                        disabled={isLoadingOlderMessages}
+                        className="bg-surface border border-outline-variant text-on-surface-variant hover:bg-surface-container-low rounded-full px-3 py-1 text-[11px] font-semibold shadow-sm transition"
+                      >
+                        {isLoadingOlderMessages ? "Đang tải..." : "Tải thêm tin cũ"}
+                      </button>
+                    </div>
+                  )}
+
+                  {messages.map((message) => {
+                    const assets = messageAssets(message);
+                    const sender = message.sender_name || (message.is_sent ? "Bạn" : "Khách");
+                    const isSentByMe = message.is_sent;
+                    const msgId = messageKey(message);
+                    const isSelected = selectedMessageIds.includes(msgId);
+                    
+                    let roleLabel = "Khách hàng";
+                    let roleColorClass = "bg-red-50 text-red-650 border border-red-200/50";
+                    if (message.role === "leader") {
+                      roleLabel = "Leader";
+                      roleColorClass = "bg-slate-100 text-slate-700 border border-slate-200/60";
+                    } else if (message.role === "staff" || isSentByMe) {
+                      roleLabel = "Staff (Seeder)";
+                      roleColorClass = "bg-slate-50 text-slate-600 border border-slate-200/50";
+                    }
+
+                    return (
+                      <div key={msgId} className={`flex group ${isSentByMe ? 'justify-end' : 'justify-start'} w-full mb-3`}>
+                        {/* Checkbox for Auto Send Selection - visible on hover or if selected */}
+                        {!isSentByMe && (
+                           <div className={`mr-1.5 pt-4 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                             <input 
+                               type="checkbox" 
+                               className="w-3.5 h-3.5 cursor-pointer"
+                               checked={isSelected}
+                               onChange={() => handleToggleSelectMessage(msgId)}
+                             />
+                           </div>
+                        )}
+
+                        <div className={fullScreen ? "max-w-[80%]" : "max-w-[70%]"}>
+                          {/* [P4.2] Role tag and sender name above bubble */}
+                          <div className={`flex items-center gap-1.5 mb-1 px-1 text-[11px] font-semibold text-slate-500 ${isSentByMe ? 'justify-end' : 'justify-start'}`}>
+                            <span className="text-slate-700 font-bold">{sender}</span>
+                            <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-extrabold tracking-wide uppercase ${roleColorClass}`}>{roleLabel}</span>
+                          </div>
+
+                          {/* Bubble box */}
+                          <div className={`rounded-2xl ${
+                            fullScreen ? "px-4 py-2.5 text-[15px]" : "px-3 py-1.5"
+                          } relative transition-all duration-200 ${
+                            isSentByMe
+                              ? 'bg-[#0068FF] text-white rounded-tr-none shadow-sm shadow-blue-500/10'
+                              : 'bg-white text-slate-800 rounded-tl-none shadow-sm border border-slate-100'
+                          } ${isSelected ? 'ring-2 ring-red-500 ring-offset-2' : ''}`}>
+                            
+                            {message.content && (
+                              <p className={`whitespace-pre-wrap break-words text-[13px] leading-relaxed ${isSentByMe ? 'text-white/95' : 'text-slate-700'}`}>
+                                {message.content}
+                              </p>
+                            )}
+                            
+                            {assets.length > 0 && (
+                              <div className="mt-1 grid gap-1 sm:grid-cols-2">
+                                {assets.map((asset) => (
+                                  <Image
+                                    key={asset.id || asset.storage_url}
+                                    src={asset.storage_url || ""}
+                                    alt="Image"
+                                    width={220}
+                                    height={150}
+                                    className="rounded-lg object-cover w-full h-auto"
+                                    unoptimized
+                                  />
+                                ))}
+                              </div>
+                            )}
+
+                            <div className={`text-[10px] mt-0.5 text-right font-medium ${isSentByMe ? 'text-blue-100' : 'text-slate-400'}`}>
+                              {formatTime(message.timestamp_text || message.time_text)}
+                            </div>
+                          </div>
+                        </div>
+
+                        {isSentByMe && (
+                           <div className={`ml-1.5 pt-4 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                             <input 
+                               type="checkbox" 
+                               className="w-3.5 h-3.5 cursor-pointer"
+                               checked={isSelected}
+                               onChange={() => handleToggleSelectMessage(msgId)}
+                             />
+                           </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {newMessageCount > 0 && (
+                    <div className="sticky bottom-2 flex justify-center z-10">
+                      <button
+                        onClick={scrollToLatest}
+                        className="bg-[#E3000F] text-white hover:bg-red-700 rounded-full px-3 py-1 text-[11px] font-semibold shadow-md flex items-center gap-1 transition"
+                      >
+                        <MaterialIcon name="arrow_downward" className="text-[11px]" />
+                        Có {newMessageCount} tin mới
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* [P5] QUICK REPLY PILLS ROW (Above input area, horizontally scrollable) */}
+              <div className="bg-white border-t border-slate-200 px-4 pt-2 pb-2 flex items-center gap-2 overflow-x-auto whitespace-nowrap shrink-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1 shrink-0">Trả lời nhanh:</span>
+                {QUICK_REPLIES.map((reply, idx) => {
+                  let emoji = "👋";
+                  if (idx === 1) emoji = "💰";
+                  else if (idx === 2) emoji = "📅";
+                  else if (idx === 3) emoji = "📞";
+                  else if (idx === 4) emoji = "🤖";
+                  else if (idx === 5) emoji = "📄";
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        setInputText(reply.text);
+                        textareaRef.current?.focus();
+                      }}
+                      className="px-3 py-1 border border-red-200 bg-red-50/50 hover:bg-red-50 text-[#E3000F] rounded-full text-[11px] font-semibold transition-all shrink-0 cursor-pointer"
+                    >
+                      {emoji} {reply.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Chat Input */}
+              <div className="bg-white px-3 py-2 border-t border-slate-200 relative">
+                {/* Invisible Inputs */}
+                <input
+                  type="file"
+                  ref={imageInputRef}
+                  multiple
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  multiple
+                  accept="*/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+
+                {/* Slash Command Autocomplete Popover */}
+                {showSlashMenu && filteredSlashReplies.length > 0 && (
+                  <div
+                    className="absolute bottom-full mb-3 left-4 right-4 z-50 max-h-56 bg-white border border-slate-200 rounded-xl shadow-xl flex flex-col overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-150 divide-y divide-slate-100"
+                  >
+                    <div className="px-3 py-1.5 bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider sticky top-0">
+                      Mẫu trả lời nhanh (Gõ để tìm kiếm, ↑↓ để di chuyển, Enter để chọn)
+                    </div>
+                    {filteredSlashReplies.map((reply, index) => (
+                      <button
+                        key={index}
                         type="button"
-                        onClick={() => setActiveEmojiTab(i)}
-                        className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition ${
-                          activeEmojiTab === i
-                            ? "bg-surface text-[#E3000F] shadow-sm"
-                            : "text-on-surface-variant hover:text-on-surface"
+                        onClick={() => {
+                          setInputText(reply.text);
+                          setShowSlashMenu(false);
+                          textareaRef.current?.focus();
+                        }}
+                        className={`w-full text-left px-3 py-2 text-[12px] transition flex flex-col gap-0.5 ${
+                          index === slashSelectedIndex
+                            ? "bg-blue-50 text-blue-700 font-medium"
+                            : "text-slate-700 hover:bg-slate-50"
                         }`}
                       >
-                        {cat.name}
+                        <div className="flex justify-between items-center w-full">
+                          <span className="font-bold text-blue-600">{reply.shortcut}</span>
+                          <span className="text-[10px] text-slate-400">{reply.label}</span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 truncate w-full font-medium">{reply.text}</p>
                       </button>
                     ))}
                   </div>
+                )}
 
-                  {/* Emoji grid */}
-                  <div className="flex-1 overflow-y-auto p-sm grid grid-cols-6 gap-xs content-start">
-                    {EMOJI_CATEGORIES[activeEmojiTab].emojis.map((emoji, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => handleEmojiClick(emoji)}
-                        className="h-9 w-9 flex items-center justify-center text-xl rounded-lg hover:bg-surface-container-high active:scale-95 transition"
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Quick Replies Popup */}
-              {showQuickReplies && (
-                <div
-                  ref={quickRepliesRef}
-                  className="absolute bottom-full mb-3 left-14 z-50 w-80 max-h-80 bg-surface border border-outline-variant rounded-2xl shadow-xl flex flex-col overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-200"
-                >
-                  <div className="px-3 py-2 border-b border-outline-variant bg-surface-container-low sticky top-0 z-10 flex justify-between items-center">
-                    <span className="text-xs font-bold text-slate-700">Mẫu câu trả lời nhanh</span>
-                    <button onClick={() => setShowQuickReplies(false)} className="text-slate-400 hover:text-red-500">
-                      <MaterialIcon name="close" className="text-[14px]" />
-                    </button>
-                  </div>
-                  <div className="flex flex-col p-1.5 gap-1">
-                    {QUICK_REPLIES.map((text, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => {
-                          handleQuickReply(text);
-                          setShowQuickReplies(false);
-                        }}
-                        disabled={isSendingDirect}
-                        className="text-left px-3 py-2 text-[12px] hover:bg-blue-50 hover:text-blue-700 text-slate-700 rounded-lg transition-all border border-transparent hover:border-blue-200 disabled:opacity-50"
-                      >
-                        {text}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Direct Send Error */}
-              {directSendError && (
-                <div className="mb-1.5 text-[10px] text-error bg-error-container/40 px-2 py-1 rounded">
-                  {directSendError}
-                </div>
-              )}
-
-              {/* Selected Media Previews */}
-              {selectedMedia.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 p-1.5 mb-2 rounded-lg border border-outline-variant/60 bg-surface-container-lowest max-h-24 overflow-y-auto">
-                  {selectedMedia.map((item, index) => {
-                    const isImage = !!item.previewUrl;
-                    return (
-                      <div
-                        key={index}
-                        className="relative group w-10 h-10 rounded border border-outline-variant bg-surface overflow-hidden flex items-center justify-center shadow-sm hover:border-[#E3000F]/50 transition"
-                      >
-                        {isImage ? (
-                          <img
-                            src={item.previewUrl}
-                            alt={item.file.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex flex-col items-center justify-center p-0.5 text-center w-full h-full">
-                            <MaterialIcon name="description" className="text-base text-[#E3000F]" />
-                            <span className="text-[8px] truncate w-full px-0.5 text-on-surface-variant font-medium">
-                              {item.file.name}
-                            </span>
-                          </div>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveMedia(index)}
-                          className="absolute -top-1 -right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-0.5 shadow-md transition transform scale-0 group-hover:scale-100 flex items-center justify-center"
-                          style={{ width: '14px', height: '14px' }}
-                        >
-                          <MaterialIcon name="close" className="text-[8px] font-bold" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                  disabled={!flow.isLoggedIn}
-                  className={`text-slate-400 hover:text-blue-500 p-1.5 rounded-full hover:bg-blue-50 transition disabled:opacity-40 disabled:hover:bg-transparent ${
-                    showEmojiPicker ? "text-blue-600 bg-blue-100" : ""
-                  }`}
-                  title="Biểu cảm"
-                >
-                  <MaterialIcon name="mood" className="text-[18px]" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowQuickReplies(!showQuickReplies)}
-                  disabled={!flow.isLoggedIn}
-                  className={`text-slate-400 hover:text-blue-500 p-1.5 rounded-full hover:bg-blue-50 transition disabled:opacity-40 disabled:hover:bg-transparent ${
-                    showQuickReplies ? "text-blue-600 bg-blue-100" : ""
-                  }`}
-                  title="Mẫu câu nhanh"
-                >
-                  <MaterialIcon name="bolt" className="text-[18px]" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => imageInputRef.current?.click()}
-                  disabled={!flow.isLoggedIn}
-                  className="text-slate-400 hover:text-blue-500 p-1.5 rounded-full hover:bg-blue-50 transition disabled:opacity-40 disabled:hover:bg-transparent"
-                  title="Gửi hình ảnh"
-                >
-                  <MaterialIcon name="image" className="text-[18px]" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={!flow.isLoggedIn}
-                  className="text-slate-400 hover:text-blue-500 p-1.5 rounded-full hover:bg-blue-50 transition disabled:opacity-40 disabled:hover:bg-transparent"
-                  title="Gửi file tài liệu"
-                >
-                  <MaterialIcon name="attach_file" className="text-[18px]" />
-                </button>
- 
-                <input
-                  type="text"
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  placeholder={
-                    !flow.isLoggedIn
-                      ? "Hãy đăng nhập để nhắn tin..."
-                      : selectedMedia.length > 0
-                        ? "Nhập chữ kèm theo file, Enter để gửi..."
-                        : "Nhập tin nhắn, Enter để gửi..."
-                  }
-                  disabled={isSendingDirect || !flow.isLoggedIn}
-                  className={`flex-1 bg-slate-100/80 rounded-full ${
-                    fullScreen
-                      ? "px-5 py-3 text-[15px]"
-                      : "px-3.5 py-2 text-[13px]"
-                  } text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white border border-transparent focus:border-blue-500/30 transition-all disabled:opacity-60`}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      void handleSingleSend();
-                    }
-                  }}
-                />
-
-                <button
-                  onClick={() => void handleSingleSend()}
-                  disabled={isSendingDirect || !flow.isLoggedIn || (!inputText.trim() && selectedMedia.length === 0)}
-                  className={`bg-[#0068FF] text-white hover:bg-blue-600 ${
-                    fullScreen ? "h-11 w-11" : "h-9 w-9"
-                  } rounded-full flex items-center justify-center transition-all shadow-sm shadow-blue-500/20 disabled:opacity-50 disabled:shadow-none`}
-                >
-                  {isSendingDirect ? (
-                    <span className="text-[10px] font-bold animate-pulse">...</span>
-                  ) : (
-                    <MaterialIcon name="send" className={`${fullScreen ? "text-[18px]" : "text-[16px]"} ml-0.5`} />
-                  )}
-                </button>
-              </div>
-            </div>
-          </>
-        ) : !flow.isLoggedIn ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-6 bg-slate-50/50 w-full overflow-y-auto">
-            {/* QR Code Display - 3 states: has QR, generating QR, no QR */}
-            {flow.qrBase64 ? (
-              <>
-                <div className="bg-white p-4 rounded-2xl shadow-lg mb-4 border border-slate-100 relative">
-                  <img
-                    src={flow.qrBase64.startsWith("data:") ? flow.qrBase64 : `data:image/png;base64,${flow.qrBase64}`}
-                    alt="Zalo QR"
-                    className="w-48 h-48 object-fill"
-                  />
-                  {flow.authStatus === "waiting_scan" && (
-                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-[#E3000F] text-white hover:bg-red-700 px-3 py-1 rounded-full text-[10px] font-bold shadow-md animate-pulse whitespace-nowrap">
-                      Đang chờ quét mã...
-                    </div>
-                  )}
-                </div>
-                <h3 className="text-base font-bold text-slate-800 mb-1.5 mt-2 text-center">Quét mã QR bằng Zalo</h3>
-                <div 
-                  className="text-slate-500 text-[11px] text-center mb-4 leading-relaxed" 
-                  style={{ minWidth: "240px", maxWidth: "100%", width: "100%" }}
-                >
-                  <p>Mở ứng dụng Zalo trên điện thoại → Quét QR → Xác nhận đăng nhập</p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => void flow.startSession()}
-                    disabled={flow.isStartingSession}
-                    className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-[12px] font-semibold hover:bg-slate-50 transition shadow-sm disabled:opacity-50"
+                {/* Emoji Picker Popup */}
+                {showEmojiPicker && (
+                  <div
+                    ref={emojiPickerRef}
+                    className="absolute bottom-full mb-3 left-4 z-50 w-72 h-80 bg-white border border-slate-200 rounded-2xl shadow-xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200"
+                    style={{ maxHeight: '320px' }}
                   >
-                    {flow.isStartingSession ? "Đang tạo..." : "Làm mới QR"}
+                    {/* Category selector */}
+                    <div className="flex border-b border-slate-200 bg-slate-50 px-2 py-1">
+                      {EMOJI_CATEGORIES.map((cat, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setActiveEmojiTab(i)}
+                          className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition ${
+                            activeEmojiTab === i
+                              ? "bg-white text-[#E3000F] shadow-sm"
+                              : "text-slate-500 hover:text-slate-700"
+                          }`}
+                        >
+                          {cat.name}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Emoji grid */}
+                    <div className="flex-1 overflow-y-auto p-2 grid grid-cols-6 gap-1 content-start bg-white">
+                      {EMOJI_CATEGORIES[activeEmojiTab].emojis.map((emoji, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => handleEmojiClick(emoji)}
+                          className="h-9 w-9 flex items-center justify-center text-xl rounded-lg hover:bg-slate-100 active:scale-95 transition cursor-pointer"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Quick Replies Popup */}
+                {showQuickReplies && (
+                  <div
+                    ref={quickRepliesRef}
+                    className="absolute bottom-full mb-3 left-14 z-50 w-80 max-h-80 bg-white border border-slate-200 rounded-2xl shadow-xl flex flex-col overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-200"
+                  >
+                    <div className="px-3 py-2 border-b border-slate-200 bg-slate-50 sticky top-0 z-10 flex justify-between items-center">
+                      <span className="text-xs font-bold text-slate-700">Mẫu câu trả lời nhanh</span>
+                      <button onClick={() => setShowQuickReplies(false)} className="text-slate-400 hover:text-red-500 cursor-pointer">
+                        <MaterialIcon name="close" className="text-[14px]" />
+                      </button>
+                    </div>
+                    <div className="flex flex-col p-1.5 gap-1 bg-white">
+                      {QUICK_REPLIES.map((reply, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            handleQuickReply(reply.text);
+                            setShowQuickReplies(false);
+                          }}
+                          disabled={isSendingDirect}
+                          className="text-left px-3 py-2 text-[12px] hover:bg-red-50 hover:text-[#E3000F] text-slate-700 rounded-lg transition-all border border-transparent hover:border-red-200 disabled:opacity-50 cursor-pointer"
+                        >
+                          {reply.text}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Direct Send Error */}
+                {directSendError && (
+                  <div className="mb-1.5 text-[10px] text-error bg-error-container/40 px-2 py-1 rounded">
+                    {directSendError}
+                  </div>
+                )}
+
+                {/* Selected Media Previews */}
+                {selectedMedia.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 p-1.5 mb-2 rounded-lg border border-slate-200 bg-slate-50 max-h-24 overflow-y-auto">
+                    {selectedMedia.map((item, index) => {
+                      const isImage = !!item.previewUrl;
+                      return (
+                        <div
+                          key={index}
+                          className="relative group w-10 h-10 rounded border border-slate-200 bg-white overflow-hidden flex items-center justify-center shadow-sm hover:border-[#E3000F]/50 transition"
+                        >
+                          {isImage ? (
+                            <img
+                              src={item.previewUrl}
+                              alt={item.file.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex flex-col items-center justify-center p-0.5 text-center w-full h-full">
+                              <MaterialIcon name="description" className="text-base text-[#E3000F]" />
+                              <span className="text-[8px] truncate w-full px-0.5 text-slate-500 font-medium">
+                                {item.file.name}
+                              </span>
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveMedia(index)}
+                            className="absolute -top-1 -right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-0.5 shadow-md transition transform scale-0 group-hover:scale-100 flex items-center justify-center cursor-pointer"
+                            style={{ width: '14px', height: '14px' }}
+                          >
+                            <MaterialIcon name="close" className="text-[8px] font-bold" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                    disabled={!flow.isLoggedIn}
+                    className={`text-slate-400 hover:text-[#E3000F] p-1.5 rounded-full hover:bg-red-50 transition disabled:opacity-40 disabled:hover:bg-transparent cursor-pointer ${
+                      showEmojiPicker ? "text-[#E3000F] bg-red-50" : ""
+                    }`}
+                    title="Biểu cảm"
+                  >
+                    <MaterialIcon name="mood" className="text-[18px]" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickReplies(!showQuickReplies)}
+                    disabled={!flow.isLoggedIn}
+                    className={`text-slate-400 hover:text-[#E3000F] p-1.5 rounded-full hover:bg-red-50 transition disabled:opacity-40 disabled:hover:bg-transparent cursor-pointer ${
+                      showQuickReplies ? "text-[#E3000F] bg-red-50" : ""
+                    }`}
+                    title="Mẫu câu nhanh"
+                  >
+                    <MaterialIcon name="bolt" className="text-[18px]" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => imageInputRef.current?.click()}
+                    disabled={!flow.isLoggedIn}
+                    className="text-slate-400 hover:text-[#E3000F] p-1.5 rounded-full hover:bg-red-50 transition disabled:opacity-40 disabled:hover:bg-transparent cursor-pointer"
+                    title="Gửi hình ảnh"
+                  >
+                    <MaterialIcon name="image" className="text-[18px]" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={!flow.isLoggedIn}
+                    className="text-slate-400 hover:text-[#E3000F] p-1.5 rounded-full hover:bg-red-50 transition disabled:opacity-40 disabled:hover:bg-transparent cursor-pointer"
+                    title="Gửi file tài liệu"
+                  >
+                    <MaterialIcon name="attach_file" className="text-[18px]" />
+                  </button>
+   
+                  <textarea
+                    ref={textareaRef}
+                    rows={1}
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    placeholder={
+                      !flow.isLoggedIn
+                        ? "Hãy đăng nhập để nhắn tin..."
+                        : selectedMedia.length > 0
+                          ? "Nhập chữ kèm theo file, Enter để gửi..."
+                          : "Nhập tin nhắn, Enter để gửi..."
+                    }
+                    disabled={isSendingDirect || !flow.isLoggedIn}
+                    className={`flex-1 bg-slate-100/80 rounded-2xl ${
+                      fullScreen
+                        ? "px-5 py-2.5 text-[15px]"
+                        : "px-3.5 py-2 text-[13px]"
+                    } text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:bg-white border border-transparent focus:border-red-500/30 transition-all disabled:opacity-60 resize-none min-h-[38px] max-h-[120px] overflow-y-auto`}
+                    onKeyDown={(e) => {
+                      if (showSlashMenu && filteredSlashReplies.length > 0) {
+                        if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          setSlashSelectedIndex((prev) => (prev + 1) % filteredSlashReplies.length);
+                          return;
+                        }
+                        if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          setSlashSelectedIndex((prev) => (prev - 1 + filteredSlashReplies.length) % filteredSlashReplies.length);
+                          return;
+                        }
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          const reply = filteredSlashReplies[slashSelectedIndex];
+                          if (reply) {
+                            setInputText(reply.text);
+                            setShowSlashMenu(false);
+                          }
+                          return;
+                        }
+                        if (e.key === "Escape") {
+                          e.preventDefault();
+                          setShowSlashMenu(false);
+                          return;
+                        }
+                      }
+
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        void handleSingleSend();
+                      }
+                    }}
+                  />
+
+                  <button
+                    onClick={() => void handleSingleSend()}
+                    disabled={isSendingDirect || !flow.isLoggedIn || (!inputText.trim() && selectedMedia.length === 0)}
+                    className={`bg-[#E3000F] text-white hover:bg-red-700 ${
+                      fullScreen ? "h-11 w-11" : "h-9 w-9"
+                    } rounded-full flex items-center justify-center transition-all shadow-sm shadow-red-500/20 disabled:opacity-50 disabled:shadow-none cursor-pointer`}
+                  >
+                    {isSendingDirect ? (
+                      <span className="text-[10px] font-bold animate-pulse">...</span>
+                    ) : (
+                      <MaterialIcon name="send" className={`${fullScreen ? "text-[18px]" : "text-[16px]"} ml-0.5`} />
+                    )}
                   </button>
                 </div>
-              </>
-            ) : flow.isStartingSession ? (
-              <>
-                <div className="w-48 h-48 bg-white rounded-2xl mb-6 flex items-center justify-center border-2 border-dashed border-slate-200 shadow-sm">
-                  <div className="flex flex-col items-center gap-2 text-slate-400">
-                    <MaterialIcon name="qr_code_scanner" className="text-3xl animate-pulse text-[#E3000F]" />
-                    <span className="text-[12px] font-semibold">Đang tạo mã QR...</span>
+              </div>
+            </>
+          ) : !flow.isLoggedIn ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-6 bg-slate-50/50 w-full overflow-y-auto">
+              {/* QR Code Display - 3 states: has QR, generating QR, no QR */}
+              {flow.qrBase64 ? (
+                <>
+                  <div className="bg-white p-4 rounded-2xl shadow-lg mb-4 border border-slate-100 relative">
+                    <img
+                      src={flow.qrBase64.startsWith("data:") ? flow.qrBase64 : `data:image/png;base64,${flow.qrBase64}`}
+                      alt="Zalo QR"
+                      className="w-48 h-48 object-fill"
+                    />
+                    {flow.authStatus === "waiting_scan" && (
+                      <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-[#E3000F] text-white hover:bg-red-700 px-3 py-1 rounded-full text-[10px] font-bold shadow-md animate-pulse whitespace-nowrap">
+                        Đang chờ quét mã...
+                      </div>
+                    )}
                   </div>
-                </div>
-                <div 
-                  className="text-slate-500 text-[11px] text-center leading-relaxed"
-                  style={{ minWidth: "240px", maxWidth: "100%", width: "100%" }}
-                >
-                  <p>Hệ thống đang khởi tạo phiên Zalo và tạo mã QR. Quá trình này có thể mất vài giây.</p>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="text-[#E3000F] text-4xl mb-4">
-                  <MaterialIcon name="login" className="text-inherit" />
-                </div>
-                <h3 className="text-base font-bold text-slate-800 mb-2.5 text-center">Tài khoản chưa đăng nhập</h3>
-                <div 
-                  className="text-slate-500 text-[11px] text-center leading-relaxed mb-5"
-                  style={{ minWidth: "280px", maxWidth: "100%", width: "100%" }}
-                >
-                  <p>Bấm vào nút bên dưới để mở Zalo Web và đăng nhập. Sau khi đăng nhập xong, hệ thống sẽ tự động đồng bộ tài khoản của bạn.</p>
-                </div>
-                <button
-                  onClick={handleOpenZaloWeb}
-                  className="bg-[#E3000F] hover:bg-red-600 text-white px-5 py-2 rounded-lg text-[12px] font-bold transition-all shadow-md shadow-red-100 active:scale-95 flex items-center gap-1.5"
-                >
-                  <MaterialIcon name="open_in_new" className="text-sm" />
-                  Tiến hành đăng nhập
-                </button>
-              </>
-            )}
-            {flow.authStatus === "qr_expired" && (
-              <div className="mt-4 text-[11px] text-orange-600 bg-orange-50 px-3 py-1.5 rounded border border-orange-100">
-                Mã QR đã hết hạn. Bấm &quot;Làm mới QR&quot; để tạo mã mới.
-              </div>
-            )}
-          </div>
-        ) : (
-          <ZaloEmptyChat
-            hasConversations={conversations.length > 0}
-            isLoggedIn={flow.isLoggedIn ?? false}
-            isLoading={isSyncingRecent}
-            onSync={() => void syncRecentConversations()}
-            onLogin={handleOpenZaloWeb}
-          />
-        )}
-      </section>
-
-      {/* Right Column: Auto Send */}
-      {flow.isLoggedIn && selectedConversationView && isAutoSendOpen && (
-        <section className="border-l border-slate-100 flex flex-col h-full bg-white overflow-hidden min-w-0">
-          <div className="px-3 py-2.5 border-b border-slate-200 flex items-center justify-between space-x-2 text-[#E3000F]">
-            <div className="flex items-center space-x-1.5 min-w-0">
-              <MaterialIcon name="send" className="text-sm" />
-              <h2 className="font-semibold uppercase tracking-wide text-[11px] truncate">Auto Send</h2>
-            </div>
-            <button
-              onClick={() => setIsAutoSendOpen(false)}
-              className="text-slate-400 hover:text-slate-800 transition shrink-0"
-              title="Đóng Auto Send"
-            >
-               <MaterialIcon name="close" className="text-base" />
-            </button>
-          </div>
-
-        <div className="flex-1 overflow-y-auto p-3 space-y-3">
-          <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
-            <div className="flex items-start space-x-2 mb-2">
-              <span className="text-[#E3000F] mt-0.5"><MaterialIcon name="auto_awesome" className="text-sm" /></span>
-              <h4 className="font-semibold text-slate-800 text-[12px] leading-tight">Gửi tin nhắn hàng loạt</h4>
-            </div>
-            <p className="text-[10px] text-slate-400 mb-2.5">Tích chọn tin nhắn ở khung chat bên trái làm nội dung mẫu, sau đó chọn người nhận bên dưới.</p>
-
-            <div className="mb-2.5">
-              <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Nội dung mẫu</label>
-              {selectedMessageIds.length > 0 ? (
-                <div className="bg-green-50 text-green-700 px-2 py-1.5 rounded text-[10px] font-medium inline-flex items-center gap-1 border border-green-200 w-full">
-                  <MaterialIcon name="check_circle" className="text-xs" />
-                  Đã chọn {selectedMessageIds.length} tin nhắn
-                </div>
+                  <h3 className="text-base font-bold text-slate-800 mb-1.5 mt-2 text-center">Quét mã QR bằng Zalo</h3>
+                  <div 
+                    className="text-slate-500 text-[11px] text-center mb-4 leading-relaxed" 
+                    style={{ minWidth: "240px", maxWidth: "100%", width: "100%" }}
+                  >
+                    <p>Mở ứng dụng Zalo trên điện thoại → Quét QR → Xác nhận đăng nhập</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => void flow.startSession()}
+                      disabled={flow.isStartingSession}
+                      className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-[12px] font-semibold hover:bg-slate-50 transition shadow-sm disabled:opacity-50"
+                    >
+                      {flow.isStartingSession ? "Đang tạo..." : "Làm mới QR"}
+                    </button>
+                  </div>
+                </>
+              ) : flow.isStartingSession ? (
+                <>
+                  <div className="w-48 h-48 bg-white rounded-2xl mb-6 flex items-center justify-center border-2 border-dashed border-slate-200 shadow-sm">
+                    <div className="flex flex-col items-center gap-2 text-slate-400">
+                      <MaterialIcon name="qr_code_scanner" className="text-3xl animate-pulse text-[#E3000F]" />
+                      <span className="text-[12px] font-semibold">Đang tạo mã QR...</span>
+                    </div>
+                  </div>
+                  <div 
+                    className="text-slate-500 text-[11px] text-center leading-relaxed"
+                    style={{ minWidth: "240px", maxWidth: "100%", width: "100%" }}
+                  >
+                    <p>Hệ thống đang khởi tạo phiên Zalo và tạo mã QR. Quá trình này có thể mất vài giây.</p>
+                  </div>
+                </>
               ) : (
-                <div className="bg-yellow-50 border border-yellow-100 p-2 rounded">
-                  <p className="text-[10px] italic text-yellow-700 leading-relaxed">
-                    Chưa chọn tin nhắn nào. Hãy tick vào checkbox bên cạnh tin nhắn.
-                  </p>
+                <>
+                  <div className="text-[#E3000F] text-4xl mb-4">
+                    <MaterialIcon name="login" className="text-inherit" />
+                  </div>
+                  <h3 className="text-base font-bold text-slate-800 mb-2.5 text-center">Tài khoản chưa đăng nhập</h3>
+                  <div 
+                    className="text-slate-500 text-[11px] text-center leading-relaxed mb-5"
+                    style={{ minWidth: "280px", maxWidth: "100%", width: "100%" }}
+                  >
+                    <p>Bấm vào nút bên dưới để mở Zalo Web và đăng nhập. Sau khi đăng nhập xong, hệ thống sẽ tự động đồng bộ tài khoản của bạn.</p>
+                  </div>
+                  <button
+                    onClick={handleOpenZaloWeb}
+                    className="bg-[#E3000F] hover:bg-red-600 text-white px-5 py-2 rounded-lg text-[12px] font-bold transition-all shadow-md shadow-red-100 active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <MaterialIcon name="open_in_new" className="text-sm" />
+                    Tiến hành đăng nhập
+                  </button>
+                </>
+              )}
+              {flow.authStatus === "qr_expired" && (
+                <div className="mt-4 text-[11px] text-orange-600 bg-orange-50 px-3 py-1.5 rounded border border-orange-100">
+                  Mã QR đã hết hạn. Bấm &quot;Làm mới QR&quot; để tạo mã mới.
                 </div>
               )}
             </div>
+          ) : (
+            <ZaloEmptyChat
+              hasConversations={conversations.length > 0}
+              isLoggedIn={flow.isLoggedIn ?? false}
+              isLoading={isSyncingRecent}
+              onSync={() => void syncRecentConversations()}
+              onLogin={handleOpenZaloWeb}
+            />
+          )}
 
-            <div className="mb-2">
-              <div className="text-[10px] font-semibold uppercase text-on-surface-variant mb-1.5">
-                Người nhận ({autoSendTargetIds.length} đã chọn)
+          {/* [P1] Floating Trigger Tab on right edge (always rendered, slides/hides or acts as close/open) */}
+          {flow.isLoggedIn && selectedConversationView && (
+            <button
+              onClick={() => setIsAutoSendOpen(!isAutoSendOpen)}
+              className="absolute right-0 top-1/3 z-50 w-9 h-12 bg-gradient-to-l from-[#E3000F] to-red-650 hover:from-red-600 hover:to-red-700 text-white rounded-l-xl shadow-lg flex flex-col items-center justify-center border-l border-y border-white/20 transition-all cursor-pointer"
+              title={isAutoSendOpen ? "Đóng chiến dịch gửi hàng loạt" : "Mở chiến dịch gửi hàng loạt"}
+            >
+              <MaterialIcon name={(isAutoSendOpen ? "arrow_forward" : "campaign") as MaterialSymbolName} className="text-lg text-white" />
+              <span className="text-[8px] font-extrabold uppercase scale-90 -mt-1 tracking-tighter">Auto</span>
+            </button>
+          )}
+        </section>
+
+        {/* [P1] AUTO SEND DRAWER (Slide-out absolute sidebar) */}
+        {flow.isLoggedIn && selectedConversationView && (
+          <section className={`absolute right-0 top-0 h-full w-[450px] max-w-[90vw] border-l border-slate-200 flex flex-col bg-white overflow-hidden shadow-2xl z-40 transition-transform duration-300 ease-in-out ${isAutoSendOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+            {/* Drawer Header */}
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50 shrink-0">
+              <div className="flex items-center gap-2">
+                <MaterialIcon name="campaign" className="text-[#E3000F] animate-pulse text-lg" />
+                <div>
+                  <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Bảng chiến dịch gửi hàng loạt (Auto)</h2>
+                  <p className="text-[10px] text-slate-400">Chọn tin mẫu đã lưu, người nhận để gửi nhanh</p>
+                </div>
               </div>
+              <button
+                onClick={() => setIsAutoSendOpen(false)}
+                className="w-8 h-8 rounded-lg hover:bg-slate-200 border border-slate-200 flex items-center justify-center text-slate-500 transition-colors"
+                title="Đóng Auto Send"
+              >
+                <MaterialIcon name="close" className="text-base" />
+              </button>
+            </div>
 
-              {/* Search conversations for Auto Send */}
-              <div className="relative mb-1.5">
-                <MaterialIcon name="search" className="absolute left-1.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-xs" />
-                <input
-                  type="text"
-                  placeholder="Tìm nhóm hoặc người nhận..."
-                  value={autoSendSearchQuery}
-                  onChange={(e) => setAutoSendSearchQuery(e.target.value)}
-                  className="w-full text-[10px] border border-outline-variant rounded py-1 pl-6 pr-1.5 bg-surface focus:outline-none focus:ring-1 focus:ring-[#E3000F]"
-                />
-              </div>
-
-              {/* Selected target chips */}
-              {autoSendTargetIds.length > 0 && (
-                <div className="flex flex-wrap gap-1 mb-1.5">
-                  {autoSendTargetIds.map(id => {
-                    const conv = conversations.find(c => c.conversation_id === id);
-                    const name = conv ? conversationTitle(conv) : id;
-                    return (
-                      <button
-                        key={id}
-                        type="button"
-                        onClick={() => handleToggleAutoSendTarget(id)}
-                        className="inline-flex items-center gap-0.5 rounded-full bg-red-50 text-red-600 border border-red-100 px-1.5 py-0.5 text-[10px] font-semibold hover:bg-[#E3000F]/20 transition"
-                      >
-                        {name.length > 18 ? `${name.slice(0, 18)}…` : name}
-                        <MaterialIcon name="close" className="text-[10px]" />
-                      </button>
-                    );
-                  })}
+            {/* Drawer Scroll Area */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {autoSendError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 rounded-lg">
+                  {autoSendError}
+                </div>
+              )}
+              {autoSendSuccess && (
+                <div className="bg-green-50 border border-green-200 text-green-700 text-xs px-3 py-2 rounded-lg">
+                  {autoSendSuccess}
                 </div>
               )}
 
-              {/* Conversation picker list */}
-              <div className="max-h-40 overflow-y-auto border border-outline-variant rounded bg-surface divide-y divide-outline-variant/50">
-                {autoSendFilteredConversations.length > 0 ? (
-                  autoSendFilteredConversations.map(conv => {
-                    const title = conversationTitle(conv);
-                    const checked = autoSendTargetIds.includes(conv.conversation_id);
-                    const isCurrentConv = conv.conversation_id === selectedConversationId;
-                    return (
-                      <label
-                        key={conv.conversation_id}
-                        className={`flex items-center gap-1.5 px-1.5 py-1 cursor-pointer hover:bg-surface-container-low transition text-[10px] ${
-                          checked ? 'bg-[#E3000F]-container/20' : ''
-                        } ${isCurrentConv ? 'border-l-2 border-l-primary' : ''}`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => handleToggleAutoSendTarget(conv.conversation_id)}
-                          className="w-3 h-3 shrink-0"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div className="font-semibold truncate text-on-surface">{title}</div>
-                          {conv.latest_content && (
-                            <div className="text-[9px] text-on-surface-variant truncate">{conv.latest_content}</div>
-                          )}
+              {/* Section 1: Content Mode Selection */}
+              <div className="border border-slate-200 rounded-xl p-3 bg-white space-y-2 shadow-sm">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Chế độ nội dung</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCampaignMode("both")}
+                    className={`py-1.5 rounded-lg border text-xs font-semibold transition-all ${
+                      campaignMode === "both"
+                        ? "border-red-500 bg-red-50 text-[#E3000F] font-bold"
+                        : "border-slate-200 text-slate-600 hover:border-red-500"
+                    }`}
+                  >
+                    Text + Ảnh
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCampaignMode("text")}
+                    className={`py-1.5 rounded-lg border text-xs font-semibold transition-all ${
+                      campaignMode === "text"
+                        ? "border-red-500 bg-red-50 text-[#E3000F] font-bold"
+                        : "border-slate-200 text-slate-600 hover:border-red-500"
+                    }`}
+                  >
+                    Chỉ Text
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCampaignMode("image")}
+                    className={`py-1.5 rounded-lg border text-xs font-semibold transition-all ${
+                      campaignMode === "image"
+                        ? "border-red-500 bg-red-50 text-[#E3000F] font-bold"
+                        : "border-slate-200 text-slate-600 hover:border-red-500"
+                    }`}
+                  >
+                    Chỉ Ảnh
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-400 font-medium mt-1">
+                  Đã chọn {selectedMessageIds.length} tin nhắn trực quan từ chat.
+                </p>
+              </div>
+
+              {/* Section 2: Recipients input */}
+              <div className="border border-slate-200 rounded-xl p-3 bg-white space-y-3 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Nhập người nhận thủ công</label>
+                  <span className="text-[9px] text-slate-400">Mỗi dòng một tên/ID</span>
+                </div>
+                <textarea
+                  value={manualRecipients}
+                  onChange={(e) => setManualRecipients(e.target.value)}
+                  rows={3}
+                  placeholder="Nhập tên group hoặc cá nhân..."
+                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-red-500 resize-none transition-all"
+                />
+
+                <hr className="border-slate-100" />
+
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Chọn người nhận từ hệ thống</span>
+                  <button
+                    type="button"
+                    onClick={handleLoadTargets}
+                    disabled={isLoadingTargets}
+                    className="bg-[#E3000F] hover:bg-red-700 text-white text-[10px] font-bold px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 shrink-0 cursor-pointer"
+                  >
+                    <MaterialIcon name="refresh" className={`text-xs ${isLoadingTargets ? "animate-spin" : ""}`} />
+                    <span>Tải danh sách</span>
+                  </button>
+                </div>
+
+                {showSystemTargets && (
+                  <>
+                    {/* Search recipient lists */}
+                    <div className="relative flex items-center">
+                      <MaterialIcon name="search" className="absolute left-2.5 text-slate-400 text-xs" />
+                      <input
+                        type="text"
+                        placeholder="Lọc danh sách nhận..."
+                        value={autoSendSearchQuery}
+                        onChange={(e) => setAutoSendSearchQuery(e.target.value)}
+                        className="w-full pl-8 pr-3 py-1 border border-slate-200 rounded-lg text-[11px] outline-none focus:border-red-500 bg-white"
+                      />
+                    </div>
+
+                    {/* List of groups fetched */}
+                    <div className="max-h-40 overflow-y-auto border border-slate-100 rounded-lg p-2 space-y-1.5 bg-slate-50 divide-y divide-slate-100">
+                      {autoSendFilteredConversations.length > 0 ? (
+                        autoSendFilteredConversations.map((conv) => {
+                          const title = conversationTitle(conv);
+                          const checked = autoSendTargetIds.includes(conv.conversation_id);
+                          return (
+                            <label
+                              key={conv.conversation_id}
+                              className={`flex items-center gap-2 p-1.5 rounded-lg border text-xs cursor-pointer select-none transition-all hover:bg-slate-100 ${
+                                checked ? 'bg-red-50/50 border-red-500/30 text-[#E3000F] font-semibold' : 'bg-white border-slate-200'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => handleToggleAutoSendTarget(conv.conversation_id)}
+                                className="rounded text-[#E3000F] border-slate-300 w-3.5 h-3.5 focus:ring-0 cursor-pointer"
+                              />
+                              <span className="font-semibold text-slate-700 truncate flex-1">{title}</span>
+                            </label>
+                          );
+                        })
+                      ) : (
+                        <div className="text-[10px] text-slate-400 text-center italic py-2">
+                          Không tìm thấy người nhận nào
                         </div>
-                      </label>
-                    );
-                  })
-                ) : (
-                  <div className="px-1.5 py-3 text-center text-[10px] text-on-surface-variant">
-                    {conversations.length === 0
-                      ? "Chưa có hội thoại. Bấm Đồng bộ ở bên trái."
-                      : "Không tìm thấy hội thoại phù hợp."}
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Section 3: Preview Box */}
+              <div className="border border-slate-200 rounded-xl p-3 bg-white space-y-2 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Bản xem trước chiến dịch</span>
+                    <span className="text-[10px] text-slate-400 font-semibold">
+                      {autoSendTargetIds.length + manualRecipients.split("\n").filter(Boolean).length > 0
+                        ? `${autoSendTargetIds.length + manualRecipients.split("\n").filter(Boolean).length} người nhận sẽ được gửi (Gặp ${autoSendTargetIds.length} nhóm hệ thống, ${manualRecipients.split("\n").filter(Boolean).length} thủ công).`
+                        : "Chưa cấu hình người nhận"}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowPreview(!showPreview)}
+                    className="border border-slate-200 hover:border-red-500 text-slate-700 hover:text-red-600 text-xs font-bold px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+                  >
+                    <MaterialIcon name="visibility" className="text-xs" />
+                    <span>Preview</span>
+                  </button>
+                </div>
+
+                {/* Preview Area Container */}
+                {showPreview && (
+                  <div className="bg-slate-50 border border-dashed border-slate-200 rounded-lg p-3 text-xs text-slate-700 whitespace-pre-wrap text-left shadow-inner">
+                    {selectedMessageIds.length > 0 ? (
+                      <div>
+                        {messages.filter(m => selectedMessageIds.includes(messageKey(m))).map((m, idx) => (
+                          <div key={idx} className="mb-2 last:mb-0">
+                            {(campaignMode === "both" || campaignMode === "text") && m.content && (
+                              <div>
+                                <div className="font-bold text-[#E3000F] mb-0.5">Text sẽ gửi:</div>
+                                <div className="bg-white border border-slate-200 rounded-lg p-2 mb-2 italic">
+                                  &quot;{m.content}&quot;
+                                </div>
+                              </div>
+                            )}
+                            {(campaignMode === "both" || campaignMode === "image") && messageAssets(m).length > 0 && (
+                              <div>
+                                <div className="font-bold text-[#e3000f] mb-0.5">Ảnh đính kèm:</div>
+                                <div className="grid grid-cols-3 gap-2">
+                                  {messageAssets(m).map((asset, aIdx) => (
+                                    <div
+                                      key={aIdx}
+                                      className="w-full aspect-video bg-slate-200 border rounded flex items-center justify-center text-[9px] text-slate-500 font-bold overflow-hidden"
+                                    >
+                                      <img src={asset.storage_url || ""} alt="Preview" className="w-full h-full object-cover" />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-slate-400 text-center italic">
+                        Chưa có nội dung gửi. Hãy chọn tin nhắn từ khung chat để làm mẫu.
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
+
+              {/* Action buttons inside panel */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => void handleAutoSend()}
+                  disabled={isSending || selectedMessageIds.length === 0 || (autoSendTargetIds.length === 0 && manualRecipients.split("\n").filter(Boolean).length === 0)}
+                  className="w-full bg-[#E3000F] hover:bg-red-700 text-white text-xs font-bold py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <MaterialIcon name="send" className="text-base" />
+                  <span>{isSending ? "Đang gửi chiến dịch..." : "Bắt đầu gửi hàng loạt"}</span>
+                </button>
+              </div>
+
+              {/* Campaign Status Logs */}
+              {campaignStatus && (
+                <div className="border border-slate-200 rounded-xl p-3 bg-white space-y-2 shadow-sm animate-in fade-in duration-300">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Chiến dịch: Camp_{flow.userId?.slice(-5) || "981a2"}
+                    </span>
+                    <span className={`text-[10px] font-bold uppercase ${
+                      campaignStatus === "success" ? "text-emerald-600" : campaignStatus === "sending" ? "text-blue-600" : "text-red-600"
+                    }`}>
+                      {campaignStatus === "sending" ? "Đang chạy" : campaignStatus === "success" ? "Hoàn thành" : "Thất bại"}
+                    </span>
+                  </div>
+                  <div className="max-h-40 overflow-y-auto space-y-1 text-[11px] font-semibold text-slate-500">
+                    {campaignLogs.map((log, idx) => (
+                      <div key={idx} className="flex items-center gap-1.5 py-0.5 border-b border-slate-50 last:border-0">
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                          log.status === "sending" ? "bg-blue-500 animate-pulse" : log.status === "success" ? "bg-emerald-500" : "bg-red-500"
+                        }`} />
+                        <span className="font-bold text-slate-600 truncate flex-1">Gửi tới: {log.name}</span>
+                        <span className={`text-[9px] uppercase shrink-0 font-bold ${
+                          log.status === "sending" ? "text-blue-500" : log.status === "success" ? "text-emerald-600" : "text-red-600"
+                        }`}>
+                          {log.status === "sending" ? "Đang gửi..." : log.status === "success" ? "Thành công" : "Lỗi"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
             </div>
-
-            {autoSendError && (
-              <div className="mb-2 text-[10px] text-error bg-red-50 p-2 rounded border border-red-100 mt-2">
-                {autoSendError}
-              </div>
-            )}
-
-            {autoSendSuccess && (
-              <div className="mb-2 text-[10px] text-green-700 bg-green-50 border border-green-200 p-2 rounded mt-2">
-                {autoSendSuccess}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="p-3 border-t border-slate-200">
-          <button
-            onClick={() => void handleAutoSend()}
-            disabled={isSending || selectedMessageIds.length === 0 || autoSendTargetIds.length === 0}
-            className="w-full bg-[#E3000F] hover:bg-red-600 text-white font-semibold py-2 rounded-lg flex items-center justify-center space-x-1.5 shadow-md shadow-red-100 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 disabled:shadow-none text-[12px]"
-          >
-            <MaterialIcon name="send" className="text-xs" />
-            <span>{isSending ? "Đang gửi..." : autoSendTargetIds.length > 0 ? `Gửi đến ${autoSendTargetIds.length} người nhận` : "Thực hiện Auto Send"}</span>
-          </button>
-        </div>
-      </section>
-      )}
+          </section>
+        )}
+      </div>
 
       {/* Modal nhắn tin cho người lạ (SĐT / username) */}
       <ZaloNewChatModal

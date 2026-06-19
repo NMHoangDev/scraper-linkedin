@@ -101,7 +101,10 @@ export type MaterialSymbolName =
   | "chat"
   | "star"
   | "star_border"
-  | "login";
+  | "login"
+  | "push_pin"
+  | "arrow_drop_down"
+  | "campaign";
 
 export interface MaterialIconProps {
   name: MaterialSymbolName;

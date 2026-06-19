@@ -4,10 +4,10 @@ import { useState, useEffect, useCallback } from "react";
 import { MaterialIcon } from "@/components/ui";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { adminDashboardService } from "@/services/all-platform.service";
-import type {
-  AdminDashboardSummaryData,
-  AdminKpiPerformanceData,
-  AdminLeaderboardsData,
+import type { 
+  AdminDashboardSummaryData, 
+  AdminKpiPerformanceData, 
+  AdminLeaderboardsData 
 } from "@/services/all-platform.service";
 import { AdminDashboardSummary } from "@/components/all-platform/admin/dashboard/AdminDashboardSummary";
 import { AdminKpiPerformanceChart } from "@/components/all-platform/admin/dashboard/AdminKpiPerformanceChart";
@@ -30,52 +30,53 @@ export default function AdminDashboardPage() {
 
   const loadDashboardData = useCallback(async () => {
     setError(null);
+    
+    // 1. Fetch Summary Stats
     setLoadingSummary(true);
-    setLoadingPerformance(true);
-    setLoadingLeaderboards(true);
-
-    const [summaryResult, kpiResult, leaderResult] = await Promise.allSettled([
-      adminDashboardService.getSummary(),
-      adminDashboardService.getKpiPerformance(),
-      adminDashboardService.getLeaderboards(),
-    ]);
-
-    if (summaryResult.status === "fulfilled") {
-      const summaryRes = summaryResult.value;
+    try {
+      const summaryRes = await adminDashboardService.getSummary();
       if (summaryRes.success && summaryRes.data) {
         setSummaryData(summaryRes.data);
       } else {
         setError(summaryRes.message || "Không thể tải số liệu tổng quan");
       }
-    } else {
+    } catch {
       setError("Lỗi kết nối máy chủ khi tải số liệu tổng quan");
+    } finally {
+      setLoadingSummary(false);
     }
 
-    if (kpiResult.status === "fulfilled") {
-      const kpiRes = kpiResult.value;
-      if (kpiRes.success && kpiRes.data) setKpiPerformance(kpiRes.data);
-    } else {
-      console.error("Failed to load KPI performance");
+    // 2. Fetch KPI Performance Charts
+    setLoadingPerformance(true);
+    try {
+      const kpiRes = await adminDashboardService.getKpiPerformance();
+      if (kpiRes.success && kpiRes.data) {
+        setKpiPerformance(kpiRes.data);
+      }
+    } catch {
+      console.error("Lỗi khi tải biểu đồ kpi");
+    } finally {
+      setLoadingPerformance(false);
     }
 
-    if (leaderResult.status === "fulfilled") {
-      const leaderRes = leaderResult.value;
-      if (leaderRes.success && leaderRes.data) setLeaderboards(leaderRes.data);
-    } else {
-      console.error("Failed to load leaderboards");
+    // 3. Fetch Leaderboards
+    setLoadingLeaderboards(true);
+    try {
+      const leaderRes = await adminDashboardService.getLeaderboards();
+      if (leaderRes.success && leaderRes.data) {
+        setLeaderboards(leaderRes.data);
+      }
+    } catch {
+      console.error("Lỗi khi tải bảng xếp hạng");
+    } finally {
+      setLoadingLeaderboards(false);
     }
-
-    setLoadingSummary(false);
-    setLoadingPerformance(false);
-    setLoadingLeaderboards(false);
   }, []);
 
   useEffect(() => {
-    if (!isAdmin) return;
-    const timer = window.setTimeout(() => {
-      void loadDashboardData();
-    }, 0);
-    return () => window.clearTimeout(timer);
+    if (isAdmin) {
+      loadDashboardData();
+    }
   }, [isAdmin, loadDashboardData]);
 
   if (!isAdmin) {
@@ -88,24 +89,24 @@ export default function AdminDashboardPage() {
     );
   }
 
-  const isLoadingAny = loadingSummary || loadingPerformance || loadingLeaderboards;
-
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-bold text-[#1A1A1A] flex items-center gap-2">
             <MaterialIcon name="dashboard" className="text-[#E3000F]" />
             Dashboard Quản Trị (Admin)
           </h2>
+          
         </div>
-
+        
         <button
           onClick={loadDashboardData}
-          disabled={isLoadingAny}
+          disabled={loadingSummary || loadingPerformance || loadingLeaderboards}
           className="flex items-center gap-2 border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition shrink-0 cursor-pointer shadow-sm active:scale-95 disabled:opacity-50"
         >
-          <FaSyncAlt className={isLoadingAny ? "animate-spin" : ""} />
+          <FaSyncAlt className={loadingSummary || loadingPerformance || loadingLeaderboards ? "animate-spin" : ""} />
           Làm mới
         </button>
       </div>
@@ -117,9 +118,23 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      <AdminDashboardSummary data={summaryData} isLoading={loadingSummary} />
-      <AdminKpiPerformanceChart data={kpiPerformance} isLoading={loadingPerformance} />
-      <AdminLeaderboards data={leaderboards} isLoading={loadingLeaderboards} />
+      {/* 1. Top Summary Stats */}
+      <AdminDashboardSummary 
+        data={summaryData} 
+        isLoading={loadingSummary} 
+      />
+
+      {/* 2. KPI Performance Chart */}
+      <AdminKpiPerformanceChart 
+        data={kpiPerformance} 
+        isLoading={loadingPerformance} 
+      />
+
+      {/* 3. Leaderboards */}
+      <AdminLeaderboards 
+        data={leaderboards} 
+        isLoading={loadingLeaderboards} 
+      />
     </div>
   );
 }

@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { useState } from "react";
 import { FaBars } from "react-icons/fa";
 import { AppPlatformProvider, useAppPlatform } from "@/components/providers/AppPlatformProvider";
 import { AllPlatformSidebar } from "./AllPlatformSidebar";
+import { MaterialIcon } from "@/components/ui";
 import { GlobalCrawlNotification } from "../components/global-crawl-notification";
 
 /**
@@ -22,6 +23,7 @@ function AllPlatformShellInner({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAppAuth();
   const { platform, setPlatform } = useAppPlatform();
   const router = useRouter();
+  const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Force platform to "general" for all-platform routes
@@ -49,6 +51,8 @@ function AllPlatformShellInner({ children }: { children: React.ReactNode }) {
   // Not authenticated — will redirect, render nothing
   if (!isAuthenticated) return null;
 
+  const isChatPage = pathname === "/zalo-chat" || pathname.startsWith("/zalo-chat");
+
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-on-background flex flex-col lg:flex-row">
       {/* Mobile Top Header */}
@@ -67,7 +71,9 @@ function AllPlatformShellInner({ children }: { children: React.ReactNode }) {
 
       <AllPlatformSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       
-      <main className="min-w-0 max-w-full flex-1 overflow-x-hidden p-3 transition-all sm:p-5 lg:ml-64 lg:w-[calc(100%-16rem)] lg:p-8">
+      <main className={`flex-1 w-full lg:ml-64 min-w-0 transition-all flex flex-col ${
+        isChatPage ? "h-screen p-0 overflow-hidden" : "p-3 sm:p-5 lg:p-8"
+      }`}>
         <GlobalCrawlNotification />
         {children}
       </main>

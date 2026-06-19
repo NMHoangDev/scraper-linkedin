@@ -21,6 +21,7 @@
  */
 
 import { useRef, useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ZaloConversationListSkeleton } from "../chat/ZaloChatSkeleton";
 import type { ZaloConversationSummary } from "@/types/zalo-api";
@@ -40,6 +41,12 @@ interface Props {
   accountId?: string;
   /** Chế độ full-screen: tăng kích thước UI (font/row) cho dễ nhìn */
   fullScreen?: boolean;
+  conversationTags: Record<string, string>;
+  onSetTag: (convId: string, tag: string) => void;
+  onTogglePin?: (id: string) => void;
+  onToggleHide?: (id: string) => void;
+  pinnedConversations?: Record<string, boolean>;
+  hiddenConversations?: Record<string, boolean>;
 }
 
 const ROW_HEIGHT_DEFAULT = 72; // px — match với padding + content của conversation item
@@ -55,9 +62,57 @@ export function ZaloConversationListVirtualized({
   enableInboxShare = false,
   accountId,
   fullScreen = false,
+  conversationTags,
+  onSetTag,
+  onTogglePin,
+  onToggleHide,
+  pinnedConversations,
+  hiddenConversations,
 }: Props) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [parentHeight, setParentHeight] = useState(0);
+  const [dropdownOpenId, setDropdownOpenId] = useState<string | null>(null);
+  const [dropdownPos, setDropdownPos] = useState({ x: 0, y: 0 });
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    return () => {
+      const tooltip = document.getElementById("zalo-custom-tooltip");
+      if (tooltip) tooltip.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!dropdownOpenId) return;
+    const handleOutsideClick = () => {
+      setDropdownOpenId(null);
+    };
+    document.addEventListener("click", handleOutsideClick);
+    return () => {
+      document.removeEventListener("click", handleOutsideClick);
+    };
+  }, [dropdownOpenId]);
+
+  useEffect(() => {
+    const parent = parentRef.current;
+    if (!parent) return;
+    const handleScroll = () => {
+      const tooltip = document.getElementById("zalo-custom-tooltip");
+      if (tooltip) tooltip.remove();
+    };
+    parent.addEventListener("scroll", handleScroll);
+    return () => {
+      parent.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
+
+  const TAGS = [
+    { value: "new", label: "Mới", bg: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+    { value: "chatting", label: "Đang chat", bg: "bg-blue-50 text-blue-700 border-blue-200" },
+    { value: "followup", label: "Follow-up", bg: "bg-amber-50 text-amber-700 border-amber-200" },
+    { value: "inactive", label: "Không HĐ", bg: "bg-slate-50 text-slate-600 border-slate-200" },
+  ];
 
   // Đo height của container thật qua ResizeObserver.
   // Quan trọng: virtualization cần height chính xác để tính viewport.
@@ -127,6 +182,11 @@ export function ZaloConversationListVirtualized({
           if (!conv) return null;
           const isActive = conv.conversation_id === selectedId;
           const title = conv.conversation_name || `Hội thoại ${conv.conversation_id.slice(0, 6)}`;
+          const isPinned = pinnedConversations
+            ? !!pinnedConversations[conv.conversation_id]
+            : !!conv.is_pinned;
+          const isFb = conv.conversation_id.startsWith("fb_");
+
           return (
             <div
               key={conv.conversation_id}
@@ -149,84 +209,207 @@ export function ZaloConversationListVirtualized({
                     onSelect(conv.conversation_id);
                   }
                 }}
-                className={`w-full h-full flex items-center gap-3 cursor-pointer ${
+                onMouseEnter={(e) => {
+                  const item = e.currentTarget;
+                  const fullName = item.getAttribute('data-fullname') || '';
+                  if (!fullName) return;
+                  
+                  let tooltip = document.getElementById('zalo-custom-tooltip');
+                  if (!tooltip) {
+                    tooltip = document.createElement('div');
+                    tooltip.id = 'zalo-custom-tooltip';
+                    tooltip.style.cssText = 'position:fixed;background:#1a1a1a;color:#fff;border-radius:6px;padding:6px 10px;font-size:12px;z-index:9999;pointer-events:none;white-space:nowrap;transition:opacity 0.1s;';
+                    document.body.appendChild(tooltip);
+                  }
+                  
+                  tooltip.textContent = fullName;
+                  const rect = item.getBoundingClientRect();
+                  tooltip.style.left = (rect.right + 8) + 'px';
+                  const tooltipHeight = tooltip.offsetHeight || 28;
+                  tooltip.style.top = (rect.top + rect.height / 2 - tooltipHeight / 2) + 'px';
+                }}
+                onMouseLeave={() => {
+                  const tooltip = document.getElementById('zalo-custom-tooltip');
+                  if (tooltip) {
+                    tooltip.remove();
+                  }
+                }}
+                title={title}
+                data-fullname={title}
+                className={`zalo-chat-item w-full h-full flex items-center gap-3 cursor-pointer ${
                   fullScreen ? "px-5 gap-4" : "px-4"
-                } text-left transition border-b border-slate-50 hover:bg-slate-50 focus:outline-none focus-visible:bg-slate-50 focus-visible:ring-2 focus-visible:ring-blue-500/40 ${
+                } text-left transition border-b border-slate-50 hover:bg-slate-50 focus:outline-none focus-visible:bg-slate-50 focus-visible:ring-2 focus-visible:ring-red-500/40 relative group ${
                   isActive
-                    ? "bg-blue-50/50 relative before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-blue-500 before:rounded-r-md"
+                    ? "bg-red-50/50 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-[#E3000F] before:rounded-r-md"
                     : ""
                 }`}
               >
-                <div
-                  className={`${
-                    fullScreen ? "h-14 w-14 text-lg" : "h-12 w-12 text-title-md"
-                  } shrink-0 rounded-full flex items-center justify-center font-semibold ${
-                    isActive
-                      ? "bg-[#E3000F] text-white"
-                      : "bg-red-50 text-red-600 border border-red-100"
-                  }`}
-                >
-                  {initials(title)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <div
+                {conv.avatar_url ? (
+                  <div className="relative shrink-0 select-none">
+                    <img
+                      src={conv.avatar_url}
+                      alt={title}
                       className={`${
-                        fullScreen ? "text-[15px]" : ""
-                      } font-semibold truncate text-on-surface ${
-                        conv.unread_count && conv.unread_count > 0
-                          ? "font-bold"
-                          : ""
+                        fullScreen ? "h-11 w-11" : "h-9 w-9"
+                      } rounded-full object-cover border border-slate-200 bg-white`}
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = "none";
+                      }}
+                    />
+                    {isPinned && (
+                      <div className="absolute -top-1.5 -left-1.5 text-[10px]">📌</div>
+                    )}
+                  </div>
+                ) : (
+                  <div
+                    className={`${
+                      fullScreen ? "h-11 w-11 text-[13px]" : "h-9 w-9 text-[11px]"
+                    } shrink-0 rounded-full flex items-center justify-center font-bold relative select-none ${
+                      isActive
+                        ? "bg-[#E3000F] text-white"
+                        : "bg-slate-200 text-slate-600"
+                    }`}
+                  >
+                    {initials(title)}
+                    {isPinned && (
+                      <div className="absolute -top-1.5 -left-1.5 text-[10px]">📌</div>
+                    )}
+                  </div>
+                )}
+                <div className="min-w-0 flex-1 flex flex-col">
+                  {/* Dòng 1 — tên + timestamp */}
+                  <div className="zalo-chat-item-row1 flex items-center justify-between mb-0.5">
+                    <div
+                      title={title}
+                      className={`zalo-chat-item-name truncate text-[13px] font-semibold text-slate-800 ${
+                        conv.unread_count && conv.unread_count > 0 ? "font-bold" : ""
                       }`}
                     >
                       {title}
                     </div>
-                    <div className={`${
-                      fullScreen ? "text-[13px]" : "text-xs"
-                    } text-on-surface-variant shrink-0`}>
+                    <div className="zalo-chat-item-time text-[10px] text-slate-400 shrink-0 font-medium">
                       {formatTime(conv.latest_message_at)}
                     </div>
                   </div>
-                  <div className="flex items-center justify-between gap-xs">
+
+                  {/* Dòng 2 — badge channel + badge trạng thái */}
+                  <div className="zalo-chat-item-row2 flex items-center gap-1.5 mb-0.5">
+                    {/* Badge channel */}
+                    {isFb ? (
+                      <span className="text-[8px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.5 rounded border border-slate-200 uppercase shrink-0">
+                        FB
+                      </span>
+                    ) : (
+                      <span className="text-[8px] bg-sky-50 text-[#0068ff] font-bold px-1.5 py-0.5 rounded border border-sky-200 uppercase shrink-0">
+                        Zalo
+                      </span>
+                    )}
+
+                    {/* Badge trạng thái */}
+                    {(() => {
+                      const tagVal = conversationTags[conv.conversation_id] || "new";
+                      const currentTag = TAGS.find((t) => t.value === tagVal) || TAGS[0];
+                      return (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setDropdownPos({
+                              x: rect.left + window.scrollX,
+                              y: rect.bottom + window.scrollY,
+                            });
+                            setDropdownOpenId(conv.conversation_id);
+                          }}
+                          className={`px-1 py-0.5 rounded text-[8px] font-bold border transition ${currentTag.bg} hover:brightness-95 shrink-0`}
+                        >
+                          {currentTag.label}
+                        </button>
+                      );
+                    })()}
+
+                    {enableInboxShare && accountId && (
+                      <div className="zalo-icon-hide ml-auto">
+                        <InboxShareToggle
+                          accountId={accountId}
+                          conversationId={conv.conversation_id}
+                          showLabel={false}
+                          size="sm"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Dòng 3 — preview message */}
+                  <div className="zalo-chat-item-row3 flex items-center justify-between">
                     <div
-                      className={`${
-                        fullScreen ? "text-[14px]" : "text-sm"
-                      } truncate flex-1 ${
+                      className={`truncate flex-1 text-[12px] ${
                         conv.unread_count && conv.unread_count > 0
-                          ? "text-on-surface font-semibold"
+                          ? "text-slate-800 font-semibold"
                           : isActive
-                            ? "text-on-surface font-medium"
-                            : "text-on-surface-variant"
+                            ? "text-slate-700 font-medium"
+                            : "text-slate-500"
                       }`}
                     >
-                      {conv.latest_sender_name
-                        ? `${conv.latest_sender_name}: `
-                        : ""}
+                      {(() => {
+                        const cleanSenderName = conv.latest_sender_name?.trim();
+                        if (!cleanSenderName) return "";
+                        
+                        const lowerName = cleanSenderName.toLowerCase();
+                        const isSelf = lowerName === "__me__" || lowerName === "me" || lowerName === "bạn" || lowerName === "ban";
+                        if (isSelf) {
+                          return "Bạn: ";
+                        }
+                        
+                        const isGroup = !conv.conversation_id.startsWith("fb_") && conv.conversation_id.startsWith("g");
+                        if (isGroup) {
+                          return `${cleanSenderName}: `;
+                        }
+                        
+                        return "";
+                      })()}
                       {conv.latest_content || "Tin nhắn mới"}
                     </div>
                     {conv.unread_count !== undefined &&
                       conv.unread_count > 0 && (
-                        <span className={`flex ${
-                          fullScreen ? "h-6 min-w-6 text-[11px]" : "h-5 min-w-5 text-[10px]"
-                        } shrink-0 items-center justify-center rounded-full bg-red-500 px-1 font-bold text-white shadow-sm`}>
+                        <span className={`flex h-4.5 min-w-4.5 text-[9px] shrink-0 items-center justify-center rounded-full bg-red-500 px-1 font-bold text-white shadow-sm`}>
                           {conv.unread_count}
                         </span>
                       )}
                   </div>
                 </div>
-                {enableInboxShare && accountId && (
-                  <InboxShareToggle
-                    accountId={accountId}
-                    conversationId={conv.conversation_id}
-                    showLabel={false}
-                    size="sm"
-                  />
-                )}
               </div>
             </div>
           );
         })}
       </div>
+      {mounted && dropdownOpenId &&
+        createPortal(
+          <div
+            className="fixed z-[9999] bg-white border border-slate-200 rounded-lg shadow-xl py-1 w-28 text-[11px] font-medium"
+            style={{
+              left: `${dropdownPos.x}px`,
+              top: `${dropdownPos.y + 4}px`,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {TAGS.map((t) => (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => {
+                  onSetTag(dropdownOpenId, t.value);
+                }}
+                className="w-full text-left px-2.5 py-1.5 hover:bg-slate-50 flex items-center gap-1.5 text-slate-700"
+              >
+                <span className={`w-2 h-2 rounded-full border ${t.bg}`} />
+                {t.label}
+              </button>
+            ))}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
