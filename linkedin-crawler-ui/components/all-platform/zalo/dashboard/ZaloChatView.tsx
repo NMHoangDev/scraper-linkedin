@@ -1020,7 +1020,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
       if (reconnectTimer) window.clearTimeout(reconnectTimer);
       if (es) es.close();
     };
-  }, [flow.userId]);
+  }, [flow.userId, flow.isLoggedIn, flow.sessionExpired, flow.email]);
 
   const handleToggleSelectMessage = (messageId: string) => {
     setSelectedMessageIds(prev => 
