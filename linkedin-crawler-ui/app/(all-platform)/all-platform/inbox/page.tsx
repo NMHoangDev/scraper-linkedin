@@ -15,6 +15,7 @@ import { fbFetch, fbHeaders, getFbProvisionConfig } from "@/lib/markee-fb-api";
 import { API_BASE_URL } from "@/lib/env";
 import { idbSetThread, idbGetAllThreadsForAcc, idbSetConvs, idbGetConvs, idbPruneOld } from "@/lib/inbox-cache";
 import TeamAccountTree from "@/components/all-platform/inbox/TeamAccountTree";
+import InboxModernLayout from "@/components/all-platform/inbox/InboxModernLayout";
 
 interface Session { user_id: string; fb_user_id?: string; label?: string; owner?: string; online?: boolean; inbox_enabled?: boolean; status?: string; }
 interface Conv { conv_id: string; name: string; preview: string; unread: boolean; time: string; is_customer: boolean; pushed_to_zalo: boolean; deleted: boolean; archived?: boolean; archived_at?: string; }
@@ -928,6 +929,53 @@ export default function InboxPage() {
       })
       .catch(() => setLoadingFresh(false));
   }, [convs, openConv, archiveReading, accOnline, needRelogin, acc, pollFreshThread]);
+
+  if (process.env.NEXT_PUBLIC_INBOX_LEGACY_UI !== "1") {
+    return (
+      <InboxModernLayout
+        role={role}
+        owner={owner}
+        sessions={sessions}
+        ownerNames={ownerNames}
+        teams={teams}
+        acc={acc}
+        accOnline={!!accOnline}
+        accPaused={!!accPaused}
+        needRelogin={needRelogin}
+        connErr={connErr}
+        extInstalled={extInstalled}
+        scanning={scanning}
+        loadingConvs={loadingConvs}
+        loadingArchives={loadingArchives}
+        loadingChat={loadingChat}
+        loadingFresh={loadingFresh}
+        archiveReading={archiveReading}
+        viewMode={viewMode}
+        filter={filter}
+        activeConvs={activeConvs}
+        filtered={filtered}
+        archives={archives}
+        openConv={openConv}
+        msgs={msgs}
+        reply={reply}
+        toast={toast}
+        chatScrollRef={chatScrollRef}
+        selectAcc={selectAcc}
+        scan={scan}
+        setViewMode={setViewMode}
+        setArchiveReading={setArchiveReading}
+        setFilter={setFilter}
+        setReply={setReply}
+        openChat={openChat}
+        openArchive={openArchive}
+        mark={mark}
+        saveArchive={saveArchive}
+        sendReply={sendReply}
+        needsReply={needsReply}
+        accLabel={accLabel}
+      />
+    );
+  }
 
   return (
     <div className="p-6 w-full">
