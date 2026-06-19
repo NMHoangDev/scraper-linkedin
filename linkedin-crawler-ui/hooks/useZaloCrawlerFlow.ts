@@ -43,13 +43,14 @@ import type {
   ZaloWorkerInfo,
 } from "@/types/zalo-api";
 
-const AUTH_POLL_INTERVAL_MS = 10000;
+const AUTH_POLL_INTERVAL_MS = 2000;
 const JOB_POLL_INTERVAL_MS = 2500;
 const JOB_STALL_TIMEOUT_MS = 45000;
 const RESUME_RETRY_ATTEMPTS = 20;
 const RESUME_RETRY_INTERVAL_MS = 2000;
 const ZALO_USER_ID_STORAGE_KEY = "zalo_crawler_user_id";
 const LINKEDIN_EMAIL_STORAGE_KEY = "linkedin_crawler_email";
+const ZALO_ACCOUNT_OWNER_ID = "default";
 const INITIAL_GROUP_ROW_ID = "zalo-group-0";
 
 const MSG_LOAD_CRAWLED_GROUPS_ERROR = "Kh\u00f4ng th\u1ec3 t\u1ea3i danh s\u00e1ch nh\u00f3m \u0111\u00e3 crawl.";
@@ -121,7 +122,6 @@ export interface ZaloCrawlerSummary {
 
 export interface ZaloCrawlerFlowValue {
   userId: string;
-  ownerId: string;
   email: string | null;
   selectedWorkerId: string;
   workers: ZaloWorkerInfo[];
@@ -163,7 +163,6 @@ export interface ZaloCrawlerFlowValue {
   setMaxMessagesPerGroup: (value: number) => void;
   switchWorker: (workerId: string) => void;
   switchAccount: (accountId: string) => void;
-  refreshAccounts: () => Promise<void>;
   refreshLoginStatus: () => Promise<void>;
   createAccount: (label: string, phone?: string) => Promise<void>;
   deleteAccount: (accountId: string, deleteAuth?: boolean) => Promise<void>;
@@ -487,10 +486,6 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
     {},
   );
   const [maxMessagesPerGroup, setMaxMessagesPerGroupState] = useState(50);
-  const ownerId = useMemo(
-    () => normalizeZaloUserId(appUser?.id || ""),
-    [appUser?.id],
-  );
 
   const authIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const jobIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -593,38 +588,19 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
   }, [userId]);
 
   const loadAccounts = useCallback(async () => {
-    if (!ownerId || ownerId === "default") {
-      setAccounts([]);
-      setIsLoadingAccounts(false);
-      return;
-    }
     setIsLoadingAccounts(true);
     setAccountsError(null);
     try {
-      const response = await getZaloAccounts(ownerId, {
-        idMember: appUser?.id,
-        email: appUser?.email,
-        role: appUser?.role,
-      });
-      const nextAccounts = response.accounts ?? [];
-      setAccounts(nextAccounts);
-      setUserId((current) => {
-        const currentId = normalizeZaloUserId(current);
-        if (currentId === "default" || nextAccounts.some((account) => account.account_id === currentId)) {
-          return current;
-        }
-        const nextId = nextAccounts[0]?.account_id ?? "default";
-        if (typeof window !== "undefined") {
-          window.localStorage.setItem(ZALO_USER_ID_STORAGE_KEY, nextId);
-        }
-        return nextId;
-      });
+      const linkedInEmail = window?.localStorage?.getItem("linkedin_crawler_email");
+      const currentOwnerId = linkedInEmail ? normalizeZaloUserId(linkedInEmail) : "default";
+      const response = await getZaloAccounts(currentOwnerId, appUser?.id);
+      setAccounts(response.accounts ?? []);
     } catch (error) {
       setAccountsError(error instanceof Error ? error.message : "Không thể tải danh sách tài khoản Zalo.");
     } finally {
       setIsLoadingAccounts(false);
     }
-  }, [appUser?.id, ownerId]);
+  }, [appUser?.id]);
 
   useEffect(() => {
     if (!isUserIdReady) return;
@@ -710,11 +686,12 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
     setAccountsError(null);
     try {
       const accountId = normalizeZaloUserId(cleanLabel);
+      const linkedInEmail = window?.localStorage?.getItem("linkedin_crawler_email");
+      const currentOwnerId = linkedInEmail ? normalizeZaloUserId(linkedInEmail) : "default";
       const response = await createZaloAccount({
         account_id: accountId,
-        owner_id: ownerId,
-        id_member: appUser?.id || ownerId,
-        email: appUser?.email,
+        owner_id: currentOwnerId,
+        id_member: appUser?.id,
         label: cleanLabel,
         phone: phone?.trim() || undefined,
       });
@@ -725,12 +702,12 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
       setAccountsError(msg);
       setErrorMessage(msg);
     }
-  }, [appUser?.id, loadAccounts, ownerId, switchAccount]);
+  }, [loadAccounts, switchAccount]);
 
   const deleteAccount = useCallback(async (accountId: string, deleteAuth = false) => {
     const safeAccountId = normalizeZaloUserId(accountId);
     try {
-      await deleteZaloAccount(safeAccountId, deleteAuth, ownerId);
+      await deleteZaloAccount(safeAccountId, deleteAuth);
       await loadAccounts();
       if (safeAccountId === userId) {
         switchAccount("default");
@@ -740,7 +717,7 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
       setAccountsError(msg);
       setErrorMessage(msg);
     }
-  }, [loadAccounts, ownerId, switchAccount, userId]);
+  }, [loadAccounts, switchAccount, userId]);
 
   const updateAccount = useCallback(async (accountId: string, label: string, phone?: string) => {
     const cleanLabel = label.trim();
@@ -752,8 +729,6 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
     try {
       const safeAccountId = normalizeZaloUserId(accountId);
       await updateZaloAccount(safeAccountId, {
-        owner_id: ownerId,
-        id_member: appUser?.id || ownerId,
         label: cleanLabel,
         phone: phone?.trim() || undefined,
       });
@@ -761,7 +736,7 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
     } catch (error) {
       setAccountsError(error instanceof Error ? error.message : "Không thể cập nhật tài khoản Zalo.");
     }
-  }, [appUser?.id, loadAccounts, ownerId]);
+  }, [loadAccounts]);
 
   const applyAuthStatus = useCallback((statusResponse: ZaloCurrentStatusResponse) => {
     setSessionId(statusResponse.session_id);
@@ -850,22 +825,14 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
         // ignore malformed payload
       }
     };
-    const onClose = () => {
-      eventSource.close();
-      if (authEventSourceRef.current === eventSource) {
-        authEventSourceRef.current = null;
-      }
-    };
 
     eventSource.addEventListener("auth-status", onAuthStatus);
-    eventSource.addEventListener("close", onClose);
     eventSource.onerror = () => {
       // keep polling fallback active
     };
 
     return () => {
       eventSource.removeEventListener("auth-status", onAuthStatus);
-      eventSource.removeEventListener("close", onClose);
       clearAuthEventStream();
     };
   }, [applyAuthStatus, clearAuthEventStream, isUserIdReady, userId]);
@@ -1565,8 +1532,7 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
             importZaloSessionViaExtension({
               account_id: userId,
               user_id: userId,
-              owner_id: ownerId,
-              id_member: appUser?.id || ownerId,
+              owner_id: userId,
             }),
             45000,
             "Import session",
@@ -1623,7 +1589,7 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
     } finally {
       setIsStartingSession(false);
     }
-  }, [appUser?.id, endSession, hasConfirmedSession, ownerId, pollAuthStatus, resetAuthState, sessionId, startSession, userId]);
+  }, [endSession, hasConfirmedSession, pollAuthStatus, resetAuthState, sessionId, startSession, userId]);
 
   const summary = useMemo<ZaloCrawlerSummary>(() => {
     const total = jobs.length;
@@ -1656,7 +1622,6 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
 
   return {
     userId,
-    ownerId,
     email,
     selectedWorkerId,
     workers,
@@ -1706,7 +1671,6 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
     setMaxMessagesPerGroup,
     switchWorker,
     switchAccount,
-    refreshAccounts: loadAccounts,
     refreshLoginStatus: pollAuthStatus,
     createAccount,
     deleteAccount,

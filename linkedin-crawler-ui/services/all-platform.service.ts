@@ -20,7 +20,7 @@ import { API_BASE_URL, API_KEY } from "@/lib/env";
 
 const BASE = `${API_BASE_URL}/api/all-platform`;
 const authHeaders = () => ({});
-const AUTH_SUBMIT_TIMEOUT_MS = 20000;
+const AUTH_SUBMIT_TIMEOUT_MS = 12000;
 
 /**
  * Trả về header mặc định cho mọi request — bao gồm:

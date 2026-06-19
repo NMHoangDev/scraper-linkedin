@@ -236,6 +236,7 @@ export interface ZaloLibraryMessage {
   content?: string | null;
   is_sent: boolean;
   is_deleted: boolean;
+  role?: "leader" | "staff" | "client" | string | null;
   assets: ZaloStoredAsset[];
 }
 

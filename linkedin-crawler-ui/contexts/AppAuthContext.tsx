@@ -26,42 +26,6 @@ interface AppAuthContextType {
 
 const AppAuthContext = createContext<AppAuthContextType | undefined>(undefined);
 const AUTH_CHECK_TIMEOUT_MS = 6000;
-const AUTH_USER_CACHE_KEY = "markee_app_user";
-
-function wait(ms: number): Promise<void> {
-  return new Promise(resolve => window.setTimeout(resolve, ms));
-}
-
-function readCachedUser(): AppUser | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(AUTH_USER_CACHE_KEY);
-    return raw ? (JSON.parse(raw) as AppUser) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeCachedUser(user: AppUser | null) {
-  if (typeof window === "undefined") return;
-  try {
-    if (user) window.localStorage.setItem(AUTH_USER_CACHE_KEY, JSON.stringify(user));
-    else window.localStorage.removeItem(AUTH_USER_CACHE_KEY);
-  } catch {
-    // localStorage can be unavailable in hardened browsers.
-  }
-}
-
-function isPermanentAuthFailure(message?: string): boolean {
-  const m = (message || "").toLowerCase();
-  return (
-    m.includes("missing or invalid authorization") ||
-    m.includes("invalid or expired token") ||
-    m.includes("invalid token payload") ||
-    m.includes("user not found") ||
-    m.includes("inactive")
-  );
-}
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -80,30 +44,20 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 }
 
 export function AppAuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AppUser | null>(() => readCachedUser());
+  const [user, setUser] = useState<AppUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const refreshUser = useCallback(async () => {
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      try {
-        const res = await withTimeout(authService.me(), AUTH_CHECK_TIMEOUT_MS);
-        if (res.success && res.data) {
-          const nextUser = res.data as AppUser;
-          setUser(nextUser);
-          writeCachedUser(nextUser);
-          return;
-        }
-        if (isPermanentAuthFailure(res.message)) {
-          setUser(null);
-          writeCachedUser(null);
-          return;
-        }
-      } catch {
-        // Network/backend hiccup: retry once, then keep the last known user.
+    try {
+      const res = await withTimeout(authService.me(), AUTH_CHECK_TIMEOUT_MS);
+      if (res.success && res.data) {
+        setUser(res.data as AppUser);
+      } else {
+        setUser(null);
       }
-      if (attempt === 0) await wait(450);
+    } catch {
+      setUser(null);
     }
-    setUser(prev => prev || readCachedUser());
   }, []);
 
   /** Cookie-based session; no localStorage session needed */
@@ -142,7 +96,6 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
       // Cookie is set by backend; just take user.
       const data = res.data as { user: AppUser };
       setUser(data.user);
-      writeCachedUser(data.user);
     } finally {
       setIsLoading(false);
     }
@@ -158,7 +111,6 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
       // Cookie is set by backend; just take user.
       const data = res.data as { user: AppUser };
       setUser(data.user);
-      writeCachedUser(data.user);
     } finally {
       setIsLoading(false);
     }
@@ -167,7 +119,6 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     await authService.logout();
     setUser(null);
-    writeCachedUser(null);
   }, []);
 
   return (
