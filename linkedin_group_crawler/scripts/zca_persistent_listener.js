@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const { Zalo, ThreadType } = require("zca-js");
+const fs = require("fs");
 
 // Đảm bảo mọi emit ra stdout được flush ngay lập tức (không buffer).
 // Trên Windows, pipe Popen có buffer ~4KB, nếu không flush kịp sẽ block Node process.
@@ -32,7 +33,11 @@ function safeJson(value) {
 
 function emit(payload) {
   const line = `${JSON.stringify({ ts: Date.now(), ...payload })}\n`;
-  process.stdout.write(line);
+  try {
+    fs.writeSync(1, line);
+  } catch (_) {
+    process.stdout.write(line);
+  }
 }
 
 function serializeError(error) {
@@ -397,10 +402,12 @@ async function main() {
 
   listener.on("connected", () => {
     emit({ event: "connected", user_id: userId, own_id: typeof api.getOwnId === "function" ? api.getOwnId() : null });
-    requestOldMessages(listener);
-    if (!oldMessageTimer) {
-      oldMessageTimer = setInterval(() => requestOldMessages(listener), oldMessageIntervalMs);
-    }
+    // NOTE: requestOldMessages DISABLED - Python startup sync (_sync_recent_groups_after_connect)
+    // handles old message loading with rate-limiting. Calling it here floods Zalo WebSocket
+    // and causes "Separator is found" crashes from massive message bursts.
+    // if (!oldMessageTimer) {
+    //   oldMessageTimer = setInterval(() => requestOldMessages(listener), oldMessageIntervalMs);
+    // }
   });
   listener.on("disconnected", (code, reason) => {
     emit({ event: "disconnected", user_id: userId, code, reason: reason ? String(reason) : null });
