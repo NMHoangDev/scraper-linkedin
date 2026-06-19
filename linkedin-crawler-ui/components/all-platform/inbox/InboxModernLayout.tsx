@@ -198,7 +198,7 @@ export default function InboxModernLayout(props: Props) {
   };
 
   return (
-    <div className="w-full p-6 text-[#1A1A1A]">
+    <div className="w-full max-w-full overflow-x-hidden text-[#1A1A1A]">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
@@ -227,7 +227,7 @@ export default function InboxModernLayout(props: Props) {
         </div>
       )}
 
-      <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-4 grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-lg border border-[#E5E5E5] bg-white px-4 py-3">
           <div className="text-[11px] font-bold uppercase text-[#A0A0A0]">Hội thoại gần đây</div>
           <div className="mt-1 text-2xl font-black">{activeConvs.length}</div>
@@ -250,7 +250,7 @@ export default function InboxModernLayout(props: Props) {
         </div>
       </div>
 
-      <div className="mb-4 rounded-lg border border-[#E5E5E5] bg-white p-3">
+      <div className="mb-4 min-w-0 rounded-lg border border-[#E5E5E5] bg-white p-3">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div>
             <div className="text-xs font-bold uppercase text-[#A0A0A0]">Tài khoản nhận viên</div>
@@ -293,8 +293,8 @@ export default function InboxModernLayout(props: Props) {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[380px_minmax(460px,1fr)_320px]">
-        <section className="overflow-hidden rounded-lg border border-[#E5E5E5] bg-white">
+      <div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-[minmax(280px,360px)_minmax(0,1fr)] 2xl:grid-cols-[minmax(280px,340px)_minmax(0,1fr)_minmax(240px,300px)]">
+        <section className="min-w-0 overflow-hidden rounded-lg border border-[#E5E5E5] bg-white">
           <div className="border-b border-[#E5E5E5] p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
@@ -318,7 +318,7 @@ export default function InboxModernLayout(props: Props) {
             </div>
           </div>
 
-          <div className="h-[620px] overflow-auto p-3">
+          <div className="h-[560px] overflow-auto p-3 2xl:h-[620px]">
             {viewMode === "archive" ? (
               loadingArchives && archives.length === 0 ? (
                 <div className="py-12 text-center text-sm text-[#A0A0A0]">Đang tải lưu trữ...</div>
@@ -373,7 +373,7 @@ export default function InboxModernLayout(props: Props) {
           </div>
         </section>
 
-        <section className="flex h-[716px] min-w-0 flex-col overflow-hidden rounded-lg border border-[#E5E5E5] bg-white">
+        <section className="flex h-[656px] min-w-0 flex-col overflow-hidden rounded-lg border border-[#E5E5E5] bg-white 2xl:h-[716px]">
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#E5E5E5] px-4 py-3">
             <div className="min-w-0">
               <h2 className="truncate text-base font-black">{selectedName || "Hội thoại"}</h2>
@@ -463,19 +463,19 @@ export default function InboxModernLayout(props: Props) {
                 placeholder={archiveReading ? "Đang xem lưu trữ, mở inbox live để trả lời" : needRelogin ? "Cookie hết hạn, đăng nhập lại để gửi" : accPaused ? "Realtime đang tạm dừng" : !accOnline ? "Tài khoản offline" : "Nhập trả lời..."}
                 className="min-h-[44px] flex-1 resize-none rounded-lg border border-[#E5E5E5] px-3 py-2 text-sm outline-none transition focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 disabled:cursor-not-allowed disabled:bg-[#F5F5F5]"
               />
-              <button onClick={sendReply} disabled={!canSend || !reply.trim()} className="rounded-lg bg-[#E3000F] px-5 text-sm font-black text-white transition hover:bg-[#C40009] disabled:cursor-not-allowed disabled:opacity-50">Gửi</button>
+              <button onClick={sendReply} disabled={!canSend || !reply.trim()} className="shrink-0 rounded-lg bg-[#E3000F] px-5 text-sm font-black text-white transition hover:bg-[#C40009] disabled:cursor-not-allowed disabled:opacity-50">Gửi</button>
             </div>
           </div>
         </section>
 
-        <aside className="h-[716px] overflow-hidden rounded-lg border border-[#E5E5E5] bg-white">
+        <aside className="min-w-0 overflow-hidden rounded-lg border border-[#E5E5E5] bg-white xl:col-span-2 2xl:col-span-1 2xl:h-[716px]">
           <div className="grid grid-cols-3 border-b border-[#E5E5E5] bg-[#FAFAFA] text-xs font-black">
             <button onClick={() => setPanelTab("templates")} className={`py-3 ${panelTab === "templates" ? "bg-white text-[#E3000F]" : "text-[#666666]"}`}>Mẫu</button>
             <button onClick={() => setPanelTab("customer")} className={`py-3 ${panelTab === "customer" ? "bg-white text-[#E3000F]" : "text-[#666666]"}`}>Khách</button>
             <button onClick={() => setPanelTab("kpi")} className={`py-3 ${panelTab === "kpi" ? "bg-white text-[#E3000F]" : "text-[#666666]"}`}>KPI</button>
           </div>
 
-          <div className="h-[676px] overflow-auto p-4">
+          <div className="max-h-[520px] overflow-auto p-4 2xl:h-[676px] 2xl:max-h-none">
             {panelTab === "templates" && (
               <div>
                 <div className="mb-3 text-sm font-black">Mẫu trả lời</div>

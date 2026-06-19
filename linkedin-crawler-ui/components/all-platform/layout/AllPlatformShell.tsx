@@ -7,7 +7,6 @@ import { useState } from "react";
 import { FaBars } from "react-icons/fa";
 import { AppPlatformProvider, useAppPlatform } from "@/components/providers/AppPlatformProvider";
 import { AllPlatformSidebar } from "./AllPlatformSidebar";
-import { MaterialIcon } from "@/components/ui";
 import { GlobalCrawlNotification } from "../components/global-crawl-notification";
 
 /**
@@ -68,7 +67,7 @@ function AllPlatformShellInner({ children }: { children: React.ReactNode }) {
 
       <AllPlatformSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       
-      <main className="flex-1 w-full lg:ml-64 p-3 sm:p-5 lg:p-8 min-w-0 transition-all">
+      <main className="min-w-0 max-w-full flex-1 overflow-x-hidden p-3 transition-all sm:p-5 lg:ml-64 lg:w-[calc(100%-16rem)] lg:p-8">
         <GlobalCrawlNotification />
         {children}
       </main>
