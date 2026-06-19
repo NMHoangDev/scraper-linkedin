@@ -549,12 +549,15 @@ async def list_zalo_accounts(owner_id: Optional[str] = None, id_member: Optional
         return []
 
     params: Dict[str, Any] = {"select": "*", "is_active": "eq.true", "order": "updated_at.desc"}
-    if owner_id and id_member:
-        params["or"] = f"(owner_id.eq.{owner_id},id_member.eq.{id_member})"
-    elif id_member:
+
+    # Khi co id_member (UUID), uu tien dung id_member lam filter.
+    # owner_id la fallback cho cac account cu chua co id_member (migrated accounts).
+    if id_member:
+        # Chi dung id_member vi day la UUID - dam bao type matching.
         params["id_member"] = f"eq.{id_member}"
     elif owner_id:
         params["owner_id"] = f"eq.{owner_id}"
+
     try:
         return await _rest("GET", "zalo_accounts", params=params) or []
     except RuntimeError as exc:
