@@ -592,7 +592,7 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
     setAccountsError(null);
     try {
       const ownerId = appUser?.id ?? "default";
-      const response = await getZaloAccounts(ownerId, appUser?.id);
+      const response = await getZaloAccounts(ownerId, appUser?.id, appUser?.email);
       setAccounts(response.accounts ?? []);
     } catch (error) {
       setAccountsError(error instanceof Error ? error.message : "Không thể tải danh sách tài khoản Zalo.");
