@@ -38,6 +38,7 @@ from app.modules.all_platform.zalo.services.zca_api_bridge import (
     find_zca_user_by_phone,
     find_zca_user_by_username,
     get_zca_group_history,
+    get_zca_user_history,
     list_zca_groups,
     list_zca_friends,
     send_zca_message,
@@ -161,71 +162,23 @@ async def sync_recent_conversations(
             )
         raise HTTPException(status_code=500, detail=f"Không thể tải danh sách hội thoại Zalo: {exc}")
 
-    groups_to_sync = []
-    skipped_results: List[SyncRecentGroupResult] = []
+    def _chat_sort_ms(chat: Any) -> int:
+        from app.modules.all_platform.zalo.services.supabase_service import _parse_to_millis
 
-    for group in groups:
-        meta = existing_meta.get(group.group_id)
-        if not meta:
-            groups_to_sync.append(group)
-            continue
-        if meta.get("unread_count", 0) > 0 or group.unread_count > 0:
-            groups_to_sync.append(group)
-            continue
-        db_ts_str = meta.get("last_message_at")
-        api_ts_str = group.last_message_at
-        if not db_ts_str or not api_ts_str:
-            groups_to_sync.append(group)
-            continue
-        try:
-            from app.modules.all_platform.zalo.services.zca_persistent_listener import _timestamp_ms
-            db_ms = _timestamp_ms(db_ts_str)
-            api_ms = _timestamp_ms(api_ts_str)
-            if api_ms > db_ms:
-                groups_to_sync.append(group)
-            else:
-                skipped_results.append(
-                    SyncRecentGroupResult(
-                        group_id=group.group_id,
-                        group_name=group.name,
-                        messages_saved=0,
-                        status="skipped",
-                    )
-                )
-        except Exception:
-            groups_to_sync.append(group)
+        return _parse_to_millis(getattr(chat, "last_message_at", None))
 
-    # Also sync personal chat threads (friends) — bug fix: previously only `groups` were processed.
-    # Personal chats have no unread_count concept via ZCA list API, so always sync friends.
-    friends_to_sync: List[Any] = []
-    friends_skipped: List[SyncRecentGroupResult] = []
-    for friend in friends:
-        meta = existing_meta.get(friend.group_id)
-        if not meta:
-            friends_to_sync.append(friend)
-            continue
-        db_ts_str = meta.get("last_message_at")
-        api_ts_str = friend.last_message_at
-        if not db_ts_str or not api_ts_str:
-            friends_to_sync.append(friend)
-            continue
-        try:
-            from app.modules.all_platform.zalo.services.zca_persistent_listener import _timestamp_ms
-            db_ms = _timestamp_ms(db_ts_str)
-            api_ms = _timestamp_ms(api_ts_str)
-            if api_ms > db_ms:
-                friends_to_sync.append(friend)
-            else:
-                friends_skipped.append(
-                    SyncRecentGroupResult(
-                        group_id=friend.group_id,
-                        group_name=friend.name,
-                        messages_saved=0,
-                        status="skipped",
-                    )
-                )
-        except Exception:
-            friends_to_sync.append(friend)
+    # Manual sync should fetch the latest page from Zalo for the visible recent chats.
+    # Do not skip based on DB/API last_message_at metadata: that metadata can be stale
+    # or already polluted by an older sync page, causing today's messages to be missed.
+    recent_chats = sorted(
+        all_chats,
+        key=lambda chat: (
+            1 if getattr(chat, "is_pinned", False) else 0,
+            _chat_sort_ms(chat),
+            int(getattr(chat, "unread_count", 0) or 0),
+        ),
+        reverse=True,
+    )[: body.limit]
 
     results: List[SyncRecentGroupResult] = []
     total_saved = 0
@@ -233,58 +186,90 @@ async def sync_recent_conversations(
     errors = 0
 
     per_group_count = max(20, min(body.messages_per_conversation, 200))
-    semaphore = asyncio.Semaphore(4)
 
-    async def _sync_one_group(group) -> SyncRecentGroupResult:
-        async with semaphore:
-            try:
-                thread_type = 0 if getattr(group, "is_friend", False) else 1
+    # Sequential processing with adaptive delay to avoid Zalo 429 rate limiting.
+    # Burst concurrent calls (semaphore(4)) caused all groups to fail when Zalo
+    # throttled the first burst — sequential + backoff is much more reliable.
+    import random
+
+    _sync_delay = 2.0       # base delay between groups (seconds)
+    _sync_max_delay = 30.0  # cap delay after repeated 429s
+    _consecutive_429 = 0
+
+    async def _fetch_group_messages(group, retry: int = 0) -> List:
+        """Fetch messages for one group with up to 2 retries on 429."""
+        nonlocal _sync_delay, _consecutive_429
+        thread_type = 0 if getattr(group, "is_friend", False) else 1
+        try:
+            if thread_type == 0:
+                messages = await get_zca_user_history(auth, group.group_id, count=per_group_count)
+            else:
+                messages = await get_zca_group_history(auth, group.group_id, count=per_group_count)
+
+            if not messages:
                 messages = await sync_zca_group_old_messages(
-                    auth,
-                    group.group_id,
-                    thread_type=thread_type,
-                    count=per_group_count,
+                    auth, group.group_id, thread_type=thread_type, count=per_group_count,
                 )
-                if not messages and thread_type == 1:
-                    messages = await sync_zca_group_old_messages(
-                        auth,
-                        group.group_id,
-                        thread_type=0,
-                        count=per_group_count,
-                    )
-                if not messages:
-                    return SyncRecentGroupResult(
-                        group_id=group.group_id,
-                        group_name=group.name,
-                        messages_saved=0,
-                        status="empty",
-                    )
-                saved = await save_listener_messages(
-                    user_id,
-                    group.group_id,
-                    group.name,
-                    messages,
-                    increment_unread=False,
+            if not messages and thread_type == 1:
+                messages = await sync_zca_group_old_messages(
+                    auth, group.group_id, thread_type=0, count=per_group_count,
                 )
-                return SyncRecentGroupResult(
-                    group_id=group.group_id,
-                    group_name=group.name,
-                    messages_saved=saved,
-                    status="has_messages" if saved else "empty",
+            _consecutive_429 = 0
+            _sync_delay = max(2.0, _sync_delay * 0.9)  # slowly recover delay on success
+            return messages or []
+        except Exception as exc:
+            err = str(exc).lower()
+            is_429 = "429" in err or "too many" in err or "rate limit" in err
+            if is_429:
+                _consecutive_429 += 1
+                _sync_delay = min(_sync_max_delay, _sync_delay * 2.0)
+                cooldown = min(120.0, 30.0 * _consecutive_429)
+                logger.warning(
+                    f"sync-recent 429 for group={group.group_id} "
+                    f"retry={retry} consecutive={_consecutive_429}, "
+                    f"cooling down {cooldown:.0f}s"
                 )
-            except Exception as exc:
-                logger.warning(f"sync-recent failed for group={group.group_id}: {exc}")
-                return SyncRecentGroupResult(
+                if retry < 2:
+                    await asyncio.sleep(cooldown)
+                    return await _fetch_group_messages(group, retry=retry + 1)
+            raise
+
+    for idx, group in enumerate(recent_chats):
+        # Adaptive jitter delay between groups (skip before the first one)
+        if idx > 0:
+            jitter = _sync_delay * (1.0 + random.uniform(-0.2, 0.2))
+            await asyncio.sleep(jitter)
+
+        try:
+            messages = await _fetch_group_messages(group)
+            if not messages:
+                results.append(SyncRecentGroupResult(
                     group_id=group.group_id,
                     group_name=group.name,
                     messages_saved=0,
-                    status="error",
-                    error=str(exc),
-                )
-
-    sync_results = await asyncio.gather(*[_sync_one_group(group) for group in groups_to_sync])
-    friends_results = await asyncio.gather(*[_sync_one_group(friend) for friend in friends_to_sync])
-    results = skipped_results + list(sync_results) + list(friends_results)
+                    status="empty",
+                ))
+                continue
+            saved = await save_listener_messages(
+                user_id, group.group_id, group.name, messages, increment_unread=False,
+            )
+            results.append(SyncRecentGroupResult(
+                group_id=group.group_id,
+                group_name=group.name,
+                messages_saved=saved,
+                status="has_messages" if saved else "empty",
+            ))
+        except ZcaAuthExpiredError:
+            raise HTTPException(status_code=401, detail=ZCA_SESSION_EXPIRED_DETAIL)
+        except Exception as exc:
+            logger.warning(f"sync-recent failed for group={group.group_id}: {exc}")
+            results.append(SyncRecentGroupResult(
+                group_id=group.group_id,
+                group_name=group.name,
+                messages_saved=0,
+                status="error",
+                error=str(exc),
+            ))
 
     for item in results:
         total_saved += item.messages_saved
@@ -295,7 +280,7 @@ async def sync_recent_conversations(
 
     return SyncRecentResponse(
         account_id=user_id,
-        scanned=len(groups) + len(friends),
+        scanned=len(recent_chats),
         groups_with_messages=groups_with_messages,
         messages_saved=total_saved,
         errors=errors,
@@ -889,6 +874,3 @@ async def create_user_thread(
         "display_name": body.display_name.strip(),
         "thread_type": 0,
     }
-
-
-

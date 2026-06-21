@@ -31,10 +31,11 @@ _supabase_group_name_cache: Dict[Tuple[str, str], str] = {}
 
 _CACHE_LIMIT_PER_GROUP = 1000
 _RESTART_BACKOFFS = [5, 15, 45, 120, 300]
-_STARTUP_SYNC_GROUP_LIMIT = 20
+_STARTUP_SYNC_GROUP_LIMIT = 8   # giảm từ 20 → 8 để tránh burst 429 khi reconnect
 _STARTUP_SYNC_MESSAGE_COUNT = 50
 _STARTUP_SYNC_TIMEOUT_MS = 25000
-_STARTUP_SYNC_PER_GROUP_DELAY_S = 2.0  # tăng từ 1.5 → 2.0 cho ổn định hơn
+_STARTUP_SYNC_PER_GROUP_DELAY_S = 2.0
+_STARTUP_SYNC_INITIAL_DELAY_S = 3.0  # chờ listener ổn định trước khi bắt đầu sync
 
 # Global semaphore: giới hạn concurrent Zalo API calls để tránh burst overload.
 _ZALO_API_SEMAPHORE = asyncio.Semaphore(2)
@@ -375,6 +376,13 @@ class ZcaPersistentListenerManager:
 
         async def _run() -> None:
             try:
+                # Chờ listener ổn định trước khi bắt đầu sync để tránh burst 429
+                # ngay sau khi connect (Zalo thường throttle nặng nếu gọi API liên tục).
+                await asyncio.sleep(_STARTUP_SYNC_INITIAL_DELAY_S)
+
+                if not state.desired or not state.connected:
+                    return
+
                 cached_group_ids = self._recent_group_ids_for_user(state.user_id, limit=8)
                 known_group_ids = [
                     str(group_id).strip()
@@ -857,23 +865,41 @@ class ZcaPersistentListenerManager:
             logger.warning(f"Could not load group names from Supabase for listener: {exc}")
 
         # 2. Load từ ZCA API (group + friends) — cập nhật vào state.group_names.
+        # Dùng try riêng cho groups và friends để 429 trên một call không chặn cả hai.
+        # Thêm delay nhỏ giữa 2 call để tránh burst rate limit ngay khi listener khởi động.
+        groups: list = []
+        friends: list = []
         try:
             groups = await list_zca_groups(state.auth or {})
-            try:
-                friends = await list_zca_friends(state.auth or {})
-            except Exception as e:
-                logger.warning(f"Could not load ZCA friends for listener name preload: {e}")
-                friends = []
+        except Exception as exc:
+            err = str(exc).lower()
+            if "429" in err or "too many" in err or "rate limit" in err:
+                logger.warning(f"Rate-limited loading ZCA groups for listener user={state.user_id}, skipping group name preload")
+            else:
+                logger.warning(f"Could not load ZCA groups for listener name preload user={state.user_id}: {exc}")
 
+        if groups:
+            # Small delay between group-list and friend-list calls to avoid burst
+            await asyncio.sleep(2.0)
+
+        try:
+            friends = await list_zca_friends(state.auth or {})
+        except Exception as exc:
+            err = str(exc).lower()
+            if "429" in err or "too many" in err or "rate limit" in err:
+                logger.warning(f"Rate-limited loading ZCA friends for listener user={state.user_id}, skipping friend name preload")
+            else:
+                logger.warning(f"Could not load ZCA friends for listener name preload user={state.user_id}: {exc}")
+
+        if groups or friends:
             state.group_names = {
                 chat.group_id: chat.name
                 for chat in (groups + friends)
                 if chat.group_id and chat.name and chat.name != chat.group_id
             }
-
             logger.info(f"Loaded {len(state.group_names)} ZCA group/friend names for listener user={state.user_id}")
-        except Exception as exc:
-            logger.warning(f"Could not preload ZCA group/friend names for listener user={state.user_id}: {exc}")
+        else:
+            logger.info(f"No ZCA group/friend names loaded for listener user={state.user_id} (will use Supabase cache)")
 
     async def _handle_event(self, state: ListenerState, raw_line: str) -> None:
         if not raw_line:
