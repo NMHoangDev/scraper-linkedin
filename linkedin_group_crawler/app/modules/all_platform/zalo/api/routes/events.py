@@ -319,7 +319,7 @@ async def test_publish_event(
     register_account_owner(account_id, "test-caller")
 
     event = {
-        "type": "zalo-message",
+        "type": "new_messages",
         "account_id": account_id,
         "group_id": conversation_id,
         "group_name": "Test Conversation",

@@ -1018,7 +1018,7 @@ class ZcaPersistentListenerManager:
                 shared_ids = await list_shared_conversation_ids(state.user_id)
 
                 event = {
-                    "type": "zalo-message",
+                    "type": "new_messages",
                     "account_id": state.user_id,
                     "group_id": group_id,
                     "group_name": group_name,
