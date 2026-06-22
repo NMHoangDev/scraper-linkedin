@@ -15,15 +15,22 @@ import { fbFetch, fbHeaders, getFbProvisionConfig } from "@/lib/markee-fb-api";
 import { API_BASE_URL } from "@/lib/env";
 import { idbSetThread, idbGetAllThreadsForAcc, idbSetConvs, idbGetConvs, idbPruneOld } from "@/lib/inbox-cache";
 import TeamAccountTree from "@/components/all-platform/inbox/TeamAccountTree";
+import InboxModernLayout from "@/components/all-platform/inbox/InboxModernLayout";
 
 interface Session { user_id: string; fb_user_id?: string; label?: string; owner?: string; online?: boolean; inbox_enabled?: boolean; status?: string; }
 interface Conv { conv_id: string; name: string; preview: string; unread: boolean; time: string; is_customer: boolean; pushed_to_zalo: boolean; deleted: boolean; archived?: boolean; archived_at?: string; }
 interface ArchiveConv { conv_id: string; name: string; preview?: string; time?: string; archived_at?: string; last_saved_at?: string; archive_reason?: string; outcome?: string; note?: string; messages_count?: number; archived_by_name?: string; is_customer?: boolean; pushed_to_zalo?: boolean; }
-interface Msg { from: "me" | "them"; text: string; time: string; }
+interface Msg { from: "me" | "them"; text: string; time: string; clientId?: string; }
 interface UserRow { id?: string; email?: string; name?: string; }
 interface TeamRow { id?: string; name_team?: string; id_leader?: string; leader_name?: string; leader_email?: string; members?: UserRow[]; }
 
 const ACTIVE_INBOX_DAYS = 7;
+const SESSION_POLL_ACTIVE_MS = 12000;
+const SESSION_POLL_HIDDEN_MS = 30000;
+const CONVERSATION_POLL_ACTIVE_MS = 9000;
+const CONVERSATION_POLL_HIDDEN_MS = 30000;
+const THREAD_DELTA_POLL_MS = 10000;
+const SILENT_SCAN_MS = 45000;
 
 async function fetchJsonWithRetry(url: string, attempts = 3): Promise<Record<string, unknown>> {
   let lastData: Record<string, unknown> | null = null;
@@ -69,6 +76,119 @@ function convListSignature(conv: Conv): string {
   return `${conv.conv_id}|${conv.preview || ""}|${conv.time || ""}|${conv.unread ? 1 : 0}`;
 }
 
+function normalizeMsgText(value: string): string {
+  return (value || "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function exactMsgKey(message: Msg): string {
+  return `${message.from}|${normalizeMsgText(message.text)}|${(message.time || "").trim()}|${message.clientId || ""}`;
+}
+
+const MESSAGE_ECHO_LOOKBACK = 8;
+
+function isSendingStatus(time: string): boolean {
+  const raw = (time || "").toLowerCase();
+  const value = foldVietnamese(time || "");
+  return (
+    raw.includes("đang gửi") ||
+    raw.includes("đã gửi") ||
+    raw.includes("dang gui") ||
+    raw.includes("da gui") ||
+    raw.includes("sent") ||
+    value.includes("dang gui") ||
+    value.includes("da gui") ||
+    value.includes("sent")
+  );
+}
+
+function isOppositeEcho(current: Msg, previous: Msg, isAdjacent: boolean): boolean {
+  if (!current.text || !previous.text || current.from === previous.from) return false;
+  if (normalizeMsgText(current.text) !== normalizeMsgText(previous.text)) return false;
+  if (current.clientId || previous.clientId) return true;
+  if (isSendingStatus(current.time) || isSendingStatus(previous.time) || !current.time || !previous.time) return true;
+  // Messenger/extension can echo our just-sent text back as an incoming bubble.
+  // When the same text appears immediately after our outgoing bubble, keep the outgoing one.
+  return previous.from === "me" && current.from === "them" && isAdjacent;
+}
+
+function isSameDirectionPendingEcho(current: Msg, previous: Msg): boolean {
+  if (!current.text || !previous.text || current.from !== previous.from) return false;
+  if (normalizeMsgText(current.text) !== normalizeMsgText(previous.text)) return false;
+  if (current.clientId && previous.clientId && current.clientId !== previous.clientId) return false;
+  if (current.clientId || previous.clientId) return true;
+  return !current.time || !previous.time;
+}
+
+function preferCurrentThreadMessage(current: Msg, previous: Msg): boolean {
+  const currentStable = !!current.time && !isSendingStatus(current.time);
+  const previousStable = !!previous.time && !isSendingStatus(previous.time);
+  if (currentStable !== previousStable) return currentStable;
+  return !previous.clientId && !!current.clientId;
+}
+
+function normalizeThreadMessages(list: Msg[]): Msg[] {
+  const out: Msg[] = [];
+  const exact = new Set<string>();
+
+  for (const raw of list || []) {
+    const msg: Msg = {
+      from: raw?.from === "me" ? "me" : "them",
+      text: (raw?.text || "").trim(),
+      time: raw?.time || "",
+      clientId: raw?.clientId,
+    };
+    if (!msg.text) continue;
+
+    const exactKey = exactMsgKey(msg);
+    if (exact.has(exactKey)) continue;
+
+    let sameDirectionIndex = -1;
+    for (let i = out.length - 1, looked = 0; i >= 0 && looked < MESSAGE_ECHO_LOOKBACK; i -= 1, looked += 1) {
+      if (isSameDirectionPendingEcho(msg, out[i])) {
+        sameDirectionIndex = i;
+        break;
+      }
+    }
+    if (sameDirectionIndex >= 0) {
+      if (preferCurrentThreadMessage(msg, out[sameDirectionIndex])) {
+        exact.delete(exactMsgKey(out[sameDirectionIndex]));
+        const replacement = { ...msg, clientId: msg.clientId || out[sameDirectionIndex].clientId };
+        out[sameDirectionIndex] = replacement;
+        exact.add(exactMsgKey(replacement));
+      }
+      continue;
+    }
+
+    let echoIndex = -1;
+    for (let i = out.length - 1, looked = 0; i >= 0 && looked < MESSAGE_ECHO_LOOKBACK; i -= 1, looked += 1) {
+      if (isOppositeEcho(msg, out[i], i === out.length - 1)) {
+        echoIndex = i;
+        break;
+      }
+    }
+    if (echoIndex >= 0) {
+      if (msg.from === "me" && out[echoIndex]?.from === "them") {
+        exact.delete(exactMsgKey(out[echoIndex]));
+        const replacement = { ...msg, clientId: msg.clientId || out[echoIndex].clientId };
+        out[echoIndex] = replacement;
+        exact.add(exactMsgKey(replacement));
+      }
+      continue;
+    }
+
+    out.push(msg);
+    exact.add(exactKey);
+  }
+
+  return out;
+}
+
+function mergeThreadMessages(current: Msg[], incoming: Msg[]): Msg[] {
+  if (!current?.length) return normalizeThreadMessages(incoming || []);
+  if (!incoming?.length) return normalizeThreadMessages(current || []);
+  return normalizeThreadMessages([...(current || []), ...(incoming || [])]);
+}
+
 export default function InboxPage() {
   const { user } = useAppAuth();
   const owner = user?.id || "";
@@ -83,6 +203,8 @@ export default function InboxPage() {
   const [extInstalled, setExtInstalled] = useState<boolean | null>(null);
   const [convs, setConvs] = useState<Conv[]>([]);
   const [archives, setArchives] = useState<ArchiveConv[]>([]);
+  const [customerNotes, setCustomerNotes] = useState<Record<string, string>>({});
+  const [savingNoteConv, setSavingNoteConv] = useState("");
   const [loadingConvs, setLoadingConvs] = useState(false);
   const [filter, setFilter] = useState<"all" | "unread" | "customer" | "need_reply">("all");
   const [viewMode, setViewMode] = useState<"inbox" | "archive">("inbox");
@@ -113,10 +235,19 @@ export default function InboxPage() {
   // Chống chồng lệnh silent scan (1 lệnh đang chạy thì bỏ qua lần kế)
   const scanInFlightRef = useRef(false);
   const lastSilentScanAtRef = useRef<Record<string, number>>({});
+  const sessionsInFlightRef = useRef(false);
+  const convsInFlightRef = useRef(false);
+  const sessionsErrorStreakRef = useRef(0);
+  const convsErrorStreakRef = useRef(0);
+  const convsAbortRef = useRef<AbortController | null>(null);
+  const replyInFlightRef = useRef(false);
 
   const showToast = (msg: string, ok: boolean) => { setToast({ msg, ok }); setTimeout(() => setToast(null), 3500); };
 
   const resetAccountView = (uid: string) => {
+    convsAbortRef.current?.abort();
+    convsInFlightRef.current = false;
+    convsErrorStreakRef.current = 0;
     selectedAccRef.current = uid;
     convsRequestSeqRef.current += 1;
     archivesRequestSeqRef.current += 1;
@@ -129,6 +260,7 @@ export default function InboxPage() {
     setReply("");
     setThreadLastFrom({});
     setConvs([]); setArchives([]);
+    setCustomerNotes({});
     setNeedRelogin(false);
     setLoadingChat(false); setLoadingFresh(false); setLoadingArchives(false);
     setLoadingConvs(!!uid);
@@ -137,14 +269,15 @@ export default function InboxPage() {
   // Lưu cache thread vào CẢ RAM (clientCacheRef) lẫn IndexedDB (bền qua reload).
   // loadedAt: nếu không truyền, giữ lại loaded_at đã biết của hội thoại đó.
   const saveThreadCache = useCallback((convId: string, list: Msg[], loadedAt?: string | null) => {
-    clientCacheRef.current.set(convId, list);
-    const lastFrom = list[list.length - 1]?.from;
+    const cleanList = normalizeThreadMessages(list);
+    clientCacheRef.current.set(convId, cleanList);
+    const lastFrom = cleanList[cleanList.length - 1]?.from;
     if (lastFrom) {
       setThreadLastFrom(prev => prev[convId] === lastFrom ? prev : { ...prev, [convId]: lastFrom });
     }
     const la = loadedAt === undefined ? (loadedAtRef.current.get(convId) ?? null) : loadedAt;
     loadedAtRef.current.set(convId, la);
-    void idbSetThread(acc, convId, list, la);
+    void idbSetThread(acc, convId, cleanList, la);
   }, [acc]);
 
   // Dọn cache thread cũ (>30 ngày) 1 lần khi vào trang để IndexedDB không phình mãi.
@@ -252,16 +385,20 @@ export default function InboxPage() {
 
   const loadSessions = useCallback(async () => {
     if (!scopeReady) return;
+    if (sessionsInFlightRef.current) return;
+    sessionsInFlightRef.current = true;
     try {
       // Nguồn acc = /sessions (BỀN, đọc từ file cookie) -> acc OFFLINE (nhân viên tắt máy) VẪN HIỆN
       const r = await fbFetch("/sessions");
       const d = await r.json();
+      if (!r.ok) throw new Error(d?.detail || "sessions failed");
       const list: Session[] = (d.sessions || []).map((s: Session) => ({
         ...s,
         status: s.online ? (s.inbox_enabled === false ? "paused" : "online") : "offline",
       })).filter(sessionInScope);
       setSessions(list);
       setConnErr(false);
+      sessionsErrorStreakRef.current = 0;
       // Tự chọn: ưu tiên giữ acc đang chọn; nếu chưa có thì chọn acc ONLINE đầu, không có online thì acc đầu
       setAcc(prev => {
         if (prev && (list.length === 0 || list.some(e => e.user_id === prev))) {
@@ -275,31 +412,54 @@ export default function InboxPage() {
         }
         return next;
       });
-    } catch { setConnErr(true); }
+    } catch {
+      sessionsErrorStreakRef.current += 1;
+      setConnErr(true);
+    } finally {
+      sessionsInFlightRef.current = false;
+    }
   }, [scopeReady, sessionInScope]);
 
   const loadConvs = useCallback(async () => {
     if (!acc) return;
+    if (convsInFlightRef.current) return;
     const requestAcc = acc;
     const requestSeq = ++convsRequestSeqRef.current;
+    const controller = new AbortController();
+    convsInFlightRef.current = true;
+    convsAbortRef.current = controller;
     if (sessions.length > 0 && !sessions.some(s => s.user_id === requestAcc)) {
       if (selectedAccRef.current !== requestAcc || convsRequestSeqRef.current !== requestSeq) return;
       setConvs([]);
       setOpenConv(""); openConvRef.current = "";
       setMsgs([]); msgsRef.current = [];
       setLoadingConvs(false);
+      convsInFlightRef.current = false;
+      if (convsAbortRef.current === controller) convsAbortRef.current = null;
       return;
     }
     try {
-      const r = await fbFetch(`/inbox/conversations?user_id=${encodeURIComponent(requestAcc)}`);
+      const r = await fbFetch(`/inbox/conversations?user_id=${encodeURIComponent(requestAcc)}`, { signal: controller.signal });
       const d = await r.json();
       if (selectedAccRef.current !== requestAcc || convsRequestSeqRef.current !== requestSeq) return;
+      if (!r.ok) {
+        convsErrorStreakRef.current += 1;
+        return;
+      }
       const list: Conv[] = d.conversations || [];
       setConvs(list);
       setNeedRelogin(!!d.needs_relogin);
+      convsErrorStreakRef.current = 0;
       void idbSetConvs(requestAcc, list);
-    } catch { /* ignore */ }
+    } catch (err) {
+      const aborted = err instanceof Error && err.name === "AbortError";
+      if (!aborted) convsErrorStreakRef.current += 1;
+    }
     finally {
+      if (convsAbortRef.current === controller) {
+        convsAbortRef.current = null;
+        convsInFlightRef.current = false;
+      }
       if (selectedAccRef.current === requestAcc && convsRequestSeqRef.current === requestSeq) {
         setLoadingConvs(false);
       }
@@ -315,7 +475,15 @@ export default function InboxPage() {
       const r = await fbFetch(`/inbox/archive?user_id=${encodeURIComponent(requestAcc)}&limit=200`);
       const d = await r.json();
       if (selectedAccRef.current !== requestAcc || archivesRequestSeqRef.current !== requestSeq) return;
-      setArchives(d.archives || []);
+      const list: ArchiveConv[] = d.archives || [];
+      setArchives(list);
+      setCustomerNotes(prev => {
+        const next = { ...prev };
+        for (const item of list) {
+          if (item?.conv_id && typeof item.note === "string") next[item.conv_id] = item.note;
+        }
+        return next;
+      });
     } catch { /* ignore */ }
     finally {
       if (selectedAccRef.current === requestAcc && archivesRequestSeqRef.current === requestSeq) {
@@ -350,16 +518,42 @@ export default function InboxPage() {
   }, [acc]);
 
   useEffect(() => {
-    loadSessions();
-    const t = setInterval(loadSessions, 6000);
-    return () => clearInterval(t);
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const tick = async () => {
+      await loadSessions();
+      if (stopped) return;
+      const base = document.hidden ? SESSION_POLL_HIDDEN_MS : SESSION_POLL_ACTIVE_MS;
+      const backoff = Math.min(sessionsErrorStreakRef.current * 6000, 30000);
+      timer = setTimeout(tick, base + backoff);
+    };
+    void tick();
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [loadSessions]);
   useEffect(() => {
     if (!acc) return;
-    loadConvs();
-    const t = setInterval(loadConvs, 3000);
-    return () => clearInterval(t);
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const tick = async () => {
+      await loadConvs();
+      if (stopped) return;
+      const base = document.hidden ? CONVERSATION_POLL_HIDDEN_MS : CONVERSATION_POLL_ACTIVE_MS;
+      const backoff = Math.min(convsErrorStreakRef.current * 5000, 25000);
+      timer = setTimeout(tick, base + backoff);
+    };
+    void tick();
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [acc, loadConvs]);
+  useEffect(() => {
+    if (!acc) return;
+    loadArchives();
+  }, [acc, loadArchives]);
   useEffect(() => {
     if (!acc || viewMode !== "archive") return;
     loadArchives();
@@ -370,10 +564,11 @@ export default function InboxPage() {
     const isOnline = sessions.find(s => s.user_id === acc)?.status === "online";
     if (!isOnline || needRelogin) return;
     const silentScan = () => {
+      if (document.hidden) return;
       if (scanInFlightRef.current) return;
       const now = Date.now();
       const last = lastSilentScanAtRef.current[acc] || 0;
-      if (now - last < 30000) return;
+      if (now - last < SILENT_SCAN_MS) return;
       lastSilentScanAtRef.current[acc] = now;
       scanInFlightRef.current = true;
       fbFetch("/inbox/scan", { method: "POST", headers: fbHeaders(), body: JSON.stringify({ user_id: acc }) })
@@ -381,7 +576,7 @@ export default function InboxPage() {
         .finally(() => { scanInFlightRef.current = false; });
     };
     silentScan();
-    const t = setInterval(silentScan, 30000);
+    const t = setInterval(silentScan, SILENT_SCAN_MS);
     return () => clearInterval(t);
   }, [acc, sessions, needRelogin]);
 
@@ -459,6 +654,7 @@ export default function InboxPage() {
           archive_reason: hide ? "hidden_from_inbox" : "saved_customer",
           mark_customer: !hide,
           hide,
+          note: customerNotes[conv_id] || undefined,
         }),
       });
       const d = await r.json().catch(() => ({}));
@@ -469,12 +665,70 @@ export default function InboxPage() {
         if (!entry) return prev;
         return [entry, ...prev.filter(x => x.conv_id !== conv_id)];
       });
+      if (typeof (d.archive as ArchiveConv | undefined)?.note === "string") {
+        setCustomerNotes(prev => ({ ...prev, [conv_id]: (d.archive as ArchiveConv).note || "" }));
+      }
       if (hide && openConvRef.current === conv_id) {
         setOpenConv(""); openConvRef.current = ""; openConvListSigRef.current = ""; setArchiveReading(false); setMsgs([]); msgsRef.current = [];
       }
       showToast(hide ? "Đã ẩn khỏi hộp thư và lưu trữ" : "Đã lưu khách vào kho lưu trữ", true);
       if (viewMode === "archive") loadArchives();
     } catch { showToast("Không kết nối được", false); }
+  }
+
+  async function saveCustomerNote(conv_id: string, note: string) {
+    const accountId = selectedAccRef.current || acc;
+    if (!accountId || !conv_id) return;
+    const previous = customerNotes[conv_id] || "";
+    const cleanNote = note.trim();
+    setSavingNoteConv(conv_id);
+    setCustomerNotes(prev => ({ ...prev, [conv_id]: cleanNote }));
+    try {
+      const currentConv = convs.find(c => c.conv_id === conv_id);
+      const currentArchive = archives.find(a => a.conv_id === conv_id);
+      const r = await fbFetch("/inbox/archive", {
+        method: "POST",
+        headers: fbHeaders(),
+        body: JSON.stringify({
+          user_id: accountId,
+          conv_id,
+          archive_reason: currentArchive?.archive_reason || "customer_note",
+          mark_customer: false,
+          hide: false,
+          note: cleanNote,
+        }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setCustomerNotes(prev => ({ ...prev, [conv_id]: previous }));
+        showToast(d.detail || "Không lưu được ghi chú", false);
+        return;
+      }
+      const entry = d.archive as ArchiveConv | undefined;
+      setArchives(prev => {
+        const fallback: ArchiveConv = {
+          ...(currentArchive || {}),
+          conv_id,
+          name: currentArchive?.name || currentConv?.name || conv_id,
+          preview: currentArchive?.preview || currentConv?.preview || "",
+          time: currentArchive?.time || currentConv?.time || "",
+          archive_reason: currentArchive?.archive_reason || "customer_note",
+          note: cleanNote,
+          last_saved_at: new Date().toISOString(),
+          is_customer: currentArchive?.is_customer ?? currentConv?.is_customer,
+          pushed_to_zalo: currentArchive?.pushed_to_zalo ?? currentConv?.pushed_to_zalo,
+        };
+        const saved = entry || fallback;
+        return [saved, ...prev.filter(x => x.conv_id !== conv_id)];
+      });
+      setCustomerNotes(prev => ({ ...prev, [conv_id]: typeof entry?.note === "string" ? entry.note : cleanNote }));
+      showToast(cleanNote ? "Đã lưu ghi chú khách" : "Đã xóa ghi chú khách", true);
+    } catch {
+      setCustomerNotes(prev => ({ ...prev, [conv_id]: previous }));
+      showToast("Không kết nối được", false);
+    } finally {
+      setSavingNoteConv(prev => prev === conv_id ? "" : prev);
+    }
   }
 
   async function openArchive(conv_id: string) {
@@ -486,7 +740,7 @@ export default function InboxPage() {
       const r = await fbFetch(`/inbox/archive/thread?user_id=${encodeURIComponent(accountId)}&conv_id=${encodeURIComponent(conv_id)}`);
       const d = await r.json();
       if (selectedAccRef.current !== accountId || threadRequestSeqRef.current !== requestSeq || openConvRef.current !== conv_id) return;
-      const archivedMsgs: Msg[] = d.messages || [];
+      const archivedMsgs = normalizeThreadMessages(d.messages || []);
       setMsgs(archivedMsgs); msgsRef.current = archivedMsgs;
     } catch { showToast("Không tải được bản lưu", false); }
     finally {
@@ -505,8 +759,9 @@ export default function InboxPage() {
       const fresh: Msg[] = d.messages || [];
       // Có nhiều tin hơn hiện tại → hiện ngay (kể cả khi loaded_at chưa đổi)
       if (fresh.length > msgsRef.current.length) {
-        setMsgs(fresh); msgsRef.current = fresh;
-        saveThreadCache(conv_id, fresh, d.loaded_at ?? undefined);
+        const merged = mergeThreadMessages(msgsRef.current, fresh);
+        setMsgs(merged); msgsRef.current = merged;
+        saveThreadCache(conv_id, merged, d.loaded_at ?? undefined);
         setLoadingChat(false);
       }
       if (d.loaded_at && d.loaded_at !== prevLoadedAt) {
@@ -545,8 +800,9 @@ export default function InboxPage() {
       if (d0.messages?.length) {
         // Chỉ hiện server cache nếu nhiều tin hơn client cache (tránh overwrite tin optimistic mới gửi)
         if (d0.messages.length >= msgsRef.current.length) {
-          setMsgs(d0.messages); msgsRef.current = d0.messages;
-          saveThreadCache(conv_id, d0.messages, prevLoadedAt);
+          const merged = mergeThreadMessages(msgsRef.current, d0.messages);
+          setMsgs(merged); msgsRef.current = merged;
+          saveThreadCache(conv_id, merged, prevLoadedAt);
         }
         setLoadingChat(false); setLoadingFresh(true);
       }
@@ -577,8 +833,9 @@ export default function InboxPage() {
       if (selectedAccRef.current !== accountId || openConvRef.current !== conv_id) return;
       const fetched: Msg[] = d.messages || [];
       if (fetched.length >= msgsRef.current.length) {
-        setMsgs(fetched); msgsRef.current = fetched;
-        saveThreadCache(conv_id, fetched, d.loaded_at ?? undefined);
+        const merged = mergeThreadMessages(msgsRef.current, fetched);
+        setMsgs(merged); msgsRef.current = merged;
+        saveThreadCache(conv_id, merged, d.loaded_at ?? undefined);
       }
     } catch { /* ignore */ }
   }
@@ -586,6 +843,7 @@ export default function InboxPage() {
   useEffect(() => {
     if (!openConv || !acc) return;
     const t = setInterval(async () => {
+      if (document.hidden) return;
       const reqN = msgsRef.current.length;
       try {
         const url = reqN === 0
@@ -597,12 +855,18 @@ export default function InboxPage() {
         // Nếu list đã thay đổi (poll chính vừa thay) thì bỏ delta cũ này — vòng sau sẽ bắt lại đúng since_n.
         if (msgsRef.current.length !== reqN) return;
         if (reqN === 0) {
-          setMsgs(d.messages); msgsRef.current = d.messages; saveThreadCache(openConv, d.messages, d.loaded_at ?? undefined);
+          const fresh = normalizeThreadMessages(d.messages);
+          setMsgs(fresh); msgsRef.current = fresh; saveThreadCache(openConv, fresh, d.loaded_at ?? undefined);
         } else {
-          setMsgs(prev => { const next = [...prev, ...d.messages]; msgsRef.current = next; saveThreadCache(openConv, next, d.loaded_at ?? undefined); return next; });
+          setMsgs(prev => {
+            const next = mergeThreadMessages(prev, d.messages);
+            msgsRef.current = next;
+            saveThreadCache(openConv, next, d.loaded_at ?? undefined);
+            return next;
+          });
         }
       } catch { /* ignore */ }
-    }, 8000);
+    }, THREAD_DELTA_POLL_MS);
     return () => clearInterval(t);
   }, [openConv, acc, saveThreadCache]);
 
@@ -625,6 +889,7 @@ export default function InboxPage() {
   async function sendReply() {
     const text = reply.trim();
     if (!text || !openConv) return;
+    if (replyInFlightRef.current) { showToast("Tin truoc dang gui, doi xac nhan roi gui tiep.", false); return; }
     if (archiveReading) { showToast("Đang xem bản lưu trữ, mở inbox live để trả lời", false); return; }
     const convIdForSend = openConv;
     const selectedSession = sessions.find(s => s.user_id === acc);
@@ -632,26 +897,43 @@ export default function InboxPage() {
     if (selectedSession?.status === "paused") { showToast("Inbox realtime đang tạm dừng trên extension — bật lại trước khi gửi.", false); return; }
     if (!accOnline) { showToast("Tài khoản đang offline (máy nhân viên chưa mở) — chưa gửi được.", false); return; }
     if (needRelogin) { showToast("Cookie tài khoản đã hết hạn — đăng nhập lại trước khi gửi.", false); return; }
+    replyInFlightRef.current = true;
     setReply("");
-    const optimistic: Msg = { from: "me", text, time: "Đang gửi..." };
-    setMsgs(prev => { const next = [...prev, optimistic]; msgsRef.current = next; return next; });
+    const clientId = `reply-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const optimistic: Msg = { from: "me", text, time: "Đang gửi...", clientId };
+    setMsgs(prev => {
+      const next = normalizeThreadMessages([...prev, optimistic]);
+      msgsRef.current = next;
+      return next;
+    });
     const setStatus = (t: string) => {
       if (openConvRef.current !== convIdForSend) return;
-      setMsgs(prev => prev.map(m => m === optimistic ? { ...m, time: t } : m));
+      setMsgs(prev => {
+        const next = normalizeThreadMessages(prev.map(m => {
+          const sameOptimistic =
+            m === optimistic ||
+            m.clientId === clientId ||
+            (m.from === "me" && normalizeMsgText(m.text) === normalizeMsgText(text) && isSendingStatus(m.time));
+          return sameOptimistic ? { ...m, time: t, clientId: m.clientId || clientId } : m;
+        }));
+        msgsRef.current = next;
+        return next;
+      });
     };
     try {
       const r = await fbFetch("/inbox/reply", { method: "POST", headers: fbHeaders(), body: JSON.stringify({ user_id: acc, conv_id: convIdForSend, text }) });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) { showToast(d.detail || "Lỗi gửi", false); setStatus("✗ Gửi lỗi"); return; }
+      if (!r.ok) { showToast(d.detail || "Lỗi gửi", false); setStatus("✗ Gửi lỗi"); replyInFlightRef.current = false; return; }
       const cmd = d.command_id;
-      if (!cmd) { setStatus("Đã gửi (đang xác nhận)"); return; }
-      pollReplyStatus(cmd, setStatus, 12, acc, convIdForSend);
+      if (!cmd) { setStatus("Đã gửi (đang xác nhận)"); replyInFlightRef.current = false; return; }
+      pollReplyStatus(cmd, setStatus, 12, acc, convIdForSend, () => { replyInFlightRef.current = false; });
     } catch {
       showToast("Không kết nối được", false); setStatus("✗ Gửi lỗi");
+      replyInFlightRef.current = false;
     }
   }
 
-  async function pollReplyStatus(cmd: string, setStatus: (t: string) => void, attemptsLeft: number, accountId: string, convId: string) {
+  async function pollReplyStatus(cmd: string, setStatus: (t: string) => void, attemptsLeft: number, accountId: string, convId: string, finish: () => void) {
     try {
       const r = await fbFetch(`/inbox/reply_status?command_id=${encodeURIComponent(cmd)}&user_id=${encodeURIComponent(accountId)}`);
       const d = await r.json();
@@ -665,11 +947,12 @@ export default function InboxPage() {
           showToast("Đã gửi tin thành công", true);
         }
         else { setStatus("✗ Gửi thất bại"); showToast("FB chưa gửi được — thử lại", false); }
+        finish();
         return;
       }
     } catch { /* ignore, thử lại */ }
-    if (attemptsLeft <= 1) { setStatus("Đã gửi (chưa rõ kết quả)"); return; }
-    setTimeout(() => pollReplyStatus(cmd, setStatus, attemptsLeft - 1, accountId, convId), 2000);
+    if (attemptsLeft <= 1) { setStatus("Đã gửi (chưa rõ kết quả)"); finish(); return; }
+    setTimeout(() => pollReplyStatus(cmd, setStatus, attemptsLeft - 1, accountId, convId, finish), 2000);
   }
 
   // chưa có cache → tạm dựa vào cờ unread (chưa đọc thường là khách vừa nhắn).
@@ -732,6 +1015,56 @@ export default function InboxPage() {
       })
       .catch(() => setLoadingFresh(false));
   }, [convs, openConv, archiveReading, accOnline, needRelogin, acc, pollFreshThread]);
+
+  if (process.env.NEXT_PUBLIC_INBOX_LEGACY_UI !== "1") {
+    return (
+      <InboxModernLayout
+        role={role}
+        owner={owner}
+        sessions={sessions}
+        ownerNames={ownerNames}
+        teams={teams}
+        acc={acc}
+        accOnline={!!accOnline}
+        accPaused={!!accPaused}
+        needRelogin={needRelogin}
+        connErr={connErr}
+        extInstalled={extInstalled}
+        scanning={scanning}
+        loadingConvs={loadingConvs}
+        loadingArchives={loadingArchives}
+        loadingChat={loadingChat}
+        loadingFresh={loadingFresh}
+        archiveReading={archiveReading}
+        viewMode={viewMode}
+        filter={filter}
+        activeConvs={activeConvs}
+        filtered={filtered}
+        archives={archives}
+        openConv={openConv}
+        msgs={msgs}
+        reply={reply}
+        customerNotes={customerNotes}
+        savingNoteConv={savingNoteConv}
+        toast={toast}
+        chatScrollRef={chatScrollRef}
+        selectAcc={selectAcc}
+        scan={scan}
+        setViewMode={setViewMode}
+        setArchiveReading={setArchiveReading}
+        setFilter={setFilter}
+        setReply={setReply}
+        openChat={openChat}
+        openArchive={openArchive}
+        mark={mark}
+        saveArchive={saveArchive}
+        saveCustomerNote={saveCustomerNote}
+        sendReply={sendReply}
+        needsReply={needsReply}
+        accLabel={accLabel}
+      />
+    );
+  }
 
   return (
     <div className="p-6 w-full">

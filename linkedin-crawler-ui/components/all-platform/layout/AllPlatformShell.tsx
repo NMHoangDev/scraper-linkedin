@@ -71,8 +71,8 @@ function AllPlatformShellInner({ children }: { children: React.ReactNode }) {
 
       <AllPlatformSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       
-      <main className={`flex-1 w-full lg:ml-64 min-w-0 transition-all flex flex-col ${
-        isChatPage ? "h-screen p-0 overflow-hidden" : "p-3 sm:p-5 lg:p-8"
+      <main className={`min-w-0 max-w-full flex-1 w-full transition-all flex flex-col lg:ml-64 lg:w-[calc(100%-16rem)] ${
+        isChatPage ? "h-screen p-0 overflow-hidden" : "overflow-x-hidden p-3 sm:p-5 lg:p-8"
       }`}>
         <GlobalCrawlNotification />
         {children}

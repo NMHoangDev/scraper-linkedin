@@ -188,6 +188,11 @@ export default function TaiKhoanFbPage() {
             <div className="text-base font-bold text-[#1A1A1A]">Thêm tài khoản mới</div>
             <div className="text-xs text-[#666666] mt-0.5">Bấm nút bên phải, đăng nhập Facebook như bình thường — hệ thống tự ghi nhớ.</div>
           </div>
+          <a href="/markee-extension.zip" download
+            className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold transition">
+            <MaterialIcon name="download" className="text-[16px]" />
+            Tải extension
+          </a>
           <button onClick={() => addAccount(false)} disabled={adding}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#E3000F] text-white font-bold hover:bg-[#C40009] transition disabled:opacity-50">
             <MaterialIcon name="person_add" className="text-[18px]" />
