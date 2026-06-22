@@ -89,6 +89,40 @@ class SyncRecentResponse(BaseModel):
     errors: int = 0
     results: List[SyncRecentGroupResult] = Field(default_factory=list)
 
+class SyncDomMessage(BaseModel):
+    message_id: Optional[str] = None
+    source_message_id: Optional[str] = None
+    sender_id: Optional[str] = None
+    sender_name: Optional[str] = None
+    timestamp: Optional[str] = None
+    timestamp_text: Optional[str] = None
+    time_text: Optional[str] = None
+    type: str = "webchat"
+    content: Optional[str] = None
+    image_urls: List[str] = Field(default_factory=list)
+    is_sent: bool = False
+    is_deleted: bool = False
+
+class SyncDomConversation(BaseModel):
+    group_id: str
+    group_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    unread_count: Optional[int] = None
+    messages: List[SyncDomMessage] = Field(default_factory=list)
+
+class SyncDomRequest(BaseModel):
+    account_id: Optional[str] = None
+    conversations: List[SyncDomConversation] = Field(default_factory=list)
+
+class SyncDomResponse(BaseModel):
+    ok: bool = True
+    account_id: str
+    scanned: int = 0
+    groups_with_messages: int = 0
+    messages_saved: int = 0
+    errors: int = 0
+    results: List[SyncRecentGroupResult] = Field(default_factory=list)
+
 
 @router.get("", response_model=ZaloConversationListResponse)
 async def get_conversations(
@@ -290,6 +324,128 @@ async def sync_recent_conversations(
 
 
 
+def _normalize_dom_conversation_id(value: str) -> str:
+    raw = str(value or "").strip()
+    if raw.startswith("g") and raw[1:].isdigit():
+        return raw[1:]
+    return raw
+
+def _normalize_dom_message_id(message: SyncDomMessage, group_id: str) -> str:
+    raw = str(message.source_message_id or message.message_id or "").strip()
+    if raw:
+        return raw
+    seed = "|".join(
+        [
+            group_id,
+            str(message.sender_id or message.sender_name or ""),
+            str(message.timestamp_text or message.timestamp or message.time_text or ""),
+            str(message.content or ""),
+            "1" if message.is_sent else "0",
+        ]
+    )
+    import hashlib
+    return "dom-" + hashlib.sha1(seed.encode("utf-8", errors="ignore")).hexdigest()[:32]
+
+@router.post("/sync-dom", response_model=SyncDomResponse)
+async def sync_dom_messages(
+    body: SyncDomRequest,
+    x_user_id: str = Header("default", alias="X-User-ID"),
+):
+    """Persist messages scraped from the visible Zalo Web DOM.
+
+    This route intentionally does not publish SSE events, send messages, or touch the
+    persistent listener. It only upserts Supabase rows using the same conflict key as
+    listener/crawl data: `(user_id, group_id, source_message_id)`.
+    """
+    user_id = _normalize_user_id(body.account_id or x_user_id)
+    results: List[SyncRecentGroupResult] = []
+    total_saved = 0
+    groups_with_messages = 0
+    errors = 0
+
+    for conversation in body.conversations[:100]:
+        group_id = _normalize_dom_conversation_id(conversation.group_id)
+        if not group_id:
+            continue
+        group_name = (conversation.group_name or group_id).strip() or group_id
+
+        messages: List[Message] = []
+        for item in conversation.messages[:500]:
+            content = (item.content or "").strip() or None
+            image_urls = [str(url) for url in (item.image_urls or []) if str(url).strip()]
+            if not content and not image_urls:
+                continue
+            source_id = _normalize_dom_message_id(item, group_id)
+            timestamp_value = item.timestamp_text or item.timestamp
+            messages.append(
+                Message(
+                    message_id=source_id,
+                    sender_id=item.sender_id,
+                    sender_name=item.sender_name,
+                    timestamp=str(timestamp_value) if timestamp_value else None,
+                    time_text=item.time_text,
+                    type=item.type or ("image" if image_urls else "webchat"),
+                    content=content,
+                    image_urls=image_urls,
+                    is_deleted=item.is_deleted,
+                    is_sent=item.is_sent,
+                    group_id=group_id,
+                )
+            )
+
+        try:
+            saved = 0
+            if messages:
+                saved = await save_listener_messages(
+                    user_id,
+                    group_id,
+                    group_name,
+                    messages,
+                    increment_unread=False,
+                )
+            elif conversation.avatar_url or conversation.unread_count is not None:
+                await upsert_group(
+                    user_id=user_id,
+                    group_id=group_id,
+                    group_name=group_name,
+                    avatar_url=conversation.avatar_url,
+                    unread_count=conversation.unread_count,
+                )
+            total_saved += saved
+            if saved > 0:
+                groups_with_messages += 1
+            results.append(
+                SyncRecentGroupResult(
+                    group_id=group_id,
+                    group_name=group_name,
+                    messages_saved=saved,
+                    status="has_messages" if saved else "empty",
+                )
+            )
+        except SupabaseNotConfigured as exc:
+            raise HTTPException(status_code=503, detail=str(exc))
+        except Exception as exc:
+            logger.warning(f"Failed saving DOM-scraped messages for group={group_id}: {exc}")
+            errors += 1
+            results.append(
+                SyncRecentGroupResult(
+                    group_id=group_id,
+                    group_name=group_name,
+                    messages_saved=0,
+                    status="error",
+                    error=str(exc),
+                )
+            )
+
+    return SyncDomResponse(
+        account_id=user_id,
+        scanned=len(body.conversations),
+        groups_with_messages=groups_with_messages,
+        messages_saved=total_saved,
+        errors=errors,
+        results=results,
+    )
+>>>>>>> Stashed changes
 
 async def _background_sync_conversation_messages(account_id: str, conversation_id: str):
     """Background sync: dùng group-history thay vì sync-old-messages để tránh lỗi getOwnId null."""

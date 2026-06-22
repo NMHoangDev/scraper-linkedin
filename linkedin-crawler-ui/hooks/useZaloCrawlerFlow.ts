@@ -1564,7 +1564,7 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
         }
       } else {
         setWarningMessage(
-          "⚠️ Chưa cài Chrome Extension lấy Zalo cookies. Mở chrome://extensions/, load unpacked thư mục facebook-seeding-extension, rồi reload trang web. Sau đó bấm 'Đăng nhập lại' lần nữa.",
+          "⚠️ Chưa cài Chrome Extension lấy Zalo cookies. Mở chrome://extensions/, load unpacked thư mục extension-login-zalo, rồi reload trang web. Sau đó bấm 'Đăng nhập lại' lần nữa.",
         );
       }
 

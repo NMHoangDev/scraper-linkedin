@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from typing import List, Dict, Any
 from datetime import datetime, timezone, timedelta
 
@@ -212,15 +213,18 @@ def setup_all_platform_jobs():
 
     scheduler = AsyncIOScheduler(executors=executors)
 
-    # Thêm tác vụ cào 24h
-    scheduler.add_job(
-        func=execute_all_platform_crawl_workflow,
-        trigger='cron',
-        minute='*', # Chạy mỗi phút (chỉ KIỂM TRA lịch; việc cào thật được cờ _is_crawling chống chồng)
-        id='all_platform_daily_facebook_crawl',
-        replace_existing=True,
-        max_instances=1  # CHỈ 1 lượt cào tại một thời điểm (chống 1 token mở nhiều luồng -> FB khóa acc)
-    )
+    if os.getenv("DISABLE_ALL_PLATFORM_CRAWL_24H", "").strip().lower() in {"1", "true", "yes"}:
+        logger.warning("All-Platform 24h crawl job disabled by DISABLE_ALL_PLATFORM_CRAWL_24H")
+    else:
+        # Thêm tác vụ cào 24h
+        scheduler.add_job(
+            func=execute_all_platform_crawl_workflow,
+            trigger='cron',
+            minute='*', # Chạy mỗi phút (chỉ KIỂM TRA lịch; việc cào thật được cờ _is_crawling chống chồng)
+            id='all_platform_daily_facebook_crawl',
+            replace_existing=True,
+            max_instances=1  # CHỈ 1 lượt cào tại một thời điểm (chống 1 token mở nhiều luồng -> FB khóa acc)
+        )
 
     # Chuyển job weekly backup từ module cũ sang để không làm đứt gãy logic
     from app.modules.facebook.src.jobs.daily_crawl_job import execute_weekly_backup_and_reset_workflow

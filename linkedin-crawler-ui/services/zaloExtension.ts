@@ -14,6 +14,8 @@
  * Extension ID: cách detect tự động qua window.__zaloExtensionAvailable (set bởi bridge).
  */
 
+import { API_BASE_URL, API_KEY } from "@/lib/env";
+
 declare const window: any;
 
 export interface ZaloCookie {
@@ -40,6 +42,8 @@ export interface ImportZaloSessionParams {
   account_id: string;
   user_id?: string;
   owner_id?: string;
+  backend_url?: string;
+  api_key?: string;
 }
 
 export interface ImportZaloSessionResult {
@@ -47,6 +51,39 @@ export interface ImportZaloSessionResult {
   backend: any;
   cookies_count: number;
   keys: string[];
+}
+
+export interface SyncZaloDomMessagesParams {
+  account_id: string;
+  conversation_id?: string;
+  limit?: number;
+  conversation_limit?: number;
+}
+
+export interface SyncZaloDomMessagesResult {
+  status: number;
+  backend: {
+    ok?: boolean;
+    account_id?: string;
+    scanned?: number;
+    groups_with_messages?: number;
+    messages_saved?: number;
+    errors?: number;
+    results?: Array<{
+      group_id: string;
+      group_name: string;
+      messages_saved: number;
+      status: string;
+      error?: string | null;
+    }>;
+    [key: string]: unknown;
+  };
+  scraped?: {
+    conversations_count?: number;
+    messages_count?: number;
+    active_group_id?: string | null;
+    active_group_name?: string | null;
+  };
 }
 
 export class ZaloExtensionError extends Error {
@@ -91,10 +128,12 @@ export async function isZaloExtensionAvailable(): Promise<boolean> {
       if (event.source !== window) return;
       const data = event.data;
       if (!data || data.__zaloExt !== true) return;
-      if (data.type === "PONG" && data.requestId === requestId) {
+      const isPong = data.type === "PONG" && data.requestId === requestId;
+      const isBridgeResponse = data.type === "RESPONSE" && data.requestId === requestId;
+      if (isPong || isBridgeResponse) {
         window.removeEventListener("message", onMessage);
         window.__zaloExtensionAvailable = true;
-        resolve(data.installed === true);
+        resolve(data.installed === true || data.data?.installed === true || data.success === true);
       }
     };
     window.addEventListener("message", onMessage);
@@ -193,5 +232,31 @@ export async function checkZaloLoginViaExtension(): Promise<{
 export async function importZaloSessionViaExtension(
   params: ImportZaloSessionParams,
 ): Promise<ImportZaloSessionResult> {
-  return await sendViaBridge<ImportZaloSessionResult>("IMPORT_ZALO_SESSION", params, 60000);
+  return await sendViaBridge<ImportZaloSessionResult>(
+    "IMPORT_ZALO_SESSION",
+    {
+      ...params,
+      backend_url: params.backend_url || API_BASE_URL,
+      api_key: params.api_key ?? API_KEY,
+    },
+    60000,
+  );
+}
+
+/**
+ * Đồng bộ tin nhắn đang hiển thị trong Zalo Web DOM qua extension.
+ * Không đụng tới realtime listener/gửi tin; extension chỉ scrape DOM rồi POST backend /sync-dom.
+ */
+export async function syncZaloDomMessagesViaExtension(
+  params: SyncZaloDomMessagesParams,
+): Promise<SyncZaloDomMessagesResult> {
+  return await sendViaBridge<SyncZaloDomMessagesResult>(
+    "SYNC_ZALO_DOM_MESSAGES",
+    {
+      ...params,
+      backend_url: API_BASE_URL,
+      api_key: API_KEY,
+    },
+    600000,
+  );
 }

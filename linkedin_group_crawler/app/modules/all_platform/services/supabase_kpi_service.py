@@ -186,6 +186,17 @@ def get_all_kpis_for_leader(leader_email: str, id_team: Optional[str] = None) ->
     )
     seeding_list = seeding_result.data or []
 
+    # Collect member emails for FB inbox query
+    member_emails = [u.get("email", "").lower() for u in user_map.values() if u.get("email")]
+
+    # Get Facebook inbox count from seeder service (messages sent by customers)
+    fb_inbox_by_email: Dict[str, Dict[str, Any]] = {}
+    if member_emails:
+        try:
+            fb_inbox_by_email = _compute_fb_inbox_progress(member_emails, default_start, default_end)
+        except Exception as exc:
+            logger.warning(f"_compute_fb_inbox_progress failed: {exc}")
+
     # Get facebook and linkedin posts for members
     # (Removed fetching posts since post and lead will be 0)
     fb_posts = []
@@ -202,6 +213,7 @@ def get_all_kpis_for_leader(leader_email: str, id_team: Optional[str] = None) ->
         active_kpi = kpi_map.get(mid, {})
         start_date = active_kpi.get("start_date") or default_start
         end_date = active_kpi.get("end_date") or default_end
+        member_email = user.get("email", "").lower()
 
         # Calculate actual Comments within active week
         member_comments = [
@@ -226,9 +238,17 @@ def get_all_kpis_for_leader(leader_email: str, id_team: Optional[str] = None) ->
             inbox_current = 0
             lead_current = 0
 
+        # Facebook Messenger inbox: tin nhắn khách gửi tới trong tuần KPI (từ seeder service)
+        fb_inbox_info = fb_inbox_by_email.get(member_email, {})
+        fb_inbox_current = int(fb_inbox_info.get("kpi_fb_inbox_count", 0))
+        fb_inbox_range = fb_inbox_info.get("range", {"start": start_date, "end": end_date})
+
+        # Tổng inbox = Zalo inbox + FB Messenger inbox
+        total_inbox_current = inbox_current + fb_inbox_current
+
         members_data.append({
             "id": mid,
-            "email": user.get("email"),
+            "email": member_email,
             "name": user.get("name"),
             "role": user.get("role", "member"),
             "profile_slug": user.get("slug"),
@@ -242,7 +262,9 @@ def get_all_kpis_for_leader(leader_email: str, id_team: Optional[str] = None) ->
                 "kpi_lead": active_kpi.get("kpi_lead", 0),
                 "kpi_lead_current": lead_current,
                 "kpi_inbox": active_kpi.get("kpi_inbox", 0),
-                "kpi_inbox_current": inbox_current,
+                "kpi_inbox_current": total_inbox_current,
+                "kpi_inbox_zalo": inbox_current,
+                "kpi_inbox_fb": fb_inbox_current,
                 "kpi_inbox_range": {
                     "start": start_date,
                     "end": end_date,
@@ -290,6 +312,8 @@ def get_kpi_by_email(email: str) -> dict:
         # Tính kpi_inbox_current trong khoảng KPI hiện tại
         kpi_inbox_target = int(kpi.get("kpi_inbox") or 0)
         kpi_inbox_current = 0
+        kpi_inbox_zalo = 0
+        kpi_inbox_fb = 0
         if kpi_inbox_target > 0:
             try:
                 progress = compute_kpi_inbox_progress(
@@ -297,9 +321,23 @@ def get_kpi_by_email(email: str) -> dict:
                     kpi.get("start_date"),
                     kpi.get("end_date"),
                 )
-                kpi_inbox_current = int(progress.get(str(user_id), {}).get("kpi_inbox_current", 0))
+                kpi_inbox_zalo = int(progress.get(str(user_id), {}).get("kpi_inbox_current", 0))
             except Exception as exc:
                 logger.warning(f"compute_kpi_inbox_progress failed for email={email}: {exc}")
+
+        # FB Messenger inbox từ seeder service
+        member_email_lower = email.strip().lower()
+        try:
+            fb_progress = _compute_fb_inbox_progress(
+                [member_email_lower],
+                kpi.get("start_date"),
+                kpi.get("end_date"),
+            )
+            kpi_inbox_fb = int(fb_progress.get(member_email_lower, {}).get("kpi_fb_inbox_count", 0))
+        except Exception as exc:
+            logger.warning(f"_compute_fb_inbox_progress failed for email={email}: {exc}")
+
+        kpi_inbox_current = kpi_inbox_zalo + kpi_inbox_fb
 
         return {
             "email": email,
@@ -309,6 +347,8 @@ def get_kpi_by_email(email: str) -> dict:
             "email_leader": leader_email,
             "kpi": [kpi],
             "kpi_inbox_current": kpi_inbox_current,
+            "kpi_inbox_zalo": kpi_inbox_zalo,
+            "kpi_inbox_fb": kpi_inbox_fb,
             "kpi_inbox_target": kpi_inbox_target,
             "profile_id": user.get("profile_id"),
             "facebook_name": user.get("facebook_name"),
@@ -428,6 +468,79 @@ def _parse_iso_date(value: Optional[str]) -> Optional[date]:
         return date.fromisoformat(raw[:10])
     except ValueError:
         return None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Facebook Inbox from seeder service
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Seeder service lưu tin nhắn khách (from='them') vào data/inbox_messages/{owner}/{yyyy-MM-dd}.json.
+# Hàm này gọi GET /inbox/messages/count của seeder để đếm tin theo owner + khoảng ngày KPI.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _compute_fb_inbox_progress(
+    member_emails: Iterable[str],
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+) -> Dict[str, Dict[str, Any]]:
+    """Gọi seeder service để đếm tin nhắn khách (FB Messenger) của từng member trong tuần KPI.
+
+    Args:
+        member_emails: danh sách email của các member cần đếm.
+        start_date: ISO date (YYYY-MM-DD). Mặc định = Monday tuần hiện tại.
+        end_date: ISO date. Mặc định = Sunday tuần hiện tại.
+
+    Returns:
+        Dict map ``email -> {kpi_fb_inbox_count, range: {start, end}}``.
+    """
+    from app.core.config import settings
+
+    if start_date is None or end_date is None:
+        today_d = date.today()
+        monday = today_d - timedelta(days=today_d.weekday())
+        sunday = monday + timedelta(days=6)
+        start_date = start_date or monday.isoformat()
+        end_date = end_date or sunday.isoformat()
+
+    out: Dict[str, Dict[str, Any]] = {}
+    base_url = settings.seeder_service_url.rstrip("/")
+    api_key = settings.seeder_service_api_key
+
+    for email in member_emails:
+        out[email] = {
+            "kpi_fb_inbox_count": 0,
+            "range": {"start": start_date, "end": end_date},
+        }
+        if not base_url:
+            continue
+        try:
+            import httpx
+
+            headers = {}
+            if api_key:
+                headers["X-API-Key"] = api_key
+
+            url = (
+                f"{base_url}/inbox/messages/count"
+                f"?owner={email}&start={start_date}&end={end_date}"
+            )
+            with httpx.Client(timeout=10.0) as client:
+                resp = client.get(url, headers=headers)
+            if resp.status_code == 200:
+                data = resp.json()
+                out[email] = {
+                    "kpi_fb_inbox_count": int(data.get("count", 0)),
+                    "range": data.get("range", {"start": start_date, "end": end_date}),
+                }
+            else:
+                logger.warning(
+                    f"Seeder service /inbox/messages/count returned {resp.status_code} "
+                    f"for {email}: {resp.text[:200]}"
+                )
+        except Exception as exc:
+            logger.warning(f"Failed to fetch FB inbox from seeder for {email}: {exc}")
+
+    return out
 
 
 def _member_zalo_account_ids(supabase: Client, member_user_id: str) -> List[str]:

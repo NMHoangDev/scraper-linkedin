@@ -113,8 +113,12 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("ZALO_ASSET_CLEANUP_BATCH_SIZE", "ASSET_CLEANUP_BATCH_SIZE"),
     )
     zca_old_message_interval_ms: int = Field(
-        default=300000,
+        default=0,
         validation_alias=AliasChoices("ZALO_ZCA_OLD_MESSAGE_INTERVAL_MS", "ZCA_OLD_MESSAGE_INTERVAL_MS"),
+    )
+    zca_startup_sync_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("ZALO_ZCA_STARTUP_SYNC_ENABLED", "ZCA_STARTUP_SYNC_ENABLED"),
     )
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

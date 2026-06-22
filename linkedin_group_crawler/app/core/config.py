@@ -401,6 +401,8 @@ class Settings:
     )
     crawl_batch_group_delay_min_sec: float = float(os.getenv("CRAWL_BATCH_GROUP_DELAY_MIN_SEC", "3"))
     crawl_batch_group_delay_max_sec: float = float(os.getenv("CRAWL_BATCH_GROUP_DELAY_MAX_SEC", "12"))
+    seeder_service_url: str = os.getenv("SEEDER_SERVICE_URL", "http://localhost:8000").rstrip("/")
+    seeder_service_api_key: str = os.getenv("SEEDER_SERVICE_API_KEY", "")
 
     def __post_init__(self) -> None:
         if self.cors_origins is None:

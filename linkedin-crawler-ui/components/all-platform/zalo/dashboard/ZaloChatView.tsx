@@ -9,7 +9,6 @@ import type { ZaloCrawlerFlowValue } from "@/hooks/useZaloCrawlerFlow";
 import {
   getZaloConversationMessages,
   getZaloConversations,
-  syncZaloRecentConversations,
   createZaloBroadcast,
   sendZaloMessage,
   sendZaloMessageWithFiles,
@@ -26,6 +25,7 @@ import type {
 } from "@/types/zalo-api";
 import { ZaloChatHeaderSkeleton, ZaloMessageListSkeleton } from "./chat/ZaloChatSkeleton";
 import { ZaloEmptyChat } from "./chat/ZaloEmptyChat";
+import { syncZaloDomMessagesViaExtension } from "@/services/zaloExtension";
 import { ZaloConversationListVirtualized } from "./sidebar/ZaloConversationListVirtualized";
 import { ZaloNewChatModal } from "./ZaloNewChatModal";
 import { ZaloKpiPanel } from "./ZaloKpiPanel";
@@ -152,6 +152,28 @@ function sortConversationsLikeZalo(list: ZaloConversationSummary[]) {
 
 function messageKey(message: ZaloLibraryMessage) {
   return message.source_message_id || message.id || `${message.group_id}-${message.timestamp_text}-${message.content}`;
+}
+
+function stableHash(value: string) {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16);
+}
+
+function messageRenderKey(message: ZaloLibraryMessage) {
+  const suffix = [
+    message.id || "",
+    message.timestamp_text || "",
+    message.time_text || "",
+    message.sender_id || "",
+    message.sender_name || "",
+    message.content || "",
+    message.is_sent ? "1" : "0",
+  ].join("|");
+  return `${message.group_id || "unknown"}-${messageKey(message)}-${stableHash(suffix)}`;
 }
 
 function isNearBottom(element: HTMLDivElement | null) {
@@ -746,30 +768,43 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
     setSyncSummary(null);
     setSyncError(null);
     try {
-      const response = await syncZaloRecentConversations(
-        flow.userId,
-        SYNC_CONVERSATION_LIMIT,
-        SYNC_MESSAGES_PER_CONVERSATION,
-      );
+      const domResponse = await syncZaloDomMessagesViaExtension({
+        account_id: flow.userId,
+        conversation_id: selectedConversationId || undefined,
+        limit: SYNC_MESSAGES_PER_CONVERSATION,
+        conversation_limit: Math.min(SYNC_CONVERSATION_LIMIT, 10),
+      });
+      if (domResponse.status >= 400) {
+        const detail = domResponse.backend?.detail || domResponse.backend?.message || domResponse.backend?.error;
+        throw new Error(typeof detail === "string" ? detail : `Extension DOM sync failed: ${domResponse.status}`);
+      }
+      const backend = domResponse.backend || {};
+      const response: ZaloSyncRecentResponse = {
+        account_id: backend.account_id || flow.userId,
+        scanned: Number(backend.scanned || 0),
+        groups_with_messages: Number(backend.groups_with_messages || 0),
+        messages_saved: Number(backend.messages_saved || 0),
+        errors: Number(backend.errors || 0),
+        results: Array.isArray(backend.results) ? backend.results : [],
+      };
       setSyncSummary(response);
       if (response.errors === response.scanned && response.scanned > 0) {
         setSyncError(
           `Đồng bộ thất bại (quét ${response.scanned} nhóm, lỗi toàn bộ). Listener Zalo có thể chưa kết nối.`,
         );
       }
-      await loadConversations();
-      if (selectedConversationId) await loadLatestMessages(selectedConversationId, { silent: true });
-    } catch (error) {
-      if (isSessionExpiredError(error)) {
-        setSyncError("Phiên đăng nhập Zalo đã hết hạn. Vui lòng đăng nhập lại bằng mã QR.");
-        void flow.refreshLoginStatus();
-      } else {
-        setSyncError(error instanceof Error ? error.message : "Không thể đồng bộ tin nhắn.");
+      try {
+        await loadConversations();
+        if (selectedConversationId) await loadLatestMessages(selectedConversationId, { silent: true });
+      } catch (refreshError) {
+        console.warn("[zalo] DOM sync saved, but refreshing local inbox failed", refreshError);
       }
+    } catch (error) {
+      setSyncError(error instanceof Error ? error.message : "Khong the dong bo DOM tin nhan Zalo.");
     } finally {
       setIsSyncingRecent(false);
     }
-  }, [flow, isSyncingRecent, loadConversations, loadLatestMessages, selectedConversationId]);
+  }, [flow.userId, isSyncingRecent, loadConversations, loadLatestMessages, selectedConversationId]);
 
   useEffect(() => {
     const action = pendingScrollRef.current;
@@ -1645,7 +1680,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                     }
 
                     return (
-                      <div key={msgId} className={`flex group ${isSentByMe ? 'justify-end' : 'justify-start'} w-full mb-3`}>
+                      <div key={messageRenderKey(message)} className={`flex group ${isSentByMe ? 'justify-end' : 'justify-start'} w-full mb-3`}>
                         {/* Checkbox for Auto Send Selection - visible on hover or if selected */}
                         {!isSentByMe && (
                            <div className={`mr-1.5 pt-4 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>

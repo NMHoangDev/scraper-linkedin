@@ -371,6 +371,9 @@ class ZcaPersistentListenerManager:
         return [group_id for _ts, _count, group_id in group_stats[: max(1, int(limit))]]
 
     async def _sync_recent_groups_after_connect(self, state: ListenerState) -> None:
+        if not getattr(settings, "zca_startup_sync_enabled", False):
+            logger.info(f"ZCA listener startup sync disabled user={state.user_id}")
+            return
         if state.reconnect_sync_task and not state.reconnect_sync_task.done():
             return
 

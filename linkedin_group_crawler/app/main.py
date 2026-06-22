@@ -47,7 +47,7 @@ async def lifespan(_: FastAPI):
     # (tránh cào bằng acc production khi dev). Production không set -> chạy như cũ.
     import os as _os
     if _os.getenv("DISABLE_SCHEDULER", "").strip() in ("1", "true", "True"):
-        logger.warning("⏸️ DISABLE_SCHEDULER bật -> KHÔNG khởi động scheduler tự cào (chế độ dev).")
+        logger.warning("DISABLE_SCHEDULER enabled -> not starting scheduler.")
     else:
         setup_all_platform_jobs()
     async def _warmup_background() -> None:
@@ -78,8 +78,8 @@ async def lifespan(_: FastAPI):
                 "ZCA persistent listeners auto-start failed — sẽ thử lại khi user login lại",
             )
 
-    if _os.getenv("DISABLE_ZCA_LISTENERS", "").strip() in ("1", "true", "True"):
-        logger.warning("DISABLE_ZCA_LISTENERS is enabled -> skip ZCA persistent listeners in this backend.")
+    if _os.getenv("DISABLE_ZCA_LISTENERS", "").strip().lower() in {"1", "true", "yes"}:
+        logger.warning("DISABLE_ZCA_LISTENERS enabled -> not auto-starting ZCA persistent listeners.")
     else:
         zca_listeners_task = asyncio.create_task(_start_zca_listeners_background())
 

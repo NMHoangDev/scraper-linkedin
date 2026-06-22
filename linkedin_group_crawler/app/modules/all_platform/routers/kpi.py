@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date, timedelta
+
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
@@ -25,6 +27,7 @@ from app.modules.all_platform.services import (
     verify_leader_code,
     update_user_role_to_member,
 )
+from app.modules.all_platform.services.supabase_kpi_service import _compute_fb_inbox_progress
 
 router = APIRouter()
 
@@ -98,6 +101,38 @@ def zalo_inbox_progress(payload: ZaloInboxProgressRequest) -> BaseResponse:
             "account_ids": [],
             "range": {"start": start or "", "end": end or ""},
         })
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+class FbInboxProgressRequest(BaseModel):
+    email: str = Field(..., min_length=3, description="Email member (app_users.email)")
+    start_date: str = Field("", description="YYYY-MM-DD, mặc định = Monday tuần hiện tại")
+    end_date: str = Field("", description="YYYY-MM-DD, mặc định = Sunday tuần hiện tại")
+
+
+@router.post("/fb-inbox-progress")
+def fb_inbox_progress(payload: FbInboxProgressRequest) -> BaseResponse:
+    """Tính số tin nhắn Facebook Messenger khách gửi tới member trong khoảng [start_date, end_date].
+
+    Gọi seeder service để đếm tin nhắn ``from='them'`` trong khoảng tuần KPI.
+    Seeder service lưu tin nhắn vào data/inbox_messages/{owner}/{yyyy-MM-dd}.json.
+    """
+    try:
+        email = payload.email.strip().lower()
+        start = payload.start_date.strip()
+        end = payload.end_date.strip()
+
+        if not start or not end:
+            today_d = date.today()
+            monday = today_d - timedelta(days=today_d.weekday())
+            sunday = monday + timedelta(days=6)
+            start = start or monday.isoformat()
+            end = end or sunday.isoformat()
+
+        result = _compute_fb_inbox_progress([email], start, end)
+        data = result.get(email, {"kpi_fb_inbox_count": 0, "range": {"start": start, "end": end}})
+        return BaseResponse(success=True, data=data)
     except Exception as e:
         return BaseResponse(success=False, message=str(e))
 
