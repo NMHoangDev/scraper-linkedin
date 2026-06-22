@@ -241,6 +241,8 @@ export default function InboxPage() {
   const convsErrorStreakRef = useRef(0);
   const convsAbortRef = useRef<AbortController | null>(null);
   const replyInFlightRef = useRef(false);
+  // Preview hội thoại lần cuối nhìn thấy — để phát hiện có tin mới mà không cần quét lại mù quáng
+  const lastSeenPreviewRef = useRef<Record<string, string>>({});
 
   const showToast = (msg: string, ok: boolean) => { setToast({ msg, ok }); setTimeout(() => setToast(null), 3500); };
 
@@ -262,6 +264,7 @@ export default function InboxPage() {
     setConvs([]); setArchives([]);
     setCustomerNotes({});
     setNeedRelogin(false);
+    lastSeenPreviewRef.current = {};
     setLoadingChat(false); setLoadingFresh(false); setLoadingArchives(false);
     setLoadingConvs(!!uid);
   };
@@ -451,6 +454,29 @@ export default function InboxPage() {
       setNeedRelogin(!!d.needs_relogin);
       convsErrorStreakRef.current = 0;
       void idbSetConvs(requestAcc, list);
+
+      // Background preload: tải trước thread cho 3 hội thoại chưa đọc đầu tiên
+      // Không block UI, không hiện spinner — khi user bấm vào sẽ hiện ngay từ cache
+      const toPreload = list
+        .filter(c => !c.deleted && c.unread && !clientCacheRef.current.has(c.conv_id))
+        .slice(0, 3);
+      for (const pConv of toPreload) {
+        void fbFetch(`/inbox/thread?user_id=${encodeURIComponent(requestAcc)}&conv_id=${encodeURIComponent(pConv.conv_id)}`)
+          .then(r => r.json())
+          .then(d2 => {
+            if (!d2.messages?.length || selectedAccRef.current !== requestAcc) return;
+            const preloaded = normalizeThreadMessages(d2.messages as Msg[]);
+            const current = clientCacheRef.current.get(pConv.conv_id);
+            if (!current || current.length < preloaded.length) {
+              clientCacheRef.current.set(pConv.conv_id, preloaded);
+              loadedAtRef.current.set(pConv.conv_id, d2.loaded_at ?? null);
+              const lastFrom = preloaded[preloaded.length - 1]?.from;
+              if (lastFrom) setThreadLastFrom(prev => ({ ...prev, [pConv.conv_id]: lastFrom }));
+              void idbSetThread(requestAcc, pConv.conv_id, preloaded, d2.loaded_at ?? null);
+            }
+          })
+          .catch(() => {});
+      }
     } catch (err) {
       const aborted = err instanceof Error && err.name === "AbortError";
       if (!aborted) convsErrorStreakRef.current += 1;
@@ -783,13 +809,28 @@ export default function InboxPage() {
     setOpenConv(conv_id); openConvRef.current = conv_id;
     const currentConv = convs.find(c => c.conv_id === conv_id);
     openConvListSigRef.current = currentConv ? convListSignature(currentConv) : "";
-    setMsgs([]); msgsRef.current = []; setLoadingChat(true);
 
-    const clientCached = clientCacheRef.current.get(conv_id);
-    if (clientCached?.length) {
-      setMsgs(clientCached); msgsRef.current = clientCached; setLoadingChat(false); setLoadingFresh(true);
+    // Capture signals TRƯỚC KHI thay đổi state
+    const isUnread = !!currentConv?.unread;
+    const convPreview = currentConv?.preview || "";
+    const previewChanged = conv_id in lastSeenPreviewRef.current
+      && lastSeenPreviewRef.current[conv_id] !== convPreview;
+    lastSeenPreviewRef.current[conv_id] = convPreview;
+
+    setMsgs([]); msgsRef.current = []; setLoadingChat(true); setLoadingFresh(false);
+
+    // Optimistic mark-as-read: cập nhật UI ngay, không chờ server
+    if (isUnread) {
+      setConvs(prev => prev.map(c => c.conv_id === conv_id ? { ...c, unread: false } : c));
     }
 
+    // 1. Hiện cache ngay — KHÔNG bật loadingFresh (không hiện "Đang cập nhật...")
+    const clientCached = clientCacheRef.current.get(conv_id);
+    if (clientCached?.length) {
+      setMsgs(clientCached); msgsRef.current = clientCached; setLoadingChat(false);
+    }
+
+    // 2. Lấy cache từ server disk (có thể nhiều tin hơn RAM)
     let prevLoadedAt: string | null = null;
     try {
       const r0 = await fbFetch(`/inbox/thread?user_id=${encodeURIComponent(accountId)}&conv_id=${encodeURIComponent(conv_id)}`);
@@ -798,20 +839,24 @@ export default function InboxPage() {
       prevLoadedAt = d0.loaded_at || null;
       loadedAtRef.current.set(conv_id, prevLoadedAt);
       if (d0.messages?.length) {
-        // Chỉ hiện server cache nếu nhiều tin hơn client cache (tránh overwrite tin optimistic mới gửi)
         if (d0.messages.length >= msgsRef.current.length) {
           const merged = mergeThreadMessages(msgsRef.current, d0.messages);
           setMsgs(merged); msgsRef.current = merged;
           saveThreadCache(conv_id, merged, prevLoadedAt);
         }
-        setLoadingChat(false); setLoadingFresh(true);
+        setLoadingChat(false);
       }
     } catch { /* ignore */ }
-    // Bỏ ép quét lại CHỈ KHI đã có sẵn tin VÀ dữ liệu vừa quét gần đây (loaded_at < 25s).
-    const la = prevLoadedAt ? Date.parse(prevLoadedAt) : NaN;
-    if (msgsRef.current.length > 0 && !Number.isNaN(la) && Number(new Date()) - la < 25000) {
+
+    // 3. Quyết định có cần quét extension không (signal-based)
+    // Chỉ quét khi: chưa có cache | hội thoại có tin chưa đọc | preview vừa đổi (tin mới đến)
+    const shouldScan = msgsRef.current.length === 0 || isUnread || previewChanged;
+    if (!shouldScan) {
       setLoadingChat(false); setLoadingFresh(false); return;
     }
+
+    // 4. Kích hoạt quét extension — chỉ bật loadingFresh khi đã có data để hiện
+    if (msgsRef.current.length > 0) setLoadingFresh(true);
     try {
       const r = await fbFetch("/inbox/thread", { method: "POST", headers: fbHeaders(), body: JSON.stringify({ user_id: accountId, conv_id }) });
       if (selectedAccRef.current !== accountId || threadRequestSeqRef.current !== requestSeq || openConvRef.current !== conv_id) return;
