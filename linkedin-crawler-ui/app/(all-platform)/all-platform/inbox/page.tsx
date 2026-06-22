@@ -27,9 +27,9 @@ interface TeamRow { id?: string; name_team?: string; id_leader?: string; leader_
 const ACTIVE_INBOX_DAYS = 7;
 const SESSION_POLL_ACTIVE_MS = 12000;
 const SESSION_POLL_HIDDEN_MS = 30000;
-const CONVERSATION_POLL_ACTIVE_MS = 9000;
+const CONVERSATION_POLL_ACTIVE_MS = 5000;
 const CONVERSATION_POLL_HIDDEN_MS = 30000;
-const THREAD_DELTA_POLL_MS = 10000;
+const THREAD_DELTA_POLL_MS = 5000;
 const SILENT_SCAN_MS = 45000;
 
 async function fetchJsonWithRetry(url: string, attempts = 3): Promise<Record<string, unknown>> {
@@ -282,6 +282,24 @@ export default function InboxPage() {
     loadedAtRef.current.set(convId, la);
     void idbSetThread(acc, convId, cleanList, la);
   }, [acc]);
+
+  // Hover preload: khi chuột di vào hội thoại, tải trước thread vào cache (không block UI).
+  const hoverConv = useCallback((conv_id: string) => {
+    if (clientCacheRef.current.has(conv_id)) return;
+    const accountId = selectedAccRef.current || acc;
+    if (!accountId) return;
+    void fbFetch(`/inbox/thread?user_id=${encodeURIComponent(accountId)}&conv_id=${encodeURIComponent(conv_id)}`)
+      .then(r => r.json())
+      .then(d => {
+        if (!d.messages?.length || selectedAccRef.current !== accountId) return;
+        const preloaded = normalizeThreadMessages(d.messages as Msg[]);
+        const current = clientCacheRef.current.get(conv_id);
+        if (!current || current.length < preloaded.length) {
+          saveThreadCache(conv_id, preloaded, d.loaded_at ?? null);
+        }
+      })
+      .catch(() => {});
+  }, [acc, saveThreadCache]);
 
   // Dọn cache thread cũ (>30 ngày) 1 lần khi vào trang để IndexedDB không phình mãi.
   useEffect(() => { void idbPruneOld(); }, []);
@@ -605,6 +623,13 @@ export default function InboxPage() {
     const t = setInterval(silentScan, SILENT_SCAN_MS);
     return () => clearInterval(t);
   }, [acc, sessions, needRelogin]);
+
+  // Khi user quay lại tab (window focus), refresh hộp thư ngay — không chờ poll timer
+  useEffect(() => {
+    const onFocus = () => { void loadConvs(); };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [loadConvs]);
 
   // Phát hiện KHÁCH mới nhắn → badge tab + sound + browser notification
   const prevConvIdsRef = useRef<Set<string>>(new Set());
@@ -1100,6 +1125,7 @@ export default function InboxPage() {
         setFilter={setFilter}
         setReply={setReply}
         openChat={openChat}
+        hoverConv={hoverConv}
         openArchive={openArchive}
         mark={mark}
         saveArchive={saveArchive}

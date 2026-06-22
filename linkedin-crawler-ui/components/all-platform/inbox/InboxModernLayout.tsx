@@ -53,6 +53,7 @@ interface Props {
   setFilter: (filter: InboxFilter) => void;
   setReply: (value: string) => void;
   openChat: (convId: string) => void;
+  hoverConv?: (convId: string) => void;
   openArchive: (convId: string) => void;
   mark: (convId: string, field: string, value: boolean) => void;
   saveArchive: (convId: string, hide?: boolean) => void;
@@ -160,6 +161,7 @@ export default function InboxModernLayout(props: Props) {
     setFilter,
     setReply,
     openChat,
+    hoverConv,
     openArchive,
     mark,
     saveArchive,
@@ -364,6 +366,7 @@ export default function InboxModernLayout(props: Props) {
               <button
                 key={conv.conv_id}
                 onClick={() => openChat(conv.conv_id)}
+                onMouseEnter={() => hoverConv?.(conv.conv_id)}
                 className={`mb-2 block w-full rounded-lg border p-3 text-left transition hover:border-[#E3000F] ${openConv === conv.conv_id && !archiveReading ? "border-[#E3000F] bg-[#FFF5F5]" : "border-[#E5E5E5] bg-white"}`}
               >
                 <div className="flex items-start justify-between gap-2">
