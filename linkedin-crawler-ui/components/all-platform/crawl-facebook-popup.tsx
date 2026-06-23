@@ -243,7 +243,7 @@ export function CrawlFacebookPopup({
         url: g.group_url,
         intent: g.intent_name || undefined,
         id: g.id || "default_id", // Đảm bảo payload hợp lệ
-        id_member: "current_user_id",
+        id_member: g.id_member,
         group_name: g.group_name || "Unknown Group"
       }));
 
