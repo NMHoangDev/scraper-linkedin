@@ -1,4 +1,4 @@
-import api from './api.service';
+import { API_BASE_URL, API_KEY } from "@/lib/env";
 
 export interface CustomerLead {
   id: string;
@@ -23,29 +23,57 @@ export interface SDRUser {
   role: string;
 }
 
+const getDefaultHeaders = () => {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (API_KEY) headers["X-API-Key"] = API_KEY;
+  return headers;
+};
+
 export const customerLeadService = {
   getAll: async () => {
-    const res = await api.get('/api/all-platform/customer-leads');
-    return res.data?.data as CustomerLead[] || [];
+    const res = await fetch(`${API_BASE_URL}/api/all-platform/customer-leads`, {
+      credentials: "include",
+      headers: getDefaultHeaders(),
+    });
+    const data = await res.json();
+    return (data?.data as CustomerLead[]) || [];
   },
 
   getSdrs: async () => {
-    const res = await api.get('/api/all-platform/customer-leads/sdrs');
-    return res.data?.data as SDRUser[] || [];
+    const res = await fetch(`${API_BASE_URL}/api/all-platform/customer-leads/sdrs`, {
+      credentials: "include",
+      headers: getDefaultHeaders(),
+    });
+    const data = await res.json();
+    return (data?.data as SDRUser[]) || [];
   },
 
-  create: async (data: Partial<CustomerLead>) => {
-    const res = await api.post('/api/all-platform/customer-leads', data);
-    return res.data;
+  create: async (payload: Partial<CustomerLead>) => {
+    const res = await fetch(`${API_BASE_URL}/api/all-platform/customer-leads`, {
+      method: "POST",
+      credentials: "include",
+      headers: getDefaultHeaders(),
+      body: JSON.stringify(payload),
+    });
+    return res.json();
   },
 
-  update: async (id: string, data: Partial<CustomerLead>) => {
-    const res = await api.put(`/api/all-platform/customer-leads/${id}`, data);
-    return res.data;
+  update: async (id: string, payload: Partial<CustomerLead>) => {
+    const res = await fetch(`${API_BASE_URL}/api/all-platform/customer-leads/${id}`, {
+      method: "PUT",
+      credentials: "include",
+      headers: getDefaultHeaders(),
+      body: JSON.stringify(payload),
+    });
+    return res.json();
   },
 
   delete: async (id: string) => {
-    const res = await api.delete(`/api/all-platform/customer-leads/${id}`);
-    return res.data;
+    const res = await fetch(`${API_BASE_URL}/api/all-platform/customer-leads/${id}`, {
+      method: "DELETE",
+      credentials: "include",
+      headers: getDefaultHeaders(),
+    });
+    return res.json();
   }
 };
