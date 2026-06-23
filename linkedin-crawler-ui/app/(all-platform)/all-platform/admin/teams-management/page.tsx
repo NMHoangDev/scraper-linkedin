@@ -11,6 +11,32 @@ import { PlatformStatsRow, PlatformStatCard } from "@/components/features/shared
 import { FaTrash, FaEdit, FaEye } from "react-icons/fa";
 import { LeaderInboxView } from "@/components/all-platform/leader/LeaderInboxView";
 
+function getRecentWeeks(numWeeks = 8) {
+  const weeks = [];
+  const curr = new Date();
+  for (let i = 0; i < numWeeks; i++) {
+    const d = new Date(curr.getTime() - i * 7 * 24 * 60 * 60 * 1000);
+    const dayOfWeek = d.getDay();
+    const monday = new Date(d);
+    monday.setDate(d.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    
+    const yearStart = new Date(monday.getFullYear(), 0, 1);
+    const weekNo = Math.ceil((((monday.getTime() - yearStart.getTime()) / 86400000) + yearStart.getDay() + 1) / 7);
+    
+    const fmt = (dt: Date) => dt.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+    const valStart = monday.toISOString().split("T")[0];
+    const valEnd = sunday.toISOString().split("T")[0];
+    
+    weeks.push({
+      label: `Tuần ${weekNo} (${fmt(monday)} - ${fmt(sunday)})`,
+      value: `${valStart}_${valEnd}`
+    });
+  }
+  return weeks;
+}
+
 export default function TeamsManagementPage() {
   const { user } = useAppAuth();
   const [teams, setTeams] = useState<TeamRow[]>([]);
@@ -29,6 +55,9 @@ export default function TeamsManagementPage() {
   const [inboxModalOpen, setInboxModalOpen] = useState(false);
   const [selectedLeaderForInbox, setSelectedLeaderForInbox] = useState<{ email: string; name: string } | null>(null);
 
+  const recentWeeks = useMemo(() => getRecentWeeks(8), []);
+  const [selectedWeek, setSelectedWeek] = useState(recentWeeks[0].value);
+
   const isAdmin = (user?.role as string) === "admin" || (user?.role as string) === "superadmin";
 
   const fetchTeams = useCallback(async () => {
@@ -41,10 +70,11 @@ export default function TeamsManagementPage() {
         setTeams(teamsData);
 
         // Fetch KPI data for all teams' leaders in parallel
+        const [startDate, endDate] = selectedWeek.split("_");
         const kpiPromises = teamsData.map(async (t) => {
           if (!t.leader_email) return { teamId: t.id, members: [] };
           try {
-            const kpiRes = await allPlatformKpiService.getAll(t.leader_email);
+            const kpiRes = await allPlatformKpiService.getAll(t.leader_email, undefined, startDate, endDate);
             return { teamId: t.id, members: kpiRes.success ? (kpiRes.data?.members || []) : [] };
           } catch {
             return { teamId: t.id, members: [] };
@@ -60,7 +90,7 @@ export default function TeamsManagementPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [selectedWeek]);
 
   useEffect(() => {
     if (isAdmin) {
@@ -163,13 +193,27 @@ export default function TeamsManagementPage() {
           <h2 className="text-xl font-bold text-[#1A1A1A]">Quản lý Teams (Admin)</h2>
           <p className="text-sm text-[#A0A0A0]">Quản lý toàn bộ danh sách team, gán leader và theo dõi KPI thành viên</p>
         </div>
-        <button
-          onClick={handleCreateTeam}
-          className="flex items-center gap-2 bg-[#E3000F] text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-[#C40009] transition shrink-0 cursor-pointer shadow-sm active:scale-95"
-        >
-          <MaterialIcon name="group_add" className="text-base" />
-          Thêm Team Mới
-        </button>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="flex items-center gap-2 border border-[#E5E5E5] rounded-lg px-3 py-1.5 bg-white shadow-sm">
+            <label className="text-xs font-bold text-slate-600">Lọc theo Tuần:</label>
+            <select
+              value={selectedWeek}
+              onChange={(e) => setSelectedWeek(e.target.value)}
+              className="text-sm font-semibold text-slate-800 outline-none bg-transparent"
+            >
+              {recentWeeks.map(w => (
+                <option key={w.value} value={w.value}>{w.label}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={handleCreateTeam}
+            className="flex items-center justify-center gap-2 bg-[#E3000F] text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-[#C40009] transition shrink-0 cursor-pointer shadow-sm active:scale-95"
+          >
+            <MaterialIcon name="group_add" className="text-base" />
+            Thêm Team Mới
+          </button>
+        </div>
       </div>
 
       {/* Statistics Cards */}

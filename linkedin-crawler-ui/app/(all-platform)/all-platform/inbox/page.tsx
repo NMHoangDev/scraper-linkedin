@@ -16,6 +16,7 @@ import { API_BASE_URL } from "@/lib/env";
 import { idbSetThread, idbGetAllThreadsForAcc, idbSetConvs, idbGetConvs, idbPruneOld } from "@/lib/inbox-cache";
 import TeamAccountTree from "@/components/all-platform/inbox/TeamAccountTree";
 import InboxModernLayout from "@/components/all-platform/inbox/InboxModernLayout";
+import { allPlatformKpiService } from "@/services/all-platform.service";
 
 interface Session { user_id: string; fb_user_id?: string; label?: string; owner?: string; online?: boolean; inbox_enabled?: boolean; status?: string; }
 interface Conv { conv_id: string; name: string; preview: string; unread: boolean; time: string; is_customer: boolean; pushed_to_zalo: boolean; deleted: boolean; archived?: boolean; archived_at?: string; }
@@ -206,9 +207,11 @@ export default function InboxPage() {
   const [customerNotes, setCustomerNotes] = useState<Record<string, string>>({});
   const [savingNoteConv, setSavingNoteConv] = useState("");
   const [loadingConvs, setLoadingConvs] = useState(false);
-  const [filter, setFilter] = useState<"all" | "unread" | "customer" | "need_reply">("all");
+  const [filter, setFilter] = useState<"all" | "unread" | "customer" | "need_reply" | "need_verify">("all");
   const [viewMode, setViewMode] = useState<"inbox" | "archive">("inbox");
   const [loadingArchives, setLoadingArchives] = useState(false);
+  const [verifiedConvIds, setVerifiedConvIds] = useState<Set<string>>(new Set());
+  const [suggestedConvIds, setSuggestedConvIds] = useState<Set<string>>(new Set()); // local state for optimistic updates
   const [archiveReading, setArchiveReading] = useState(false);
   const [openConv, setOpenConv] = useState("");
   const [msgs, setMsgs] = useState<Msg[]>([]);
@@ -303,6 +306,13 @@ export default function InboxPage() {
 
   // Dọn cache thread cũ (>30 ngày) 1 lần khi vào trang để IndexedDB không phình mãi.
   useEffect(() => { void idbPruneOld(); }, []);
+
+  // Fetch verified conv IDs when user changes
+  useEffect(() => {
+    if (user?.email) {
+      void fetchVerifiedConvIds();
+    }
+  }, [user?.email]);
 
   // Chọn 1 tài khoản: xóa NGAY hộp thư + chat của acc cũ và bật loading (tránh "trơ trơ" hiện data cũ).
   const selectAcc = (uid: string) => {
@@ -782,6 +792,64 @@ export default function InboxPage() {
     }
   }
 
+  async function syncFbInboxKpi(payload: {
+    leader_email: string;
+    member_email: string;
+    conv_ids: string[];
+    user_id: string;
+    is_lead: boolean;
+  }) {
+    try {
+      await allPlatformKpiService.syncFbInbox(payload);
+      // Refresh verified conv_ids after sync
+      await fetchVerifiedConvIds();
+    } catch {
+      showToast("Lỗi xác nhận KPI inbox", false);
+      throw new Error("KPI sync failed");
+    }
+  }
+
+  async function fetchVerifiedConvIds() {
+    if (!user?.email) return;
+    try {
+      const res = await allPlatformKpiService.getVerifiedConvIds(user.email);
+      if (res.success) {
+        // confirmed = đã được leader duyệt
+        setVerifiedConvIds(new Set(res.data?.confirmed_conv_ids || []));
+        // pending = đã đề xuất nhưng chưa được duyệt
+        setSuggestedConvIds(new Set(res.data?.pending_conv_ids || []));
+      }
+    } catch (e) {
+      console.warn("Failed to fetch verified conv IDs:", e);
+    }
+  }
+
+  async function suggestFbInboxKpi(payload: {
+    member_email: string;
+    conv_ids: string[];
+    user_id: string;
+  }) {
+    const convId = payload.conv_ids[0];
+    // Optimistic update - immediately mark as suggested
+    setSuggestedConvIds(prev => new Set([...prev, convId]));
+
+    try {
+      await allPlatformKpiService.suggestFbInbox(payload);
+      // Refresh verified conv_ids after suggest
+      await fetchVerifiedConvIds();
+      showToast(`Đã đề xuất inbox cho KPI`, true);
+    } catch {
+      // Revert optimistic update on error
+      setSuggestedConvIds(prev => {
+        const next = new Set(prev);
+        next.delete(convId);
+        return next;
+      });
+      showToast("Lỗi đề xuất KPI inbox", false);
+      throw new Error("Suggest KPI failed");
+    }
+  }
+
   async function openArchive(conv_id: string) {
     const accountId = selectedAccRef.current || acc;
     const requestSeq = ++threadRequestSeqRef.current;
@@ -1038,11 +1106,12 @@ export default function InboxPage() {
     c.conv_id === openConv ||
     isRecentMessengerTime(c.time || "");
 
-  const activeConvs = convs.filter(c => !c.deleted && isActiveInboxConv(c));
+  const activeConvs = convs.filter(c => !c.deleted && (filter === "all" || isActiveInboxConv(c)));
   const visible = activeConvs.filter(c => (
     filter === "unread" ? c.unread :
     filter === "customer" ? c.is_customer :
     filter === "need_reply" ? needsReply(c) :
+    filter === "need_verify" ? (!verifiedConvIds.has(c.conv_id) && !suggestedConvIds.has(c.conv_id)) :
     true
   ));
   // Nổi ưu tiên lên đầu: cần trả lời > chưa đọc > khách; giữ thứ tự gốc trong cùng nhóm.
@@ -1133,6 +1202,12 @@ export default function InboxPage() {
         sendReply={sendReply}
         needsReply={needsReply}
         accLabel={accLabel}
+        syncFbInbox={syncFbInboxKpi}
+        onSuggestKpi={suggestFbInboxKpi}
+        verifiedConvIds={verifiedConvIds}
+        suggestedConvIds={suggestedConvIds}
+        userEmail={user?.email || ""}
+        ownerEmail={user?.email || ""}
       />
     );
   }
@@ -1199,11 +1274,12 @@ export default function InboxPage() {
         <div className="bg-white rounded-lg border border-[#E5E5E5] p-5">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-base font-bold text-[#1A1A1A]">Hộp thư</h2>
-            <select value={filter} onChange={e => setFilter(e.target.value as "all" | "unread" | "customer" | "need_reply")} className="text-sm border border-[#E5E5E5] rounded-lg px-2 py-1 outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A] bg-white">
+            <select value={filter} onChange={e => setFilter(e.target.value as "all" | "unread" | "customer" | "need_reply" | "need_verify")} className="text-sm border border-[#E5E5E5] rounded-lg px-2 py-1 outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A] bg-white">
               <option value="all">Tất cả</option>
               <option value="need_reply">Cần trả lời</option>
               <option value="unread">Chưa đọc</option>
-              <option value="customer">Đã đánh dấu khách</option>
+              <option value="customer">Khách</option>
+              <option value="need_verify">Chưa tính KPI</option>
             </select>
           </div>
           <div className="inline-flex rounded-lg border border-[#E5E5E5] bg-[#F8F8F8] p-0.5 mb-3">

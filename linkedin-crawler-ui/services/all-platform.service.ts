@@ -198,10 +198,10 @@ export const allPlatformKpiService = {
     });
   },
 
-  getAll: (leader_email: string, id_team?: string): Promise<ApiResponse<{ total: number; members: KpiMember[] }>> => {
+  getAll: (leader_email: string, id_team?: string, start_date?: string, end_date?: string): Promise<ApiResponse<{ total: number; members: KpiMember[] }>> => {
     return requestJson(`${BASE}/kpi/get-all`, {
       method: "POST",
-      body: JSON.stringify({ leader_email, id_team }),
+      body: JSON.stringify({ leader_email, id_team, start_date, end_date }),
     });
   },
 
@@ -222,6 +222,46 @@ export const allPlatformKpiService = {
     range: { start: string; end: string };
   }>> => {
     return requestJson(`${BASE}/kpi/zalo-inbox-progress`, {
+      method: "POST",
+      body: JSON.stringify({ email, start_date: startDate, end_date: endDate }),
+    });
+  },
+
+  getFbInboxProgress: (
+    email: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<ApiResponse<{
+    kpi_fb_inbox_count: number;
+    range: { start: string; end: string };
+  }>> => {
+    return requestJson(`${BASE}/kpi/fb-inbox-progress`, {
+      method: "POST",
+      body: JSON.stringify({ email, start_date: startDate, end_date: endDate }),
+    });
+  },
+
+  getFbPostKpiSummary: (
+    email: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<ApiResponse<{
+    post_count: number;
+    profile_count: number;
+    group_count: number;
+    page_count: number;
+    posts: Array<{
+      id: string;
+      job_id: string;
+      post_url: string | null;
+      content: string | null;
+      target_type: string;
+      target_id: string | null;
+      posted_at: string;
+    }>;
+    range: { start: string; end: string };
+  }>> => {
+    return requestJson(`${BASE}/fb/post-kpi/summary`, {
       method: "POST",
       body: JSON.stringify({ email, start_date: startDate, end_date: endDate }),
     });
@@ -248,6 +288,110 @@ export const allPlatformKpiService = {
     return requestJson(`${BASE}/kpi/auth/verify-leader-code`, {
       method: "POST",
       body: JSON.stringify({ code }),
+    });
+  },
+
+  /**
+   * Đếm/tính inbox KPI cho 1 hoặc nhiều hội thoại FB.
+   * Gọi khi leader/admin bấm nút "Tính Inbox" trên hộp thoại FB.
+   * @param is_lead - đánh dấu là lead tiềm năng
+   */
+  syncFbInbox: (payload: {
+    leader_email: string;
+    member_email: string;
+    conv_ids: string[];
+    user_id: string;
+    is_lead?: boolean;
+  }): Promise<ApiResponse<{ synced: number; lead: number; member_email: string }>> => {
+    return requestJson(`${BASE}/kpi/fb-inbox-sync`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /**
+   * Lấy tổng hợp inbox KPI từ bảng fb_inbox_kpi (Supabase).
+   * Chỉ lấy inbox ĐÃ XÁC NHẬN (is_confirmed=True).
+   */
+  getFbInboxSummary: (
+    email: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<ApiResponse<{
+    inbox_count: number;
+    lead_count: number;
+    conv_ids: string[];
+    range: { start: string; end: string };
+  }>> => {
+    return requestJson(`${BASE}/kpi/fb-inbox-summary`, {
+      method: "POST",
+      body: JSON.stringify({ email, start_date: startDate, end_date: endDate }),
+    });
+  },
+
+  /**
+   * Lấy danh sách inbox KPI CHƯA XÁC NHẬN từ bảng fb_inbox_kpi (Supabase).
+   * Dùng cho filter "Chưa xác minh" - hiển thị inbox member đã đề xuất
+   * nhưng leader/admin chưa duyệt (is_confirmed=False).
+   */
+  getPendingFbInbox: (
+    email: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<ApiResponse<{
+    pending_count: number;
+    pending_conv_ids: string[];
+    range: { start: string; end: string };
+  }>> => {
+    return requestJson(`${BASE}/kpi/fb-inbox-pending`, {
+      method: "POST",
+      body: JSON.stringify({ email, start_date: startDate, end_date: endDate }),
+    });
+  },
+
+  /**
+   * Lấy danh sách conv_ids đã xác nhận KPI inbox trong tuần hiện tại.
+   * Dùng cho frontend filter "Chưa tính KPI" trong inbox page.
+   * Trả về cả confirmed (đã duyệt) và pending (chờ duyệt).
+   */
+  getVerifiedConvIds: (
+    leaderEmail: string,
+    idTeam?: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<ApiResponse<{
+    confirmed_conv_ids: string[];
+    pending_conv_ids: string[];
+    range: { start: string; end: string };
+    member_count: number;
+  }>> => {
+    return requestJson(`${BASE}/kpi/fb-inbox-verified-ids`, {
+      method: "POST",
+      body: JSON.stringify({
+        leader_email: leaderEmail,
+        id_team: idTeam,
+        start_date: startDate || "",
+        end_date: endDate || "",
+      }),
+    });
+  },
+
+  /**
+   * Member tự đề xuất KPI inbox cho mình.
+   */
+  suggestFbInbox: (payload: {
+    member_email: string;
+    conv_ids: string[];
+    user_id: string;
+  }): Promise<ApiResponse<{
+    synced: number;
+    member_email: string;
+    conv_ids: string[];
+    message: string;
+  }>> => {
+    return requestJson(`${BASE}/kpi/fb-inbox-suggest`, {
+      method: "POST",
+      body: JSON.stringify(payload),
     });
   },
 };
@@ -1018,5 +1162,86 @@ export const adminDashboardService = {
   },
   getLeaderboards: (): Promise<ApiResponse<AdminLeaderboardsData>> => {
     return requestJson(`${BASE}/admin/dashboard/leaderboards`);
+  },
+};
+
+// ── FB INBOX ACCOUNTS ─────────────────────────────────────────────────────────
+
+export interface FbInboxAccount {
+  id: string;
+  id_member: string;
+  user_id: string;        // Seeder service user_id (VD: "fb_10001")
+  fb_user_id?: string;    // Facebook UID thật
+  account_label?: string; // Tên hiển thị
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export const fbInboxAccountService = {
+  /**
+   * Link FB inbox account với tài khoản của member.
+   * Member gọi API này để thêm FB account vào app.
+   * Backend sẽ decode JWT để lấy id_member và lưu vào bảng fb_inbox_accounts.
+   */
+  create: (payload: {
+    user_id: string;
+    fb_user_id?: string;
+    account_label?: string;
+  }): Promise<ApiResponse<FbInboxAccount>> => {
+    return requestJson(`${BASE}/inbox-accounts`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /**
+   * Lấy danh sách FB inbox accounts của member hiện tại.
+   */
+  list: (): Promise<ApiResponse<{ accounts: FbInboxAccount[]; total: number }>> => {
+    return requestJson(`${BASE}/inbox-accounts`);
+  },
+
+  /**
+   * Lấy thông tin 1 FB inbox account theo seeder user_id.
+   */
+  getByUserId: (userId: string): Promise<ApiResponse<FbInboxAccount | null>> => {
+    return requestJson(`${BASE}/inbox-accounts/${encodeURIComponent(userId)}`);
+  },
+
+  /**
+   * Resolve seeder user_id -> id_member.
+   * Dùng để kiểm tra xem 1 seeder user_id thuộc về member nào.
+   */
+  resolve: (userId: string): Promise<ApiResponse<{
+    user_id: string;
+    id_member: string | null;
+    found: boolean;
+    message: string;
+  }>> => {
+    return requestJson(`${BASE}/inbox-accounts/resolve/${encodeURIComponent(userId)}`);
+  },
+
+  /**
+   * Cập nhật FB inbox account.
+   */
+  update: (accountId: string, payload: {
+    fb_user_id?: string;
+    account_label?: string;
+    is_active?: boolean;
+  }): Promise<ApiResponse<FbInboxAccount>> => {
+    return requestJson(`${BASE}/inbox-accounts/${encodeURIComponent(accountId)}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /**
+   * Xóa FB inbox account.
+   */
+  delete: (accountId: string): Promise<ApiResponse<void>> => {
+    return requestJson(`${BASE}/inbox-accounts/${encodeURIComponent(accountId)}`, {
+      method: "DELETE",
+    });
   },
 };

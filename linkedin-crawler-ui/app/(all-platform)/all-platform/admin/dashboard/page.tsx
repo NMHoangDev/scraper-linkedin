@@ -12,6 +12,7 @@ import type {
 import { AdminDashboardSummary } from "@/components/all-platform/admin/dashboard/AdminDashboardSummary";
 import { AdminKpiPerformanceChart } from "@/components/all-platform/admin/dashboard/AdminKpiPerformanceChart";
 import { AdminLeaderboards } from "@/components/all-platform/admin/dashboard/AdminLeaderboards";
+import { AdminKpiHistoryTable } from "@/components/all-platform/admin/dashboard/AdminKpiHistoryTable";
 import { FaSyncAlt } from "react-icons/fa";
 
 export default function AdminDashboardPage() {
@@ -135,6 +136,9 @@ export default function AdminDashboardPage() {
         data={leaderboards} 
         isLoading={loadingLeaderboards} 
       />
+
+      {/* 4. Weekly KPI History Table (Google Sheets Style) */}
+      <AdminKpiHistoryTable />
     </div>
   );
 }

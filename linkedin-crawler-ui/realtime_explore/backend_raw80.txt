@@ -1,0 +1,80 @@
+  "zfamily": [
+    "https://zfml.chat.zalo.me"
+  ],
+  "group_poll": [
+    "https://tt-group-wpa.chat.zalo.me"
+  ],
+  "group_cloud_message": [
+    "https://tt-group-cm.chat.zalo.me"
+  ],
+  "media_store": [
+    "https://media-wpa.chat.zalo.me"
+  ],
+  "file": [
+    "
+2026-06-19 13:48:44.268 | INFO     | app.modules.all_platform.zalo.services.zca_api_bridge:sync_cm_messages:494 - ZCA CM message sync: thread=7837756215903721314, messages=0, source=http-history, has_more=False
+2026-06-19 13:48:44.268 | INFO     | app.modules.all_platform.zalo.services.zca_persistent_listener:_run:446 - ZCA listener startup sync empty user=zl_8560c387 group=7837756215903721314
+INFO:     172.26.0.4:54748 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+2026-06-19 13:48:44.276 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_event_stream:1106 - SSE stream closing — user=zl_8560c387 confirmed login
+2026-06-19 13:48:44,881 | INFO | httpx | HTTP Request: GET https://rtwpogvficadngtfrcci.supabase.co/rest/v1/zalo_message_assets?select=source_url%2Cstatus&message_id=eq.7d2f6006-ad8e-45a8-bd68-d82e3747d91a "HTTP/1.1 200 OK"
+2026-06-19 13:48:44,883 | INFO | httpx | HTTP Request: GET https://rtwpogvficadngtfrcci.supabase.co/rest/v1/zalo_message_assets?select=source_url%2Cstatus&message_id=eq.c2c4a9a8-6d5d-40c5-b5ee-a78a0e772465 "HTTP/1.1 200 OK"
+2026-06-19 13:48:44.989 | INFO     | app.modules.all_platform.zalo.services.supabase_service:save_listener_messages:1001 - Saved Zalo listener messages: user=zl_8560c387 group='[Markee Seeding] Sử dụng và đánh giá' messages=7 images_uploaded=0 images_failed=0
+2026-06-19 13:48:45.088 | WARNING  | app.modules.all_platform.zalo.services.zca_api_bridge:_run_zca_command:104 - ZCA API helper stderr: ZCA API zpwServiceMap: {
+  "other_contact": [
+    "https://vbcontact-wpa.chat.zalo.me"
+  ],
+  "chat_e2e": [
+    "https://tt-e2e-chat.chat.zalo.me"
+  ],
+  "workspace": [
+    "https://workspace.chat.zalo.me"
+  ],
+  "catalog": [
+    "https://catalog.chat.zalo.me"
+  ],
+  "boards": [
+    "https://board-wpa.chat.zalo.me"
+  ],
+  "downloadStickerUrl": [
+    "https://api.chat.zalo.me/api/emoticon/sticker/webpc"
+  ],
+  "sp_contact": [
+    "https://spcontact-wpa.chat.zalo.me"
+  ],
+  "zcloud_up_file": [
+    "https://tt-zcfiles-wpa.chat.zalo.me"
+  ],
+  "media_store_send2me": [
+    "https://mediasend2me-wpa.chat.zalo.me"
+  ],
+  "push_act": [
+    "https://push-act-wpa.chat.zalo.me"
+  ],
+  "aext": [
+    "https://aextra-wpa.chat.zalo.me"
+  ],
+  "zfamily": [
+    "https://zfml.chat.zalo.me"
+  ],
+  "group_poll": [
+    "https://tt-group-wpa.chat.zalo.me"
+  ],
+  "group_cloud_message": [
+    "https://tt-group-cm.chat.zalo.me"
+  ],
+  "media_store": [
+    "https://media-wpa.chat.zalo.me"
+  ],
+  "file": [
+    "
+2026-06-19 13:48:45.088 | INFO     | app.modules.all_platform.zalo.services.zca_api_bridge:sync_cm_messages:494 - ZCA CM message sync: thread=4190488225126163328, messages=0, source=http-history, has_more=False
+2026-06-19 13:48:45,232 | INFO | httpx | HTTP Request: GET https://rtwpogvficadngtfrcci.supabase.co/rest/v1/zalo_groups?select=group_name&user_id=eq.zl_8560c387&group_id=eq.4190488225126163328&limit=1 "HTTP/1.1 200 OK"
+2026-06-19 13:48:45,354 | INFO | httpx | HTTP Request: GET https://rtwpogvficadngtfrcci.supabase.co/rest/v1/zalo_groups?select=group_id%2Cgroup_name&user_id=eq.zl_8560c387&group_id=eq.4190488225126163328 "HTTP/1.1 200 OK"
+2026-06-19 13:48:45,429 | INFO | httpx | HTTP Request: POST https://rtwpogvficadngtfrcci.supabase.co/rest/v1/zalo_messages?on_conflict=user_id%2Cgroup_id%2Csource_message_id "HTTP/1.1 200 OK"
+2026-06-19 13:48:45,432 | INFO | httpx | HTTP Request: POST https://rtwpogvficadngtfrcci.supabase.co/rest/v1/zalo_groups?on_conflict=user_id%2Cgroup_id "HTTP/1.1 200 OK"
+2026-06-19 13:48:45,434 | INFO | httpx | HTTP Request: GET https://rtwpogvficadngtfrcci.supabase.co/rest/v1/zalo_groups?select=group_id%2Cgroup_name%2Cavatar_url%2Cunread_count%2Cupdated_at%2Clast_message_at%2Clast_message_content%2Clast_sender_id%2Clast_sender_name%2Clast_message_type%2Cis_pinned&user_id=eq.zl_8560c387&order=is_pinned.desc%2Clast_message_at.desc%2Cupdated_at.desc&limit=5000 "HTTP/1.1 200 OK"
+INFO:     127.0.0.1:47010 - "GET /health HTTP/1.1" 200 OK
+2026-06-19 13:48:45,890 | INFO | httpx | HTTP Request: GET https://rtwpogvficadngtfrcci.supabase.co/rest/v1/zalo_messages?select=%2A%2Cassets%3Azalo_message_assets%28%2A%29&user_id=eq.zl_8560c387&is_deleted=eq.false&order=created_at.desc&limit=50&offset=0&or=%28group_id.eq.4190488225126163328%2Cgroup_name.eq.%22%5B+T2_Th%C6%B0%C6%A1ngnv+%5D+Seeding+team+Dev%22%29 "HTTP/1.1 200 OK"
+INFO:     172.26.0.4:54764 - "GET /api/all-platform/zalo/conversations/4190488225126163328/messages?account_id=zl_8560c387&limit=50&offset=0 HTTP/1.1" 200 OK
+2026-06-19 13:48:46,007 | INFO | httpx | HTTP Request: POST https://rtwpogvficadngtfrcci.supabase.co/rest/v1/zalo_messages?on_conflict=user_id%2Cgroup_id%2Csource_message_id "HTTP/1.1 201 Created"
+2026-06-19 13:48:46,009 | INFO | httpx | HTTP Request: GET https://rtwpogvficadngtfrcci.supabase.co/rest/v1/zalo_message_assets?select=source_url%2Cstatus&message_id=eq.7f9618c9-033c-4942-9f23-a7276d59d90a "HTTP/1.1 200 OK"

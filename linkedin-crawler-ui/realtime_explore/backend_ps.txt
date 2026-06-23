@@ -1,0 +1,20 @@
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+pwuser         1 38.8  0.9 1369224 154360 ?      Rsl  13:19  11:13 /usr/bin/python /usr/local/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+pwuser       100  0.0  0.4 11784012 78016 ?      Sl   13:20   0:01 node /app/scripts/zca_persistent_listener.js --user-id zl_8560c387 --old-message-interval-ms 60000
+pwuser       236  0.1  0.4 11784012 77652 ?      Sl   13:20   0:02 node /app/scripts/zca_persistent_listener.js --user-id zl_8560c387 --old-message-interval-ms 60000
+pwuser       287  0.1  0.4 11784012 69820 ?      Sl   13:20   0:02 node /app/scripts/zca_persistent_listener.js --user-id zl_8560c387 --old-message-interval-ms 60000
+pwuser       427  0.1  0.4 11784268 69212 ?      Sl   13:21   0:01 node /app/scripts/zca_persistent_listener.js --user-id zl_8560c387 --old-message-interval-ms 60000
+pwuser       478  0.1  0.4 11784268 70060 ?      Sl   13:21   0:02 node /app/scripts/zca_persistent_listener.js --user-id zl_8560c387 --old-message-interval-ms 60000
+pwuser       522  0.1  0.4 11784268 78648 ?      Sl   13:22   0:02 node /app/scripts/zca_persistent_listener.js --user-id zl_8560c387 --old-message-interval-ms 60000
+pwuser       681  0.1  0.4 11784012 78152 ?      Sl   13:23   0:01 node /app/scripts/zca_persistent_listener.js --user-id zl_8560c387 --old-message-interval-ms 60000
+pwuser       826  0.1  0.4 11784268 78192 ?      Sl   13:23   0:02 node /app/scripts/zca_persistent_listener.js --user-id zl_8560c387 --old-message-interval-ms 60000
+pwuser       980  0.1  0.4 11784012 78364 ?      Sl   13:24   0:01 node /app/scripts/zca_persistent_listener.js --user-id zl_8560c387 --old-message-interval-ms 60000
+pwuser      1024  0.1  0.4 11784012 70440 ?      Sl   13:24   0:01 node /app/scripts/zca_persistent_listener.js --user-id zl_8560c387 --old-message-interval-ms 60000
+pwuser      1176  0.1  0.4 11784268 71316 ?      Sl   13:25   0:01 node /app/scripts/zca_persistent_listener.js --user-id zl_8560c387 --old-message-interval-ms 60000
+pwuser      1312  0.1  0.4 11718460 69312 ?      Sl   13:26   0:01 node /app/scripts/zca_persistent_listener.js --user-id zl_8560c387 --old-message-interval-ms 60000
+pwuser      1356  0.1  0.4 11718460 77912 ?      Sl   13:26   0:01 node /app/scripts/zca_persistent_listener.js --user-id zl_8560c387 --old-message-interval-ms 60000
+pwuser      1501  0.1  0.4 11784012 77776 ?      Sl   13:27   0:02 node /app/scripts/zca_persistent_listener.js --user-id zl_8560c387 --old-message-interval-ms 60000
+pwuser      1639  0.1  0.4 11784012 70528 ?      Sl   13:28   0:01 node /app/scripts/zca_persistent_listener.js --user-id zl_8560c387 --old-message-interval-ms 60000
+pwuser      1786  0.1  0.4 11784268 77764 ?      Sl   13:29   0:02 node /app/scripts/zca_persistent_listener.js --user-id zl_8560c387 --old-message-interval-ms 60000
+pwuser      1945  0.1  0.4 11784012 77784 ?      Sl   13:30   0:01 node /app/scripts/zca_persistent_listener.js --user-id zl_8560c387 --old-message-interval-ms 60000
+pwuser      2091  0.1  0.4 11784012 69424 ?      Sl   13:31   0:02 node /app/scripts/zca_persistent_listener.js --user-id zl_8560c387 --old-message-interval-ms 60000

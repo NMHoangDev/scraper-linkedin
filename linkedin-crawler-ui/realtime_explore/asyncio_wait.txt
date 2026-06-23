@@ -1,0 +1,4 @@
+56:        return await asyncio.wait_for(_auth_expired_queue.get(), timeout=timeout)
+256:            pending = [asyncio.create_task(q.get(), name=f"sse-{acc}") for acc, q, _ in queues]
+257:            done, _ = await asyncio.wait(pending, timeout=20, return_when=asyncio.FIRST_COMPLETED)
+260:            for task in pending:

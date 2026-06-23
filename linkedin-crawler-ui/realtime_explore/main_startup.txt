@@ -1,0 +1,6 @@
+43:async def lifespan(_: FastAPI):
+61:    if settings.playwright_warmup_on_startup:
+67:    # realtime push. Chạy nền (background) để không block startup.
+71:                start_persisted_listeners,
+73:            await start_persisted_listeners()
+111:    lifespan=lifespan,

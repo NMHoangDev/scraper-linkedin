@@ -1,0 +1,21 @@
+    emit({ event: "fatal", error: "unhandled_rejection", error_detail: serializeError(reason) });
+  });
+
+  listener.on("connected", () => {
+    emit({ event: "connected", user_id: userId, own_id: typeof api.getOwnId === "function" ? api.getOwnId() : null });
+    // NOTE: requestOldMessages DISABLED - Python startup sync (_sync_recent_groups_after_connect)
+    // handles old message loading with rate-limiting. Calling it here floods Zalo WebSocket
+    // and causes "Separator is found" crashes from massive message bursts.
+    // if (!oldMessageTimer) {
+    //   oldMessageTimer = setInterval(() => requestOldMessages(listener), oldMessageIntervalMs);
+    // }
+  });
+  listener.on("disconnected", (code, reason) => {
+    emit({ event: "disconnected", user_id: userId, code, reason: reason ? String(reason) : null });
+  });
+  listener.on("closed", (code, reason) => {
+    emit({ event: "closed", user_id: userId, code, reason: reason ? String(reason) : null });
+  });
+  listener.on("error", (error) => {
+    emit({ event: "error", user_id: userId, error: "listener_error", error_detail: serializeError(error) });
+  });

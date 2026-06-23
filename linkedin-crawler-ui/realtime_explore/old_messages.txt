@@ -1,0 +1,1 @@
+2026-06-19 13:48:04.423 | WARNING  | app.modules.all_platform.zalo.services.zca_api_bridge:sync_zca_group_old_messages:281 - ZCA listener sync returned no messages for requested group/global; diagnostics={"requested_thread_id": "", "request_count": 1, "thread_counts": {}, "last_msg_id": null, "no_more_messages": false}

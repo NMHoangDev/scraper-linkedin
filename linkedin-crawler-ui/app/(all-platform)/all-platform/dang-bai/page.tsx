@@ -20,7 +20,7 @@ import type { FacebookGroup } from "@/types/unified.types";
 interface Ext { user_id: string; owner?: string; label?: string; email?: string; note?: string; status: string; }
 interface FbSession { user_id: string; owner?: string; label?: string; email?: string; note?: string; }
 interface Grp { id: string; name: string; url: string; team?: string; intent?: string; }
-interface Job { user_id?: string; content?: string; status?: string; target_type?: string; post_url?: string; error?: string; updated_at?: string; created_at?: string; }
+interface Job { job_id?: string; user_id?: string; content?: string; status?: string; target_type?: string; target_id?: string; post_url?: string; error?: string; updated_at?: string; created_at?: string; }
 
 export default function DangBaiPage() {
   const { user } = useAppAuth();
@@ -38,8 +38,33 @@ export default function DangBaiPage() {
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [connErr, setConnErr] = useState(false);
   const [extInstalled, setExtInstalled] = useState<boolean | null>(null);
+  const [verifying, setVerifying] = useState<string | null>(null);
 
   const showToast = (msg: string, ok: boolean) => { setToast({ msg, ok }); setTimeout(() => setToast(null), 3500); };
+
+  async function verifyKpi(job: Job) {
+    if (!job.job_id || !job.user_id) return showToast("Dữ liệu job không đầy đủ", false);
+    setVerifying(job.job_id);
+    try {
+      const r = await fetch("/api/all-platform/fb/post-kpi/save", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          job_id: job.job_id,
+          user_id: job.user_id,
+          post_url: job.post_url,
+          content: job.content,
+          target_type: job.target_type,
+          target_id: job.target_id || null,
+        }),
+      });
+      const d = await r.json();
+      if (d.success) showToast("Đã lưu KPI thành công", true);
+      else showToast("Lỗi lưu KPI: " + (d.message || "Unknown error"), false);
+    } catch (e) {
+      showToast("Lỗi kết nối", false);
+    }
+    setVerifying(null);
+  }
 
   // Tự provision extension khi vào trang (zero-config): gắn các acc FB ở browser này với owner đang login.
   useEffect(() => {
@@ -256,7 +281,16 @@ export default function DangBaiPage() {
                     </td>
                     <td className="max-w-[260px] truncate text-[#1A1A1A]" title={j.content}>{j.content}</td>
                     <td><span className={`text-[11px] px-2.5 py-1 rounded-full font-bold ${cls}`}>{txt}</span>
-                      {j.status === "success" && j.post_url && <div className="mt-1"><a href={j.post_url} target="_blank" rel="noopener" className="text-xs text-[#E3000F] font-semibold">🔗 Xem bài</a></div>}
+                      {j.status === "success" && j.post_url && (
+                        <div className="mt-1 flex flex-col gap-1.5 items-start">
+                          <a href={j.post_url} target="_blank" rel="noopener" className="text-xs text-[#E3000F] font-semibold flex items-center gap-1">
+                            🔗 Xem bài
+                          </a>
+                          <button onClick={() => verifyKpi(j)} disabled={verifying === j.job_id} className="text-xs px-2 py-1 bg-[#1A1A1A] text-white rounded font-semibold hover:bg-black transition disabled:opacity-50">
+                            {verifying === j.job_id ? "Đang xử lý..." : "Xác minh KPI"}
+                          </button>
+                        </div>
+                      )}
                       {j.error && <div className="text-xs text-[#A0A0A0] mt-1">{j.error}</div>}
                     </td>
                   </tr>);

@@ -1,0 +1,151 @@
+    const n = Number(text);
+    if (!Number.isFinite(n)) return 0;
+    return n < 10000000000 ? Math.floor(n * 1000) : Math.floor(n);
+  }
+  const parsed = Date.parse(text);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function firstTimestampMs(...values) {
+  for (const value of values) {
+    const ts = toTimestampMs(value);
+    if (ts > 0) return ts;
+  }
+  return 0;
+}
+
+function normalizeMessage(raw, index, ownId = null) {
+  const data = raw && raw.data ? raw.data : raw || {};
+  const content = data.content ?? data.message ?? data.msg ?? raw.content ?? raw.message;
+  const imageUrls = collectUrls(content).concat(collectUrls(data.attachments || data.attachment || data.photos));
+  const msgType = String(data.msgType || data.type || raw.type || "text");
+  
+  const senderId = String(data.uidFrom || raw.uidFrom || raw.senderId || raw.sender_id || "");
+  const isSent = Boolean(raw.isSelf || data.isSelf || (ownId && String(senderId) === String(ownId)));
+  
+  let threadId = String(
+    raw.threadId ||
+    data.threadId ||
+    data.groupId ||
+    raw.groupId ||
+    data.grid ||
+    raw.grid ||
+    ""
+  );
+
+  const idTo = String(
+    data.idTo || raw.idTo || 
+    data.toUid || raw.toUid || 
+    data.receiverId || raw.receiverId || 
+    data.destId || raw.destId || 
+    ""
+  );
+
+  if (!threadId) {
+    if (ownId && idTo === String(ownId)) {
+      // Received a personal message sent TO ME
+      threadId = senderId;
+    } else {
+      // I sent a personal message, OR someone sent a group message, OR I sent a group message
+      threadId = idTo;
+    }
+    // Fallback if idTo was empty
+    if (!threadId) {
+      threadId = senderId;
+    }
+  }
+
+  // Fix DM: nếu threadId trùng với ownId → Zalo đã trả nhầm ID của chính mình
+  // làm threadId cho cuộc chat cá nhân. Phải lấy lại ID đối phương.
+  if (ownId && threadId === String(ownId)) {
+    if (idTo && idTo !== String(ownId)) {
+      threadId = idTo;        // Tôi gửi → thread = người nhận
+    } else if (senderId && senderId !== String(ownId)) {
+      threadId = senderId;    // Người khác gửi cho tôi → thread = người gửi
+    }
+  }
+
+  const messageId = String(
+    data.msgId ||
+      data.cliMsgId ||
+      data.realMsgId ||
+      raw.msgId ||
+      raw.messageId ||
+      raw.id ||
+      `${data.ts || Date.now()}-${index}`
+  );
+  const timestampMs = firstTimestampMs(
+    data.ts,
+    data.time,
+    data.timestamp,
+    raw.timestamp,
+    raw.ts,
+    raw.time,
+    raw.createdAt,
+    data.createdAt
+  );
+  const timestamp = timestampMs || null;
+  let contentText = textOf(content);
+  if (imageUrls.length > 0 && contentText) {
+    const trimmed = contentText.trim();
+    if (imageUrls.includes(trimmed) || isLikelyImageUrl(trimmed)) {
+      contentText = "";
+    }
+  }
+
+  return {
+    thread_id: threadId || null,
+    message_id: messageId,
+    sender_id: senderId || null,
+    sender_name: data.dName || data.displayName || raw.senderName || raw.sender_name || null,
+    timestamp: timestamp ? String(timestamp) : null,
+    time_text: timestamp ? new Date(Number(timestamp)).toISOString() : null,
+    type: imageUrls.length ? "image" : msgType,
+    content: contentText || null,
+    image_urls: Array.from(new Set(imageUrls)),
+    reply_to_id: data.quote?.msgId || data.quoteMsgId || null,
+    is_deleted: msgType === "chat.delete" || msgType === "recalled",
+    is_sent: isSent,
+    raw,
+  };
+}
+
+async function login(auth) {
+  const cookie = normalizeCookieJar(auth.cookies);
+  if (!cookie || !auth.imei || !auth.userAgent) {
+    throw new Error("Missing ZCA auth fields: cookies, imei, userAgent");
+  }
+  const zalo = new Zalo({
+    selfListen: true,
+    checkUpdate: false,
+    logging: false,
+  });
+  return await zalo.login({
+    cookie,
+    imei: auth.imei,
+    userAgent: auth.userAgent,
+  });
+}
+
+async function requestOldMessages(listener) {
+  try {
+    if (listener && typeof listener.requestOldMessages === "function") {
+      listener.requestOldMessages(ThreadType.Group, null);
+      emit({ event: "old_messages_requested", type: ThreadType.Group });
+      if (ThreadType.User !== undefined) {
+        listener.requestOldMessages(ThreadType.User, null);
+        emit({ event: "old_messages_requested", type: ThreadType.User });
+      }
+    }
+  } catch (error) {
+    emit({ event: "error", error: "request_old_messages_failed", error_detail: serializeError(error) });
+  }
+}
+
+async function main() {
+  const args = parseArgs(process.argv);
+  const input = await readStdinJson();
+  const userId = String(args["user-id"] || input.user_id || "default");
+  const oldMessageIntervalMs = Number(args["old-message-interval-ms"] || 300000);
+  const auth = input.auth || input.zca_auth || input;
+

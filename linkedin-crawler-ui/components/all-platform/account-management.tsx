@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { FaLinkedin, FaPlus, FaLock } from "react-icons/fa";
 import { MaterialIcon } from "@/components/ui";
 import { SocialAccountsManager } from "@/components/all-platform/social-accounts-manager";
+import { FbInboxAccountsTab } from "@/components/all-platform/accounts/FbInboxAccountsTab";
 import { cn } from "@/lib/utils";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import {
@@ -12,7 +13,7 @@ import {
   type LinkedInAccount,
 } from "@/services/all-platform.service";
 
-type Tab = "crawl" | "social";
+type Tab = "crawl" | "social" | "fb_inbox";
 
 export function AccountManagementContent() {
   const { user } = useAppAuth();
@@ -191,13 +192,13 @@ export function AccountManagementContent() {
       {/* Tabs */}
       <div className="border-b border-[#E5E5E5] overflow-x-auto whitespace-nowrap">
         <div className="flex gap-8 px-2">
-          {(["crawl", "social"] as Tab[]).map((tab) => (
+          {(["crawl", "social", "fb_inbox"] as Tab[]).map((tab) => (
             <button key={tab} type="button" onClick={() => setActiveTab(tab)}
               className={cn("py-4 text-xs font-bold border-b-2 transition-all uppercase tracking-wider cursor-pointer",
                 activeTab === tab
                   ? "border-[#E3000F] text-[#E3000F]"
                   : "border-transparent text-[#666666] hover:text-[#E3000F]")}>
-              {tab === "crawl" ? "Tài khoản cào dữ liệu" : "Tài khoản mạng xã hội"}
+              {tab === "crawl" ? "Tài khoản cào dữ liệu" : tab === "social" ? "Tài khoản mạng xã hội" : "Tài khoản FB & KPI"}
             </button>))}
         </div>
       </div>
@@ -290,8 +291,10 @@ export function AccountManagementContent() {
                 </table>
               </div>)}
           </div>
-        ) : (
+        ) : activeTab === "social" ? (
           <SocialAccountsManager />
+        ) : (
+          <FbInboxAccountsTab />
         )}
       </div>
 

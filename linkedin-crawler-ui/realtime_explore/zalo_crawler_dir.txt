@@ -1,0 +1,11 @@
+total 176
+drwxrwxr-x 3 vmadmin vmadmin  4096 Jun 15 18:18 .
+drwxrwxr-x 8 vmadmin vmadmin  4096 Jun 19 10:57 ..
+-rw-rw-r-- 1 vmadmin vmadmin 27090 Jun 15 09:36 broadcast_sender.py
+-rw-rw-r-- 1 vmadmin vmadmin  7592 Jun 15 18:04 browser.py
+-rw-rw-r-- 1 vmadmin vmadmin 24919 Jun 15 09:36 group_parser.py
+-rw-rw-r-- 1 vmadmin vmadmin     4 Jun 15 09:36 __init__.py
+-rw-rw-r-- 1 vmadmin vmadmin 22768 Jun 15 09:36 message_parser.py
+drwxrwxr-x 2 vmadmin vmadmin  4096 Jun 15 18:18 __pycache__
+-rw-rw-r-- 1 vmadmin vmadmin 23850 Jun 15 18:18 qr_login.py
+-rw-rw-r-- 1 vmadmin vmadmin 45065 Jun 15 09:36 scroll_handler.py
