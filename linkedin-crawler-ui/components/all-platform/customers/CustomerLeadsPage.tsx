@@ -131,14 +131,14 @@ export default function CustomerLeadsPage() {
         <h1 className="text-2xl font-bold text-gray-800">Quản lý Khách hàng (Leads)</h1>
         <button 
           onClick={() => handleOpenForm()}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+          className="bg-[#E3000F] hover:bg-red-750 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors duration-150 shadow-sm shadow-red-500/20"
         >
           <MaterialIcon name="add" className="text-[18px]" /> Thêm Khách hàng
         </button>
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center p-10"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div></div>
+        <div className="flex justify-center p-10"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#E3000F]"></div></div>
       ) : (
         <div className="bg-white rounded-xl shadow overflow-hidden">
           <div className="overflow-x-auto">
@@ -165,7 +165,7 @@ export default function CustomerLeadsPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       {lead.is_assigned ? (
-                        <span className="text-blue-600 font-medium">{lead.sdr_name}</span>
+                        <span className="text-[#E3000F] dark:text-red-400 font-semibold">{lead.sdr_name}</span>
                       ) : (
                         <span className="text-gray-400 italic">Chưa giao</span>
                       )}
@@ -186,7 +186,7 @@ export default function CustomerLeadsPage() {
                             href={`/all-platform/inbox?conv=${lead.conv_id}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-blue-600 hover:text-blue-900 flex items-center gap-1 bg-blue-50 px-2 py-1 rounded"
+                            className="text-[#E3000F] hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 flex items-center gap-1 bg-red-50 dark:bg-red-950/20 px-2 py-1 rounded border border-red-100 dark:border-red-900/30 transition-all"
                             title="Mở hội thoại xử lý"
                           >
                             <MaterialIcon name="chat" className="text-[16px]" /> Xử lý
@@ -229,7 +229,6 @@ export default function CustomerLeadsPage() {
               <h3 className="text-lg font-bold text-gray-800 dark:text-slate-100">{editingId ? "Sửa thông tin khách hàng" : "Thêm khách hàng mới"}</h3>
               <button onClick={() => setIsFormOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 text-2xl">&times;</button>
             </div>
-            
             <div className="p-6 space-y-4 overflow-y-auto flex-1 text-slate-800 dark:text-slate-200">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Tên khách hàng <span className="text-red-500">*</span></label>
@@ -237,7 +236,7 @@ export default function CustomerLeadsPage() {
                   type="text" 
                   value={formData.customer_name} 
                   onChange={e => setFormData({...formData, customer_name: e.target.value})}
-                  className="w-full border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition"
+                  className="w-full border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition"
                   placeholder="Nhập tên khách hàng..."
                 />
               </div>
@@ -249,7 +248,7 @@ export default function CustomerLeadsPage() {
                     type="text" 
                     value={formData.company_name} 
                     onChange={e => setFormData({...formData, company_name: e.target.value})}
-                    className="w-full border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition"
+                    className="w-full border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition"
                     placeholder="Tên công ty..."
                   />
                 </div>
@@ -259,7 +258,7 @@ export default function CustomerLeadsPage() {
                     type="text" 
                     value={formData.conv_id} 
                     onChange={e => setFormData({...formData, conv_id: e.target.value})}
-                    className="w-full border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition"
+                    className="w-full border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition"
                     placeholder="VD: t_123456789"
                   />
                 </div>
@@ -270,7 +269,7 @@ export default function CustomerLeadsPage() {
                 <select 
                   value={formData.sdr_id || ""}
                   onChange={e => setFormData({...formData, sdr_id: e.target.value})}
-                  className="w-full border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 transition"
+                  className="w-full border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 transition"
                 >
                   <option value="">-- Chọn SDR xử lý --</option>
                   {sdrs.map(sdr => (
@@ -284,7 +283,7 @@ export default function CustomerLeadsPage() {
                 <select 
                   value={formData.status}
                   onChange={e => setFormData({...formData, status: e.target.value as any})}
-                  className="w-full border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 transition"
+                  className="w-full border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 transition"
                 >
                   <option value="pending">Đang chờ</option>
                   <option value="closed">Đã chốt</option>
@@ -310,7 +309,7 @@ export default function CustomerLeadsPage() {
                 <textarea 
                   value={formData.note} 
                   onChange={e => setFormData({...formData, note: e.target.value})}
-                  className="w-full border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 min-h-[80px] transition"
+                  className="w-full border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 min-h-[80px] transition"
                   placeholder="Ghi chú thêm..."
                 ></textarea>
               </div>
@@ -325,7 +324,7 @@ export default function CustomerLeadsPage() {
               </button>
               <button 
                 onClick={handleSave}
-                className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 font-medium flex items-center gap-2 transition"
+                className="px-4 py-2 bg-[#E3000F] hover:bg-red-750 text-white rounded-lg font-medium flex items-center gap-2 transition shadow-sm shadow-red-500/20"
               >
                 <MaterialIcon name="check_circle" className="text-[18px]" /> Lưu lại
               </button>
