@@ -1,6 +1,6 @@
 import logging
 from typing import List, Dict, Any, Optional
-from app.core.database import get_supabase_client
+from app.core.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
