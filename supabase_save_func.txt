@@ -1,0 +1,151 @@
+            customer["latest_content"] = row.get("content")
+
+    for account_id in account_stats:
+        account_stats[account_id]["customer_count"] = sum(1 for key in customer_stats if key[0] == account_id)
+
+    customers = sorted(customer_stats.values(), key=lambda item: item.get("latest_message_at") or "", reverse=True)
+    accounts_out = sorted(account_stats.values(), key=lambda item: item.get("latest_message_at") or "", reverse=True)
+    return {
+        "accounts": accounts_out,
+        "customers": customers,
+        "total_messages": sum(item["message_count"] for item in accounts_out),
+        "total_customers": len(customers),
+    }
+
+
+async def save_listener_messages(
+    user_id: str,
+    group_id: str,
+    group_name: str,
+    messages: Iterable[Message],
+    *,
+    increment_unread: bool = True,
+) -> int:
+    if not is_supabase_configured():
+        return 0
+
+    safe_group_name = group_name or group_id
+    messages_list = list(messages)
+
+    unread_inc = 0
+    if increment_unread:
+        for msg in messages_list:
+            if not msg.is_sent:
+                unread_inc += 1
+
+    current_unread = 0
+    if unread_inc > 0:
+        try:
+            group_rows = await _rest(
+                "GET",
+                "zalo_groups",
+                params={
+                    "select": "unread_count",
+                    "user_id": f"eq.{user_id}",
+                    "group_id": f"eq.{group_id}",
+                    "limit": "1",
+                },
+            ) or []
+            if group_rows:
+                current_unread = int(group_rows[0].get("unread_count") or 0)
+        except Exception as exc:
+            logger.warning(f"Could not fetch current unread count for group={group_id}: {exc}")
+
+    # Tìm tin nhắn mới nhất theo timestamp để update group metadata.
+    last_message = None
+    if messages_list:
+        last_message = max(
+            messages_list,
+            key=lambda msg: _parse_to_millis(msg.timestamp) or _parse_to_millis(msg.time_text),
+        )
+
+    last_message_at_value = None
+    if last_message:
+        ts_ms = _parse_to_millis(last_message.timestamp) or _parse_to_millis(last_message.time_text)
+        if ts_ms > 0:
+            last_message_at_value = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+
+    await upsert_group(
+        user_id=user_id,
+        group_id=group_id,
+        group_name=safe_group_name,
+        unread_count=(current_unread + unread_inc) if unread_inc > 0 else None,
+        last_message_at=last_message_at_value,
+        last_message_content=last_message.content if last_message else None,
+        last_sender_id=last_message.sender_id if last_message else None,
+        last_sender_name=last_message.sender_name if last_message else None,
+        last_message_type=last_message.type if last_message else None,
+    )
+
+    saved_count = 0
+    uploaded_images = 0
+    failed_images = 0
+    for msg in messages_list:
+        if not msg.message_id:
+            continue
+        rows = await _rest(
+            "POST",
+            "zalo_messages",
+            json=[_listener_message_payload(user_id, group_id, safe_group_name, msg)],
+            params={"on_conflict": "user_id,group_id,source_message_id"},
+            prefer="resolution=merge-duplicates,return=representation",
+        )
+        if not rows:
+            continue
+        saved_count += 1
+        message_uuid = rows[0]["id"]
+        asset_stats = await save_message_assets(message_uuid, user_id, None, msg.image_urls)
+        uploaded_images += asset_stats["uploaded"]
+        failed_images += asset_stats["failed"]
+
+    if saved_count:
+        logger.info(
+            "Saved Zalo listener messages: user={} group={!r} messages={} images_uploaded={} images_failed={}",
+            user_id,
+            safe_group_name,
+            saved_count,
+            uploaded_images,
+            failed_images,
+        )
+    return saved_count
+
+
+async def save_global_listener_messages(
+    user_id: str,
+    messages: Iterable[Message],
+) -> int:
+    if not is_supabase_configured():
+        return 0
+
+    from collections import defaultdict
+    grouped = defaultdict(list)
+    for msg in messages:
+        g_id = getattr(msg, "group_id", None) or ""
+        if g_id:
+            grouped[g_id].append(msg)
+
+    total_saved = 0
+    for g_id, g_messages in grouped.items():
+        group_rows = await _rest(
+            "GET",
+            "zalo_groups",
+            params={
+                "select": "group_name",
+                "user_id": f"eq.{user_id}",
+                "group_id": f"eq.{g_id}",
+                "limit": "1",
+            },
+        ) or []
+        g_name = group_rows[0].get("group_name") if group_rows else g_id
+        
+        saved = await save_listener_messages(user_id, g_id, g_name, g_messages)
+        total_saved += saved
+
+    return total_saved
+
+
+
+async def list_recent_messages_for_group(
+    user_id: str,
+    group_id: str,
+    limit: int = 500,

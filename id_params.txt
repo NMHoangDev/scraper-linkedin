@@ -1,0 +1,40 @@
+221:        message_id=str(row.get("source_message_id") or row.get("id") or ""),
+316:                    "user_id": f"eq.{user_id}",
+317:                    "group_id": f"eq.{group_id}",
+359:async def upsert_groups(user_id: str, groups: Iterable[Dict[str, Any]]) -> int:
+365:        group_id = str(group.get("group_id") or group.get("id") or group.get("name") or "").strip()
+382:                "user_id": f"eq.{user_id}",
+386:        existing_map = {str(r.get("group_id")): r for r in existing_rows}
+391:    for group_id, group_name, group in candidates:
+410:            "last_sender_id": group.get("last_sender_id") or existing.get("last_sender_id"),
+428:async def save_crawl_messages(user_id: str, job: JobData, group_id: str, messages: Iterable[Message]) -> int:
+448:        message_uuid = message_row["id"]
+515:        rows = await _rest("GET", "zalo_accounts", params={"account_id": f"eq.{account_id}", "limit": "1"})
+528:        params["id_member"] = f"eq.{id_member}"
+530:        params["owner_id"] = f"eq.{owner_id}"
+544:        await _rest("PATCH", "zalo_accounts", params={"account_id": f"eq.{account_id}"}, json={"is_active": False, "updated_at": datetime.utcnow().isoformat()})
+551:async def hard_delete_zalo_account_data(account_id: str) -> Dict[str, int]:
+574:        ("zalo_sessions", {"user_id": f"eq.{account_id}"}),
+575:        ("zalo_users", {"user_id": f"eq.{account_id}"}),
+576:        ("zalo_accounts", {"account_id": f"eq.{account_id}"}),
+577:        ("zalo_groups", {"user_id": f"eq.{account_id}"}),
+578:        ("zalo_messages", {"user_id": f"eq.{account_id}"}),
+653:    return str(user.get("id") or "").strip() or None
+671:                "id_leader": f"eq.{leader_user_id}",
+736:                    "account_id": f"eq.{account_id}",
+737:                    "conversation_id": f"eq.{conversation_id}",
+769:        "account_id": f"eq.{account_id}",
+813:                "account_id": f"eq.{account_id}",
+814:                "conversation_id": f"eq.{conversation_id}",
+838:    account_by_id = {str(row.get("account_id")): row for row in accounts}
+840:    selected_ids = [item for item in (account_ids or []) if item]
+848:        "user_id": f"in.({','.join(selected_ids)})",
+902:    for account_id in account_stats:
+903:        account_stats[account_id]["customer_count"] = sum(1 for key in customer_stats if key[0] == account_id)
+943:                    "user_id": f"eq.{user_id}",
+944:                    "group_id": f"eq.{group_id}",
+995:        message_uuid = rows[0]["id"]
+1027:    for g_id, g_messages in grouped.items():
+1033:                "user_id": f"eq.{user_id}",
+1034:                "group_id": f"eq.{g_id}",
+1060:            "user_id": f"eq.{user_id}",

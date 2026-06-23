@@ -1,0 +1,113 @@
+1. Pulling latest code...
+From https://github.com/NMHoangDev/scraper-linkedin
+ * branch            restyle-form -> FETCH_HEAD
+   acca461..3544bd0  restyle-form -> origin/restyle-form
+error: Your local changes to the following files would be overwritten by merge:
+	linkedin_group_crawler/app/modules/all_platform/zalo/services/zca_persistent_listener.py
+Please commit your changes or stash them before you merge.
+Aborting
+Updating acca461..3544bd0
+
+2. Checking new endpoint...
+grep: /opt/apps/seeding_markeeai/scraper-linkedin/app/modules/all_platform/routers/fb.py: No such file or directory
+
+3. Building Docker image (this takes ~5-10min)...
+-> Removed intermediate container 91346e9c65f2
+ ---> b27105431869
+Step 11/14 : VOLUME ["/app/storage", "/app/data"]
+ ---> Running in 0c276cf528a5
+ ---> Removed intermediate container 0c276cf528a5
+ ---> f85340af6bd9
+Step 12/14 : HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()"
+ ---> Running in e26482baac08
+ ---> Removed intermediate container e26482baac08
+ ---> e8a4baebc79c
+Step 13/14 : CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+ ---> Running in 57fd15d59423
+ ---> Removed intermediate container 57fd15d59423
+ ---> ccf9d9ae7e88
+Step 14/14 : LABEL com.docker.compose.image.builder=classic
+ ---> Running in 61678ee39f9d
+ ---> Removed intermediate container 61678ee39f9d
+ ---> 0d6f335730f7
+Successfully built 0d6f335730f7
+Successfully tagged scraper-linkedin-backend:latest
+ Image scraper-linkedin-backend:latest Built 
+ Image scraper-linkedin-backend:latest Built 
+ ---> Removed intermediate container eaf776d93799
+ ---> a98480d54fa8
+Step 13/26 : RUN mkdir -p public
+ ---> Running in d35d38a9c228
+ ---> Removed intermediate container d35d38a9c228
+ ---> a97e8d75df68
+Step 14/26 : FROM node:20-alpine AS runner
+ ---> 11cedc39e663
+Step 15/26 : WORKDIR /app
+ ---> Running in 0a9ed71596f0
+ ---> Removed intermediate container 0a9ed71596f0
+ ---> 8553c6393f1e
+Step 16/26 : ENV NODE_ENV=production
+ ---> Running in 0e1bf6a7fcb3
+ ---> Removed intermediate container 0e1bf6a7fcb3
+ ---> 63b3b5a86355
+Step 17/26 : RUN addgroup --system --gid 1001 nodejs   && adduser --system --uid 1002 nextjs
+ ---> Running in 3e41a8085fd9
+ ---> Removed intermediate container 3e41a8085fd9
+ ---> e2dfbabde0b4
+Step 18/26 : COPY --from=builder /app/public ./public
+ ---> 3581a350bf7b
+Step 19/26 : COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+ ---> 57362c32bdd7
+Step 20/26 : COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+ ---> e50e3cb61110
+Step 21/26 : USER nextjs
+ ---> Running in 1301bcbc833a
+ ---> Removed intermediate container 1301bcbc833a
+ ---> 7413a9e4e009
+Step 22/26 : EXPOSE 3000
+ ---> Running in 046235f39226
+ ---> Removed intermediate container 046235f39226
+ ---> 35a7dde459f9
+Step 23/26 : ENV PORT=3000
+ ---> Running in 469d6540ab6f
+ ---> Removed intermediate container 469d6540ab6f
+ ---> fdf3fee8659f
+Step 24/26 : ENV HOSTNAME=0.0.0.0
+ ---> Running in 1a1eafd08047
+ ---> Removed intermediate container 1a1eafd08047
+ ---> c890734c92a1
+Step 25/26 : CMD ["node", "server.js"]
+ ---> Running in 7047f90a33f6
+ ---> Removed intermediate container 7047f90a33f6
+ ---> b71f80f37d5d
+Step 26/26 : LABEL com.docker.compose.image.builder=classic
+ ---> Running in 577d2d6895cb
+ ---> Removed intermediate container 577d2d6895cb
+ ---> 218427e62764
+Successfully built 218427e62764
+Successfully tagged scraper-linkedin-frontend:latest
+ Image scraper-linkedin-frontend:latest Built 
+ Image scraper-linkedin-frontend:latest Built 
+
+4. Restarting containers...
+cker Compose. Use `external: true` to use an existing volume"
+ Container seeding-backend Creating 
+ Container seeding-frontend Creating 
+ Container seeding-frontend Created 
+ Container seeding-backend Created 
+ Container seeding-router Creating 
+ Container seeding-router Created 
+ Container seeding-frontend Starting 
+ Container seeding-backend Starting 
+ Container seeding-backend Started 
+ Container seeding-frontend Started 
+ Container seeding-router Starting 
+ Container seeding-router Started 
+
+5. Waiting 10s for service to start...
+6. Health check...
+{"success":true,"message":"Service is healthy","data":null}
+7. Testing /api/all-platform/fb/sessions...
+{"detail":"Not Found"}
+8. Testing /api/all-platform/fb/session/owner/{user_id}...
+{"detail":"Not Found"}

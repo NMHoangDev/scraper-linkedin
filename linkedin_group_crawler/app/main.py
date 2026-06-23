@@ -78,6 +78,10 @@ async def lifespan(_: FastAPI):
                 "ZCA persistent listeners auto-start failed — sẽ thử lại khi user login lại",
             )
 
+<<<<<<< Updated upstream
+=======
+    zca_listeners_task: asyncio.Task[None] | None = None
+>>>>>>> Stashed changes
     if _os.getenv("DISABLE_ZCA_LISTENERS", "").strip().lower() in {"1", "true", "yes"}:
         logger.warning("DISABLE_ZCA_LISTENERS enabled -> not auto-starting ZCA persistent listeners.")
     else:

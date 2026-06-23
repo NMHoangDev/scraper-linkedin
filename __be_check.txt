@@ -1,0 +1,15 @@
+=== curl -s --max-time 5 http://127.0.0.1:8000/api/all-platform/fb/sessions -H "Auth ===
+{"detail":"Not Found"}
+=== cd /opt/apps/seeding_markeeai/scraper-linkedin && git branch --show-current && g ===
+restyle-form
+grep: app/modules/all_platform/routers/fb.py: No such file or directory
+
+=== cd /opt/apps/seeding_markeeai/scraper-linkedin && git remote -v 2>&1 ===
+origin	https://github.com/NMHoangDev/scraper-linkedin.git (fetch)
+origin	https://github.com/NMHoangDev/scraper-linkedin.git (push)
+
+=== cd /opt/apps/seeding_markeeai/scraper-linkedin && git log --oneline -3 2>&1 ===
+acca461 Restore inbox workspace and extension download
+5e27859 fix(zalo): replace burst semaphore sync with sequential+adaptive-delay to fix 429 errors
+e586ecd fix(zalo): align SSE event type with frontend -- 'zalo-message' -> 'new_messages'
+

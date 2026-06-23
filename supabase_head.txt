@@ -1,0 +1,100 @@
+from __future__ import annotations
+
+from typing import Any, Dict, Iterable, List, Optional, Tuple
+import mimetypes
+import posixpath
+import uuid
+import re
+
+_UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
+import base64
+import hashlib
+from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
+
+import httpx
+from loguru import logger
+
+from app.modules.all_platform.zalo.config import settings
+from app.modules.all_platform.zalo.schemas.job import JobData
+from app.modules.all_platform.zalo.schemas.message import Message
+
+
+class SupabaseNotConfigured(RuntimeError):
+    pass
+
+
+def is_supabase_configured() -> bool:
+    return bool(settings.supabase_url.strip() and settings.supabase_service_role_key.strip())
+
+
+def _require_configured() -> None:
+    if not is_supabase_configured():
+        raise SupabaseNotConfigured("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required")
+
+
+def _base_url() -> str:
+    return settings.supabase_url.rstrip("/")
+
+
+def _http_client(*, timeout: int = 60, follow_redirects: bool = False) -> "httpx.AsyncClient":
+    """HTTP client dùng chung cho Supabase.
+
+    Mặc định verify SSL. Khi chạy local sau proxy/antivirus có SSL inspection
+    (self-signed cert) gây CERTIFICATE_VERIFY_FAILED, đặt SUPABASE_SSL_VERIFY=false
+    để bỏ qua verify. KHÔNG dùng false trên production công khai.
+    """
+    return httpx.AsyncClient(
+        timeout=timeout,
+        follow_redirects=follow_redirects,
+        verify=settings.supabase_ssl_verify,
+    )
+
+
+def _headers(extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+    key = settings.supabase_service_role_key
+    headers = {
+        "apikey": key,
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
+    }
+    if extra:
+        headers.update(extra)
+    return headers
+
+
+async def _rest(
+    method: str,
+    path: str,
+    *,
+    params: Optional[Dict[str, Any]] = None,
+    json: Optional[Any] = None,
+    prefer: Optional[str] = None,
+) -> Any:
+    _require_configured()
+    headers = _headers({"Prefer": prefer} if prefer else None)
+    url = f"{_base_url()}/rest/v1/{path.lstrip('/')}"
+    async with _http_client(timeout=60) as client:
+        response = await client.request(method, url, headers=headers, params=params, json=json)
+    if response.status_code >= 400:
+        raise RuntimeError(f"Supabase {method} {path} failed: {response.status_code} {response.text}")
+    if not response.content:
+        return None
+    return response.json()
+
+
+async def _rest_with_count(
+    path: str,
+    *,
+    params: Optional[Dict[str, Any]] = None,
+) -> Tuple[Any, int]:
+    _require_configured()
+    headers = _headers({"Prefer": "count=exact"})
+    url = f"{_base_url()}/rest/v1/{path.lstrip('/')}"
+    async with _http_client(timeout=60) as client:
+        response = await client.get(url, headers=headers, params=params)
+    if response.status_code >= 400:
+        raise RuntimeError(f"Supabase GET {path} failed: {response.status_code} {response.text}")
+    content_range = response.headers.get("content-range", "")
+    total = 0
+    if "/" in content_range:

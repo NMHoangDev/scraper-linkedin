@@ -1,0 +1,5 @@
+total 16
+drwxrwxr-x  2 vmadmin vmadmin 4096 Jun 19 13:31 .
+drwxrwxr-x 11 vmadmin vmadmin 4096 Jun 19 10:57 ..
+-rw-rw-r--  1 vmadmin vmadmin 1294 Jun 19 13:31 nginx.conf
+-rw-rw-r--  1 vmadmin vmadmin 1251 Jun 19 13:31 nginx.conf.bak

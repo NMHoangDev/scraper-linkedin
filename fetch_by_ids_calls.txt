@@ -1,0 +1,6 @@
+app/modules/all_platform/zalo/services/supabase_service.py:1842:async def fetch_messages_by_ids(
+app/modules/all_platform/zalo/services/supabase_service.py:1906:    return (await fetch_messages_by_ids(user_id, [row["id"]]))[0]
+app/modules/all_platform/zalo/services/supabase_service.py:1922:    fetched = await fetch_messages_by_ids(user_id, [message_id], include_deleted=include_deleted)
+app/modules/all_platform/zalo/api/routes/broadcasts.py:30:    fetch_messages_by_ids,
+app/modules/all_platform/zalo/api/routes/broadcasts.py:128:        messages = await fetch_messages_by_ids(user_id, body.message_ids)
+app/modules/all_platform/zalo/api/routes/broadcasts.py:165:        messages = await fetch_messages_by_ids(user_id, body.message_ids)

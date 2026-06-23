@@ -30,6 +30,7 @@ const ADMIN_NAV: NavItem[] = [
   { href: "/all-platform/inbox", icon: "inbox", label: "Inbox FB" },
   { href: "/all-platform/quan-ly-tai-khoan", icon: "account_circle", label: "Tài khoản" },
   { href: "/all-platform/tai-khoan", icon: "manage_accounts", label: "Quản lý TK Zalo" },
+  { href: "/all-platform/customers", icon: "support_agent", label: "Khách hàng" },
   { href: "/all-platform/profile", icon: "person", label: "Trang cá nhân" },
   { href: "/all-platform/quan-ly-danh-muc", icon: "category", label: "Quản lý danh mục" }
 ];
@@ -42,6 +43,7 @@ const LEADER_NAV: NavItem[] = [
   { href: "/all-platform/dang-bai", icon: "send", label: "Đăng bài FB" },
   { href: "/all-platform/inbox", icon: "inbox", label: "Inbox FB" },
   { href: "/all-platform/quan-ly-tai-khoan", icon: "account_circle", label: "Tài khoản" },
+  { href: "/all-platform/customers", icon: "support_agent", label: "Khách hàng" },
   { href: "/all-platform/profile", icon: "person", label: "Trang cá nhân" },
   { href: "/all-platform/quan-ly-danh-muc", icon: "category", label: "Quản lý danh mục" },
   { href: "/all-platform/tai-khoan", icon: "manage_accounts", label: "Quản lý TK Zalo" },
@@ -54,6 +56,7 @@ const MEMBER_NAV: NavItem[] = [
   { href: "/all-platform/inbox", icon: "inbox", label: "Inbox FB" },
   { href: "/all-platform/quan-ly-nhom", icon: "group", label: "Quản lý groups" },
   { href: "/all-platform/quan-ly-tai-khoan", icon: "account_circle", label: "Tài khoản" },
+  { href: "/all-platform/customers", icon: "support_agent", label: "Khách hàng" },
   { href: "/all-platform/profile", icon: "person", label: "Trang cá nhân" },
   { href: "/all-platform/quan-ly-danh-muc", icon: "category", label: "Quản lý danh mục" },
   { href: "/all-platform/tai-khoan", icon: "manage_accounts", label: "Quản lý TK Zalo" },

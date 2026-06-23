@@ -1,0 +1,15 @@
+=== facebook_accounts_crawl (all records) ===
+Status: 200
+[]
+
+=== social_accounts columns (first record) ===
+Status: 200
+Columns: id, app_user_id, account_name, account_email, account_password, is_active, is_primary, notes, created_at, updated_at, account_profile_id, id_platform
+  id = 504211af-e8ff-4b71-819e-4829afc721b8
+  app_user_id = d3af4117-bbea-4ce0-9cfa-67e68061c576
+  account_profile_id = uctran.805044
+  id_platform = 1
+
+=== fb_inbox_kpi all records ===
+Status: 200
+[]

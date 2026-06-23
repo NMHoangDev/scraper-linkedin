@@ -1,0 +1,30 @@
+seeding-backend  | INFO:     172.26.0.4:43578 - "GET /api/all-platform/zalo/conversations?account_id=zl_986934c9 HTTP/1.1" 200 OK
+seeding-backend  | INFO:     127.0.0.1:56090 - "GET /health HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:43622 - "GET /api/all-platform/fb/sessions HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:41828 - "GET /api/all-platform/fb/sessions HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:41840 - "GET /api/all-platform/fb/sessions HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:51808 - "GET /api/all-platform/fb/sessions HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:51850 - "GET /api/all-platform/fb/sessions HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:51834 - "GET /api/all-platform/fb/inbox/conversations?user_id=fb_61590681369014 HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:51822 - "GET /api/all-platform/fb/sessions HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:51866 - "GET /api/all-platform/fb/inbox/conversations?user_id=fb_61590681369014 HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:44628 - "GET /api/all-platform/fb/sessions HTTP/1.1" 200 OK
+seeding-backend  | INFO:     127.0.0.1:43464 - "GET /health HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:44640 - "GET /api/all-platform/fb/sessions HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:35202 - "GET /api/all-platform/fb/sessions HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:35208 - "GET /api/all-platform/fb/sessions HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:58350 - "GET /api/all-platform/fb/sessions HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:58362 - "GET /api/all-platform/zalo/workers HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:58400 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:58378 - "GET /api/all-platform/zalo/accounts?owner_id=613877fc-c12a-4fc6-837d-10f1aa80a29a&id_member=613877fc-c12a-4fc6-837d-10f1aa80a29a&email=ngminhhoang0934%40gmail.com&role=member HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:58390 - "GET /api/all-platform/zalo/conversations?account_id=zl_a8e3e28b HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:58406 - "GET /api/all-platform/fb/sessions HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:58414 - "GET /api/all-platform/fb/sessions HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:58428 - "GET /api/all-platform/fb/inbox/conversations?user_id=fb_61590681369014 HTTP/1.1" 200 OK
+seeding-backend  | 2026-06-19 15:32:00,001 | INFO | apscheduler.executors.default | Running job "execute_all_platform_crawl_workflow (trigger: cron[minute='*'], next run at: 2026-06-19 15:33:00 UTC)" (scheduled at 2026-06-19 15:32:00+00:00)
+seeding-backend  | 2026-06-19 15:32:00,244 | INFO | apscheduler.executors.default | Job "execute_all_platform_crawl_workflow (trigger: cron[minute='*'], next run at: 2026-06-19 15:33:00 UTC)" executed successfully
+seeding-backend  | INFO:     172.26.0.4:46962 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:46964 - "GET /api/all-platform/zalo/workers HTTP/1.1" 200 OK
+seeding-backend  | 2026-06-19 15:32:02.695 | WARNING  | app.modules.all_platform.zalo.services.supabase_service:list_zalo_accounts:565 - zalo_accounts table is not ready; returning empty account list: Supabase GET zalo_accounts failed: 400 {"code":"22P02","details":null,"hint":null,"message":"invalid input syntax for type uuid: \"tycatong-gmail.com\""}
+seeding-backend  | INFO:     172.26.0.4:46972 - "GET /api/all-platform/zalo/accounts?owner_id=tycatong-gmail.com&id_member=3d74cd88-a53a-4002-a757-cabf119d2ea4 HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:46954 - "GET /api/all-platform/zalo/conversations?account_id=zl_986934c9 HTTP/1.1" 200 OK

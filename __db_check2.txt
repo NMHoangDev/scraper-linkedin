@@ -1,0 +1,35 @@
+============================================================
+fb_inbox_accounts - ALL columns (raw)
+============================================================
+Status: 200
+Rows: 1
+  FULL ROW: {"id": "f683767e-a5b8-4c06-ac92-62374173e8a6", "id_member": "613877fc-c12a-4fc6-837d-10f1aa80a29a", "user_id": "613877fc-c12a-4fc6-837d-10f1aa80a29a", "fb_user_id": "61590643803233", "account_label": "Hoàng", "is_active": true, "created_at": "2026-06-23T03:47:10.600314+00:00", "updated_at": "2026-06-23T09:06:41.39826+00:00"}
+  user_id repr: '613877fc-c12a-4fc6-837d-10f1aa80a29a'
+  user_id type: <class 'str'>
+  user_id starts with 'fb_': False
+
+
+============================================================
+Extension user_id format analysis
+============================================================
+  Extension will send: user_id = 'fb_' + '61590643803233' = 'fb_61590643803233'
+  resolve_id_member() looks for: fb_inbox_accounts.user_id = 'fb_61590643803233'
+  But fb_inbox_accounts.user_id appears to be EMPTY or NULL
+
+  This is the ROOT CAUSE of the KPI save failure.
+
+============================================================
+Test: what user_id values would resolve correctly?
+============================================================
+  Row has fb_user_id='61590643803233'
+  Extension sends user_id='fb_61590643803233'
+  resolve_id_member() tries:
+    1. WHERE user_id = 'fb_61590643803233' -> FAILS (user_id is empty/null)
+    2. WHERE fb_user_id = '61590643803233' -> SHOULD WORK (fallback)
+  -> But the existing row has is_active=True, so fallback SHOULD find it
+
+============================================================
+Test: POST /fb/post-kpi/save with real fb_user_id as user_id
+============================================================
+Status: 200
+Body: {"success":true,"message":"Đã lưu KPI bài viết","data":{"id":"79695c41-dc7a-4c71-a2e2-d72b2904b85d","id_member":"613877fc-c12a-4fc6-837d-10f1aa80a29a","id_leader":"3c20b0c1-a986-4568-a470-e212cf58c2e7","job_id":"test_real_001","post_url":"https://facebook.com/test","posted_at":"2026-06-23T09:47:56.451755+00:00","message":"Saved successfully"}}

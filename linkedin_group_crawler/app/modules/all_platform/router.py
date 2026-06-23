@@ -26,6 +26,7 @@ from app.modules.all_platform.routers.crawl_facebook import crawl_facebook_route
 from app.modules.all_platform.routers.fb import router as fb_automation_router
 from app.modules.all_platform.routers.websocket import router as websocket_router
 from app.modules.all_platform.routers.fb_inbox_accounts import router as fb_inbox_accounts_router
+from app.modules.all_platform.routers.customer_lead import router as customer_lead_router
 
 all_platform_router = APIRouter()
 
@@ -167,6 +168,12 @@ all_platform_router.include_router(
     admin_dashboard_router,
     prefix="/admin/dashboard",
     tags=["All-Platform Admin Dashboard"],
+)
+
+# ── Customer Leads ─────────────────────────────────────────────────────────────
+all_platform_router.include_router(
+    customer_lead_router,
+    tags=["Customer Leads"]
 )
 
 # ── Zalo ───────────────────────────────────────────────────────────────────────

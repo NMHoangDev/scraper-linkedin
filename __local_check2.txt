@@ -1,0 +1,12 @@
+=== curl -s --max-time 5 http://localhost:8000/openapi.json 2>&1 | python3 -c "impor ===
+/api/zalo/auth/qr-image/{session_id}
+/api/zalo/auth/status/{session_id}
+/api/zalo/auth/session/{session_id}
+/api/zalo/auth/sessions
+=== docker exec $(docker ps -q --filter name=app 2>/dev/null | head -1) env 2>&1 | g ===
+(empty, err=)
+=== ps aux | grep -E "uvicorn|python.*main" | grep -v grep | head -5 ===
+root        2829  0.5  0.5 772580 93008 ?        Ssl  Jun18  35:24 python -m uvicorn app.main:app --host 0.0.0.0 --port 8808 --log-level info
+root      256522  0.2  0.4 271220 81684 ?        Ssl  Jun19  12:49 /usr/local/bin/python3.10 /usr/local/bin/uvicorn src.main:app --host 0.0.0.0 --port 8000 --workers 1
+vmadmin   467943  0.3  0.5 249420 84632 ?        Ssl  Jun19  17:21 /usr/bin/python /usr/local/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+vmadmin   818423  3.8  1.2 2297796 200640 ? 

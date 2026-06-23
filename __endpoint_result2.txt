@@ -1,0 +1,4 @@
+Status: 200
+
+Body:
+{"success":false,"message":"Không tìm thấy member cho user_id [test_fb_001]. Hãy đảm bảo FB account đã được thêm vào app (vào app -> Quản lý tài khoản -> Thêm FB Inbox Account).","data":null}

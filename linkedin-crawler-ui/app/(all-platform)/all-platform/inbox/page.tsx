@@ -7,7 +7,8 @@
  *   -> đánh dấu "Là khách" -> "Mở chat" (tải full) -> trả lời / đẩy Zalo.
  */
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { MaterialIcon } from "@/components/ui";
 import { provisionExtension, pingExtension } from "@/lib/markee-ext-provision";
@@ -191,7 +192,16 @@ function mergeThreadMessages(current: Msg[], incoming: Msg[]): Msg[] {
 }
 
 export default function InboxPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-gray-500">Đang tải...</div>}>
+      <InboxPageContent />
+    </Suspense>
+  );
+}
+
+function InboxPageContent() {
   const { user } = useAppAuth();
+  const searchParams = useSearchParams();
   const owner = user?.id || "";
   const role = user?.role || "member";
 
@@ -213,7 +223,7 @@ export default function InboxPage() {
   const [verifiedConvIds, setVerifiedConvIds] = useState<Set<string>>(new Set());
   const [suggestedConvIds, setSuggestedConvIds] = useState<Set<string>>(new Set()); // local state for optimistic updates
   const [archiveReading, setArchiveReading] = useState(false);
-  const [openConv, setOpenConv] = useState("");
+  const [openConv, setOpenConv] = useState(() => searchParams.get("conv") || "");
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [threadLastFrom, setThreadLastFrom] = useState<Record<string, Msg["from"]>>({});
   const [reply, setReply] = useState("");

@@ -1,0 +1,111 @@
+============================================================
+1. fb_inbox_accounts
+============================================================
+Status: 200
+Total rows: 1
+  id=f683767e-a5b8-4c06-ac92-62374173e8a6
+  user_id='613877fc-c12a-4fc6-837d-10f1aa80a29a'
+  fb_user_id='61590643803233'
+  id_member=613877fc-c12a-4fc6-837d-10f1aa80a29a
+  is_active=True
+
+
+============================================================
+2. fb_post_kpi
+============================================================
+Status: 200
+Total rows: 2
+  job_id='70d1e667-7038-4281-9db0-1529e95f8870'
+  id_member=613877fc-c12a-4fc6-837d-10f1aa80a29a
+  user_id='fb_61590643803233'
+  post_url='https://www.facebook.com/61590643803233'
+  is_confirmed=None
+
+  job_id='cc829870-79af-4d99-ad3b-22c09ba03a87'
+  id_member=613877fc-c12a-4fc6-837d-10f1aa80a29a
+  user_id='fb_61590643803233'
+  post_url='https://www.facebook.com/61590643803233'
+  is_confirmed=None
+
+
+============================================================
+3. app_users (sample)
+============================================================
+Status: 200
+Total rows: 20
+  id=a283efa1-b3d4-4436-86f6-a6fb92893d80  email='duongmai.13022005@gmail.com'  role=leader
+  id=ce5aa1dc-b125-4af0-8efe-97a8c68ff7e0  email='duongthidung23092007@gmail.com'  role=member
+  id=dadc2f27-03c3-452e-a295-2400bfff12ec  email='thuowngnguyen@gmail.com'  role=leader
+  id=edbb8757-d6b2-46db-bafd-948c14f98640  email='ngminhhoang@gmail.com'  role=member
+  id=eaf645f8-6f41-48a8-ac28-c1f3d97d60a0  email='junkim160386@gmail.com'  role=admin
+  id=1f73acc2-db75-4226-a666-600a069da024  email='thhoangtran3011@gmail.com'  role=member
+  id=8122422e-c02a-4861-8a54-f72b3ea10bef  email='huuthuat2222@gmail.com'  role=member
+  id=a196af4f-83c3-4df6-a86a-b7acbbcbc227  email='thuhuyen23082004@gmail.com'  role=member
+  id=ddb3ea6f-1051-429b-b3ba-c16dc6fe4b6e  email='xuanductran71@gmail.com'  role=member
+  id=9e4c0a0e-6dea-4690-a2cb-1990ecfc3e53  email='buiquynhnhu280705@gmail.com'  role=member
+  id=3d74cd88-a53a-4002-a757-cabf119d2ea4  email='tycatong@gmail.com'  role=member
+  id=8f1352cd-9351-4a33-b77e-bee36539cebd  email='vuvu9433@gmail.com'  role=member
+  id=f826c600-2791-446d-80ba-6ede0af0973e  email='duongquangvu1707@gmail.com'  role=member
+  id=631c7d8d-7c86-448c-82c6-664f9ccaa3ba  email='tg08102005@gmail.com'  role=member
+  id=d3af4117-bbea-4ce0-9cfa-67e68061c576  email='ductranxuan28@gmail.com'  role=member
+  id=3c20b0c1-a986-4568-a470-e212cf58c2e7  email='leader@gmail.com'  role=leader
+  id=aa521395-04fa-4ccc-ab64-948c6b2a45af  email='devthanh@markee.local'  role=member
+  id=7714fa9a-f947-474c-8e9c-c38083763dad  email='ngomylanh1804@gmail.com'  role=member
+  id=ebebd750-f379-47b5-b6d8-81ecbadc1fd5  email='quocvietpham185@gmail.com'  role=member
+  id=70edd4ae-31ac-4116-9a18-e9fccadfad46  email='ntngochuyen1394@gmail.com'  role=member
+
+============================================================
+4. teams
+============================================================
+Status: 200
+Total rows: 4
+  id=14d20906-fbba-4a43-a46d-3b7ce0810a34  name='Mai'  leader=a283efa1-b3d4-4436-86f6-a6fb92893d80
+  id=450fb4ea-1873-4566-8ed9-32a034dde858  name='dev'  leader=3c20b0c1-a986-4568-a470-e212cf58c2e7
+  id=ab9b52f7-b23e-4b38-a21c-e480e1b5b60f  name='Thảo Team Dev'  leader=883d0d8c-bd7b-4da2-abed-5f9b8c5b5cce
+  id=39d3415b-55e7-4e50-8753-7bc933a01db0  name='Dev Team'  leader=78218d3c-118b-4a3c-95d8-20eb7aab6ea1
+
+============================================================
+5. member_of_teams
+============================================================
+Status: 200
+Total rows: 15
+  id_teams=39d3415b-55e7-4e50-8753-7bc933a01db0  id_member=631c7d8d-7c86-448c-82c6-664f9ccaa3ba
+  id_teams=39d3415b-55e7-4e50-8753-7bc933a01db0  id_member=d3af4117-bbea-4ce0-9cfa-67e68061c576
+  id_teams=39d3415b-55e7-4e50-8753-7bc933a01db0  id_member=50368bff-d0e7-49ea-a537-a3b053e3986b
+  id_teams=39d3415b-55e7-4e50-8753-7bc933a01db0  id_member=9e4c0a0e-6dea-4690-a2cb-1990ecfc3e53
+  id_teams=39d3415b-55e7-4e50-8753-7bc933a01db0  id_member=ad5c388f-e987-4585-88a1-17269c09e354
+  id_teams=39d3415b-55e7-4e50-8753-7bc933a01db0  id_member=a196af4f-83c3-4df6-a86a-b7acbbcbc227
+  id_teams=39d3415b-55e7-4e50-8753-7bc933a01db0  id_member=9841036a-1c36-4843-84c2-5e17cda3d87d
+  id_teams=39d3415b-55e7-4e50-8753-7bc933a01db0  id_member=70edd4ae-31ac-4116-9a18-e9fccadfad46
+  id_teams=14d20906-fbba-4a43-a46d-3b7ce0810a34  id_member=ce5aa1dc-b125-4af0-8efe-97a8c68ff7e0
+  id_teams=450fb4ea-1873-4566-8ed9-32a034dde858  id_member=613877fc-c12a-4fc6-837d-10f1aa80a29a
+  id_teams=ab9b52f7-b23e-4b38-a21c-e480e1b5b60f  id_member=7538ac54-86da-46f0-b85f-7a70007a0d57
+  id_teams=ab9b52f7-b23e-4b38-a21c-e480e1b5b60f  id_member=db2d4684-c855-4664-af42-66983d4123ca
+  id_teams=ab9b52f7-b23e-4b38-a21c-e480e1b5b60f  id_member=df4cd6a0-7b3c-42d8-a622-bfb72efb873e
+  id_teams=ab9b52f7-b23e-4b38-a21c-e480e1b5b60f  id_member=afbe3040-0983-48c3-b610-d39abf99799e
+  id_teams=ab9b52f7-b23e-4b38-a21c-e480e1b5b60f  id_member=7b24d2e2-623b-4ec7-93f5-3df410992e5a
+
+============================================================
+6. team_associations
+============================================================
+Status: 404
+Error: {"code":"PGRST205","details":null,"hint":"Perhaps you meant the table 'public.conversations'","message":"Could not find the table 'public.team_associations' in the schema cache"}
+
+============================================================
+7. Check: user_id starting with 'fb_' in fb_inbox_accounts
+============================================================
+Status: 200
+Found 0 rows with user_id like 'fb_%'
+
+============================================================
+8. Check: fb_post_kpi.is_confirmed column
+============================================================
+Status: 400
+Error: {"code":"42703","details":null,"hint":null,"message":"column fb_post_kpi.is_confirmed does not exist"}
+
+============================================================
+9. Extension user_id format check
+============================================================
+  Extension generates: user_id = 'fb_' + c_user cookie (FB real UID)
+  e.g., if FB UID=10001, user_id='fb_10001'
+  Must match fb_inbox_accounts.user_id column
