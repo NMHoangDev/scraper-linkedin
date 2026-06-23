@@ -1,1 +1,0 @@
-pwuser         1 29.6  0.7 585428 129108 ?       Ssl  13:03   1:26 /usr/bin/python /usr/local/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000

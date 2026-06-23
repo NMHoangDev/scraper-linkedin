@@ -531,3 +531,28 @@ def get_verified_fb_inbox_ids(payload: GetVerifiedConvIdsRequest) -> BaseRespons
     except Exception as e:
         logger.error(f"fb-inbox-verified-ids error: {e}")
         return BaseResponse(success=False, message=str(e))
+
+
+class TeamKpiHistoryRequest(BaseModel):
+    leader_email: Optional[str] = Field(None, description="Lọc theo leader. Bỏ trống = admin (tất cả team).")
+    weeks: int = Field(4, ge=1, le=12, description="Số tuần gần nhất cần lấy (mặc định 4).")
+
+
+@router.post("/team-history")
+def team_kpi_history(payload: TeamKpiHistoryRequest) -> BaseResponse:
+    """Lịch sử KPI theo tuần cho từng team.
+
+    Admin gọi không cần leader_email → trả tất cả team.
+    Leader gọi với leader_email của mình → chỉ trả team mình phụ trách.
+    Mỗi phần tử = 1 WeeklySnapshot { week_name, teams: [KpiTeamStats] }.
+    """
+    try:
+        from app.modules.all_platform.services.supabase_kpi_service import get_team_kpi_history
+        data = get_team_kpi_history(
+            leader_email=payload.leader_email,
+            weeks=payload.weeks,
+        )
+        return BaseResponse(success=True, data=data)
+    except Exception as e:
+        logger.error(f"team-history error: {e}")
+        return BaseResponse(success=False, message=str(e))

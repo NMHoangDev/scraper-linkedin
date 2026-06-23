@@ -277,6 +277,22 @@ export const allPlatformKpiService = {
     });
   },
 
+  getTeamHistory: (leaderEmail?: string, weeks = 4): Promise<ApiResponse<Array<{
+    week_name: string;
+    teams: Array<{
+      team_id: string; team_name: string;
+      lead_actual: number; lead_target: number;
+      inbox_actual: number; inbox_target: number;
+      post_actual: number; post_target: number;
+      comment_actual: number; comment_target: number;
+    }>;
+  }>>> => {
+    return requestJson(`${BASE}/kpi/team-history`, {
+      method: "POST",
+      body: JSON.stringify({ leader_email: leaderEmail ?? null, weeks }),
+    });
+  },
+
   checkPermission: (email: string): Promise<ApiResponse<{ role: string; email_leader?: string; name?: string }>> => {
     return requestJson(`${BASE}/kpi/auth/check-permission`, {
       method: "POST",

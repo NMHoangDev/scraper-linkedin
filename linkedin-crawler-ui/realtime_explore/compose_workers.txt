@@ -1,9 +1,0 @@
-21:  backend:
-25:    image: scraper-linkedin-backend:latest
-26:    container_name: seeding-backend
-35:      - backend-storage:/app/storage
-36:      - backend-data:/app/data
-40:          - backend
-48:      - backend
-59:  backend-storage:
-60:  backend-data:

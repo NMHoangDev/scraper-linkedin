@@ -1,2 +1,0 @@
-8:        proxy_set_header Connection "Upgrade";
-20:        proxy_set_header Connection "Upgrade";

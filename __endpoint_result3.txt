@@ -1,4 +1,0 @@
-Status: 200
-
-Body:
-{"success":true,"message":"","data":{"post_count":0,"profile_count":0,"group_count":0,"page_count":0,"posts":[],"range":{"start":"","end":""}}}

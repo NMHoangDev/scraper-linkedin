@@ -1,6 +1,0 @@
-4:    location /api/all-platform/zalo/ {
-5:        proxy_pass http://10.30.50.29:8001/api/all-platform/zalo/;
-16:    location /api/ {
-17:        proxy_pass http://backend:8000;
-29:    location / {
-30:        proxy_pass http://frontend:3000;

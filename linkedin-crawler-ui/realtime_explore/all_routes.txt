@@ -1,5 +1,0 @@
-HEAD /openapi.json
-HEAD /docs
-HEAD /docs/oauth2-redirect
-HEAD /redoc
-GET /health

@@ -1,7 +1,0 @@
-34:_STARTUP_SYNC_GROUP_LIMIT = 20
-35:_STARTUP_SYNC_MESSAGE_COUNT = 50
-36:_STARTUP_SYNC_TIMEOUT_MS = 25000
-37:_STARTUP_SYNC_PER_GROUP_DELAY_S = 2.0  # tăng từ 1.5 → 2.0 cho ổn định hơn
-386:                    :_STARTUP_SYNC_GROUP_LIMIT
-408:                                    count=_STARTUP_SYNC_MESSAGE_COUNT,
-414:                                    count=_STARTUP_SYNC_MESSAGE_COUNT,

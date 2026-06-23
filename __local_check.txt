@@ -1,4 +1,0 @@
-=== curl -s --max-time 5 http://localhost:8000/health 2>&1 ===
-{"success":true,"message":"Service is healthy","data":null}
-=== curl -s --max-time 5 http://localhost:8000/api/all-platform/fb/sessions -H 'Authorization: Bearer test' 2>&1 | head -c 500 ===
-{"detail":"Not Found"}

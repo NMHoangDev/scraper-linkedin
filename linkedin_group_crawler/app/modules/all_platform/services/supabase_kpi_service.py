@@ -947,3 +947,179 @@ def get_pending_fb_inbox_kpi(
         "pending_conv_ids": pending_conv_ids,
         "range": {"start": start_date or "", "end": end_date or ""},
     }
+
+
+def get_team_kpi_history(
+    leader_email: Optional[str] = None,
+    weeks: int = 4,
+) -> List[Dict[str, Any]]:
+    """Trả về lịch sử KPI theo tuần cho từng team.
+
+    Admin: trả tất cả team.
+    Leader: chỉ trả team mình phụ trách (leader_email bắt buộc).
+    Mỗi tuần = 1 WeeklySnapshot { week_name, teams: [KpiTeamStats] }.
+    Actuals: inbox + lead lấy từ fb_inbox_kpi, post từ fb_post_kpi.
+    Comment actuals = 0 (chưa có bảng riêng).
+    """
+    supabase: Client = get_supabase_client()
+
+    # 1. Lấy danh sách team
+    if leader_email:
+        leader_res = (
+            supabase.table("app_users")
+            .select("id")
+            .eq("email", leader_email.strip().lower())
+            .limit(1)
+            .execute()
+        )
+        if not leader_res.data:
+            return []
+        leader_id = leader_res.data[0]["id"]
+        teams_res = (
+            supabase.table("teams")
+            .select("id, name_team, id_leader")
+            .eq("id_leader", leader_id)
+            .execute()
+        )
+    else:
+        teams_res = supabase.table("teams").select("id, name_team, id_leader").execute()
+
+    teams = teams_res.data or []
+    if not teams:
+        return []
+
+    team_ids = [str(t["id"]) for t in teams]
+
+    # 2. Member ↔ team mapping
+    members_res = (
+        supabase.table("member_of_teams")
+        .select("id_teams, id_member")
+        .in_("id_teams", team_ids)
+        .execute()
+    )
+    team_members: Dict[str, List[str]] = {}
+    for row in (members_res.data or []):
+        tid = str(row["id_teams"])
+        mid = str(row["id_member"])
+        team_members.setdefault(tid, []).append(mid)
+
+    all_member_ids = list({m for mids in team_members.values() for m in mids})
+    if not all_member_ids:
+        return []
+
+    # 3. Tuần cần hiển thị (mới nhất trước)
+    today = date.today()
+    monday_this = today - timedelta(days=today.weekday())
+    week_ranges: List[Tuple[str, date, date]] = []
+    for i in range(weeks):
+        w_start = monday_this - timedelta(weeks=i)
+        w_end = w_start + timedelta(days=6)
+        year, wnum, _ = w_start.isocalendar()
+        week_ranges.append((f"{year}-W{wnum:02d}", w_start, w_end))
+
+    earliest_start = week_ranges[-1][1].isoformat()
+
+    # 4. KPI targets từ kpi_tracker
+    kpi_res = (
+        supabase.table("kpi_tracker")
+        .select("id_member, kpi_inbox, kpi_lead, kpi_post, kpi_comment, start_date, end_date")
+        .in_("id_member", all_member_ids)
+        .eq("status", "active")
+        .execute()
+    )
+    kpi_rows = kpi_res.data or []
+
+    # 5. Actuals cho toàn bộ khoảng
+    inbox_res = (
+        supabase.table("fb_inbox_kpi")
+        .select("id_member, is_lead, is_confirmed, synced_at")
+        .in_("id_member", all_member_ids)
+        .gte("synced_at", earliest_start)
+        .execute()
+    )
+    post_res = (
+        supabase.table("fb_post_kpi")
+        .select("id_member, posted_at")
+        .in_("id_member", all_member_ids)
+        .gte("posted_at", earliest_start)
+        .execute()
+    )
+    inbox_rows = inbox_res.data or []
+    post_rows = post_res.data or []
+
+    # 6. Build snapshots
+    result: List[Dict[str, Any]] = []
+    for week_name, w_start, w_end in week_ranges:
+        week_teams = []
+        for team in teams:
+            tid = str(team["id"])
+            mids = set(team_members.get(tid, []))
+            if not mids:
+                continue
+
+            # --- Targets: sum KPI tracker entries overlapping this week ---
+            inbox_target = lead_target = post_target = comment_target = 0
+            for kt in kpi_rows:
+                if str(kt["id_member"]) not in mids:
+                    continue
+                kt_start = date.fromisoformat(kt["start_date"]) if kt.get("start_date") else None
+                kt_end = date.fromisoformat(kt["end_date"]) if kt.get("end_date") else None
+                if kt_start and kt_end:
+                    if not (kt_end < w_start or kt_start > w_end):
+                        inbox_target += kt.get("kpi_inbox") or 0
+                        lead_target += kt.get("kpi_lead") or 0
+                        post_target += kt.get("kpi_post") or 0
+                        comment_target += kt.get("kpi_comment") or 0
+                else:
+                    inbox_target += kt.get("kpi_inbox") or 0
+                    lead_target += kt.get("kpi_lead") or 0
+                    post_target += kt.get("kpi_post") or 0
+                    comment_target += kt.get("kpi_comment") or 0
+
+            # --- Actuals ---
+            inbox_actual = lead_actual = post_actual = 0
+            for row in inbox_rows:
+                if str(row["id_member"]) not in mids:
+                    continue
+                raw = (row.get("synced_at") or "")[:10]
+                if not raw:
+                    continue
+                try:
+                    d = date.fromisoformat(raw)
+                except ValueError:
+                    continue
+                if w_start <= d <= w_end:
+                    if row.get("is_confirmed"):
+                        inbox_actual += 1
+                    if row.get("is_lead"):
+                        lead_actual += 1
+
+            for row in post_rows:
+                if str(row["id_member"]) not in mids:
+                    continue
+                raw = (row.get("posted_at") or "")[:10]
+                if not raw:
+                    continue
+                try:
+                    d = date.fromisoformat(raw)
+                except ValueError:
+                    continue
+                if w_start <= d <= w_end:
+                    post_actual += 1
+
+            week_teams.append({
+                "team_id": tid,
+                "team_name": team.get("name_team") or "",
+                "lead_actual": lead_actual,
+                "lead_target": lead_target,
+                "inbox_actual": inbox_actual,
+                "inbox_target": inbox_target,
+                "post_actual": post_actual,
+                "post_target": post_target,
+                "comment_actual": 0,
+                "comment_target": comment_target,
+            })
+
+        result.append({"week_name": week_name, "teams": week_teams})
+
+    return result

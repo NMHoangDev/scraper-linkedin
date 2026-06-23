@@ -28,7 +28,7 @@ def get_current_user(request: Request, authorization: str | None = Header(None))
 router = APIRouter(prefix="/customer-leads", tags=["Customer Leads"])
 
 @router.get("", response_model=BaseResponse)
-def get_customer_leads():
+def get_customer_leads(_: Any = Depends(get_current_user)):
     try:
         data = customer_lead_service.get_all_customer_leads()
         return BaseResponse(success=True, data=data)
@@ -36,7 +36,7 @@ def get_customer_leads():
         return BaseResponse(success=False, message=str(e))
 
 @router.get("/sdrs", response_model=BaseResponse)
-def get_sdrs():
+def get_sdrs(_: Any = Depends(get_current_user)):
     try:
         data = customer_lead_service.get_all_sdrs()
         return BaseResponse(success=True, data=data)
@@ -49,14 +49,13 @@ def create_customer_lead(payload: CustomerLeadCreate, current_user: Any = Depend
         data_dict = payload.model_dump(exclude_unset=True)
         if not data_dict.get("leaded_by") and isinstance(current_user, dict) and current_user.get("id"):
             data_dict["leaded_by"] = current_user.get("id")
-            
         new_lead = customer_lead_service.create_customer_lead(data_dict)
         return BaseResponse(success=True, data=new_lead)
     except Exception as e:
         return BaseResponse(success=False, message=str(e))
 
 @router.put("/{lead_id}", response_model=BaseResponse)
-def update_customer_lead(lead_id: str, payload: CustomerLeadUpdate):
+def update_customer_lead(lead_id: str, payload: CustomerLeadUpdate, _: Any = Depends(get_current_user)):
     try:
         updated = customer_lead_service.update_customer_lead(lead_id, payload.model_dump(exclude_unset=True))
         if not updated:
@@ -66,7 +65,7 @@ def update_customer_lead(lead_id: str, payload: CustomerLeadUpdate):
         return BaseResponse(success=False, message=str(e))
 
 @router.delete("/{lead_id}", response_model=BaseResponse)
-def delete_customer_lead(lead_id: str):
+def delete_customer_lead(lead_id: str, _: Any = Depends(get_current_user)):
     try:
         success = customer_lead_service.delete_customer_lead(lead_id)
         if success:
