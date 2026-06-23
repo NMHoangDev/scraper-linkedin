@@ -57,6 +57,7 @@ services:
           - router
 
 volumes:
+  backend-artifacts:
   backend-storage:
   backend-data:
 
