@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { customerLeadService, CustomerLead, SDRUser } from "@/services/customer-lead.service";
 import { MaterialIcon } from "@/components/ui";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 export default function CustomerLeadsPage() {
   const [leads, setLeads] = useState<CustomerLead[]>([]);
