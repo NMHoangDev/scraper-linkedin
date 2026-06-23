@@ -104,7 +104,11 @@ export type MaterialSymbolName =
   | "login"
   | "push_pin"
   | "arrow_drop_down"
-  | "campaign";
+  | "campaign"
+  | "done"
+  | "done_all"
+  | "mail"
+  | "content_copy";
 
 export interface MaterialIconProps {
   name: MaterialSymbolName;

@@ -234,7 +234,7 @@ export default function CustomerLeadsPage() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Tên khách hàng <span className="text-red-500">*</span></label>
                 <input 
                   type="text" 
-                  value={formData.customer_name} 
+                  value={formData.customer_name ?? ""}
                   onChange={e => setFormData({...formData, customer_name: e.target.value})}
                   className="w-full border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition"
                   placeholder="Nhập tên khách hàng..."
@@ -246,7 +246,7 @@ export default function CustomerLeadsPage() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Công ty</label>
                   <input 
                     type="text" 
-                    value={formData.company_name} 
+                    value={formData.company_name ?? ""}
                     onChange={e => setFormData({...formData, company_name: e.target.value})}
                     className="w-full border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition"
                     placeholder="Tên công ty..."
@@ -256,7 +256,7 @@ export default function CustomerLeadsPage() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Conversation ID (FB Inbox)</label>
                   <input 
                     type="text" 
-                    value={formData.conv_id} 
+                    value={formData.conv_id ?? ""}
                     onChange={e => setFormData({...formData, conv_id: e.target.value})}
                     className="w-full border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition"
                     placeholder="VD: t_123456789"
@@ -296,7 +296,7 @@ export default function CustomerLeadsPage() {
                   <label className="block text-sm font-medium text-red-600 dark:text-red-400 mb-1 flex items-center gap-1"><MaterialIcon name="error" className="text-[14px]" /> Lý do từ chối</label>
                   <input 
                     type="text" 
-                    value={formData.reject_reason} 
+                    value={formData.reject_reason ?? ""}
                     onChange={e => setFormData({...formData, reject_reason: e.target.value})}
                     className="w-full border border-red-300 dark:border-red-800 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-red-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition"
                     placeholder="Nhập lý do khách hàng từ chối..."
@@ -307,7 +307,7 @@ export default function CustomerLeadsPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Ghi chú</label>
                 <textarea 
-                  value={formData.note} 
+                  value={formData.note ?? ""}
                   onChange={e => setFormData({...formData, note: e.target.value})}
                   className="w-full border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 min-h-[80px] transition"
                   placeholder="Ghi chú thêm..."

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MaterialIcon } from "@/components/ui";
+import { MaterialIcon, type MaterialSymbolName } from "@/components/ui";
 import { allPlatformKpiService } from "@/services/all-platform.service";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { cn } from "@/lib/utils";
@@ -271,8 +271,7 @@ export function LeaderPostView({
             >
               <MaterialIcon
                 name="article"
-                className="text-[22px]"
-                style={{ color: "#ffffff" }}
+                className="text-[22px] text-white"
               />
             </div>
             <div>
@@ -445,7 +444,7 @@ export function LeaderPostView({
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     )}
                   >
-                    {cfg && <MaterialIcon name={cfg.icon} className="text-[11px]" />}
+                    {cfg && <MaterialIcon name={cfg.icon as MaterialSymbolName} className="text-[11px]" />}
                     {type
                       ? `${cfg?.label} ${count}`
                       : `Tất cả ${count}`}
@@ -538,7 +537,7 @@ export function LeaderPostView({
                             cfg.text
                           )}
                         >
-                          <MaterialIcon name={cfg.icon} className="text-[11px]" />
+                          <MaterialIcon name={cfg.icon as MaterialSymbolName} className="text-[11px]" />
                           {cfg.label}
                         </span>
                         {post.target_id && (

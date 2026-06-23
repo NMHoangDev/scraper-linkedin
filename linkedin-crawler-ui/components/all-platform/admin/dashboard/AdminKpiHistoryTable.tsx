@@ -77,7 +77,7 @@ export function AdminKpiHistoryTable() {
       <div className="p-4 border-b border-[#E5E5E5] flex items-center justify-between bg-slate-50/50">
         <div>
           <h2 className="text-base font-bold text-[#1A1A1A] flex items-center gap-2">
-            <MaterialIcon name="table_chart" className="text-emerald-600" />
+            <MaterialIcon name="table_view" className="text-emerald-600" />
             Bảng Tổng hợp KPI theo Tuần (History)
           </h2>
           <p className="text-xs text-[#666666] mt-0.5">Dữ liệu mô phỏng (Simulated) để chuẩn bị cho API chốt số tuần.</p>
