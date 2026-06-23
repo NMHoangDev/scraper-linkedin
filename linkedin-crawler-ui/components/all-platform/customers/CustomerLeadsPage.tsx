@@ -217,54 +217,60 @@ export default function CustomerLeadsPage() {
 
       {/* Form Modal */}
       {isFormOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-              <h3 className="text-lg font-bold text-gray-800">{editingId ? "Sửa thông tin khách hàng" : "Thêm khách hàng mới"}</h3>
-              <button onClick={() => setIsFormOpen(false)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4"
+          onClick={() => setIsFormOpen(false)}
+        >
+          <div 
+            className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-[480px] overflow-hidden border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-gray-50 dark:bg-slate-800/50">
+              <h3 className="text-lg font-bold text-gray-800 dark:text-slate-100">{editingId ? "Sửa thông tin khách hàng" : "Thêm khách hàng mới"}</h3>
+              <button onClick={() => setIsFormOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 text-2xl">&times;</button>
             </div>
             
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 overflow-y-auto flex-1 text-slate-800 dark:text-slate-200">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tên khách hàng <span className="text-red-500">*</span></label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Tên khách hàng <span className="text-red-500">*</span></label>
                 <input 
                   type="text" 
                   value={formData.customer_name} 
                   onChange={e => setFormData({...formData, customer_name: e.target.value})}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition"
                   placeholder="Nhập tên khách hàng..."
                 />
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Công ty</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Công ty</label>
                   <input 
                     type="text" 
                     value={formData.company_name} 
                     onChange={e => setFormData({...formData, company_name: e.target.value})}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition"
                     placeholder="Tên công ty..."
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Conversation ID (FB Inbox)</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Conversation ID (FB Inbox)</label>
                   <input 
                     type="text" 
                     value={formData.conv_id} 
                     onChange={e => setFormData({...formData, conv_id: e.target.value})}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition"
                     placeholder="VD: t_123456789"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Người xử lý (SDR)</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Người xử lý (SDR)</label>
                 <select 
                   value={formData.sdr_id || ""}
                   onChange={e => setFormData({...formData, sdr_id: e.target.value})}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="w-full border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 transition"
                 >
                   <option value="">-- Chọn SDR xử lý --</option>
                   {sdrs.map(sdr => (
@@ -274,11 +280,11 @@ export default function CustomerLeadsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Trạng thái</label>
                 <select 
                   value={formData.status}
                   onChange={e => setFormData({...formData, status: e.target.value as any})}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="w-full border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 transition"
                 >
                   <option value="pending">Đang chờ</option>
                   <option value="closed">Đã chốt</option>
@@ -288,38 +294,38 @@ export default function CustomerLeadsPage() {
 
               {formData.status === "rejected" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1 text-red-600 flex items-center gap-1"><MaterialIcon name="error" className="text-[14px]" /> Lý do từ chối</label>
+                  <label className="block text-sm font-medium text-red-600 dark:text-red-400 mb-1 flex items-center gap-1"><MaterialIcon name="error" className="text-[14px]" /> Lý do từ chối</label>
                   <input 
                     type="text" 
                     value={formData.reject_reason} 
                     onChange={e => setFormData({...formData, reject_reason: e.target.value})}
-                    className="w-full border border-red-300 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-full border border-red-300 dark:border-red-800 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-red-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition"
                     placeholder="Nhập lý do khách hàng từ chối..."
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Ghi chú</label>
                 <textarea 
                   value={formData.note} 
                   onChange={e => setFormData({...formData, note: e.target.value})}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
+                  className="w-full border border-gray-300 dark:border-slate-700 rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 min-h-[80px] transition"
                   placeholder="Ghi chú thêm..."
                 ></textarea>
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
+            <div className="p-6 border-t border-gray-100 dark:border-slate-800 flex justify-end gap-3 bg-gray-50 dark:bg-slate-800/50">
               <button 
                 onClick={() => setIsFormOpen(false)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-medium"
+                className="px-4 py-2 border border-gray-300 dark:border-slate-700 text-gray-700 dark:text-slate-300 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 font-medium transition"
               >
                 Hủy
               </button>
               <button 
                 onClick={handleSave}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2"
+                className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 font-medium flex items-center gap-2 transition"
               >
                 <MaterialIcon name="check_circle" className="text-[18px]" /> Lưu lại
               </button>
