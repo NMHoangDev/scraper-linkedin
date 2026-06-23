@@ -445,7 +445,6 @@ async def sync_dom_messages(
         errors=errors,
         results=results,
     )
->>>>>>> Stashed changes
 
 async def _background_sync_conversation_messages(account_id: str, conversation_id: str):
     """Background sync: dùng group-history thay vì sync-old-messages để tránh lỗi getOwnId null."""

@@ -12,6 +12,9 @@ import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 load_dotenv(BASE_DIR / ".env")
+# Load .env.local after .env so it overrides production values for local dev.
+# To rollback, simply delete .env.local (it will be ignored).
+load_dotenv(BASE_DIR / ".env.local", override=True)
 
 
 def _parse_bool(value: str | None, default: bool = False) -> bool:

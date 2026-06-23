@@ -269,6 +269,14 @@ async def fb_sessions(request: Request, authorization: str | None = Header(None)
     return _json_response(status, payload)
 
 
+@router.get("/session/owner/{user_id}")
+async def fb_session_owner(user_id: str, request: Request, authorization: str | None = Header(None)) -> JSONResponse:
+    user = _current_user(request, authorization)
+    await _require_fb_account_scope(user, user_id)
+    status, payload = await _markee_json("GET", f"/session/owner/{user_id}")
+    return _json_response(status, payload)
+
+
 @router.get("/extensions")
 async def fb_extensions(request: Request, authorization: str | None = Header(None)) -> JSONResponse:
     user = _current_user(request, authorization)

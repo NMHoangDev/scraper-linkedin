@@ -25,6 +25,7 @@ from app.modules.all_platform.routers.linkedin_legacy import router as linkedin_
 from app.modules.all_platform.routers.crawl_facebook import crawl_facebook_router
 from app.modules.all_platform.routers.fb import router as fb_automation_router
 from app.modules.all_platform.routers.websocket import router as websocket_router
+from app.modules.all_platform.routers.fb_inbox_accounts import router as fb_inbox_accounts_router
 
 all_platform_router = APIRouter()
 
@@ -137,6 +138,20 @@ all_platform_router.include_router(
     social_accounts_router,
     prefix="/social-accounts",
     tags=["All-Platform Social Accounts"],
+)
+
+# ── FB Inbox Accounts ──────────────────────────────────────────────────────────
+all_platform_router.include_router(
+    fb_inbox_accounts_router,
+    tags=["All-Platform FB Inbox Accounts"],
+)
+
+# ── FB Post KPI ────────────────────────────────────────────────────────────────
+from app.modules.all_platform.routers.fb_post_kpi import router as fb_post_kpi_router
+all_platform_router.include_router(
+    fb_post_kpi_router,
+    prefix="/fb/post-kpi",
+    tags=["All-Platform FB Post KPI"],
 )
 
 # ── Platforms ─────────────────────────────────────────────────────────────────

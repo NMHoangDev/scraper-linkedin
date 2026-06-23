@@ -1964,6 +1964,9 @@ class GetAllKpiRequest(BaseModel):
     """POST /kpi/get-all — Lấy toàn bộ KPI cho leader."""
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
     email_leader: str = Field(..., validation_alias=AliasChoices("email_leader", "emailLeader", "email"))
+    id_team: Optional[str] = Field(default=None)
+    start_date: Optional[str] = Field(default=None)
+    end_date: Optional[str] = Field(default=None)
 
 class GetKpiByEmailRequest(BaseModel):
     """POST /kpi/get-by-email — Lấy KPI cho member."""

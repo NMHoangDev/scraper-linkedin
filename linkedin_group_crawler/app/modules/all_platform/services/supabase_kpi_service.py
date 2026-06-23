@@ -96,7 +96,12 @@ def assign_kpi(payload: dict) -> dict:
     return result.data[0] if result.data else {}
 
 
-def get_all_kpis_for_leader(leader_email: str, id_team: Optional[str] = None) -> dict:
+def get_all_kpis_for_leader(
+    leader_email: str,
+    id_team: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+) -> dict:
     """Get all KPIs for a leader's team with weekly actual counts."""
     supabase: Client = get_supabase_client()
 
@@ -167,40 +172,24 @@ def get_all_kpis_for_leader(leader_email: str, id_team: Optional[str] = None) ->
     today = date.today()
     monday = today - timedelta(days=today.weekday())
     sunday = monday + timedelta(days=6)
-    default_start = monday.isoformat()
-    default_end = sunday.isoformat()
+    default_start = start_date or monday.isoformat()
+    default_end = end_date or sunday.isoformat()
 
     # Find minimum start date to fetch records efficiently
     min_start_date = default_start
     for k in kpi_map.values():
-        if k.get("start_date") and k["start_date"] < min_start_date:
-            min_start_date = k["start_date"]
+        eff_start = start_date or k.get("start_date") or default_start
+        if eff_start and eff_start < min_start_date:
+            min_start_date = eff_start
 
-    # Get seeding content for members (Comments)
+    # Get seeding content for members (Comments) - filter in Python for accurate date range
     seeding_result = (
         supabase.table("seeding_content_kpi")
         .select("id_member, verify, current_day, content, link_comment, id_social_account, social_accounts(account_name)")
         .in_("id_member", member_ids)
-        .gte("current_day", min_start_date)
         .execute()
     )
     seeding_list = seeding_result.data or []
-
-    # Collect member emails for FB inbox query
-    member_emails = [u.get("email", "").lower() for u in user_map.values() if u.get("email")]
-
-    # Get Facebook inbox count from seeder service (messages sent by customers)
-    fb_inbox_by_email: Dict[str, Dict[str, Any]] = {}
-    if member_emails:
-        try:
-            fb_inbox_by_email = _compute_fb_inbox_progress(member_emails, default_start, default_end)
-        except Exception as exc:
-            logger.warning(f"_compute_fb_inbox_progress failed: {exc}")
-
-    # Get facebook and linkedin posts for members
-    # (Removed fetching posts since post and lead will be 0)
-    fb_posts = []
-    li_posts = []
 
     verified_keywords = ("yes", "đã seeding", "xác minh", "verified")
 
@@ -211,16 +200,16 @@ def get_all_kpis_for_leader(leader_email: str, id_team: Optional[str] = None) ->
             continue
 
         active_kpi = kpi_map.get(mid, {})
-        start_date = active_kpi.get("start_date") or default_start
-        end_date = active_kpi.get("end_date") or default_end
+        eff_start_date = start_date or active_kpi.get("start_date") or default_start
+        eff_end_date = end_date or active_kpi.get("end_date") or default_end
         member_email = user.get("email", "").lower()
 
-        # Calculate actual Comments within active week
+        # Calculate actual Comments within active week (using member's KPI date range)
         member_comments = [
             s for s in seeding_list
             if str(s.get("id_member")) == mid
             and s.get("current_day")
-            and start_date <= s["current_day"] <= end_date
+            and eff_start_date <= s["current_day"] <= eff_end_date
         ]
         comment_current = len(member_comments)
 
@@ -228,9 +217,8 @@ def get_all_kpis_for_leader(leader_email: str, id_team: Optional[str] = None) ->
         post_current = 0
 
         # Zalo inbox: số tin nhắn khách gửi tới trong tuần KPI.
-        # Nếu member không claim Zalo account nào thì current = 0 (không lỗi).
         try:
-            inbox_progress = compute_kpi_inbox_progress([mid], start_date, end_date)
+            inbox_progress = compute_kpi_inbox_progress([mid], eff_start_date, eff_end_date)
             inbox_current = int(inbox_progress.get(mid, {}).get("kpi_inbox_current", 0))
             lead_current = int(inbox_progress.get(mid, {}).get("kpi_lead_current", 0))
         except Exception as exc:
@@ -238,13 +226,35 @@ def get_all_kpis_for_leader(leader_email: str, id_team: Optional[str] = None) ->
             inbox_current = 0
             lead_current = 0
 
-        # Facebook Messenger inbox: tin nhắn khách gửi tới trong tuần KPI (từ seeder service)
-        fb_inbox_info = fb_inbox_by_email.get(member_email, {})
-        fb_inbox_current = int(fb_inbox_info.get("kpi_fb_inbox_count", 0))
-        fb_inbox_range = fb_inbox_info.get("range", {"start": start_date, "end": end_date})
+        # Facebook Messenger inbox: dùng date range của member (KHÔNG phải default)
+        fb_inbox_from_seeder = 0
+        fb_inbox_from_kpi = 0
+        fb_lead_from_kpi = 0
+        if member_email:
+            try:
+                fb_progress = _compute_fb_inbox_progress([member_email], eff_start_date, eff_end_date)
+                fb_inbox_from_seeder = int(fb_progress.get(member_email, {}).get("kpi_fb_inbox_count", 0))
+            except Exception as exc:
+                logger.warning(f"_compute_fb_inbox_progress failed for member={mid}: {exc}")
 
-        # Tổng inbox = Zalo inbox + FB Messenger inbox
-        total_inbox_current = inbox_current + fb_inbox_current
+            try:
+                fb_kpi_summary = get_fb_inbox_kpi_summary(member_email, eff_start_date, eff_end_date)
+                fb_inbox_from_kpi = int(fb_kpi_summary.get("inbox_count", 0))
+                fb_lead_from_kpi = int(fb_kpi_summary.get("lead_count", 0))
+            except Exception as exc:
+                logger.warning(f"get_fb_inbox_kpi_summary failed for member={mid}: {exc}")
+
+        # Facebook Post KPI: đếm số bài viết đã đăng từ fb_post_kpi
+        fb_post_count = 0
+        try:
+            from app.modules.all_platform.services.fb_post_kpi_service import get_fb_post_kpi_summary
+            fb_post_summary = get_fb_post_kpi_summary(member_email, eff_start_date, eff_end_date)
+            fb_post_count = int(fb_post_summary.get("post_count", 0))
+        except Exception as exc:
+            logger.warning(f"get_fb_post_kpi_summary failed for member={mid}: {exc}")
+
+        # Tổng inbox = Zalo inbox + FB seeder messages + FB counted via "Tính Inbox"
+        total_inbox_current = inbox_current + fb_inbox_from_seeder + fb_inbox_from_kpi
 
         members_data.append({
             "id": mid,
@@ -258,16 +268,17 @@ def get_all_kpis_for_leader(leader_email: str, id_team: Optional[str] = None) ->
                 "verified_count": comment_current,
                 "kpi_target": active_kpi.get("kpi_comment", 0),
                 "kpi_post": active_kpi.get("kpi_post", 0),
-                "kpi_post_current": post_current,
+                "kpi_post_current": fb_post_count,  # FB Post KPI từ fb_post_kpi
                 "kpi_lead": active_kpi.get("kpi_lead", 0),
-                "kpi_lead_current": lead_current,
+                "kpi_lead_current": lead_current + fb_lead_from_kpi,
                 "kpi_inbox": active_kpi.get("kpi_inbox", 0),
                 "kpi_inbox_current": total_inbox_current,
                 "kpi_inbox_zalo": inbox_current,
-                "kpi_inbox_fb": fb_inbox_current,
+                "kpi_inbox_fb_seeder": fb_inbox_from_seeder,
+                "kpi_inbox_fb_kpi": fb_inbox_from_kpi,
                 "kpi_inbox_range": {
-                    "start": start_date,
-                    "end": end_date,
+                    "start": eff_start_date,
+                    "end": eff_end_date,
                 },
             },
             "seeding_items": member_comments,
@@ -327,17 +338,30 @@ def get_kpi_by_email(email: str) -> dict:
 
         # FB Messenger inbox từ seeder service
         member_email_lower = email.strip().lower()
+        kpi_inbox_fb_seeder = 0
+        kpi_inbox_fb_kpi = 0
         try:
             fb_progress = _compute_fb_inbox_progress(
                 [member_email_lower],
                 kpi.get("start_date"),
                 kpi.get("end_date"),
             )
-            kpi_inbox_fb = int(fb_progress.get(member_email_lower, {}).get("kpi_fb_inbox_count", 0))
+            kpi_inbox_fb_seeder = int(fb_progress.get(member_email_lower, {}).get("kpi_fb_inbox_count", 0))
         except Exception as exc:
             logger.warning(f"_compute_fb_inbox_progress failed for email={email}: {exc}")
 
-        kpi_inbox_current = kpi_inbox_zalo + kpi_inbox_fb
+        # FB inbox KPI từ Supabase fb_inbox_kpi table (manually counted via "Tính Inbox")
+        try:
+            fb_kpi_summary = get_fb_inbox_kpi_summary(
+                member_email_lower,
+                kpi.get("start_date"),
+                kpi.get("end_date"),
+            )
+            kpi_inbox_fb_kpi = int(fb_kpi_summary.get("inbox_count", 0))
+        except Exception as exc:
+            logger.warning(f"get_fb_inbox_kpi_summary failed for email={email}: {exc}")
+
+        kpi_inbox_current = kpi_inbox_zalo + kpi_inbox_fb_seeder + kpi_inbox_fb_kpi
 
         return {
             "email": email,
@@ -348,7 +372,8 @@ def get_kpi_by_email(email: str) -> dict:
             "kpi": [kpi],
             "kpi_inbox_current": kpi_inbox_current,
             "kpi_inbox_zalo": kpi_inbox_zalo,
-            "kpi_inbox_fb": kpi_inbox_fb,
+            "kpi_inbox_fb_seeder": kpi_inbox_fb_seeder,
+            "kpi_inbox_fb_kpi": kpi_inbox_fb_kpi,
             "kpi_inbox_target": kpi_inbox_target,
             "profile_id": user.get("profile_id"),
             "facebook_name": user.get("facebook_name"),
@@ -666,3 +691,259 @@ def get_kpi_inbox_progress_by_email(
     member_id = str(res.data[0]["id"])
     progress = compute_kpi_inbox_progress([member_id], start_date, end_date)
     return progress.get(member_id, {"kpi_inbox_current": 0, "account_ids": [], "range": {}})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Facebook Inbox KPI (local Supabase — FB inbox từ seeder service)
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Sau khi leader/admin bấm "Tính Inbox" trên hộp thoại FB:
+#   1. FE gọi POST /kpi/fb-inbox-sync với {user_id, conv_ids}
+#   2. Backend upsert vào bảng fb_inbox_kpi (supabase)
+#   3. Backend proxy request sang seeder service để lưu tin nhắn
+#   4. KPI inbox được tính tổng hợp: Zalo (zalo_conversation_permissions) + FB (fb_inbox_kpi)
+#
+# Bảng fb_inbox_kpi schema:
+#   id (uuid), id_member (uuid FK app_users), id_leader (uuid FK app_users),
+#   conv_id (text), user_id (text — FB user_id), message_count (int),
+#   is_lead (bool), synced_at (timestamptz), created_at (timestamptz)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def count_fb_inbox_kpi(
+    member_email: str,
+    leader_email: str,
+    conv_ids: List[str],
+    user_id: str,
+    is_lead: bool = False,
+) -> dict:
+    """Upsert inbox KPI count cho 1 hoặc nhiều hội thoại FB.
+
+    Mỗi hội thoại = 1 inbox KPI count.
+    Nếu is_lead=True -> đánh dấu là lead tiềm năng.
+
+    Trả: {"synced": n, "lead": m} với số lượng upsert thành công.
+
+    LUỒNG MỚI:
+    1. Gọi resolve_id_member() từ fb_inbox_account_service - dùng bảng fb_inbox_accounts
+    2. Nếu không tìm thấy -> thử các fallback cũ (social_accounts, profile_id, Markee)
+    3. Lưu vào fb_inbox_kpi với id_member đã resolve
+    """
+    supabase: Client = get_supabase_client()
+
+    # Resolve leader email -> user id (always via email)
+    leader_res = supabase.table("app_users").select("id").eq("email", leader_email).limit(1).execute()
+    if not leader_res.data:
+        raise ValueError(f"Không tìm thấy leader với email: {leader_email}")
+    id_leader = leader_res.data[0]["id"]
+
+    # === PRIMARY: Resolve id_member từ bảng fb_inbox_accounts ===
+    from app.modules.all_platform.services.fb_inbox_account_service import resolve_id_member
+    id_member: Optional[str] = resolve_id_member(user_id)
+
+    # === FALLBACK: Các cách resolve cũ nếu bảng mới không có ===
+    if not id_member:
+        # Trường hợp 1 — member_email != leader_email (member tự bấm trên acc của mình):
+        if member_email.lower() != leader_email.lower():
+            member_res = supabase.table("app_users").select("id").eq("email", member_email).limit(1).execute()
+            if member_res.data:
+                id_member = member_res.data[0]["id"]
+        # Trường hợp 2 — member_email == leader_email (admin/leader bấm trên session của member khác)
+        else:
+            # A) Qua social_accounts
+            platforms_res = supabase.table("platforms").select("id").ilike("name", "facebook").limit(1).execute()
+            fb_platform_id = platforms_res.data[0]["id"] if platforms_res.data else None
+
+            if fb_platform_id:
+                fb_acc_res = (
+                    supabase.table("social_accounts")
+                    .select("app_user_id")
+                    .eq("id_platform", fb_platform_id)
+                    .eq("account_profile_id", user_id)
+                    .limit(1)
+                    .execute()
+                )
+                if fb_acc_res.data:
+                    id_member = str(fb_acc_res.data[0]["app_user_id"])
+
+            # B) Fallback: thử qua app_users.profile_id
+            if not id_member:
+                try:
+                    member_by_profile = (
+                        supabase.table("app_users")
+                        .select("id")
+                        .eq("profile_id", user_id)
+                        .limit(1)
+                        .execute()
+                    )
+                    if member_by_profile.data:
+                        id_member = str(member_by_profile.data[0]["id"])
+                except Exception:
+                    pass  # column profile_id may not exist
+
+            # C) Fallback: gọi Markee service
+            if not id_member:
+                try:
+                    import httpx as _hx
+                    import os as _os
+                    _markee_url = (_os.getenv("MARKEE_FB_BASE_URL") or "https://auto-fb.zenithglobal.dev").rstrip("/")
+                    _markee_key = _os.getenv("MARKEE_FB_API_KEY", "").strip()
+                    _h = {"X-API-Key": _markee_key} if _markee_key else {}
+                    with _hx.Client(timeout=10.0) as _c:
+                        _r = _c.get(f"{_markee_url}/session/owner/{user_id}", headers=_h)
+                    if _r.status_code == 200:
+                        _payload = _r.json()
+                        _owner = _payload.get("owner")
+                        if _owner and isinstance(_owner, str) and len(_owner) == 36:
+                            id_member = _owner
+                except Exception:
+                    pass
+
+    if not id_member:
+        raise ValueError(
+            f"Không tìm thấy member sở hữu FB account [{user_id}]. "
+            f"Vui lòng đảm bảo FB account đã được thêm vào hệ thống "
+            f"(vào app -> Quản lý tài khoản -> Thêm FB Inbox Account)."
+        )
+
+    now = datetime.now(timezone.utc).isoformat()
+    synced = 0
+    lead = 0
+
+    for conv_id in conv_ids:
+        existing = (
+            supabase.table("fb_inbox_kpi")
+            .select("id, is_lead")
+            .eq("id_member", id_member)
+            .eq("conv_id", conv_id)
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+
+        if existing.data:
+            existing_row = existing.data[0]
+            # Update only if is_lead changed from False to True
+            if is_lead and not existing_row.get("is_lead"):
+                supabase.table("fb_inbox_kpi").update(
+                    {"is_lead": True, "synced_at": now}
+                ).eq("id", existing_row["id"]).execute()
+                lead += 1
+            else:
+                supabase.table("fb_inbox_kpi").update(
+                    {"message_count": existing_row.get("message_count", 0) + 1, "synced_at": now}
+                ).eq("id", existing_row["id"]).execute()
+            synced += 1
+        else:
+            supabase.table("fb_inbox_kpi").insert({
+                "id_member": id_member,
+                "id_leader": id_leader,
+                "conv_id": conv_id,
+                "user_id": user_id,
+                "message_count": 1,
+                "is_lead": is_lead,
+                "synced_at": now,
+            }).execute()
+            synced += 1
+            if is_lead:
+                lead += 1
+
+    return {"synced": synced, "lead": lead, "member_email": member_email}
+
+
+def get_fb_inbox_kpi_summary(
+    member_email: str,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Lấy tổng hợp KPI inbox FB ĐÃ XÁC NHẬN cho 1 member trong khoảng ngày.
+
+    CHỈ đếm inbox đã được leader/admin xác nhận (is_confirmed=True).
+    Dùng cho hiển thị KPI đã hoàn thành.
+
+    Returns: {inbox_count, lead_count, conv_ids, range}.
+    """
+    supabase: Client = get_supabase_client()
+
+    res = supabase.table("app_users").select("id").eq("email", member_email).limit(1).execute()
+    if not res.data:
+        return {"inbox_count": 0, "lead_count": 0, "conv_ids": [], "range": {}}
+
+    member_id = res.data[0]["id"]
+
+    if start_date and end_date:
+        query = (
+            supabase.table("fb_inbox_kpi")
+            .select("id, conv_id, message_count, is_lead, synced_at")
+            .eq("id_member", member_id)
+            .eq("is_confirmed", True)  # CHỈ đếm inbox ĐÃ XÁC NHẬN
+            .gte("synced_at", start_date)
+            .lte("synced_at", end_date + "T23:59:59")
+        )
+    else:
+        query = (
+            supabase.table("fb_inbox_kpi")
+            .select("id, conv_id, message_count, is_lead, synced_at")
+            .eq("id_member", member_id)
+            .eq("is_confirmed", True)  # CHỈ đếm inbox ĐÃ XÁC NHẬN
+        )
+
+    rows = query.execute().data or []
+    inbox_count = len(rows)
+    lead_count = sum(1 for r in rows if r.get("is_lead"))
+    conv_ids = [r["conv_id"] for r in rows if r.get("conv_id")]
+
+    return {
+        "inbox_count": inbox_count,
+        "lead_count": lead_count,
+        "conv_ids": conv_ids,
+        "range": {"start": start_date or "", "end": end_date or ""},
+    }
+
+
+def get_pending_fb_inbox_kpi(
+    member_email: str,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Lấy danh sách KPI inbox FB CHƯA XÁC NHẬN cho 1 member.
+
+    Dùng cho filter "Chưa xác minh" - hiển thị inbox member đã đề xuất
+    nhưng leader/admin chưa duyệt (is_confirmed=False).
+
+    Returns: {pending_count, pending_conv_ids, range}.
+    """
+    supabase: Client = get_supabase_client()
+
+    res = supabase.table("app_users").select("id").eq("email", member_email).limit(1).execute()
+    if not res.data:
+        return {"pending_count": 0, "pending_conv_ids": [], "range": {}}
+
+    member_id = res.data[0]["id"]
+
+    if start_date and end_date:
+        query = (
+            supabase.table("fb_inbox_kpi")
+            .select("id, conv_id, message_count, is_lead, synced_at")
+            .eq("id_member", member_id)
+            .eq("is_confirmed", False)  # CHỈ lấy inbox CHƯA XÁC NHẬN
+            .gte("synced_at", start_date)
+            .lte("synced_at", end_date + "T23:59:59")
+        )
+    else:
+        query = (
+            supabase.table("fb_inbox_kpi")
+            .select("id, conv_id, message_count, is_lead, synced_at")
+            .eq("id_member", member_id)
+            .eq("is_confirmed", False)  # CHỈ lấy inbox CHƯA XÁC NHẬN
+        )
+
+    rows = query.execute().data or []
+    pending_count = len(rows)
+    pending_conv_ids = [r["conv_id"] for r in rows if r.get("conv_id")]
+
+    return {
+        "pending_count": pending_count,
+        "pending_conv_ids": pending_conv_ids,
+        "range": {"start": start_date or "", "end": end_date or ""},
+    }
