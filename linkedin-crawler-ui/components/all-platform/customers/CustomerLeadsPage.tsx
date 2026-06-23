@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { customerLeadService, CustomerLead, SDRUser } from "@/services/customer-lead.service";
-import { Plus, Edit2, Trash2, MessageCircle, AlertCircle, CheckCircle } from "lucide-react";
+import { MaterialIcon } from "@/components/ui";
 import toast from "react-hot-toast";
 
 export default function CustomerLeadsPage() {
@@ -133,7 +133,7 @@ export default function CustomerLeadsPage() {
           onClick={() => handleOpenForm()}
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
         >
-          <Plus size={18} /> Thêm Khách hàng
+          <MaterialIcon name="add" className="text-[18px]" /> Thêm Khách hàng
         </button>
       </div>
 
@@ -189,14 +189,14 @@ export default function CustomerLeadsPage() {
                             className="text-blue-600 hover:text-blue-900 flex items-center gap-1 bg-blue-50 px-2 py-1 rounded"
                             title="Mở hội thoại xử lý"
                           >
-                            <MessageCircle size={16} /> Xử lý
+                            <MaterialIcon name="chat" className="text-[16px]" /> Xử lý
                           </a>
                         )}
                         <button onClick={() => handleOpenForm(lead)} className="text-indigo-600 hover:text-indigo-900" title="Sửa">
-                          <Edit2 size={18} />
+                          <MaterialIcon name="edit" className="text-[18px]" />
                         </button>
                         <button onClick={() => handleDelete(lead.id)} className="text-red-600 hover:text-red-900" title="Xóa">
-                          <Trash2 size={18} />
+                          <MaterialIcon name="delete" className="text-[18px]" />
                         </button>
                       </div>
                     </td>
@@ -288,7 +288,7 @@ export default function CustomerLeadsPage() {
 
               {formData.status === "rejected" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1 text-red-600 flex items-center gap-1"><AlertCircle size={14}/> Lý do từ chối</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1 text-red-600 flex items-center gap-1"><MaterialIcon name="error" className="text-[14px]" /> Lý do từ chối</label>
                   <input 
                     type="text" 
                     value={formData.reject_reason} 
@@ -321,7 +321,7 @@ export default function CustomerLeadsPage() {
                 onClick={handleSave}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2"
               >
-                <CheckCircle size={18} /> Lưu lại
+                <MaterialIcon name="check_circle" className="text-[18px]" /> Lưu lại
               </button>
             </div>
           </div>
