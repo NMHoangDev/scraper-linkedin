@@ -254,6 +254,8 @@ function InboxPageContent() {
   const convsErrorStreakRef = useRef(0);
   const convsAbortRef = useRef<AbortController | null>(null);
   const replyInFlightRef = useRef(false);
+  const threadDeltaInFlightRef = useRef(false);
+  const lastFocusLoadAtRef = useRef(0);
   // Preview hội thoại lần cuối nhìn thấy — để phát hiện có tin mới mà không cần quét lại mù quáng
   const lastSeenPreviewRef = useRef<Record<string, string>>({});
 
@@ -644,9 +646,14 @@ function InboxPageContent() {
     return () => clearInterval(t);
   }, [acc, sessions, needRelogin]);
 
-  // Khi user quay lại tab (window focus), refresh hộp thư ngay — không chờ poll timer
+  // Khi user quay lại tab (window focus), refresh hộp thư — debounce 4s tránh gọi liên tục khi alt-tab
   useEffect(() => {
-    const onFocus = () => { void loadConvs(); };
+    const onFocus = () => {
+      const now = Date.now();
+      if (now - lastFocusLoadAtRef.current < 4000) return;
+      lastFocusLoadAtRef.current = now;
+      void loadConvs();
+    };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [loadConvs]);
@@ -990,32 +997,45 @@ function InboxPageContent() {
 
   useEffect(() => {
     if (!openConv || !acc) return;
-    const t = setInterval(async () => {
-      if (document.hidden) return;
-      const reqN = msgsRef.current.length;
-      try {
-        const url = reqN === 0
-          ? `/inbox/thread?user_id=${encodeURIComponent(acc)}&conv_id=${encodeURIComponent(openConv)}`
-          : `/inbox/thread?user_id=${encodeURIComponent(acc)}&conv_id=${encodeURIComponent(openConv)}&since_n=${reqN}`;
-        const r = await fbFetch(url);
-        const d = await r.json();
-        if (!Array.isArray(d.messages) || d.messages.length === 0) return;
-        // Nếu list đã thay đổi (poll chính vừa thay) thì bỏ delta cũ này — vòng sau sẽ bắt lại đúng since_n.
-        if (msgsRef.current.length !== reqN) return;
-        if (reqN === 0) {
-          const fresh = normalizeThreadMessages(d.messages);
-          setMsgs(fresh); msgsRef.current = fresh; saveThreadCache(openConv, fresh, d.loaded_at ?? undefined);
-        } else {
-          setMsgs(prev => {
-            const next = mergeThreadMessages(prev, d.messages);
-            msgsRef.current = next;
-            saveThreadCache(openConv, next, d.loaded_at ?? undefined);
-            return next;
-          });
+    let cancelled = false;
+
+    const poll = async () => {
+      while (!cancelled) {
+        await new Promise(r => window.setTimeout(r, THREAD_DELTA_POLL_MS));
+        if (cancelled) break;
+        if (document.hidden) continue;
+        if (threadDeltaInFlightRef.current) continue;
+        threadDeltaInFlightRef.current = true;
+        const reqN = msgsRef.current.length;
+        try {
+          const url = reqN === 0
+            ? `/inbox/thread?user_id=${encodeURIComponent(acc)}&conv_id=${encodeURIComponent(openConv)}`
+            : `/inbox/thread?user_id=${encodeURIComponent(acc)}&conv_id=${encodeURIComponent(openConv)}&since_n=${reqN}`;
+          const r = await fbFetch(url);
+          const d = await r.json();
+          if (cancelled) break;
+          if (!Array.isArray(d.messages) || d.messages.length === 0) continue;
+          // Nếu list đã thay đổi (poll chính vừa thay) thì bỏ delta cũ — vòng sau sẽ bắt đúng since_n.
+          if (msgsRef.current.length !== reqN) continue;
+          if (reqN === 0) {
+            const fresh = normalizeThreadMessages(d.messages);
+            setMsgs(fresh); msgsRef.current = fresh; saveThreadCache(openConv, fresh, d.loaded_at ?? undefined);
+          } else {
+            setMsgs(prev => {
+              const next = mergeThreadMessages(prev, d.messages);
+              msgsRef.current = next;
+              saveThreadCache(openConv, next, d.loaded_at ?? undefined);
+              return next;
+            });
+          }
+        } catch { /* ignore */ } finally {
+          threadDeltaInFlightRef.current = false;
         }
-      } catch { /* ignore */ }
-    }, THREAD_DELTA_POLL_MS);
-    return () => clearInterval(t);
+      }
+    };
+
+    void poll();
+    return () => { cancelled = true; threadDeltaInFlightRef.current = false; };
   }, [openConv, acc, saveThreadCache]);
 
   useEffect(() => {
