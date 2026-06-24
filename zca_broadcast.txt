@@ -1,0 +1,6 @@
+84:            message_id = message["id"]
+91:                    await log_callback(campaign_id, group_name, "sent", "Text sent by ZCA API", message_id)
+100:                        await log_callback(campaign_id, group_name, "sent", "Images sent by ZCA API", message_id)
+104:                    await log_callback(campaign_id, group_name, "skipped", "No selected content to send", message_id)
+106:                logger.warning(f"ZCA broadcast failed for message {message_id} to {group_name}: {exc}")
+107:                await log_callback(campaign_id, group_name, "failed", str(exc), message_id)

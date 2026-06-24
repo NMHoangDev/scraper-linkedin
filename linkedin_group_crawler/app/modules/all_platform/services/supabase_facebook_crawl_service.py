@@ -107,8 +107,16 @@ def save_facebook_crawl_to_supabase(user_id: str, summaries: List[GroupSummary])
         
     group_map = {g.get("group_url"): g for g in groups_db if g.get("group_url")}
     
+    # 2. Get existing posts to avoid duplicates
+    all_post_urls = [s.hot_post.url for s in summaries if s.hot_post and s.hot_post.url]
+    existing_urls = set()
+    if all_post_urls:
+        res_existing = supabase.table("facebook_posts").select("post_url").in_("post_url", all_post_urls).execute()
+        existing_urls = {p["post_url"] for p in (res_existing.data or []) if p.get("post_url")}
+    
     posts_to_insert = []
     errors = []
+    duplicates = 0
     
     for summary in summaries:
         if not summary.hot_post:
@@ -119,6 +127,10 @@ def save_facebook_crawl_to_supabase(user_id: str, summaries: List[GroupSummary])
         group_id = db_group.get("id")
         
         post = summary.hot_post
+        
+        if post.url in existing_urls:
+            duplicates += 1
+            continue
         
         # Format post.date properly if needed, parsing Vietnamese relative times
         post_time = parse_facebook_time(post.date) if post.date else None
@@ -137,7 +149,7 @@ def save_facebook_crawl_to_supabase(user_id: str, summaries: List[GroupSummary])
             "image_urls": [],
             "created_at": now_iso,
             "updated_at": now_iso,
-            "id_member": user_id
+            "id_member": summary.id_member or user_id
         }
         
         # Chỉ chèn các bài có group_id để đảm bảo Foreign Key Constraint (nếu có)
@@ -147,9 +159,9 @@ def save_facebook_crawl_to_supabase(user_id: str, summaries: List[GroupSummary])
     if posts_to_insert:
         try:
             res = supabase.table("facebook_posts").insert(posts_to_insert).execute()
-            return {"total_posts": len(res.data or []), "errors": errors}
+            return {"total_posts": len(res.data or []), "errors": errors, "duplicates": duplicates}
         except Exception as e:
             logger.error(f"Error saving FB posts to Supabase: {e}")
             errors.append(str(e))
             
-    return {"total_posts": 0, "errors": errors}
+    return {"total_posts": 0, "errors": errors, "duplicates": duplicates}

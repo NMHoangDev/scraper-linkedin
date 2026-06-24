@@ -1,0 +1,3 @@
+{"success":true,"message":"Service is healthy","data":null}
+{"detail":"Not Found"}
+{"detail":"Not Found"}

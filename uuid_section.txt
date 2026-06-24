@@ -1,0 +1,26 @@
+    if not message_ids:
+        return []
+    
+    uuid_ids = []
+    source_ids = []
+    for mid in message_ids:
+        try:
+            uuid.UUID(mid)
+            uuid_ids.append(mid)
+        except ValueError:
+            source_ids.append(mid)
+            
+    params = {
+        "select": "*,assets:zalo_message_assets(*)",
+        "user_id": f"eq.{user_id}",
+    }
+    
+    if uuid_ids and source_ids:
+        quoted_uuids = ",".join(uuid_ids)
+        quoted_sources = ",".join(source_ids)
+        params["or"] = f"(id.in.({quoted_uuids}),source_message_id.in.({quoted_sources}))"
+    elif uuid_ids:
+        quoted_uuids = ",".join(uuid_ids)
+        params["id"] = f"in.({quoted_uuids})"
+    elif source_ids:
+        quoted_sources = ",".join(source_ids)

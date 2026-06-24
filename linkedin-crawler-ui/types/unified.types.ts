@@ -11,6 +11,14 @@ export type UserRole = "member" | "leader" | "admin";
 
 // ── Posts ────────────────────────────────────────────────────────────────────
 
+export interface UnifiedSeedingInfo {
+  member_name?: string;
+  seeding_content?: string;
+  seeding_name?: string;
+  link_comment?: string;
+  verify_status?: VerifyStatus;
+}
+
 export interface UnifiedPost {
   id: string;
   platform: FeedPlatform;
@@ -27,6 +35,7 @@ export interface UnifiedPost {
   comments: number;
   shares: number;
   author?: string;
+  author_url?: string;
   media_url?: string;
   image_urls?: string[];
   intent?: string;
@@ -41,6 +50,9 @@ export interface UnifiedPost {
   seeding_name?: string;
   link_comment?: string;
   verify_status?: VerifyStatus;
+  crawler_name?: string;
+  crawler_team?: string;
+  all_seedings?: UnifiedSeedingInfo[];
 }
 
 export interface GetAllPostsRequest {
@@ -106,7 +118,7 @@ export interface KpiAssignment {
   url_profile?: string;
   email_leader: string;
   platform: FeedPlatform;
-  kpi_per_week: number;
+  kpi_comment: number;
   start_date: string;
   end_date: string;
   status: "active" | "inactive";
@@ -193,6 +205,7 @@ export interface FacebookGroup {
   risk_note?: string;
   assignee_id?: string;
   co_assignee_id?: string;
+  id_member?: string;
 }
 
 export interface LinkedInGroup {
@@ -224,6 +237,7 @@ export interface LinkedInGroup {
   risk_note?: string;
   assignee_id?: string;
   co_assignee_id?: string;
+  id_member?: string;
 }
 
 // ── Crawl Sessions ─────────────────────────────────────────────────────────────

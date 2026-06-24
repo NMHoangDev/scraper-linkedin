@@ -1,0 +1,9 @@
+NAMES                   STATUS                    PORTS
+seeding-backend         Up 59 minutes (healthy)   8000/tcp
+seeding-router          Up About an hour          80/tcp, 0.0.0.0:8080->8080/tcp, :::8080->8080/tcp
+seeding-frontend        Up 2 hours                3000/tcp
+nginx_proxy             Up 2 days                 0.0.0.0:8081->80/tcp, :::8081->80/tcp
+crawl_fb_backend_ssh1   Up 2 days                 
+zalo-api-vnc            Up 2 days (healthy)       0.0.0.0:5900->5900/tcp, :::5900->5900/tcp, 0.0.0.0:6080->6080/tcp, :::6080->6080/tcp, 0.0.0.0:8000->8000/tcp, :::8000->8000/tcp
+crawl-zalo-api          Up 3 days                 0.0.0.0:8808->8808/tcp, :::8808->8808/tcp
+nextjs-crawldfb         Up 3 days                 0.0.0.0:3234->3234/tcp, :::3234->3234/tcp

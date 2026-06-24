@@ -40,4 +40,6 @@ from app.modules.all_platform.schemas.auth import (
     SocialAccountUpdateRequest,
     ChangePasswordRequest,
     DeactivateAccountRequest,
+    CheckEmailRequest,
+    ResetPasswordRequest,
 )

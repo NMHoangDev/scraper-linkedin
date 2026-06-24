@@ -76,7 +76,7 @@ function CategoryModal({ isOpen, onClose, onSave, editing, categoryType }: any) 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-[#FFFFFF] p-6 shadow-xl border border-[#E5E5E5] max-h-[90vh] overflow-y-auto">
+      <div className="w-full max-w-[448px] rounded-2xl bg-[#FFFFFF] p-6 shadow-xl border border-[#E5E5E5] max-h-[90vh] overflow-y-auto">
         <h2 className="mb-4 text-lg font-bold text-[#1A1A1A]">
           {editing ? "Sửa" : "Thêm"} danh mục
         </h2>
@@ -197,7 +197,7 @@ function TeamModal({ isOpen, onClose, onSave, editing }: any) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-[#FFFFFF] p-6 shadow-xl border border-[#E5E5E5] max-h-[90vh] flex flex-col">
+      <div className="w-full max-w-[448px] rounded-2xl bg-[#FFFFFF] p-6 shadow-xl border border-[#E5E5E5] max-h-[90vh] flex flex-col">
         <h2 className="mb-4 text-lg font-bold text-[#1A1A1A] shrink-0">
           {editing ? "Sửa" : "Thêm"} Team
         </h2>

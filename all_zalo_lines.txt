@@ -1,0 +1,7 @@
+app/modules/all_platform/services/supabase_kpi_service.py:408:#   - zalo_messages.user_id       -> zalo_accounts.account_id
+app/modules/all_platform/services/supabase_kpi_service.py:409:#   - zalo_messages.is_sent=false -> tin nhắn nhận từ khách
+app/modules/all_platform/zalo/services/supabase_inbox_share_service.py:364:                            supabase.table("zalo_messages")
+app/modules/all_platform/zalo/api/routes/conversations.py:703:      zalo_messages với unique key `(user_id, group_id, source_message_id)`,
+app/modules/all_platform/zalo/api/routes/auth.py:1475:      ``zalo_groups``, ``zalo_messages`` (xoá theo user_id / account_id)
+app/modules/all_platform/zalo/api/routes/auth.py:1506:            "zalo_messages": 0,
+app/modules/all_platform/zalo/api/routes/auth.py:1533:    # 4. Xoá Supabase: zalo_accounts, zalo_sessions, zalo_users, zalo_groups, zalo_messages

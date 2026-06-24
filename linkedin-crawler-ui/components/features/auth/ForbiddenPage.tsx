@@ -10,7 +10,7 @@ export function ForbiddenPage() {
         <MaterialIcon name="block" className="text-5xl" />
       </div>
       <h1 className="text-h1 font-black text-on-surface mb-md">403 - TRUY CẬP BỊ TỪ CHỐI</h1>
-      <p className="text-body-lg text-on-surface-variant max-w-md mb-xl">
+      <p className="text-body-lg text-on-surface-variant max-w-[480px] mb-xl">
         Bạn không có quyền truy cập vào trang này. Khu vực này chỉ dành cho quản trị viên hoặc trưởng nhóm.
       </p>
       <Link 

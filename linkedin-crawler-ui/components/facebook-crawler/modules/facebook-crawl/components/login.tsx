@@ -29,7 +29,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen w-full min-w-[100vw] flex items-center justify-center bg-surface-container-lowest p-lg relative">
-      <div className="w-full max-w-sm min-w-[320px] sm:w-[384px] shrink-0 bg-surface rounded-xl border border-outline-variant shadow-xl p-lg">
+      <div className="w-full max-w-[384px] min-w-[320px] sm:w-[384px] shrink-0 bg-surface rounded-xl border border-outline-variant shadow-xl p-lg">
 
         {/* Logo/Brand */}
         <div className="flex flex-col items-center text-center mb-lg">
@@ -128,7 +128,7 @@ export default function LoginPage() {
           aria-modal="true"
           aria-labelledby="otp-modal-title"
         >
-          <div className="border-outline-variant bg-surface w-full max-w-sm rounded-xl border p-lg shadow-xl flex flex-col items-center">
+          <div className="border-outline-variant bg-surface w-full max-w-[384px] rounded-xl border p-lg shadow-xl flex flex-col items-center">
             {/* Icon cảnh báo */}
             <div className="w-12 h-12 rounded-full bg-secondary-container/30 flex items-center justify-center text-secondary mb-md">
               <MaterialIcon name="lock" className="text-[24px]" />

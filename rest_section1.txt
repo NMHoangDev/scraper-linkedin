@@ -1,0 +1,379 @@
+    accounts = await list_zalo_accounts(owner_id)
+    account_by_id = {str(row.get("account_id")): row for row in accounts}
+
+    selected_ids = [item for item in (account_ids or []) if item]
+    if not selected_ids:
+        selected_ids = list(account_by_id.keys())
+    if not selected_ids:
+        return {"accounts": [], "customers": [], "total_messages": 0, "total_customers": 0}
+
+    params = {
+        "select": "id,user_id,group_id,group_name,source_message_id,sender_id,sender_name,timestamp_text,time_text,type,content,is_sent,created_at",
+        "user_id": f"in.({','.join(selected_ids)})",
+        "is_deleted": "eq.false",
+        "order": "created_at.desc",
+        "limit": str(max(1, min(limit, 5000))),
+    }
+    rows = await _rest("GET", "zalo_messages", params=params) or []
+
+    account_stats: Dict[str, Dict[str, Any]] = {}
+    customer_stats: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    for row in rows:
+        account_id = str(row.get("user_id") or "default")
+        account = account_by_id.get(account_id) or {"account_id": account_id, "label": account_id}
+        acc = account_stats.setdefault(
+            account_id,
+            {
+                "account_id": account_id,
+                "label": account.get("label") or account_id,
+                "owner_id": account.get("owner_id") or owner_id or "default",
+                "message_count": 0,
+                "customer_count": 0,
+                "latest_message_at": None,
+            },
+        )
+        acc["message_count"] += 1
+        if not acc["latest_message_at"]:
+            acc["latest_message_at"] = row.get("created_at")
+
+        customer_id = str(row.get("group_id") or row.get("sender_id") or row.get("group_name") or "unknown")
+        key = (account_id, customer_id)
+        customer = customer_stats.setdefault(
+            key,
+            {
+                "account_id": account_id,
+                "account_label": account.get("label") or account_id,
+                "customer_id": customer_id,
+                "customer_name": row.get("group_name") or row.get("sender_name") or customer_id,
+                "conversation_id": row.get("group_id"),
+                "conversation_name": row.get("group_name"),
+                "message_count": 0,
+                "sent_count": 0,
+                "received_count": 0,
+                "latest_message_at": None,
+                "latest_content": None,
+            },
+        )
+        customer["message_count"] += 1
+        if row.get("is_sent"):
+            customer["sent_count"] += 1
+        else:
+            customer["received_count"] += 1
+        if not customer["latest_message_at"]:
+            customer["latest_message_at"] = row.get("created_at")
+            customer["latest_content"] = row.get("content")
+
+    for account_id in account_stats:
+        account_stats[account_id]["customer_count"] = sum(1 for key in customer_stats if key[0] == account_id)
+
+    customers = sorted(customer_stats.values(), key=lambda item: item.get("latest_message_at") or "", reverse=True)
+    accounts_out = sorted(account_stats.values(), key=lambda item: item.get("latest_message_at") or "", reverse=True)
+    return {
+        "accounts": accounts_out,
+        "customers": customers,
+        "total_messages": sum(item["message_count"] for item in accounts_out),
+        "total_customers": len(customers),
+    }
+
+
+async def save_listener_messages(
+    user_id: str,
+    group_id: str,
+    group_name: str,
+    messages: Iterable[Message],
+    *,
+    increment_unread: bool = True,
+) -> int:
+    if not is_supabase_configured():
+        return 0
+
+    safe_group_name = group_name or group_id
+    messages_list = list(messages)
+
+    unread_inc = 0
+    if increment_unread:
+        for msg in messages_list:
+            if not msg.is_sent:
+                unread_inc += 1
+
+    current_unread = 0
+    if unread_inc > 0:
+        try:
+            group_rows = await _rest(
+                "GET",
+                "zalo_groups",
+                params={
+                    "select": "unread_count",
+                    "user_id": f"eq.{user_id}",
+                    "group_id": f"eq.{group_id}",
+                    "limit": "1",
+                },
+            ) or []
+            if group_rows:
+                current_unread = int(group_rows[0].get("unread_count") or 0)
+        except Exception as exc:
+            logger.warning(f"Could not fetch current unread count for group={group_id}: {exc}")
+
+    # Tìm tin nhắn mới nhất theo timestamp để update group metadata.
+    last_message = None
+    if messages_list:
+        last_message = max(
+            messages_list,
+            key=lambda msg: _parse_to_millis(msg.timestamp) or _parse_to_millis(msg.time_text),
+        )
+
+    last_message_at_value = None
+    if last_message:
+        ts_ms = _parse_to_millis(last_message.timestamp) or _parse_to_millis(last_message.time_text)
+        if ts_ms > 0:
+            last_message_at_value = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+
+    await upsert_group(
+        user_id=user_id,
+        group_id=group_id,
+        group_name=safe_group_name,
+        unread_count=(current_unread + unread_inc) if unread_inc > 0 else None,
+        last_message_at=last_message_at_value,
+        last_message_content=last_message.content if last_message else None,
+        last_sender_id=last_message.sender_id if last_message else None,
+        last_sender_name=last_message.sender_name if last_message else None,
+        last_message_type=last_message.type if last_message else None,
+    )
+
+    saved_count = 0
+    uploaded_images = 0
+    failed_images = 0
+    for msg in messages_list:
+        if not msg.message_id:
+            continue
+        rows = await _rest(
+            "POST",
+            "zalo_messages",
+            json=[_listener_message_payload(user_id, group_id, safe_group_name, msg)],
+            params={"on_conflict": "user_id,group_id,source_message_id"},
+            prefer="resolution=merge-duplicates,return=representation",
+        )
+        if not rows:
+            continue
+        saved_count += 1
+        message_uuid = rows[0]["id"]
+        asset_stats = await save_message_assets(message_uuid, user_id, None, msg.image_urls)
+        uploaded_images += asset_stats["uploaded"]
+        failed_images += asset_stats["failed"]
+
+    if saved_count:
+        logger.info(
+            "Saved Zalo listener messages: user={} group={!r} messages={} images_uploaded={} images_failed={}",
+            user_id,
+            safe_group_name,
+            saved_count,
+            uploaded_images,
+            failed_images,
+        )
+    return saved_count
+
+
+async def save_global_listener_messages(
+    user_id: str,
+    messages: Iterable[Message],
+) -> int:
+    if not is_supabase_configured():
+        return 0
+
+    from collections import defaultdict
+    grouped = defaultdict(list)
+    for msg in messages:
+        g_id = getattr(msg, "group_id", None) or ""
+        if g_id:
+            grouped[g_id].append(msg)
+
+    total_saved = 0
+    for g_id, g_messages in grouped.items():
+        group_rows = await _rest(
+            "GET",
+            "zalo_groups",
+            params={
+                "select": "group_name",
+                "user_id": f"eq.{user_id}",
+                "group_id": f"eq.{g_id}",
+                "limit": "1",
+            },
+        ) or []
+        g_name = group_rows[0].get("group_name") if group_rows else g_id
+        
+        saved = await save_listener_messages(user_id, g_id, g_name, g_messages)
+        total_saved += saved
+
+    return total_saved
+
+
+
+async def list_recent_messages_for_group(
+    user_id: str,
+    group_id: str,
+    limit: int = 500,
+) -> List[Message]:
+    if not is_supabase_configured():
+        return []
+    safe_limit = max(1, min(int(limit or 500), 1000))
+    rows = await _rest(
+        "GET",
+        "zalo_messages",
+        params={
+            "select": "*,assets:zalo_message_assets(*)",
+            "user_id": f"eq.{user_id}",
+            "group_id": f"eq.{group_id}",
+            "is_deleted": "eq.false",
+            "order": "created_at.desc",
+            "limit": str(safe_limit),
+        },
+    ) or []
+    messages = [_message_from_row(row) for row in rows]
+    return [message for message in messages if message.message_id]
+
+
+async def save_message_assets(
+    message_uuid: str,
+    user_id: str,
+    job_id: Optional[str],
+    source_urls: Iterable[str],
+) -> Dict[str, int]:
+    stats = {"uploaded": 0, "failed": 0}
+    existing_assets = {}
+    try:
+        rows = await _rest(
+            "GET",
+            "zalo_message_assets",
+            params={
+                "select": "source_url,status",
+                "message_id": f"eq.{message_uuid}",
+            }
+        ) or []
+        existing_assets = {r["source_url"]: r["status"] for r in rows}
+    except Exception as exc:
+        logger.warning(f"Could not pre-fetch existing zalo_message_assets for message {message_uuid}: {exc}")
+
+    for source_url in source_urls:
+        status = "pending"
+        storage_path = None
+        storage_url = None
+        error = None
+        source_url_ref = source_url
+
+        if source_url.startswith("data:image/"):
+            # Normalize data URL structure to match source_url_ref hash check
+            try:
+                content, content_type, ext = await _download_image(source_url)
+                source_url_ref = f"data:{content_type};sha256={hashlib.sha256(content).hexdigest()}"
+            except Exception:
+                pass
+
+        if existing_assets.get(source_url_ref) == "uploaded":
+            continue
+
+        if source_url.startswith("blob:"):
+            status = "failed"
+            error = "Blob URL is browser-local and cannot be persisted after crawl"
+        else:
+            try:
+                content, content_type, ext = await _download_image(source_url)
+                if source_url.startswith("data:image/"):
+                    source_url_ref = f"data:{content_type};sha256={hashlib.sha256(content).hexdigest()}"
+                storage_path = posixpath.join(
+                    user_id,
+                    job_id or "manual",
+                    f"{message_uuid}-{uuid.uuid4().hex}{ext}",
+                )
+                storage_url = await upload_asset_bytes(storage_path, content, content_type)
+                status = "uploaded"
+                stats["uploaded"] += 1
+            except Exception as exc:
+                logger.warning(f"Could not persist Zalo image {source_url}: {exc}")
+                status = "failed"
+                error = str(exc)
+                stats["failed"] += 1
+        if status == "failed" and source_url.startswith("blob:"):
+            stats["failed"] += 1
+
+        await _rest(
+            "POST",
+            "zalo_message_assets",
+            json=[
+                {
+                    "message_id": message_uuid,
+                    "source_url": source_url_ref,
+                    "storage_path": storage_path,
+                    "storage_url": storage_url,
+                    "status": status,
+                    "error": error,
+                    "updated_at": datetime.utcnow().isoformat(),
+                }
+            ],
+            params={"on_conflict": "message_id,source_url"},
+            prefer="resolution=merge-duplicates",
+        )
+    return stats
+
+
+async def list_library_messages(
+    user_id: str,
+    group_name: Optional[str] = None,
+    limit: int = 200,
+    offset: int = 0,
+    content_kind: str = "all",
+) -> Tuple[List[Dict[str, Any]], int]:
+    safe_limit = max(1, min(limit, 1000))
+    safe_offset = max(0, offset)
+    select_clause = "*,assets:zalo_message_assets(*)"
+    if content_kind == "image":
+        select_clause = "*,assets:zalo_message_assets!inner(*)"
+    params: Dict[str, Any] = {
+        "select": select_clause,
+        "user_id": f"eq.{user_id}",
+        "is_deleted": "eq.false",
+        "order": "created_at.desc",
+        "limit": str(safe_limit),
+        "offset": str(safe_offset),
+    }
+    if group_name:
+        params["group_name"] = f"ilike.*{group_name}*"
+    if content_kind == "text":
+        params["content"] = "not.is.null"
+    if content_kind == "image":
+        params["assets.status"] = "eq.uploaded"
+    rows, total = await _rest_with_count("zalo_messages", params=params)
+    if group_name and not rows:
+        job_rows = await _rest(
+            "GET",
+            "zalo_crawl_jobs",
+            params={
+                "select": "job_id",
+                "user_id": f"eq.{user_id}",
+                "group_name": f"ilike.*{group_name}*",
+                "limit": "200",
+            },
+        ) or []
+        job_ids = [
+            str(job.get("job_id") or "").strip()
+            for job in job_rows
+            if str(job.get("job_id") or "").strip()
+        ]
+        if job_ids:
+            fallback_params = dict(params)
+            fallback_params.pop("group_name", None)
+            fallback_params["job_id"] = "in.(" + ",".join(f'"{job_id}"' for job_id in job_ids) + ")"
+            rows, total = await _rest_with_count("zalo_messages", params=fallback_params)
+    hydrated_rows = await hydrate_message_groups_from_jobs(user_id, rows or [])
+    return hydrated_rows, total
+
+
+def _normalize_iso_timestamp(val: Any) -> Optional[str]:
+    """Chuẩn hóa giá trị thời gian (epoch ms/s hoặc ISO) về ISO-8601 UTC cho cột timestamptz."""
+    if val is None or val == "":
+        return None
+    if isinstance(val, str) and not val.strip().isdigit():
+        # Đã là ISO hoặc text -> giữ nguyên, để Postgres tự parse.
+        return val
+    ms = _parse_to_millis(val)
+    if ms <= 0:
+        return None

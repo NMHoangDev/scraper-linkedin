@@ -1,0 +1,51 @@
+    *,
+    include_deleted: bool = False,
+) -> List[Dict[str, Any]]:
+    if not message_ids:
+        return []
+    
+    uuid_ids = []
+    source_ids = []
+    for mid in message_ids:
+        if _UUID_RE.match(mid):
+            uuid_ids.append(mid)
+        else:
+            source_ids.append(mid)
+            
+    params = {
+        "select": "*,assets:zalo_message_assets(*)",
+        "user_id": f"eq.{user_id}",
+    }
+    
+    if uuid_ids and source_ids:
+        quoted_uuids = ",".join(uuid_ids)
+        quoted_sources = ",".join(source_ids)
+        params["or"] = f"(id.in.({quoted_uuids}),source_message_id.in.({quoted_sources}))"
+    elif uuid_ids:
+        quoted_uuids = ",".join(uuid_ids)
+        params["id"] = f"in.({quoted_uuids})"
+    elif source_ids:
+        quoted_sources = ",".join(source_ids)
+        params["source_message_id"] = f"in.({quoted_sources})"
+    else:
+        return []
+
+    if not include_deleted:
+        params["is_deleted"] = "eq.false"
+        
+    return await _rest(
+        "GET",
+        "zalo_messages",
+        params=params,
+    ) or []
+
+
+async def create_library_message(user_id: str, payload: Dict[str, Any], asset_urls: List[str]) -> Dict[str, Any]:
+    rows = await _rest(
+        "POST",
+        "zalo_messages",
+        json=[
+            {
+                "user_id": user_id,
+                "group_name": payload.get("group_name"),
+                "sender_name": payload.get("sender_name"),

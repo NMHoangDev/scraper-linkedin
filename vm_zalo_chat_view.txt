@@ -1,0 +1,100 @@
+"use client";
+
+import Image from "next/image";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { MaterialIcon, type MaterialSymbolName } from "@/components/ui";
+import { API_BASE_URL, API_KEY } from "@/lib/env";
+import type { ZaloCrawlerFlowValue } from "@/hooks/useZaloCrawlerFlow";
+import {
+  getZaloConversationMessages,
+  getZaloConversations,
+  syncZaloRecentConversations,
+  createZaloBroadcast,
+  sendZaloMessage,
+  sendZaloMessageWithFiles,
+  markZaloConversationAsRead,
+  buildZaloRealtimeStreamUrl,
+  getZaloConversationShareStatus,
+  setZaloConversationShare,
+} from "@/services/zaloCrawlerService";
+import type {
+  ZaloConversationSummary,
+  ZaloLibraryMessage,
+  ZaloSyncRecentResponse,
+  ZaloBroadcastTarget,
+} from "@/types/zalo-api";
+import { ZaloChatHeaderSkeleton, ZaloMessageListSkeleton } from "./chat/ZaloChatSkeleton";
+import { ZaloEmptyChat } from "./chat/ZaloEmptyChat";
+import { ZaloConversationListVirtualized } from "./sidebar/ZaloConversationListVirtualized";
+import { ZaloNewChatModal } from "./ZaloNewChatModal";
+import { ZaloKpiPanel } from "./ZaloKpiPanel";
+
+const REFRESH_INTERVAL_MS = 2000;
+const MESSAGE_PAGE_SIZE = 50;
+const SYNC_CONVERSATION_LIMIT = 50;
+const SYNC_MESSAGES_PER_CONVERSATION = 50;
+const BOTTOM_THRESHOLD_PX = 96;
+
+interface ZaloChatViewProps {
+  flow: ZaloCrawlerFlowValue;
+  onBackToDashboard: () => void;
+  /**
+   * Chế độ full-screen: tăng kích thước UI (font/padding/bubble) cho dễ nhìn.
+   * Dùng khi trang này là 1 route độc lập (vd /zalo-chat) thay vì embed trong shell.
+   */
+  fullScreen?: boolean;
+}
+
+function formatTime(value?: string | null) {
+  if (!value) return "Chưa có";
+  const trimmed = String(value).trim();
+
+  // Case 1: chuỗi số thuần — là timestamp từ Zalo / backend
+  if (/^\d+$/.test(trimmed)) {
+    const num = Number(trimmed);
+    // Zalo trả ms (13 chữ số = 2026). Một số client cũ trả về seconds (10 chữ số = 2026 cũngng có thể).
+    // 13 chữ số = ms (> 10^12). 10 chữ số = seconds (< 10^11).
+    // Nếu < 10^11 → nhân 1000 để ra ms.
+    const ms = num > 1e11 ? num : num * 1000;
+    const date = new Date(ms);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "Asia/Ho_Chi_Minh",
+    });
+  }
+
+  // Case 2: ISO string — backend lưu UTC với 'Z' (vd "2026-06-14T09:36:19.531Z")
+  // Browser sẽ tự parse thành Date object ở UTC. Sau đó hiển thị theo VN.
+  const date = new Date(trimmed);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Ho_Chi_Minh",
+  });
+}
+
+function shortId(value: string, head = 10, tail = 6) {
+  if (value.length <= head + tail + 3) return value;
+  return `${value.slice(0, head)}...${value.slice(-tail)}`;
+}
+
+function isFallbackName(name: string | null | undefined, id: string) {
+  const cleanName = String(name || "").trim();
+  return !cleanName || cleanName === id || cleanName === `Conversation ${id}`;
+}
+
+function conversationTitle(conversation: ZaloConversationSummary | null) {
+  if (!conversation) return "Chọn một hội thoại";
+  if (isFallbackName(conversation.conversation_name, conversation.conversation_id)) {
+    return "Hội thoại chưa đặt tên";
+  }

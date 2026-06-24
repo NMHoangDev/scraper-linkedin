@@ -10,8 +10,13 @@ from app.modules.all_platform.services.supabase_seeding_service import (
 )
 from app.modules.all_platform.services.supabase_kpi_service import (
     assign_kpi,
+    compute_kpi_inbox_progress,
     get_all_kpis_for_leader,
     get_kpi_by_email,
+    get_kpi_inbox_progress_by_email,
+    count_fb_inbox_kpi,
+    get_fb_inbox_kpi_summary,
+    get_pending_fb_inbox_kpi,
     sync_kpi_progress,
     check_permission,
     verify_leader_code,
@@ -66,11 +71,13 @@ from app.modules.all_platform.services.auth_service import (
     create_access_token,
     verify_leader_code,
     promote_to_leader,
+    promote_to_leader,
     get_user_sessions,
     delete_session,
     delete_all_sessions,
     change_password,
     deactivate_account,
+    reset_password_without_old,
 )
 from app.modules.all_platform.services.social_accounts_service import (
     get_social_accounts,

@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
+import sys
 import asyncio
+
+if sys.platform == "win32":
+    try:
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    except AttributeError:
+        pass
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
@@ -12,7 +19,7 @@ from fastapi.responses import JSONResponse
 from app.modules.linkedin.router import linkedin_app_router, router
 from app.modules.linkedin.schemas.response_models import BaseResponse
 from app.core.config import settings
-from app.modules.facebook.src.jobs.daily_crawl_job import setup_and_start_jobs
+from app.modules.all_platform.jobs.crawl_24h_job import setup_all_platform_jobs
 from app.modules.facebook.src.modules.api_router.index import api_router
 from app.modules.all_platform.router import all_platform_router
 from app.core.playwright_browser_pool import (
@@ -35,7 +42,14 @@ ensure_directory(settings.session_storage_dir)
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     warmup_task: asyncio.Task[None] | None = None
-    setup_and_start_jobs()
+    zca_listeners_task: asyncio.Task[None] | None = None
+    # An toàn khi chạy dev/local: đặt env DISABLE_SCHEDULER=1 để KHÔNG bật scheduler tự cào
+    # (tránh cào bằng acc production khi dev). Production không set -> chạy như cũ.
+    import os as _os
+    if _os.getenv("DISABLE_SCHEDULER", "").strip() in ("1", "true", "True"):
+        logger.warning("DISABLE_SCHEDULER enabled -> not starting scheduler.")
+    else:
+        setup_all_platform_jobs()
     async def _warmup_background() -> None:
         try:
             await asyncio.to_thread(warmup_playwright_pool)
@@ -48,6 +62,28 @@ async def lifespan(_: FastAPI):
     if settings.playwright_warmup_on_startup:
         warmup_task = asyncio.create_task(_warmup_background())
 
+    # ── Auto-start ZCA persistent listeners cho mọi user đã có auth trong disk ──
+    # Không có hook này thì listener chỉ được start khi user mới login QR.
+    # Khi BE restart hoặc restore session cũ, listener không tự chạy → không có
+    # realtime push. Chạy nền (background) để không block startup.
+    async def _start_zca_listeners_background() -> None:
+        try:
+            from app.modules.all_platform.zalo.services.zca_persistent_listener import (
+                start_persisted_listeners,
+            )
+            await start_persisted_listeners()
+            logger.info("ZCA persistent listeners auto-start finished")
+        except Exception:
+            logger.exception(
+                "ZCA persistent listeners auto-start failed — sẽ thử lại khi user login lại",
+            )
+
+
+    if _os.getenv("DISABLE_ZCA_LISTENERS", "").strip().lower() in {"1", "true", "yes"}:
+        logger.warning("DISABLE_ZCA_LISTENERS enabled -> not auto-starting ZCA persistent listeners.")
+    else:
+        zca_listeners_task = asyncio.create_task(_start_zca_listeners_background())
+
     try:
         yield
     finally:
@@ -57,6 +93,19 @@ async def lifespan(_: FastAPI):
                 await warmup_task
             except asyncio.CancelledError:
                 pass
+        if zca_listeners_task is not None and not zca_listeners_task.done():
+            zca_listeners_task.cancel()
+            try:
+                await zca_listeners_task
+            except asyncio.CancelledError:
+                pass
+        try:
+            from app.modules.all_platform.zalo.services.zca_persistent_listener import (
+                shutdown_persistent_listeners,
+            )
+            await shutdown_persistent_listeners()
+        except Exception:
+            logger.exception("ZCA persistent listeners shutdown failed")
         await asyncio.to_thread(shutdown_playwright_pool)
 
 
@@ -80,7 +129,14 @@ async def handle_cors_middleware(request: Request, call_next):
         "http://localhost:8080",
         "http://127.0.0.1:8080",
     }
-    
+    # Thêm origin từ env CORS_ORIGINS (ngăn cách dấu phẩy) — cho phép cấu hình domain deploy
+    # mà không hardcode vào code (vd seeding.zenithglobal.dev khi chạy bản demo).
+    import os as _os
+    for _o in (_os.getenv("CORS_ORIGINS", "") or "").split(","):
+        _o = _o.strip()
+        if _o:
+            allowed_origins.add(_o)
+
     is_allowed = origin in allowed_origins or origin.startswith("chrome-extension://")
 
     if request.method == "OPTIONS":
@@ -91,7 +147,7 @@ async def handle_cors_middleware(request: Request, call_next):
         else:
             response.headers["Access-Control-Allow-Origin"] = origin or "*"
         response.headers["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS, PUT, DELETE, PATCH"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, x-api-key, Authorization"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, x-api-key, Authorization, X-User-ID, X-Session-ID, X-Zalo-Worker-ID"
         return response
 
     response = await call_next(request)
@@ -137,3 +193,4 @@ app.include_router(router)
 app.include_router(linkedin_app_router)
 app.include_router(api_router, prefix="/facebook/api/v1")
 app.include_router(all_platform_router, prefix="/api/all-platform")
+

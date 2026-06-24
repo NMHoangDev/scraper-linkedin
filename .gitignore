@@ -28,6 +28,7 @@ linkedin-crawler-ui/.env*
 # ---- Back-end (linkedin_group_crawler) ----
 linkedin_group_crawler/__pycache__/
 linkedin_group_crawler/.venv/
+linkedin_group_crawler/venv/
 linkedin_group_crawler/.pytest_cache/
 linkedin_group_crawler/.env
 
@@ -46,3 +47,14 @@ linkedin_group_crawler/*.session-journal
 linkedin_group_crawler/data/raw/*.png
 linkedin_group_crawler/data/raw/*.html
 linkedin_group_crawler/app/modules/facebook/src/credentials.json
+
+# Debug/check scripts (Hoàng's local debugging tools — không commit vào repo)
+__*.py
+__*.txt
+__*.json
+__*.ps1
+__*.md
+*.cpython-*.pyc
+linkedin_group_crawler/artifacts/zca-auth/
+realtime_explore/
+linkedin-crawler-ui/realtime_explore/

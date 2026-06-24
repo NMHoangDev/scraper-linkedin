@@ -1,0 +1,239 @@
+2026-06-21 17:54:36.464 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:54230 - "GET /api/all-platform/zalo/conversations/4686231406661695407/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:54220 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:54:38.479 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:54254 - "GET /api/all-platform/zalo/conversations/4686231406661695407/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:54264 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+INFO:     172.26.0.4:54290 - "GET /api/all-platform/zalo/events/share-status?account_id=zl_cd319bbf&conversation_id=3268549805814730747&api_key=secret_api_key HTTP/1.1" 200 OK
+INFO:     172.26.0.4:54298 - "GET /api/all-platform/zalo/conversations/3268549805814730747/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+2026-06-21 17:54:40.524 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:54:42.465 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:54:44.474 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:54:46.493 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:47314 - "GET /api/all-platform/zalo/conversations/3268549805814730747/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:47308 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+INFO:     172.26.0.4:47366 - "GET /api/all-platform/zalo/events/share-status?account_id=zl_cd319bbf&conversation_id=3596423503363073614&api_key=secret_api_key HTTP/1.1" 200 OK
+INFO:     172.26.0.4:47352 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+2026-06-21 17:54:48.619 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:47400 - "GET /api/all-platform/zalo/events/share-status?account_id=zl_cd319bbf&conversation_id=4686231406661695407&api_key=secret_api_key HTTP/1.1" 200 OK
+INFO:     172.26.0.4:47380 - "GET /api/all-platform/zalo/conversations/4686231406661695407/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+2026-06-21 17:54:50.876 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:47432 - "GET /api/all-platform/zalo/events/share-status?account_id=zl_cd319bbf&conversation_id=3596423503363073614&api_key=secret_api_key HTTP/1.1" 200 OK
+INFO:     172.26.0.4:47428 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+2026-06-21 17:54:52.482 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:54:54.474 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:54:56.473 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:55724 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+INFO:     172.26.0.4:55710 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+2026-06-21 17:54:58.465 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:55:00.477 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:55:02.484 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:42588 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:42574 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:55:04.809 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:55:06.840 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:42636 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:42640 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:55:08.811 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:55:10.820 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:37314 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:37310 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:55:12.814 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:55:14.810 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:55:17.027 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:37386 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:37388 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:55:18.809 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:55:20.817 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:55:22.819 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:52980 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:52966 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:55:24.816 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:55:26.818 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:53036 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:53024 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:55:28.805 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:55:30.811 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:55:32.622 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:41132 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:41120 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:55:34.471 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:55:36.932 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:41152 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+INFO:     172.26.0.4:41168 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+2026-06-21 17:55:38.823 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:55:40.838 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:44098 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+2026-06-21 17:55:42.820 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:44096 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:55:45.010 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:55:46.996 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:44168 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:44180 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:55:48.856 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:55:50.819 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:55:53.084 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:41154 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:41140 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:55:54.813 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:55:56.846 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:41186 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:41192 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:55:58.812 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:56:00.815 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:53678 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+2026-06-21 17:56:02.815 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:53674 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:56:04.802 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:56:06.977 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:53708 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+INFO:     172.26.0.4:53712 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+2026-06-21 17:56:08.815 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:56:10.808 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:33286 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+INFO:     172.26.0.4:33272 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+2026-06-21 17:56:12.839 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:56:14.807 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:56:16.861 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:33368 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:33338 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:56:18.820 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:56:20.817 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:56:22.811 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:46160 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:46144 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:56:24.830 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:56:27.001 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:46202 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:46206 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:56:28.819 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:56:30.809 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:56:32.803 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:45934 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:45930 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:56:34.816 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:56:48.975 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:35994 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:35966 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:57:22.404 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:57:22.828 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:54304 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+INFO:     172.26.0.4:54320 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+2026-06-21 17:57:24.818 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:57:26.829 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:54402 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:54392 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:57:28.808 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:57:30.821 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:57:32.810 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:38884 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:38886 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:57:34.841 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:57:37.001 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:38904 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:38908 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:57:38.814 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:57:40.809 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:46334 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+2026-06-21 17:57:42.829 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:46326 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:57:44.825 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:57:47.110 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:46390 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:46366 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:57:48.814 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:57:50.818 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:57:52.824 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:57816 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:57812 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:57:54.803 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:57:56.927 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:57846 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:57852 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:57:58.823 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:58:00.817 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:45266 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+2026-06-21 17:58:02.812 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:45260 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:58:04.811 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:58:06.845 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:45326 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:45308 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:58:08.818 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:58:10.810 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:59586 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+2026-06-21 17:58:12.821 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:59588 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:58:14.810 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:58:16.866 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:59642 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:59656 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:58:18.817 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:58:20.818 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+2026-06-21 17:58:22.812 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:59658 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:59646 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:58:48.826 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:53856 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:53870 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 17:58:58.235 | INFO     | app.modules.all_platform.zalo.services.zca_persistent_listener:_run_once:797 - ZCA listener stdout line#700 user=zl_cd319bbf: {"ts":1782064738235,"event":"heartbeat","user_id":"zl_cd319bbf","pid":473,"uptime_s":3512}
+2026-06-21 17:59:48.943 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:33260 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:33248 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 18:00:02,642 | ERROR | app.modules.facebook.src.modules.telegram.services.telegram_service | ❌ Lỗi Telegram (Status: 400): {"ok":false,"error_code":400,"description":"Bad Request: can't parse entities: Unsupported start tag \"3\" at byte offset 740"}
+2026-06-21 18:00:26.626 | INFO     | app.modules.all_platform.zalo.services.zca_persistent_listener:_run_once:797 - ZCA listener stdout line#500 user=zl_2c470749: {"ts":1782064826626,"event":"heartbeat","user_id":"zl_2c470749","pid":289,"uptime_s":3652}
+2026-06-21 18:00:50.197 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:39168 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:39158 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 18:01:48.838 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:40030 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:40016 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 18:02:49.177 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:53538 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:53516 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 18:03:50.217 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:60276 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:60268 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 18:04:21.454 | INFO     | app.modules.all_platform.zalo.services.supabase_service:save_listener_messages:1037 - Saved Zalo listener messages: user=zl_cd319bbf group='Phú Tuấn' messages=1 images_uploaded=0 images_failed=0
+2026-06-21 18:04:29.338 | INFO     | app.modules.all_platform.zalo.services.supabase_service:save_listener_messages:1037 - Saved Zalo listener messages: user=zl_cd319bbf group='Phú Tuấn' messages=1 images_uploaded=0 images_failed=0
+2026-06-21 18:04:36.388 | INFO     | app.modules.all_platform.zalo.services.zca_persistent_listener:_run_once:797 - ZCA listener stdout line#750 user=zl_cd319bbf: {"ts":1782065076387,"event":"message","user_id":"zl_cd319bbf","message":{"thread_id":"3268549805814730747","message_id":"7961697435902","sender_id":"36191948659899943","sender_name":"Nguyễn Minh Hoàng
+2026-06-21 18:04:37.472 | INFO     | app.modules.all_platform.zalo.services.supabase_service:save_listener_messages:1037 - Saved Zalo listener messages: user=zl_cd319bbf group='Phú Tuấn' messages=1 images_uploaded=0 images_failed=0
+2026-06-21 18:04:48.849 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:47510 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:47500 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 18:05:48.847 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:37690 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:37678 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 18:06:36.835 | INFO     | app.modules.all_platform.zalo.services.zca_persistent_listener:_run_once:797 - ZCA listener stdout line#550 user=zl_2c470749: {"ts":1782065196835,"event":"heartbeat","user_id":"zl_2c470749","pid":289,"uptime_s":4023}
+2026-06-21 18:06:48.948 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:51918 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:51914 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 18:07:49.218 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:41160 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:41142 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 18:08:48.990 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:58782 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:58756 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 18:09:48.868 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:46882 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:46874 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 18:10:48.669 | INFO     | app.modules.all_platform.zalo.services.zca_persistent_listener:_run_once:797 - ZCA listener stdout line#800 user=zl_cd319bbf: {"ts":1782065448669,"event":"heartbeat","user_id":"zl_cd319bbf","pid":473,"uptime_s":4223}
+2026-06-21 18:10:48.853 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:41660 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:41634 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 18:11:49.286 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:44674 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:44642 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 18:12:48.993 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:47610 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:47570 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 18:12:57.089 | INFO     | app.modules.all_platform.zalo.services.zca_persistent_listener:_run_once:797 - ZCA listener stdout line#600 user=zl_2c470749: {"ts":1782065577089,"event":"heartbeat","user_id":"zl_2c470749","pid":289,"uptime_s":4403}
+2026-06-21 18:13:49.119 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:53728 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:53714 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 18:14:48.836 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:55282 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:55256 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK
+2026-06-21 18:15:48.832 | INFO     | app.modules.all_platform.zalo.api.routes.auth:_build_current_status_payload:315 - Returning confirmed ZCA status for user=zl_cd319bbf, session=zl_cd319bbf--2a460c101049461cb87f6807b838397b
+INFO:     172.26.0.4:56108 - "GET /api/all-platform/zalo/conversations/3596423503363073614/messages?account_id=zl_cd319bbf&limit=50&offset=0 HTTP/1.1" 200 OK
+INFO:     172.26.0.4:56104 - "GET /api/all-platform/zalo/conversations?account_id=zl_cd319bbf HTTP/1.1" 200 OK

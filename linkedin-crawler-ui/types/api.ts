@@ -528,10 +528,47 @@ export interface KpiMemberData {
   profile_slug?: string;
   email_leader?: string;
   kpi: any[];
+  /** Số tin nhắn inbox target mà member này phải xử lý trong tuần KPI */
+  kpi_inbox_target?: number;
+  /** Số tin nhắn inbox thực tế đã đếm từ zalo_messages (is_sent=false) */
+  kpi_inbox_current?: number;
   /** Facebook/LinkedIn profile ID — dùng lọc seeding chuẩn xác */
   profile_id?: string;
   /** Tên Facebook hiển thị trên web — dùng lọc dự phòng */
   facebook_name?: string;
+  /** Stats phụ (cho giao diện admin / dashboard) */
+  seeding_stats?: {
+    verified_count?: number;
+    kpi_target?: number;
+    kpi_post?: number;
+    kpi_post_current?: number;
+    kpi_lead?: number;
+    kpi_lead_current?: number;
+    kpi_inbox?: number;
+    kpi_inbox_current?: number;
+    kpi_inbox_range?: { start: string; end: string };
+  };
+}
+
+export interface ZaloInboxProgressData {
+  kpi_inbox_current: number;
+  account_ids: string[];
+  range: { start: string; end: string };
+}
+
+export interface ZaloSharedConversation {
+  id: number;
+  account_id: string;
+  conversation_id: string;
+  shared_role: "leader" | "admin";
+  is_active: boolean;
+  note?: string | null;
+  id_member?: string;
+  id_leader?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  /** Joined từ zalo_accounts (chỉ có ở leader-view) */
+  zalo_accounts?: { label?: string; phone?: string } | null;
 }
 
 export interface GetAllKpiResponse extends ApiResponse<KpiMemberData[]> {

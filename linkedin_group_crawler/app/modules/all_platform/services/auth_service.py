@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+import time
+from threading import Thread
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -11,7 +13,54 @@ import bcrypt
 from jose import JWTError, jwt
 
 from app.core.config import settings
-from app.core.supabase_client import get_supabase_client
+from app.core.supabase_client import execute_supabase_query, get_supabase_client
+
+_USER_PUBLIC_FIELDS = "id, email, name, role, is_active, created_at, updated_at"
+_USER_CACHE_TTL_SECONDS = 30.0
+_USER_BY_ID_CACHE: dict[str, tuple[float, dict]] = {}
+_USER_BY_EMAIL_CACHE: dict[str, tuple[float, dict]] = {}
+
+
+def _copy_user(user: dict) -> dict:
+    clean = dict(user)
+    clean.pop("password", None)
+    return clean
+
+
+def _cache_user(user: dict) -> dict:
+    clean = _copy_user(user)
+    expires_at = time.monotonic() + _USER_CACHE_TTL_SECONDS
+    user_id = str(clean.get("id") or "")
+    email = str(clean.get("email") or "").lower().strip()
+    if user_id:
+        _USER_BY_ID_CACHE[user_id] = (expires_at, clean)
+    if email:
+        _USER_BY_EMAIL_CACHE[email] = (expires_at, clean)
+    if len(_USER_BY_ID_CACHE) > 1000:
+        for key in list(_USER_BY_ID_CACHE.keys())[:-1000]:
+            _USER_BY_ID_CACHE.pop(key, None)
+    if len(_USER_BY_EMAIL_CACHE) > 1000:
+        for key in list(_USER_BY_EMAIL_CACHE.keys())[:-1000]:
+            _USER_BY_EMAIL_CACHE.pop(key, None)
+    return dict(clean)
+
+
+def _cached_user(cache: dict[str, tuple[float, dict]], key: str) -> Optional[dict]:
+    cached = cache.get(key)
+    if not cached:
+        return None
+    expires_at, user = cached
+    if expires_at <= time.monotonic():
+        cache.pop(key, None)
+        return None
+    return dict(user)
+
+
+def clear_user_cache(user_id: str | None = None, email: str | None = None) -> None:
+    if user_id:
+        _USER_BY_ID_CACHE.pop(str(user_id), None)
+    if email:
+        _USER_BY_EMAIL_CACHE.pop(str(email).lower().strip(), None)
 
 
 def _hash_password(password: str) -> str:
@@ -61,10 +110,10 @@ def decode_token(token: str) -> Optional[dict]:
 
 def register_user(email: str, password: str, name: Optional[str] = None) -> dict:
     """Register a new app user. Returns user data or raises ValueError."""
-    supabase = get_supabase_client()
-
     # Check if email already exists
-    existing = supabase.table("app_users").select("id").eq("email", email.lower()).execute()
+    existing = execute_supabase_query(
+        lambda: get_supabase_client().table("app_users").select("id").eq("email", email.lower()).execute()
+    )
     if existing.data:
         raise ValueError("Email already registered")
 
@@ -76,22 +125,24 @@ def register_user(email: str, password: str, name: Optional[str] = None) -> dict
         "role": "member",
         "is_active": True,
     }
-    result = supabase.table("app_users").insert(user_data).execute()
+    result = execute_supabase_query(
+        lambda: get_supabase_client().table("app_users").insert(user_data).execute()
+    )
     if not result.data:
         raise ValueError("Failed to create user")
 
     user = result.data[0]
+    cached_user = _cache_user(user)
     access_token = create_access_token(user["id"], user["email"], user["role"])
 
-    # Store session
-    _store_session(user["id"], access_token)
+    _store_session_async(user["id"], access_token)
 
     return {
         "user": {
-            "id": user["id"],
-            "email": user["email"],
-            "name": user.get("name"),
-            "role": user["role"],
+            "id": cached_user["id"],
+            "email": cached_user["email"],
+            "name": cached_user.get("name"),
+            "role": cached_user["role"],
         },
         "access_token": access_token,
     }
@@ -99,30 +150,34 @@ def register_user(email: str, password: str, name: Optional[str] = None) -> dict
 
 def login_user(email: str, password: str) -> dict:
     """Login an existing app user. Returns user + token or raises ValueError."""
-    supabase = get_supabase_client()
-
-    result = supabase.table("app_users").select("*").eq("email", email.lower().strip()).execute()
+    result = execute_supabase_query(
+        lambda: get_supabase_client()
+        .table("app_users")
+        .select("id, email, name, role, is_active, password")
+        .eq("email", email.lower().strip())
+        .execute()
+    )
     if not result.data:
-        raise ValueError("Invalid email or password")
+        raise ValueError("Email không tồn tại")
 
     user = result.data[0]
     if not user.get("is_active", True):
-        raise ValueError("Account is deactivated")
+        raise ValueError("Tài khoản đã bị vô hiệu hóa")
 
     if not _verify_password(password, user["password"]):
-        raise ValueError("Invalid email or password")
+        raise ValueError("Sai mật khẩu")
 
+    cached_user = _cache_user(user)
     access_token = create_access_token(user["id"], user["email"], user["role"])
 
-    # Store session
-    _store_session(user["id"], access_token)
+    _store_session_async(user["id"], access_token)
 
     return {
         "user": {
-            "id": user["id"],
-            "email": user["email"],
-            "name": user.get("name"),
-            "role": user.get("role", "member"),
+            "id": cached_user["id"],
+            "email": cached_user["email"],
+            "name": cached_user.get("name"),
+            "role": cached_user.get("role", "member"),
         },
         "access_token": access_token,
     }
@@ -134,14 +189,24 @@ def logout_user(token: str) -> dict:
     Some deployments don't have `public.user_sessions` (older schema). In that case
     we treat logout as a no-op (client will still discard JWT).
     """
-    supabase = get_supabase_client()
     token_hash = _hash_token(token)
     try:
-        supabase.table("user_sessions").delete().eq("token_hash", token_hash).execute()
+        execute_supabase_query(
+            lambda: get_supabase_client()
+            .table("user_sessions")
+            .delete()
+            .eq("token_hash", token_hash)
+            .execute(),
+            attempts=2,
+        )
     except Exception:
         # Best-effort: don't block logout if sessions table missing
         pass
     return {"logged_out": True}
+
+
+def _store_session_async(user_id: str, token: str) -> None:
+    Thread(target=_store_session, args=(user_id, token), daemon=True).start()
 
 
 def _store_session(user_id: str, token: str, user_agent: Optional[str] = None, ip: Optional[str] = None) -> None:
@@ -150,17 +215,19 @@ def _store_session(user_id: str, token: str, user_agent: Optional[str] = None, i
     Some Supabase projects may not have this table yet; login/register should still
     succeed even if we can't persist sessions.
     """
-    supabase = get_supabase_client()
     token_hash = _hash_token(token)
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_access_token_expire_minutes)
     try:
-        supabase.table("user_sessions").insert({
-            "user_id": user_id,
-            "token_hash": token_hash,
-            "user_agent": user_agent,
-            "ip_address": ip,
-            "expires_at": expires_at.isoformat(),
-        }).execute()
+        execute_supabase_query(
+            lambda: get_supabase_client().table("user_sessions").insert({
+                "user_id": user_id,
+                "token_hash": token_hash,
+                "user_agent": user_agent,
+                "ip_address": ip,
+                "expires_at": expires_at.isoformat(),
+            }).execute(),
+            attempts=2,
+        )
     except Exception:
         # Best-effort: don't block login/register if sessions table missing
         pass
@@ -168,35 +235,42 @@ def _store_session(user_id: str, token: str, user_agent: Optional[str] = None, i
 
 def get_user_by_id(user_id: str) -> Optional[dict]:
     """Get user by ID."""
-    supabase = get_supabase_client()
-    result = supabase.table("app_users").select("*").eq("id", user_id).execute()
+    user_key = str(user_id)
+    cached = _cached_user(_USER_BY_ID_CACHE, user_key)
+    if cached:
+        return cached
+    result = execute_supabase_query(
+        lambda: get_supabase_client().table("app_users").select(_USER_PUBLIC_FIELDS).eq("id", user_key).execute()
+    )
     if result.data:
-        user = result.data[0]
-        user.pop("password", None)
-        return user
+        return _cache_user(result.data[0])
     return None
 
 
 def get_user_by_email(email: str) -> Optional[dict]:
     """Get user by email."""
-    supabase = get_supabase_client()
-    result = supabase.table("app_users").select("*").eq("email", email.lower().strip()).execute()
+    email_key = email.lower().strip()
+    cached = _cached_user(_USER_BY_EMAIL_CACHE, email_key)
+    if cached:
+        return cached
+    result = execute_supabase_query(
+        lambda: get_supabase_client().table("app_users").select(_USER_PUBLIC_FIELDS).eq("email", email_key).execute()
+    )
     if result.data:
-        user = result.data[0]
-        user.pop("password", None)
-        return user
+        return _cache_user(result.data[0])
     return None
 
 
 def update_user_profile(user_id: str, updates: dict) -> dict:
     """Update user profile (name, etc)."""
-    supabase = get_supabase_client()
     safe_updates = {k: v for k, v in updates.items() if k in ("name") and v is not None}
     safe_updates["updated_at"] = "now()"
-    result = supabase.table("app_users").update(safe_updates).eq("id", user_id).execute()
+    result = execute_supabase_query(
+        lambda: get_supabase_client().table("app_users").update(safe_updates).eq("id", user_id).execute()
+    )
     if result.data:
-        result.data[0].pop("password", None)
-        return result.data[0]
+        clear_user_cache(user_id=user_id)
+        return _cache_user(result.data[0])
     return {}
 
 
@@ -206,17 +280,19 @@ def _store_session(user_id: str, token: str, user_agent: Optional[str] = None, i
     We now keep auth session on the browser via HttpOnly cookie.
     This function remains for backward-compat but is best-effort.
     """
-    supabase = get_supabase_client()
     token_hash = _hash_token(token)
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_access_token_expire_minutes)
     try:
-        supabase.table("user_sessions").insert({
-            "user_id": user_id,
-            "token_hash": token_hash,
-            "user_agent": user_agent,
-            "ip_address": ip,
-            "expires_at": expires_at.isoformat(),
-        }).execute()
+        execute_supabase_query(
+            lambda: get_supabase_client().table("user_sessions").insert({
+                "user_id": user_id,
+                "token_hash": token_hash,
+                "user_agent": user_agent,
+                "ip_address": ip,
+                "expires_at": expires_at.isoformat(),
+            }).execute(),
+            attempts=2,
+        )
     except Exception:
         pass
 
@@ -226,15 +302,17 @@ def get_user_sessions(user_id: str) -> list[dict]:
 
     If `user_sessions` table doesn't exist, return empty list.
     """
-    supabase = get_supabase_client()
     try:
-        result = (
-            supabase.table("user_sessions")
-            .select("id, user_agent, ip_address, created_at, expires_at")
-            .eq("user_id", user_id)
-            .gte("expires_at", datetime.now(timezone.utc).isoformat())
-            .order("created_at", desc=True)
-            .execute()
+        result = execute_supabase_query(
+            lambda: (
+                get_supabase_client().table("user_sessions")
+                .select("id, user_agent, ip_address, created_at, expires_at")
+                .eq("user_id", user_id)
+                .gte("expires_at", datetime.now(timezone.utc).isoformat())
+                .order("created_at", desc=True)
+                .execute()
+            ),
+            attempts=2,
         )
         return result.data or []
     except Exception:
@@ -246,14 +324,16 @@ def delete_session(session_id: str, user_id: str) -> dict:
 
     If `user_sessions` table doesn't exist, treat as no-op.
     """
-    supabase = get_supabase_client()
     try:
-        result = (
-            supabase.table("user_sessions")
-            .delete()
-            .eq("id", session_id)
-            .eq("user_id", user_id)
-            .execute()
+        result = execute_supabase_query(
+            lambda: (
+                get_supabase_client().table("user_sessions")
+                .delete()
+                .eq("id", session_id)
+                .eq("user_id", user_id)
+                .execute()
+            ),
+            attempts=2,
         )
         return {"deleted": len(result.data) if result.data else 0}
     except Exception:
@@ -265,9 +345,11 @@ def delete_all_sessions(user_id: str) -> dict:
 
     If `user_sessions` table doesn't exist, treat as no-op.
     """
-    supabase = get_supabase_client()
     try:
-        result = supabase.table("user_sessions").delete().eq("user_id", user_id).execute()
+        result = execute_supabase_query(
+            lambda: get_supabase_client().table("user_sessions").delete().eq("user_id", user_id).execute(),
+            attempts=2,
+        )
         return {"deleted": len(result.data) if result.data else 0}
     except Exception:
         return {"deleted": 0}
@@ -275,13 +357,14 @@ def delete_all_sessions(user_id: str) -> dict:
 
 def verify_leader_code(code: str) -> dict:
     """Verify a leader code from the leader_codes table."""
-    supabase = get_supabase_client()
-    result = (
-        supabase.table("leader_codes")
-        .select("*")
-        .eq("code", code)
-        .eq("is_active", True)
-        .execute()
+    result = execute_supabase_query(
+        lambda: (
+            get_supabase_client().table("leader_codes")
+            .select("*")
+            .eq("code", code)
+            .eq("is_active", True)
+            .execute()
+        )
     )
     if not result.data:
         return {"valid": False, "reason": "Invalid code"}
@@ -309,9 +392,9 @@ def verify_leader_code(code: str) -> dict:
 
 def deactivate_account(user_id: str, password: str) -> None:
     """Deactivate account after password verification."""
-    supabase = get_supabase_client()
-
-    result = supabase.table("app_users").select("password").eq("id", user_id).execute()
+    result = execute_supabase_query(
+        lambda: get_supabase_client().table("app_users").select("password").eq("id", user_id).execute()
+    )
     if not result.data:
         raise ValueError("User not found")
 
@@ -319,16 +402,23 @@ def deactivate_account(user_id: str, password: str) -> None:
     if not _verify_password(password, user["password"]):
         raise ValueError("Invalid password")
 
-    supabase.table("app_users").update({"is_active": False, "updated_at": "now()"}).eq("id", user_id).execute()
+    execute_supabase_query(
+        lambda: get_supabase_client()
+        .table("app_users")
+        .update({"is_active": False, "updated_at": "now()"})
+        .eq("id", user_id)
+        .execute()
+    )
+    clear_user_cache(user_id=user_id)
     # Also delete all sessions
     delete_all_sessions(user_id)
 
 
 def change_password(user_id: str, current_password: str, new_password: str) -> None:
     """Change user password after verifying current password."""
-    supabase = get_supabase_client()
-
-    result = supabase.table("app_users").select("password").eq("id", user_id).execute()
+    result = execute_supabase_query(
+        lambda: get_supabase_client().table("app_users").select("password").eq("id", user_id).execute()
+    )
     if not result.data:
         raise ValueError("User not found")
 
@@ -340,31 +430,67 @@ def change_password(user_id: str, current_password: str, new_password: str) -> N
         raise ValueError("New password must be different from current password")
 
     hashed_pw = _hash_password(new_password)
-    supabase.table("app_users").update({"password": hashed_pw, "updated_at": "now()"}).eq("id", user_id).execute()
+    execute_supabase_query(
+        lambda: get_supabase_client()
+        .table("app_users")
+        .update({"password": hashed_pw, "updated_at": "now()"})
+        .eq("id", user_id)
+        .execute()
+    )
+    clear_user_cache(user_id=user_id)
+    delete_all_sessions(user_id)
+
+
+def reset_password_without_old(email: str, new_password: str) -> None:
+    """Reset user password by email without verifying the current password."""
+    result = execute_supabase_query(
+        lambda: get_supabase_client().table("app_users").select("id").eq("email", email.lower().strip()).execute()
+    )
+    if not result.data:
+        raise ValueError("Email không tồn tại trong hệ thống")
+    user_id = result.data[0]["id"]
+    hashed_pw = _hash_password(new_password)
+    execute_supabase_query(
+        lambda: get_supabase_client()
+        .table("app_users")
+        .update({"password": hashed_pw, "updated_at": "now()"})
+        .eq("id", user_id)
+        .execute()
+    )
+    clear_user_cache(user_id=user_id, email=email)
     delete_all_sessions(user_id)
 
 
 def promote_to_leader(user_id: str, leader_code: str) -> dict:
     """Promote a user to leader role after verifying code."""
-    supabase = get_supabase_client()
-
     code_check = verify_leader_code(leader_code)
     if not code_check.get("valid"):
         raise ValueError(code_check.get("reason", "Invalid code"))
 
-    result = (
-        supabase.table("app_users")
-        .update({"role": "leader", "updated_at": "now()"})
-        .eq("id", user_id)
-        .execute()
+    result = execute_supabase_query(
+        lambda: (
+            get_supabase_client().table("app_users")
+            .update({"role": "leader", "updated_at": "now()"})
+            .eq("id", user_id)
+            .execute()
+        )
     )
     if not result.data:
         raise ValueError("User not found")
+    clear_user_cache(user_id=user_id)
 
     code_id = code_check.get("code_id")
     if code_id:
-        supabase.table("leader_codes").update({
-            "used_count": supabase.table("leader_codes").select("used_count").eq("id", code_id).execute().data[0]["used_count"] + 1
-        }).eq("id", code_id).execute()
+        used_res = execute_supabase_query(
+            lambda: get_supabase_client().table("leader_codes").select("used_count").eq("id", code_id).execute()
+        )
+        used_count = (used_res.data or [{}])[0].get("used_count", 0)
+        execute_supabase_query(
+            lambda: get_supabase_client()
+            .table("leader_codes")
+            .update({"used_count": used_count + 1})
+            .eq("id", code_id)
+            .execute()
+        )
 
     return {"user_id": user_id, "role": "leader"}

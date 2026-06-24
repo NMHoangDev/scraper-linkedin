@@ -1,0 +1,73 @@
+221:        message_id=str(row.get("source_message_id") or row.get("id") or ""),
+316:                    "user_id": f"eq.{user_id}",
+317:                    "group_id": f"eq.{group_id}",
+365:        group_id = str(group.get("group_id") or group.get("id") or group.get("name") or "").strip()
+382:                "user_id": f"eq.{user_id}",
+448:        message_uuid = message_row["id"]
+515:        rows = await _rest("GET", "zalo_accounts", params={"account_id": f"eq.{account_id}", "limit": "1"})
+528:        params["id_member"] = f"eq.{id_member}"
+530:        params["owner_id"] = f"eq.{owner_id}"
+544:        await _rest("PATCH", "zalo_accounts", params={"account_id": f"eq.{account_id}"}, json={"is_active": False, "updated_at": datetime.utcnow().isoformat()})
+574:        ("zalo_sessions", {"user_id": f"eq.{account_id}"}),
+575:        ("zalo_users", {"user_id": f"eq.{account_id}"}),
+576:        ("zalo_accounts", {"account_id": f"eq.{account_id}"}),
+577:        ("zalo_groups", {"user_id": f"eq.{account_id}"}),
+578:        ("zalo_messages", {"user_id": f"eq.{account_id}"}),
+653:    return str(user.get("id") or "").strip() or None
+671:                "id_leader": f"eq.{leader_user_id}",
+736:                    "account_id": f"eq.{account_id}",
+737:                    "conversation_id": f"eq.{conversation_id}",
+769:        "account_id": f"eq.{account_id}",
+813:                "account_id": f"eq.{account_id}",
+814:                "conversation_id": f"eq.{conversation_id}",
+848:        "user_id": f"in.({','.join(selected_ids)})",
+943:                    "user_id": f"eq.{user_id}",
+944:                    "group_id": f"eq.{group_id}",
+995:        message_uuid = rows[0]["id"]
+1033:                "user_id": f"eq.{user_id}",
+1034:                "group_id": f"eq.{g_id}",
+1060:            "user_id": f"eq.{user_id}",
+1061:            "group_id": f"eq.{group_id}",
+1085:                "message_id": f"eq.{message_uuid}",
+1168:        "user_id": f"eq.{user_id}",
+1187:                "user_id": f"eq.{user_id}",
+1247:            "user_id": f"eq.{user_id}",
+1278:            "user_id": f"eq.{user_id}",
+1440:                    "user_id": f"eq.{user_id}",
+1441:                    "group_id": f"eq.{conversation_id}",
+1455:                    "user_id": f"eq.{user_id}",
+1456:                    "group_id": f"eq.{conversation_id}",
+1470:                        "user_id": f"eq.{user_id}",
+1490:                        "user_id": f"eq.{user_id}",
+1491:                        "group_id": f"eq.{conversation_id}",
+1505:                        "user_id": f"eq.{user_id}",
+1506:                        "group_id": f"eq.{conversation_id}",
+1520:                            "user_id": f"eq.{user_id}",
+1547:        "user_id": f"eq.{user_id}",
+1558:        query_params["group_id"] = f"eq.{resolved_group_id}"
+1651:            "user_id": f"eq.{user_id}",
+1652:            "job_id": f"in.({quoted_job_ids})",
+1683:            "user_id": f"eq.{user_id}",
+1704:            "user_id": f"eq.{user_id}",
+1734:            "user_id": f"eq.{user_id}",
+1755:            "user_id": f"eq.{user_id}",
+1808:        asset_id = row.get("id")
+1819:                params={"id": f"eq.{asset_id}"},
+1831:            failed.append({"id": asset_id, "storage_path": storage_path, "error": str(exc)})
+1861:        "user_id": f"eq.{user_id}",
+1870:        params["id"] = f"in.({quoted_uuids})"
+1873:        params["source_message_id"] = f"in.({quoted_sources})"
+1899:                "source_message_id": f"manual-{uuid.uuid4()}",
+1905:    await save_message_assets(row["id"], user_id, None, asset_urls)
+1906:    return (await fetch_messages_by_ids(user_id, [row["id"]]))[0]
+1916:        params={"id": f"eq.{message_id}", "user_id": f"eq.{user_id}"},
+1934:    params: Dict[str, Any] = {"user_id": f"eq.{user_id}", "is_deleted": "eq.false"}
+1942:        params["id"] = f"in.({','.join(ids)})"
+1966:                "id": campaign_id,
+2012:    await _rest("PATCH", "zalo_broadcast_campaigns", params={"id": f"eq.{campaign_id}"}, json=payload)
+2038:    campaigns = await _rest("GET", "zalo_broadcast_campaigns", params={"id": f"eq.{campaign_id}"}) or []
+2041:    targets = await _rest("GET", "zalo_broadcast_targets", params={"campaign_id": f"eq.{campaign_id}", "order": "created_at.asc"}) or []
+2042:    items = await _rest("GET", "zalo_broadcast_items", params={"campaign_id": f"eq.{campaign_id}", "order": "position.asc"}) or []
+2043:    logs = await _rest("GET", "zalo_broadcast_logs", params={"campaign_id": f"eq.{campaign_id}", "order": "created_at.asc"}) or []
+2054:            "user_id": f"eq.{user_id}",
+2055:            "group_id": f"eq.{group_id}",

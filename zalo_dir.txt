@@ -1,0 +1,12 @@
+total 48
+drwxrwxr-x 8 vmadmin vmadmin 4096 Jun 19 10:57 .
+drwxrwxr-x 8 vmadmin vmadmin 4096 Jun 17 09:40 ..
+drwxrwxr-x 4 vmadmin vmadmin 4096 Jun 17 17:50 api
+-rw-rw-r-- 1 vmadmin vmadmin 4547 Jun 19 10:57 config.py
+drwxrwxr-x 3 vmadmin vmadmin 4096 Jun 15 18:18 crawler
+-rw-rw-r-- 1 vmadmin vmadmin   12 Jun 15 09:36 __init__.py
+drwxrwxr-x 2 vmadmin vmadmin 4096 Jun 18 09:17 __pycache__
+drwxrwxr-x 3 vmadmin vmadmin 4096 Jun 17 17:50 schemas
+drwxrwxr-x 3 vmadmin vmadmin 4096 Jun 19 10:57 services
+drwxrwxr-x 2 vmadmin vmadmin 4096 Jun 15 09:36 utils
+-rw-rw-r-- 1 vmadmin vmadmin 2830 Jun 15 09:36 zalo-manual-login-mode.md

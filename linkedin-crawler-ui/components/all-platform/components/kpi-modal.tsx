@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { cn } from "@/lib/utils";
 
 interface KpiModalProps {
@@ -18,7 +18,7 @@ interface KpiModalProps {
 
 export interface KpiModalPayload {
   email: string;
-  kpi_per_week: number;
+  kpi_comment: number;
   start_day: string;
   end_day: string;
   platform: string;
@@ -27,16 +27,59 @@ export interface KpiModalPayload {
 
 export function KpiModal({ isOpen, onClose, member, onSubmit }: KpiModalProps) {
   const [kpiPerWeek, setKpiPerWeek] = useState(member?.kpi_target?.toString() || "10");
-  const [startDay, setStartDay] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - d.getDay() + 1);
-    return d.toISOString().split("T")[0];
-  });
-  const [endDay, setEndDay] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - d.getDay() + 7);
-    return d.toISOString().split("T")[0];
-  });
+  // Generate weeks for current year
+  const generateWeeks = () => {
+    const year = new Date().getFullYear();
+    const weeks = [];
+    
+    let firstDay = new Date(year, 0, 1);
+    let dayOfWeek = firstDay.getDay() || 7;
+    let startMonday = new Date(firstDay);
+    startMonday.setDate(firstDay.getDate() - dayOfWeek + 1);
+    
+    for (let i = 1; i <= 52; i++) {
+      let monday = new Date(startMonday);
+      monday.setDate(startMonday.getDate() + (i - 1) * 7);
+      let sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      
+      const formatDate = (d: Date) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      };
+      
+      weeks.push({
+        weekNumber: i,
+        monday: formatDate(monday),
+        sunday: formatDate(sunday),
+        label: `Tuần ${i} (${formatDate(monday)} đến ${formatDate(sunday)})`
+      });
+    }
+    return weeks;
+  };
+
+  const weeks = useMemo(() => generateWeeks(), []);
+  
+  const getCurrentWeek = () => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${y}-${m}-${day}`;
+    
+    const current = weeks.find(w => todayStr >= w.monday && todayStr <= w.sunday);
+    return current ? current.weekNumber : 24;
+  };
+
+  const [selectedWeek, setSelectedWeek] = useState<number>(getCurrentWeek());
+
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedWeek(getCurrentWeek());
+    }
+  }, [isOpen, weeks]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen || !member) return null;
@@ -50,11 +93,12 @@ export function KpiModal({ isOpen, onClose, member, onSubmit }: KpiModalProps) {
     if (!onSubmit) return;
     setIsSubmitting(true);
     try {
+      const currentWeekData = weeks.find(w => w.weekNumber === selectedWeek);
       await onSubmit({
         email: member.email,
-        kpi_per_week: parseInt(kpiPerWeek) || 0,
-        start_day: startDay,
-        end_day: endDay,
+        kpi_comment: parseInt(kpiPerWeek) || 0,
+        start_day: currentWeekData?.monday || "",
+        end_day: currentWeekData?.sunday || "",
         platform: "Facebook",
         leader_email: "",
       });
@@ -121,25 +165,19 @@ export function KpiModal({ isOpen, onClose, member, onSubmit }: KpiModalProps) {
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-600">Từ ngày</label>
-              <input
-                type="date"
-                value={startDay}
-                onChange={(e) => setStartDay(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-slate-600">Đến ngày</label>
-              <input
-                type="date"
-                value={endDay}
-                onChange={(e) => setEndDay(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none"
-              />
-            </div>
+          <div className="space-y-1">
+            <label className="mb-1 block text-xs font-semibold text-slate-600">Chọn Tuần</label>
+            <select
+              value={selectedWeek}
+              onChange={(e) => setSelectedWeek(Number(e.target.value))}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+            >
+              {weeks.map((w) => (
+                <option key={w.weekNumber} value={w.weekNumber}>
+                  {w.label}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 

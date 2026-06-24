@@ -1,0 +1,41 @@
+    payload = {key: value for key, value in payload.items() if value is not None}
+    payload["updated_at"] = datetime.utcnow().isoformat()
+    include_deleted = payload.get("is_deleted") is True
+    rows = await _rest(
+        "PATCH",
+        "zalo_messages",
+        params={"id": f"eq.{message_id}", "user_id": f"eq.{user_id}"},
+        json=payload,
+        prefer="return=representation",
+    )
+    if not rows:
+        raise KeyError(message_id)
+    fetched = await fetch_messages_by_ids(user_id, [message_id], include_deleted=include_deleted)
+    return fetched[0] if fetched else rows[0]
+
+
+async def bulk_delete_library_messages(
+    user_id: str,
+    *,
+    message_ids: Optional[List[str]] = None,
+    group_name: Optional[str] = None,
+    delete_all_matching: bool = False,
+) -> int:
+    payload = {"is_deleted": True, "updated_at": datetime.utcnow().isoformat()}
+    params: Dict[str, Any] = {"user_id": f"eq.{user_id}", "is_deleted": "eq.false"}
+    ids = [message_id for message_id in (message_ids or []) if message_id]
+    if delete_all_matching:
+        if group_name:
+            params["group_name"] = f"ilike.*{group_name}*"
+    else:
+        if not ids:
+            return 0
+        params["id"] = f"in.({','.join(ids)})"
+
+    rows = await _rest(
+        "PATCH",
+        "zalo_messages",
+        params=params,
+        json=payload,
+        prefer="return=representation",
+    )

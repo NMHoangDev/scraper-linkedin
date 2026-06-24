@@ -1,0 +1,49 @@
+Total groups found: 68
+Active groups (chay_24h=True): 47
+Name: Test Group Insert Cleaned | Start: 22 | End: 23 | Interval: 40 | User: 3c20b0c1-a986-4568-a470-e212cf58c2e7
+Name: Thiết Kế Website | Start: 7 | End: 22 | Interval: 60 | User: 7714fa9a-f947-474c-8e9c-c38083763dad
+Name: Cộng đồng AI Việt Nam | Start: 7 | End: 22 | Interval: 60 | User: 50368bff-d0e7-49ea-a537-a3b053e3986b
+Name: Hội Thiết Kế Mobile App, Website Và Phần Mềm ERP | Start: 7 | End: 22 | Interval: 180 | User: ad5c388f-e987-4585-88a1-17269c09e354
+Name: Cộng đồng Claude AI & AI Agents Việt Nam | Start: 7 | End: 22 | Interval: 60 | User: 50368bff-d0e7-49ea-a537-a3b053e3986b
+Name: Cộng đồng Homestay Việt Nam | Start: 0 | End: 23 | Interval: 300 | User: 9e4c0a0e-6dea-4690-a2cb-1990ecfc3e53
+Name: Nghiện AI | Start: 0 | End: 23 | Interval: 300 | User: 9e4c0a0e-6dea-4690-a2cb-1990ecfc3e53
+Name: Việc làm IT-CNTT Đà Nẵng | Start: 22 | End: 23 | Interval: 57 | User: 613877fc-c12a-4fc6-837d-10f1aa80a29a
+Name: Group New | Start: None | End: None | Interval: None | User: 613877fc-c12a-4fc6-837d-10f1aa80a29a
+Name: Việc làm CNTT Đà Nẵng | Start: None | End: None | Interval: None | User: 613877fc-c12a-4fc6-837d-10f1aa80a29a
+Name: Tuyển dụng CNTT Đà Nẵng | Start: None | End: None | Interval: None | User: 613877fc-c12a-4fc6-837d-10f1aa80a29a
+Name: Thiết Kế Web Giá Rẻ - Code MMO Theo Yêu Cầu | Start: None | End: None | Interval: None | User: 613877fc-c12a-4fc6-837d-10f1aa80a29a
+Name: n8n mới | Start: None | End: None | Interval: None | User: 613877fc-c12a-4fc6-837d-10f1aa80a29a
+Name: Tuyển dụng CNTT Đà Nẵng | Start: None | End: None | Interval: None | User: 613877fc-c12a-4fc6-837d-10f1aa80a29a
+Name: Tuyển dụng Thực tập sinh IT | Start: None | End: None | Interval: None | User: 613877fc-c12a-4fc6-837d-10f1aa80a29a
+Name: Việc làm CNTT Đà Nẵng | Start: None | End: None | Interval: None | User: 613877fc-c12a-4fc6-837d-10f1aa80a29a
+Name: Thực tập CNTT Đà Nẵng - Việc làm CNTT Đà Nẵng | Start: None | End: None | Interval: None | User: 613877fc-c12a-4fc6-837d-10f1aa80a29a
+Name: Việc làm CNTT Đà Nẵng | Start: None | End: None | Interval: None | User: 613877fc-c12a-4fc6-837d-10f1aa80a29a
+Name: Cộng đồng N8N Việt Nam | Start: None | End: None | Interval: None | User: 613877fc-c12a-4fc6-837d-10f1aa80a29a
+Name: IT Jobs - Tuyển Dụng IT - Việc làm CNTT - AI engineer | Start: None | End: None | Interval: None | User: 613877fc-c12a-4fc6-837d-10f1aa80a29a
+Name: Tuyển Dụng Nhân Sự CNTT | Start: None | End: None | Interval: None | User: 613877fc-c12a-4fc6-837d-10f1aa80a29a
+Name: vieclam, | Start: None | End: None | Interval: None | User: eaf645f8-6f41-48a8-ac28-c1f3d97d60a0
+Name: Cộng Đồng Thiết Kế Website Và SEO | Start: 7 | End: 22 | Interval: 60 | User: 7714fa9a-f947-474c-8e9c-c38083763dad
+Name: Cộng đồng Make.com Việt Nam | Start: 7 | End: 22 | Interval: 60 | User: 50368bff-d0e7-49ea-a537-a3b053e3986b
+Name: Hội thiết kế website và SEO web Online | Start: 7 | End: 22 | Interval: 120 | User: ad5c388f-e987-4585-88a1-17269c09e354
+Name: AI4Future Việt Nam (AI, DATA, Vibe Coding, OpenClaw, Antigravity, Claude,…) | Start: 0 | End: 23 | Interval: 300 | User: 9e4c0a0e-6dea-4690-a2cb-1990ecfc3e53
+Name: Cộng đồng thiết kế website giá rẻ uy tín | Start: 0 | End: 23 | Interval: 300 | User: 9e4c0a0e-6dea-4690-a2cb-1990ecfc3e53
+Name: Thiết kế website, app mobile, phần mềm CRM, ERP | Start: 0 | End: 23 | Interval: 300 | User: 9e4c0a0e-6dea-4690-a2cb-1990ecfc3e53
+Name: Việc làm CNTT Đà Nẵng | Start: None | End: None | Interval: None | User: eaf645f8-6f41-48a8-ac28-c1f3d97d60a0
+Name: Cộng đồng AI Automation - Học AI & Marketing Automation | Start: 0 | End: 23 | Interval: 300 | User: 9e4c0a0e-6dea-4690-a2cb-1990ecfc3e53
+Name: Trạm sáng tạo AI (AI Creative Station Vietnam) | Start: 22 | End: 23 | Interval: 57 | User: 613877fc-c12a-4fc6-837d-10f1aa80a29a
+Name: Hội thiết kế website và SEO web Online | Start: 22 | End: 23 | Interval: 57 | User: 613877fc-c12a-4fc6-837d-10f1aa80a29a
+Name: CỘNG ĐỒNG THIẾT KẾ WEBSITE - LANDING PAGE - Website AI Chạy Google Ads | Start: 7 | End: 22 | Interval: 60 | User: 7714fa9a-f947-474c-8e9c-c38083763dad
+Name: Cộng Đồng Thiết Kế Website Và SEOCỘNG ĐỒNG THIẾT KẾ WEBSITE UY TÍN GIÁ RẺ ✅ | Start: 7 | End: 22 | Interval: 60 | User: 7714fa9a-f947-474c-8e9c-c38083763dad
+Name: Cộng đồng Claude Al Agent Chatbot Prompt N8n ChatGPT Vibe Coding Perplexity | Start: 7 | End: 22 | Interval: 60 | User: 50368bff-d0e7-49ea-a537-a3b053e3986b
+Name: Cộng Đồng Thiết Kế Website Uy Tín, Landing Page, Phầm Mềm Giá Rẻ | Start: 7 | End: 22 | Interval: 120 | User: ad5c388f-e987-4585-88a1-17269c09e354
+Name: SEO - Marketing | Start: 0 | End: 23 | Interval: 300 | User: 9e4c0a0e-6dea-4690-a2cb-1990ecfc3e53
+Name: Cộng đồng thiết kế website giá rẻ uy tín | Start: 7 | End: 22 | Interval: 60 | User: ce5aa1dc-b125-4af0-8efe-97a8c68ff7e0
+Name: Hội thiết kế website | Start: None | End: None | Interval: None | User: a196af4f-83c3-4df6-a86a-b7acbbcbc227
+Name: Thiết Kế Website + Branding Thương hiệu (Nhóm chính thức)❤️ | Start: 7 | End: 22 | Interval: 60 | User: 7714fa9a-f947-474c-8e9c-c38083763dad
+Name: NGHIỆN AI 🚀✨ Tạo Ảnh, Video & Automation | Start: 22 | End: 23 | Interval: 57 | User: 613877fc-c12a-4fc6-837d-10f1aa80a29a
+Name: Chatbot AI Việt Nam | Start: 7 | End: 22 | Interval: 60 | User: 50368bff-d0e7-49ea-a537-a3b053e3986b
+Name: THIẾT KẾ WEBSITE - MOBILE APP - PHẦN MỀM DOANH NGHIỆP | Start: 7 | End: 22 | Interval: 120 | User: ad5c388f-e987-4585-88a1-17269c09e354
+Name: Cộng đồng n8n AI Automation Việt Nam | Start: 7 | End: 22 | Interval: 120 | User: ad5c388f-e987-4585-88a1-17269c09e354
+Name: Chatbot AI Việt Nam | Start: 0 | End: 23 | Interval: 300 | User: 9e4c0a0e-6dea-4690-a2cb-1990ecfc3e53
+Name: Cộng Đồng Thiết Kế Website Uy Tín, Landing Page, Phầm Mềm Giá Rẻ | Start: 0 | End: 23 | Interval: 300 | User: 9e4c0a0e-6dea-4690-a2cb-1990ecfc3e53
+Name: Hội UI/UX Designers Vietnam | Start: 7 | End: 17 | Interval: 60 | User: 48e45591-2906-4a21-a831-f14cd5ad92fc

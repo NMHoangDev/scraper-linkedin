@@ -1,0 +1,15 @@
+from __future__ import annotations
+
+from typing import Any, Dict, Iterable, List, Optional, Tuple
+import mimetypes
+import posixpath
+import uuid
+import re
+
+_UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
+import base64
+import hashlib
+from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
+
+import httpx

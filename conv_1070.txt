@@ -1,0 +1,27 @@
+            "saved_count": saved_count,
+        }
+    except ZcaAuthExpiredError:
+        raise HTTPException(status_code=401, detail=ZCA_SESSION_EXPIRED_DETAIL)
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Message sync timed out.")
+    except Exception as exc:
+        logger.exception(f"CM message sync failed: {exc}")
+        raise HTTPException(status_code=500, detail=f"Message sync error: {exc}")
+
+
+def _to_message_from_raw(row: Dict, thread_id: str) -> Message:
+    """Convert raw message dict from bridge to Message schema for DB save."""
+    return Message(
+        message_id=str(row.get("message_id") or ""),
+        sender_id=row.get("sender_id") or None,
+        sender_name=row.get("sender_name") or None,
+        timestamp=row.get("timestamp") or None,
+        time_text=row.get("time_text") or None,
+        type=str(row.get("type") or "text"),
+        content=row.get("content") or None,
+        image_urls=[str(url) for url in (row.get("image_urls") or []) if url],
+        reply_to_id=row.get("reply_to_id") or None,
+        is_deleted=bool(row.get("is_deleted")),
+        is_sent=bool(row.get("is_sent")),
+        group_id=thread_id,
+    )

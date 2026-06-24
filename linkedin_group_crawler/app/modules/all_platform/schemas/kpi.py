@@ -13,6 +13,10 @@ class KpiWeekItem(BaseModel):
     total_comment: int = 0
     total_post_crawl: int = 0
     total_session_crawl: int = 0
+    kpi_comment: int = 0
+    kpi_post: int = 0
+    kpi_lead: int = 0
+    kpi_inbox: int = 0
     platform: str = "Facebook"
 
 
@@ -24,6 +28,7 @@ class AssignKpiRequest(BaseModel):
     email_leader: str
     kpi: List[KpiWeekItem]
     platform: str = "Facebook"
+    id_team: Optional[str] = None
 
 
 class KpiMemberData(BaseModel):
@@ -42,7 +47,10 @@ class GetKpiByEmailRequest(BaseModel):
 
 
 class GetAllKpiRequest(BaseModel):
-    leader_email: str
+    email_leader: str
+    id_team: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
 
 
 class CheckPermissionRequest(BaseModel):

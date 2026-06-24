@@ -5,7 +5,7 @@ import { FaSearch } from "react-icons/fa";
 import { cn } from "@/lib/utils";
 import type { Category } from "@/types/unified.types";
 
-export type SortOption = "latest" | "score_high" | "score_low" | "comments_high";
+export type SortOption = "latest" | "score_high" | "score_low" | "comments_high" | "crawler";
 
 interface FilterBarProps {
   intents: Category[];
@@ -37,6 +37,7 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "score_high", label: "Score cao nhất" },
   { value: "score_low", label: "Score thấp nhất" },
   { value: "comments_high", label: "Bình luận nhiều nhất" },
+  { value: "crawler", label: "Theo người cào (Team & Tên)" },
 ];
 
 const DATE_OPTIONS = [

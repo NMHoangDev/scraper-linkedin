@@ -1,0 +1,80 @@
+seeding-backend  | INFO:     172.26.0.4:55882 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:55898 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:55910 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:57134 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:57148 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:57162 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:57176 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:57180 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:57198 - "GET /api/all-platform/zalo/workers HTTP/1.1" 200 OK
+seeding-backend  | 2026-06-19 16:53:20.534 | WARNING  | app.modules.all_platform.zalo.services.supabase_service:list_zalo_accounts:565 - zalo_accounts table is not ready; returning empty account list: Supabase GET zalo_accounts failed: 400 {"code":"22P02","details":null,"hint":null,"message":"invalid input syntax for type uuid: \"ngminhhoang0934-gmail.com\""}
+seeding-backend  | INFO:     172.26.0.4:57178 - "GET /api/all-platform/zalo/accounts?owner_id=ngminhhoang0934-gmail.com&id_member=613877fc-c12a-4fc6-837d-10f1aa80a29a HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:52712 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:52718 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:52720 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:52724 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+seeding-backend  | INFO:     127.0.0.1:60016 - "GET /health HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:52734 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:35196 - "GET /api/all-platform/zalo/workers HTTP/1.1" 200 OK
+seeding-backend  | 2026-06-19 16:53:50.665 | WARNING  | app.modules.all_platform.zalo.services.supabase_service:list_zalo_accounts:565 - zalo_accounts table is not ready; returning empty account list: Supabase GET zalo_accounts failed: 400 {"code":"22P02","details":null,"hint":null,"message":"invalid input syntax for type uuid: \"ngminhhoang0934-gmail.com\""}
+seeding-backend  | INFO:     172.26.0.4:35182 - "GET /api/all-platform/zalo/accounts?owner_id=ngminhhoang0934-gmail.com&id_member=613877fc-c12a-4fc6-837d-10f1aa80a29a HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:47104 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:47130 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:47140 - "GET /api/all-platform/zalo/workers HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:47118 - "GET /api/all-platform/zalo/conversations?account_id=zl_0b6a9462 HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:47126 - "GET /api/all-platform/zalo/accounts?owner_id=quocvietpham185-gmail.com&id_member=ebebd750-f379-47b5-b6d8-81ecbadc1fd5&email=quocvietpham185%40gmail.com&role=member HTTP/1.1" 200 OK
+seeding-backend  | INFO:     127.0.0.1:41874 - "GET /health HTTP/1.1" 200 OK
+seeding-backend  | 2026-06-19 16:54:00,001 | INFO | apscheduler.executors.default | Running job "execute_all_platform_crawl_workflow (trigger: cron[minute='*'], next run at: 2026-06-19 16:55:00 UTC)" (scheduled at 2026-06-19 16:54:00+00:00)
+seeding-backend  | 2026-06-19 16:54:00,401 | INFO | apscheduler.executors.default | Job "execute_all_platform_crawl_workflow (trigger: cron[minute='*'], next run at: 2026-06-19 16:55:00 UTC)" executed successfully
+seeding-backend  | INFO:     172.26.0.4:36498 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:36512 - "GET /api/all-platform/zalo/workers HTTP/1.1" 200 OK
+seeding-backend  | 2026-06-19 16:54:02.595 | WARNING  | app.modules.all_platform.zalo.services.supabase_service:list_zalo_accounts:565 - zalo_accounts table is not ready; returning empty account list: Supabase GET zalo_accounts failed: 400 {"code":"22P02","details":null,"hint":null,"message":"invalid input syntax for type uuid: \"tycatong-gmail.com\""}
+seeding-backend  | INFO:     172.26.0.4:36504 - "GET /api/all-platform/zalo/accounts?owner_id=tycatong-gmail.com&id_member=3d74cd88-a53a-4002-a757-cabf119d2ea4 HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:36490 - "GET /api/all-platform/zalo/conversations?account_id=zl_986934c9 HTTP/1.1" 200 OK
+seeding-backend  | INFO:     127.0.0.1:32988 - "GET /health HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:35762 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:35772 - "GET /api/all-platform/zalo/workers HTTP/1.1" 200 OK
+seeding-backend  | 2026-06-19 16:54:52.549 | WARNING  | app.modules.all_platform.zalo.services.supabase_service:list_zalo_accounts:565 - zalo_accounts table is not ready; returning empty account list: Supabase GET zalo_accounts failed: 400 {"code":"22P02","details":null,"hint":null,"message":"invalid input syntax for type uuid: \"ngminhhoang0934-gmail.com\""}
+seeding-backend  | INFO:     172.26.0.4:35768 - "GET /api/all-platform/zalo/accounts?owner_id=ngminhhoang0934-gmail.com&id_member=613877fc-c12a-4fc6-837d-10f1aa80a29a HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:35790 - "GET /api/all-platform/zalo/workers HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:35788 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:35820 - "GET /api/all-platform/zalo/conversations?account_id=zl_0b6a9462 HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:35830 - "GET /api/all-platform/zalo/accounts?owner_id=quocvietpham185-gmail.com&id_member=ebebd750-f379-47b5-b6d8-81ecbadc1fd5&email=quocvietpham185%40gmail.com&role=member HTTP/1.1" 200 OK
+seeding-backend  | 2026-06-19 16:55:00,002 | INFO | apscheduler.executors.default | Running job "execute_all_platform_crawl_workflow (trigger: cron[minute='*'], next run at: 2026-06-19 16:56:00 UTC)" (scheduled at 2026-06-19 16:55:00+00:00)
+seeding-backend  | 2026-06-19 16:55:00,381 | INFO | apscheduler.executors.default | Job "execute_all_platform_crawl_workflow (trigger: cron[minute='*'], next run at: 2026-06-19 16:56:00 UTC)" executed successfully
+seeding-backend  | INFO:     127.0.0.1:34142 - "GET /health HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:60088 - "GET /api/all-platform/zalo/workers HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:60100 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+seeding-backend  | 2026-06-19 16:55:02.690 | WARNING  | app.modules.all_platform.zalo.services.supabase_service:list_zalo_accounts:565 - zalo_accounts table is not ready; returning empty account list: Supabase GET zalo_accounts failed: 400 {"code":"22P02","details":null,"hint":null,"message":"invalid input syntax for type uuid: \"tycatong-gmail.com\""}
+seeding-backend  | INFO:     172.26.0.4:60108 - "GET /api/all-platform/zalo/accounts?owner_id=tycatong-gmail.com&id_member=3d74cd88-a53a-4002-a757-cabf119d2ea4 HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:60074 - "GET /api/all-platform/zalo/conversations?account_id=zl_986934c9 HTTP/1.1" 200 OK
+seeding-backend  | INFO:     127.0.0.1:40564 - "GET /health HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:57028 - "GET /api/all-platform/zalo/workers HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:57040 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+seeding-backend  | 2026-06-19 16:55:52.552 | WARNING  | app.modules.all_platform.zalo.services.supabase_service:list_zalo_accounts:565 - zalo_accounts table is not ready; returning empty account list: Supabase GET zalo_accounts failed: 400 {"code":"22P02","details":null,"hint":null,"message":"invalid input syntax for type uuid: \"ngminhhoang0934-gmail.com\""}
+seeding-backend  | INFO:     172.26.0.4:57050 - "GET /api/all-platform/zalo/accounts?owner_id=ngminhhoang0934-gmail.com&id_member=613877fc-c12a-4fc6-837d-10f1aa80a29a HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:57054 - "GET /api/all-platform/zalo/workers HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:57072 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:57070 - "GET /api/all-platform/zalo/conversations?account_id=zl_0b6a9462 HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:57084 - "GET /api/all-platform/zalo/accounts?owner_id=quocvietpham185-gmail.com&id_member=ebebd750-f379-47b5-b6d8-81ecbadc1fd5&email=quocvietpham185%40gmail.com&role=member HTTP/1.1" 200 OK
+seeding-backend  | 2026-06-19 16:56:00,001 | INFO | apscheduler.executors.default | Running job "execute_all_platform_crawl_workflow (trigger: cron[minute='*'], next run at: 2026-06-19 16:57:00 UTC)" (scheduled at 2026-06-19 16:56:00+00:00)
+seeding-backend  | 2026-06-19 16:56:00,385 | INFO | apscheduler.executors.default | Job "execute_all_platform_crawl_workflow (trigger: cron[minute='*'], next run at: 2026-06-19 16:57:00 UTC)" executed successfully
+seeding-backend  | INFO:     127.0.0.1:58700 - "GET /health HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:54722 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:54738 - "GET /api/all-platform/zalo/workers HTTP/1.1" 200 OK
+seeding-backend  | 2026-06-19 16:56:02.745 | WARNING  | app.modules.all_platform.zalo.services.supabase_service:list_zalo_accounts:565 - zalo_accounts table is not ready; returning empty account list: Supabase GET zalo_accounts failed: 400 {"code":"22P02","details":null,"hint":null,"message":"invalid input syntax for type uuid: \"tycatong-gmail.com\""}
+seeding-backend  | INFO:     172.26.0.4:54744 - "GET /api/all-platform/zalo/accounts?owner_id=tycatong-gmail.com&id_member=3d74cd88-a53a-4002-a757-cabf119d2ea4 HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:54706 - "GET /api/all-platform/zalo/conversations?account_id=zl_986934c9 HTTP/1.1" 200 OK
+seeding-backend  | INFO:     127.0.0.1:44994 - "GET /health HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:46224 - "GET /api/all-platform/zalo/auth/events?user_id=zl_0b6a9462&api_key=secret_api_key HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:53742 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:53748 - "GET /api/all-platform/zalo/workers HTTP/1.1" 200 OK
+seeding-backend  | 2026-06-19 16:56:52.539 | WARNING  | app.modules.all_platform.zalo.services.supabase_service:list_zalo_accounts:565 - zalo_accounts table is not ready; returning empty account list: Supabase GET zalo_accounts failed: 400 {"code":"22P02","details":null,"hint":null,"message":"invalid input syntax for type uuid: \"ngminhhoang0934-gmail.com\""}
+seeding-backend  | INFO:     172.26.0.4:53728 - "GET /api/all-platform/zalo/accounts?owner_id=ngminhhoang0934-gmail.com&id_member=613877fc-c12a-4fc6-837d-10f1aa80a29a HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:53770 - "GET /api/all-platform/zalo/auth/current-status HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:53774 - "GET /api/all-platform/zalo/workers HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:53756 - "GET /api/all-platform/zalo/conversations?account_id=zl_0b6a9462 HTTP/1.1" 200 OK
+seeding-backend  | INFO:     172.26.0.4:53778 - "GET /api/all-platform/zalo/accounts?owner_id=quocvietpham185-gmail.com&id_member=ebebd750-f379-47b5-b6d8-81ecbadc1fd5&email=quocvietpham185%40gmail.com&role=member HTTP/1.1" 200 OK
+seeding-backend  | 2026-06-19 16:57:00,001 | INFO | apscheduler.executors.default | Running job "execute_all_platform_crawl_workflow (trigger: cron[minute='*'], next run at: 2026-06-19 16:58:00 UTC)" (scheduled at 2026-06-19 16:57:00+00:00)
+seeding-backend  | 2026-06-19 16:57:00,434 | INFO | apscheduler.executors.default | Job "execute_all_platform_crawl_workflow (trigger: cron[minute='*'], next run at: 2026-06-19 16:58:00 UTC)" executed successfully
+seeding-backend  | INFO:     127.0.0.1:48000 - "GET /health HTTP/1.1" 200 OK

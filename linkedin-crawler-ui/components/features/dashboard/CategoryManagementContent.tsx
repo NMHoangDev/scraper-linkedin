@@ -624,7 +624,7 @@ export function CategoryManagementContent() {
 
         {/* Filter & Action bar */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-          <div className="relative w-full sm:max-w-xs flex items-center">
+          <div className="relative w-full sm:max-w-[280px] flex items-center">
             <span className="material-symbols-outlined absolute left-3 text-slate-400 text-[20px] pointer-events-none select-none">
               search
             </span>

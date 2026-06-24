@@ -850,10 +850,17 @@ function findUserComment() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Click nút sort comments và chọn "Tất cả bình luận"
+ * Click nút sort comments và chọn option sắp xếp
+ * Ưu tiên: Tất cả bình luận > Mới nhất > Phù hợp nhất
  * Đợi tối đa 15 giây để trang load xong và tìm dropdown
  * Nếu không tìm được → reload trang để thử lại
  */
+const SORT_OPTIONS = {
+  ALL_COMMENTS: ["Tất cả bình luận", "All comments", "All Comments"],
+  NEWEST: ["Mới nhất", "Newest"],
+  MOST_RELEVANT: ["Phù hợp nhất", "Most relevant", "Most Relevant"]
+};
+
 async function clickAllCommentsDropdown() {
   try {
     updateOverlay("step-dropdown", 15, "Đang chờ trang load...");
@@ -887,7 +894,16 @@ async function clickAllCommentsDropdown() {
           const isReact = /\b(Cảm xúc|Like|React)\b/i.test(text);
           const isBookmark = /\b(Lưu|Save|Bookmark)\b/i.test(text);
           const isReport = /\b(Báo cáo|Report)\b/i.test(text);
-          const isCommentSort = /\b(Phù hợp nhất|Mới nhất|Tất cả bình luận|All comments)\b/i.test(text);
+
+          // Check for any of the 3 sort options
+          const sortOptions = [
+            ...SORT_OPTIONS.ALL_COMMENTS,
+            ...SORT_OPTIONS.NEWEST,
+            ...SORT_OPTIONS.MOST_RELEVANT
+          ];
+          const isCommentSort = sortOptions.some(opt =>
+            new RegExp("\\b" + opt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "\\b", "i").test(text)
+          );
 
           if (isCommentSort) {
             dropdownBtn = btn;
@@ -926,13 +942,19 @@ async function clickAllCommentsDropdown() {
       return true;
     }
 
-    // Check: nếu đang ở mode "Tất cả bình luận" thì skip
-    const isAllCommentsMode = /\b(Tất cả|All)\b/i.test(currentText);
-    if (isAllCommentsMode) {
-      log("Đang ở mode 'Tất cả bình luận' - skip dropdown");
-      updateOverlay("step-dropdown", 25, "✓ Đang ở chế độ tất cả bình luận");
+    // Check: nếu đang ở "Tất cả bình luận" / "All comments" thì skip
+    const currentMode = [
+      ...SORT_OPTIONS.ALL_COMMENTS
+    ].some(opt => new RegExp("^" + opt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "$", "i").test(currentText));
+
+    if (currentMode) {
+      log("Đang ở mode 'Tất cả bình luận' / 'All comments' - skip dropdown");
+      updateOverlay("step-dropdown", 25, "✓ Đang ở chế độ: " + currentText);
       return true;
     }
+
+    // Nếu đang ở "Phù hợp nhất" hoặc "Mới nhất" → vẫn phải click để chuyển sang "Tất cả bình luận"
+    log("Đang ở mode:", currentText, "→ sẽ chuyển sang Tất cả bình luận");
 
     // Check: nếu dropdown đang mở (aria-expanded=true)
     const isExpanded = dropdownBtn.getAttribute("aria-expanded") === "true";
@@ -952,31 +974,60 @@ async function clickAllCommentsDropdown() {
     // Đợi menu xuất hiện
     await delay(CONFIG.CLICK_DELAY);
 
-    // Tìm và click option "Tất cả bình luận"
+    // Tìm và click option sort comments
     // Cấu trúc: <div role="menuitem"><div><div><span>TÊN</span></div><div><span>MÔ TẢ</span></div></div></div>
+    // Ưu tiên: Tất cả bình luận / All comments > Mới nhất / Newest > Phù hợp nhất / Most relevant
+    const priorityOptions = [
+      ...SORT_OPTIONS.ALL_COMMENTS,
+      ...SORT_OPTIONS.NEWEST,
+      ...SORT_OPTIONS.MOST_RELEVANT
+    ];
+
     let foundOption = false;
+    let selectedOption = "";
 
     for (let wait = 0; wait < 30 && !foundOption; wait++) {
       const menuItems = document.querySelectorAll('[role="menuitem"]');
 
+      // Tìm tất cả options trong menu
+      const menuOptions = [];
       for (const item of menuItems) {
-        // Lấy span đầu tiên có dir="auto" trong menuitem - đây là TITLE của option
         const titleSpan = item.querySelector('span[dir="auto"]');
         if (!titleSpan) continue;
         const titleText = (titleSpan.textContent || "").trim();
-        
-        // Log menu option để debug (chỉ log vòng đầu)
+
         if (wait === 0) {
           log("Menu option:", titleText);
         }
-        
-        // Kiểm tra title có phải "Tất cả bình luận" không
-        if (titleText === "Tất cả bình luận") {
-          log("Tìm thấy option 'Tất cả bình luận'");
-          item.click();
-          foundOption = true;
-          break;
+
+        // Check xem option này thuộc group nào
+        let optionGroup = null;
+        if (SORT_OPTIONS.ALL_COMMENTS.includes(titleText)) {
+          optionGroup = "ALL_COMMENTS";
+        } else if (SORT_OPTIONS.NEWEST.includes(titleText)) {
+          optionGroup = "NEWEST";
+        } else if (SORT_OPTIONS.MOST_RELEVANT.includes(titleText)) {
+          optionGroup = "MOST_RELEVANT";
         }
+
+        if (optionGroup) {
+          menuOptions.push({ item, titleText, group: optionGroup });
+        }
+      }
+
+      // Ưu tiên ALL_COMMENTS > NEWEST > MOST_RELEVANT
+      const prioritizedOptions = [
+        ...menuOptions.filter(o => o.group === "ALL_COMMENTS"),
+        ...menuOptions.filter(o => o.group === "NEWEST"),
+        ...menuOptions.filter(o => o.group === "MOST_RELEVANT")
+      ];
+
+      if (prioritizedOptions.length > 0) {
+        const selected = prioritizedOptions[0];
+        log("Click option ưu tiên:", selected.titleText, "(group:", selected.group + ")");
+        selected.item.click();
+        foundOption = true;
+        selectedOption = selected.titleText;
       }
 
       if (!foundOption) {
@@ -985,32 +1036,43 @@ async function clickAllCommentsDropdown() {
     }
 
     if (foundOption) {
-      log("✅ Đã chọn 'Tất cả bình luận'");
-      updateOverlay("step-dropdown", 25, "✓ Đã chọn 'Tất cả bình luận'");
+      log("✅ Đã chọn option sort:", selectedOption);
+      updateOverlay("step-dropdown", 25, "✓ Đã chọn: " + selectedOption);
       await delay(CONFIG.CLICK_DELAY);
       return true;
     }
 
-    // Fallback: click bằng text content trực tiếp
+    // Fallback: click bằng text content trực tiếp (ưu tiên ALL_COMMENTS)
     log("Fallback: tìm bằng text content...");
+    const fallbackPriority = [
+      ...SORT_OPTIONS.ALL_COMMENTS,
+      ...SORT_OPTIONS.NEWEST,
+      ...SORT_OPTIONS.MOST_RELEVANT
+    ];
+
     for (const item of document.querySelectorAll('[role="menuitem"]')) {
       const content = (item.textContent || "").trim();
-      if (content.includes("Tất cả bình luận")) {
-        log("Tìm thấy 'Tất cả bình luận' bằng fallback");
-        item.click();
-        foundOption = true;
-        break;
+
+      for (const optText of fallbackPriority) {
+        if (content.includes(optText)) {
+          log("Tìm thấy '" + optText + "' bằng fallback");
+          item.click();
+          foundOption = true;
+          selectedOption = optText;
+          break;
+        }
       }
+      if (foundOption) break;
     }
 
     if (foundOption) {
-      log("✅ Đã click 'Tất cả bình luận' (fallback)");
-      updateOverlay("step-dropdown", 25, "✓ Đã chọn 'Tất cả bình luận'");
+      log("✅ Đã click option (fallback):", selectedOption);
+      updateOverlay("step-dropdown", 25, "✓ Đã chọn: " + selectedOption);
       await delay(CONFIG.CLICK_DELAY);
       return true;
     }
 
-    logError("Không tìm thấy option 'Tất cả bình luận'");
+    logError("Không tìm thấy option sort comments");
     return false;
   } catch (e) {
     logError("Lỗi click dropdown:", e);

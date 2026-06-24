@@ -48,6 +48,7 @@ class CrawlFacebookResult:
     total_groups_failed: int
     total_sessions_saved: int
     total_posts_saved: int
+    total_duplicates: int = 0
     groups_results: List[CrawlGroupResult] = field(default_factory=list)
     errors: List[str] = field(default_factory=list)
 
@@ -58,17 +59,15 @@ def crawl_sync(
     groups: List[dict],
     custom_email: Optional[str] = None,
     custom_pass: Optional[str] = None,
+    loop: Optional[asyncio.AbstractEventLoop] = None,
+    involved_users_list: Optional[List[str]] = None,
 ) -> List:
-    """
-    Hàm sync — gọi FacebookScraper.scrape_groups() giữ nguyên logic gốc.
-    Chạy trong threadpool để không block event loop.
-    """
-    # Chuyển dict -> GroupTarget (giữ key Intent viết hoa như dataclass định nghĩa)
     targets: List[GroupTarget] = [
         GroupTarget(
             name=g.get("name", g.get("url", "")),
             url=g.get("url", ""),
             Intent=g.get("Intent", g.get("intent", "")),
+            id_member=g.get("id_member", "")
         )
         for g in groups
         if g.get("url")
@@ -77,12 +76,69 @@ def crawl_sync(
     if not targets:
         return []
 
+    from app.core.supabase_client import get_supabase_client
+    from app.modules.facebook.src.modules.telegram.services.telegram_service import TelegramService
+    from app.modules.all_platform.websocket import manager
+
+    def on_group_crawled(summary):
+        # 1. Lưu DB ngay lập tức
+        res = save_facebook_crawl_to_supabase("00000000-0000-0000-0000-000000000000", [summary])
+        total_saved = res.get("total_posts", 0)
+        total_duplicates = res.get("duplicates", 0)
+        
+        # 2. Gửi Telegram
+        try:
+            telegram = TelegramService()
+            supabase = get_supabase_client()
+            user_id = summary.id_member or "00000000-0000-0000-0000-000000000000"
+            user_name = user_id
+            if user_id != "00000000-0000-0000-0000-000000000000":
+                user_res = supabase.table("app_users").select("name, email").eq("id", user_id).execute()
+                if user_res.data:
+                    user_name = user_res.data[0].get("name") or user_res.data[0].get("email") or user_id
+            
+            msg = f"✅ <b>[ALL-PLATFORM] BÁO CÁO CÀO 24H</b>\n"
+            msg += f"• Nền tảng: Facebook\n"
+            msg += f"• Nhóm: {summary.group_name}\n"
+            msg += f"• Người thực thi: {user_name}\n"
+            msg += f"• Số bài viết mới: {total_saved}\n"
+            if total_duplicates > 0:
+                msg += f"• Bỏ qua {total_duplicates} bài viết trùng lặp.\n"
+            
+            if summary.hot_post:
+                content = summary.hot_post.content or ""
+                if len(content) > 100:
+                    content = content[:100] + "..."
+                msg += f"\n📝 <i>{content}</i>\n"
+                msg += f"👉 Tương tác: 👍 {summary.hot_post.reactions} | 💬 {summary.hot_post.comments}\n"
+            
+            telegram.send_message(msg)
+        except Exception as e:
+            logger.error(f"Lỗi gửi Tele callback: {e}")
+
+        # 3. Gửi Socket
+        if loop and not loop.is_closed():
+            msg_broadcast = f"Đã cào xong {summary.group_name}: {total_saved} bài mới."
+            if total_duplicates > 0:
+                msg_broadcast += f" ({total_duplicates} bài trùng)"
+            asyncio.run_coroutine_threadsafe(
+                manager.broadcast({
+                    "event": "crawl_success",
+                    "message": msg_broadcast,
+                    "total_posts": total_saved,
+                    "total_duplicates": total_duplicates,
+                    "involved_users": involved_users_list or []
+                }),
+                loop
+            )
+
     scraper = FacebookScraper(config=Config)
     return scraper.scrape_groups(
         groups=targets,
         custom_email=custom_email,
         custom_pass=custom_pass,
         client_id=None,
+        on_group_crawled=on_group_crawled
     )
 
 
@@ -91,35 +147,27 @@ async def crawl_facebook_groups(
     user_id: str,
     custom_email: Optional[str] = None,
     custom_pass: Optional[str] = None,
+    involved_users_list: Optional[List[str]] = None,
 ) -> CrawlFacebookResult:
-    """
-    Cào danh sách nhóm Facebook bằng Playwright (FacebookScraper).
-
-    Args:
-        groups:        Danh sách dict [{name, url, Intent?}].
-        user_id:       ID của user thực hiện cào (để ghi vào Supabase).
-        custom_email:  Email FB tùy chỉnh (None = dùng cookie mặc định).
-        custom_pass:   Password FB tùy chỉnh.
-
-    Returns:
-        CrawlFacebookResult với kết quả chi tiết từng nhóm.
-    """
     if not groups:
         return CrawlFacebookResult(
             total_groups_ok=0,
             total_groups_failed=0,
             total_sessions_saved=0,
             total_posts_saved=0,
+            total_duplicates=0,
             groups_results=[],
             errors=["Không có nhóm nào hợp lệ để cào."],
         )
 
-    # 1. Gọi scraper trong threadpool (sync Playwright → không block event loop)
+    loop = asyncio.get_running_loop()
     group_summaries = await asyncio.to_thread(
         crawl_sync,
         groups=groups,
         custom_email=custom_email,
         custom_pass=custom_pass,
+        loop=loop,
+        involved_users_list=involved_users_list
     )
 
     if not group_summaries:
@@ -128,20 +176,15 @@ async def crawl_facebook_groups(
             total_groups_failed=len(groups),
             total_sessions_saved=0,
             total_posts_saved=0,
+            total_duplicates=0,
             groups_results=[],
             errors=["Scraper không trả về kết quả nào."],
         )
 
-    # 2. Lưu hot_post vào Supabase
     save_errors: List[str] = []
     total_saved = 0
-    try:
-        result = save_facebook_crawl_to_supabase(user_id, group_summaries)
-        total_saved = result.get("total_posts", 0)
-        save_errors = result.get("errors", [])
-    except Exception as e:
-        logger.warning("Không lưu được vào Supabase: %s", e)
-        save_errors.append(str(e))
+    total_duplicates = 0
+    # Đã lưu trong callback, không gọi lại save_facebook_crawl_to_supabase ở đây nữa
 
     # 3. Tổng hợp kết quả từng nhóm
     groups_results: List[CrawlGroupResult] = []
@@ -172,6 +215,7 @@ async def crawl_facebook_groups(
         total_groups_failed=total_failed,
         total_sessions_saved=total_ok,
         total_posts_saved=total_saved,
+        total_duplicates=total_duplicates,
         groups_results=groups_results,
         errors=save_errors,
     )

@@ -57,9 +57,9 @@ def _fetch_posts(
 
     # Select nested group to get group_name and taxonomy UUIDs
     if table == "facebook_posts":
-        query = tbl.select("*, facebook_groups(group_name, id_intent, id_industry, id_team, id_tier, id_icp, id_content_type, id_product_seeding)", count="exact")
+        query = tbl.select("*, author_post(*), facebook_groups(group_name, id_intent, id_industry, id_team, id_tier, id_icp, id_content_type, id_product_seeding, id_member)", count="exact")
     else:
-        query = tbl.select("*, linkedin_groups(group_name, id_intent, id_industry, id_team, id_tier, id_icp, id_content_type, id_product_seeding)", count="exact")
+        query = tbl.select("*, author_post(*), linkedin_groups(group_name, id_intent, id_industry, id_team, id_tier, id_icp, id_content_type, id_product_seeding, id_member)", count="exact")
 
     # Scope to requesting user
     if email:
@@ -79,15 +79,39 @@ def _fetch_posts(
     # Resolve taxonomy and email filters via groups table
     group_ids: list[str] | None = None
     
+    # 1. Resolve user role and scoped member ids
+    user_id = None
+    user_role = "member"
+    allowed_member_ids: list[str] | None = None
+
+    if email:
+        user_res = sb.table("app_users").select("id, role").eq("email", email.strip().lower()).limit(1).execute()
+        if user_res.data:
+            user_id = user_res.data[0]["id"]
+            user_role = user_res.data[0].get("role", "member")
+            
+    if user_role == "admin":
+        allowed_member_ids = None  # Admin sees all
+    elif user_role == "leader":
+        if user_id:
+            teams_res = sb.table("teams").select("id").eq("id_leader", user_id).execute()
+            team_ids = [t["id"] for t in (teams_res.data or [])]
+            allowed_member_ids = []
+            if team_ids:
+                mot_res = sb.table("member_of_teams").select("id_member").in_("id_teams", team_ids).execute()
+                allowed_member_ids = [m["id_member"] for m in (mot_res.data or []) if m.get("id_member")]
+            if user_id not in allowed_member_ids:
+                allowed_member_ids.append(user_id)
+        else:
+            allowed_member_ids = ["00000000-0000-0000-0000-000000000000"]
+    else:
+        # Member role
+        allowed_member_ids = [user_id] if user_id else ["00000000-0000-0000-0000-000000000000"]
+    
     if table == "facebook_posts":
-        if email:
-            user_res = sb.table("app_users").select("id").eq("email", email.strip().lower()).limit(1).execute()
-            user_id = user_res.data[0]["id"] if user_res.data else None
-            if user_id:
-                query = query.eq("id_member", user_id)
-            else:
-                query = query.eq("id_member", "00000000-0000-0000-0000-000000000000")
-                
+        if allowed_member_ids is not None:
+            query = query.in_("id_member", allowed_member_ids)
+
         if intent or industry or team or tier is not None or icp or content_type or product_seeding:
             gq = sb.table("facebook_groups").select("id")
             if intent:
@@ -112,13 +136,8 @@ def _fetch_posts(
         gq = sb.table("linkedin_groups").select("id")
         needs_group_filter = False
         
-        if email:
-            user_res = sb.table("app_users").select("id").eq("email", email.strip().lower()).limit(1).execute()
-            user_id = user_res.data[0]["id"] if user_res.data else None
-            if user_id:
-                gq = gq.eq("id_member", user_id)
-            else:
-                gq = gq.eq("id_member", "00000000-0000-0000-0000-000000000000") # Force empty if user not found
+        if allowed_member_ids is not None:
+            gq = gq.in_("id_member", allowed_member_ids)
             needs_group_filter = True
             
         if intent:
@@ -162,6 +181,11 @@ def _fetch_posts(
         query = query.order("score", desc=False, nullsfirst=False)
     elif sort == "comments_high":
         query = query.order("comments", desc=True, nullsfirst=False)
+    elif sort == "crawler":
+        if table == "facebook_posts":
+            query = query.order("id_member", desc=False, nullsfirst=False)
+        else:
+            query = query.order("crawl_date", desc=True, nullsfirst=False)
     else:  # latest
         query = query.order("crawl_date", desc=True, nullsfirst=False)
 
@@ -176,11 +200,22 @@ def _fetch_posts(
     if not posts:
         return posts, total
 
-    # Collect UUIDs to resolve
+    # Collect UUIDs to resolve taxonomy and crawlers
     cat_ids = set()
     team_ids = set()
+    member_ids_to_resolve = set()
     for p in posts:
+        # Facebook posts have id_member on the root level
+        if p.get("id_member"):
+            member_ids_to_resolve.add(p["id_member"])
+            
         grp = p.get("facebook_groups") or p.get("linkedin_groups") or {}
+        # LinkedIn posts resolve id_member through linkedin_groups
+        if grp.get("id_member"):
+            member_ids_to_resolve.add(grp["id_member"])
+            p["id_member"] = grp["id_member"] # Store it on post level for uniformity
+            
+
         if grp.get("id_intent"): cat_ids.add(grp["id_intent"])
         if grp.get("id_industry"): cat_ids.add(grp["id_industry"])
         if grp.get("id_icp"): cat_ids.add(grp["id_icp"])
@@ -201,6 +236,26 @@ def _fetch_posts(
         for t in (tres.data or []):
             team_map[t["id"]] = t["name_team"]
 
+    member_map = {}
+    if member_ids_to_resolve:
+        # Get member names
+        mres = sb.table("app_users").select("id, name").in_("id", list(member_ids_to_resolve)).execute()
+        for m in (mres.data or []):
+            member_map[m["id"]] = {"name": m.get("name") or "Unknown"}
+            
+        # Get primary team for these members
+        mot_res = sb.table("member_of_teams").select("id_member, id_teams").in_("id_member", list(member_ids_to_resolve)).execute()
+        if mot_res.data:
+            team_ids_for_members = set(m["id_teams"] for m in mot_res.data if m.get("id_teams"))
+            team_res = sb.table("teams").select("id, name_team").in_("id", list(team_ids_for_members)).execute()
+            team_dict = {t["id"]: t["name_team"] for t in (team_res.data or [])}
+            
+            for mot in mot_res.data:
+                mid = mot.get("id_member")
+                tid = mot.get("id_teams")
+                if mid in member_map and tid in team_dict:
+                    member_map[mid]["team_name"] = team_dict[tid]
+
     # Map nested group properties and resolved names to root
     for p in posts:
         grp = p.pop("facebook_groups", None) or p.pop("linkedin_groups", None)
@@ -213,6 +268,16 @@ def _fetch_posts(
             if grp.get("id_content_type"): p["content_type"] = cat_map.get(grp["id_content_type"])
             if grp.get("id_product_seeding"): p["product_seeding"] = cat_map.get(grp["id_product_seeding"])
             if grp.get("id_team"): p["team"] = team_map.get(grp["id_team"])
+            
+        mid = p.get("id_member")
+        if mid and mid in member_map:
+            p["crawler_name"] = member_map[mid].get("name")
+            p["crawler_team"] = member_map[mid].get("team_name")
+
+        # Map author_url from author_post relationship
+        author_post_data = p.pop("author_post", None)
+        if author_post_data and isinstance(author_post_data, dict):
+            p["author_url"] = author_post_data.get("url_profile") or ""
 
     return posts, total
 
@@ -248,7 +313,7 @@ def _get_kpi_progress(sb: Client, id_member: str, platform: str) -> tuple[int, i
         now_vn = datetime.now(timezone.utc) + timedelta(hours=7)
         today = now_vn.date().isoformat()
         
-        kpi_query = sb.table("kpi_tracker").select("start_date, end_date, kpi_per_week, id_platform").eq("id_member", id_member).eq("status", "active")
+        kpi_query = sb.table("kpi_tracker").select("start_date, end_date, kpi_comment, id_platform").eq("id_member", id_member).eq("status", "active")
         kpi_res = kpi_query.execute()
         
         if not kpi_res.data:
@@ -267,7 +332,7 @@ def _get_kpi_progress(sb: Client, id_member: str, platform: str) -> tuple[int, i
             
         start_date = active_kpi.get("start_date")
         end_date = active_kpi.get("end_date")
-        kpi_target = active_kpi.get("kpi_per_week") or 0
+        kpi_target = active_kpi.get("kpi_comment") or 0
         
         if not start_date or not end_date:
             return 0, kpi_target
@@ -304,25 +369,45 @@ def _fetch_stats(
     today = now_vn.date().isoformat()
     yesterday = (now_vn.date() - timedelta(days=1)).isoformat()
 
-    # Resolve scope logic exactly like _fetch_posts
-    group_ids = None
+    # 1. Resolve user role and scoped member ids
     user_id_fetch = None
+    user_role = "member"
+    allowed_member_ids: list[str] | None = None
+
     if email:
-        user_res = sb.table("app_users").select("id").eq("email", email.strip().lower()).limit(1).execute()
-        user_id_fetch = user_res.data[0]["id"] if user_res.data else None
+        user_res = sb.table("app_users").select("id, role").eq("email", email.strip().lower()).limit(1).execute()
+        if user_res.data:
+            user_id_fetch = user_res.data[0]["id"]
+            user_role = user_res.data[0].get("role", "member")
+            
+    if user_role == "admin":
+        allowed_member_ids = None  # Admin sees all
+    elif user_role == "leader":
+        if user_id_fetch:
+            teams_res = sb.table("teams").select("id").eq("id_leader", user_id_fetch).execute()
+            team_ids = [t["id"] for t in (teams_res.data or [])]
+            allowed_member_ids = []
+            if team_ids:
+                mot_res = sb.table("member_of_teams").select("id_member").in_("id_teams", team_ids).execute()
+                allowed_member_ids = [m["id_member"] for m in (mot_res.data or []) if m.get("id_member")]
+            if user_id_fetch not in allowed_member_ids:
+                allowed_member_ids.append(user_id_fetch)
+        else:
+            allowed_member_ids = ["00000000-0000-0000-0000-000000000000"]
+    else:
+        # Member role
+        allowed_member_ids = [user_id_fetch] if user_id_fetch else ["00000000-0000-0000-0000-000000000000"]
         
-    if table == "linkedin_posts" and user_id_fetch:
-        gq = sb.table("linkedin_groups").select("id").eq("id_member", user_id_fetch).execute()
+    group_ids = None
+    if table == "linkedin_posts" and allowed_member_ids is not None:
+        gq = sb.table("linkedin_groups").select("id").in_("id_member", allowed_member_ids).execute()
         group_ids = [r.get("id") for r in (gq.data or []) if r.get("id")]
     
     def apply_scope(query):
-        if table == "linkedin_posts" and email:
+        if table == "linkedin_posts" and allowed_member_ids is not None:
             return query.in_("id_group", group_ids or ["00000000-0000-0000-0000-000000000000"])
-        if table == "facebook_posts" and email:
-            if user_id_fetch:
-                return query.eq("id_member", user_id_fetch)
-            else:
-                return query.eq("id_member", "00000000-0000-0000-0000-000000000000")
+        if table == "facebook_posts" and allowed_member_ids is not None:
+            return query.in_("id_member", allowed_member_ids)
         return query
 
     # Total posts today
@@ -453,6 +538,10 @@ def get_unified_posts(
             all_posts.sort(key=lambda p: p.get("score", 0), reverse=False)
         elif sort == "comments_high" or sort == "engagement":
             all_posts.sort(key=lambda p: (p.get("reactions", 0) + p.get("comments", 0) + p.get("shares", 0)), reverse=True)
+        elif sort == "crawler":
+            def get_crawler_key(p):
+                return (p.get("crawler_team") or "zzz", p.get("crawler_name") or "zzz", str(p.get("crawl_date") or ""))
+            all_posts.sort(key=get_crawler_key, reverse=False)
         else: # newest / latest
             def get_date_key(p):
                 dt = p.get("crawl_date")
@@ -489,6 +578,12 @@ def get_unified_posts(
         for p in posts:
             p["platform"] = platform_name
             p["_platform"] = platform_name
+            
+        if sort == "crawler":
+            def get_crawler_key(p):
+                return (p.get("crawler_team") or "zzz", p.get("crawler_name") or "zzz", str(p.get("crawl_date") or ""))
+            posts.sort(key=get_crawler_key, reverse=False)
+            
         all_posts = posts
         total_count = count
 
@@ -496,29 +591,60 @@ def get_unified_posts(
     if all_posts and email:
         try:
             sb = _supabase()
-            user_res = sb.table("app_users").select("id").eq("email", email).limit(1).execute()
+            user_res = sb.table("app_users").select("id, role").eq("email", email).limit(1).execute()
             if user_res.data:
                 id_member = user_res.data[0]["id"]
+                role = user_res.data[0].get("role", "member")
                 post_ids = [p.get("id") for p in all_posts if p.get("id")]
                 if post_ids:
-                    kpi_res = sb.table("seeding_content_kpi").select("id_post, content, verify, link_comment, social_accounts(account_name)").eq("id_member", id_member).in_("id_post", post_ids).execute()
+                    if role in ["admin", "leader"]:
+                        kpi_res = sb.table("seeding_content_kpi").select("id_post, id_member, content, verify, link_comment, social_accounts(account_name)").in_("id_post", post_ids).execute()
+                    else:
+                        kpi_res = sb.table("seeding_content_kpi").select("id_post, id_member, content, verify, link_comment, social_accounts(account_name)").eq("id_member", id_member).in_("id_post", post_ids).execute()
                     
+                    kpi_data = kpi_res.data or []
+                    seeding_member_ids = list(set([k.get("id_member") for k in kpi_data if k.get("id_member")]))
+                    member_name_map = {}
+                    if seeding_member_ids:
+                        mem_res = sb.table("app_users").select("id, name").in_("id", seeding_member_ids).execute()
+                        for m in (mem_res.data or []):
+                            member_name_map[m["id"]] = m.get("name") or "Unknown"
+
                     kpi_map = {}
-                    for kpi in (kpi_res.data or []):
+                    all_seedings_map = {}
+                    
+                    for kpi in kpi_data:
                         pid = kpi.get("id_post")
                         if pid:
                             sa = kpi.get("social_accounts") or {}
-                            kpi_map[pid] = {
+                            s_member_id = kpi.get("id_member")
+                            
+                            seeding_info = {
+                                "member_name": member_name_map.get(s_member_id, "Unknown"),
                                 "seeding_content": kpi.get("content"),
                                 "seeding_name": sa.get("account_name") if isinstance(sa, dict) else None,
                                 "link_comment": kpi.get("link_comment"),
                                 "verify_status": kpi.get("verify")
                             }
+                            
+                            if pid not in all_seedings_map:
+                                all_seedings_map[pid] = []
+                            all_seedings_map[pid].append(seeding_info)
+                            
+                            if s_member_id == id_member or pid not in kpi_map:
+                                kpi_map[pid] = {
+                                    "seeding_content": kpi.get("content"),
+                                    "seeding_name": sa.get("account_name") if isinstance(sa, dict) else None,
+                                    "link_comment": kpi.get("link_comment"),
+                                    "verify_status": kpi.get("verify")
+                                }
                     
                     for p in all_posts:
                         pid = p.get("id")
                         if pid in kpi_map:
                             p.update(kpi_map[pid])
+                        if pid in all_seedings_map:
+                            p["all_seedings"] = all_seedings_map[pid]
         except Exception as e:
             print("Error fetching seeding info:", e)
 

@@ -11,6 +11,7 @@ from apscheduler.executors.asyncio import AsyncIOExecutor
 from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_groups_service import GroupManagementSheetService
 from app.modules.all_platform.services.supabase_facebook_crawl_service import save_facebook_crawl_to_supabase
 from app.core.supabase_client import get_supabase_client
+from app.modules.all_platform.websocket import manager
 
 from app.modules.facebook.src.modules.gg_sheet.services.history_sheet_service import HistorySheetService
 from app.modules.facebook.src.modules.gg_sheet.services.user_score_sheet_service import UserScoreSheetService
@@ -43,21 +44,37 @@ def execute_crawl_workflow():
         
         target_groups: List[GroupTarget] = []
         for row in all_auto_groups:
-            # Lấy giờ đã set trong DB, nếu lưu kiểu time SQL thì chuỗi có dạng "15:30:00"
-            db_time = row.get("crawl_time")
-            if not db_time:
+            # Lấy các thiết lập cào
+            start_time = row.get("start_time_in_day")
+            end_time = row.get("end_time_in_day")
+            time_crawl = row.get("time_crawl")
+            end_date_str = row.get("end_date_hour")
+            
+            # Nếu thiếu thiết lập cần thiết thì bỏ qua
+            if start_time is None or end_time is None or time_crawl is None or time_crawl <= 0:
                 continue
-            
-            # Cắt lấy giờ phút từ DB (để so sánh với HH:MM)
-            # Ví dụ: "15:30:00" -> "15:30"
-            db_time_hhmm = str(db_time)[:5] 
-            
-            if db_time_hhmm == current_time_str:
-                group_url = row.get("group_url", "").strip()
-                group_name = row.get("group_name", "Unknown").strip()
-                intent_val = str(row.get("id_intent", ""))
-                if not group_url: continue
-                target_groups.append(GroupTarget(name=group_name, url=group_url, Intent=intent_val))
+
+            # Kiểm tra hạn end_date_hour
+            if end_date_str:
+                try:
+                    end_date = datetime.strptime(end_date_str[:10], "%Y-%m-%d").date()
+                    if now.date() > end_date:
+                        continue # Hết hạn
+                except ValueError:
+                    pass
+
+            now_minutes = now.hour * 60 + now.minute
+            start_minutes = start_time * 60
+            end_minutes = end_time * 60
+
+            # Điều kiện trong khung giờ VÀ đúng chu kỳ time_crawl
+            if start_minutes <= now_minutes <= end_minutes:
+                if (now_minutes - start_minutes) % time_crawl == 0:
+                    group_url = row.get("group_url", "").strip()
+                    group_name = row.get("group_name", "Unknown").strip()
+                    intent_val = str(row.get("id_intent", ""))
+                    if group_url:
+                        target_groups.append(GroupTarget(name=group_name, url=group_url, Intent=intent_val))
 
         if not target_groups:
             # Không log error, chỉ kết thúc nhẹ nhàng nếu không có job vào phút này
@@ -65,13 +82,29 @@ def execute_crawl_workflow():
 
         # 3. Bắt đầu cào
         logger.info(f"Tổng cộng có {len(target_groups)} group cần cào.")
+        
+        # Bắn socket báo bắt đầu cào
+        asyncio.create_task(manager.broadcast({
+            "event": "crawl_started",
+            "message": f"Bắt đầu cào 24h tự động cho {len(target_groups)} nhóm Facebook",
+            "count": len(target_groups)
+        }))
+        
         scraper = FacebookScraper(Config)
         daily_summary_report: List[GroupSummary] = scraper.scrape_groups(target_groups)
 
         # 4. Gửi báo cáo và lưu Supabase
         if daily_summary_report:
             try:
-                save_facebook_crawl_to_supabase("cronjob", daily_summary_report)
+                save_result = save_facebook_crawl_to_supabase("cronjob", daily_summary_report)
+                total_posts = save_result.get("total_posts", 0)
+                
+                # Bắn socket báo xong
+                asyncio.create_task(manager.broadcast({
+                    "event": "crawl_success",
+                    "message": f"Cào xong {len(target_groups)} nhóm, lưu được {total_posts} bài viết",
+                    "total_posts": total_posts
+                }))
                 
                 telegram.send_completion_notification()
                 mes = telegram.format_daily_telegram_report(summaries=daily_summary_report)
@@ -79,8 +112,17 @@ def execute_crawl_workflow():
                 logger.info("✅ HOÀN TẤT TIẾN TRÌNH LƯU SUPABASE.")
             except Exception as e:
                 logger.error(f"❌ Lỗi khi lưu dữ liệu vào Supabase: {e}")
+                asyncio.create_task(manager.broadcast({
+                    "event": "crawl_error",
+                    "message": f"Lỗi lưu dữ liệu: {e}"
+                }))
         else:
             logger.warning("⚠️ Không thu được dữ liệu.")
+            asyncio.create_task(manager.broadcast({
+                "event": "crawl_success",
+                "message": "Cào xong nhưng không có bài viết nào mới.",
+                "total_posts": 0
+            }))
 
     except Exception as e:
         logger.error(f"❌ Thất bại: {e}", exc_info=True)

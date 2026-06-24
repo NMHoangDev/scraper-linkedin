@@ -497,6 +497,7 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
               <PostCard
                 key={post.id || post.post_url}
                 post={post}
+                userRole={user?.role}
                 seeded={!!post.verify_status && post.verify_status !== "no"}
                 verifyStatus={post.verify_status as any}
                 onSeeding={() => {}}
