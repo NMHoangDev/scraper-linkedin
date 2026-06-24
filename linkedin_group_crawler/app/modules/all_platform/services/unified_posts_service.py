@@ -57,9 +57,9 @@ def _fetch_posts(
 
     # Select nested group to get group_name and taxonomy UUIDs
     if table == "facebook_posts":
-        query = tbl.select("*, facebook_groups(group_name, id_intent, id_industry, id_team, id_tier, id_icp, id_content_type, id_product_seeding, id_member)", count="exact")
+        query = tbl.select("*, author_post(*), facebook_groups(group_name, id_intent, id_industry, id_team, id_tier, id_icp, id_content_type, id_product_seeding, id_member)", count="exact")
     else:
-        query = tbl.select("*, linkedin_groups(group_name, id_intent, id_industry, id_team, id_tier, id_icp, id_content_type, id_product_seeding, id_member)", count="exact")
+        query = tbl.select("*, author_post(*), linkedin_groups(group_name, id_intent, id_industry, id_team, id_tier, id_icp, id_content_type, id_product_seeding, id_member)", count="exact")
 
     # Scope to requesting user
     if email:
@@ -273,6 +273,11 @@ def _fetch_posts(
         if mid and mid in member_map:
             p["crawler_name"] = member_map[mid].get("name")
             p["crawler_team"] = member_map[mid].get("team_name")
+
+        # Map author_url from author_post relationship
+        author_post_data = p.pop("author_post", None)
+        if author_post_data and isinstance(author_post_data, dict):
+            p["author_url"] = author_post_data.get("url_profile") or ""
 
     return posts, total
 

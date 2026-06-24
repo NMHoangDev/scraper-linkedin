@@ -326,6 +326,20 @@ export const allPlatformKpiService = {
   },
 
   /**
+   * Leader tính KPI hàng loạt cho team trong một ngày cụ thể.
+   * Chuyển các đề xuất có is_confirmed=False thành True.
+   */
+  bulkVerifyFbInbox: (payload: {
+    leader_email: string;
+    target_date: string;
+  }): Promise<ApiResponse<{ synced: number; message: string }>> => {
+    return requestJson(`${BASE}/kpi/fb-inbox-bulk-verify`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /**
    * Lấy tổng hợp inbox KPI từ bảng fb_inbox_kpi (Supabase).
    * Chỉ lấy inbox ĐÃ XÁC NHẬN (is_confirmed=True).
    */

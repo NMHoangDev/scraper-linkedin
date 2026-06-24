@@ -10,10 +10,11 @@ interface AssignKpiModalProps {
   onClose: () => void;
   member: any;
   teamId?: string;
+  selectedWeekValue?: string; // YYYY-MM-DD_YYYY-MM-DD
   onSuccess: () => void;
 }
 
-export function AssignKpiModal({ isOpen, onClose, member, teamId, onSuccess }: AssignKpiModalProps) {
+export function AssignKpiModal({ isOpen, onClose, member, teamId, selectedWeekValue, onSuccess }: AssignKpiModalProps) {
   const { user } = useAppAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,10 +79,18 @@ export function AssignKpiModal({ isOpen, onClose, member, teamId, onSuccess }: A
       setKpiPost(member.kpiPostTarget || 0);
       setKpiLead(member.kpiLeadTarget || 0);
       setKpiInbox(member.kpiInboxTarget || member.kpi_inbox_target || 0);
-      setSelectedWeek(getCurrentWeek());
+      
+      let initialWeek = getCurrentWeek();
+      if (selectedWeekValue) {
+        const [start] = selectedWeekValue.split("_");
+        const found = weeks.find(w => w.monday === start);
+        if (found) initialWeek = found.weekNumber;
+      }
+      setSelectedWeek(initialWeek);
+      
       setError(null);
     }
-  }, [isOpen, member, weeks]);
+  }, [isOpen, member, weeks, selectedWeekValue]);
 
   if (!isOpen) return null;
 

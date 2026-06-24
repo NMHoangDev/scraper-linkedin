@@ -846,24 +846,36 @@ function InboxPageContent() {
     conv_ids: string[];
     user_id: string;
   }) {
-    const convId = payload.conv_ids[0];
-    // Optimistic update - immediately mark as suggested
-    setSuggestedConvIds(prev => new Set([...prev, convId]));
+    // Optimistic update
+    setSuggestedConvIds(prev => new Set([...prev, ...payload.conv_ids]));
 
     try {
       await allPlatformKpiService.suggestFbInbox(payload);
-      // Refresh verified conv_ids after suggest
       await fetchVerifiedConvIds();
-      showToast(`Đã đề xuất inbox cho KPI`, true);
+      showToast(payload.conv_ids.length > 1 ? `Đã đề xuất ${payload.conv_ids.length} inbox cho KPI` : `Đã đề xuất inbox cho KPI`, true);
     } catch {
       // Revert optimistic update on error
       setSuggestedConvIds(prev => {
         const next = new Set(prev);
-        next.delete(convId);
+        payload.conv_ids.forEach(id => next.delete(id));
         return next;
       });
       showToast("Lỗi đề xuất KPI inbox", false);
       throw new Error("Suggest KPI failed");
+    }
+  }
+
+  async function bulkVerifyFbInboxKpi(payload: {
+    leader_email: string;
+    target_date: string;
+  }) {
+    try {
+      await allPlatformKpiService.bulkVerifyFbInbox(payload);
+      await fetchVerifiedConvIds();
+      showToast(`Đã tính KPI hàng loạt thành công!`, true);
+    } catch {
+      showToast("Lỗi tính KPI hàng loạt", false);
+      throw new Error("Bulk verify KPI failed");
     }
   }
 
@@ -1238,6 +1250,7 @@ function InboxPageContent() {
         suggestedConvIds={suggestedConvIds}
         userEmail={user?.email || ""}
         ownerEmail={user?.email || ""}
+        onBulkVerifyKpi={bulkVerifyFbInboxKpi}
       />
     );
   }

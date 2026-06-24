@@ -322,11 +322,6 @@ async def sync_recent_conversations(
     )
 
 
-<<<<<<< Updated upstream
-
-
-=======
->>>>>>> Stashed changes
 def _normalize_dom_conversation_id(value: str) -> str:
     raw = str(value or "").strip()
     if raw.startswith("g") and raw[1:].isdigit():

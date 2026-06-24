@@ -29,8 +29,8 @@ function getRecentWeeks(numWeeks = 8) {
     const weekNo = Math.ceil((((monday.getTime() - yearStart.getTime()) / 86400000) + yearStart.getDay() + 1) / 7);
     
     const fmt = (dt: Date) => dt.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
-    const valStart = monday.toISOString().split("T")[0];
-    const valEnd = sunday.toISOString().split("T")[0];
+    const valStart = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
+    const valEnd = `${sunday.getFullYear()}-${String(sunday.getMonth() + 1).padStart(2, '0')}-${String(sunday.getDate()).padStart(2, '0')}`;
     
     weeks.push({
       label: `Tuần ${weekNo} (${fmt(monday)} - ${fmt(sunday)})`,
@@ -126,9 +126,10 @@ export function TeamManagement() {
         monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
         const sunday = new Date(monday);
         sunday.setDate(monday.getDate() + 6);
+        const formatLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         setPostDateRange({
-          start: monday.toISOString().split("T")[0],
-          end: sunday.toISOString().split("T")[0],
+          start: formatLocal(monday),
+          end: formatLocal(sunday),
         });
       }
     }
@@ -466,6 +467,7 @@ export function TeamManagement() {
           onClose={() => setAssignModalOpen(false)}
           member={selectedMember}
           teamId={selectedTeamId}
+          selectedWeekValue={selectedWeek}
           onSuccess={handleKpiAssigned}
         />
       )}

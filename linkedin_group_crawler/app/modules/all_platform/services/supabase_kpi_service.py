@@ -30,6 +30,8 @@ def assign_kpi(payload: dict) -> dict:
     id_leader = leader_res.data[0]["id"]
 
     id_team = payload.get("id_team")
+    if id_team == "":
+        id_team = None
 
     kpi_items = payload.get("kpi", [])
     kpi_comment = 0
@@ -62,13 +64,18 @@ def assign_kpi(payload: dict) -> dict:
         "status": "active",
     }
 
-    # Check if there is already an active KPI for this member in this team
+    # Check if there is already an active KPI for this member in this team for this SPECIFIC week
     query = (
         supabase.table("kpi_tracker")
         .select("id")
         .eq("id_member", id_member)
         .eq("status", "active")
     )
+    if start_date:
+        query = query.eq("start_date", start_date)
+    if end_date:
+        query = query.eq("end_date", end_date)
+        
     if id_team:
         query = query.eq("id_team", id_team)
     else:
@@ -151,6 +158,14 @@ def get_all_kpis_for_leader(
     )
     user_map = {str(u["id"]): u for u in (user_result.data or [])}
 
+    # Calculate default weekly range (current week: Monday to Sunday)
+    from datetime import date, timedelta
+    today = date.today()
+    monday = today - timedelta(days=today.weekday())
+    sunday = monday + timedelta(days=6)
+    default_start = start_date or monday.isoformat()
+    default_end = end_date or sunday.isoformat()
+
     # Get KPI for each member
     kpi_query = (
         supabase.table("kpi_tracker")
@@ -160,20 +175,17 @@ def get_all_kpis_for_leader(
     )
     if id_team:
         kpi_query = kpi_query.eq("id_team", id_team)
+    if start_date and end_date:
+        # Match exact week if both are provided
+        kpi_query = kpi_query.eq("start_date", start_date).eq("end_date", end_date)
         
     kpi_query = kpi_query.order("start_date", desc=False)
     kpi_result = kpi_query.execute()
     kpi_map = {}
     for k in (kpi_result.data or []):
+        # We might have multiple active ones if start/end date were not provided, 
+        # so keeping the latest one is a reasonable fallback. But we prefer exact match.
         kpi_map[str(k["id_member"])] = k
-
-    # Calculate default weekly range (current week: Monday to Sunday)
-    from datetime import date, timedelta
-    today = date.today()
-    monday = today - timedelta(days=today.weekday())
-    sunday = monday + timedelta(days=6)
-    default_start = start_date or monday.isoformat()
-    default_end = end_date or sunday.isoformat()
 
     # Find minimum start date to fetch records efficiently
     min_start_date = default_start
@@ -305,14 +317,36 @@ def get_kpi_by_email(email: str) -> dict:
     user = user_result.data[0]
     user_id = user["id"]
 
+    # Determine current week
+    from datetime import date, timedelta
+    today = date.today()
+    monday = today - timedelta(days=today.weekday())
+    sunday = monday + timedelta(days=6)
+    current_monday = monday.isoformat()
+    current_sunday = sunday.isoformat()
+
     result = (
         supabase.table("kpi_tracker")
         .select("*")
         .eq("id_member", user_id)
         .eq("status", "active")
+        .eq("start_date", current_monday)
+        .eq("end_date", current_sunday)
         .order("start_date", desc=True)
         .execute()
     )
+    
+    # Fallback to latest KPI if no exact match for current week
+    if not result.data:
+        result = (
+            supabase.table("kpi_tracker")
+            .select("*")
+            .eq("id_member", user_id)
+            .eq("status", "active")
+            .order("start_date", desc=True)
+            .limit(1)
+            .execute()
+        )
 
     if result.data:
         kpi = result.data[0]

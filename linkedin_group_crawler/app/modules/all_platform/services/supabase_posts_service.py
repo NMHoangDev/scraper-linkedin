@@ -18,7 +18,7 @@ def get_all_facebook_posts(
     """Get all Facebook posts, optionally filtered."""
     supabase: Client = get_supabase_client()
 
-    query = supabase.table("facebook_posts").select("*")
+    query = supabase.table("facebook_posts").select("*, author_post(*)")
 
     if email:
         user_res = supabase.table("app_users").select("id").eq("email", email.strip().lower()).limit(1).execute()
@@ -82,6 +82,12 @@ def build_crawl_sessions_from_supabase_posts(posts: list[dict]) -> list[dict]:
             mapped_p["tier"] = p.get("tier") or 0
             mapped_p["icp"] = p.get("icp") or ""
             mapped_p["icp_desc"] = p.get("icp_desc") or ""
+            
+            # Map author_url from author_post relationship
+            mapped_p["author_url"] = ""
+            if p.get("author_post") and isinstance(p.get("author_post"), dict):
+                mapped_p["author_url"] = p.get("author_post").get("url_profile") or ""
+                
             mapped_posts.append(mapped_p)
 
         sessions.append({
@@ -110,7 +116,7 @@ def get_all_linkedin_posts(
     """Get all LinkedIn posts for the given email_crawl only."""
     supabase: Client = get_supabase_client()
 
-    query = supabase.table("linkedin_posts").select("*")
+    query = supabase.table("linkedin_posts").select("*, author_post(*)")
 
     # Always scope to the requesting user's crawl email
     if email:
@@ -144,7 +150,7 @@ def filter_facebook_posts(
     """Filter Facebook posts with multiple criteria."""
     supabase: Client = get_supabase_client()
 
-    query = supabase.table("facebook_posts").select("*")
+    query = supabase.table("facebook_posts").select("*, author_post(*)")
 
     if email:
         user_res = supabase.table("app_users").select("id").eq("email", email.strip().lower()).limit(1).execute()
@@ -186,7 +192,7 @@ def filter_linkedin_posts(
     """Filter LinkedIn posts for the given email_crawl only."""
     supabase: Client = get_supabase_client()
 
-    query = supabase.table("linkedin_posts").select("*")
+    query = supabase.table("linkedin_posts").select("*, author_post(*)")
 
     # Always scope to the requesting user's crawl email
     if email:

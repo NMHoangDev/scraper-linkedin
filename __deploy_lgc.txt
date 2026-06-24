@@ -1,0 +1,135 @@
+1. Pulling latest code...
+From https://github.com/NMHoangDev/scraper-linkedin
+ * branch            restyle-form -> FETCH_HEAD
+   3544bd0..0d6c88b  restyle-form -> origin/restyle-form
+error: Your local changes to the following files would be overwritten by merge:
+	linkedin_group_crawler/app/modules/all_platform/zalo/services/zca_persistent_listener.py
+Please commit your changes or stash them before you merge.
+Aborting
+Updating acca461..0d6c88b
+
+2. Checking new endpoint...
+grep: /opt/apps/seeding_markeeai/scraper-linkedin/app/modules/all_platform/routers/fb.py: No such file or directory
+
+3. Building Docker image (this takes ~5-10min)...
+(15/31) 
+  Generating static pages using 3 workers (23/31) 
+✓ Generating static pages using 3 workers (31/31) in 1976ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /403
+├ ○ /admin/team
+├ ○ /all-platform/admin/dashboard
+├ ○ /all-platform/admin/teams-management
+├ ○ /all-platform/dang-bai
+├ ○ /all-platform/inbox
+├ ○ /all-platform/leader/team
+├ ○ /all-platform/post-feed
+├ ○ /all-platform/profile
+├ ○ /all-platform/quan-ly-danh-muc
+├ ○ /all-platform/quan-ly-nhom
+├ ○ /all-platform/quan-ly-tai-khoan
+├ ○ /all-platform/tai-khoan
+├ ○ /all-platform/tai-khoan-fb
+├ ○ /all-platform/zalo-crawl
+├ ○ /auth/login
+├ ○ /auth/register
+├ ○ /crawl-data
+├ ○ /Interaction
+├ ○ /loginFb
+├ ○ /post-feed
+├ ○ /profile
+├ ○ /quan-ly-danh-muc
+├ ○ /quan-ly-nhom
+├ ○ /quan-ly-tai-khoan
+├ ○ /top-post
+└ ○ /zalo-chat
+
+
+○  (Static)  prerendered as static content
+
+
+> linkedin-crawler-ui@0.1.0 postbuild
+> node scripts/copy-standalone-assets.mjs
+
+[copy-standalone-assets] Đã copy .next/static và public → .next/standalone/
+ ---> Removed intermediate container eeb82ff590ea
+ ---> 527e4de1d887
+Step 13/26 : RUN mkdir -p public
+ ---> Running in 5d378b1aeba8
+ ---> Removed intermediate container 5d378b1aeba8
+ ---> 6aa4cc5c91c8
+Step 14/26 : FROM node:20-alpine AS runner
+ ---> 11cedc39e663
+Step 15/26 : WORKDIR /app
+ ---> Running in 87bf4fa02d31
+ ---> Removed intermediate container 87bf4fa02d31
+ ---> 4f49f4a615d4
+Step 16/26 : ENV NODE_ENV=production
+ ---> Running in 28cd14296192
+ ---> Removed intermediate container 28cd14296192
+ ---> 5d2228435761
+Step 17/26 : RUN addgroup --system --gid 1001 nodejs   && adduser --system --uid 1002 nextjs
+ ---> Running in ea5e10fd2079
+ ---> Removed intermediate container ea5e10fd2079
+ ---> 3a6d09083d4c
+Step 18/26 : COPY --from=builder /app/public ./public
+ ---> 01d7bf6f4259
+Step 19/26 : COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+ ---> ae2eadf0177a
+Step 20/26 : COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+ ---> bb997ab9a7cd
+Step 21/26 : USER nextjs
+ ---> Running in 96746e6d6f99
+ ---> Removed intermediate container 96746e6d6f99
+ ---> 8e4a19098be9
+Step 22/26 : EXPOSE 3000
+ ---> Running in 3b8979738f8d
+ ---> Removed intermediate container 3b8979738f8d
+ ---> 388e8a8202bd
+Step 23/26 : ENV PORT=3000
+ ---> Running in d35fd02305af
+ ---> Removed intermediate container d35fd02305af
+ ---> 6ecd9571711d
+Step 24/26 : ENV HOSTNAME=0.0.0.0
+ ---> Running in 8c6c689a3763
+ ---> Removed intermediate container 8c6c689a3763
+ ---> 71c856a21c45
+Step 25/26 : CMD ["node", "server.js"]
+ ---> Running in 617f3982aede
+ ---> Removed intermediate container 617f3982aede
+ ---> ff4032e5f737
+Step 26/26 : LABEL com.docker.compose.image.builder=classic
+ ---> Running in 64b42a379529
+ ---> Removed intermediate container 64b42a379529
+ ---> 18ae7cc9fa39
+Successfully built 18ae7cc9fa39
+Successfully tagged scraper-linkedin-frontend:latest
+ Image scraper-linkedin-frontend:latest Built 
+ Image scraper-linkedin-frontend:latest Built 
+
+4. Restarting containers...
+cker Compose. Use `external: true` to use an existing volume"
+ Container seeding-frontend Creating 
+ Container seeding-backend Creating 
+ Container seeding-backend Created 
+ Container seeding-frontend Created 
+ Container seeding-router Creating 
+ Container seeding-router Created 
+ Container seeding-backend Starting 
+ Container seeding-frontend Starting 
+ Container seeding-frontend Started 
+ Container seeding-backend Started 
+ Container seeding-router Starting 
+ Container seeding-router Started 
+
+5. Waiting 10s for service to start...
+6. Health check...
+{"success":true,"message":"Service is healthy","data":null}
+7. Testing /api/all-platform/fb/sessions...
+{"detail":"Not Found"}
+8. Testing /api/all-platform/fb/session/owner/{user_id}...
+{"detail":"Not Found"}

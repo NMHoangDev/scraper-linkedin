@@ -78,6 +78,7 @@ interface Props {
   suggestedConvIds: Set<string>;
   userEmail: string;
   ownerEmail: string;
+  onBulkVerifyKpi: (payload: { leader_email: string; target_date: string }) => Promise<void>;
 }
 
 const QUICK_REPLY_GROUPS = [
@@ -157,6 +158,9 @@ export default function InboxModernLayout(props: Props) {
   const [kpiToast, setKpiToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [noteDraftState, setNoteDraftState] = useState({ convId: "", value: "" });
   const panelScrollRef = useRef<HTMLDivElement>(null);
+  const [targetDate, setTargetDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [isBulkSuggesting, setIsBulkSuggesting] = useState(false);
+  const [isBulkVerifying, setIsBulkVerifying] = useState(false);
 
   const selectedSession = sessions.find(s => s.user_id === acc);
   const selectedConv = activeConvs.find(c => c.conv_id === openConv) || filtered.find(c => c.conv_id === openConv);
@@ -190,6 +194,32 @@ export default function InboxModernLayout(props: Props) {
       showToastKpi("Đã đề xuất KPI thành công!", true);
     } catch {
       showToastKpi("Lỗi khi đề xuất KPI", false);
+    }
+  };
+
+  const handleBulkSuggest = async () => {
+    if (!acc || !userEmail) return;
+    const pendingConvs = activeConvs.filter(c => !verifiedConvIds.has(c.conv_id) && !suggestedConvIds.has(c.conv_id));
+    if (pendingConvs.length === 0) {
+      showToastKpi("Không có hội thoại nào cần đề xuất KPI cho tài khoản này", false);
+      return;
+    }
+    const convIds = pendingConvs.map(c => c.conv_id);
+    setIsBulkSuggesting(true);
+    try {
+      await onSuggestKpi({ member_email: userEmail, conv_ids: convIds, user_id: acc });
+    } finally {
+      setIsBulkSuggesting(false);
+    }
+  };
+
+  const handleBulkVerify = async () => {
+    if (!ownerEmail) return;
+    setIsBulkVerifying(true);
+    try {
+      await props.onBulkVerifyKpi({ leader_email: ownerEmail, target_date: targetDate });
+    } finally {
+      setIsBulkVerifying(false);
     }
   };
 
@@ -248,18 +278,44 @@ export default function InboxModernLayout(props: Props) {
         ))}
       </div>
 
-      {/* Account bar */}
       <div className="mb-4 min-w-0 rounded-xl border border-[#E5E5E5] bg-white p-3 shadow-sm">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <div className="text-xs font-bold uppercase text-[#A0A0A0]">Tài khoản nhận viên</div>
+            <div className="text-xs font-bold uppercase text-[#A0A0A0]">Tài khoản nhân viên</div>
             <div className="mt-0.5 flex items-center gap-2 text-sm font-bold">
               <span className={`h-2 w-2 rounded-full ${statusClasses(selectedSession?.status)}`} />
               {selectedSession ? accLabel(selectedSession) : "Chưa chọn tài khoản"}
               {selectedSession && <span className="text-xs font-semibold text-[#A0A0A0]">({statusLabel(selectedSession.status)})</span>}
             </div>
           </div>
-          <div className="text-xs text-[#A0A0A0]">Online realtime, offline chỉ xem dữ liệu.</div>
+          <div className="flex flex-wrap items-center gap-3">
+            {(role === "admin" || role === "leader") ? (
+              <div className="flex items-center gap-2">
+                <input 
+                  type="date" 
+                  value={targetDate} 
+                  onChange={e => setTargetDate(e.target.value)}
+                  className="rounded border border-[#E5E5E5] px-2 py-1 text-xs outline-none focus:border-[#E3000F]"
+                />
+                <button 
+                  onClick={handleBulkVerify} 
+                  disabled={isBulkVerifying}
+                  className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {isBulkVerifying ? "ĐANG TÍNH..." : "TÍNH KPI HÀNG LOẠT"}
+                </button>
+              </div>
+            ) : (
+              <button 
+                onClick={handleBulkSuggest} 
+                disabled={isBulkSuggesting || !acc}
+                className="rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-blue-700 disabled:opacity-50"
+              >
+                {isBulkSuggesting ? "ĐANG ĐỀ XUẤT..." : "ĐỀ XUẤT TÍNH KPI HÀNG LOẠT"}
+              </button>
+            )}
+            <div className="text-xs text-[#A0A0A0] hidden md:block">Online realtime, offline chỉ xem dữ liệu.</div>
+          </div>
         </div>
         {sessions.length === 0 ? (
           <div className="rounded-lg border border-dashed border-[#E5E5E5] bg-[#FAFAFA] px-3 py-4 text-sm text-[#666666]">
@@ -591,7 +647,7 @@ export default function InboxModernLayout(props: Props) {
                             } catch { showToastKpi("Lỗi xác nhận", false); }
                           }}
                             className="group relative flex w-full items-center justify-center gap-2 rounded-xl bg-[#E3000F] px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#C40009] active:scale-[0.98]">
-                            <MaterialIcon name="done" className="text-[16px]" /> Xác nhận Inbox
+                            <MaterialIcon name="check" className="text-[16px]" /> Xác nhận Inbox
                           </button>
                           <button onClick={async () => {
                             if (!acc) return;

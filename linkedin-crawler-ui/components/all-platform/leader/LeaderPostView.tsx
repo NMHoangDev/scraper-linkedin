@@ -315,7 +315,7 @@ export function LeaderPostView({
           <div className="flex items-center gap-3">
             <div className="relative flex-1" ref={dropdownRef}>
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-                <MaterialIcon name="mail" className="text-[16px]" />
+                <MaterialIcon name="person" className="text-[16px]" />
               </div>
               <input
                 ref={inputRef}

@@ -35,6 +35,7 @@ export interface UnifiedPost {
   comments: number;
   shares: number;
   author?: string;
+  author_url?: string;
   media_url?: string;
   image_urls?: string[];
   intent?: string;

@@ -15,6 +15,7 @@ export interface DataFBResponse{
     content?: string;
     media_url: string | null;
     images: string[];
+    author_url?: string;
 
     // Taxonomy fields - kế thừa từ nhóm nguồn
     industry?: string;

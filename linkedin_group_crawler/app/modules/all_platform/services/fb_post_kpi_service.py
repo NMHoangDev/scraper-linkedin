@@ -288,9 +288,25 @@ def get_fb_post_kpi_list(
     )
 
     if not member_res.data:
-        return {"posts": [], "total": 0, "range": {}}
+        return {"posts": [], "total": 0, "kpi_target": 0, "range": {}}
 
     id_member = member_res.data[0]["id"]
+
+    # Fetch active kpi target
+    kpi_target = 0
+    try:
+        kpi_res = (
+            supabase.table("kpi_tracker")
+            .select("kpi_post")
+            .eq("id_member", id_member)
+            .eq("status", "active")
+            .limit(1)
+            .execute()
+        )
+        if kpi_res.data:
+            kpi_target = kpi_res.data[0].get("kpi_post", 0) or 0
+    except Exception as e:
+        logger.warning(f"Error fetching kpi_post target: {e}")
 
     # Default date range: tuần hiện tại
     if not start_date or not end_date:
@@ -321,6 +337,7 @@ def get_fb_post_kpi_list(
         {
             "id": r.get("id"),
             "job_id": r.get("job_id"),
+            "user_id": r.get("user_id"),
             "post_url": r.get("post_url"),
             "content": r.get("content"),
             "target_type": r.get("target_type"),
@@ -333,5 +350,6 @@ def get_fb_post_kpi_list(
     return {
         "posts": posts,
         "total": len(posts),
+        "kpi_target": kpi_target,
         "range": {"start": start_date, "end": end_date},
     }

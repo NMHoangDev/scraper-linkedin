@@ -140,6 +140,11 @@ class GetFbInboxKpiSummaryRequest(BaseModel):
     end_date: str = Field("", description="YYYY-MM-DD")
 
 
+class BulkVerifyInboxRequest(BaseModel):
+    leader_email: str = Field(..., min_length=3)
+    target_date: str = Field(..., description="YYYY-MM-DD")
+
+
 @router.post("/fb-inbox-progress")
 def fb_inbox_progress(payload: FbInboxProgressRequest) -> BaseResponse:
     """Tính số tin nhắn Facebook Messenger khách gửi tới member trong khoảng [start_date, end_date].
@@ -233,6 +238,46 @@ def fb_inbox_sync(payload: SyncFbInboxRequest) -> BaseResponse:
         })
     except Exception as e:
         logger.error(f"fb_inbox_sync error: {e}")
+        return BaseResponse(success=False, message=str(e))
+
+
+@router.post("/fb-inbox-bulk-verify")
+def fb_inbox_bulk_verify(payload: BulkVerifyInboxRequest) -> BaseResponse:
+    """Xác nhận KPI inbox hàng loạt cho Leader trong 1 ngày cụ thể."""
+    try:
+        supabase: Client = get_supabase_client()
+        leader_email = payload.leader_email.strip().lower()
+        target_date = payload.target_date.strip()
+
+        # Get leader ID
+        leader_res = supabase.table("app_users").select("id").eq("email", leader_email).limit(1).execute()
+        if not leader_res.data:
+            return BaseResponse(success=False, message=f"Không tìm thấy leader với email: {leader_email}")
+        id_leader = leader_res.data[0]["id"]
+
+        now = datetime.now(timezone.utc).isoformat()
+        start_ts = f"{target_date}T00:00:00"
+        end_ts = f"{target_date}T23:59:59"
+
+        # Cập nhật tất cả các record chưa được xác nhận của leader này trong ngày target_date
+        update_res = (
+            supabase.table("fb_inbox_kpi")
+            .update({"is_confirmed": True, "synced_at": now})
+            .eq("id_leader", id_leader)
+            .eq("is_confirmed", False)
+            .gte("synced_at", start_ts)
+            .lte("synced_at", end_ts)
+            .execute()
+        )
+        
+        updated_count = len(update_res.data or [])
+
+        return BaseResponse(success=True, data={
+            "synced": updated_count,
+            "message": f"Đã tính KPI hàng loạt thành công cho {updated_count} hội thoại trong ngày {target_date}"
+        })
+    except Exception as e:
+        logger.error(f"fb_inbox_bulk_verify error: {e}")
         return BaseResponse(success=False, message=str(e))
 
 

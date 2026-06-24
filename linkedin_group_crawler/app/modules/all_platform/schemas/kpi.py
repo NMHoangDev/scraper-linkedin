@@ -47,8 +47,10 @@ class GetKpiByEmailRequest(BaseModel):
 
 
 class GetAllKpiRequest(BaseModel):
-    leader_email: str
+    email_leader: str
     id_team: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
 
 
 class CheckPermissionRequest(BaseModel):
