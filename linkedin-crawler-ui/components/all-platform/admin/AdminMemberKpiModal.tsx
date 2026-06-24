@@ -180,10 +180,10 @@ export function AdminMemberKpiModal({ isOpen, onClose, team }: AdminMemberKpiMod
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-500">
                   <tr>
                     <th className="text-left px-3 py-2.5 font-bold text-[10px] uppercase tracking-wider">Thành viên</th>
-                    <th className="text-center px-1 py-2.5 font-bold text-[10px] uppercase tracking-wider">Comment</th>
                     <th className="text-center px-1 py-2.5 font-bold text-[10px] uppercase tracking-wider">Post</th>
-                    <th className="text-center px-1 py-2.5 font-bold text-[10px] uppercase tracking-wider">Lead</th>
+                    <th className="text-center px-1 py-2.5 font-bold text-[10px] uppercase tracking-wider">Comment</th>
                     <th className="text-center px-1 py-2.5 font-bold text-[10px] uppercase tracking-wider">Inbox</th>
+                    <th className="text-center px-1 py-2.5 font-bold text-[10px] uppercase tracking-wider">Lead</th>
                     <th className="text-center px-2 py-2.5 font-bold text-[10px] uppercase tracking-wider">Tiến độ</th>
                     <th className="text-center px-2 py-2.5 font-bold text-[10px] uppercase tracking-wider">Hành động</th>
                   </tr>
@@ -196,20 +196,20 @@ export function AdminMemberKpiModal({ isOpen, onClose, team }: AdminMemberKpiMod
                         <div className="text-[10px] text-slate-400 font-medium">{m.email}</div>
                       </td>
                       <td className="px-1 py-2.5 text-center">
-                        <span className="font-bold text-slate-800 text-[11px]">{m.commentCurrent}</span>
-                        <span className="text-slate-400 text-[10px]"> / {m.commentTarget}</span>
-                      </td>
-                      <td className="px-1 py-2.5 text-center">
                         <span className={m.postCurrent > 0 ? "font-bold text-emerald-600 text-[11px]" : "font-bold text-slate-800 text-[11px]"}>{m.postCurrent}</span>
                         <span className="text-slate-400 text-[10px]"> / {m.postTarget}</span>
                       </td>
                       <td className="px-1 py-2.5 text-center">
-                        <span className="font-bold text-slate-800 text-[11px]">{m.leadCurrent}</span>
-                        <span className="text-slate-400 text-[10px]"> / {m.leadTarget}</span>
+                        <span className="font-bold text-slate-800 text-[11px]">{m.commentCurrent}</span>
+                        <span className="text-slate-400 text-[10px]"> / {m.commentTarget}</span>
                       </td>
                       <td className="px-1 py-2.5 text-center">
                         <span className={m.inboxCurrent >= m.inboxTarget && m.inboxTarget > 0 ? "font-bold text-emerald-600 text-[11px]" : "font-bold text-slate-800 text-[11px]"}>{m.inboxCurrent}</span>
                         <span className="text-slate-400 text-[10px]"> / {m.inboxTarget}</span>
+                      </td>
+                      <td className="px-1 py-2.5 text-center">
+                        <span className="font-bold text-slate-800 text-[11px]">{m.leadCurrent}</span>
+                        <span className="text-slate-400 text-[10px]"> / {m.leadTarget}</span>
                       </td>
                       <td className="px-2 py-2.5">
                         <div className="flex items-center gap-1.5">

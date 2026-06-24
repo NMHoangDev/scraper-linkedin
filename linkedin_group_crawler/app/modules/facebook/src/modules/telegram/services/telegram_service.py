@@ -62,11 +62,17 @@ class TelegramService:
         try:
             # Dùng thư viện requests (đồng bộ)
             response = requests.post(self.api_url, json=payload)
-            response.raise_for_status() 
+            response.raise_for_status()
         except requests.exceptions.HTTPError as e:
-            logger.error(f"❌ Lỗi Telegram (Status: {e.response.status_code}): {e.response.text}")
+            # Tránh log emoji / tiếng Việt có dấu trực tiếp trên Windows console cp1252
+            # -> encode-safe ASCII để logger không vỡ UnicodeEncodeError.
+            try:
+                resp_text = e.response.text
+            except Exception:
+                resp_text = "<no body>"
+            logger.error("[Telegram Error] status=%s body=%s", e.response.status_code, resp_text)
         except Exception as e:
-            logger.error(f"❌ Không thể kết nối tới Telegram API: {e}")
+            logger.error("[Telegram Connect Error] %s", e)
 
     # (Hàm format_daily_telegram_report này hoàn toàn giống nguyên bản của bạn, không đổi gì)
     def format_daily_telegram_report(self, summaries: List[GroupSummary]) -> str:

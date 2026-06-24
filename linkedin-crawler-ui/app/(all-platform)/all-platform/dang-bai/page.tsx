@@ -16,6 +16,7 @@ import { MaterialIcon } from "@/components/ui";
 import { allPlatformGroupsService } from "@/services/all-platform.service";
 import type { FacebookGroup } from "@/types/unified.types";
 import { toast } from "sonner";
+import { KpiProgressCard } from "@/components/all-platform/components/kpi-progress-card";
 
 interface Ext { user_id: string; owner?: string; label?: string; email?: string; note?: string; status: string; }
 interface FbSession { user_id: string; owner?: string; label?: string; email?: string; note?: string; }
@@ -182,9 +183,6 @@ export default function DangBaiPage() {
     }
   }
 
-  // Tính phần trăm tiến độ KPI tuần
-  const percent = kpiTarget > 0 ? Math.min((kpiPosts.length / kpiTarget) * 100, 100) : 0;
-
   return (
     <div className="p-6 w-full max-w-7xl mx-auto space-y-6">
       {/* Header */}
@@ -216,27 +214,9 @@ export default function DangBaiPage() {
       )}
 
       {/* KPI Progress Bar */}
-      <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800/80 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-          <div>
-            <h2 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Tiến độ hoàn thành KPI đăng bài tuần này</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">KPI được tính dựa trên số lượng bài đăng thành công lưu nhận trong bảng fb_post_kpi</p>
-          </div>
-          <div className="flex items-baseline gap-1.5 shrink-0 bg-red-50 dark:bg-red-950/20 px-3.5 py-1.5 rounded-lg">
-            <span className="text-2xl font-black text-[#E3000F]">{kpiPosts.length}</span>
-            <span className="text-xs text-slate-500 dark:text-slate-400">/ {kpiTarget} bài đăng</span>
-            <span className="text-xs font-bold text-[#E3000F] ml-1.5">({Math.round(percent)}%)</span>
-          </div>
-        </div>
-        <div className="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-200/40 dark:border-slate-700/40">
-          <div 
-            className="h-full bg-gradient-to-r from-red-500 to-[#E3000F] rounded-full transition-all duration-700 relative overflow-hidden" 
-            style={{ width: `${percent}%` }}
-          >
-            <div className="absolute inset-0 bg-[linear-gradient(45deg,rgba(255,255,255,0.15)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.15)_50%,rgba(255,255,255,0.15)_75%,transparent_75%,transparent)] bg-[length:1rem_1rem] animate-[progress-bar-stripes_1s_linear_infinite]" />
-          </div>
-        </div>
-      </div>
+      {user?.email && (
+        <KpiProgressCard email={user.email} type="post" />
+      )}
 
       {/* Lịch sử gần đây */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 shadow-sm overflow-hidden">

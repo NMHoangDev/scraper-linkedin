@@ -10,81 +10,92 @@ from supabase import Client
 
 from app.core.supabase_client import get_supabase_client
 
+# Vietnam timezone (+07:00) — used consistently in all date comparisons
+vn_tz = VN_TZ = timezone(timedelta(hours=7))
+
 
 def assign_kpi(payload: dict) -> dict:
-    """Assign KPI to a member — upsert into kpi_tracker."""
+    """Assign KPI to a member — upsert into kpi_tracker.
+
+    Upsert rules:
+    - Unique key: (id_member, id_team, start_date, end_date) with status='active'.
+    - If start_date or end_date is missing, use current VN week boundaries.
+    - If a record already exists for that exact week+team, UPDATE it.
+    - Otherwise INSERT a new record.
+    """
+    from app.modules.all_platform.schemas.kpi import AssignKpiRequest
+
+    # Use Pydantic to normalise the payload and extract validated fields
+    validated: AssignKpiRequest = AssignKpiRequest.model_validate(payload)
+
     supabase: Client = get_supabase_client()
 
-    # Resolve member email to app_users.id
-    email = payload.get("email")
-    member_res = supabase.table("app_users").select("id").eq("email", email).execute()
+    # ── Resolve emails ────────────────────────────────────────────────────────
+    member_res = supabase.table("app_users").select("id").eq("email", validated.email.lower().strip()).execute()
     if not member_res.data:
-        raise ValueError(f"Không tìm thấy user với email: {email}")
-    id_member = member_res.data[0]["id"]
+        raise ValueError(f"Không tìm thấy user với email: {validated.email}")
+    id_member: str = member_res.data[0]["id"]
 
-    # Resolve leader email to app_users.id
-    email_leader = payload.get("email_leader")
-    leader_res = supabase.table("app_users").select("id").eq("email", email_leader).execute()
+    leader_res = supabase.table("app_users").select("id").eq("email", validated.email_leader.lower().strip()).execute()
     if not leader_res.data:
-        raise ValueError(f"Không tìm thấy leader với email: {email_leader}")
-    id_leader = leader_res.data[0]["id"]
+        raise ValueError(f"Không tìm thấy leader với email: {validated.email_leader}")
+    id_leader: str = leader_res.data[0]["id"]
 
-    id_team = payload.get("id_team")
+    id_team = validated.id_team
     if id_team == "":
         id_team = None
 
-    kpi_items = payload.get("kpi", [])
-    kpi_comment = 0
-    kpi_post = 0
-    kpi_lead = 0
-    kpi_inbox = 0
-    start_date = None
-    end_date = None
+    # ── Determine week boundaries ─────────────────────────────────────────────
+    # Always use the latest KPI item in the payload
+    kpi_items = validated.kpi
+    if not kpi_items:
+        raise ValueError("KPI payload phải có ít nhất 1 mục trong mảng 'kpi'")
 
-    if kpi_items:
-        latest = kpi_items[-1]
-        kpi_comment = latest.get("kpi_comment", 0) or latest.get("kpi_per_week", 0) or 0
-        kpi_post = latest.get("kpi_post", 0)
-        kpi_lead = latest.get("kpi_lead", 0)
-        kpi_inbox = latest.get("kpi_inbox", 0)
-        start_date = latest.get("start_day")
-        end_date = latest.get("end_day")
+    latest = kpi_items[-1]
+
+    # Normalise start/end dates: if missing, default to current VN week Mon–Sun
+    if latest.start_day and latest.end_day:
+        start_date = str(latest.start_day).strip()[:10]
+        end_date = str(latest.end_day).strip()[:10]
+    else:
+        today_vn = date.today()
+        monday = today_vn - timedelta(days=today_vn.weekday())
+        sunday = monday + timedelta(days=6)
+        start_date = monday.isoformat()
+        end_date = sunday.isoformat()
 
     upsert_data = {
         "id_member": id_member,
         "id_leader": id_leader,
-        "id_platform": payload.get("id_platform", 1),
+        "id_platform": 1,  # all-platform
         "id_team": id_team,
-        "kpi_comment": kpi_comment,
-        "kpi_post": kpi_post,
-        "kpi_lead": kpi_lead,
-        "kpi_inbox": kpi_inbox,
+        "kpi_comment": latest.kpi_comment,
+        "kpi_post": latest.kpi_post,
+        "kpi_lead": latest.kpi_lead,
+        "kpi_inbox": latest.kpi_inbox,
         "start_date": start_date,
         "end_date": end_date,
         "status": "active",
     }
 
-    # Check if there is already an active KPI for this member in this team for this SPECIFIC week
+    # ── Check for existing record (unique key: member + team + week) ───────────
     query = (
         supabase.table("kpi_tracker")
         .select("id")
         .eq("id_member", id_member)
         .eq("status", "active")
+        .eq("start_date", start_date)
+        .eq("end_date", end_date)
     )
-    if start_date:
-        query = query.eq("start_date", start_date)
-    if end_date:
-        query = query.eq("end_date", end_date)
-        
     if id_team:
         query = query.eq("id_team", id_team)
     else:
         query = query.is_("id_team", "null")
-        
+
     existing = query.execute()
 
     if existing.data:
-        # Update existing
+        # UPDATE existing record
         kpi_id = existing.data[0]["id"]
         result = (
             supabase.table("kpi_tracker")
@@ -92,15 +103,20 @@ def assign_kpi(payload: dict) -> dict:
             .eq("id", kpi_id)
             .execute()
         )
+        logger.info(f"assign_kpi: updated kpi_id={kpi_id} for member={id_member}, week={start_date}..{end_date}")
     else:
-        # Insert new
+        # INSERT new record
         result = (
             supabase.table("kpi_tracker")
             .insert(upsert_data)
             .execute()
         )
+        logger.info(f"assign_kpi: inserted new KPI for member={id_member}, week={start_date}..{end_date}")
 
-    return result.data[0] if result.data else {}
+    if not result.data:
+        raise RuntimeError("Không thể lưu KPI vào database")
+
+    return result.data[0]
 
 
 def get_all_kpis_for_leader(
@@ -194,11 +210,16 @@ def get_all_kpis_for_leader(
         if eff_start and eff_start < min_start_date:
             min_start_date = eff_start
 
-    # Get seeding content for members (Comments) - filter in Python for accurate date range
+    # Get seeding content for members (Comments) with server-side date filtering.
+    # We query from the earliest KPI start date to the latest end date needed,
+    # then filter per-member in Python for precision. This avoids loading
+    # the entire seeding_history table while ensuring date correctness.
     seeding_result = (
         supabase.table("seeding_content_kpi")
         .select("id_member, verify, current_day, content, link_comment, id_social_account, social_accounts(account_name)")
         .in_("id_member", member_ids)
+        .gte("current_day", min_start_date)
+        .lte("current_day", default_end)
         .execute()
     )
     seeding_list = seeding_result.data or []
@@ -658,7 +679,7 @@ def compute_kpi_inbox_progress(
     end_iso = _parse_iso_date(end_date) or date.today()
 
     # Tạo timezone Vietnam (+07:00) để đảm bảo so sánh thời gian trùng khớp với mốc ngày của user
-    vn_tz = timezone(timedelta(hours=7))
+    vn_tz = VN_TZ
 
     # Mở rộng end_date lên cuối ngày (VN) cho so sánh updated_at/created_at, sau đó chuyển sang UTC để so sánh chuỗi ISO
     end_dt = datetime.combine(end_iso, datetime.max.time(), tzinfo=vn_tz).astimezone(timezone.utc).isoformat()
@@ -905,14 +926,21 @@ def get_fb_inbox_kpi_summary(
 
     member_id = res.data[0]["id"]
 
+    # Convert YYYY-MM-DD -> VN timezone datetime range, then compare as UTC strings.
+    # This matches the same logic used in compute_kpi_inbox_progress for consistency.
     if start_date and end_date:
+        vn_tz = VN_TZ
+        start_iso = _parse_iso_date(start_date) or date.today()
+        end_iso = _parse_iso_date(end_date) or date.today()
+        start_dt = datetime.combine(start_iso, datetime.min.time(), tzinfo=vn_tz).astimezone(timezone.utc).isoformat()
+        end_dt = datetime.combine(end_iso, datetime.max.time(), tzinfo=vn_tz).astimezone(timezone.utc).isoformat()
         query = (
             supabase.table("fb_inbox_kpi")
             .select("id, conv_id, message_count, is_lead, synced_at")
             .eq("id_member", member_id)
             .eq("is_confirmed", True)  # CHỈ đếm inbox ĐÃ XÁC NHẬN
-            .gte("synced_at", start_date)
-            .lte("synced_at", end_date + "T23:59:59")
+            .gte("synced_at", start_dt)
+            .lte("synced_at", end_dt)
         )
     else:
         query = (
@@ -956,13 +984,18 @@ def get_pending_fb_inbox_kpi(
     member_id = res.data[0]["id"]
 
     if start_date and end_date:
+        vn_tz = VN_TZ
+        start_iso = _parse_iso_date(start_date) or date.today()
+        end_iso = _parse_iso_date(end_date) or date.today()
+        start_dt = datetime.combine(start_iso, datetime.min.time(), tzinfo=vn_tz).astimezone(timezone.utc).isoformat()
+        end_dt = datetime.combine(end_iso, datetime.max.time(), tzinfo=vn_tz).astimezone(timezone.utc).isoformat()
         query = (
             supabase.table("fb_inbox_kpi")
             .select("id, conv_id, message_count, is_lead, synced_at")
             .eq("id_member", member_id)
             .eq("is_confirmed", False)  # CHỈ lấy inbox CHƯA XÁC NHẬN
-            .gte("synced_at", start_date)
-            .lte("synced_at", end_date + "T23:59:59")
+            .gte("synced_at", start_dt)
+            .lte("synced_at", end_dt)
         )
     else:
         query = (
@@ -981,6 +1014,24 @@ def get_pending_fb_inbox_kpi(
         "pending_conv_ids": pending_conv_ids,
         "range": {"start": start_date or "", "end": end_date or ""},
     }
+
+
+def _vn_date(ts: str) -> Optional[date]:
+    """Convert an ISO timestamp to a VN (Asia/Ho_Chi_Minh) date.
+
+    Handles timestamps stored as UTC strings and converts them to VN local date,
+    ensuring consistent date-boundary filtering across all KPI functions.
+    Falls back to naive date.fromisoformat if the timestamp can't be parsed.
+    """
+    if not ts:
+        return None
+    try:
+        return datetime.fromisoformat(ts.replace("Z", "+00:00")).astimezone(VN_TZ).date()
+    except ValueError:
+        try:
+            return date.fromisoformat(ts[:10])
+        except ValueError:
+            return None
 
 
 def get_team_kpi_history(
@@ -1052,6 +1103,9 @@ def get_team_kpi_history(
         week_ranges.append((f"{year}-W{wnum:02d}", w_start, w_end))
 
     earliest_start = week_ranges[-1][1].isoformat()
+    earliest_start_date = week_ranges[-1][1]
+    # Convert earliest_start to VN timezone for DB query (match other functions)
+    earliest_start_dt = datetime.combine(earliest_start_date, datetime.min.time(), tzinfo=VN_TZ).astimezone(timezone.utc).isoformat()
 
     # 4. KPI targets từ kpi_tracker
     kpi_res = (
@@ -1068,14 +1122,14 @@ def get_team_kpi_history(
         supabase.table("fb_inbox_kpi")
         .select("id_member, is_lead, is_confirmed, synced_at")
         .in_("id_member", all_member_ids)
-        .gte("synced_at", earliest_start)
+        .gte("synced_at", earliest_start_dt)
         .execute()
     )
     post_res = (
         supabase.table("fb_post_kpi")
         .select("id_member, posted_at")
         .in_("id_member", all_member_ids)
-        .gte("posted_at", earliest_start)
+        .gte("posted_at", earliest_start_dt)
         .execute()
     )
     inbox_rows = inbox_res.data or []
@@ -1115,12 +1169,8 @@ def get_team_kpi_history(
             for row in inbox_rows:
                 if str(row["id_member"]) not in mids:
                     continue
-                raw = (row.get("synced_at") or "")[:10]
-                if not raw:
-                    continue
-                try:
-                    d = date.fromisoformat(raw)
-                except ValueError:
+                d = _vn_date(row.get("synced_at") or "")
+                if d is None:
                     continue
                 if w_start <= d <= w_end:
                     if row.get("is_confirmed"):
@@ -1131,12 +1181,8 @@ def get_team_kpi_history(
             for row in post_rows:
                 if str(row["id_member"]) not in mids:
                     continue
-                raw = (row.get("posted_at") or "")[:10]
-                if not raw:
-                    continue
-                try:
-                    d = date.fromisoformat(raw)
-                except ValueError:
+                d = _vn_date(row.get("posted_at") or "")
+                if d is None:
                     continue
                 if w_start <= d <= w_end:
                     post_actual += 1

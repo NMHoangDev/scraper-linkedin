@@ -201,7 +201,7 @@ export const allPlatformKpiService = {
   getAll: (leader_email: string, id_team?: string, start_date?: string, end_date?: string): Promise<ApiResponse<{ total: number; members: KpiMember[] }>> => {
     return requestJson(`${BASE}/kpi/get-all`, {
       method: "POST",
-      body: JSON.stringify({ leader_email, id_team, start_date, end_date }),
+      body: JSON.stringify({ email_leader: leader_email, id_team, start_date, end_date }),
     });
   },
 

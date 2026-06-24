@@ -9,6 +9,7 @@ import { FilterBar, type FilterState } from "@/components/all-platform/component
 import { PostCard } from "@/components/all-platform/components/post-card";
 import { PostDetailModal } from "@/components/all-platform/components/post-detail-modal";
 import { VerifyAccountModal } from "@/components/all-platform/components/verify-account-modal";
+import { KpiProgressCard } from "@/components/all-platform/components/kpi-progress-card";
 import { allPlatformPostsService, allPlatformCategoriesService, teamsService } from "@/services/all-platform.service";
 import type { UnifiedPost, UnifiedStats, Category, FeedPlatform } from "@/types/unified.types";
 
@@ -464,6 +465,16 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
           accent="indigo"
         />
       </div>
+
+      {/* ── KPI Progress Cards ──────────────────────────────────────────────── */}
+      {CURRENT_USER_EMAIL && (
+        <div className="mb-6">
+          <KpiProgressCard
+            email={CURRENT_USER_EMAIL}
+            type="comment"
+          />
+        </div>
+      )}
 
       <FilterBar
         intents={intents}

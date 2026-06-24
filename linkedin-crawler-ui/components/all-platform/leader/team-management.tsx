@@ -348,10 +348,10 @@ export function TeamManagement() {
             <thead className="bg-slate-50/75 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
               <tr>
                 <th className="px-3 py-2.5 text-left whitespace-nowrap">Thành viên</th>
-                <th className="px-1 py-2.5 text-center whitespace-nowrap">Comment</th>
                 <th className="px-1 py-2.5 text-center whitespace-nowrap">Post</th>
-                <th className="px-1 py-2.5 text-center whitespace-nowrap">Lead</th>
+                <th className="px-1 py-2.5 text-center whitespace-nowrap">Comment</th>
                 <th className="px-1 py-2.5 text-center whitespace-nowrap">Inbox</th>
+                <th className="px-1 py-2.5 text-center whitespace-nowrap">Lead</th>
                 <th className="px-2 py-2.5 text-center whitespace-nowrap">Tiến độ</th>
                 <th className="px-2 py-2.5 text-center whitespace-nowrap">Hành động</th>
               </tr>
@@ -393,20 +393,20 @@ export function TeamManagement() {
                         <div className="text-[10px] text-slate-400 font-medium max-w-[120px] truncate" title={member.email}>{member.email}</div>
                       </td>
                       <td className="px-1 py-2.5 text-center">
-                        <span className="font-bold text-slate-800 text-[11px]">{member.kpiCommentCurrent}</span>
-                        <span className="text-slate-400 text-[10px]"> / {member.kpiCommentTarget}</span>
-                      </td>
-                      <td className="px-1 py-2.5 text-center">
                         <span className={cn("font-bold text-[11px]", member.kpiPostCurrent > 0 ? "text-emerald-600" : "text-slate-800")}>{member.kpiPostCurrent}</span>
                         <span className="text-slate-400 text-[10px]"> / {member.kpiPostTarget}</span>
                       </td>
                       <td className="px-1 py-2.5 text-center">
-                        <span className="font-bold text-slate-800 text-[11px]">{member.kpiLeadCurrent}</span>
-                        <span className="text-slate-400 text-[10px]"> / {member.kpiLeadTarget}</span>
+                        <span className="font-bold text-slate-800 text-[11px]">{member.kpiCommentCurrent}</span>
+                        <span className="text-slate-400 text-[10px]"> / {member.kpiCommentTarget}</span>
                       </td>
                       <td className="px-1 py-2.5 text-center">
                         <span className={cn("font-bold text-[11px]", member.kpiInboxCurrent >= member.kpiInboxTarget && member.kpiInboxTarget > 0 ? "text-emerald-600" : "text-slate-800")}>{member.kpiInboxCurrent}</span>
                         <span className="text-slate-400 text-[10px]"> / {member.kpiInboxTarget}</span>
+                      </td>
+                      <td className="px-1 py-2.5 text-center">
+                        <span className="font-bold text-slate-800 text-[11px]">{member.kpiLeadCurrent}</span>
+                        <span className="text-slate-400 text-[10px]"> / {member.kpiLeadTarget}</span>
                       </td>
                       <td className="px-2 py-2.5">
                         <div className="flex items-center gap-1.5">

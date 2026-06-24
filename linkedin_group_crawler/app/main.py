@@ -6,6 +6,16 @@ import sys
 import asyncio
 
 if sys.platform == "win32":
+    # Force UTF-8 on Windows console to avoid cp1252 encode errors when logging
+    # Vietnamese text and emojis (e.g., 'UnicodeEncodeError: charmap codec can't
+    # encode character \u1ec7'). Must run before any logging is configured.
+    for _stream_name in ("stdout", "stderr"):
+        _stream = getattr(sys, _stream_name, None)
+        if _stream is not None and hasattr(_stream, "reconfigure"):
+            try:
+                _stream.reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
     try:
         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
     except AttributeError:
