@@ -62,6 +62,11 @@ all_platform_router.include_router(
     prefix="/fb",
     tags=["All-Platform Facebook Automation"],
 )
+from app.modules.facebook.src.modules.crawl_fb.router.vps_router import router as vps_fb_router
+all_platform_router.include_router(
+    vps_fb_router,
+    tags=["All-Platform Facebook VPS"],
+)
 
 # ── LinkedIn ───────────────────────────────────────────────────────────────────
 all_platform_router.include_router(

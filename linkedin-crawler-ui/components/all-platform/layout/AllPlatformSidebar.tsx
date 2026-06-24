@@ -25,6 +25,7 @@ const ADMIN_NAV: NavItem[] = [
   { href: "/all-platform/admin/dashboard", icon: "dashboard", label: "Dashboard" },
   { href: "/all-platform/admin/teams-management", icon: "shield_person", label: "Quản lý Teams" },
   { href: "/all-platform/quan-ly-nhom", icon: "group", label: "Quản lý groups" },
+  { href: "/all-platform/quan-ly-vps", icon: "database", label: "Quản lý VPS" },
   { href: "/all-platform/post-feed", icon: "radar", label: "Post Feed" },
   { href: "/all-platform/dang-bai", icon: "send", label: "Đăng bài FB" },
   { href: "/all-platform/inbox", icon: "inbox", label: "Inbox FB" },
@@ -39,6 +40,7 @@ const ADMIN_NAV: NavItem[] = [
 const LEADER_NAV: NavItem[] = [
   { href: "/all-platform/leader/team", icon: "groups", label: "Quản lý Team" },
   { href: "/all-platform/quan-ly-nhom", icon: "group", label: "Quản lý groups" },
+  { href: "/all-platform/quan-ly-vps", icon: "database", label: "Quản lý VPS" },
   { href: "/all-platform/post-feed", icon: "radar", label: "Post Feed" },
   { href: "/all-platform/dang-bai", icon: "send", label: "Đăng bài FB" },
   { href: "/all-platform/inbox", icon: "inbox", label: "Inbox FB" },
@@ -55,6 +57,7 @@ const MEMBER_NAV: NavItem[] = [
   { href: "/all-platform/dang-bai", icon: "send", label: "Đăng bài FB" },
   { href: "/all-platform/inbox", icon: "inbox", label: "Inbox FB" },
   { href: "/all-platform/quan-ly-nhom", icon: "group", label: "Quản lý groups" },
+  { href: "/all-platform/quan-ly-vps", icon: "database", label: "Quản lý VPS" },
   { href: "/all-platform/quan-ly-tai-khoan", icon: "account_circle", label: "Tài khoản" },
   { href: "/all-platform/customers", icon: "support_agent", label: "Khách hàng" },
   { href: "/all-platform/profile", icon: "person", label: "Trang cá nhân" },
