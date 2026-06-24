@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { MaterialIcon } from "@/components/ui";
+import { MaterialIcon, type MaterialSymbolName } from "@/components/ui";
 import { allPlatformKpiService } from "@/services/all-platform.service";
 
 /** ─── KPI Type definitions ─────────────────────────────────────────────── */
@@ -21,7 +21,7 @@ interface KpiProgressCardProps {
   /** Loại KPI muốn hiển thị */
   type: KpiType;
   /** Icon hiển thị trên header */
-  icon?: string;
+  icon?: MaterialSymbolName;
   /** Nhãn tiêu đề */
   label?: string;
   /** Tự truyền data thay vì tự động fetch (để parent kiểm soát) */
@@ -245,7 +245,7 @@ export function KpiProgressCard({
 interface KpiProgressCompactProps {
   email: string;
   type: KpiType;
-  icon?: string;
+  icon?: MaterialSymbolName;
   label?: string;
   className?: string;
 }
@@ -292,7 +292,7 @@ export function KpiProgressCompact({
   return (
     <div className={cn("flex items-center gap-2", className)}>
       {icon && (
-        <MaterialIcon name={icon} className={cn("text-[14px]", colors.text)} />
+        <MaterialIcon name={icon as MaterialSymbolName} className={cn("text-[14px]", colors.text)} />
       )}
       <div className="flex items-center gap-1 text-[11px] font-bold">
         <span className={colors.text}>{snap.current}/{snap.target}</span>
