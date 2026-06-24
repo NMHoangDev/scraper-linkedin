@@ -143,7 +143,6 @@ export function KpiProgressCard({
   onRefresh,
 }: KpiProgressCardProps) {
   const cfg = KPI_CONFIG[type];
-  const displayIcon  = icon  || cfg.icon;
   const displayTitle = label || cfg.title;
 
   const [snap, setSnap] = useState<{
