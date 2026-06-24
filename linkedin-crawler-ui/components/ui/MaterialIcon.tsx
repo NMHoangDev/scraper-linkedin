@@ -108,7 +108,9 @@ export type MaterialSymbolName =
   | "done"
   | "done_all"
   | "mail"
-  | "content_copy";
+  | "content_copy"
+  | "cookie"
+  | "warning_amber";
 
 export interface MaterialIconProps {
   name: MaterialSymbolName;
