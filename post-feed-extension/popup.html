@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>PostFeed Crawler</title>
+  <style>
+    body { width: 300px; padding: 16px; font-family: system-ui, sans-serif; margin: 0; }
+    h1 { font-size: 16px; margin: 0 0 12px; color: #333; }
+    .status { padding: 8px 12px; background: #e8f5e9; border-radius: 8px; margin-bottom: 12px; }
+    .status.error { background: #ffebee; }
+    .status p { margin: 4px 0; font-size: 13px; }
+    button { width: 100%; padding: 10px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    .btn-start { background: #4caf50; color: white; }
+    .btn-stop { background: #f44336; color: white; }
+    .btn-start:hover { background: #388e3c; }
+    .btn-stop:hover { background: #d32f2f; }
+  </style>
+</head>
+<body>
+  <h1>PostFeed Crawler</h1>
+  <div id="status" class="status">
+    <p><strong>Trạng thái:</strong> <span id="status-text">Sẵn sàng</span></p>
+    <p><strong>Posts:</strong> <span id="post-count">0</span></p>
+  </div>
+  <button id="btn-action" class="btn-start">Bắt đầu Crawl</button>
+
+  <script src="popup.js"></script>
+</body>
+</html>

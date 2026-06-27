@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <div class="header">
+      <div class="logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="#1877F2">
+          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+        </svg>
+        <span>FB Crawler</span>
+      </div>
+      <div class="status-badge" id="statusBadge">Sẵn sàng</div>
+    </div>
+
+    <!-- Group Info -->
+    <div class="section">
+      <div class="section-title">📌 Group hiện tại</div>
+      <div class="group-info" id="groupInfo">
+        <div class="group-name" id="groupName">Chưa có thông tin</div>
+        <div class="group-url" id="groupUrl">—</div>
+      </div>
+    </div>
+
+    <!-- Cấu hình -->
+    <div class="section">
+      <div class="section-title">⚙️ Cấu hình</div>
+
+      <div class="config-row">
+        <label for="maxPosts">Số bài tối đa</label>
+        <input type="number" id="maxPosts" min="10" max="500" value="100" />
+      </div>
+
+      <div class="config-row">
+        <label for="scrollDelay">Delay scroll (ms)</label>
+        <input type="number" id="scrollDelay" min="500" max="5000" value="2000" step="100" />
+      </div>
+
+      <div class="config-row">
+        <label>Auto chuyển group</label>
+        <label class="toggle">
+          <input type="checkbox" id="autoNextGroup" checked />
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Groups Queue -->
+    <div class="section">
+      <div class="section-title">
+        📋 Hàng đợi Groups
+        <span id="queueCount" class="badge">0</span>
+      </div>
+      <div class="groups-list" id="groupsList">
+        <div class="empty-state">Chưa có group nào trong hàng đợi</div>
+      </div>
+      <div class="add-group-row">
+        <input type="text" id="newGroupUrl" placeholder="Dán URL group..." />
+        <button id="addGroupBtn" title="Thêm group">+</button>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="actions">
+      <button id="btnStart" class="btn btn-primary">
+        <span class="btn-icon">▶</span>
+        Bắt đầu cào
+      </button>
+      <button id="btnStop" class="btn btn-danger" disabled>
+        <span class="btn-icon">■</span>
+        Dừng lại
+      </button>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="statPosts">0</div>
+        <div class="stat-label">Bài đã cào</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statScrolls">0</div>
+        <div class="stat-label">Lần scroll</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statTime">0s</div>
+        <div class="stat-label">Thời gian</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statGroupIdx">0/0</div>
+        <div class="stat-label">Group</div>
+      </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="progress-section">
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <div class="progress-text" id="progressText">Đang chờ...</div>
+    </div>
+
+    <!-- Log -->
+    <div class="section log-section">
+      <div class="section-title">📋 Nhật ký</div>
+      <div class="log-container" id="logContainer">
+        <div class="log-entry log-info">[System] Extension đã sẵn sàng</div>
+      </div>
+    </div>
+
+    <!-- Export -->
+    <div class="actions">
+      <button id="btnExport" class="btn btn-secondary" disabled>
+        📥 Xuất JSON
+      </button>
+      <button id="btnExportCSV" class="btn btn-secondary" disabled>
+        📥 Xuất CSV
+      </button>
+      <button id="btnSendAPI" class="btn btn-secondary" disabled>
+        📡 Gửi API
+      </button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+/* content.css — Overlay & debug styles cho content script */
+
+/* Ẩn overlay debug (bật bằng cách thêm class fb-crawler-debug vào body) */
+body.fb-crawler-debug .fb-crawler-highlight {
+  outline: 2px solid rgba(24, 119, 242, 0.5) !important;
+  outline-offset: 2px !important;
+}
+
+/* Highlight post blocks đang được crawl */
+body.fb-crawler-debug div[role="feed"] > div.fb-crawler-processed {
+  outline: 1px dashed rgba(74, 222, 128, 0.4);
+}
+
+/* Loading indicator overlay */
+.fb-crawler-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 999999;
+  pointer-events: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.fb-crawler-toast {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  background: #1a1a2e;
+  color: #fff;
+  padding: 12px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  border-left: 4px solid #1877F2;
+  z-index: 9999999;
+  display: none;
+  max-width: 320px;
+}
+
+.fb-crawler-toast.visible {
+  display: block;
+}
+
+.fb-crawler-toast.success {
+  border-left-color: #4ade80;
+}
+
+.fb-crawler-toast.error {
+  border-left-color: #f87171;
+}
