@@ -237,6 +237,15 @@ async def _require_fb_account_scope(user: dict[str, Any], user_id: str) -> None:
         raise HTTPException(status_code=403, detail="Facebook account is outside your team scope")
 
 
+async def _require_fb_accounts_scope(user: dict[str, Any], user_ids: list[str]) -> None:
+    allowed = await _owned_user_ids(user)
+    if allowed is None:
+        return
+    outside = [uid for uid in user_ids if uid and uid not in allowed]
+    if outside:
+        raise HTTPException(status_code=403, detail="One or more Facebook accounts are outside your team scope")
+
+
 @router.get("/config")
 async def fb_config(request: Request, authorization: str | None = Header(None)) -> dict[str, Any]:
     """Config safe for extension provisioning.
@@ -288,6 +297,50 @@ async def fb_extensions(request: Request, authorization: str | None = Header(Non
 async def fb_groups(request: Request, authorization: str | None = Header(None)) -> JSONResponse:
     _current_user(request, authorization)
     status, payload = await _markee_json("GET", "/groups")
+    return _json_response(status, payload)
+
+
+@router.get("/account-groups")
+async def fb_account_groups(request: Request, authorization: str | None = Header(None)) -> JSONResponse:
+    user = _current_user(request, authorization)
+    uid = str(request.query_params.get("user_id") or "")
+    await _require_fb_account_scope(user, uid)
+    params = dict(request.query_params)
+    status, payload = await _markee_json("GET", "/account-groups", params=params, cache_ttl=3.0)
+    return _json_response(status, payload)
+
+
+@router.get("/account-groups/summary")
+async def fb_account_groups_summary(request: Request, authorization: str | None = Header(None)) -> JSONResponse:
+    user = _current_user(request, authorization)
+    user_ids = [
+        uid.strip()
+        for uid in str(request.query_params.get("user_ids") or "").split(",")
+        if uid.strip()
+    ]
+    await _require_fb_accounts_scope(user, user_ids)
+    params = dict(request.query_params)
+    status, payload = await _markee_json("GET", "/account-groups/summary", params=params, cache_ttl=3.0)
+    return _json_response(status, payload)
+
+
+@router.post("/account-groups/scan")
+async def fb_account_groups_scan(data: dict, request: Request, authorization: str | None = Header(None)) -> JSONResponse:
+    user = _current_user(request, authorization)
+    uid = str(data.get("user_id") or "")
+    await _require_fb_account_scope(user, uid)
+    status, payload = await _markee_json("POST", "/account-groups/scan", json_body=data)
+    _clear_markee_cache("/account-groups")
+    return _json_response(status, payload)
+
+
+@router.post("/account-groups/sync")
+async def fb_account_groups_sync(data: dict, request: Request, authorization: str | None = Header(None)) -> JSONResponse:
+    user = _current_user(request, authorization)
+    uid = str(data.get("user_id") or "")
+    await _require_fb_account_scope(user, uid)
+    status, payload = await _markee_json("POST", "/account-groups/sync", json_body=data)
+    _clear_markee_cache("/account-groups")
     return _json_response(status, payload)
 
 
