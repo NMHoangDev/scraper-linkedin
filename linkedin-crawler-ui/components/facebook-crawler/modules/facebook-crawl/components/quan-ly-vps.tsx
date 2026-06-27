@@ -470,7 +470,7 @@ export function QuanLyVps() {
               <div className="flex-1 overflow-y-auto bg-slate-50">
                 {(!currentCookieVps.Vps_cookies || currentCookieVps.Vps_cookies.length === 0) ? (
                   <div className="p-10 flex flex-col items-center justify-center text-slate-400">
-                    <MaterialIcon name="cookie" className="text-[48px] mb-3 text-slate-300" />
+                    <MaterialIcon name={"cookie" as any} className="text-[48px] mb-3 text-slate-300" />
                     <p className="font-medium text-sm">Chưa có cookie nào trong VPS này.</p>
                   </div>
                 ) : (
