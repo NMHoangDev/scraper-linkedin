@@ -320,7 +320,7 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
 
     try {
       const meRes = await authService.me();
-      const idMember = meRes?.data?.id || meRes?.data?.user?.id || '';
+      const idMember = meRes?.data?.id || (meRes?.data as any)?.user?.id || '';
       
       if (!idMember) {
         setLaunchLog((prev) => [
