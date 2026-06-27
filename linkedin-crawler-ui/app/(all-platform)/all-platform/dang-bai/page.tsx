@@ -258,7 +258,12 @@ export default function DangBaiPage() {
   async function scanGroupsForSelected() {
     if (selectedOnline.length === 0) return toast.error("Chọn tài khoản online trước khi quét group");
     if (selectedWithoutGroupScan.length > 0) {
-      toast.error(`Có ${selectedWithoutGroupScan.length} tài khoản đang dùng extension cũ, hãy tải/cập nhật Seeding Markee rồi reload extension`);
+      const names = selectedWithoutGroupScan
+        .map(e => `${labelOf(e)}${e.version ? ` (${e.version})` : ""}`)
+        .slice(0, 3)
+        .join(", ");
+      const more = selectedWithoutGroupScan.length > 3 ? ` +${selectedWithoutGroupScan.length - 3}` : "";
+      toast.error(`Có ${selectedWithoutGroupScan.length} tài khoản đang dùng extension cũ: ${names}${more}. Hãy tải/cập nhật Seeding Markee rồi reload extension`);
     }
     const targets = selectedOnline.filter(hasAccountGroupsFeature).map(e => e.user_id);
     if (targets.length === 0) return;
@@ -281,7 +286,14 @@ export default function DangBaiPage() {
       const ok = results.filter(x => x.ok).length;
       const fail = results.filter(x => !x.ok);
       if (ok > 0) toast.success(`Đã gửi lệnh quét group cho ${ok} tài khoản`);
-      if (fail.length > 0) toast.error(`Không quét được ${fail.length} tài khoản`);
+      if (fail.length > 0) {
+        const details = fail
+          .map(x => `${accountLabelMap.get(x.uid) || shortFbId(x.uid)}: ${x.detail || "lỗi không rõ"}`)
+          .slice(0, 3)
+          .join("; ");
+        const more = fail.length > 3 ? `; +${fail.length - 3} tài khoản khác` : "";
+        toast.error(`Không quét được ${fail.length} tài khoản: ${details}${more}`);
+      }
       if (ok > 0) {
         const done = await waitForGroupScan(results.filter(x => x.ok).map(x => x.uid), beforeScan);
         if (done) toast.success("Đã cập nhật danh sách group");
