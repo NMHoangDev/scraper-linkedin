@@ -256,12 +256,12 @@ async function extractAndProcess(maxPosts: number, baseDelay: number, todayOnly:
 
   // Click 'Xem thêm' / 'See more' để mở rộng bài viết dài
   const expandButtons = document.querySelectorAll('div[role="button"], span[dir="auto"], div[dir="auto"]');
-  const targetTexts = ['xem thêm', 'see more'];
   let clickedAny = false;
 
   for (const btn of Array.from(expandButtons)) {
     const text = (btn.textContent || '').trim().toLowerCase();
-    if (targetTexts.includes(text)) {
+    // Bắt các trường hợp chứa "xem thêm", "see more", "xem thm" và giới hạn độ dài để không click nhầm đoạn văn
+    if ((text.includes('xem thêm') || text.includes('see more') || text.includes('xem th')) && text.length < 30) {
       try {
         (btn as HTMLElement).click();
         clickedAny = true;
