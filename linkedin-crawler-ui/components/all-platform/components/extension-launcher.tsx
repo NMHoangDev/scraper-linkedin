@@ -414,7 +414,7 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
         </div>
         
         <div className="flex items-center gap-2">
-          <a href="https://drive.google.com/uc?export=download&id=1helLrXxkLqkHxuiEDdKdL6Zd-1cwNbdR" download
+          <a href="https://drive.google.com/uc?export=download&id=1f8e3HQzcxICu9RMYpvYWGWvwV2Jn5VBJ" download
             target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-violet-200 bg-violet-50 hover:bg-violet-100 text-violet-700 text-xs font-bold transition cursor-pointer">
             <span className="material-symbols-outlined text-[16px]">download</span>
