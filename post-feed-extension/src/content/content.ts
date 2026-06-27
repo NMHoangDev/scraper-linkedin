@@ -270,8 +270,8 @@ async function extractAndProcess(maxPosts: number, baseDelay: number, todayOnly:
   }
 
   if (clickedAny) {
-    // Đợi Facebook render text đầy đủ sau khi click
-    await new Promise(r => setTimeout(r, 300));
+    // Đợi Facebook render text đầy đủ sau khi click. Tăng lên 1500ms vì đôi khi Xem thêm cần call API tải text.
+    await new Promise(r => setTimeout(r, 1500));
   }
 
   // Extract posts
@@ -522,11 +522,11 @@ function extractPostData(el: Element): any {
     }
   }
 
-  // Dọn dẹp các text thừa thường bị dính ở cuối bài (Xem thêm, See more, Xem bản dịch...)
+  // Dọn dẹp các text thừa thường bị dính ở cuối bài (Xem thêm, See more, Xem bản dịch, Ẩn bớt, See less...)
   if (content) {
-    const junkRegex = /\s*(?:xem thêm|see more|xem thm|see translation|xem bản dịch|ẩn bản dịch|hide translation)\s*\.*$/gi;
+    const junkRegex = /\s*(?:xem thêm|see more|xem thm|see translation|xem bản dịch|ẩn bản dịch|hide translation|ẩn bớt|see less)\s*\.*$/gi;
     content = content.replace(junkRegex, '').trim();
-    // Chạy thêm 1 lần nữa đề phòng trường hợp dính 2 nút liền nhau (vd: Xem thêm \n Xem bản dịch)
+    // Chạy thêm 1 lần nữa đề phòng trường hợp dính 2 nút liền nhau (vd: Ẩn bớt \n Xem bản dịch)
     content = content.replace(junkRegex, '').trim();
   }
 
