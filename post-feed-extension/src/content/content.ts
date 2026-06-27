@@ -522,6 +522,14 @@ function extractPostData(el: Element): any {
     }
   }
 
+  // Dọn dẹp các text thừa thường bị dính ở cuối bài (Xem thêm, See more, Xem bản dịch...)
+  if (content) {
+    const junkRegex = /\s*(?:xem thêm|see more|xem thm|see translation|xem bản dịch|ẩn bản dịch|hide translation)\s*\.*$/gi;
+    content = content.replace(junkRegex, '').trim();
+    // Chạy thêm 1 lần nữa đề phòng trường hợp dính 2 nút liền nhau (vd: Xem thêm \n Xem bản dịch)
+    content = content.replace(junkRegex, '').trim();
+  }
+
   // Author - Logic matched with Python Scraper for perfect URL parsing
   let author = 'Ẩn danh';
   let authorUrl = '';
