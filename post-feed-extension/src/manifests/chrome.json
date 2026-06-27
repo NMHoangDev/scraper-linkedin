@@ -1,0 +1,63 @@
+{
+  "manifest_version": 3,
+  "name": "PostFeed Crawler Extension",
+  "version": "1.0.0",
+  "description": "Extension crawl bài viết từ Facebook groups theo lệnh từ app",
+
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "storage",
+    "alarms",
+    "notifications",
+    "scripting"
+  ],
+
+  "host_permissions": [
+    "https://www.facebook.com/*",
+    "https://facebook.com/*",
+    "https://m.facebook.com/*",
+    "https://web.facebook.com/*",
+    "http://localhost:3000/*",
+    "http://127.0.0.1:3000/*",
+    "http://localhost:8000/*",
+    "http://127.0.0.1:8000/*",
+    "https://seeding.markeeai.com/*",
+    "https://seeding.zenithglobal.dev/*"
+  ],
+
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.facebook.com/*",
+        "https://facebook.com/*",
+        "https://m.facebook.com/*",
+        "https://web.facebook.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_end",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "http://localhost:3000/*",
+        "http://127.0.0.1:3000/*",
+        "https://seeding.markeeai.com/*",
+        "https://seeding.zenithglobal.dev/*"
+      ],
+      "js": ["provision-bridge.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "PostFeed Crawler"
+  }
+}
