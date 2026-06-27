@@ -69,7 +69,8 @@ export default function DangBaiPage() {
   const [content, setContent] = useState("");
   const [targetType, setTargetType] = useState<"profile" | "group">("profile");
   const [selectedAccountGroupKeys, setSelectedAccountGroupKeys] = useState<Set<string>>(new Set());
-  const [groupSearch, setGroupSearch] = useState("");
+  const [groupPickerAccountId, setGroupPickerAccountId] = useState<string | null>(null);
+  const [groupSearchByAccount, setGroupSearchByAccount] = useState<Record<string, string>>({});
   const [accountGroups, setAccountGroups] = useState<AccountGroup[]>([]);
   const [groupLastScan, setGroupLastScan] = useState<Record<string, string | null>>({});
   const [scanningGroups, setScanningGroups] = useState<Set<string>>(new Set());
@@ -164,13 +165,11 @@ export default function DangBaiPage() {
     return map;
   }, [exts]);
   const accountGroupsByAccount = useMemo(() => {
-    const q = groupSearch.trim().toLowerCase();
     const map = new Map<string, AccountGroup[]>();
     selectedOnline.forEach(e => map.set(e.user_id, []));
     accountGroups.forEach(group => {
       const targetId = accountGroupTargetId(group);
       if (!targetId) return;
-      if (q && !(group.name || "").toLowerCase().includes(q) && !(group.url || "").toLowerCase().includes(q) && !(group.group_id || "").toLowerCase().includes(q)) return;
       group.accounts.forEach(uid => {
         if (!selectedOnlineIds.has(uid)) return;
         const list = map.get(uid);
@@ -186,7 +185,7 @@ export default function DangBaiPage() {
       map.set(uid, [...deduped.values()].sort((a, b) => (a.name || "").localeCompare(b.name || "", "vi")));
     });
     return map;
-  }, [accountGroups, groupSearch, selectedOnline, selectedOnlineIds]);
+  }, [accountGroups, selectedOnline, selectedOnlineIds]);
   const availableAccountGroupKeys = useMemo(() => {
     const keys = new Set<string>();
     accountGroups.forEach(group => {
@@ -725,27 +724,26 @@ export default function DangBaiPage() {
                     </div>
                   </div>
 
-                  <input
-                    value={groupSearch}
-                    onChange={ev => setGroupSearch(ev.target.value)}
-                    placeholder="Tìm group theo tên hoặc URL..."
-                    className="w-full border border-slate-200 dark:border-slate-750 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 transition"
-                  />
-
                   <div className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400">
                     <span>{selectedOnline.length} acc online đã chọn</span>
-                    <span className="font-bold text-slate-700 dark:text-slate-200">{groupPostTargets.length} group · {groupPostTargets.length} lệnh đăng</span>
+                    <span className="font-bold text-slate-700 dark:text-slate-200">{groupPostTargets.length}/{selectedOnline.length} acc có group · {groupPostTargets.length} lệnh đăng</span>
                   </div>
 
-                  <div className="max-h-[360px] overflow-y-auto space-y-2 pr-1">
+                  <div className="max-h-[430px] overflow-y-auto space-y-2 pr-1">
                     {selectedIds.length === 0 ? (
                       <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 text-xs text-slate-400">Chọn tài khoản trước.</div>
                     ) : (
                       selectedOnline.map(e => {
                         const list = accountGroupsByAccount.get(e.user_id) || [];
                         const canScanGroups = hasAccountGroupsFeature(e);
-                        const selectedInAccount = list.filter(g => selectedAccountGroupKeys.has(accountGroupSelectionKey(e.user_id, g))).length;
+                        const selectedGroup = list.find(g => selectedAccountGroupKeys.has(accountGroupSelectionKey(e.user_id, g)));
                         const isScanning = scanningGroups.has(e.user_id);
+                        const isPickerOpen = groupPickerAccountId === e.user_id;
+                        const search = groupSearchByAccount[e.user_id] || "";
+                        const q = search.trim().toLowerCase();
+                        const filteredList = q
+                          ? list.filter(g => (g.name || "").toLowerCase().includes(q) || (g.url || "").toLowerCase().includes(q) || (g.group_id || "").toLowerCase().includes(q))
+                          : list;
                         return (
                           <div key={e.user_id} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/30">
@@ -759,10 +757,11 @@ export default function DangBaiPage() {
                                   {canScanGroups
                                     ? groupLastScan[e.user_id] ? `Quét gần nhất ${new Date(groupLastScan[e.user_id] as string).toLocaleDateString("vi-VN")}` : "Chưa quét group"
                                     : `Cần cập nhật extension${e.version ? ` (${e.version})` : ""}`}
+                                  {canScanGroups && list.length > 0 ? ` · ${list.length} group đã lưu` : ""}
                                 </div>
                               </div>
                               <div className="flex items-center gap-2 shrink-0">
-                                {selectedInAccount > 0 && (
+                                {selectedGroup && (
                                   <button
                                     type="button"
                                     onClick={() => clearGroupsForAccount(e.user_id)}
@@ -771,6 +770,15 @@ export default function DangBaiPage() {
                                     Bỏ chọn
                                   </button>
                                 )}
+                                <button
+                                  type="button"
+                                  onClick={() => setGroupPickerAccountId(prev => prev === e.user_id ? null : e.user_id)}
+                                  disabled={!canScanGroups || list.length === 0}
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#E3000F] text-white text-xs font-bold hover:bg-red-700 disabled:opacity-50 disabled:hover:bg-[#E3000F] transition"
+                                >
+                                  <MaterialIcon name={isPickerOpen ? "arrow_drop_down" : selectedGroup ? "edit" : "search"} className="text-[14px]" />
+                                  {isPickerOpen ? "Đóng" : selectedGroup ? "Đổi group" : "Chọn group"}
+                                </button>
                                 <button
                                   type="button"
                                   onClick={() => scanGroupsForAccounts([e])}
@@ -793,50 +801,83 @@ export default function DangBaiPage() {
                               </div>
                             ) : list.length === 0 ? (
                               <div className="p-3 text-xs text-slate-400">
-                                {groupSearch.trim() ? "Không có group khớp bộ lọc." : "Chưa có group trong cache."}
+                                Chưa có group trong cache. Bấm Quét để cập nhật group của tài khoản này.
                               </div>
                             ) : (
-                              <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                                {list.map(g => {
-                                  const selectionKey = accountGroupSelectionKey(e.user_id, g);
-                                  const checked = selectedAccountGroupKeys.has(selectionKey);
-                                  const deleting = deletingAccountGroupKeys.has(selectionKey);
-                                  return (
-                                    <div
-                                      key={selectionKey}
-                                      className={`flex items-start gap-2 px-3 py-2.5 transition ${
-                                        checked ? "bg-red-50/70 dark:bg-red-950/10" : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
-                                      }`}
-                                    >
-                                      <label className="flex items-start gap-3 min-w-0 flex-1 cursor-pointer">
-                                        <input
-                                          type="radio"
-                                          name={`group-${e.user_id}`}
-                                          checked={checked}
-                                          onChange={() => toggleAccountGroup(e.user_id, g)}
-                                          className="mt-0.5 h-4 w-4 accent-[#E3000F] shrink-0"
-                                        />
-                                        <div className="min-w-0 flex-1">
-                                          <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{g.name}</div>
-                                          <div className="mt-0.5 text-[10px] text-slate-400 truncate">{g.url || g.group_id}</div>
-                                        </div>
-                                      </label>
-                                      <button
-                                        type="button"
-                                        onClick={() => deleteAccountGroup(e.user_id, g)}
-                                        disabled={deleting}
-                                        title="Xóa group khỏi cache tài khoản này"
-                                        className="h-7 w-7 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#E3000F] hover:bg-red-50 dark:hover:bg-red-950/20 disabled:opacity-50 shrink-0"
-                                      >
-                                        {deleting ? (
-                                          <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                        ) : (
-                                          <MaterialIcon name="delete" className="text-[16px]" />
-                                        )}
-                                      </button>
+                              <div className="p-3 space-y-2">
+                                {selectedGroup ? (
+                                  <div className="flex items-start gap-2 rounded-xl border border-emerald-100 dark:border-emerald-900/30 bg-emerald-50/70 dark:bg-emerald-950/10 px-3 py-2">
+                                    <MaterialIcon name="check_circle" className="text-[18px] text-emerald-600 dark:text-emerald-300 shrink-0 mt-0.5" />
+                                    <div className="min-w-0 flex-1">
+                                      <div className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{selectedGroup.name}</div>
+                                      <div className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400 truncate">{selectedGroup.url || selectedGroup.group_id}</div>
                                     </div>
-                                  );
-                                })}
+                                  </div>
+                                ) : (
+                                  <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 px-3 py-2 text-xs text-slate-400">
+                                    Chưa chọn group cho tài khoản này.
+                                  </div>
+                                )}
+
+                                {isPickerOpen && (
+                                  <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                                    <div className="p-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/30">
+                                      <input
+                                        value={search}
+                                        onChange={ev => setGroupSearchByAccount(prev => ({ ...prev, [e.user_id]: ev.target.value }))}
+                                        placeholder="Tìm group của tài khoản này..."
+                                        className="w-full border border-slate-200 dark:border-slate-750 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 transition"
+                                      />
+                                    </div>
+                                    <div className="max-h-[220px] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                                      {filteredList.length === 0 ? (
+                                        <div className="p-3 text-xs text-slate-400">Không có group khớp bộ lọc.</div>
+                                      ) : filteredList.map(g => {
+                                        const selectionKey = accountGroupSelectionKey(e.user_id, g);
+                                        const checked = selectedAccountGroupKeys.has(selectionKey);
+                                        const deleting = deletingAccountGroupKeys.has(selectionKey);
+                                        return (
+                                          <div
+                                            key={selectionKey}
+                                            className={`flex items-start gap-2 px-3 py-2.5 transition ${
+                                              checked ? "bg-red-50/70 dark:bg-red-950/10" : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                                            }`}
+                                          >
+                                            <label className="flex items-start gap-3 min-w-0 flex-1 cursor-pointer">
+                                              <input
+                                                type="radio"
+                                                name={`group-${e.user_id}`}
+                                                checked={checked}
+                                                onChange={() => {
+                                                  toggleAccountGroup(e.user_id, g);
+                                                  setGroupPickerAccountId(null);
+                                                }}
+                                                className="mt-0.5 h-4 w-4 accent-[#E3000F] shrink-0"
+                                              />
+                                              <div className="min-w-0 flex-1">
+                                                <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{g.name}</div>
+                                                <div className="mt-0.5 text-[10px] text-slate-400 truncate">{g.url || g.group_id}</div>
+                                              </div>
+                                            </label>
+                                            <button
+                                              type="button"
+                                              onClick={() => deleteAccountGroup(e.user_id, g)}
+                                              disabled={deleting}
+                                              title="Xóa group khỏi cache tài khoản này"
+                                              className="h-7 w-7 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#E3000F] hover:bg-red-50 dark:hover:bg-red-950/20 disabled:opacity-50 shrink-0"
+                                            >
+                                              {deleting ? (
+                                                <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                              ) : (
+                                                <MaterialIcon name="delete" className="text-[16px]" />
+                                              )}
+                                            </button>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
