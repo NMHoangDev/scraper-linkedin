@@ -130,9 +130,10 @@ export default function DangBaiPage() {
     return e.email || "Tài khoản Facebook";
   }
 
-  const online = exts.filter(e => e.status === "online");
+  const online = useMemo(() => exts.filter(e => e.status === "online"), [exts]);
   const selectedOnline = useMemo(() => online.filter(e => selected.has(e.user_id)), [online, selected]);
   const selectedIds = useMemo(() => selectedOnline.map(e => e.user_id), [selectedOnline]);
+  const selectedIdsKey = useMemo(() => selectedIds.join(","), [selectedIds]);
   const selectedOnlineIds = useMemo(() => new Set(selectedOnline.map(e => e.user_id)), [selectedOnline]);
   const hasAccountGroupsFeature = useCallback((e: Ext) => (e.features || []).includes("account_groups"), []);
   const selectedWithoutGroupScan = useMemo(
@@ -182,14 +183,15 @@ export default function DangBaiPage() {
     return targets;
   }, [selectedGroupList, selectedOnlineIds]);
 
-  const refreshAccountGroups = useCallback(async (ids = selectedIds) => {
-    if (ids.length === 0) {
+  const refreshAccountGroups = useCallback(async (ids?: string[]) => {
+    const targetIds = ids ?? (selectedIdsKey ? selectedIdsKey.split(",") : []);
+    if (targetIds.length === 0) {
       setAccountGroups([]);
       setGroupLastScan({});
       return;
     }
     try {
-      const qs = encodeURIComponent(ids.join(","));
+      const qs = encodeURIComponent(targetIds.join(","));
       const d = await fbFetch(`/account-groups/summary?user_ids=${qs}`).then(r => r.json());
       setAccountGroups(d.groups || []);
       setGroupLastScan(d.last_scan || {});
@@ -199,7 +201,7 @@ export default function DangBaiPage() {
       setGroupLastScan({});
       return null;
     }
-  }, [selectedIds]);
+  }, [selectedIdsKey]);
 
   const waitForGroupScan = useCallback(async (ids: string[], before: Record<string, string | null>) => {
     const isDone = (lastScan: Record<string, string | null>) => ids.every(uid => {
@@ -223,7 +225,7 @@ export default function DangBaiPage() {
   useEffect(() => {
     if (targetType !== "group") return;
     refreshAccountGroups();
-  }, [targetType, selectedIds.join(","), refreshAccountGroups]);
+  }, [targetType, selectedIdsKey, refreshAccountGroups]);
 
   useEffect(() => {
     if (targetType !== "group" || selectedGroupUrls.size === 0) return;
