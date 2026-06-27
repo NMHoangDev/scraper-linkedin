@@ -8,11 +8,16 @@ import "@xterm/xterm/css/xterm.css";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_FACEBOOK_BASE_URL || "http://127.0.0.1:8000";
 
-// Lấy WebSocket URL (Sử dụng proxy của Next.js)
+// Lấy WebSocket URL (Sử dụng API_BASE để kết nối trực tiếp backend)
 const getWsUrl = (path: string) => {
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const host = window.location.host;
-  return `${protocol}//${host}${path}`;
+  try {
+    const url = new URL(API_BASE || window.location.origin, window.location.origin);
+    const protocol = url.protocol === "https:" ? "wss:" : "ws:";
+    return `${protocol}//${url.host}${path}`;
+  } catch (e) {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    return `${protocol}//${window.location.host}${path}`;
+  }
 };
 
 interface Vps {
