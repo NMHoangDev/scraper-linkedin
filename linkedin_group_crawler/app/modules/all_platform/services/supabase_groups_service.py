@@ -223,7 +223,7 @@ def delete_facebook_group(group_id: str, id_member: str, is_admin: bool = False)
             posts_res = (
                 supabase.table("facebook_posts")
                 .delete()
-                .eq("group_url", group_url)
+                .eq("group_id", group_id)  # Fix: dùng group_id thay vì group_url
                 .execute()
             )
             deleted_posts = len(posts_res.data) if posts_res.data else 0

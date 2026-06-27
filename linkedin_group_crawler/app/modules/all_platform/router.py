@@ -23,18 +23,13 @@ from app.modules.all_platform.routers.groups_linkedin import linkedin_groups_rou
 from app.modules.all_platform.routers.crawl_linkedin import crawl_linkedin_router
 from app.modules.all_platform.routers.linkedin_legacy import router as linkedin_legacy_router
 from app.modules.all_platform.routers.crawl_facebook import crawl_facebook_router
+from app.modules.all_platform.routers.extension_crawl import router as extension_crawl_router
 from app.modules.all_platform.routers.fb import router as fb_automation_router
 from app.modules.all_platform.routers.websocket import router as websocket_router
 from app.modules.all_platform.routers.fb_inbox_accounts import router as fb_inbox_accounts_router
 from app.modules.all_platform.routers.customer_lead import router as customer_lead_router
 
 all_platform_router = APIRouter()
-
-# ── WebSocket ──────────────────────────────────────────────────────────────────
-all_platform_router.include_router(
-    websocket_router,
-    tags=["All-Platform WebSockets"],
-)
 
 # ── Facebook ────────────────────────────────────────────────────────────────────
 all_platform_router.include_router(
@@ -56,6 +51,11 @@ all_platform_router.include_router(
     crawl_facebook_router,
     prefix="/facebook",
     tags=["All-Platform Facebook Crawl"],
+)
+all_platform_router.include_router(
+    extension_crawl_router,
+    prefix="/extension",
+    tags=["All-Platform Extension Crawl"],
 )
 all_platform_router.include_router(
     fb_automation_router,

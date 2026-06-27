@@ -666,6 +666,14 @@ export const allPlatformGroupsService = {
     return requestJson(url);
   },
 
+  /**
+   * Lấy groups cho Extension Launcher.
+   * Backend tự động filter theo id_member từ auth token.
+   */
+  getForExtension: (): Promise<ApiResponse<FacebookGroup[]>> => {
+    return requestJson(`${BASE}/facebook/groups`);
+  },
+
   add: (
     payload: Record<string, unknown>,
     platform: string,

@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { CrawlLinkedInPopup } from "@/components/all-platform/crawl-linkedin-popup";
 import { CrawlFacebookPopup } from "@/components/all-platform/crawl-facebook-popup";
+import { ExtensionLauncher } from "@/components/all-platform/components/extension-launcher";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { FilterBar, type FilterState } from "@/components/all-platform/components/filter-bar";
 import { PostCard } from "@/components/all-platform/components/post-card";
@@ -424,6 +425,7 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
               <span className="material-symbols-outlined text-[18px]">download</span>
               Cào dữ liệu
             </button>
+
           </div>
         </div>
       )}
@@ -468,11 +470,19 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
 
       {/* ── KPI Progress Cards ──────────────────────────────────────────────── */}
       {CURRENT_USER_EMAIL && (
-        <div className="mb-6">
+        <div className="mb-6 space-y-6">
           <KpiProgressCard
             email={CURRENT_USER_EMAIL}
             type="comment"
           />
+          {feedPlatform === "facebook" && (
+            <ExtensionLauncher
+              onComplete={() => {
+                fetchPosts();
+                fetchStats();
+              }}
+            />
+          )}
         </div>
       )}
 

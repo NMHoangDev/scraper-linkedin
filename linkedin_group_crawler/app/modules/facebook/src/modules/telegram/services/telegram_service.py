@@ -2,6 +2,7 @@ import logging
 import time # Dùng time.sleep thay vì asyncio.sleep
 import requests # Dùng requests thay vì httpx
 import html
+import os
 from datetime import datetime
 from typing import List
 
@@ -60,6 +61,10 @@ class TelegramService:
             payload["message_thread_id"] = self.topic_id
 
         try:
+            # Xoá biến môi trường gây lỗi của PostgreSQL trên Windows (nếu có)
+            os.environ.pop('CURL_CA_BUNDLE', None)
+            os.environ.pop('REQUESTS_CA_BUNDLE', None)
+            
             # Dùng thư viện requests (đồng bộ)
             response = requests.post(self.api_url, json=payload)
             response.raise_for_status()
@@ -151,6 +156,10 @@ class TelegramService:
         }
 
         try:
+            # Xoá biến môi trường gây lỗi của PostgreSQL trên Windows (nếu có)
+            os.environ.pop('CURL_CA_BUNDLE', None)
+            os.environ.pop('REQUESTS_CA_BUNDLE', None)
+            
             response = requests.post(self.api_url, json=payload)
             response.raise_for_status()
             logger.info(f"✅ Đã gửi thông báo hoàn tất kèm link vào Topic {topic_id}.")
