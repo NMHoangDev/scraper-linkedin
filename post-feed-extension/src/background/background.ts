@@ -311,7 +311,7 @@ class FeedCrawler {
   private async savePostsToSupabase(posts: any[], group: FeedGroup, groupId: string, idMember: string): Promise<void> {
     try {
       // Gọi API mới: /save-posts (schema đúng facebook_posts)
-      const response = await fetch('http://localhost:8000/api/all-platform/extension/save-posts', {
+      const response = await fetch('https://seeding.markeeai.com/api/all-platform/extension/save-posts', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -362,7 +362,7 @@ class FeedCrawler {
   // Legacy: Gọi API cũ /crawl-result (lưu vào bảng fb_posts)
   private async savePostsToSupabaseLegacy(posts: any[], group: FeedGroup): Promise<void> {
     try {
-      const response = await fetch('http://localhost:8000/api/all-platform/extension/crawl-result', {
+      const response = await fetch('https://seeding.markeeai.com/api/all-platform/extension/crawl-result', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
