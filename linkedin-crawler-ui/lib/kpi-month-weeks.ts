@@ -1,7 +1,20 @@
 /**
  * KPI theo tuần lịch: **thứ Hai → chủ nhật** (tuần giao với tháng được liệt kê tuần 1…N).
  * Dùng cho nhãn UI, so khớp KPI và merge payload gửi `/kpi/assign`.
+ *
+ * LƯU Ý về múi giờ:
+ * - Backend lưu tất cả timestamp dưới dạng UTC ISO strings trong Supabase.
+ * - Backend tính week boundaries (Mon–Sun) theo giờ Việt Nam (+07:00).
+ * - Frontend dùng `new Date()` (local browser time). Nếu server chạy ở VN timezone,
+ *   hai bên nhất quán. Nếu browser ở timezone khác, tuần UI có thể lệch 1 ngày
+ *   so với backend khi gần ranh giới UTC midnight.
+ *
+ * Backend luôn là nguồn chân lý cho date boundaries. Frontend chỉ dùng các hàm
+ * ở đây để format hiển thị và gửi week windows lên backend.
  */
+
+/** Vietnam timezone offset: +07:00 = 7 * 60 * 1000 ms */
+export const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
 
 export function pad2(n: number): string {
   return String(n).padStart(2, "0");

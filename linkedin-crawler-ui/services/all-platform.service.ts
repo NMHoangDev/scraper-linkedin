@@ -201,7 +201,7 @@ export const allPlatformKpiService = {
   getAll: (leader_email: string, id_team?: string, start_date?: string, end_date?: string): Promise<ApiResponse<{ total: number; members: KpiMember[] }>> => {
     return requestJson(`${BASE}/kpi/get-all`, {
       method: "POST",
-      body: JSON.stringify({ leader_email, id_team, start_date, end_date }),
+      body: JSON.stringify({ email_leader: leader_email, id_team, start_date, end_date }),
     });
   },
 
@@ -664,6 +664,14 @@ export const allPlatformGroupsService = {
     const qs = searchParams.toString();
     const url = `${BASE}/${platform}/groups${qs ? `?${qs}` : ""}`;
     return requestJson(url);
+  },
+
+  /**
+   * Lấy groups cho Extension Launcher.
+   * Backend tự động filter theo id_member từ auth token.
+   */
+  getForExtension: (): Promise<ApiResponse<FacebookGroup[]>> => {
+    return requestJson(`${BASE}/facebook/groups`);
   },
 
   add: (

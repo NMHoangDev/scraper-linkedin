@@ -251,10 +251,18 @@ def get_kpi_target(
     if id_team:
         query = query.eq("id_team", id_team)
 
-    if date_from:
-        query = query.lte("start_date", date_to or _today())
-    if date_to:
-        query = query.gte("end_date", date_from or _today())
+    if date_from and date_to:
+        # KPI that overlaps with the requested range:
+        # KPI.start_date <= date_to AND KPI.end_date >= date_from
+        query = (
+            query
+            .lte("start_date", date_to)
+            .gte("end_date", date_from)
+        )
+    elif date_to:
+        query = query.lte("start_date", date_to)
+    elif date_from:
+        query = query.gte("end_date", date_from)
 
     result = query.execute()
     return result.data[0] if result.data else {}

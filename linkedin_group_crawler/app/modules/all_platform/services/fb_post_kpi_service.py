@@ -7,13 +7,16 @@ Khi extension đăng bài FB thành công, service gọi API để lưu KPI.
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from loguru import logger
 from supabase import Client
 
 from app.core.supabase_client import get_supabase_client
 from app.modules.all_platform.services.fb_inbox_account_service import resolve_id_member
+
+# Vietnam timezone (+07:00) — consistent with supabase_kpi_service.py
+VN_TZ = timezone(timedelta(hours=7))
 
 
 def save_fb_post_kpi(
@@ -170,6 +173,24 @@ def _resolve_id_leader(supabase: Client, id_member: str) -> Optional[str]:
     return None
 
 
+def _parse_iso_date(value: Optional[str]):
+    """Parse YYYY-MM-DD string to date. Returns None if unparseable."""
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(str(value).strip()[:10])
+    except ValueError:
+        return None
+
+
+def _default_vn_week() -> Tuple[str, str]:
+    """Return current VN week boundaries: (monday_ymd, sunday_ymd)."""
+    today_vn = datetime.now(VN_TZ).date()
+    monday = today_vn - timedelta(days=today_vn.weekday())
+    sunday = monday + timedelta(days=6)
+    return monday.isoformat(), sunday.isoformat()
+
+
 def get_fb_post_kpi_summary(
     member_email: str,
     start_date: Optional[str] = None,
@@ -208,21 +229,25 @@ def get_fb_post_kpi_summary(
 
     id_member = member_res.data[0]["id"]
 
-    # Default date range: tuần hiện tại
+    # Default date range: current VN week (Mon–Sun)
     if not start_date or not end_date:
-        today_d = date.today()
-        monday = today_d - timedelta(days=today_d.weekday())
-        sunday = monday + timedelta(days=6)
-        start_date = start_date or monday.isoformat()
-        end_date = end_date or sunday.isoformat()
+        start_date, end_date = _default_vn_week()
+
+    # Convert to VN timezone datetime range for DB comparison.
+    # posted_at is stored as UTC; we need to find all UTC moments whose
+    # VN local date falls within [start_date, end_date].
+    start_iso = _parse_iso_date(start_date) or date.today()
+    end_iso = _parse_iso_date(end_date) or date.today()
+    start_dt = datetime.combine(start_iso, datetime.min.time(), tzinfo=VN_TZ).astimezone(timezone.utc).isoformat()
+    end_dt = datetime.combine(end_iso, datetime.max.time(), tzinfo=VN_TZ).astimezone(timezone.utc).isoformat()
 
     # Query fb_post_kpi
     query = (
         supabase.table("fb_post_kpi")
         .select("*")
         .eq("id_member", id_member)
-        .gte("posted_at", start_date)
-        .lte("posted_at", end_date + "T23:59:59")
+        .gte("posted_at", start_dt)
+        .lte("posted_at", end_dt)
         .order("posted_at", desc=True)
     )
 
@@ -308,21 +333,23 @@ def get_fb_post_kpi_list(
     except Exception as e:
         logger.warning(f"Error fetching kpi_post target: {e}")
 
-    # Default date range: tuần hiện tại
+    # Default date range: current VN week (Mon–Sun)
     if not start_date or not end_date:
-        today_d = date.today()
-        monday = today_d - timedelta(days=today_d.weekday())
-        sunday = monday + timedelta(days=6)
-        start_date = start_date or monday.isoformat()
-        end_date = end_date or sunday.isoformat()
+        start_date, end_date = _default_vn_week()
+
+    # Convert to VN timezone datetime range for DB comparison
+    start_iso = _parse_iso_date(start_date) or date.today()
+    end_iso = _parse_iso_date(end_date) or date.today()
+    start_dt = datetime.combine(start_iso, datetime.min.time(), tzinfo=VN_TZ).astimezone(timezone.utc).isoformat()
+    end_dt = datetime.combine(end_iso, datetime.max.time(), tzinfo=VN_TZ).astimezone(timezone.utc).isoformat()
 
     # Query fb_post_kpi
     query = (
         supabase.table("fb_post_kpi")
         .select("*")
         .eq("id_member", id_member)
-        .gte("posted_at", start_date)
-        .lte("posted_at", end_date + "T23:59:59")
+        .gte("posted_at", start_dt)
+        .lte("posted_at", end_dt)
         .order("posted_at", desc=True)
         .limit(limit)
     )

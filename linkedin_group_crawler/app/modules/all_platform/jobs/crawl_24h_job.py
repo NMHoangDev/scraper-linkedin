@@ -1,4 +1,5 @@
 import asyncio
+import html
 import logging
 import os
 from typing import List, Dict, Any
@@ -85,14 +86,14 @@ async def _do_crawl(groups: List[Dict[str, Any]], user_id: str, involved_users_l
                     # Gửi báo lỗi Telegram nếu max retries
                     try:
                         telegram = TelegramService()
-                        telegram.send_message(f"🚨 <b>LỖI CÀO NỀN (FB)</b> 🚨\n\n<code>{str(e)}</code>")
+                        telegram.send_message(f"🚨 <b>LỖI CÀO NỀN (FB)</b> 🚨\n\n<code>{html.escape(str(e))}</code>")
                     except Exception:
                         pass
                     return
                 else:
                     try:
                         telegram = TelegramService()
-                        telegram.send_message(f"🚨 <b>LỖI CÀO NỀN (FB)</b> 🚨\n\n<code>{str(e)}</code>")
+                        telegram.send_message(f"🚨 <b>LỖI CÀO NỀN (FB)</b> 🚨\n\n<code>{html.escape(str(e))}</code>")
                     except Exception:
                         pass
                     return # Lỗi khác thì văng luôn không cần retry
@@ -195,7 +196,7 @@ async def execute_all_platform_crawl_workflow():
         logger.error(f"❌ Thất bại trong lúc check scheduler: {e}", exc_info=True)
         try:
             telegram = TelegramService()
-            telegram.send_message(f"🚨 <b>LỖI HỆ THỐNG CRON 24H (FB)</b> 🚨\n\n<code>{str(e)}</code>")
+            telegram.send_message(f"🚨 <b>LỖI HỆ THỐNG CRON 24H (FB)</b> 🚨\n\n<code>{html.escape(str(e))}</code>")
         except Exception:
             pass
 

@@ -6,6 +6,16 @@ import sys
 import asyncio
 
 if sys.platform == "win32":
+    # Force UTF-8 on Windows console to avoid cp1252 encode errors when logging
+    # Vietnamese text and emojis (e.g., 'UnicodeEncodeError: charmap codec can't
+    # encode character \u1ec7'). Must run before any logging is configured.
+    for _stream_name in ("stdout", "stderr"):
+        _stream = getattr(sys, _stream_name, None)
+        if _stream is not None and hasattr(_stream, "reconfigure"):
+            try:
+                _stream.reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
     try:
         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
     except AttributeError:
@@ -22,6 +32,7 @@ from app.core.config import settings
 from app.modules.all_platform.jobs.crawl_24h_job import setup_all_platform_jobs
 from app.modules.facebook.src.modules.api_router.index import api_router
 from app.modules.all_platform.router import all_platform_router
+from app.modules.all_platform.routers.websocket import router as websocket_router
 from app.core.playwright_browser_pool import (
     shutdown_playwright_pool,
     warmup_playwright_pool,
@@ -49,7 +60,9 @@ async def lifespan(_: FastAPI):
     if _os.getenv("DISABLE_SCHEDULER", "").strip() in ("1", "true", "True"):
         logger.warning("DISABLE_SCHEDULER enabled -> not starting scheduler.")
     else:
-        setup_all_platform_jobs()
+        # TODO: Re-enable when needed
+        # setup_all_platform_jobs()
+        logger.warning("24h crawl scheduler DISABLED - comment this block to re-enable")
     async def _warmup_background() -> None:
         try:
             await asyncio.to_thread(warmup_playwright_pool)
@@ -193,4 +206,7 @@ app.include_router(router)
 app.include_router(linkedin_app_router)
 app.include_router(api_router, prefix="/facebook/api/v1")
 app.include_router(all_platform_router, prefix="/api/all-platform")
+
+# WebSocket ở root level (không có prefix)
+app.include_router(websocket_router)
 

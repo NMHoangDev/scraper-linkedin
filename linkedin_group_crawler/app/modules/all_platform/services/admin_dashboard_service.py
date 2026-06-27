@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from datetime import date, timedelta, timezone
 from typing import Dict, List, Any
 import time
 from app.core.supabase_client import execute_supabase_query, get_supabase_client
+
+VN_TZ = timezone(timedelta(hours=7))
 
 _CACHE_TTL_SECONDS = 30.0
 _CACHE: dict[str, tuple[float, Any]] = {}
@@ -76,7 +79,7 @@ def get_top_stats() -> Dict[str, Any]:
 
     approval_rate = round((approved_count / total_seeding * 100), 1) if total_seeding > 0 else 0.0
 
-    # 4. Average KPI completion rate across active KPIs
+    # 4. Average KPI completion rate across active KPIs (current VN week)
     try:
         kpis = execute_supabase_query(
             lambda: get_supabase_client().table("kpi_tracker").select("*").eq("status", "active").execute()
@@ -84,37 +87,53 @@ def get_top_stats() -> Dict[str, Any]:
         if not kpis:
             kpi_rate = 0.0
         else:
-            # Load all seeding contents to calculate actual achievements
+            # Compute current VN week boundaries
+            today_vn = date.today()  # server runs in VN timezone
+            monday_vn = today_vn - timedelta(days=today_vn.weekday())
+            sunday_vn = monday_vn + timedelta(days=6)
+
+            # Load seeding contents for current VN week only (server-side filter)
             seeding_data = execute_supabase_query(
-                lambda: get_supabase_client().table("seeding_content_kpi").select("id_member, current_day").execute()
+                lambda: (
+                    get_supabase_client()
+                    .table("seeding_content_kpi")
+                    .select("id_member, current_day")
+                    .gte("current_day", monday_vn.isoformat())
+                    .lte("current_day", sunday_vn.isoformat())
+                    .execute()
+                )
             ).data or []
-            
+
             total_target = 0
             total_actual = 0
-            
+
             for k in kpis:
                 mid = str(k.get("id_member"))
                 sd = k.get("start_date")
                 ed = k.get("end_date")
-                
+
                 # Targets
                 comment_t = k.get("kpi_comment") or 0
                 post_t = k.get("kpi_post") or 0
                 lead_t = k.get("kpi_lead") or 0
                 inbox_t = k.get("kpi_inbox") or 0
-                
+
                 total_target += comment_t + post_t + lead_t + inbox_t
-                
-                # Actual comments within active range
+
+                # Actual comments within KPI range (intersection with current week)
                 actual_comments = 0
                 if sd and ed:
-                    actual_comments = sum(
-                        1 for s in seeding_data 
-                        if str(s.get("id_member")) == mid 
-                        and s.get("current_day") 
-                        and sd <= s["current_day"] <= ed
-                    )
-                total_actual += actual_comments # posts/leads/inbox are 0 on current frontend/backend setup
+                    # Overlap between KPI range [sd, ed] and current week [monday, sunday]
+                    overlap_start = max(sd, monday_vn.isoformat())
+                    overlap_end = min(ed, sunday_vn.isoformat())
+                    if overlap_start <= overlap_end:
+                        actual_comments = sum(
+                            1 for s in seeding_data
+                            if str(s.get("id_member")) == mid
+                            and s.get("current_day")
+                            and overlap_start <= s["current_day"] <= overlap_end
+                        )
+                total_actual += actual_comments
 
             kpi_rate = round((total_actual / total_target * 100), 1) if total_target > 0 else 0.0
     except Exception:
@@ -157,10 +176,22 @@ def get_kpi_performance() -> List[Dict[str, Any]]:
         kpis = execute_supabase_query(
             lambda: get_supabase_client().table("kpi_tracker").select("*").eq("status", "active").execute()
         ).data or []
-        
-        # Load seeding records
+
+        # Compute current VN week boundaries
+        today_vn = date.today()
+        monday_vn = today_vn - timedelta(days=today_vn.weekday())
+        sunday_vn = monday_vn + timedelta(days=6)
+
+        # Load seeding records for current VN week only (server-side filter)
         seeding_data = execute_supabase_query(
-            lambda: get_supabase_client().table("seeding_content_kpi").select("id_member, current_day").execute()
+            lambda: (
+                get_supabase_client()
+                .table("seeding_content_kpi")
+                .select("id_member, current_day")
+                .gte("current_day", monday_vn.isoformat())
+                .lte("current_day", sunday_vn.isoformat())
+                .execute()
+            )
         ).data or []
 
         # Group data by team name
@@ -170,7 +201,7 @@ def get_kpi_performance() -> List[Dict[str, Any]]:
             tname = t.get("name_team") or "Unnamed Team"
             if tname not in team_performance:
                 team_performance[tname] = {"target": 0, "actual": 0}
-            
+
             mids = team_members.get(tid, [])
             for mid in mids:
                 # Find active KPI for this member and this team
@@ -185,13 +216,17 @@ def get_kpi_performance() -> List[Dict[str, Any]]:
                     sd = k.get("start_date")
                     ed = k.get("end_date")
                     if sd and ed:
-                        actual = sum(
-                            1 for s in seeding_data 
-                            if str(s.get("id_member")) == mid 
-                            and s.get("current_day") 
-                            and sd <= s["current_day"] <= ed
-                        )
-                        team_performance[tname]["actual"] += actual
+                        # Overlap between KPI range [sd, ed] and current week [monday, sunday]
+                        overlap_start = max(sd, monday_vn.isoformat())
+                        overlap_end = min(ed, sunday_vn.isoformat())
+                        if overlap_start <= overlap_end:
+                            actual = sum(
+                                1 for s in seeding_data
+                                if str(s.get("id_member")) == mid
+                                and s.get("current_day")
+                                and overlap_start <= s["current_day"] <= overlap_end
+                            )
+                            team_performance[tname]["actual"] += actual
 
         return _set_cached("kpi_performance", [
             {"team_name": name, "target": stats["target"], "actual": stats["actual"]}
@@ -207,25 +242,30 @@ def get_leaderboards() -> Dict[str, List[Dict[str, Any]]]:
     if cached is not None:
         return cached
     
-    # 1. Top Seeders
+    # 1. Top Seeders (current VN week)
     top_seeders = []
     try:
+        today_vn = date.today()
+        monday_vn = today_vn - timedelta(days=today_vn.weekday())
+        sunday_vn = monday_vn + timedelta(days=6)
         seeding_res = execute_supabase_query(
             lambda: (
                 get_supabase_client().table("seeding_content_kpi")
                 .select("id_member")
                 .eq("verify", "yes")
+                .gte("current_day", monday_vn.isoformat())
+                .lte("current_day", sunday_vn.isoformat())
                 .execute()
             )
         )
         seeding_list = seeding_res.data or []
-        
+
         # Group and count
         counts = {}
         for s in seeding_list:
             mid = str(s.get("id_member"))
             counts[mid] = counts.get(mid, 0) + 1
-        
+
         sorted_mids = sorted(counts.items(), key=lambda x: x[1], reverse=True)[:5]
         if sorted_mids:
             uids = [m[0] for m in sorted_mids]

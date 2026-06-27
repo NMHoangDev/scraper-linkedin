@@ -68,49 +68,60 @@ export function TeamManagement() {
   const recentWeeks = useMemo(() => getRecentWeeks(8), []);
   const [selectedWeek, setSelectedWeek] = useState(recentWeeks[0].value);
 
-  const fetchData = useCallback(async () => {
+  // Effect 1: Fetch teams when user loads page
+  useEffect(() => {
     if (!user?.id || !["leader", "admin", "superadmin"].includes(user.role || "")) return;
-    setIsLoading(true);
-    try {
-      // 1. Fetch all teams and filter for this leader (or all if admin)
-      const teamsRes = await teamsService.getAll();
-      let myTeams: TeamRow[] = [];
-      let activeTeamId = selectedTeamId;
-      if (teamsRes.success && teamsRes.data) {
-        if ((user.role as string) === "admin" || (user.role as string) === "superadmin") {
-          myTeams = teamsRes.data;
-        } else {
-          myTeams = teamsRes.data.filter(t => t.id_leader === user.id);
+    
+    const loadTeams = async () => {
+      try {
+        const teamsRes = await teamsService.getAll();
+        if (teamsRes.success && teamsRes.data) {
+          let myTeams: TeamRow[] = [];
+          if ((user.role as string) === "admin" || (user.role as string) === "superadmin") {
+            myTeams = teamsRes.data;
+          } else {
+            myTeams = teamsRes.data.filter(t => t.id_leader === user.id);
+          }
+          setTeams(myTeams);
+          // Auto-select first team if none selected
+          if (myTeams.length > 0 && !selectedTeamId) {
+            setSelectedTeamId(myTeams[0].id);
+          }
         }
-        setTeams(myTeams);
-        if (myTeams.length > 0 && !selectedTeamId) {
-          activeTeamId = myTeams[0].id;
-          setSelectedTeamId(activeTeamId);
-        }
+      } catch (err) {
+        console.error("Error fetching teams:", err);
       }
+    };
+    
+    loadTeams();
+  }, [user?.id, user?.role]);
 
-      // 2. Fetch KPI data for all members of this leader (scoped by selected team)
-      if (user.email && activeTeamId) {
-        const [startDate, endDate] = selectedWeek.split("_");
-        const kpiRes = await allPlatformKpiService.getAll(user.email, activeTeamId, startDate, endDate);
+  // Effect 2: Fetch KPI when team or week changes (uses current selectedTeamId from state)
+  useEffect(() => {
+    if (!user?.email || !selectedTeamId) {
+      setKpiData([]);
+      return;
+    }
+    
+    const [startDate, endDate] = selectedWeek.split("_");
+    
+    setIsLoading(true);
+    allPlatformKpiService.getAll(user.email, selectedTeamId, startDate, endDate)
+      .then(kpiRes => {
         if (kpiRes.success && kpiRes.data?.members) {
           setKpiData(kpiRes.data.members);
+        } else {
+          setKpiData([]);
         }
-      } else if (user.email && !activeTeamId) {
+      })
+      .catch(err => {
+        console.error("Error fetching KPI:", err);
         setKpiData([]);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user, selectedTeamId, selectedWeek]);
-
-  useEffect(() => {
-    if (user?.id) {
-      fetchData();
-    }
-  }, [user?.id, selectedTeamId, selectedWeek, fetchData]);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  }, [user?.email, selectedTeamId, selectedWeek]);
 
   // Get KPI date range for post view (from first member with KPI)
   useEffect(() => {
@@ -145,8 +156,23 @@ export function TeamManagement() {
     setSeedingModalOpen(true);
   };
 
+  // Helper to refresh KPI data
+  const refreshKpi = useCallback(() => {
+    if (user?.email && selectedTeamId) {
+      const [startDate, endDate] = selectedWeek.split("_");
+      setIsLoading(true);
+      allPlatformKpiService.getAll(user.email, selectedTeamId, startDate, endDate)
+        .then(kpiRes => {
+          if (kpiRes.success && kpiRes.data?.members) {
+            setKpiData(kpiRes.data.members);
+          }
+        })
+        .finally(() => setIsLoading(false));
+    }
+  }, [user?.email, selectedTeamId, selectedWeek]);
+
   const handleKpiAssigned = () => {
-    fetchData(); // Refresh data after assigning KPI
+    refreshKpi();
   };
 
   const selectedTeam = teams.find(t => t.id === selectedTeamId);
@@ -201,7 +227,22 @@ export function TeamManagement() {
         throw new Error(res.message || "Xóa thất bại");
       }
       setSelectedTeamId("");
-      await fetchData();
+      setKpiData([]);
+      // Refresh teams list
+      const teamsRes = await teamsService.getAll();
+      if (teamsRes.success && teamsRes.data) {
+        let myTeams: TeamRow[] = [];
+        if ((user.role as string) === "admin" || (user.role as string) === "superadmin") {
+          myTeams = teamsRes.data;
+        } else {
+          myTeams = teamsRes.data.filter(t => t.id_leader === user.id);
+        }
+        setTeams(myTeams);
+        // Auto-select first team if available
+        if (myTeams.length > 0) {
+          setSelectedTeamId(myTeams[0].id);
+        }
+      }
       return res;
     };
 
@@ -348,10 +389,10 @@ export function TeamManagement() {
             <thead className="bg-slate-50/75 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
               <tr>
                 <th className="px-3 py-2.5 text-left whitespace-nowrap">Thành viên</th>
-                <th className="px-1 py-2.5 text-center whitespace-nowrap">Comment</th>
                 <th className="px-1 py-2.5 text-center whitespace-nowrap">Post</th>
-                <th className="px-1 py-2.5 text-center whitespace-nowrap">Lead</th>
+                <th className="px-1 py-2.5 text-center whitespace-nowrap">Comment</th>
                 <th className="px-1 py-2.5 text-center whitespace-nowrap">Inbox</th>
+                <th className="px-1 py-2.5 text-center whitespace-nowrap">Lead</th>
                 <th className="px-2 py-2.5 text-center whitespace-nowrap">Tiến độ</th>
                 <th className="px-2 py-2.5 text-center whitespace-nowrap">Hành động</th>
               </tr>
@@ -393,20 +434,20 @@ export function TeamManagement() {
                         <div className="text-[10px] text-slate-400 font-medium max-w-[120px] truncate" title={member.email}>{member.email}</div>
                       </td>
                       <td className="px-1 py-2.5 text-center">
-                        <span className="font-bold text-slate-800 text-[11px]">{member.kpiCommentCurrent}</span>
-                        <span className="text-slate-400 text-[10px]"> / {member.kpiCommentTarget}</span>
-                      </td>
-                      <td className="px-1 py-2.5 text-center">
                         <span className={cn("font-bold text-[11px]", member.kpiPostCurrent > 0 ? "text-emerald-600" : "text-slate-800")}>{member.kpiPostCurrent}</span>
                         <span className="text-slate-400 text-[10px]"> / {member.kpiPostTarget}</span>
                       </td>
                       <td className="px-1 py-2.5 text-center">
-                        <span className="font-bold text-slate-800 text-[11px]">{member.kpiLeadCurrent}</span>
-                        <span className="text-slate-400 text-[10px]"> / {member.kpiLeadTarget}</span>
+                        <span className="font-bold text-slate-800 text-[11px]">{member.kpiCommentCurrent}</span>
+                        <span className="text-slate-400 text-[10px]"> / {member.kpiCommentTarget}</span>
                       </td>
                       <td className="px-1 py-2.5 text-center">
                         <span className={cn("font-bold text-[11px]", member.kpiInboxCurrent >= member.kpiInboxTarget && member.kpiInboxTarget > 0 ? "text-emerald-600" : "text-slate-800")}>{member.kpiInboxCurrent}</span>
                         <span className="text-slate-400 text-[10px]"> / {member.kpiInboxTarget}</span>
+                      </td>
+                      <td className="px-1 py-2.5 text-center">
+                        <span className="font-bold text-slate-800 text-[11px]">{member.kpiLeadCurrent}</span>
+                        <span className="text-slate-400 text-[10px]"> / {member.kpiLeadTarget}</span>
                       </td>
                       <td className="px-2 py-2.5">
                         <div className="flex items-center gap-1.5">
@@ -486,7 +527,7 @@ export function TeamManagement() {
           onClose={() => setInboxModalOpen(false)}
           memberEmail={inboxMember.email}
           memberName={inboxMember.name}
-          onStatusChange={fetchData}
+          onStatusChange={refreshKpi}
         />
       )}
 
@@ -498,7 +539,7 @@ export function TeamManagement() {
           memberName={postMember.name}
           startDate={postDateRange?.start}
           endDate={postDateRange?.end}
-          onStatusChange={fetchData}
+          onStatusChange={refreshKpi}
         />
       )}
 
@@ -509,7 +550,25 @@ export function TeamManagement() {
           team={isEditingTeam ? selectedTeam || null : null}
           leaderId={user.id}
           onSuccess={() => {
-            fetchData();
+            // Refresh teams list by re-triggering the teams effect
+            if (!["leader", "admin", "superadmin"].includes(user.role || "")) return;
+            
+            teamsService.getAll()
+              .then(teamsRes => {
+                if (teamsRes.success && teamsRes.data) {
+                  let myTeams: TeamRow[] = [];
+                  if ((user.role as string) === "admin" || (user.role as string) === "superadmin") {
+                    myTeams = teamsRes.data;
+                  } else {
+                    myTeams = teamsRes.data.filter(t => t.id_leader === user.id);
+                  }
+                  setTeams(myTeams);
+                  // Auto-select first team if none selected
+                  if (myTeams.length > 0 && !selectedTeamId) {
+                    setSelectedTeamId(myTeams[0].id);
+                  }
+                }
+              });
           }}
         />
       )}

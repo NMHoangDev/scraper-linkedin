@@ -5,6 +5,7 @@ import type { RefObject } from "react";
 import { MaterialIcon } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import TeamAccountTree from "@/components/all-platform/inbox/TeamAccountTree";
+import { KpiProgressCard } from "@/components/all-platform/components/kpi-progress-card";
 
 interface Session { user_id: string; fb_user_id?: string; label?: string; owner?: string; online?: boolean; inbox_enabled?: boolean; status?: string; }
 interface Conv { conv_id: string; name: string; preview: string; unread: boolean; time: string; is_customer: boolean; pushed_to_zalo: boolean; deleted: boolean; archived?: boolean; archived_at?: string; }
@@ -277,6 +278,20 @@ export default function InboxModernLayout(props: Props) {
           </div>
         ))}
       </div>
+
+      {/* KPI Progress Cards */}
+      {userEmail && (
+        <div className="mb-4 grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <KpiProgressCard
+            email={userEmail}
+            type="inbox"
+          />
+          <KpiProgressCard
+            email={userEmail}
+            type="lead"
+          />
+        </div>
+      )}
 
       <div className="mb-4 min-w-0 rounded-xl border border-[#E5E5E5] bg-white p-3 shadow-sm">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -688,9 +703,9 @@ export default function InboxModernLayout(props: Props) {
                 <div className="mb-3 text-sm font-black">Tổng quan inbox</div>
                 {[
                   ["Cần trả lời", stats.need, activeConvs.length || 1, "bg-[#E3000F]"],
-                  ["Chưa đọc", stats.unread, activeConvs.length || 1, "bg-amber-500"],
+                  ["Chưa đọc",    stats.unread,    activeConvs.length || 1, "bg-amber-500"],
                   ["Lead đã lưu", stats.customers, activeConvs.length || 1, "bg-emerald-500"],
-                  ["Đã đẩy Zalo", stats.pushed, activeConvs.length || 1, "bg-blue-500"],
+                  ["Đã đẩy Zalo", stats.pushed,    activeConvs.length || 1, "bg-blue-500"],
                 ].map(([label, value, total, color]) => {
                   const pct = Math.min(100, Math.round((Number(value) / Number(total)) * 100));
                   return (

@@ -21,12 +21,12 @@ class KpiWeekItem(BaseModel):
 
 
 class AssignKpiRequest(BaseModel):
-    leader_role: str
-    role: str
+    leader_role: str = "leader"
+    role: str = "member"
     email: str
-    profile_slug: str
+    profile_slug: str = ""
     email_leader: str
-    kpi: List[KpiWeekItem]
+    kpi: List[KpiWeekItem] = []
     platform: str = "Facebook"
     id_team: Optional[str] = None
 

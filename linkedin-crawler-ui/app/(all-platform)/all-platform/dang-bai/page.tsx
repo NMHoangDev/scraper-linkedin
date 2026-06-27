@@ -8,7 +8,7 @@
  * Lấy danh sách acc online: GET /extensions. Thư viện group: GET /groups.
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { provisionExtension, pingExtension } from "@/lib/markee-ext-provision";
 import { fbFetch, fbHeaders, getFbProvisionConfig } from "@/lib/markee-fb-api";
@@ -16,10 +16,20 @@ import { MaterialIcon } from "@/components/ui";
 import { allPlatformGroupsService } from "@/services/all-platform.service";
 import type { FacebookGroup } from "@/types/unified.types";
 import { toast } from "sonner";
+import { KpiProgressCard } from "@/components/all-platform/components/kpi-progress-card";
 
 interface Ext { user_id: string; owner?: string; label?: string; email?: string; note?: string; status: string; }
 interface FbSession { user_id: string; owner?: string; label?: string; email?: string; note?: string; }
 interface Grp { id: string; name: string; url: string; team?: string; intent?: string; }
+interface AccountGroup {
+  group_id?: string;
+  name: string;
+  url: string;
+  accounts: string[];
+  account_count: number;
+  total_selected: number;
+  all_selected: boolean;
+}
 
 interface KpiPost {
   id: string;
@@ -44,6 +54,10 @@ export default function DangBaiPage() {
   const [content, setContent] = useState("");
   const [targetType, setTargetType] = useState<"profile" | "group">("profile");
   const [groupUrl, setGroupUrl] = useState("");
+  const [accountGroups, setAccountGroups] = useState<AccountGroup[]>([]);
+  const [groupLastScan, setGroupLastScan] = useState<Record<string, string | null>>({});
+  const [showPartialGroups, setShowPartialGroups] = useState(false);
+  const [scanningGroups, setScanningGroups] = useState<Set<string>>(new Set());
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
   const [connErr, setConnErr] = useState(false);
@@ -105,6 +119,39 @@ export default function DangBaiPage() {
   }, [refresh]);
 
   const online = exts.filter(e => e.status === "online");
+  const selectedIds = useMemo(() => [...selected], [selected]);
+  const selectedOnline = useMemo(() => online.filter(e => selected.has(e.user_id)), [online, selected]);
+  const groupOptions = useMemo(
+    () => accountGroups.filter(g => showPartialGroups || g.all_selected),
+    [accountGroups, showPartialGroups]
+  );
+
+  const refreshAccountGroups = useCallback(async (ids = selectedIds) => {
+    if (ids.length === 0) {
+      setAccountGroups([]);
+      setGroupLastScan({});
+      return;
+    }
+    try {
+      const qs = encodeURIComponent(ids.join(","));
+      const d = await fbFetch(`/account-groups/summary?user_ids=${qs}`).then(r => r.json());
+      setAccountGroups(d.groups || []);
+      setGroupLastScan(d.last_scan || {});
+    } catch {
+      setAccountGroups([]);
+      setGroupLastScan({});
+    }
+  }, [selectedIds]);
+
+  useEffect(() => {
+    if (targetType !== "group") return;
+    refreshAccountGroups();
+  }, [targetType, selectedIds.join(","), refreshAccountGroups]);
+
+  useEffect(() => {
+    if (targetType !== "group" || !groupUrl) return;
+    if (!groupOptions.some(g => g.url === groupUrl)) setGroupUrl("");
+  }, [targetType, groupUrl, groupOptions]);
   
   const toggle = (uid: string) => {
     const next = new Set(selected);
@@ -112,6 +159,34 @@ export default function DangBaiPage() {
     else next.add(uid);
     setSelected(next);
   };
+
+  async function scanGroupsForSelected() {
+    const targets = selectedOnline.map(e => e.user_id);
+    if (targets.length === 0) return toast.error("Chọn tài khoản online trước khi quét group");
+    setScanningGroups(new Set(targets));
+    try {
+      const results = await Promise.all(targets.map(async uid => {
+        try {
+          const r = await fbFetch("/account-groups/scan", {
+            method: "POST",
+            headers: fbHeaders(),
+            body: JSON.stringify({ user_id: uid, force: true }),
+          });
+          const d = await r.json().catch(() => ({}));
+          return { uid, ok: r.ok, detail: d.detail };
+        } catch {
+          return { uid, ok: false, detail: "không kết nối được" };
+        }
+      }));
+      const ok = results.filter(x => x.ok).length;
+      const fail = results.filter(x => !x.ok);
+      if (ok > 0) toast.success(`Đã gửi lệnh quét group cho ${ok} tài khoản`);
+      if (fail.length > 0) toast.error(`Không quét được ${fail.length} tài khoản`);
+      setTimeout(() => refreshAccountGroups(targets), 3500);
+    } finally {
+      setScanningGroups(new Set());
+    }
+  }
 
   const shortFbId = (id: string) => {
     const raw = id.replace(/^fb_/, "");
@@ -140,6 +215,14 @@ export default function DangBaiPage() {
     if (selected.size === 0) return toast.error("Chưa chọn tài khoản nào");
     if (!content.trim() && mediaUrls.length === 0) return toast.error("Chưa nhập nội dung hoặc ảnh");
     if (targetType === "group" && !groupUrl) return toast.error("Chưa chọn group");
+    if (targetType === "group") {
+      const chosen = accountGroups.find(g => g.url === groupUrl);
+      if (!chosen) return toast.error("Group này chưa có trong cache của các tài khoản đã chọn");
+      if (!chosen.all_selected) {
+        const missing = selectedIds.length - chosen.account_count;
+        return toast.error(`Group này chỉ có ${chosen.account_count}/${selectedIds.length} tài khoản đã join, còn thiếu ${missing} tài khoản`);
+      }
+    }
     
     setSending(true);
     const results = await Promise.all([...selected].map(async uid => {
@@ -182,9 +265,6 @@ export default function DangBaiPage() {
     }
   }
 
-  // Tính phần trăm tiến độ KPI tuần
-  const percent = kpiTarget > 0 ? Math.min((kpiPosts.length / kpiTarget) * 100, 100) : 0;
-
   return (
     <div className="p-6 w-full max-w-7xl mx-auto space-y-6">
       {/* Header */}
@@ -216,27 +296,9 @@ export default function DangBaiPage() {
       )}
 
       {/* KPI Progress Bar */}
-      <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800/80 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-          <div>
-            <h2 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Tiến độ hoàn thành KPI đăng bài tuần này</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">KPI được tính dựa trên số lượng bài đăng thành công lưu nhận trong bảng fb_post_kpi</p>
-          </div>
-          <div className="flex items-baseline gap-1.5 shrink-0 bg-red-50 dark:bg-red-950/20 px-3.5 py-1.5 rounded-lg">
-            <span className="text-2xl font-black text-[#E3000F]">{kpiPosts.length}</span>
-            <span className="text-xs text-slate-500 dark:text-slate-400">/ {kpiTarget} bài đăng</span>
-            <span className="text-xs font-bold text-[#E3000F] ml-1.5">({Math.round(percent)}%)</span>
-          </div>
-        </div>
-        <div className="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-200/40 dark:border-slate-700/40">
-          <div 
-            className="h-full bg-gradient-to-r from-red-500 to-[#E3000F] rounded-full transition-all duration-700 relative overflow-hidden" 
-            style={{ width: `${percent}%` }}
-          >
-            <div className="absolute inset-0 bg-[linear-gradient(45deg,rgba(255,255,255,0.15)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.15)_50%,rgba(255,255,255,0.15)_75%,transparent_75%,transparent)] bg-[length:1rem_1rem] animate-[progress-bar-stripes_1s_linear_infinite]" />
-          </div>
-        </div>
-      </div>
+      {user?.email && (
+        <KpiProgressCard email={user.email} type="post" />
+      )}
 
       {/* Lịch sử gần đây */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 shadow-sm overflow-hidden">
@@ -320,15 +382,19 @@ export default function DangBaiPage() {
       {/* Modal Đăng Bài Seeding Mới */}
       {isPostModalOpen && (
         <div 
-          className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 transition-all"
+          className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 transition-all"
           onClick={() => setIsPostModalOpen(false)}
         >
           <div 
-            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-xl flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl w-[95vw] md:w-[600px] flex flex-col max-h-[90vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
+            <div 
+              className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-[36rem] flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
             {/* Modal Header */}
-            <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-55/40 dark:bg-slate-800/40">
+            <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/40 dark:bg-slate-800/40">
               <div className="flex items-center gap-2">
                 <div className="h-8 w-8 rounded-lg bg-red-50 dark:bg-red-950/30 flex items-center justify-center">
                   <MaterialIcon name="send" className="text-[#E3000F] text-base" />
@@ -429,22 +495,61 @@ export default function DangBaiPage() {
 
               {/* Nếu chọn đăng Group thì render dropdown */}
               {targetType === "group" && (
-                <div className="space-y-1.5 animate-in slide-in-from-top-1 duration-150">
-                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Chọn nhóm từ danh sách liên kết</label>
+                <div className="space-y-2 animate-in slide-in-from-top-1 duration-150">
+                  <div className="flex items-center justify-between gap-3">
+                    <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Chọn nhóm acc đã tham gia</label>
+                    <button
+                      type="button"
+                      onClick={scanGroupsForSelected}
+                      disabled={scanningGroups.size > 0 || selectedOnline.length === 0}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:border-[#E3000F]/40 hover:text-[#E3000F] disabled:opacity-50 disabled:hover:text-slate-700 transition"
+                    >
+                      {scanningGroups.size > 0 ? (
+                        <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <MaterialIcon name="sync" className="text-[14px]" />
+                      )}
+                      Quét group
+                    </button>
+                  </div>
                   <select 
                     value={groupUrl} 
                     onChange={ev => setGroupUrl(ev.target.value)} 
                     className="w-full border border-slate-200 dark:border-slate-750 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 transition"
                   >
-                    <option value="">-- Chọn từ danh sách Quản lý nhóm --</option>
-                    {groups.length === 0 && <option disabled value="">Chưa có group Facebook nào được cấu hình</option>}
-                    {groups.map(g => (
-                      <option key={g.id} value={g.url}>
-                        {g.name}{g.team ? ` - ${g.team}` : ""}{g.intent ? ` - ${g.intent}` : ""}
+                    <option value="">-- Chọn group mà các acc đã join --</option>
+                    {selectedIds.length === 0 && <option disabled value="">Chọn tài khoản trước</option>}
+                    {selectedIds.length > 0 && groupOptions.length === 0 && <option disabled value="">Chưa có group chung, bấm Quét group</option>}
+                    {groupOptions.map(g => (
+                      <option key={g.url || g.group_id} value={g.url}>
+                        {g.name} ({g.account_count}/{g.total_selected} acc)
                       </option>
                     ))}
                   </select>
-                  <p className="text-[10px] text-slate-400 mt-1">Danh sách được lấy tự động từ trang Quản lý nhóm. Lưu ý tài khoản seeding phải là thành viên của nhóm.</p>
+                  <div className="flex items-center justify-between gap-3 text-[10px] text-slate-400">
+                    <span>
+                      Mặc định chỉ hiện group chung của tất cả acc đã chọn. {groups.length > 0 ? `Danh sách Quản lý nhóm hiện có ${groups.length} group để đối chiếu.` : ""}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowPartialGroups(v => !v)}
+                      className="shrink-0 font-bold text-[#E3000F] hover:underline"
+                    >
+                      {showPartialGroups ? "Chỉ group chung" : "Hiện group thiếu acc"}
+                    </button>
+                  </div>
+                  {selectedIds.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedOnline.map(e => (
+                        <span key={e.user_id} className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-1 text-[10px] text-slate-500 dark:text-slate-400">
+                          {labelOf(e)}
+                          <span className="text-slate-400">
+                            {groupLastScan[e.user_id] ? new Date(groupLastScan[e.user_id] as string).toLocaleDateString("vi-VN") : "chưa quét"}
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -497,7 +602,7 @@ export default function DangBaiPage() {
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 bg-slate-55/40 dark:bg-slate-800/40">
+            <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 bg-slate-50/40 dark:bg-slate-800/40">
               <button 
                 onClick={() => setIsPostModalOpen(false)}
                 className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-350 rounded-xl hover:bg-slate-150 dark:hover:bg-slate-800 font-semibold text-xs transition"
