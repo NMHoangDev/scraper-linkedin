@@ -42,9 +42,24 @@ interface KpiPost {
   posted_at: string;
 }
 
+function accountGroupTargetId(group: AccountGroup) {
+  return (group.url || group.group_id || "").trim();
+}
+
+function accountGroupIdentity(group: AccountGroup) {
+  return (group.group_id || group.url || group.name || "").trim();
+}
+
+function accountGroupSelectionKey(uid: string, group: AccountGroup) {
+  const key = accountGroupIdentity(group);
+  return key ? `${uid}::${key}` : "";
+}
+
 export default function DangBaiPage() {
   const { user } = useAppAuth();
   const owner = user?.id || "";  // tài khoản Markee đang login = chủ sở hữu các acc FB
+  const userEmail = user?.email || "";
+  const userName = user?.name || "";
 
   const [exts, setExts] = useState<Ext[]>([]);
   const [groups, setGroups] = useState<Grp[]>([]);
@@ -53,12 +68,12 @@ export default function DangBaiPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [content, setContent] = useState("");
   const [targetType, setTargetType] = useState<"profile" | "group">("profile");
-  const [selectedGroupUrls, setSelectedGroupUrls] = useState<Set<string>>(new Set());
-  const [groupSelectionMode, setGroupSelectionMode] = useState<"common" | "available">("common");
+  const [selectedAccountGroupKeys, setSelectedAccountGroupKeys] = useState<Set<string>>(new Set());
   const [groupSearch, setGroupSearch] = useState("");
   const [accountGroups, setAccountGroups] = useState<AccountGroup[]>([]);
   const [groupLastScan, setGroupLastScan] = useState<Record<string, string | null>>({});
   const [scanningGroups, setScanningGroups] = useState<Set<string>>(new Set());
+  const [deletingAccountGroupKeys, setDeletingAccountGroupKeys] = useState<Set<string>>(new Set());
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
   const [connErr, setConnErr] = useState(false);
@@ -73,10 +88,10 @@ export default function DangBaiPage() {
       setExtInstalled(installed);
       if (installed) {
         const cfg = await getFbProvisionConfig();
-        await provisionExtension({ serverUrl: cfg.serverUrl, owner, apiKey: cfg.extensionApiKey, label: user?.name || user?.email || owner });
+        await provisionExtension({ serverUrl: cfg.serverUrl, owner, apiKey: cfg.extensionApiKey, label: userName || userEmail || owner });
       }
     })();
-  }, [owner, user?.email, user?.name]);
+  }, [owner, userEmail, userName]);
 
   const refresh = useCallback(async () => {
     if (!owner) return;
@@ -88,7 +103,7 @@ export default function DangBaiPage() {
         fetch("/api/all-platform/fb/post-kpi/list", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: user?.email || "", limit: 30 })
+          body: JSON.stringify({ email: userEmail, limit: 30 })
         }).then(r => r.json()).catch(() => ({ success: false, data: { posts: [], kpi_target: 0 } })),
       ]);
 
@@ -111,12 +126,15 @@ export default function DangBaiPage() {
       }
       setConnErr(false);
     } catch { setConnErr(true); }
-  }, [owner, user?.email]);
+  }, [owner, userEmail]);
 
   useEffect(() => {
-    refresh();
-    const t = setInterval(refresh, 5000);
-    return () => clearInterval(t);
+    const first = window.setTimeout(() => { void refresh(); }, 0);
+    const t = window.setInterval(() => { void refresh(); }, 5000);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(t);
+    };
   }, [refresh]);
 
   function shortFbId(id: string) {
@@ -140,40 +158,63 @@ export default function DangBaiPage() {
     () => selectedOnline.filter(e => !hasAccountGroupsFeature(e)),
     [selectedOnline, hasAccountGroupsFeature]
   );
-  const groupOptions = useMemo(
-    () => accountGroups
-      .filter(g => groupSelectionMode === "available" || g.all_selected)
-      .filter(g => {
-        const q = groupSearch.trim().toLowerCase();
-        if (!q) return true;
-        return (g.name || "").toLowerCase().includes(q) || (g.url || "").toLowerCase().includes(q);
-      }),
-    [accountGroups, groupSelectionMode, groupSearch]
-  );
-  const eligibleGroupKeys = useMemo(
-    () => new Set(accountGroups
-      .filter(g => groupSelectionMode === "available" || g.all_selected)
-      .map(g => g.url || g.group_id || "")
-      .filter(Boolean)),
-    [accountGroups, groupSelectionMode]
-  );
   const accountLabelMap = useMemo(() => {
     const map = new Map<string, string>();
     exts.forEach(e => map.set(e.user_id, labelOf(e)));
     return map;
   }, [exts]);
-  const selectedGroupList = useMemo(
-    () => accountGroups.filter(g => selectedGroupUrls.has(g.url || g.group_id || "")),
-    [accountGroups, selectedGroupUrls]
-  );
+  const accountGroupsByAccount = useMemo(() => {
+    const q = groupSearch.trim().toLowerCase();
+    const map = new Map<string, AccountGroup[]>();
+    selectedOnline.forEach(e => map.set(e.user_id, []));
+    accountGroups.forEach(group => {
+      const targetId = accountGroupTargetId(group);
+      if (!targetId) return;
+      if (q && !(group.name || "").toLowerCase().includes(q) && !(group.url || "").toLowerCase().includes(q) && !(group.group_id || "").toLowerCase().includes(q)) return;
+      group.accounts.forEach(uid => {
+        if (!selectedOnlineIds.has(uid)) return;
+        const list = map.get(uid);
+        if (list) list.push(group);
+      });
+    });
+    map.forEach((list, uid) => {
+      const deduped = new Map<string, AccountGroup>();
+      list.forEach(group => {
+        const key = accountGroupSelectionKey(uid, group);
+        if (key) deduped.set(key, group);
+      });
+      map.set(uid, [...deduped.values()].sort((a, b) => (a.name || "").localeCompare(b.name || "", "vi")));
+    });
+    return map;
+  }, [accountGroups, groupSearch, selectedOnline, selectedOnlineIds]);
+  const availableAccountGroupKeys = useMemo(() => {
+    const keys = new Set<string>();
+    accountGroups.forEach(group => {
+      if (!accountGroupTargetId(group)) return;
+      group.accounts.forEach(uid => {
+        if (!selectedOnlineIds.has(uid)) return;
+        const key = accountGroupSelectionKey(uid, group);
+        if (key) keys.add(key);
+      });
+    });
+    return keys;
+  }, [accountGroups, selectedOnlineIds]);
+  const visibleAccountGroupCount = useMemo(() => {
+    let total = 0;
+    accountGroupsByAccount.forEach(list => { total += list.length; });
+    return total;
+  }, [accountGroupsByAccount]);
+  const selectedAccountGroupCount = selectedAccountGroupKeys.size;
   const groupPostTargets = useMemo(() => {
     const seen = new Set<string>();
     const targets: Array<{ user_id: string; target_id: string; group_name: string }> = [];
-    selectedGroupList.forEach(group => {
-      const targetId = group.url || group.group_id || "";
+    accountGroups.forEach(group => {
+      const targetId = accountGroupTargetId(group);
       if (!targetId) return;
       group.accounts.forEach(uid => {
         if (!selectedOnlineIds.has(uid)) return;
+        const selectedKey = accountGroupSelectionKey(uid, group);
+        if (!selectedKey || !selectedAccountGroupKeys.has(selectedKey)) return;
         const key = `${uid}::${targetId}`;
         if (seen.has(key)) return;
         seen.add(key);
@@ -181,7 +222,7 @@ export default function DangBaiPage() {
       });
     });
     return targets;
-  }, [selectedGroupList, selectedOnlineIds]);
+  }, [accountGroups, selectedOnlineIds, selectedAccountGroupKeys]);
 
   const refreshAccountGroups = useCallback(async (ids?: string[]) => {
     const targetIds = ids ?? (selectedIdsKey ? selectedIdsKey.split(",") : []);
@@ -224,21 +265,26 @@ export default function DangBaiPage() {
 
   useEffect(() => {
     if (targetType !== "group") return;
-    refreshAccountGroups();
+    const t = window.setTimeout(() => { void refreshAccountGroups(); }, 0);
+    return () => window.clearTimeout(t);
   }, [targetType, selectedIdsKey, refreshAccountGroups]);
 
   useEffect(() => {
-    if (targetType !== "group" || selectedGroupUrls.size === 0) return;
-    setSelectedGroupUrls(prev => {
-      const next = new Set([...prev].filter(url => eligibleGroupKeys.has(url)));
-      return next.size === prev.size ? prev : next;
-    });
-  }, [targetType, selectedGroupUrls.size, eligibleGroupKeys]);
+    if (targetType !== "group" || selectedAccountGroupKeys.size === 0) return;
+    const t = window.setTimeout(() => {
+      setSelectedAccountGroupKeys(prev => {
+        const next = new Set([...prev].filter(key => availableAccountGroupKeys.has(key)));
+        if (next.size === prev.size && [...next].every(key => prev.has(key))) return prev;
+        return next;
+      });
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [targetType, selectedAccountGroupKeys.size, availableAccountGroupKeys]);
 
-  const toggleGroup = (group: AccountGroup) => {
-    const key = group.url || group.group_id || "";
+  const toggleAccountGroup = (uid: string, group: AccountGroup) => {
+    const key = accountGroupSelectionKey(uid, group);
     if (!key) return;
-    setSelectedGroupUrls(prev => {
+    setSelectedAccountGroupKeys(prev => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
@@ -246,9 +292,36 @@ export default function DangBaiPage() {
     });
   };
 
-  const selectVisibleGroups = () => {
-    setSelectedGroupUrls(new Set(groupOptions.map(g => g.url || g.group_id || "").filter(Boolean)));
+  const selectGroupsForAccount = (uid: string, list: AccountGroup[]) => {
+    setSelectedAccountGroupKeys(prev => {
+      const next = new Set(prev);
+      list.forEach(group => {
+        const key = accountGroupSelectionKey(uid, group);
+        if (key) next.add(key);
+      });
+      return next;
+    });
   };
+
+  const clearGroupsForAccount = (uid: string) => {
+    const prefix = `${uid}::`;
+    setSelectedAccountGroupKeys(prev => new Set([...prev].filter(key => !key.startsWith(prefix))));
+  };
+
+  const selectAllVisibleAccountGroups = () => {
+    setSelectedAccountGroupKeys(prev => {
+      const next = new Set(prev);
+      accountGroupsByAccount.forEach((list, uid) => {
+        list.forEach(group => {
+          const key = accountGroupSelectionKey(uid, group);
+          if (key) next.add(key);
+        });
+      });
+      return next;
+    });
+  };
+
+  const clearAllAccountGroups = () => setSelectedAccountGroupKeys(new Set());
   
   const toggle = (uid: string) => {
     const next = new Set(selected);
@@ -257,20 +330,22 @@ export default function DangBaiPage() {
     setSelected(next);
   };
 
-  async function scanGroupsForSelected() {
-    if (selectedOnline.length === 0) return toast.error("Chọn tài khoản online trước khi quét group");
-    if (selectedWithoutGroupScan.length > 0) {
-      const names = selectedWithoutGroupScan
+  async function scanGroupsForAccounts(accounts: Ext[]) {
+    const accountsToScan = accounts.filter(e => selectedOnlineIds.has(e.user_id));
+    if (accountsToScan.length === 0) return toast.error("Chọn tài khoản online trước khi quét group");
+    const withoutGroupScan = accountsToScan.filter(e => !hasAccountGroupsFeature(e));
+    if (withoutGroupScan.length > 0) {
+      const names = withoutGroupScan
         .map(e => `${labelOf(e)}${e.version ? ` (${e.version})` : ""}`)
         .slice(0, 3)
         .join(", ");
-      const more = selectedWithoutGroupScan.length > 3 ? ` +${selectedWithoutGroupScan.length - 3}` : "";
-      toast.error(`Có ${selectedWithoutGroupScan.length} tài khoản đang dùng extension cũ: ${names}${more}. Hãy tải/cập nhật Seeding Markee rồi reload extension`);
+      const more = withoutGroupScan.length > 3 ? ` +${withoutGroupScan.length - 3}` : "";
+      toast.error(`Có ${withoutGroupScan.length} tài khoản đang dùng extension cũ: ${names}${more}. Hãy tải/cập nhật Seeding Markee rồi reload extension`);
     }
-    const targets = selectedOnline.filter(hasAccountGroupsFeature).map(e => e.user_id);
+    const targets = accountsToScan.filter(hasAccountGroupsFeature).map(e => e.user_id);
     if (targets.length === 0) return;
     const beforeScan = { ...groupLastScan };
-    setScanningGroups(new Set(targets));
+    setScanningGroups(prev => new Set([...prev, ...targets]));
     try {
       const results = await Promise.all(targets.map(async uid => {
         try {
@@ -302,7 +377,46 @@ export default function DangBaiPage() {
         else toast.error("Chưa nhận được kết quả quét group, kiểm tra tab Facebook/extension rồi bấm quét lại");
       }
     } finally {
-      setScanningGroups(new Set());
+      setScanningGroups(prev => {
+        const next = new Set(prev);
+        targets.forEach(uid => next.delete(uid));
+        return next;
+      });
+    }
+  }
+
+  async function scanGroupsForSelected() {
+    return scanGroupsForAccounts(selectedOnline);
+  }
+
+  async function deleteAccountGroup(uid: string, group: AccountGroup) {
+    const groupKey = accountGroupIdentity(group);
+    const selectionKey = accountGroupSelectionKey(uid, group);
+    if (!groupKey || !selectionKey) return;
+    const ok = window.confirm(`Xóa group "${group.name || group.url || group.group_id}" khỏi cache của ${accountLabelMap.get(uid) || shortFbId(uid)}?`);
+    if (!ok) return;
+
+    setDeletingAccountGroupKeys(prev => new Set([...prev, selectionKey]));
+    try {
+      const params = new URLSearchParams({ user_id: uid, group_key: groupKey });
+      const r = await fbFetch(`/account-groups?${params.toString()}`, { method: "DELETE" });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || "Không xóa được group");
+      setSelectedAccountGroupKeys(prev => {
+        const next = new Set(prev);
+        next.delete(selectionKey);
+        return next;
+      });
+      await refreshAccountGroups();
+      toast.success("Đã xóa group khỏi cache tài khoản");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không xóa được group");
+    } finally {
+      setDeletingAccountGroupKeys(prev => {
+        const next = new Set(prev);
+        next.delete(selectionKey);
+        return next;
+      });
     }
   }
 
@@ -325,7 +439,7 @@ export default function DangBaiPage() {
       ? groupPostTargets.map(t => ({ user_id: t.user_id, target_type: "group" as const, target_id: t.target_id, group_name: t.group_name }))
       : selectedOnline.map(e => ({ user_id: e.user_id, target_type: "profile" as const, target_id: null as string | null, group_name: "" }));
     if (targetType === "group") {
-      if (selectedGroupUrls.size === 0) return toast.error("Chưa chọn group");
+      if (selectedAccountGroupKeys.size === 0) return toast.error("Chưa chọn group");
       if (jobs.length === 0) return toast.error("Các group đã chọn chưa có tài khoản online nào phù hợp");
     }
     
@@ -354,7 +468,7 @@ export default function DangBaiPage() {
       toast.success(`Đã gửi ${ok}/${jobs.length} lệnh đăng!`); 
       setContent(""); 
       setMediaUrls([]); 
-      setSelectedGroupUrls(new Set());
+      setSelectedAccountGroupKeys(new Set());
       setIsPostModalOpen(false);
     }
     else if (ok > 0) toast.error(`Gửi OK ${ok}, lỗi ${fail.length}: ${fail.map(f => f.uid).join(", ")}`);
@@ -408,8 +522,8 @@ export default function DangBaiPage() {
       )}
 
       {/* KPI Progress Bar */}
-      {user?.email && (
-        <KpiProgressCard email={user.email} type="post" />
+      {userEmail && (
+        <KpiProgressCard email={userEmail} type="post" />
       )}
 
       {/* Lịch sử gần đây */}
@@ -498,7 +612,7 @@ export default function DangBaiPage() {
           onClick={() => setIsPostModalOpen(false)}
         >
           <div 
-            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl w-[95vw] md:w-[600px] max-w-[36rem] flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl w-[95vw] md:w-[760px] max-w-[48rem] flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -601,19 +715,19 @@ export default function DangBaiPage() {
                 </div>
               </div>
 
-              {/* Nếu chọn đăng Group thì render danh sách group theo acc đã quét */}
+              {/* Nếu chọn đăng Group thì render danh sách group theo từng acc đã quét */}
               {targetType === "group" && (
                 <div className="space-y-3 animate-in slide-in-from-top-1 duration-150">
                   <div className="flex items-center justify-between gap-3">
-                    <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Chọn nhóm acc đã tham gia</label>
+                    <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Chọn group theo từng tài khoản</label>
                     <div className="flex items-center gap-2">
-                      {groupOptions.length > 0 && (
+                      {visibleAccountGroupCount > 0 && (
                         <button
                           type="button"
-                          onClick={selectedGroupUrls.size > 0 ? () => setSelectedGroupUrls(new Set()) : selectVisibleGroups}
+                          onClick={selectedAccountGroupCount > 0 ? clearAllAccountGroups : selectAllVisibleAccountGroups}
                           className="text-xs font-bold text-[#E3000F] hover:underline"
                         >
-                          {selectedGroupUrls.size > 0 ? "Bỏ chọn group" : "Chọn group đang hiện"}
+                          {selectedAccountGroupCount > 0 ? "Bỏ chọn group" : "Chọn group đang hiện"}
                         </button>
                       )}
                       <button
@@ -633,31 +747,6 @@ export default function DangBaiPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
-                    <button
-                      type="button"
-                      onClick={() => setGroupSelectionMode("common")}
-                      className={`py-2 text-xs font-bold rounded-lg transition-all ${
-                        groupSelectionMode === "common"
-                          ? "bg-white dark:bg-slate-700 text-[#E3000F] shadow-sm"
-                          : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-                      }`}
-                    >
-                      Group chung
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setGroupSelectionMode("available")}
-                      className={`py-2 text-xs font-bold rounded-lg transition-all ${
-                        groupSelectionMode === "available"
-                          ? "bg-white dark:bg-slate-700 text-[#E3000F] shadow-sm"
-                          : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-                      }`}
-                    >
-                      Theo acc đã join
-                    </button>
-                  </div>
-
                   <input
                     value={groupSearch}
                     onChange={ev => setGroupSearch(ev.target.value)}
@@ -665,86 +754,125 @@ export default function DangBaiPage() {
                     className="w-full border border-slate-200 dark:border-slate-750 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 transition"
                   />
 
-                  <div className="max-h-[220px] overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 divide-y divide-slate-100 dark:divide-slate-800">
+                  <div className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400">
+                    <span>{selectedOnline.length} acc online đã chọn</span>
+                    <span className="font-bold text-slate-700 dark:text-slate-200">{selectedAccountGroupCount} group · {groupPostTargets.length} lệnh đăng</span>
+                  </div>
+
+                  <div className="max-h-[360px] overflow-y-auto space-y-2 pr-1">
                     {selectedIds.length === 0 ? (
-                      <div className="p-4 text-xs text-slate-400">Chọn tài khoản trước.</div>
-                    ) : groupOptions.length === 0 ? (
-                      <div className="p-4 text-xs text-slate-400">
-                        {selectedWithoutGroupScan.length === selectedOnline.length && selectedOnline.length > 0
-                          ? "Các tài khoản đã chọn cần cập nhật extension Seeding Markee mới để quét group."
-                          : "Chưa có group phù hợp trong cache, bấm Quét group để cập nhật."}
-                      </div>
+                      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 text-xs text-slate-400">Chọn tài khoản trước.</div>
                     ) : (
-                      groupOptions.map(g => {
-                        const key = g.url || g.group_id || "";
-                        const checked = selectedGroupUrls.has(key);
-                        const joinedNames = g.accounts
-                          .filter(uid => selectedOnlineIds.has(uid))
-                          .map(uid => accountLabelMap.get(uid) || shortFbId(uid));
+                      selectedOnline.map(e => {
+                        const list = accountGroupsByAccount.get(e.user_id) || [];
+                        const canScanGroups = hasAccountGroupsFeature(e);
+                        const selectedInAccount = list.filter(g => selectedAccountGroupKeys.has(accountGroupSelectionKey(e.user_id, g))).length;
+                        const allVisibleSelected = list.length > 0 && selectedInAccount === list.length;
+                        const isScanning = scanningGroups.has(e.user_id);
                         return (
-                          <label
-                            key={key}
-                            className={`flex items-start gap-3 px-3 py-3 cursor-pointer transition ${
-                              checked ? "bg-red-50/70 dark:bg-red-950/10" : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => toggleGroup(g)}
-                              className="mt-0.5 h-4 w-4 accent-[#E3000F] shrink-0"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center justify-between gap-3">
-                                <span className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{g.name}</span>
-                                <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                                  g.all_selected
-                                    ? "bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-300 dark:border-emerald-900/30"
-                                    : "bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/20 dark:text-amber-300 dark:border-amber-900/30"
-                                }`}>
-                                  {g.account_count}/{g.total_selected} acc
-                                </span>
-                              </div>
-                              <div className="mt-0.5 text-[10px] text-slate-400 truncate">{g.url || g.group_id}</div>
-                              {joinedNames.length > 0 && (
-                                <div className="mt-1 text-[10px] text-slate-500 dark:text-slate-400 truncate">
-                                  {joinedNames.slice(0, 4).join(", ")}
-                                  {joinedNames.length > 4 ? ` +${joinedNames.length - 4}` : ""}
+                          <div key={e.user_id} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/30">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                                  <span className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{labelOf(e)}</span>
+                                  <span className="text-[10px] text-slate-400 shrink-0">{shortFbId(e.user_id)}</span>
                                 </div>
-                              )}
+                                <div className="mt-0.5 text-[10px] text-slate-400">
+                                  {canScanGroups
+                                    ? groupLastScan[e.user_id] ? `Quét gần nhất ${new Date(groupLastScan[e.user_id] as string).toLocaleDateString("vi-VN")}` : "Chưa quét group"
+                                    : `Cần cập nhật extension${e.version ? ` (${e.version})` : ""}`}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                {list.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => allVisibleSelected ? clearGroupsForAccount(e.user_id) : selectGroupsForAccount(e.user_id, list)}
+                                    className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 hover:border-[#E3000F]/40 hover:text-[#E3000F]"
+                                  >
+                                    {allVisibleSelected ? "Bỏ chọn" : "Chọn hết"}
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => scanGroupsForAccounts([e])}
+                                  disabled={!canScanGroups || isScanning}
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:border-[#E3000F]/40 hover:text-[#E3000F] disabled:opacity-50 transition"
+                                >
+                                  {isScanning ? (
+                                    <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                  ) : (
+                                    <MaterialIcon name="sync" className="text-[14px]" />
+                                  )}
+                                  Quét
+                                </button>
+                              </div>
                             </div>
-                          </label>
+
+                            {!canScanGroups ? (
+                              <div className="p-3 text-xs text-amber-700 dark:text-amber-300 bg-amber-50/70 dark:bg-amber-950/10">
+                                Tài khoản này đang dùng extension cũ nên chưa quét được group.
+                              </div>
+                            ) : list.length === 0 ? (
+                              <div className="p-3 text-xs text-slate-400">
+                                {groupSearch.trim() ? "Không có group khớp bộ lọc." : "Chưa có group trong cache."}
+                              </div>
+                            ) : (
+                              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                                {list.map(g => {
+                                  const selectionKey = accountGroupSelectionKey(e.user_id, g);
+                                  const checked = selectedAccountGroupKeys.has(selectionKey);
+                                  const deleting = deletingAccountGroupKeys.has(selectionKey);
+                                  return (
+                                    <div
+                                      key={selectionKey}
+                                      className={`flex items-start gap-2 px-3 py-2.5 transition ${
+                                        checked ? "bg-red-50/70 dark:bg-red-950/10" : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                                      }`}
+                                    >
+                                      <label className="flex items-start gap-3 min-w-0 flex-1 cursor-pointer">
+                                        <input
+                                          type="checkbox"
+                                          checked={checked}
+                                          onChange={() => toggleAccountGroup(e.user_id, g)}
+                                          className="mt-0.5 h-4 w-4 accent-[#E3000F] shrink-0"
+                                        />
+                                        <div className="min-w-0 flex-1">
+                                          <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{g.name}</div>
+                                          <div className="mt-0.5 text-[10px] text-slate-400 truncate">{g.url || g.group_id}</div>
+                                        </div>
+                                      </label>
+                                      <button
+                                        type="button"
+                                        onClick={() => deleteAccountGroup(e.user_id, g)}
+                                        disabled={deleting}
+                                        title="Xóa group khỏi cache tài khoản này"
+                                        className="h-7 w-7 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#E3000F] hover:bg-red-50 dark:hover:bg-red-950/20 disabled:opacity-50 shrink-0"
+                                      >
+                                        {deleting ? (
+                                          <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                        ) : (
+                                          <MaterialIcon name="delete" className="text-[16px]" />
+                                        )}
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
                         );
                       })
                     )}
                   </div>
 
                   <div className="flex items-center justify-between gap-3 text-[10px] text-slate-400">
-                    <span>
-                      {groupSelectionMode === "common"
-                        ? "Chỉ hiện group mà tất cả tài khoản đã chọn đều tham gia."
-                        : "Group thiếu acc vẫn chọn được; hệ thống chỉ gửi lệnh cho acc đã join group đó."}
-                      {groups.length > 0 ? ` Quản lý nhóm đang có ${groups.length} group để đối chiếu.` : ""}
-                    </span>
+                    <span>{groups.length > 0 ? `Thư viện đối chiếu: ${groups.length} group.` : "Cache group lấy từ extension."}</span>
                     <span className="shrink-0 font-bold text-slate-600 dark:text-slate-300">
                       {targetType === "group" ? `${groupPostTargets.length} lệnh đăng` : ""}
                     </span>
                   </div>
-
-                  {selectedIds.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedOnline.map(e => (
-                        <span key={e.user_id} className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-1 text-[10px] text-slate-500 dark:text-slate-400">
-                          {labelOf(e)}
-                          <span className="text-slate-400">
-                            {!hasAccountGroupsFeature(e)
-                              ? `cần cập nhật${e.version ? ` (${e.version})` : ""}`
-                              : groupLastScan[e.user_id] ? new Date(groupLastScan[e.user_id] as string).toLocaleDateString("vi-VN") : "chưa quét"}
-                          </span>
-                        </span>
-                      ))}
-                    </div>
-                  )}
                 </div>
               )}
 

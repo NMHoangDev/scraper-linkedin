@@ -344,6 +344,17 @@ async def fb_account_groups_sync(data: dict, request: Request, authorization: st
     return _json_response(status, payload)
 
 
+@router.delete("/account-groups")
+async def fb_account_group_delete(request: Request, authorization: str | None = Header(None)) -> JSONResponse:
+    user = _current_user(request, authorization)
+    uid = str(request.query_params.get("user_id") or "")
+    await _require_fb_account_scope(user, uid)
+    params = dict(request.query_params)
+    status, payload = await _markee_json("DELETE", "/account-groups", params=params)
+    _clear_markee_cache("/account-groups")
+    return _json_response(status, payload)
+
+
 @router.get("/jobs")
 async def fb_jobs(request: Request, authorization: str | None = Header(None)) -> JSONResponse:
     user = _current_user(request, authorization)
