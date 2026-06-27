@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PostFeed Crawler Extension",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Extension crawl bài viết từ Facebook groups theo lệnh từ app",
 
   "permissions": [

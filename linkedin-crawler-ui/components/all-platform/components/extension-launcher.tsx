@@ -50,10 +50,10 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
       const msg = event.data;
       if (!msg || typeof msg !== 'object') return;
 
-      if (msg.type === 'MARKEE_FB_EXTENSION_READY') {
+      if (msg.type === 'MARKEE_POST_FEED_READY' && msg.extension === 'fb-post-feed-crawler') {
         setExtensionReady(true);
       }
-      if (msg.type === 'MARKEE_FB_PONG' && msg.installed) {
+      if (msg.type === 'MARKEE_POST_FEED_PONG' && msg.extension === 'fb-post-feed-crawler' && msg.installed) {
         setExtensionReady(true);
         if (msg.isRunning) {
           setIsLaunching(true);
@@ -74,15 +74,15 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
           }
         }
       }
-      if (msg.type === 'CRAWL_STATUS') {
+      if (msg.type === 'MARKEE_POST_FEED_CRAWL_STATUS') {
         setLaunchLog((prev) => [...prev, `🔄 ${msg.message}`]);
-      } else if (msg.type === 'CRAWL_LOG') {
+      } else if (msg.type === 'MARKEE_POST_FEED_CRAWL_LOG') {
         const icon =
           msg.level === 'success' ? '✅' :
           msg.level === 'error' ? '❌' :
           msg.level === 'warn' ? '⚠️' : '📋';
         setLaunchLog((prev) => [...prev, `${icon} ${msg.message}`]);
-      } else if (msg.type === 'CRAWL_PROGRESS') {
+      } else if (msg.type === 'MARKEE_POST_FEED_CRAWL_PROGRESS') {
         setCrawlProgress((p) => ({
           ...p,
           groupIndex: msg.groupIndex !== undefined ? msg.groupIndex : p.groupIndex,
@@ -90,11 +90,11 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
           posts: msg.posts !== undefined ? msg.posts : p.posts,
           scrolls: msg.scrolls !== undefined ? msg.scrolls : p.scrolls,
         }));
-      } else if (msg.type === 'CRAWL_POST') {
+      } else if (msg.type === 'MARKEE_POST_FEED_CRAWL_POST') {
         setCrawlProgress((p) => ({ ...p, posts: msg.posts ?? p.posts + 1 }));
-      } else if (msg.type === 'CRAWL_SCROLL') {
+      } else if (msg.type === 'MARKEE_POST_FEED_CRAWL_SCROLL') {
         setCrawlProgress((p) => ({ ...p, scrolls: p.scrolls + 1 }));
-      } else if (msg.type === 'CRAWL_DONE') {
+      } else if (msg.type === 'MARKEE_POST_FEED_CRAWL_DONE') {
         setIsLaunching(false);
         setIsDone(true);
         setLaunchLog((prev) => [
@@ -102,7 +102,7 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
           `🎉 Hoàn tất! ${msg.totalPosts ?? 0} bài viết từ ${msg.totalGroups ?? 0} groups`,
         ]);
         onCompleteRef.current?.(msg.totalPosts ?? 0);
-      } else if (msg.type === 'CRAWL_COMPLETE') {
+      } else if (msg.type === 'MARKEE_POST_FEED_CRAWL_COMPLETE') {
         const posts = msg.posts ?? [];
         setCrawlProgress((p) => ({ ...p, posts: posts.length }));
         setScrapedGroups((prev) => [{ groupUrl: msg.groupUrl || msg.data?.groupUrl || '', posts, groupName: msg.groupName || msg.data?.groupName || 'Group' }, ...prev]);
@@ -111,10 +111,10 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
           lines.push(`✅ Group hoàn tất: ${posts.length} bài viết mới`);
           return lines;
         });
-      } else if (msg.type === 'CRAWL_ERROR') {
+      } else if (msg.type === 'MARKEE_POST_FEED_CRAWL_ERROR') {
         setLaunchLog((prev) => [...prev, `❌ Lỗi: ${msg.message}`]);
         setIsLaunching(false);
-      } else if (msg.type === 'LAUNCH_FROM_APP_RESULT') {
+      } else if (msg.type === 'MARKEE_POST_FEED_LAUNCH_RESULT') {
         if (msg.success) {
           setLaunchLog((prev) => [
             ...prev,
@@ -127,13 +127,13 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
           ]);
           setIsLaunching(false);
         }
-      } else if (msg.type === 'EXTENSION_INVALIDATED') {
+      } else if (msg.type === 'MARKEE_POST_FEED_INVALIDATED') {
         setLaunchLog((prev) => [
           ...prev,
           "🔄 Extension vừa được cập nhật. Đang tải lại trang web để kết nối lại...",
         ]);
         setTimeout(() => window.location.reload(), 1500);
-      } else if (msg.type === 'CRAWL_SAVED') {
+      } else if (msg.type === 'MARKEE_POST_FEED_CRAWL_SAVED') {
         const savedData = msg.data || msg;
         setCrawlProgress((p) => ({
           ...p,
@@ -295,7 +295,7 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
   // ── Ping extension on mount ────────────────────────────────────────────────
   useEffect(() => {
     const timer = setTimeout(() => {
-      window.postMessage({ type: 'MARKEE_FB_PING' }, '*');
+      window.postMessage({ type: 'MARKEE_POST_FEED_PING' }, '*');
     }, 500);
     return () => clearTimeout(timer);
   }, []);
@@ -355,7 +355,7 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
 
       window.postMessage(
         {
-          type: 'LAUNCH_FROM_APP',
+          type: 'MARKEE_POST_FEED_LAUNCH',
           data: {
             groups: extensionGroups,
             config: { 
@@ -389,7 +389,7 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
 
   // ── Stop crawl ────────────────────────────────────────────────────────────
   const handleStop = useCallback(() => {
-    window.postMessage({ type: 'STOP_CRAWL' }, '*');
+    window.postMessage({ type: 'MARKEE_POST_FEED_STOP' }, '*');
     setLaunchLog((prev) => [...prev, "⏹ Đã gửi lệnh dừng..."]);
     setIsLaunching(false);
   }, []);
@@ -414,8 +414,7 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
         </div>
         
         <div className="flex items-center gap-2">
-          <a href="https://drive.google.com/uc?export=download&id=1f8e3HQzcxICu9RMYpvYWGWvwV2Jn5VBJ" download
-            target="_blank" rel="noopener noreferrer"
+          <a href="/post-feed-extension.zip" download
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-violet-200 bg-violet-50 hover:bg-violet-100 text-violet-700 text-xs font-bold transition cursor-pointer">
             <span className="material-symbols-outlined text-[16px]">download</span>
             Tải Extension

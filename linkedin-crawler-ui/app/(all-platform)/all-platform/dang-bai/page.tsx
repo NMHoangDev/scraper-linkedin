@@ -18,7 +18,7 @@ import type { FacebookGroup } from "@/types/unified.types";
 import { toast } from "sonner";
 import { KpiProgressCard } from "@/components/all-platform/components/kpi-progress-card";
 
-interface Ext { user_id: string; owner?: string; label?: string; email?: string; note?: string; status: string; }
+interface Ext { user_id: string; owner?: string; label?: string; email?: string; note?: string; status: string; version?: string; features?: string[]; }
 interface FbSession { user_id: string; owner?: string; label?: string; email?: string; note?: string; }
 interface Grp { id: string; name: string; url: string; team?: string; intent?: string; }
 interface AccountGroup {
@@ -121,6 +121,11 @@ export default function DangBaiPage() {
   const online = exts.filter(e => e.status === "online");
   const selectedIds = useMemo(() => [...selected], [selected]);
   const selectedOnline = useMemo(() => online.filter(e => selected.has(e.user_id)), [online, selected]);
+  const hasAccountGroupsFeature = useCallback((e: Ext) => (e.features || []).includes("account_groups"), []);
+  const selectedWithoutGroupScan = useMemo(
+    () => selectedOnline.filter(e => !hasAccountGroupsFeature(e)),
+    [selectedOnline, hasAccountGroupsFeature]
+  );
   const groupOptions = useMemo(
     () => accountGroups.filter(g => showPartialGroups || g.all_selected),
     [accountGroups, showPartialGroups]
@@ -137,11 +142,32 @@ export default function DangBaiPage() {
       const d = await fbFetch(`/account-groups/summary?user_ids=${qs}`).then(r => r.json());
       setAccountGroups(d.groups || []);
       setGroupLastScan(d.last_scan || {});
+      return d;
     } catch {
       setAccountGroups([]);
       setGroupLastScan({});
+      return null;
     }
   }, [selectedIds]);
+
+  const waitForGroupScan = useCallback(async (ids: string[], before: Record<string, string | null>) => {
+    const isDone = (lastScan: Record<string, string | null>) => ids.every(uid => {
+      const next = lastScan[uid];
+      if (!next) return false;
+      const prev = before[uid];
+      if (!prev) return true;
+      return Date.parse(next) > Date.parse(prev);
+    });
+
+    const deadline = Date.now() + 60000;
+    while (Date.now() < deadline) {
+      const d = await refreshAccountGroups(ids);
+      if (d?.last_scan && isDone(d.last_scan)) return true;
+      await new Promise(resolve => setTimeout(resolve, 2500));
+    }
+    await refreshAccountGroups(ids);
+    return false;
+  }, [refreshAccountGroups]);
 
   useEffect(() => {
     if (targetType !== "group") return;
@@ -161,8 +187,13 @@ export default function DangBaiPage() {
   };
 
   async function scanGroupsForSelected() {
-    const targets = selectedOnline.map(e => e.user_id);
-    if (targets.length === 0) return toast.error("Chọn tài khoản online trước khi quét group");
+    if (selectedOnline.length === 0) return toast.error("Chọn tài khoản online trước khi quét group");
+    if (selectedWithoutGroupScan.length > 0) {
+      toast.error(`Có ${selectedWithoutGroupScan.length} tài khoản đang dùng extension cũ, hãy tải/cập nhật Seeding Markee rồi reload extension`);
+    }
+    const targets = selectedOnline.filter(hasAccountGroupsFeature).map(e => e.user_id);
+    if (targets.length === 0) return;
+    const beforeScan = { ...groupLastScan };
     setScanningGroups(new Set(targets));
     try {
       const results = await Promise.all(targets.map(async uid => {
@@ -182,7 +213,11 @@ export default function DangBaiPage() {
       const fail = results.filter(x => !x.ok);
       if (ok > 0) toast.success(`Đã gửi lệnh quét group cho ${ok} tài khoản`);
       if (fail.length > 0) toast.error(`Không quét được ${fail.length} tài khoản`);
-      setTimeout(() => refreshAccountGroups(targets), 3500);
+      if (ok > 0) {
+        const done = await waitForGroupScan(results.filter(x => x.ok).map(x => x.uid), beforeScan);
+        if (done) toast.success("Đã cập nhật danh sách group");
+        else toast.error("Chưa nhận được kết quả quét group, kiểm tra tab Facebook/extension rồi bấm quét lại");
+      }
     } finally {
       setScanningGroups(new Set());
     }
@@ -497,7 +532,8 @@ export default function DangBaiPage() {
                     <button
                       type="button"
                       onClick={scanGroupsForSelected}
-                      disabled={scanningGroups.size > 0 || selectedOnline.length === 0}
+                      disabled={scanningGroups.size > 0 || selectedOnline.length === 0 || selectedWithoutGroupScan.length === selectedOnline.length}
+                      title={selectedWithoutGroupScan.length > 0 ? "Một số tài khoản cần cập nhật extension Seeding Markee mới để quét group" : undefined}
                       className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:border-[#E3000F]/40 hover:text-[#E3000F] disabled:opacity-50 disabled:hover:text-slate-700 transition"
                     >
                       {scanningGroups.size > 0 ? (
@@ -515,7 +551,13 @@ export default function DangBaiPage() {
                   >
                     <option value="">-- Chọn group mà các acc đã join --</option>
                     {selectedIds.length === 0 && <option disabled value="">Chọn tài khoản trước</option>}
-                    {selectedIds.length > 0 && groupOptions.length === 0 && <option disabled value="">Chưa có group chung, bấm Quét group</option>}
+                    {selectedIds.length > 0 && groupOptions.length === 0 && (
+                      <option disabled value="">
+                        {selectedWithoutGroupScan.length === selectedOnline.length && selectedOnline.length > 0
+                          ? "Cập nhật extension Seeding Markee mới để quét group"
+                          : "Chưa có group chung, bấm Quét group"}
+                      </option>
+                    )}
                     {groupOptions.map(g => (
                       <option key={g.url || g.group_id} value={g.url}>
                         {g.name} ({g.account_count}/{g.total_selected} acc)
@@ -540,7 +582,9 @@ export default function DangBaiPage() {
                         <span key={e.user_id} className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-1 text-[10px] text-slate-500 dark:text-slate-400">
                           {labelOf(e)}
                           <span className="text-slate-400">
-                            {groupLastScan[e.user_id] ? new Date(groupLastScan[e.user_id] as string).toLocaleDateString("vi-VN") : "chưa quét"}
+                            {!hasAccountGroupsFeature(e)
+                              ? `cần cập nhật${e.version ? ` (${e.version})` : ""}`
+                              : groupLastScan[e.user_id] ? new Date(groupLastScan[e.user_id] as string).toLocaleDateString("vi-VN") : "chưa quét"}
                           </span>
                         </span>
                       ))}

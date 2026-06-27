@@ -21,6 +21,9 @@ export interface ExtProvisionConfig {
 
 interface ExtBridgeMessage {
   type?: string;
+  extension?: string;
+  version?: string;
+  features?: string[];
   success?: boolean;
   error?: string;
   data?: unknown;
@@ -52,23 +55,23 @@ export function provisionExtension(cfg: ExtProvisionConfig): Promise<{ success: 
   });
 }
 
-/** Kiểm tra extension đã cài + đang kết nối chưa. */
-export function pingExtension(): Promise<{ installed: boolean; connected: boolean }> {
+/** Kiểm tra đúng extension Seeding Markee đã cài + đang kết nối chưa. */
+export function pingExtension(): Promise<{ installed: boolean; connected: boolean; version?: string; features: string[] }> {
   return new Promise((resolve) => {
     let done = false;
     const onMsg = (e: MessageEvent) => {
       if (e.source !== window) return;
       const d = e.data as ExtBridgeMessage;
-      if (d && d.type === 'MARKEE_FB_PONG') {
+      if (d && d.type === 'MARKEE_FB_PONG' && d.extension === 'seeding-markee') {
         done = true;
         window.removeEventListener('message', onMsg);
-        resolve({ installed: !!d.installed, connected: !!d.connected });
+        resolve({ installed: !!d.installed, connected: !!d.connected, version: d.version, features: d.features || [] });
       }
     };
     window.addEventListener('message', onMsg);
     window.postMessage({ type: 'MARKEE_FB_PING' }, '*');
     setTimeout(() => {
-      if (!done) { window.removeEventListener('message', onMsg); resolve({ installed: false, connected: false }); }
+      if (!done) { window.removeEventListener('message', onMsg); resolve({ installed: false, connected: false, features: [] }); }
     }, 3000);
   });
 }
