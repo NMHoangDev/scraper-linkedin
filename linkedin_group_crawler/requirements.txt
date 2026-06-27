@@ -24,3 +24,4 @@ supabase>=2.0.0
 bcrypt
 python-jose[cryptography]
 loguru
+asyncssh

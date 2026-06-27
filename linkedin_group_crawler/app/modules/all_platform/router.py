@@ -68,6 +68,12 @@ all_platform_router.include_router(
     tags=["All-Platform Facebook VPS"],
 )
 
+from app.modules.facebook.src.modules.crawl_fb.router.vps import router as vps_vnc_router
+all_platform_router.include_router(
+    vps_vnc_router,
+    tags=["All-Platform Facebook VPS VNC"],
+)
+
 # ── LinkedIn ───────────────────────────────────────────────────────────────────
 all_platform_router.include_router(
     seeding_router,
