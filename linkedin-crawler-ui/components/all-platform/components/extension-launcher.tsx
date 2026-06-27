@@ -1,6 +1,11 @@
 "use client";
 
-declare const chrome: typeof window.chrome & { runtime?: { onMessage?: { addListener: (fn: (msg: any) => void) => void; removeListener: (fn: (msg: any) => void) => void } } };
+declare global {
+  interface Window {
+    chrome: any;
+  }
+}
+declare const chrome: any;
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
