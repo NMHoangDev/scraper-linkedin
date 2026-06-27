@@ -60,7 +60,9 @@ async def lifespan(_: FastAPI):
     if _os.getenv("DISABLE_SCHEDULER", "").strip() in ("1", "true", "True"):
         logger.warning("DISABLE_SCHEDULER enabled -> not starting scheduler.")
     else:
-        setup_all_platform_jobs()
+        # TODO: Re-enable when needed
+        # setup_all_platform_jobs()
+        logger.warning("24h crawl scheduler DISABLED - comment this block to re-enable")
     async def _warmup_background() -> None:
         try:
             await asyncio.to_thread(warmup_playwright_pool)

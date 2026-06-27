@@ -100,16 +100,38 @@ async def vnc_proxy(websocket: WebSocket, vps_id: str):
         vps_port = vps_info.get("port")
         target_ports = [vps_port] if vps_port else [5900, 5901]
         
+        logger.info(f"[VNC] Connecting to VPS {vps_id} at {vps_ip}:{target_ports}")
+        
         reader, writer = None, None
         connected = False
 
         for port in target_ports:
             try:
-                reader, writer = await asyncio.open_connection(vps_ip, port)
-                connected = True
-                break
+                logger.info(f"[VNC] Trying port {port}...")
+                
+                # Sử dụng create_connection với retry cho Windows
+                for attempt in range(3):
+                    try:
+                        reader, writer = await asyncio.wait_for(
+                            asyncio.open_connection(vps_ip, port),
+                            timeout=5.0
+                        )
+                        connected = True
+                        logger.info(f"[VNC] Connected successfully on port {port}")
+                        break
+                    except OSError as e:
+                        if e.winerror == 10035 and attempt < 2:  # Retry on Windows non-blocking error
+                            logger.warning(f"[VNC] Windows non-blocking error, retrying ({attempt + 1}/3)...")
+                            await asyncio.sleep(1)
+                            continue
+                        raise
+                
+                if connected:
+                    break
+            except asyncio.TimeoutError:
+                logger.warning(f"[VNC] Timeout connecting to port {port} at {vps_ip}")
             except Exception as e:
-                logger.warning(f"Không thể kết nối port {port} tại {vps_ip} - Thử port tiếp theo nếu có... ({e})")
+                logger.warning(f"[VNC] Failed port {port}: {type(e).__name__}: {e}")
                 
         if not connected or not reader or not writer:
             logger.error(f"Không thể kết nối TCP tới VNC server tại {vps_ip} (các cổng: {target_ports})")
