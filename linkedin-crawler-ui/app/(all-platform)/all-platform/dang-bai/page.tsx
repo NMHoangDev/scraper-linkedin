@@ -199,25 +199,23 @@ export default function DangBaiPage() {
     });
     return keys;
   }, [accountGroups, selectedOnlineIds]);
-  const visibleAccountGroupCount = useMemo(() => {
-    let total = 0;
-    accountGroupsByAccount.forEach(list => { total += list.length; });
-    return total;
-  }, [accountGroupsByAccount]);
   const selectedAccountGroupCount = selectedAccountGroupKeys.size;
   const groupPostTargets = useMemo(() => {
     const seen = new Set<string>();
+    const usedUsers = new Set<string>();
     const targets: Array<{ user_id: string; target_id: string; group_name: string }> = [];
     accountGroups.forEach(group => {
       const targetId = accountGroupTargetId(group);
       if (!targetId) return;
       group.accounts.forEach(uid => {
         if (!selectedOnlineIds.has(uid)) return;
+        if (usedUsers.has(uid)) return;
         const selectedKey = accountGroupSelectionKey(uid, group);
         if (!selectedKey || !selectedAccountGroupKeys.has(selectedKey)) return;
         const key = `${uid}::${targetId}`;
         if (seen.has(key)) return;
         seen.add(key);
+        usedUsers.add(uid);
         targets.push({ user_id: uid, target_id: targetId, group_name: group.name || targetId });
       });
     });
@@ -284,21 +282,11 @@ export default function DangBaiPage() {
   const toggleAccountGroup = (uid: string, group: AccountGroup) => {
     const key = accountGroupSelectionKey(uid, group);
     if (!key) return;
+    const prefix = `${uid}::`;
     setSelectedAccountGroupKeys(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
-
-  const selectGroupsForAccount = (uid: string, list: AccountGroup[]) => {
-    setSelectedAccountGroupKeys(prev => {
-      const next = new Set(prev);
-      list.forEach(group => {
-        const key = accountGroupSelectionKey(uid, group);
-        if (key) next.add(key);
-      });
+      const wasSelected = prev.has(key);
+      const next = new Set([...prev].filter(item => !item.startsWith(prefix)));
+      if (!wasSelected) next.add(key);
       return next;
     });
   };
@@ -306,19 +294,6 @@ export default function DangBaiPage() {
   const clearGroupsForAccount = (uid: string) => {
     const prefix = `${uid}::`;
     setSelectedAccountGroupKeys(prev => new Set([...prev].filter(key => !key.startsWith(prefix))));
-  };
-
-  const selectAllVisibleAccountGroups = () => {
-    setSelectedAccountGroupKeys(prev => {
-      const next = new Set(prev);
-      accountGroupsByAccount.forEach((list, uid) => {
-        list.forEach(group => {
-          const key = accountGroupSelectionKey(uid, group);
-          if (key) next.add(key);
-        });
-      });
-      return next;
-    });
   };
 
   const clearAllAccountGroups = () => setSelectedAccountGroupKeys(new Set());
@@ -721,13 +696,16 @@ export default function DangBaiPage() {
                   <div className="flex items-center justify-between gap-3">
                     <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Chọn group theo từng tài khoản</label>
                     <div className="flex items-center gap-2">
-                      {visibleAccountGroupCount > 0 && (
+                      <span className="hidden sm:inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-1 text-[10px] font-bold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                        Tối đa 1 group/acc
+                      </span>
+                      {selectedAccountGroupCount > 0 && (
                         <button
                           type="button"
-                          onClick={selectedAccountGroupCount > 0 ? clearAllAccountGroups : selectAllVisibleAccountGroups}
+                          onClick={clearAllAccountGroups}
                           className="text-xs font-bold text-[#E3000F] hover:underline"
                         >
-                          {selectedAccountGroupCount > 0 ? "Bỏ chọn group" : "Chọn group đang hiện"}
+                          Bỏ chọn group
                         </button>
                       )}
                       <button
@@ -756,7 +734,7 @@ export default function DangBaiPage() {
 
                   <div className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400">
                     <span>{selectedOnline.length} acc online đã chọn</span>
-                    <span className="font-bold text-slate-700 dark:text-slate-200">{selectedAccountGroupCount} group · {groupPostTargets.length} lệnh đăng</span>
+                    <span className="font-bold text-slate-700 dark:text-slate-200">{groupPostTargets.length} group · {groupPostTargets.length} lệnh đăng</span>
                   </div>
 
                   <div className="max-h-[360px] overflow-y-auto space-y-2 pr-1">
@@ -767,7 +745,6 @@ export default function DangBaiPage() {
                         const list = accountGroupsByAccount.get(e.user_id) || [];
                         const canScanGroups = hasAccountGroupsFeature(e);
                         const selectedInAccount = list.filter(g => selectedAccountGroupKeys.has(accountGroupSelectionKey(e.user_id, g))).length;
-                        const allVisibleSelected = list.length > 0 && selectedInAccount === list.length;
                         const isScanning = scanningGroups.has(e.user_id);
                         return (
                           <div key={e.user_id} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
@@ -785,13 +762,13 @@ export default function DangBaiPage() {
                                 </div>
                               </div>
                               <div className="flex items-center gap-2 shrink-0">
-                                {list.length > 0 && (
+                                {selectedInAccount > 0 && (
                                   <button
                                     type="button"
-                                    onClick={() => allVisibleSelected ? clearGroupsForAccount(e.user_id) : selectGroupsForAccount(e.user_id, list)}
+                                    onClick={() => clearGroupsForAccount(e.user_id)}
                                     className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 hover:border-[#E3000F]/40 hover:text-[#E3000F]"
                                   >
-                                    {allVisibleSelected ? "Bỏ chọn" : "Chọn hết"}
+                                    Bỏ chọn
                                   </button>
                                 )}
                                 <button
@@ -833,7 +810,8 @@ export default function DangBaiPage() {
                                     >
                                       <label className="flex items-start gap-3 min-w-0 flex-1 cursor-pointer">
                                         <input
-                                          type="checkbox"
+                                          type="radio"
+                                          name={`group-${e.user_id}`}
                                           checked={checked}
                                           onChange={() => toggleAccountGroup(e.user_id, g)}
                                           className="mt-0.5 h-4 w-4 accent-[#E3000F] shrink-0"
