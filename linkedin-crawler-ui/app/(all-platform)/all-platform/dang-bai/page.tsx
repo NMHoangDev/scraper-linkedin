@@ -53,10 +53,11 @@ export default function DangBaiPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [content, setContent] = useState("");
   const [targetType, setTargetType] = useState<"profile" | "group">("profile");
-  const [groupUrl, setGroupUrl] = useState("");
+  const [selectedGroupUrls, setSelectedGroupUrls] = useState<Set<string>>(new Set());
+  const [groupSelectionMode, setGroupSelectionMode] = useState<"common" | "available">("common");
+  const [groupSearch, setGroupSearch] = useState("");
   const [accountGroups, setAccountGroups] = useState<AccountGroup[]>([]);
   const [groupLastScan, setGroupLastScan] = useState<Record<string, string | null>>({});
-  const [showPartialGroups, setShowPartialGroups] = useState(false);
   const [scanningGroups, setScanningGroups] = useState<Set<string>>(new Set());
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
@@ -118,18 +119,68 @@ export default function DangBaiPage() {
     return () => clearInterval(t);
   }, [refresh]);
 
+  function shortFbId(id: string) {
+    const raw = id.replace(/^fb_/, "");
+    return raw.length > 10 ? `fb ${raw.slice(0, 4)}...${raw.slice(-4)}` : id;
+  }
+
+  function labelOf(e: Ext) {
+    const explicit = (e.label || "").trim();
+    if (explicit && explicit !== e.user_id) return explicit;
+    return e.email || "Tài khoản Facebook";
+  }
+
   const online = exts.filter(e => e.status === "online");
-  const selectedIds = useMemo(() => [...selected], [selected]);
   const selectedOnline = useMemo(() => online.filter(e => selected.has(e.user_id)), [online, selected]);
+  const selectedIds = useMemo(() => selectedOnline.map(e => e.user_id), [selectedOnline]);
+  const selectedOnlineIds = useMemo(() => new Set(selectedOnline.map(e => e.user_id)), [selectedOnline]);
   const hasAccountGroupsFeature = useCallback((e: Ext) => (e.features || []).includes("account_groups"), []);
   const selectedWithoutGroupScan = useMemo(
     () => selectedOnline.filter(e => !hasAccountGroupsFeature(e)),
     [selectedOnline, hasAccountGroupsFeature]
   );
   const groupOptions = useMemo(
-    () => accountGroups.filter(g => showPartialGroups || g.all_selected),
-    [accountGroups, showPartialGroups]
+    () => accountGroups
+      .filter(g => groupSelectionMode === "available" || g.all_selected)
+      .filter(g => {
+        const q = groupSearch.trim().toLowerCase();
+        if (!q) return true;
+        return (g.name || "").toLowerCase().includes(q) || (g.url || "").toLowerCase().includes(q);
+      }),
+    [accountGroups, groupSelectionMode, groupSearch]
   );
+  const eligibleGroupKeys = useMemo(
+    () => new Set(accountGroups
+      .filter(g => groupSelectionMode === "available" || g.all_selected)
+      .map(g => g.url || g.group_id || "")
+      .filter(Boolean)),
+    [accountGroups, groupSelectionMode]
+  );
+  const accountLabelMap = useMemo(() => {
+    const map = new Map<string, string>();
+    exts.forEach(e => map.set(e.user_id, labelOf(e)));
+    return map;
+  }, [exts]);
+  const selectedGroupList = useMemo(
+    () => accountGroups.filter(g => selectedGroupUrls.has(g.url || g.group_id || "")),
+    [accountGroups, selectedGroupUrls]
+  );
+  const groupPostTargets = useMemo(() => {
+    const seen = new Set<string>();
+    const targets: Array<{ user_id: string; target_id: string; group_name: string }> = [];
+    selectedGroupList.forEach(group => {
+      const targetId = group.url || group.group_id || "";
+      if (!targetId) return;
+      group.accounts.forEach(uid => {
+        if (!selectedOnlineIds.has(uid)) return;
+        const key = `${uid}::${targetId}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        targets.push({ user_id: uid, target_id: targetId, group_name: group.name || targetId });
+      });
+    });
+    return targets;
+  }, [selectedGroupList, selectedOnlineIds]);
 
   const refreshAccountGroups = useCallback(async (ids = selectedIds) => {
     if (ids.length === 0) {
@@ -175,9 +226,27 @@ export default function DangBaiPage() {
   }, [targetType, selectedIds.join(","), refreshAccountGroups]);
 
   useEffect(() => {
-    if (targetType !== "group" || !groupUrl) return;
-    if (!groupOptions.some(g => g.url === groupUrl)) setGroupUrl("");
-  }, [targetType, groupUrl, groupOptions]);
+    if (targetType !== "group" || selectedGroupUrls.size === 0) return;
+    setSelectedGroupUrls(prev => {
+      const next = new Set([...prev].filter(url => eligibleGroupKeys.has(url)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [targetType, selectedGroupUrls.size, eligibleGroupKeys]);
+
+  const toggleGroup = (group: AccountGroup) => {
+    const key = group.url || group.group_id || "";
+    if (!key) return;
+    setSelectedGroupUrls(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const selectVisibleGroups = () => {
+    setSelectedGroupUrls(new Set(groupOptions.map(g => g.url || g.group_id || "").filter(Boolean)));
+  };
   
   const toggle = (uid: string) => {
     const next = new Set(selected);
@@ -223,17 +292,6 @@ export default function DangBaiPage() {
     }
   }
 
-  const shortFbId = (id: string) => {
-    const raw = id.replace(/^fb_/, "");
-    return raw.length > 10 ? `fb ${raw.slice(0, 4)}...${raw.slice(-4)}` : id;
-  };
-
-  const labelOf = (e: Ext) => {
-    const explicit = (e.label || "").trim();
-    if (explicit && explicit !== e.user_id) return explicit;
-    return e.email || "Tài khoản Facebook";
-  };
-
   async function renameAcc(uid: string, current: string) {
     const name = window.prompt("Đặt tên cho tài khoản này:", current);
     if (!name || !name.trim()) return;
@@ -247,37 +305,42 @@ export default function DangBaiPage() {
   }
 
   async function submit() {
-    if (selected.size === 0) return toast.error("Chưa chọn tài khoản nào");
+    if (selectedOnline.length === 0) return toast.error("Chưa chọn tài khoản online nào");
     if (!content.trim() && mediaUrls.length === 0) return toast.error("Chưa nhập nội dung hoặc ảnh");
-    if (targetType === "group" && !groupUrl) return toast.error("Chưa chọn group");
+    const jobs = targetType === "group"
+      ? groupPostTargets.map(t => ({ user_id: t.user_id, target_type: "group" as const, target_id: t.target_id, group_name: t.group_name }))
+      : selectedOnline.map(e => ({ user_id: e.user_id, target_type: "profile" as const, target_id: null as string | null, group_name: "" }));
     if (targetType === "group") {
-      const chosen = accountGroups.find(g => g.url === groupUrl);
-      if (!chosen) return toast.error("Group này chưa có trong cache của các tài khoản đã chọn");
-      if (!chosen.all_selected) {
-        const missing = selectedIds.length - chosen.account_count;
-        return toast.error(`Group này chỉ có ${chosen.account_count}/${selectedIds.length} tài khoản đã join, còn thiếu ${missing} tài khoản`);
-      }
+      if (selectedGroupUrls.size === 0) return toast.error("Chưa chọn group");
+      if (jobs.length === 0) return toast.error("Các group đã chọn chưa có tài khoản online nào phù hợp");
     }
     
     setSending(true);
-    const results = await Promise.all([...selected].map(async uid => {
+    const results = await Promise.all(jobs.map(async job => {
       try {
         const r = await fbFetch("/post", {
           method: "POST", headers: fbHeaders(),
-          body: JSON.stringify({ user_id: uid, content, media_urls: mediaUrls, target_type: targetType, target_id: groupUrl || null }),
+          body: JSON.stringify({
+            user_id: job.user_id,
+            content,
+            media_urls: mediaUrls,
+            target_type: job.target_type,
+            target_id: job.target_id,
+          }),
         });
         const d = await r.json().catch(() => ({}));
-        return { uid, ok: r.ok, detail: d.detail };
-      } catch { return { uid, ok: false, detail: "không kết nối được" }; }
+        return { uid: job.user_id, group: job.group_name, ok: r.ok, detail: d.detail };
+      } catch { return { uid: job.user_id, group: job.group_name, ok: false, detail: "không kết nối được" }; }
     }));
     
     const ok = results.filter(x => x.ok).length;
     const fail = results.filter(x => !x.ok);
     
     if (fail.length === 0) { 
-      toast.success(`Đã gửi lệnh đăng cho ${ok} tài khoản!`); 
+      toast.success(`Đã gửi ${ok}/${jobs.length} lệnh đăng!`); 
       setContent(""); 
       setMediaUrls([]); 
+      setSelectedGroupUrls(new Set());
       setIsPostModalOpen(false);
     }
     else if (ok > 0) toast.error(`Gửi OK ${ok}, lỗi ${fail.length}: ${fail.map(f => f.uid).join(", ")}`);
@@ -524,58 +587,136 @@ export default function DangBaiPage() {
                 </div>
               </div>
 
-              {/* Nếu chọn đăng Group thì render dropdown */}
+              {/* Nếu chọn đăng Group thì render danh sách group theo acc đã quét */}
               {targetType === "group" && (
-                <div className="space-y-2 animate-in slide-in-from-top-1 duration-150">
+                <div className="space-y-3 animate-in slide-in-from-top-1 duration-150">
                   <div className="flex items-center justify-between gap-3">
                     <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Chọn nhóm acc đã tham gia</label>
+                    <div className="flex items-center gap-2">
+                      {groupOptions.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={selectedGroupUrls.size > 0 ? () => setSelectedGroupUrls(new Set()) : selectVisibleGroups}
+                          className="text-xs font-bold text-[#E3000F] hover:underline"
+                        >
+                          {selectedGroupUrls.size > 0 ? "Bỏ chọn group" : "Chọn group đang hiện"}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={scanGroupsForSelected}
+                        disabled={scanningGroups.size > 0 || selectedOnline.length === 0 || selectedWithoutGroupScan.length === selectedOnline.length}
+                        title={selectedWithoutGroupScan.length > 0 ? "Một số tài khoản cần cập nhật extension Seeding Markee mới để quét group" : undefined}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:border-[#E3000F]/40 hover:text-[#E3000F] disabled:opacity-50 disabled:hover:text-slate-700 transition"
+                      >
+                        {scanningGroups.size > 0 ? (
+                          <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <MaterialIcon name="sync" className="text-[14px]" />
+                        )}
+                        Quét group
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
                     <button
                       type="button"
-                      onClick={scanGroupsForSelected}
-                      disabled={scanningGroups.size > 0 || selectedOnline.length === 0 || selectedWithoutGroupScan.length === selectedOnline.length}
-                      title={selectedWithoutGroupScan.length > 0 ? "Một số tài khoản cần cập nhật extension Seeding Markee mới để quét group" : undefined}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:border-[#E3000F]/40 hover:text-[#E3000F] disabled:opacity-50 disabled:hover:text-slate-700 transition"
+                      onClick={() => setGroupSelectionMode("common")}
+                      className={`py-2 text-xs font-bold rounded-lg transition-all ${
+                        groupSelectionMode === "common"
+                          ? "bg-white dark:bg-slate-700 text-[#E3000F] shadow-sm"
+                          : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                      }`}
                     >
-                      {scanningGroups.size > 0 ? (
-                        <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <MaterialIcon name="sync" className="text-[14px]" />
-                      )}
-                      Quét group
+                      Group chung
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setGroupSelectionMode("available")}
+                      className={`py-2 text-xs font-bold rounded-lg transition-all ${
+                        groupSelectionMode === "available"
+                          ? "bg-white dark:bg-slate-700 text-[#E3000F] shadow-sm"
+                          : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                      }`}
+                    >
+                      Theo acc đã join
                     </button>
                   </div>
-                  <select 
-                    value={groupUrl} 
-                    onChange={ev => setGroupUrl(ev.target.value)} 
+
+                  <input
+                    value={groupSearch}
+                    onChange={ev => setGroupSearch(ev.target.value)}
+                    placeholder="Tìm group theo tên hoặc URL..."
                     className="w-full border border-slate-200 dark:border-slate-750 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 transition"
-                  >
-                    <option value="">-- Chọn group mà các acc đã join --</option>
-                    {selectedIds.length === 0 && <option disabled value="">Chọn tài khoản trước</option>}
-                    {selectedIds.length > 0 && groupOptions.length === 0 && (
-                      <option disabled value="">
+                  />
+
+                  <div className="max-h-[220px] overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 divide-y divide-slate-100 dark:divide-slate-800">
+                    {selectedIds.length === 0 ? (
+                      <div className="p-4 text-xs text-slate-400">Chọn tài khoản trước.</div>
+                    ) : groupOptions.length === 0 ? (
+                      <div className="p-4 text-xs text-slate-400">
                         {selectedWithoutGroupScan.length === selectedOnline.length && selectedOnline.length > 0
-                          ? "Cập nhật extension Seeding Markee mới để quét group"
-                          : "Chưa có group chung, bấm Quét group"}
-                      </option>
+                          ? "Các tài khoản đã chọn cần cập nhật extension Seeding Markee mới để quét group."
+                          : "Chưa có group phù hợp trong cache, bấm Quét group để cập nhật."}
+                      </div>
+                    ) : (
+                      groupOptions.map(g => {
+                        const key = g.url || g.group_id || "";
+                        const checked = selectedGroupUrls.has(key);
+                        const joinedNames = g.accounts
+                          .filter(uid => selectedOnlineIds.has(uid))
+                          .map(uid => accountLabelMap.get(uid) || shortFbId(uid));
+                        return (
+                          <label
+                            key={key}
+                            className={`flex items-start gap-3 px-3 py-3 cursor-pointer transition ${
+                              checked ? "bg-red-50/70 dark:bg-red-950/10" : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleGroup(g)}
+                              className="mt-0.5 h-4 w-4 accent-[#E3000F] shrink-0"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{g.name}</span>
+                                <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                  g.all_selected
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-300 dark:border-emerald-900/30"
+                                    : "bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/20 dark:text-amber-300 dark:border-amber-900/30"
+                                }`}>
+                                  {g.account_count}/{g.total_selected} acc
+                                </span>
+                              </div>
+                              <div className="mt-0.5 text-[10px] text-slate-400 truncate">{g.url || g.group_id}</div>
+                              {joinedNames.length > 0 && (
+                                <div className="mt-1 text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                                  {joinedNames.slice(0, 4).join(", ")}
+                                  {joinedNames.length > 4 ? ` +${joinedNames.length - 4}` : ""}
+                                </div>
+                              )}
+                            </div>
+                          </label>
+                        );
+                      })
                     )}
-                    {groupOptions.map(g => (
-                      <option key={g.url || g.group_id} value={g.url}>
-                        {g.name} ({g.account_count}/{g.total_selected} acc)
-                      </option>
-                    ))}
-                  </select>
+                  </div>
+
                   <div className="flex items-center justify-between gap-3 text-[10px] text-slate-400">
                     <span>
-                      Mặc định chỉ hiện group chung của tất cả acc đã chọn. {groups.length > 0 ? `Danh sách Quản lý nhóm hiện có ${groups.length} group để đối chiếu.` : ""}
+                      {groupSelectionMode === "common"
+                        ? "Chỉ hiện group mà tất cả tài khoản đã chọn đều tham gia."
+                        : "Group thiếu acc vẫn chọn được; hệ thống chỉ gửi lệnh cho acc đã join group đó."}
+                      {groups.length > 0 ? ` Quản lý nhóm đang có ${groups.length} group để đối chiếu.` : ""}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => setShowPartialGroups(v => !v)}
-                      className="shrink-0 font-bold text-[#E3000F] hover:underline"
-                    >
-                      {showPartialGroups ? "Chỉ group chung" : "Hiện group thiếu acc"}
-                    </button>
+                    <span className="shrink-0 font-bold text-slate-600 dark:text-slate-300">
+                      {targetType === "group" ? `${groupPostTargets.length} lệnh đăng` : ""}
+                    </span>
                   </div>
+
                   {selectedIds.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
                       {selectedOnline.map(e => (
@@ -657,7 +798,7 @@ export default function DangBaiPage() {
                 {sending ? (
                   <>
                     <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Đang gửi ({selected.size})...
+                    Đang gửi ({targetType === "group" ? groupPostTargets.length : selectedOnline.length})...
                   </>
                 ) : (
                   <>
