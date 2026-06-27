@@ -156,8 +156,8 @@ export function TeamManagement() {
     setSeedingModalOpen(true);
   };
 
-  const handleKpiAssigned = () => {
-    // Refresh KPI data by triggering the KPI fetch effect
+  // Helper to refresh KPI data
+  const refreshKpi = useCallback(() => {
     if (user?.email && selectedTeamId) {
       const [startDate, endDate] = selectedWeek.split("_");
       setIsLoading(true);
@@ -169,6 +169,10 @@ export function TeamManagement() {
         })
         .finally(() => setIsLoading(false));
     }
+  }, [user?.email, selectedTeamId, selectedWeek]);
+
+  const handleKpiAssigned = () => {
+    refreshKpi();
   };
 
   const selectedTeam = teams.find(t => t.id === selectedTeamId);
@@ -223,7 +227,22 @@ export function TeamManagement() {
         throw new Error(res.message || "Xóa thất bại");
       }
       setSelectedTeamId("");
-      await fetchData();
+      setKpiData([]);
+      // Refresh teams list
+      const teamsRes = await teamsService.getAll();
+      if (teamsRes.success && teamsRes.data) {
+        let myTeams: TeamRow[] = [];
+        if ((user.role as string) === "admin" || (user.role as string) === "superadmin") {
+          myTeams = teamsRes.data;
+        } else {
+          myTeams = teamsRes.data.filter(t => t.id_leader === user.id);
+        }
+        setTeams(myTeams);
+        // Auto-select first team if available
+        if (myTeams.length > 0) {
+          setSelectedTeamId(myTeams[0].id);
+        }
+      }
       return res;
     };
 
@@ -508,7 +527,7 @@ export function TeamManagement() {
           onClose={() => setInboxModalOpen(false)}
           memberEmail={inboxMember.email}
           memberName={inboxMember.name}
-          onStatusChange={fetchData}
+          onStatusChange={refreshKpi}
         />
       )}
 
@@ -520,7 +539,7 @@ export function TeamManagement() {
           memberName={postMember.name}
           startDate={postDateRange?.start}
           endDate={postDateRange?.end}
-          onStatusChange={fetchData}
+          onStatusChange={refreshKpi}
         />
       )}
 
