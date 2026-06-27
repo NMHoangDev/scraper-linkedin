@@ -3,7 +3,6 @@ import re
 import time
 from pathlib import Path
 from typing import Dict, Any, Optional
-from playwright_stealth import stealth_sync
 import pyotp
 from playwright.sync_api import sync_playwright, Page, BrowserContext, Browser, TimeoutError as PlaywrightTimeoutError
 from .human_behavior import HumanBehavior
@@ -208,6 +207,7 @@ class FacebookAuth:
             }
         """)
         page = context.new_page()
+        from playwright_stealth import stealth_sync
         stealth_sync(page)
         return browser, context, page
 

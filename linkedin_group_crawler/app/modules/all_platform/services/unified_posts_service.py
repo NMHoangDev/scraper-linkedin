@@ -24,6 +24,31 @@ def _supabase() -> Client:
 
 # ── Core fetch ──────────────────────────────────────────────────────────────────
 
+import time
+from functools import wraps
+
+def retry_on_winerror(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        attempts = 3
+        last_exc = None
+        for attempt in range(attempts):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                last_exc = e
+                msg = str(e)
+                if "10035" in msg or "WSAEWOULDBLOCK" in msg or "Connection" in msg or "Timeout" in msg:
+                    # Reset the global supabase client to clear broken sockets
+                    from app.core.supabase_client import reset_supabase_client
+                    reset_supabase_client()
+                    time.sleep(0.5 * (attempt + 1))
+                else:
+                    raise
+        raise last_exc
+    return wrapper
+
+@retry_on_winerror
 def _fetch_posts(
     *,
     table: str,
@@ -358,6 +383,7 @@ def _get_kpi_progress(sb: Client, id_member: str, platform: str) -> tuple[int, i
 
 
 
+@retry_on_winerror
 def _fetch_stats(
     *,
     table: str,
