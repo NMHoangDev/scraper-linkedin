@@ -502,9 +502,8 @@ export default function TeamsManagementPage() {
                         key={member.id}
                         className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.04)]"
                       >
-                        <button
-                          type="button"
-                          className="flex w-full items-center justify-between p-3 text-left transition-colors hover:bg-slate-50"
+                        <div
+                          className="flex w-full cursor-pointer items-center justify-between p-3 text-left transition-colors hover:bg-slate-50"
                           onClick={() => setExpandedMemberId(isExpanded ? null : member.id)}
                         >
                           <div className="flex min-w-0 items-center gap-3">
@@ -540,7 +539,7 @@ export default function TeamsManagementPage() {
                               className={`text-[18px] text-slate-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
                             />
                           </div>
-                        </button>
+                        </div>
 
                         {isExpanded ? (
                           <div className="border-t border-slate-100 bg-white p-3">
