@@ -269,7 +269,7 @@ export function InboxShareToggle({
         className={`${dim} inline-flex items-center justify-center rounded-md transition shrink-0 ${
           state.isActive
             ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
-            : "bg-surface-container-low text-on-surface-variant border border-outline-variant hover:bg-surface-container-low hover:text-on-surface-variant"
+            : "bg-slate-50 text-slate-400 border border-slate-200 hover:bg-slate-100 hover:text-slate-600"
         } ${state.loading ? "opacity-60 cursor-wait" : "active:scale-95"}`}
       >
         <MaterialIcon

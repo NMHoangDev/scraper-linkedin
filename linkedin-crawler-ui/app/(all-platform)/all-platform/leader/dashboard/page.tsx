@@ -23,8 +23,8 @@ export default function LeaderDashboardPage() {
 
   if (authorized === null) {
     return (
-      <div className="flex h-64 flex-col items-center justify-center p-6 text-center text-on-surface-variant">
-        <div className="mb-3 h-8 w-8 animate-spin rounded-full border-4 border-outline-variant border-t-primary" />
+      <div className="flex h-64 flex-col items-center justify-center p-6 text-center text-gray-500">
+        <div className="mb-3 h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-[#DC2626]" />
         <p>Đang kiểm tra quyền truy cập...</p>
       </div>
     );

@@ -18,16 +18,16 @@ export function GlobalCrawlNotification() {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-
+        
         console.log("WebSocket received:", data);
-
+        
         // Chỉ thông báo nếu current user có liên quan đến group đang cào
         // hoặc là admin (người có quyền xem mọi thứ)
         if (data.involved_users && user?.id) {
           const isIncluded = data.involved_users.includes(user.id);
           const isAdmin = user?.role === "admin";
           console.log("WebSocket user check:", { userId: user.id, isIncluded, isAdmin, involved: data.involved_users });
-
+          
           if (!isIncluded && !isAdmin) {
             console.log("WebSocket message ignored because user is not involved.");
             // Tạm thời comment dòng return này để test hiển thị thông báo cho tất cả
@@ -70,7 +70,7 @@ export function GlobalCrawlNotification() {
         ) : (
           <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
         )}
-        <span className="font-semibold">
+        <span className="font-semibold tracking-wide">
           {crawlStatus.message}
         </span>
       </div>

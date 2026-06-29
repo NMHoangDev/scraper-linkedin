@@ -30,7 +30,7 @@ export default function ZaloChatFullScreenPage() {
   if (isLoading || !user || user.role === "leader" || user.role === "admin") {
     return (
       <div className="h-screen flex items-center justify-center bg-slate-50">
-        <div className="w-10 h-10 border-4 border-outline-variant border-t-primary rounded-full animate-spin" />
+        <div className="w-10 h-10 border-4 border-slate-200 border-t-[#E3000F] rounded-full animate-spin" />
       </div>
     );
   }

@@ -48,7 +48,7 @@ export function SheetInteractionStatus({
           className="shrink-0 text-[22px] leading-none"
         />
         <span className="flex min-w-0 flex-col items-start leading-tight">
-          <span className="text-on-surface text-xs font-bold">
+          <span className="text-on-surface text-xs font-bold tracking-tight">
             {kindLabel}
           </span>
           {showTriggerDate && dayLabel ? (

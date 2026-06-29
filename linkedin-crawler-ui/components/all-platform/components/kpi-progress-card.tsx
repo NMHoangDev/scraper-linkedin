@@ -121,21 +121,21 @@ function getProgressColor(percent: number): { bar: string; text: string; bg: str
   if (percent >= 100) return { bar: "bg-green-500",  text: "text-green-700", bg: "bg-green-50"  };
   if (percent >= 80)  return { bar: "bg-blue-500",   text: "text-blue-700",  bg: "bg-blue-50"   };
   if (percent >= 50)  return { bar: "bg-amber-500",   text: "text-amber-700", bg: "bg-amber-50"  };
-  return                       { bar: "bg-primary",    text: "text-primary",   bg: "bg-red-50"    };
+  return                       { bar: "bg-[#E3000F]",    text: "text-[#E3000F]",   bg: "bg-red-50"    };
 }
 
 /** ─── Skeleton loading ─────────────────────────────────────────────── */
 function KpiProgressSkeleton() {
   return (
-    <div className="rounded-xl border border-outline-variant bg-surface shadow-[0_2px_10px_rgba(0,0,0,0.02)] p-5 animate-pulse mb-6">
+    <div className="rounded-2xl border border-slate-100 bg-white shadow-[0_2px_10px_rgba(0,0,0,0.02)] p-5 animate-pulse mb-6">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <div className="w-64 h-4 rounded bg-surface-container-highest" />
-          <div className="w-96 h-3 rounded bg-surface-container-low mt-2" />
+          <div className="w-64 h-4 rounded bg-slate-200" />
+          <div className="w-96 h-3 rounded bg-slate-100 mt-2" />
         </div>
-        <div className="w-32 h-8 rounded-lg bg-surface-container-low" />
+        <div className="w-32 h-8 rounded-lg bg-slate-100" />
       </div>
-      <div className="w-full h-2.5 rounded-full bg-surface-container-low" />
+      <div className="w-full h-2.5 rounded-full bg-slate-100" />
     </div>
   );
 }
@@ -210,17 +210,17 @@ export function KpiProgressCard({
   const colors = getProgressColor(percent);
 
   return (
-    <div className={cn("bg-surface p-5 rounded-xl border border-outline-variant shadow-[0_2px_10px_rgba(0,0,0,0.02)]", className)}>
+    <div className={cn("bg-white p-5 rounded-2xl border border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.02)]", className)}>
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-4">
         <div className="flex-1 min-w-0 pr-0 xl:pr-4">
-          <h3 className="text-[13px] font-bold text-[#1E293B] uppercase break-words">
+          <h3 className="text-[13px] font-bold text-[#1E293B] uppercase tracking-wide break-words">
             {displayTitle}
           </h3>
-          <p className="text-[11px] text-on-surface-variant mt-0.5">
+          <p className="text-[11px] text-slate-500 mt-0.5">
             {cfg.subtitle}
           </p>
           {(snap.startDate || snap.endDate) && (
-            <p className="text-[10px] text-on-surface-variant mt-1 font-medium">
+            <p className="text-[10px] text-slate-400 mt-1 font-medium">
               Tuần: {snap.startDate} → {snap.endDate}
             </p>
           )}
@@ -229,7 +229,7 @@ export function KpiProgressCard({
           <span className={cn("text-lg font-black", colors.text)}>
             {snap.current.toLocaleString("vi-VN")}
           </span>
-          <span className="text-[11px] text-on-surface-variant font-medium">
+          <span className="text-[11px] text-slate-500 font-medium">
             / {snap.target} {cfg.unit}
           </span>
           <span className={cn("text-xs font-bold ml-1", colors.text)}>
@@ -237,8 +237,8 @@ export function KpiProgressCard({
           </span>
         </div>
       </div>
-
-      <div className="w-full h-2.5 rounded-full overflow-hidden bg-surface-container-low">
+      
+      <div className="w-full h-2.5 rounded-full overflow-hidden bg-slate-100">
         <div
           className={cn(
             "h-full rounded-full transition-all duration-1000 ease-out",
@@ -288,8 +288,8 @@ export function KpiProgressCompact({
   if (snap.loading) {
     return (
       <div className={cn("flex items-center gap-2", className)}>
-        <div className="w-4 h-4 rounded bg-surface-container-highest animate-pulse" />
-        <div className="h-1.5 w-16 rounded-full bg-surface-container-highest animate-pulse" />
+        <div className="w-4 h-4 rounded bg-slate-200 animate-pulse" />
+        <div className="h-1.5 w-16 rounded-full bg-slate-200 animate-pulse" />
       </div>
     );
   }
@@ -306,9 +306,9 @@ export function KpiProgressCompact({
       )}
       <div className="flex items-center gap-1 text-[11px] font-bold">
         <span className={colors.text}>{snap.current}/{snap.target}</span>
-        {label && <span className="text-on-surface-variant font-medium">{label}</span>}
+        {label && <span className="text-slate-400 font-medium">{label}</span>}
       </div>
-      <div className="relative w-16 h-1.5 bg-surface-container-low rounded-full overflow-hidden">
+      <div className="relative w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
         <div
           className={cn("absolute inset-y-0 left-0 rounded-full transition-all", colors.bar)}
           style={{ width: `${percent}%` }}

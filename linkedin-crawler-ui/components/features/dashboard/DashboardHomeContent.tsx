@@ -31,7 +31,7 @@ export function DashboardHomeContent() {
       {/* HEADER SECTION */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-md mb-xl">
         <div className="space-y-xs">
-          <h1 className="text-h1 text-on-surface font-semibold">
+          <h1 className="text-h1 text-on-surface font-semibold tracking-tight">
             {title}
           </h1>
           <p className="text-body-lg text-on-surface-variant max-w-3xl">
@@ -69,4 +69,4 @@ export function DashboardHomeContent() {
     </div>
   );
 }
-
+ 

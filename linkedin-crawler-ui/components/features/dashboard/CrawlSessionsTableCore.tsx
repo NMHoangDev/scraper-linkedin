@@ -154,7 +154,7 @@ export function CrawlSessionsTableCore({
                     <button
                       type="button"
                       onClick={() => setOpenSessionId(row.id_session_crawl)}
-                      className="text-primary text-xs font-bold uppercase hover:underline"
+                      className="text-primary text-xs font-bold uppercase tracking-wide hover:underline"
                     >
                       Xem
                     </button>

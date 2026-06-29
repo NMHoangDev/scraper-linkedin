@@ -69,7 +69,7 @@ export function ZaloKpiPanel({ accountId, memberEmail, compact = true }: ZaloKpi
         const kpiMember = (kpiRes?.data as any) || {};
         const activeKpi = Array.isArray(kpiMember.kpi) && kpiMember.kpi.length > 0 ? kpiMember.kpi[0] : null;
         const target = activeKpi ? Number(activeKpi.kpi_inbox || 0) : 0;
-
+        
         const startDate = activeKpi?.start_date || undefined;
         const endDate = activeKpi?.end_date || undefined;
 
@@ -121,7 +121,7 @@ export function ZaloKpiPanel({ accountId, memberEmail, compact = true }: ZaloKpi
   // Trạng thái loading
   if (snap.loading) {
     return (
-      <div className="flex items-center gap-1.5 text-[10.5px] text-on-surface-variant">
+      <div className="flex items-center gap-1.5 text-[10.5px] text-slate-400">
         <MaterialIcon name="sync" className="text-[12px] animate-spin" />
         <span>Đang tải KPI…</span>
       </div>
@@ -154,7 +154,7 @@ export function ZaloKpiPanel({ accountId, memberEmail, compact = true }: ZaloKpi
     ? "text-emerald-700"
     : isNear
       ? "text-amber-700"
-      : "text-on-surface-variant";
+      : "text-slate-600";
 
   const progressColor = isOverTarget
     ? "bg-emerald-500"
@@ -173,9 +173,9 @@ export function ZaloKpiPanel({ accountId, memberEmail, compact = true }: ZaloKpi
           <span className={`font-bold ${accent}`}>
             {snap.current}/{snap.target}
           </span>
-          <span className="text-on-surface-variant">inbox</span>
+          <span className="text-slate-400">inbox</span>
         </div>
-        <div className="relative w-16 h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
+        <div className="relative w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
           <div
             className={`absolute inset-y-0 left-0 ${progressColor} transition-all`}
             style={{ width: `${percent}%` }}
@@ -197,8 +197,8 @@ export function ZaloKpiPanel({ accountId, memberEmail, compact = true }: ZaloKpi
         <span className={`text-[11px] font-bold ${accent}`}>{percent}%</span>
       </div>
       <div className="flex items-baseline gap-1">
-        <span className="text-2xl font-bold text-on-surface">{snap.current}</span>
-        <span className="text-xs text-on-surface-variant">/ {snap.target} tin nhắn từ khách</span>
+        <span className="text-2xl font-bold text-slate-800">{snap.current}</span>
+        <span className="text-xs text-slate-500">/ {snap.target} tin nhắn từ khách</span>
       </div>
       <div className="relative w-full h-2 bg-orange-100 rounded-full overflow-hidden">
         <div
@@ -207,7 +207,7 @@ export function ZaloKpiPanel({ accountId, memberEmail, compact = true }: ZaloKpi
         />
       </div>
       {snap.range.start && (
-        <p className="text-[10px] text-on-surface-variant">
+        <p className="text-[10px] text-slate-500">
           {snap.range.start} → {snap.range.end} · {snap.accountIds.length} Zalo account
         </p>
       )}

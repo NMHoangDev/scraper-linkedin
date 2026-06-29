@@ -39,7 +39,7 @@ export function LinkedInTopPostsPagination({
           type="button"
           onClick={onPrev}
           disabled={page <= 1}
-          className="border-outline-variant text-on-surface-variant hover:bg-surface rounded border px-md py-1.5 font-label-md transition-colors disabled:opacity-40"
+          className="border-outline-variant text-on-surface-variant hover:bg-white rounded border px-md py-1.5 font-label-md transition-colors disabled:opacity-40"
         >
           Trước
         </button>
@@ -53,8 +53,8 @@ export function LinkedInTopPostsPagination({
             onClick={() => onSelectPage(p)}
             className={`border-outline-variant rounded border px-md py-1.5 font-label-md transition-colors ${
               p === page
-                ? "text-on-surface bg-surface shadow-sm"
-                : "text-on-surface-variant hover:bg-surface"
+                ? "text-on-surface bg-white shadow-sm"
+                : "text-on-surface-variant hover:bg-white"
             }`}
           >
             {p}
@@ -64,7 +64,7 @@ export function LinkedInTopPostsPagination({
           type="button"
           onClick={onNext}
           disabled={page >= totalPages}
-          className="border-outline-variant text-on-surface-variant hover:bg-surface rounded border px-md py-1.5 font-label-md transition-colors disabled:opacity-40"
+          className="border-outline-variant text-on-surface-variant hover:bg-white rounded border px-md py-1.5 font-label-md transition-colors disabled:opacity-40"
         >
           Tiếp
         </button>

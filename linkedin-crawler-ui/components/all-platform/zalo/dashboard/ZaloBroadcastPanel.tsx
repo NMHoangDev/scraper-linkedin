@@ -262,7 +262,7 @@ export function ZaloBroadcastPanel({
   const canSend = canPreview && preview !== null && (preview.warnings?.length ?? 0) === 0;
 
   return (
-    <section className="border-outline-variant bg-surface-container-lowest rounded-xl border p-lg shadow-sm">
+    <section className="border-outline-variant bg-surface-container-lowest rounded-2xl border p-lg shadow-sm">
       <div className="mb-lg flex flex-col gap-md lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h2 className="text-h2 text-on-surface font-semibold">Chiến dịch gửi</h2>

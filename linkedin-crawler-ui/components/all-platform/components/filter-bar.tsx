@@ -50,10 +50,6 @@ const DATE_OPTIONS = [
   { value: "30days", label: "30 ngày" },
 ];
 
-const fieldClass =
-  "border border-outline-variant bg-surface hover:bg-surface-container-low focus:border-primary focus:ring-2 focus:ring-primary/15 rounded-lg px-sm py-xs text-body-sm font-semibold text-on-surface outline-none transition cursor-pointer shadow-sm";
-const selectClass = `${fieldClass} min-w-[120px]`;
-
 export function FilterBar({ intents, industries, teams, tiers, icps, contentTypes = [], productSeedings = [], members = [], onFilter, isLoading }: FilterBarProps) {
   const [search, setSearch] = useState("");
   const [intent, setIntent] = useState("");
@@ -123,9 +119,9 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-sm rounded-xl border border-outline-variant bg-surface p-md shadow-sm">
+    <div className="bg-[#F5F5F5]/50 flex flex-wrap items-center gap-3 rounded-2xl border border-[#E5E5E5] p-4 shadow-[0_4px_20px_rgba(0,0,0,0.015)]">
       <div className="relative min-w-[200px] flex-1">
-        <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm" />
+        <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0A0A0] text-sm" />
         <input
           type="text"
           placeholder="Tìm kiếm nội dung, tên nhóm..."
@@ -134,7 +130,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
             setSearch(e.target.value);
             handleChange({ search: e.target.value });
           }}
-          className="w-full rounded-lg border border-outline-variant bg-surface py-xs pl-9 pr-sm text-body-sm font-semibold text-on-surface shadow-sm outline-none transition placeholder:text-on-surface-variant focus:border-primary focus:ring-2 focus:ring-primary/15"
+          className="w-full border border-[#333333] bg-[#FFFFFF] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl pl-9 pr-4 py-2 text-xs font-semibold text-[#1A1A1A] outline-none transition shadow-sm"
         />
       </div>
 
@@ -144,7 +140,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
           setDateRange(e.target.value);
           handleChange({ dateRange: e.target.value });
         }}
-        className={`${fieldClass} min-w-[110px]`}
+        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[110px]"
       >
         {DATE_OPTIONS.map((o) => (
           <option key={o.value} value={o.value}>
@@ -159,7 +155,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
           setSort(e.target.value as SortOption);
           handleChange({ sort: e.target.value as SortOption });
         }}
-        className={`${fieldClass} min-w-[130px]`}
+        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
       >
         {SORT_OPTIONS.map((o) => (
           <option key={o.value} value={o.value}>
@@ -174,7 +170,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
           setIntent(e.target.value);
           handleChange({ intent: e.target.value });
         }}
-        className={selectClass}
+        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[120px]"
       >
         <option value="">Tất cả Lĩnh vực</option>
         {intents.map((i) => (
@@ -190,7 +186,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
           setIndustry(e.target.value);
           handleChange({ industry: e.target.value });
         }}
-        className={selectClass}
+        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[120px]"
       >
         <option value="">Tất cả Ngành</option>
         {industries.map((i) => (
@@ -206,7 +202,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
           setTeam(e.target.value);
           handleChange({ team: e.target.value });
         }}
-        className={selectClass}
+        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[120px]"
       >
         <option value="">Tất cả Team</option>
         {teams.map((t) => (
@@ -222,7 +218,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
           setTier(e.target.value);
           handleChange({ tier: e.target.value });
         }}
-        className={`${fieldClass} min-w-[110px]`}
+        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[110px]"
       >
         <option value="">Tất cả Tier</option>
         {tiers.map((t) => (
@@ -239,7 +235,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
             setIcp(e.target.value);
             handleChange({ icp: e.target.value });
           }}
-          className={`${fieldClass} min-w-[110px]`}
+          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[110px]"
         >
           <option value="">Tất cả ICP</option>
           {icps.map((c) => (
@@ -257,7 +253,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
             setContentType(e.target.value);
             handleChange({ content_type: e.target.value });
           }}
-          className={selectClass}
+          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[120px]"
         >
           <option value="">Loại nội dung</option>
           {contentTypes.map((c) => (
@@ -275,7 +271,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
             setProductSeeding(e.target.value);
             handleChange({ product_seeding: e.target.value });
           }}
-          className={`${fieldClass} min-w-[130px]`}
+          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
         >
           <option value="">Sản phẩm Seeding</option>
           {productSeedings.map((c) => (
@@ -293,7 +289,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
             setMember(e.target.value);
             handleChange({ member: e.target.value });
           }}
-          className={`${fieldClass} min-w-[130px]`}
+          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
         >
           <option value="">Tất cả Thành viên</option>
           {members.map((m) => (
@@ -309,7 +305,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
         type="button"
         onClick={clearFilters}
         disabled={isLoading}
-        className="ml-auto rounded-lg border border-outline-variant bg-surface px-md py-xs text-body-sm font-semibold text-primary shadow-sm transition hover:border-primary hover:bg-primary/5 cursor-pointer disabled:opacity-50"
+        className="ml-auto rounded-xl bg-white border border-[#E5E5E5] px-4 py-2 text-xs font-bold text-[#E3000F] hover:bg-[#E3000F]/5 hover:border-[#E3000F]/30 transition shadow-sm cursor-pointer disabled:opacity-50"
       >
         Xóa lọc
       </button>

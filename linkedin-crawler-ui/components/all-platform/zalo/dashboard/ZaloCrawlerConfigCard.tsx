@@ -263,7 +263,7 @@ export function ZaloCrawlerConfigCard({ flow }: ZaloCrawlerConfigCardProps) {
                 width={256}
                 height={256}
                 unoptimized
-                className="h-64 w-64 rounded-lg border border-outline-variant bg-surface object-contain p-sm"
+                className="h-64 w-64 rounded-lg border border-outline-variant bg-white object-contain p-sm"
               />
               <div className="text-body-sm text-on-surface">
                 <div className="text-body-md mb-xs font-semibold">Quét QR bằng ứng dụng Zalo</div>

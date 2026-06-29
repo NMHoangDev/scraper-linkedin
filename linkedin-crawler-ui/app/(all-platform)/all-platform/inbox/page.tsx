@@ -193,7 +193,7 @@ function mergeThreadMessages(current: Msg[], incoming: Msg[]): Msg[] {
 
 export default function InboxPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-on-surface-variant">Đang tải...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-gray-500">Đang tải...</div>}>
       <InboxPageContent />
     </Suspense>
   );
@@ -1270,10 +1270,10 @@ function InboxPageContent() {
   return (
     <div className="p-6 w-full">
       <div className="flex items-center gap-2 mb-1">
-        <MaterialIcon name="inbox" className="text-primary" />
-        <h1 className="text-xl font-black text-on-surface">Inbox Facebook</h1>
+        <MaterialIcon name="inbox" className="text-[#E3000F]" />
+        <h1 className="text-xl font-black text-[#1A1A1A]">Inbox Facebook</h1>
       </div>
-      <p className="text-sm text-on-surface-variant mb-6">Tin nhắn Messenger tự cập nhật gần như tức thời khi extension đang mở (đọc ngay trên trình duyệt seeder, giải được mã hóa đầu cuối). Đánh dấu khách và trả lời, ưu tiên đẩy khách sang Zalo.</p>
+      <p className="text-sm text-[#666666] mb-6">Tin nhắn Messenger tự cập nhật gần như tức thời khi extension đang mở (đọc ngay trên trình duyệt seeder, giải được mã hóa đầu cuối). Đánh dấu khách và trả lời, ưu tiên đẩy khách sang Zalo.</p>
 
       {connErr && <div className="mb-4 rounded-lg bg-amber-50 border border-amber-300 px-4 py-3 text-sm text-amber-700">⚠️ Không kết nối được Facebook automation service. Kiểm tra backend product và Markee service.</div>}
       {needRelogin && <div className="mb-4 rounded-lg bg-red-50 border border-red-300 px-4 py-3 text-sm text-red-700">🔑 Cookie tài khoản này đã hết hạn — vào tab Tài khoản đăng nhập lại.</div>}
@@ -1286,15 +1286,15 @@ function InboxPageContent() {
         </div>
       )}
 
-      <div className="bg-surface rounded-lg border border-outline-variant p-3 mb-4">
+      <div className="bg-white rounded-lg border border-[#E5E5E5] p-3 mb-4">
         <div className="flex items-center justify-between mb-2">
-          <label className="text-xs font-bold text-on-surface-variant">Tài khoản nhân viên</label>
-          <button onClick={scan} disabled={scanning || !acc || !accOnline || needRelogin} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-on-primary-fixed-variant transition disabled:opacity-50">
+          <label className="text-xs font-bold text-[#666666]">Tài khoản nhân viên</label>
+          <button onClick={scan} disabled={scanning || !acc || !accOnline || needRelogin} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-[#E3000F] text-white hover:bg-[#C40009] transition disabled:opacity-50">
             {scanning ? "Đang quét..." : "Quét ngay"}
           </button>
         </div>
         {sessions.length === 0 ? (
-          <span className="text-sm text-on-surface-variant">{extInstalled === false ? 'Chưa thấy extension. Hãy cài + mở extension trên trình duyệt này.' : 'Chưa có tài khoản nào. Nhân viên cài extension + đăng nhập Facebook để tài khoản hiện ra.'}</span>
+          <span className="text-sm text-[#A0A0A0]">{extInstalled === false ? 'Chưa thấy extension. Hãy cài + mở extension trên trình duyệt này.' : 'Chưa có tài khoản nào. Nhân viên cài extension + đăng nhập Facebook để tài khoản hiện ra.'}</span>
         ) : (role === "admin" || role === "leader") ? (
           <div className="w-full">
             <TeamAccountTree
@@ -1315,21 +1315,21 @@ function InboxPageContent() {
               return (
                 <button key={s.user_id} onClick={() => selectAcc(s.user_id)}
                   title={isOnline ? "Đang online — đọc/trả lời được" : isPaused ? "Inbox realtime đang tạm dừng trên extension" : "Offline (nhân viên tắt máy) — chỉ xem tin cũ"}
-                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold border transition ${acc === s.user_id ? "bg-primary text-white border-primary" : `border-outline-variant hover:border-primary ${isOnline ? "text-on-surface" : isPaused ? "text-amber-700" : "text-on-surface-variant"}`}`}>
-                  <span className={`inline-block w-2 h-2 rounded-full ${isOnline ? "bg-green-500" : isPaused ? "bg-amber-400" : "bg-surface-container-highest"}`} />{accLabel(s)}{!isOnline && <span className="text-[10px] opacity-70">({isPaused ? "paused" : "offline"})</span>}
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold border transition ${acc === s.user_id ? "bg-[#E3000F] text-white border-[#E3000F]" : `border-[#E5E5E5] hover:border-[#E3000F] ${isOnline ? "text-[#1A1A1A]" : isPaused ? "text-amber-700" : "text-[#A0A0A0]"}`}`}>
+                  <span className={`inline-block w-2 h-2 rounded-full ${isOnline ? "bg-green-500" : isPaused ? "bg-amber-400" : "bg-gray-300"}`} />{accLabel(s)}{!isOnline && <span className="text-[10px] opacity-70">({isPaused ? "paused" : "offline"})</span>}
                 </button>
               );
             })}
           </div>
         )}
-        <div className="text-[11px] text-on-surface-variant mt-1.5">Online: đọc + trả lời realtime. Offline: chỉ xem tin cũ tới khi máy nhân viên bật lại.</div>
+        <div className="text-[11px] text-[#A0A0A0] mt-1.5">Online: đọc + trả lời realtime. Offline: chỉ xem tin cũ tới khi máy nhân viên bật lại.</div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-        <div className="bg-surface rounded-lg border border-outline-variant p-5">
+        <div className="bg-white rounded-lg border border-[#E5E5E5] p-5">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-bold text-on-surface">Hộp thư</h2>
-            <select value={filter} onChange={e => setFilter(e.target.value as "all" | "unread" | "customer" | "need_reply" | "need_verify")} className="text-sm border border-outline-variant rounded-lg px-2 py-1 outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary text-on-surface bg-surface">
+            <h2 className="text-base font-bold text-[#1A1A1A]">Hộp thư</h2>
+            <select value={filter} onChange={e => setFilter(e.target.value as "all" | "unread" | "customer" | "need_reply" | "need_verify")} className="text-sm border border-[#E5E5E5] rounded-lg px-2 py-1 outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A] bg-white">
               <option value="all">Tất cả</option>
               <option value="need_reply">Cần trả lời</option>
               <option value="unread">Chưa đọc</option>
@@ -1337,59 +1337,59 @@ function InboxPageContent() {
               <option value="need_verify">Chưa tính KPI</option>
             </select>
           </div>
-          <div className="inline-flex rounded-lg border border-outline-variant bg-[#F8F8F8] p-0.5 mb-3">
-            <button onClick={() => { setViewMode("inbox"); setArchiveReading(false); }} className={`text-xs font-bold px-3 py-1.5 rounded-md transition ${viewMode === "inbox" ? "bg-surface text-primary shadow-sm" : "text-on-surface-variant hover:text-on-surface"}`}>Hộp thư</button>
-            <button onClick={() => setViewMode("archive")} className={`text-xs font-bold px-3 py-1.5 rounded-md transition ${viewMode === "archive" ? "bg-surface text-primary shadow-sm" : "text-on-surface-variant hover:text-on-surface"}`}>Lưu trữ</button>
+          <div className="inline-flex rounded-lg border border-[#E5E5E5] bg-[#F8F8F8] p-0.5 mb-3">
+            <button onClick={() => { setViewMode("inbox"); setArchiveReading(false); }} className={`text-xs font-bold px-3 py-1.5 rounded-md transition ${viewMode === "inbox" ? "bg-white text-[#E3000F] shadow-sm" : "text-[#666666] hover:text-[#1A1A1A]"}`}>Hộp thư</button>
+            <button onClick={() => setViewMode("archive")} className={`text-xs font-bold px-3 py-1.5 rounded-md transition ${viewMode === "archive" ? "bg-white text-[#E3000F] shadow-sm" : "text-[#666666] hover:text-[#1A1A1A]"}`}>Lưu trữ</button>
           </div>
           <div className="space-y-2 max-h-[520px] overflow-auto">
             {viewMode === "archive" ? (
               loadingArchives && archives.length === 0
-                ? <div className="text-center text-on-surface-variant py-10 text-sm animate-pulse">Đang tải lưu trữ...</div>
-                : archives.length === 0 ? <div className="text-center text-on-surface-variant py-10 text-sm">Chưa có hội thoại lưu trữ.</div> :
+                ? <div className="text-center text-[#A0A0A0] py-10 text-sm animate-pulse">Đang tải lưu trữ...</div>
+                : archives.length === 0 ? <div className="text-center text-[#A0A0A0] py-10 text-sm">Chưa có hội thoại lưu trữ.</div> :
                 archives.map(a => (
-                  <div key={a.conv_id} className={`border rounded-lg p-3 transition ${openConv === a.conv_id && archiveReading ? "border-primary bg-[#FFF5F5]" : "border-outline-variant"}`}>
+                  <div key={a.conv_id} className={`border rounded-lg p-3 transition ${openConv === a.conv_id && archiveReading ? "border-[#E3000F] bg-[#FFF5F5]" : "border-[#E5E5E5]"}`}>
                     <div onClick={() => openArchive(a.conv_id)} title="Xem bản lưu" className="flex justify-between gap-2 cursor-pointer">
                       <div className="min-w-0">
-                        <div className="truncate font-semibold text-on-surface">{a.name || a.conv_id}</div>
-                        <div className="text-xs text-on-surface-variant truncate">{a.preview || "(không có preview)"}</div>
+                        <div className="truncate font-semibold text-[#1A1A1A]">{a.name || a.conv_id}</div>
+                        <div className="text-xs text-[#A0A0A0] truncate">{a.preview || "(không có preview)"}</div>
                       </div>
-                      <div className="text-xs text-on-surface-variant whitespace-nowrap">{a.messages_count || 0} tin</div>
+                      <div className="text-xs text-[#A0A0A0] whitespace-nowrap">{a.messages_count || 0} tin</div>
                     </div>
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       {a.is_customer && <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-bold">khách</span>}
                       {a.pushed_to_zalo && <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold">đã đẩy Zalo</span>}
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-container-low text-on-surface-variant font-bold">{a.archive_reason === "hidden_from_inbox" ? "đã ẩn" : "đã lưu"}</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-bold">{a.archive_reason === "hidden_from_inbox" ? "đã ẩn" : "đã lưu"}</span>
                     </div>
                     <div className="flex flex-wrap gap-1.5 mt-2">
-                      <button onClick={() => openArchive(a.conv_id)} className="text-xs px-2.5 py-1 rounded-lg border border-outline-variant hover:border-primary text-on-surface font-semibold transition">Xem lại</button>
-                      <button onClick={() => { setViewMode("inbox"); openChat(a.conv_id); }} className="text-xs px-2.5 py-1 rounded-lg border border-outline-variant hover:border-primary text-on-surface font-semibold transition">Mở inbox</button>
+                      <button onClick={() => openArchive(a.conv_id)} className="text-xs px-2.5 py-1 rounded-lg border border-[#E5E5E5] hover:border-[#E3000F] text-[#1A1A1A] font-semibold transition">Xem lại</button>
+                      <button onClick={() => { setViewMode("inbox"); openChat(a.conv_id); }} className="text-xs px-2.5 py-1 rounded-lg border border-[#E5E5E5] hover:border-[#E3000F] text-[#1A1A1A] font-semibold transition">Mở inbox</button>
                     </div>
                   </div>
                 ))
             ) : (loadingConvs && filtered.length === 0
-              ? <div className="text-center text-on-surface-variant py-10 text-sm animate-pulse">Đang tải hộp thư của tài khoản...</div>
-              : filtered.length === 0 ? <div className="text-center text-on-surface-variant py-10 text-sm">Chưa có hội thoại gần đây. Tin cũ nên lưu khách hoặc để ở lưu trữ.</div> :
+              ? <div className="text-center text-[#A0A0A0] py-10 text-sm animate-pulse">Đang tải hộp thư của tài khoản...</div>
+              : filtered.length === 0 ? <div className="text-center text-[#A0A0A0] py-10 text-sm">Chưa có hội thoại gần đây. Tin cũ nên lưu khách hoặc để ở lưu trữ.</div> :
               filtered.map(c => (
-                <div key={c.conv_id} className={`border rounded-lg p-3 transition ${openConv === c.conv_id && !archiveReading ? "border-primary bg-[#FFF5F5]" : "border-outline-variant"}`}>
+                <div key={c.conv_id} className={`border rounded-lg p-3 transition ${openConv === c.conv_id && !archiveReading ? "border-[#E3000F] bg-[#FFF5F5]" : "border-[#E5E5E5]"}`}>
                   <div onClick={() => openChat(c.conv_id)} title="Bấm để mở hội thoại" className="flex justify-between gap-2 cursor-pointer">
                     <div className="min-w-0">
-                      <div className={`truncate ${c.unread ? "font-extrabold" : "font-semibold"} text-on-surface`}>{c.name}</div>
-                      <div className="text-xs text-on-surface-variant truncate">{c.preview || "(không có preview)"}</div>
+                      <div className={`truncate ${c.unread ? "font-extrabold" : "font-semibold"} text-[#1A1A1A]`}>{c.name}</div>
+                      <div className="text-xs text-[#A0A0A0] truncate">{c.preview || "(không có preview)"}</div>
                     </div>
-                    <div className="text-xs text-on-surface-variant whitespace-nowrap">{c.time}</div>
+                    <div className="text-xs text-[#A0A0A0] whitespace-nowrap">{c.time}</div>
                   </div>
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     {needsReply(c) && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-bold">cần trả lời</span>}
                     {c.unread && <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold">chưa đọc</span>}
                     {c.is_customer && <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-bold">khách</span>}
                     {c.pushed_to_zalo && <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold">đã đẩy Zalo</span>}
-                    {c.archived && <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-container-low text-on-surface-variant font-bold">đã lưu</span>}
+                    {c.archived && <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-bold">đã lưu</span>}
                   </div>
                   <div className="flex flex-wrap gap-1.5 mt-2">
-                    <button onClick={() => openChat(c.conv_id)} className="text-xs px-2.5 py-1 rounded-lg border border-outline-variant hover:border-primary text-on-surface font-semibold transition">Mở chat</button>
-                    <button onClick={() => mark(c.conv_id, "is_customer", !c.is_customer)} className="text-xs px-2.5 py-1 rounded-lg border border-outline-variant hover:border-primary text-on-surface font-semibold transition">{c.is_customer ? "Bỏ khách" : "Là khách"}</button>
-                    {c.is_customer && <button onClick={() => mark(c.conv_id, "pushed_to_zalo", !c.pushed_to_zalo)} className="text-xs px-2.5 py-1 rounded-lg border border-outline-variant hover:border-primary text-on-surface font-semibold transition">{c.pushed_to_zalo ? "Bỏ Zalo" : "Đã đẩy Zalo"}</button>}
-                    <button onClick={() => saveArchive(c.conv_id, false)} className="text-xs px-2.5 py-1 rounded-lg border border-outline-variant hover:border-primary text-on-surface font-semibold transition">Lưu khách</button>
+                    <button onClick={() => openChat(c.conv_id)} className="text-xs px-2.5 py-1 rounded-lg border border-[#E5E5E5] hover:border-[#E3000F] text-[#1A1A1A] font-semibold transition">Mở chat</button>
+                    <button onClick={() => mark(c.conv_id, "is_customer", !c.is_customer)} className="text-xs px-2.5 py-1 rounded-lg border border-[#E5E5E5] hover:border-[#E3000F] text-[#1A1A1A] font-semibold transition">{c.is_customer ? "Bỏ khách" : "Là khách"}</button>
+                    {c.is_customer && <button onClick={() => mark(c.conv_id, "pushed_to_zalo", !c.pushed_to_zalo)} className="text-xs px-2.5 py-1 rounded-lg border border-[#E5E5E5] hover:border-[#E3000F] text-[#1A1A1A] font-semibold transition">{c.pushed_to_zalo ? "Bỏ Zalo" : "Đã đẩy Zalo"}</button>}
+                    <button onClick={() => saveArchive(c.conv_id, false)} className="text-xs px-2.5 py-1 rounded-lg border border-[#E5E5E5] hover:border-[#E3000F] text-[#1A1A1A] font-semibold transition">Lưu khách</button>
                     <button onClick={() => { if (window.confirm(`Ẩn "${c.name || "hội thoại này"}" khỏi hộp thư? Markee sẽ lưu lại bản archive, không xóa trên Messenger.`)) saveArchive(c.conv_id, true); }} className="text-xs px-2.5 py-1 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 font-semibold transition">Ẩn</button>
                   </div>
                 </div>
@@ -1398,13 +1398,13 @@ function InboxPageContent() {
         </div>
 
         {/* Khung chat */}
-        <div className="bg-surface rounded-lg border border-outline-variant p-5">
-          <h2 className="text-base font-bold text-on-surface mb-3">Hội thoại</h2>
-          {!openConv ? <div className="text-center text-on-surface-variant py-10 text-sm">Chọn 1 hội thoại để xem tin nhắn.</div> : (
+        <div className="bg-white rounded-lg border border-[#E5E5E5] p-5">
+          <h2 className="text-base font-bold text-[#1A1A1A] mb-3">Hội thoại</h2>
+          {!openConv ? <div className="text-center text-[#A0A0A0] py-10 text-sm">Chọn 1 hội thoại để xem tin nhắn.</div> : (
             <>
               <div ref={chatScrollRef} className="max-h-[430px] overflow-auto mb-3 space-y-2 p-1">
                 {loadingChat && msgs.length === 0
-                  ? <div className="text-sm text-on-surface-variant">Đang tải hội thoại (extension đang mở Messenger quét)... lần đầu có thể chờ 30–60s.</div>
+                  ? <div className="text-sm text-[#A0A0A0]">Đang tải hội thoại (extension đang mở Messenger quét)... lần đầu có thể chờ 30–60s.</div>
                   : msgs.length === 0
                     ? <div className="text-sm rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5 text-amber-800 space-y-2">
                         {archiveReading
@@ -1432,20 +1432,20 @@ function InboxPageContent() {
                         return (
                           <div key={i} className={`flex ${m.from === "me" ? "justify-end" : "justify-start"}`}>
                             <div className={`max-w-[78%] flex flex-col ${m.from === "me" ? "items-end" : "items-start"}`}>
-                              <div className={`px-3 py-2 rounded-lg text-sm ${m.from === "me" ? "bg-primary text-white" : "bg-surface-container-low text-on-surface"}`}>{content}</div>
-                              {time && <div className="text-[10px] text-on-surface-variant mt-0.5 px-1">{time}</div>}
+                              <div className={`px-3 py-2 rounded-lg text-sm ${m.from === "me" ? "bg-[#E3000F] text-white" : "bg-[#F5F5F5] text-[#1A1A1A]"}`}>{content}</div>
+                              {time && <div className="text-[10px] text-[#A0A0A0] mt-0.5 px-1">{time}</div>}
                             </div>
                           </div>
                         );
                       })}
-                {loadingFresh && <div className="text-[11px] text-on-surface-variant text-center pt-1 animate-pulse">Đang cập nhật tin mới nhất...</div>}
+                {loadingFresh && <div className="text-[11px] text-[#A0A0A0] text-center pt-1 animate-pulse">Đang cập nhật tin mới nhất...</div>}
               </div>
               <div className="flex gap-2">
                 <input value={reply} onChange={e => setReply(e.target.value)} onKeyDown={e => { if (e.key === "Enter") sendReply(); }}
                   disabled={archiveReading || !accOnline || needRelogin}
                   placeholder={archiveReading ? "Đang xem bản lưu trữ — mở inbox live để trả lời" : needRelogin ? "Cookie hết hạn — đăng nhập lại để gửi" : accPaused ? "Inbox realtime đang tạm dừng — chưa gửi được" : !accOnline ? "Tài khoản offline — không gửi được" : "Nhập trả lời..."}
-                  className="flex-1 border border-outline-variant rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary text-on-surface disabled:bg-surface-container-low disabled:cursor-not-allowed" />
-                <button onClick={sendReply} disabled={archiveReading || !accOnline || needRelogin} className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold hover:bg-on-primary-fixed-variant transition disabled:opacity-50 disabled:cursor-not-allowed">Gửi</button>
+                  className="flex-1 border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A] disabled:bg-[#F5F5F5] disabled:cursor-not-allowed" />
+                <button onClick={sendReply} disabled={archiveReading || !accOnline || needRelogin} className="px-4 py-2 rounded-lg bg-[#E3000F] text-white text-sm font-bold hover:bg-[#C40009] transition disabled:opacity-50 disabled:cursor-not-allowed">Gửi</button>
               </div>
             </>
           )}

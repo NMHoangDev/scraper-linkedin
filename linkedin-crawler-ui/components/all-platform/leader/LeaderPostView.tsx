@@ -229,7 +229,7 @@ export function LeaderPostView({
   if (!isOpen) return null;
 
   const headerBg = "bg-gradient-to-r from-slate-800 to-slate-700";
-  const accentColor = "var(--color-primary)";
+  const accentColor = "#E3000F";
 
   return (
     <div
@@ -278,7 +278,7 @@ export function LeaderPostView({
               <h2 className="text-base font-bold text-white">
                 KPI Bài viết Facebook
               </h2>
-              <p className="text-[11px] text-outline mt-0.5">
+              <p className="text-[11px] text-slate-300 mt-0.5">
                 {memberName
                   ? `${memberName} · `
                   : memberEmail
@@ -294,7 +294,7 @@ export function LeaderPostView({
             <button
               onClick={refreshPosts}
               disabled={loading || !memberEmail}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-semibold transition hover:bg-surface/10 disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-semibold transition hover:bg-white/10 disabled:opacity-40"
               style={{ backgroundColor: "rgba(255,255,255,0.15)" }}
             >
               <MaterialIcon name="refresh" className="text-[14px]" />
@@ -302,7 +302,7 @@ export function LeaderPostView({
             </button>
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-lg text-white/70 hover:text-white hover:bg-surface/10 flex items-center justify-center transition"
+              className="w-8 h-8 rounded-lg text-white/70 hover:text-white hover:bg-white/10 flex items-center justify-center transition"
             >
               <MaterialIcon name="close" className="text-[20px]" />
             </button>
@@ -310,11 +310,11 @@ export function LeaderPostView({
         </div>
 
         {/* Search + Date Bar */}
-        <div className="px-6 py-3 border-b border-outline-variant bg-surface-container-low flex flex-col gap-2">
+        <div className="px-6 py-3 border-b border-slate-100 bg-slate-50/50 flex flex-col gap-2">
           {/* Email row */}
           <div className="flex items-center gap-3">
             <div className="relative flex-1" ref={dropdownRef}>
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
                 <MaterialIcon name="person" className="text-[16px]" />
               </div>
               <input
@@ -327,20 +327,20 @@ export function LeaderPostView({
                 onFocus={() => setShowDropdown(true)}
                 onKeyDown={(e) => e.key === "Enter" && handleLoad()}
                 placeholder="Email thành viên cần xem (VD: thanh@company.com)"
-                className="w-full pl-9 pr-3 py-2 bg-surface border border-outline-variant rounded-xl text-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition"
+                className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200 transition"
               />
               {showDropdown && memberEmail && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-outline-variant rounded-xl shadow-lg z-50 overflow-hidden">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden">
                   <button
                     onClick={() => {
                       setShowDropdown(false);
                       handleLoad();
                     }}
-                    className="w-full px-3 py-2 text-left text-xs text-on-surface hover:bg-surface-container-low flex items-center gap-2"
+                    className="w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2"
                   >
                     <MaterialIcon
                       name="search"
-                      className="text-[14px] text-on-surface-variant"
+                      className="text-[14px] text-slate-400"
                     />
                     Tìm: <strong>{memberEmail}</strong>
                   </button>
@@ -366,7 +366,7 @@ export function LeaderPostView({
 
           {/* Date row */}
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] font-bold text-on-surface-variant uppercase">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
               Tuần:
             </span>
             <div className="flex items-center gap-1">
@@ -396,14 +396,14 @@ export function LeaderPostView({
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="px-2 py-1 border border-outline-variant rounded-lg text-[11px] text-on-surface-variant outline-none focus:border-primary bg-surface"
+                className="px-2 py-1 border border-slate-200 rounded-lg text-[11px] text-slate-600 outline-none focus:border-slate-400 bg-white"
               />
-              <span className="text-on-surface-variant text-xs">—</span>
+              <span className="text-slate-400 text-xs">—</span>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="px-2 py-1 border border-outline-variant rounded-lg text-[11px] text-on-surface-variant outline-none focus:border-primary bg-surface"
+                className="px-2 py-1 border border-slate-200 rounded-lg text-[11px] text-slate-600 outline-none focus:border-slate-400 bg-white"
               />
             </div>
           </div>
@@ -411,13 +411,13 @@ export function LeaderPostView({
 
         {/* Stats + Filter Bar */}
         {postData && (
-          <div className="px-6 py-3 border-b border-outline-variant flex items-center gap-4 flex-wrap">
+          <div className="px-6 py-3 border-b border-slate-100 flex items-center gap-4 flex-wrap">
             {/* Counters */}
             <div className="flex items-center gap-1.5 text-[13px]">
-              <span className="font-bold text-on-surface">{stats.total}</span>
-              <span className="text-on-surface-variant">bài viết</span>
+              <span className="font-bold text-slate-800">{stats.total}</span>
+              <span className="text-slate-500">bài viết</span>
             </div>
-            <div className="h-4 w-px bg-surface-container-highest" />
+            <div className="h-4 w-px bg-slate-200" />
             {/* Filter pills */}
             <div className="flex items-center gap-1.5">
               {[
@@ -441,7 +441,7 @@ export function LeaderPostView({
                           : "bg-slate-800 text-white"
                         : cfg
                         ? cn(cfg.bg, cfg.text, "hover:opacity-80")
-                        : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-highest"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     )}
                   >
                     {cfg && <MaterialIcon name={cfg.icon as MaterialSymbolName} className="text-[11px]" />}
@@ -470,20 +470,20 @@ export function LeaderPostView({
 
           {/* Initial empty state */}
           {!loading && !postData && !error && (
-            <div className="flex flex-col items-center justify-center py-20 text-on-surface-variant">
+            <div className="flex flex-col items-center justify-center py-20 text-slate-400">
               <div
-                className="w-16 h-16 rounded-xl flex items-center justify-center mb-4"
+                className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
                 style={{ backgroundColor: "#f1f5f9" }}
               >
-                <MaterialIcon name="article" className="text-[36px] text-outline" />
+                <MaterialIcon name="article" className="text-[36px] text-slate-300" />
               </div>
-              <p className="text-sm font-medium text-on-surface-variant">
+              <p className="text-sm font-medium text-slate-500">
                 Nhập email thành viên và bấm{" "}
                 <span className="font-bold" style={{ color: accentColor }}>
                   Tải bài viết
                 </span>
               </p>
-              <p className="text-xs text-on-surface-variant mt-1">
+              <p className="text-xs text-slate-400 mt-1">
                 Hệ thống sẽ hiển thị danh sách bài viết đã đăng trong tuần KPI
               </p>
             </div>
@@ -491,15 +491,15 @@ export function LeaderPostView({
 
           {/* Loaded but empty */}
           {!loading && postData && filteredPosts.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20 text-on-surface-variant">
+            <div className="flex flex-col items-center justify-center py-20 text-slate-400">
               <div
-                className="w-16 h-16 rounded-xl flex items-center justify-center mb-4"
+                className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
                 style={{ backgroundColor: "#f1f5f9" }}
               >
-                <MaterialIcon name="inbox" className="text-[36px] text-outline" />
+                <MaterialIcon name="inbox" className="text-[36px] text-slate-300" />
               </div>
-              <p className="text-sm font-medium text-on-surface-variant">Không có bài viết nào</p>
-              <p className="text-xs text-on-surface-variant mt-1">
+              <p className="text-sm font-medium text-slate-500">Không có bài viết nào</p>
+              <p className="text-xs text-slate-400 mt-1">
                 {filterType
                   ? `Không có bài viết loại "${TARGET_TYPE_CONFIG[filterType]?.label || filterType}"`
                   : "Thành viên chưa đăng bài nào trong khoảng thời gian này"}
@@ -525,10 +525,10 @@ export function LeaderPostView({
                 return (
                   <div
                     key={post.id}
-                    className="border border-outline-variant rounded-xl bg-surface overflow-hidden hover:shadow-md hover:border-outline-variant transition-all duration-200"
+                    className="border border-slate-200 rounded-2xl bg-white overflow-hidden hover:shadow-md hover:border-slate-300 transition-all duration-200"
                   >
                     {/* Post header */}
-                    <div className="flex items-center justify-between px-4 py-2.5 bg-surface-container-low border-b border-outline-variant">
+                    <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50/80 border-b border-slate-100">
                       <div className="flex items-center gap-2">
                         <span
                           className={cn(
@@ -541,17 +541,17 @@ export function LeaderPostView({
                           {cfg.label}
                         </span>
                         {post.target_id && (
-                          <span className="text-[10px] text-on-surface-variant font-mono">
+                          <span className="text-[10px] text-slate-400 font-mono">
                             {post.target_id}
                           </span>
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-on-surface-variant font-medium">
+                        <span className="text-[11px] text-slate-500 font-medium">
                           {formatDate(post.posted_at)}
                         </span>
                         {post.job_id && (
-                          <span className="text-[10px] text-outline font-mono">
+                          <span className="text-[10px] text-slate-300 font-mono">
                             #{post.job_id.slice(0, 8)}
                           </span>
                         )}
@@ -561,11 +561,11 @@ export function LeaderPostView({
                     {/* Post content */}
                     <div className="px-4 py-3">
                       {post.content ? (
-                        <p className="text-[13px] text-on-surface whitespace-pre-wrap line-clamp-3 leading-relaxed">
+                        <p className="text-[13px] text-slate-700 whitespace-pre-wrap line-clamp-3 leading-relaxed">
                           {post.content}
                         </p>
                       ) : (
-                        <p className="text-[13px] text-on-surface-variant italic">
+                        <p className="text-[13px] text-slate-400 italic">
                           Không có nội dung (chỉ đăng ảnh/video)
                         </p>
                       )}
@@ -573,7 +573,7 @@ export function LeaderPostView({
 
                     {/* Post actions */}
                     {post.post_url && (
-                      <div className="px-4 py-2.5 border-t border-outline-variant bg-surface-container-low flex items-center justify-between">
+                      <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50/30 flex items-center justify-between">
                         <button
                           onClick={() => openPostUrl(post.post_url)}
                           className="inline-flex items-center gap-1.5 text-[11px] font-semibold transition hover:underline"
@@ -586,7 +586,7 @@ export function LeaderPostView({
                           onClick={() => {
                             navigator.clipboard.writeText(post.post_url || "");
                           }}
-                          className="inline-flex items-center gap-1 text-[11px] text-on-surface-variant hover:text-on-surface-variant transition"
+                          className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-slate-600 transition"
                           title="Sao chép link"
                         >
                           <MaterialIcon name="content_copy" className="text-[13px]" />

@@ -4,7 +4,6 @@ export type MaterialSymbolName =
   | "search"
   | "notifications"
   | "settings"
-  | "menu"
   | "radar"
   | "download"
   | "group"

@@ -24,14 +24,14 @@ function getRecentWeeks(numWeeks = 8) {
     monday.setDate(d.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
-
+    
     const yearStart = new Date(monday.getFullYear(), 0, 1);
     const weekNo = Math.ceil((((monday.getTime() - yearStart.getTime()) / 86400000) + yearStart.getDay() + 1) / 7);
-
+    
     const fmt = (dt: Date) => dt.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
     const valStart = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
     const valEnd = `${sunday.getFullYear()}-${String(sunday.getMonth() + 1).padStart(2, '0')}-${String(sunday.getDate()).padStart(2, '0')}`;
-
+    
     weeks.push({
       label: `Tuần ${weekNo} (${fmt(monday)} - ${fmt(sunday)})`,
       value: `${valStart}_${valEnd}`
@@ -48,7 +48,7 @@ export function TeamManagement() {
   const [isLoading, setIsLoading] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<any>(null);
-
+  
   const [seedingModalOpen, setSeedingModalOpen] = useState(false);
   const [selectedMemberSeeding, setSelectedMemberSeeding] = useState<any>(null);
 
@@ -71,7 +71,7 @@ export function TeamManagement() {
   // Effect 1: Fetch teams when user loads page
   useEffect(() => {
     if (!user?.id || !["leader", "admin", "superadmin"].includes(user.role || "")) return;
-
+    
     const loadTeams = async () => {
       try {
         const teamsRes = await teamsService.getAll();
@@ -92,7 +92,7 @@ export function TeamManagement() {
         console.error("Error fetching teams:", err);
       }
     };
-
+    
     loadTeams();
   }, [user?.id, user?.role]);
 
@@ -102,9 +102,9 @@ export function TeamManagement() {
       setKpiData([]);
       return;
     }
-
+    
     const [startDate, endDate] = selectedWeek.split("_");
-
+    
     setIsLoading(true);
     allPlatformKpiService.getAll(user.email, selectedTeamId, startDate, endDate)
       .then(kpiRes => {
@@ -222,7 +222,7 @@ export function TeamManagement() {
 
   const handleDeleteTeam = async () => {
     if (!selectedTeam || !user?.id) return;
-
+    
     const confirmDelete = window.confirm(`Bạn có chắc chắn muốn xóa team "${selectedTeam.name_team}" không?`);
     if (!confirmDelete) return;
 
@@ -261,14 +261,14 @@ export function TeamManagement() {
   return (
     <div className="mx-auto w-full max-w-7xl min-w-0 space-y-6 font-sans">
       <div className="mb-6 flex items-start gap-3">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-          <MaterialIcon name="groups" className="text-primary text-3xl" />
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#E3000F]/10">
+          <MaterialIcon name="groups" className="text-[#E3000F] text-3xl" />
         </div>
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-on-surface">
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-[-0.02em] text-slate-900">
             Quản lý Team KPI
           </h1>
-          <p className="text-sm text-on-surface-variant">
+          <p className="text-sm text-[#A0A0A0]">
             Theo dõi tiến độ KPI và phân công nhiệm vụ cho các thành viên
           </p>
         </div>
@@ -295,16 +295,16 @@ export function TeamManagement() {
         />
       </PlatformStatsRow>
 
-      <div className="mt-6 flex flex-col overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-none">
+      <div className="mt-6 flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-none">
         {/* Toolbar */}
-        <div className="flex flex-col gap-4 border-b border-outline-variant bg-surface-container-low p-4 sm:p-5">
+        <div className="flex flex-col gap-4 border-b border-slate-100 bg-slate-50/50 p-4 sm:p-5">
           <div className="grid gap-3 lg:grid-cols-2">
-            <label className="flex flex-col gap-1.5 text-sm font-bold text-on-surface-variant">
+            <label className="flex flex-col gap-1.5 text-sm font-bold text-slate-600">
               <span>Chọn Team:</span>
             <select
               value={selectedTeamId}
               onChange={(e) => setSelectedTeamId(e.target.value)}
-              className="min-h-[44px] rounded-xl border border-outline-variant bg-surface px-4 py-2 text-sm font-semibold text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+              className="min-h-[44px] rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 outline-none transition focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20"
             >
               {teams.length === 0 && <option value="">Chưa có team</option>}
               {teams.map((t) => (
@@ -315,12 +315,12 @@ export function TeamManagement() {
             </select>
             </label>
 
-            <label className="flex flex-col gap-1.5 text-sm font-bold text-on-surface-variant">
+            <label className="flex flex-col gap-1.5 text-sm font-bold text-slate-600">
               <span>Tuần:</span>
             <select
               value={selectedWeek}
               onChange={(e) => setSelectedWeek(e.target.value)}
-              className="min-h-[44px] rounded-xl border border-outline-variant bg-surface px-4 py-2 text-sm font-semibold text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+              className="min-h-[44px] rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 outline-none transition focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20"
             >
               {recentWeeks.map((w) => (
                 <option key={w.value} value={w.value}>
@@ -373,7 +373,7 @@ export function TeamManagement() {
               }}
               className={cn(
                 toolbarButtonClass,
-                "bg-primary text-white hover:bg-on-primary-fixed-variant",
+                "bg-[#E3000F] text-white hover:bg-[#C40009]",
               )}
             >
               <MaterialIcon name="add" className="text-[16px]" />
@@ -390,7 +390,7 @@ export function TeamManagement() {
                   }}
                   className={cn(
                     toolbarButtonClass,
-                    "bg-surface-container-low text-on-surface hover:bg-surface-container-highest",
+                    "bg-slate-100 text-slate-700 hover:bg-slate-200",
                   )}
                 >
                   <MaterialIcon name="edit" className="text-[16px]" />
@@ -414,12 +414,12 @@ export function TeamManagement() {
 
         <div className="space-y-3 p-4 md:hidden">
           {isLoading ? (
-            <div className="py-12 text-center text-on-surface-variant">
-              <div className="mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <div className="py-12 text-center text-slate-400">
+              <div className="mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-[#E3000F] border-t-transparent" />
               <span className="text-sm font-medium">Đang tải dữ liệu KPI...</span>
             </div>
           ) : membersWithKpi.length === 0 ? (
-            <div className="py-12 text-center text-sm text-on-surface-variant">
+            <div className="py-12 text-center text-sm text-slate-400">
               Chưa có thành viên nào trong team này.
             </div>
           ) : (
@@ -438,13 +438,13 @@ export function TeamManagement() {
                 totalTarget === 0 ? 0 : Math.min(100, Math.round((totalCurrent / totalTarget) * 100));
 
               return (
-                <div key={member.id} className="rounded-xl border border-outline-variant bg-surface p-4">
+                <div key={member.id} className="rounded-2xl border border-slate-100 bg-white p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-bold text-on-surface">{member.name || "N/A"}</p>
-                      <p className="truncate text-[11px] text-on-surface-variant">{member.email}</p>
+                      <p className="truncate text-sm font-bold text-slate-900">{member.name || "N/A"}</p>
+                      <p className="truncate text-[11px] text-slate-400">{member.email}</p>
                     </div>
-                    <span className="rounded-full bg-surface-container-low px-2.5 py-1 text-[11px] font-semibold text-on-surface-variant">
+                    <span className="rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
                       {percent}%
                     </span>
                   </div>
@@ -456,21 +456,21 @@ export function TeamManagement() {
                       { label: "Inbox", current: member.kpiInboxCurrent, target: member.kpiInboxTarget },
                       { label: "Lead", current: member.kpiLeadCurrent, target: member.kpiLeadTarget },
                     ].map((item) => (
-                      <div key={item.label} className="rounded-xl bg-surface-container-low px-3 py-2">
-                        <p className="text-[11px] font-semibold text-on-surface-variant">{item.label}</p>
-                        <p className="mt-1 text-sm font-bold text-on-surface">
+                      <div key={item.label} className="rounded-xl bg-slate-50 px-3 py-2">
+                        <p className="text-[11px] font-semibold text-slate-400">{item.label}</p>
+                        <p className="mt-1 text-sm font-bold text-slate-900">
                           {item.current}
-                          <span className="ml-1 text-xs font-medium text-on-surface-variant">/ {item.target}</span>
+                          <span className="ml-1 text-xs font-medium text-slate-400">/ {item.target}</span>
                         </p>
                       </div>
                     ))}
                   </div>
 
-                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-surface-container-low">
+                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
                     <div
                       className={cn(
                         "h-full rounded-full transition-all duration-500",
-                        percent >= 100 ? "bg-emerald-500" : percent > 50 ? "bg-amber-500" : "bg-primary",
+                        percent >= 100 ? "bg-emerald-500" : percent > 50 ? "bg-amber-500" : "bg-[#E3000F]",
                       )}
                       style={{ width: `${percent}%` }}
                     />
@@ -517,7 +517,7 @@ export function TeamManagement() {
                       onClick={() => handleAssignKpi(member)}
                       className={cn(
                         memberActionButtonClass,
-                        "border border-outline-variant bg-surface-container-low text-on-surface hover:bg-surface-container-highest",
+                        "border border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200",
                       )}
                     >
                       <MaterialIcon name="assignment" className="text-[12px]" />
@@ -532,7 +532,7 @@ export function TeamManagement() {
 
         <div className="hidden w-full overflow-x-auto md:block">
           <table className="w-full min-w-[760px] text-left text-[12px]">
-            <thead className="bg-surface-container-low border-b border-outline-variant text-[10px] font-bold text-on-surface-variant uppercase">
+            <thead className="bg-slate-50/75 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
               <tr>
                 <th className="px-3 py-2.5 text-left whitespace-nowrap">Thành viên</th>
                 <th className="px-1 py-2.5 text-center whitespace-nowrap">Post</th>
@@ -543,19 +543,19 @@ export function TeamManagement() {
                 <th className="px-2 py-2.5 text-center whitespace-nowrap">Hành động</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-outline-variant">
+            <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={8} className="px-3 py-12 text-center text-on-surface-variant">
+                  <td colSpan={8} className="px-3 py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-3">
-                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#E3000F] border-t-transparent" />
                       <span className="text-sm font-medium">Đang tải dữ liệu KPI...</span>
                     </div>
                   </td>
                 </tr>
               ) : membersWithKpi.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-3 py-12 text-center text-on-surface-variant italic">
+                  <td colSpan={8} className="px-3 py-12 text-center text-slate-400 italic">
                     Chưa có thành viên nào trong team này.
                   </td>
                 </tr>
@@ -574,32 +574,32 @@ export function TeamManagement() {
                   const percent = totalTarget === 0 ? 0 : Math.min(100, Math.round((totalCurrent / totalTarget) * 100));
 
                   return (
-                    <tr key={member.id} className="transition hover:bg-surface-container-low">
+                    <tr key={member.id} className="transition hover:bg-slate-50/50">
                       <td className="px-3 py-2.5">
-                        <div className="whitespace-nowrap text-xs font-bold text-on-surface">{member.name || "N/A"}</div>
-                        <div className="max-w-[120px] truncate text-[10px] font-medium text-on-surface-variant" title={member.email}>{member.email}</div>
+                        <div className="whitespace-nowrap text-xs font-bold text-slate-800">{member.name || "N/A"}</div>
+                        <div className="max-w-[120px] truncate text-[10px] font-medium text-slate-400" title={member.email}>{member.email}</div>
                       </td>
                       <td className="px-1 py-2.5 text-center">
-                        <span className={cn("text-[11px] font-bold", member.kpiPostCurrent > 0 ? "text-emerald-600" : "text-on-surface")}>{member.kpiPostCurrent}</span>
-                        <span className="text-[10px] text-on-surface-variant"> / {member.kpiPostTarget}</span>
+                        <span className={cn("text-[11px] font-bold", member.kpiPostCurrent > 0 ? "text-emerald-600" : "text-slate-800")}>{member.kpiPostCurrent}</span>
+                        <span className="text-[10px] text-slate-400"> / {member.kpiPostTarget}</span>
                       </td>
                       <td className="px-1 py-2.5 text-center">
-                        <span className="text-[11px] font-bold text-on-surface">{member.kpiCommentCurrent}</span>
-                        <span className="text-[10px] text-on-surface-variant"> / {member.kpiCommentTarget}</span>
+                        <span className="text-[11px] font-bold text-slate-800">{member.kpiCommentCurrent}</span>
+                        <span className="text-[10px] text-slate-400"> / {member.kpiCommentTarget}</span>
                       </td>
                       <td className="px-1 py-2.5 text-center">
-                        <span className={cn("text-[11px] font-bold", member.kpiInboxCurrent >= member.kpiInboxTarget && member.kpiInboxTarget > 0 ? "text-emerald-600" : "text-on-surface")}>{member.kpiInboxCurrent}</span>
-                        <span className="text-[10px] text-on-surface-variant"> / {member.kpiInboxTarget}</span>
+                        <span className={cn("text-[11px] font-bold", member.kpiInboxCurrent >= member.kpiInboxTarget && member.kpiInboxTarget > 0 ? "text-emerald-600" : "text-slate-800")}>{member.kpiInboxCurrent}</span>
+                        <span className="text-[10px] text-slate-400"> / {member.kpiInboxTarget}</span>
                       </td>
                       <td className="px-1 py-2.5 text-center">
-                        <span className="text-[11px] font-bold text-on-surface">{member.kpiLeadCurrent}</span>
-                        <span className="text-[10px] text-on-surface-variant"> / {member.kpiLeadTarget}</span>
+                        <span className="text-[11px] font-bold text-slate-800">{member.kpiLeadCurrent}</span>
+                        <span className="text-[10px] text-slate-400"> / {member.kpiLeadTarget}</span>
                       </td>
                       <td className="px-2 py-2.5">
                         <div className="flex items-center gap-1.5">
-                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-container-low">
+                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
                             <div
-                              className={cn("h-full rounded-full transition-all duration-500", percent >= 100 ? "bg-emerald-500" : percent > 50 ? "bg-amber-500" : "bg-primary")}
+                              className={cn("h-full rounded-full transition-all duration-500", percent >= 100 ? "bg-emerald-500" : percent > 50 ? "bg-amber-500" : "bg-[#E3000F]")}
                               style={{ width: `${percent}%` }}
                             />
                           </div>
@@ -608,7 +608,7 @@ export function TeamManagement() {
                               "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold",
                               percent >= 100 ? "bg-emerald-100 text-emerald-700" :
                               percent > 50 ? "bg-amber-100 text-amber-700" :
-                              "bg-surface-container-low text-on-surface-variant",
+                              "bg-slate-100 text-slate-600",
                             )}
                           >
                             {percent}%
@@ -647,7 +647,7 @@ export function TeamManagement() {
                           <button onClick={() => handleAssignKpi(member)}
                             className={cn(
                               memberActionButtonClass,
-                              "border border-outline-variant bg-surface-container-low text-on-surface hover:bg-surface-container-highest",
+                              "border border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200",
                             )}>
                             <MaterialIcon name="assignment" className="text-[12px]" />KPI
                           </button>
@@ -712,7 +712,7 @@ export function TeamManagement() {
           onSuccess={() => {
             // Refresh teams list by re-triggering the teams effect
             if (!["leader", "admin", "superadmin"].includes(user.role || "")) return;
-
+            
             teamsService.getAll()
               .then(teamsRes => {
                 if (teamsRes.success && teamsRes.data) {

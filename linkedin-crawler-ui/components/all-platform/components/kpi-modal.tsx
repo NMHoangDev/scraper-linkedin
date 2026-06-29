@@ -31,25 +31,25 @@ export function KpiModal({ isOpen, onClose, member, onSubmit }: KpiModalProps) {
   const generateWeeks = () => {
     const year = new Date().getFullYear();
     const weeks = [];
-
+    
     let firstDay = new Date(year, 0, 1);
     let dayOfWeek = firstDay.getDay() || 7;
     let startMonday = new Date(firstDay);
     startMonday.setDate(firstDay.getDate() - dayOfWeek + 1);
-
+    
     for (let i = 1; i <= 52; i++) {
       let monday = new Date(startMonday);
       monday.setDate(startMonday.getDate() + (i - 1) * 7);
       let sunday = new Date(monday);
       sunday.setDate(monday.getDate() + 6);
-
+      
       const formatDate = (d: Date) => {
         const y = d.getFullYear();
         const m = String(d.getMonth() + 1).padStart(2, '0');
         const day = String(d.getDate()).padStart(2, '0');
         return `${y}-${m}-${day}`;
       };
-
+      
       weeks.push({
         weekNumber: i,
         monday: formatDate(monday),
@@ -61,14 +61,14 @@ export function KpiModal({ isOpen, onClose, member, onSubmit }: KpiModalProps) {
   };
 
   const weeks = useMemo(() => generateWeeks(), []);
-
+  
   const getCurrentWeek = () => {
     const today = new Date();
     const y = today.getFullYear();
     const m = String(today.getMonth() + 1).padStart(2, '0');
     const day = String(today.getDate()).padStart(2, '0');
     const todayStr = `${y}-${m}-${day}`;
-
+    
     const current = weeks.find(w => todayStr >= w.monday && todayStr <= w.sunday);
     return current ? current.weekNumber : 24;
   };
@@ -110,18 +110,18 @@ export function KpiModal({ isOpen, onClose, member, onSubmit }: KpiModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-[min(90vw,440px)] rounded-xl bg-surface p-6 shadow-xl flex flex-col gap-md">
-        <h2 className="text-lg font-bold text-on-surface">KPI: {member.name || member.email}</h2>
+      <div className="w-[min(90vw,440px)] rounded-2xl bg-white p-6 shadow-xl flex flex-col gap-md">
+        <h2 className="text-lg font-bold text-slate-900">KPI: {member.name || member.email}</h2>
 
         {/* Progress */}
         <div className="mb-4">
           <div className="mb-1 flex justify-between text-sm">
-            <span className="text-on-surface-variant">Tiến độ</span>
-            <span className="font-semibold text-on-surface">
+            <span className="text-slate-600">Tiến độ</span>
+            <span className="font-semibold text-slate-900">
               {verifiedCount} / {target}
             </span>
           </div>
-          <div className="h-2 w-full rounded-full bg-surface-container-highest">
+          <div className="h-2 w-full rounded-full bg-slate-200">
             <div
               className={cn(
                 "h-2 rounded-full transition-all",
@@ -134,14 +134,14 @@ export function KpiModal({ isOpen, onClose, member, onSubmit }: KpiModalProps) {
               style={{ width: `${progress}%` }}
             />
           </div>
-          <p className="mt-1 text-xs text-on-surface-variant">{progress}% hoàn thành KPI</p>
+          <p className="mt-1 text-xs text-slate-500">{progress}% hoàn thành KPI</p>
         </div>
 
         {/* Stats */}
         <div className="mb-4 grid grid-cols-3 gap-3 text-center">
-          <div className="rounded-lg bg-surface-container-low p-3">
-            <p className="text-lg font-bold text-on-surface">{totalCount}</p>
-            <p className="text-xs text-on-surface-variant">Tổng bài</p>
+          <div className="rounded-lg bg-slate-50 p-3">
+            <p className="text-lg font-bold text-slate-900">{totalCount}</p>
+            <p className="text-xs text-slate-500">Tổng bài</p>
           </div>
           <div className="rounded-lg bg-green-50 p-3">
             <p className="text-lg font-bold text-green-600">{verifiedCount}</p>
@@ -156,21 +156,21 @@ export function KpiModal({ isOpen, onClose, member, onSubmit }: KpiModalProps) {
         {/* Form */}
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-semibold text-on-surface-variant">KPI/tuần</label>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">KPI/tuần</label>
             <input
               type="number"
               value={kpiPerWeek}
               onChange={(e) => setKpiPerWeek(e.target.value)}
               min={0}
-              className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
           <div className="space-y-1">
-            <label className="mb-1 block text-xs font-semibold text-on-surface-variant">Chọn Tuần</label>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">Chọn Tuần</label>
             <select
               value={selectedWeek}
               onChange={(e) => setSelectedWeek(Number(e.target.value))}
-              className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
             >
               {weeks.map((w) => (
                 <option key={w.weekNumber} value={w.weekNumber}>
@@ -185,7 +185,7 @@ export function KpiModal({ isOpen, onClose, member, onSubmit }: KpiModalProps) {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-outline-variant px-4 py-2 text-sm font-medium text-on-surface-variant transition-colors hover:bg-surface-container-low"
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
           >
             Đóng
           </button>

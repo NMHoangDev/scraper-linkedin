@@ -34,20 +34,20 @@ export function StatsRow({
   return (
     <PlatformStatsRow>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <div className="rounded-xl border border-outline-variant bg-surface p-md shadow-sm">
-          <p className="text-body-sm font-semibold text-on-surface-variant">
+        <div className="rounded-xl border border-[#E5E5E5] bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#666666]">
             Tổng bài hôm nay
           </p>
-          <p className="mt-1 text-h1 text-on-surface">{totalPostsToday}</p>
-          <p className="mt-0.5 text-body-sm text-on-surface-variant">{hint}</p>
+          <p className="mt-1 text-2xl font-bold text-[#1A1A1A]">{totalPostsToday}</p>
+          <p className="mt-0.5 text-xs text-[#A0A0A0]">{hint}</p>
         </div>
 
-        <div className="rounded-xl border border-outline-variant bg-surface p-md shadow-sm">
-          <p className="text-body-sm font-semibold text-on-surface-variant">
+        <div className="rounded-xl border border-[#E5E5E5] bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#666666]">
             Tiến độ KPI
           </p>
           <p className="mt-1 text-2xl font-bold text-green-600">{kpiProgress !== undefined ? kpiProgress : (highScoreCount || 0)}</p>
-          <p className="mt-0.5 text-body-sm text-on-surface-variant">
+          <p className="mt-0.5 text-xs text-[#A0A0A0]">
             {kpiProgressPercent !== undefined
               ? `${kpiProgressPercent}% hoàn thành`
               : highScorePercent !== undefined
@@ -56,20 +56,20 @@ export function StatsRow({
           </p>
         </div>
 
-        <div className="rounded-xl border border-outline-variant bg-surface p-md shadow-sm">
-          <p className="text-body-sm font-semibold text-on-surface-variant">
+        <div className="rounded-xl border border-[#E5E5E5] bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#666666]">
             Đã seeded hôm nay
           </p>
-          <p className="mt-1 text-h1 text-primary">{seededToday}</p>
-          <p className="mt-0.5 text-body-sm text-on-surface-variant">bài đã xác minh</p>
+          <p className="mt-1 text-2xl font-bold text-[#E3000F]">{seededToday}</p>
+          <p className="mt-0.5 text-xs text-[#A0A0A0]">bài đã xác minh</p>
         </div>
 
-        <div className="rounded-xl border border-outline-variant bg-surface p-md shadow-sm">
-          <p className="text-body-sm font-semibold text-on-surface-variant">
+        <div className="rounded-xl border border-[#E5E5E5] bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#666666]">
             Tổng bài đang hiển thị
           </p>
-          <p className="mt-1 text-h1 text-on-surface">{totalVisible}</p>
-          <p className="mt-0.5 text-body-sm text-on-surface-variant">trên tổng bài</p>
+          <p className="mt-1 text-2xl font-bold text-[#1A1A1A]">{totalVisible}</p>
+          <p className="mt-0.5 text-xs text-[#A0A0A0]">trên tổng bài</p>
         </div>
       </div>
     </PlatformStatsRow>

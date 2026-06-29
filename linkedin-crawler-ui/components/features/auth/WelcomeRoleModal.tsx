@@ -58,7 +58,7 @@ export function WelcomeRoleModal({
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-md bg-surface/80 backdrop-blur-md">
-      <div className="w-[min(92vw,450px)] bg-surface rounded-xl border border-outline-variant p-xl shadow-2xl space-y-lg animate-in fade-in zoom-in duration-300">
+      <div className="w-[min(92vw,450px)] bg-surface rounded-2xl border border-outline-variant p-xl shadow-2xl space-y-lg animate-in fade-in zoom-in duration-300">
         <div className="text-center space-y-xs">
           <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary mb-md">
             <MaterialIcon name="verified_user" className="text-4xl" />
@@ -122,7 +122,7 @@ export function WelcomeRoleModal({
               <input
                 type="password"
                 placeholder="••••"
-                className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-md py-sm text-center text-xl outline-none focus:ring-2 focus:ring-primary"
+                className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-md py-sm text-center text-xl tracking-[1em] outline-none focus:ring-2 focus:ring-primary"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 disabled={busy}

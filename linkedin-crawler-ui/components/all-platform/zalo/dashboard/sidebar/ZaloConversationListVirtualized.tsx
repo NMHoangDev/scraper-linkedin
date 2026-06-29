@@ -111,7 +111,7 @@ export function ZaloConversationListVirtualized({
     { value: "new", label: "Mới", bg: "bg-emerald-50 text-emerald-700 border-emerald-200" },
     { value: "chatting", label: "Đang chat", bg: "bg-blue-50 text-blue-700 border-blue-200" },
     { value: "followup", label: "Follow-up", bg: "bg-amber-50 text-amber-700 border-amber-200" },
-    { value: "inactive", label: "Không HĐ", bg: "bg-surface-container-low text-on-surface-variant border-outline-variant" },
+    { value: "inactive", label: "Không HĐ", bg: "bg-slate-50 text-slate-600 border-slate-200" },
   ];
 
   // Đo height của container thật qua ResizeObserver.
@@ -155,8 +155,8 @@ export function ZaloConversationListVirtualized({
 
   if (conversations.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center p-8 text-center bg-surface h-full">
-        <p className="text-sm text-on-surface-variant leading-relaxed">
+      <div className="flex-1 flex items-center justify-center p-8 text-center bg-white h-full">
+        <p className="text-sm text-slate-400 leading-relaxed">
           {searchQuery
             ? "Không tìm thấy hội thoại phù hợp"
             : "Chưa có hội thoại. Bấm Đồng bộ để tải về."}
@@ -213,7 +213,7 @@ export function ZaloConversationListVirtualized({
                   const item = e.currentTarget;
                   const fullName = item.getAttribute('data-fullname') || '';
                   if (!fullName) return;
-
+                  
                   let tooltip = document.getElementById('zalo-custom-tooltip');
                   if (!tooltip) {
                     tooltip = document.createElement('div');
@@ -221,7 +221,7 @@ export function ZaloConversationListVirtualized({
                     tooltip.style.cssText = 'position:fixed;background:#1a1a1a;color:#fff;border-radius:6px;padding:6px 10px;font-size:12px;z-index:9999;pointer-events:none;white-space:nowrap;transition:opacity 0.1s;';
                     document.body.appendChild(tooltip);
                   }
-
+                  
                   tooltip.textContent = fullName;
                   const rect = item.getBoundingClientRect();
                   tooltip.style.left = (rect.right + 8) + 'px';
@@ -238,9 +238,9 @@ export function ZaloConversationListVirtualized({
                 data-fullname={title}
                 className={`zalo-chat-item w-full h-full flex items-center gap-3 cursor-pointer ${
                   fullScreen ? "px-5 gap-4" : "px-4"
-                } text-left transition border-b border-outline-variant hover:bg-surface-container-low focus:outline-none focus-visible:bg-surface-container-low focus-visible:ring-2 focus-visible:ring-red-500/40 relative group ${
+                } text-left transition border-b border-slate-50 hover:bg-slate-50 focus:outline-none focus-visible:bg-slate-50 focus-visible:ring-2 focus-visible:ring-red-500/40 relative group ${
                   isActive
-                    ? "bg-red-50/50 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-primary before:rounded-r-md"
+                    ? "bg-red-50/50 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-[#E3000F] before:rounded-r-md"
                     : ""
                 }`}
               >
@@ -251,7 +251,7 @@ export function ZaloConversationListVirtualized({
                       alt={title}
                       className={`${
                         fullScreen ? "h-11 w-11" : "h-9 w-9"
-                      } rounded-full object-cover border border-outline-variant bg-surface`}
+                      } rounded-full object-cover border border-slate-200 bg-white`}
                       onError={(e) => {
                         (e.target as HTMLElement).style.display = "none";
                       }}
@@ -266,8 +266,8 @@ export function ZaloConversationListVirtualized({
                       fullScreen ? "h-11 w-11 text-[13px]" : "h-9 w-9 text-[11px]"
                     } shrink-0 rounded-full flex items-center justify-center font-bold relative select-none ${
                       isActive
-                        ? "bg-primary text-white"
-                        : "bg-surface-container-highest text-on-surface-variant"
+                        ? "bg-[#E3000F] text-white"
+                        : "bg-slate-200 text-slate-600"
                     }`}
                   >
                     {initials(title)}
@@ -281,13 +281,13 @@ export function ZaloConversationListVirtualized({
                   <div className="zalo-chat-item-row1 flex items-center justify-between mb-0.5">
                     <div
                       title={title}
-                      className={`zalo-chat-item-name truncate text-[13px] font-semibold text-on-surface ${
+                      className={`zalo-chat-item-name truncate text-[13px] font-semibold text-slate-800 ${
                         conv.unread_count && conv.unread_count > 0 ? "font-bold" : ""
                       }`}
                     >
                       {title}
                     </div>
-                    <div className="zalo-chat-item-time text-[10px] text-on-surface-variant shrink-0 font-medium">
+                    <div className="zalo-chat-item-time text-[10px] text-slate-400 shrink-0 font-medium">
                       {formatTime(conv.latest_message_at)}
                     </div>
                   </div>
@@ -296,7 +296,7 @@ export function ZaloConversationListVirtualized({
                   <div className="zalo-chat-item-row2 flex items-center gap-1.5 mb-0.5">
                     {/* Badge channel */}
                     {isFb ? (
-                      <span className="text-[8px] bg-surface-container-low text-on-surface-variant font-bold px-1.5 py-0.5 rounded border border-outline-variant uppercase shrink-0">
+                      <span className="text-[8px] bg-slate-100 text-slate-600 font-bold px-1.5 py-0.5 rounded border border-slate-200 uppercase shrink-0">
                         FB
                       </span>
                     ) : (
@@ -346,27 +346,27 @@ export function ZaloConversationListVirtualized({
                     <div
                       className={`truncate flex-1 text-[12px] ${
                         conv.unread_count && conv.unread_count > 0
-                          ? "text-on-surface font-semibold"
+                          ? "text-slate-800 font-semibold"
                           : isActive
-                            ? "text-on-surface font-medium"
-                            : "text-on-surface-variant"
+                            ? "text-slate-700 font-medium"
+                            : "text-slate-500"
                       }`}
                     >
                       {(() => {
                         const cleanSenderName = conv.latest_sender_name?.trim();
                         if (!cleanSenderName) return "";
-
+                        
                         const lowerName = cleanSenderName.toLowerCase();
                         const isSelf = lowerName === "__me__" || lowerName === "me" || lowerName === "bạn" || lowerName === "ban";
                         if (isSelf) {
                           return "Bạn: ";
                         }
-
+                        
                         const isGroup = !conv.conversation_id.startsWith("fb_") && conv.conversation_id.startsWith("g");
                         if (isGroup) {
                           return `${cleanSenderName}: `;
                         }
-
+                        
                         return "";
                       })()}
                       {conv.latest_content || "Tin nhắn mới"}
@@ -387,7 +387,7 @@ export function ZaloConversationListVirtualized({
       {mounted && dropdownOpenId &&
         createPortal(
           <div
-            className="fixed z-[9999] bg-surface border border-outline-variant rounded-lg shadow-xl py-1 w-28 text-[11px] font-medium"
+            className="fixed z-[9999] bg-white border border-slate-200 rounded-lg shadow-xl py-1 w-28 text-[11px] font-medium"
             style={{
               left: `${dropdownPos.x}px`,
               top: `${dropdownPos.y + 4}px`,
@@ -401,7 +401,7 @@ export function ZaloConversationListVirtualized({
                 onClick={() => {
                   onSetTag(dropdownOpenId, t.value);
                 }}
-                className="w-full text-left px-2.5 py-1.5 hover:bg-surface-container-low flex items-center gap-1.5 text-on-surface"
+                className="w-full text-left px-2.5 py-1.5 hover:bg-slate-50 flex items-center gap-1.5 text-slate-700"
               >
                 <span className={`w-2 h-2 rounded-full border ${t.bg}`} />
                 {t.label}

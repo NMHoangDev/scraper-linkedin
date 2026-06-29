@@ -160,19 +160,19 @@ export function ProfileContent() {
     <div className="mx-auto w-full max-w-[1100px] min-w-0 space-y-6 font-sans">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <div className="rounded-xl bg-primary/10 p-3">
-          <MaterialIcon name="person" className="text-primary text-3xl" />
+        <div className="rounded-xl bg-[#E3000F]/10 p-3">
+          <MaterialIcon name="person" className="text-[#E3000F] text-3xl" />
         </div>
         <div>
-          <h1 className="text-h1 text-on-surface font-semibold">Trang cá nhân</h1>
-          <p className="text-body-md text-on-surface-variant">
+          <h1 className="text-h1 text-[#1A1A1A] font-semibold">Trang cá nhân</h1>
+          <p className="text-body-md text-[#666666]">
             Quản lý thông tin cá nhân và cài đặt bảo mật tài khoản
           </p>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-outline-variant overflow-x-auto whitespace-nowrap">
+      <div className="border-b border-[#E5E5E5] overflow-x-auto whitespace-nowrap">
         <div className="flex gap-8 px-2">
           {TABS.map((tab) => {
             const active = activeTab === tab.key;
@@ -182,10 +182,10 @@ export function ProfileContent() {
                 type="button"
                 onClick={() => setActiveTab(tab.key)}
                 className={cn(
-                  "py-4 text-xs font-bold border-b-2 transition-all uppercase cursor-pointer",
+                  "py-4 text-xs font-bold border-b-2 transition-all uppercase tracking-wider cursor-pointer",
                   active
-                    ? "border-primary text-primary"
-                    : "border-transparent text-on-surface-variant hover:text-primary",
+                    ? "border-[#E3000F] text-[#E3000F]"
+                    : "border-transparent text-[#A0A0A0] hover:text-[#E3000F]",
                 )}
               >
                 {tab.label}
@@ -200,19 +200,19 @@ export function ProfileContent() {
         <div className="grid grid-cols-12 gap-6">
           <div className="col-span-12 lg:col-span-8 min-w-0 space-y-6">
             {/* Personal info */}
-            <div className="rounded-xl border border-outline-variant bg-surface p-6 space-y-6 shadow-sm">
-              <h2 className="text-sm font-bold text-on-surface border-b border-outline-variant pb-3 flex items-center gap-2">
-                <MaterialIcon name="person" className="text-primary" />
+            <div className="rounded-xl border border-[#E5E5E5] bg-white p-6 space-y-6 shadow-sm">
+              <h2 className="text-sm font-bold text-[#1A1A1A] border-b border-[#E5E5E5] pb-3 flex items-center gap-2">
+                <MaterialIcon name="person" className="text-[#E3000F]" />
                 Chi tiết tài khoản
               </h2>
 
               <div className="grid gap-6 md:grid-cols-2">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-on-surface-variant uppercase">
+                  <label className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider">
                     Email đăng nhập
                   </label>
                   <input
-                    className="w-full px-4 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-xs text-on-surface-variant focus:ring-primary/15 focus:border-primary cursor-not-allowed"
+                    className="w-full px-4 py-2 bg-[#F5F5F5] border border-[#E5E5E5] rounded-xl text-xs text-[#A0A0A0] focus:ring-[#E3000F]/20 focus:border-[#E3000F] cursor-not-allowed"
                     readOnly
                     type="text"
                     value={user?.email ?? ""}
@@ -220,11 +220,11 @@ export function ProfileContent() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-on-surface-variant uppercase">
+                  <label className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider">
                     Họ tên hiển thị
                   </label>
                   <input
-                    className="w-full px-4 py-2 bg-surface-container-low/30 border border-outline-variant rounded-xl text-xs text-on-surface focus:ring-primary/15 focus:border-primary transition-all"
+                    className="w-full px-4 py-2 bg-[#F5F5F5]/30 border border-[#E5E5E5] rounded-xl text-xs text-[#1A1A1A] focus:ring-[#E3000F]/20 focus:border-[#E3000F] transition-all"
                     type="text"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
@@ -232,24 +232,24 @@ export function ProfileContent() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-on-surface-variant uppercase">
+                  <label className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider">
                     Vai trò hệ thống
                   </label>
                   <div className="pt-1">
-                    <span className="inline-flex items-center px-3 py-1 rounded-full bg-surface-container-low text-on-surface-variant text-[9px] uppercase border border-outline-variant font-bold">
+                    <span className="inline-flex items-center px-3 py-1 rounded-full bg-[#F5F5F5] text-[#666666] text-[9px] uppercase border border-[#E5E5E5] font-bold tracking-wider">
                       {user?.role ?? "member"}
                     </span>
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-on-surface-variant uppercase">
+                  <label className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider">
                     Ngày đăng ký
                   </label>
-                  <p className="text-xs font-semibold text-on-surface flex items-center gap-2 pt-1.5">
+                  <p className="text-xs font-semibold text-[#1A1A1A] flex items-center gap-2 pt-1.5">
                     <MaterialIcon
                       name="calendar_today"
-                      className="text-xs text-on-surface-variant"
+                      className="text-xs text-[#A0A0A0]"
                     />
                     {createdAtLabel}
                   </p>
@@ -262,7 +262,7 @@ export function ProfileContent() {
                     "rounded-xl border px-4 py-3 text-xs font-medium",
                     profileMsg.type === "success"
                       ? "bg-green-50 text-green-800 border-green-200"
-                      : "bg-primary-container/10 text-primary-container border-primary-container/20",
+                      : "bg-[#FF3344]/10 text-[#FF3344] border-[#FF3344]/20",
                   )}
                 >
                   {profileMsg.text}
@@ -274,7 +274,7 @@ export function ProfileContent() {
                   type="button"
                   onClick={() => void handleSaveProfile()}
                   disabled={savingProfile}
-                  className="px-4 py-2 bg-primary hover:bg-on-primary-fixed-variant text-white font-bold text-xs rounded-xl active:scale-95 transition-all disabled:opacity-50 shadow-sm cursor-pointer"
+                  className="px-4 py-2 bg-[#E3000F] hover:bg-[#C40009] text-white font-bold text-xs rounded-xl active:scale-95 transition-all disabled:opacity-50 shadow-sm cursor-pointer"
                 >
                   {savingProfile ? "Đang lưu..." : "Lưu thông tin"}
                 </button>
@@ -282,23 +282,23 @@ export function ProfileContent() {
             </div>
 
             {/* Danger zone */}
-            <div className="rounded-xl border border-red-100 bg-surface p-6 space-y-6 shadow-sm">
+            <div className="rounded-xl border border-red-100 bg-white p-6 space-y-6 shadow-sm">
               <h2 className="text-sm font-bold text-red-600 border-b border-red-50 pb-3 flex items-center gap-2">
                 <MaterialIcon name="warning" className="text-red-500" />
                 Vô hiệu hóa tài khoản
               </h2>
-              <p className="text-xs text-on-surface-variant leading-relaxed">
+              <p className="text-xs text-[#666666] leading-relaxed">
                 Việc vô hiệu hóa tài khoản sẽ khiến bạn không thể truy cập vào hệ thống nữa.
                 Hành động này không thể hoàn tác, vui lòng cẩn thận.
               </p>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-on-surface-variant uppercase">
+                <label className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider">
                   Mật khẩu xác nhận
                 </label>
                 <div className="relative">
                   <input
-                    className="w-full px-4 py-2 bg-surface-container-low/30 border border-outline-variant rounded-xl text-xs text-on-surface focus:ring-error focus:border-error pr-12 transition-all"
+                    className="w-full px-4 py-2 bg-[#F5F5F5]/30 border border-[#E5E5E5] rounded-xl text-xs text-[#1A1A1A] focus:ring-error focus:border-error pr-12 transition-all"
                     type={showDeactivatePw ? "text" : "password"}
                     placeholder="••••••••"
                     value={deactivatePw}
@@ -307,7 +307,7 @@ export function ProfileContent() {
                   <button
                     type="button"
                     onClick={() => setShowDeactivatePw((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-on-surface-variant hover:text-on-surface cursor-pointer"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#666666] hover:text-[#1A1A1A] cursor-pointer"
                   >
                     <MaterialIcon
                       name={showDeactivatePw ? "visibility_off" : "visibility"}
@@ -323,7 +323,7 @@ export function ProfileContent() {
                     "rounded-xl border px-4 py-3 text-xs font-medium",
                     deactivateMsg.type === "success"
                       ? "bg-green-50 text-green-800 border-green-200"
-                      : "bg-primary-container/10 text-primary-container border-primary-container/20",
+                      : "bg-[#FF3344]/10 text-[#FF3344] border-[#FF3344]/20",
                   )}
                 >
                   {deactivateMsg.text}
@@ -345,9 +345,9 @@ export function ProfileContent() {
 
           {/* Right notes */}
           <div className="col-span-12 lg:col-span-4 min-w-0">
-            <div className="rounded-xl border border-outline-variant bg-surface p-6 sticky top-24 space-y-6 shadow-sm">
-              <h3 className="text-xs font-bold text-on-surface border-b border-outline-variant pb-2 flex items-center gap-2">
-                <MaterialIcon name="verified_user" className="text-primary" />
+            <div className="rounded-xl border border-[#E5E5E5] bg-white p-6 sticky top-24 space-y-6 shadow-sm">
+              <h3 className="text-xs font-bold text-[#1A1A1A] border-b border-[#E5E5E5] pb-2 flex items-center gap-2">
+                <MaterialIcon name="verified_user" className="text-[#E3000F]" />
                 An toàn & Bảo mật
               </h3>
               <ul className="space-y-4">
@@ -361,7 +361,7 @@ export function ProfileContent() {
                       name="check_circle"
                       className="text-green-500 shrink-0 text-sm mt-0.5"
                     />
-                    <span className="text-xs text-on-surface-variant leading-normal">
+                    <span className="text-xs text-[#666666] leading-normal">
                       {t}
                     </span>
                   </li>
@@ -376,21 +376,21 @@ export function ProfileContent() {
       {activeTab === "password" && (
         <div className="grid grid-cols-12 gap-6">
           <div className="col-span-12 lg:col-span-8 min-w-0">
-            <div className="rounded-xl border border-outline-variant bg-surface p-6 space-y-6 shadow-sm">
-              <h2 className="text-sm font-bold text-on-surface border-b border-outline-variant pb-3 flex items-center gap-2">
-                <MaterialIcon name="lock_reset" className="text-primary" />
+            <div className="rounded-xl border border-[#E5E5E5] bg-white p-6 space-y-6 shadow-sm">
+              <h2 className="text-sm font-bold text-[#1A1A1A] border-b border-[#E5E5E5] pb-3 flex items-center gap-2">
+                <MaterialIcon name="lock_reset" className="text-[#E3000F]" />
                 Thay đổi mật khẩu đăng nhập
               </h2>
 
               <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
                 <div className="space-y-4">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-on-surface-variant uppercase">
+                    <label className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider">
                       Mật khẩu hiện tại
                     </label>
                     <div className="relative">
                       <input
-                        className="w-full px-4 py-2 bg-surface-container-low/30 border border-outline-variant rounded-xl text-xs text-on-surface focus:ring-2 focus:ring-primary/15 focus:border-primary pr-12 transition-all outline-none"
+                        className="w-full px-4 py-2 bg-[#F5F5F5]/30 border border-[#E5E5E5] rounded-xl text-xs text-[#1A1A1A] focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] pr-12 transition-all outline-none"
                         placeholder="••••••••"
                         type={showCurrent ? "text" : "password"}
                         value={currentPw}
@@ -399,7 +399,7 @@ export function ProfileContent() {
                       <button
                         type="button"
                         onClick={() => setShowCurrent((v) => !v)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-on-surface-variant hover:text-on-surface cursor-pointer"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#666666] hover:text-[#1A1A1A] cursor-pointer"
                       >
                         <MaterialIcon
                           name={showCurrent ? "visibility_off" : "visibility"}
@@ -411,12 +411,12 @@ export function ProfileContent() {
 
                   <div className="grid gap-6 md:grid-cols-2">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-on-surface-variant uppercase">
+                      <label className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider">
                         Mật khẩu mới
                       </label>
                       <div className="relative">
                         <input
-                          className="w-full px-4 py-2 bg-surface-container-low/30 border border-outline-variant rounded-xl text-xs text-on-surface focus:ring-2 focus:ring-primary/15 focus:border-primary pr-12 transition-all outline-none"
+                          className="w-full px-4 py-2 bg-[#F5F5F5]/30 border border-[#E5E5E5] rounded-xl text-xs text-[#1A1A1A] focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] pr-12 transition-all outline-none"
                           placeholder="••••••••"
                           type={showNew ? "text" : "password"}
                           value={newPw}
@@ -425,7 +425,7 @@ export function ProfileContent() {
                         <button
                           type="button"
                           onClick={() => setShowNew((v) => !v)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-on-surface-variant hover:text-on-surface cursor-pointer"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#666666] hover:text-[#1A1A1A] cursor-pointer"
                         >
                           <MaterialIcon
                             name={showNew ? "visibility_off" : "visibility"}
@@ -436,11 +436,11 @@ export function ProfileContent() {
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-on-surface-variant uppercase">
+                      <label className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider">
                         Xác nhận mật khẩu mới
                       </label>
                       <input
-                        className="w-full px-4 py-2 bg-surface-container-low/30 border border-outline-variant rounded-xl text-xs text-on-surface focus:ring-2 focus:ring-primary/15 focus:border-primary transition-all outline-none"
+                        className="w-full px-4 py-2 bg-[#F5F5F5]/30 border border-[#E5E5E5] rounded-xl text-xs text-[#1A1A1A] focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] transition-all outline-none"
                         placeholder="••••••••"
                         type="password"
                         value={confirmPw}
@@ -456,7 +456,7 @@ export function ProfileContent() {
                       "rounded-xl border px-4 py-3 text-xs font-medium",
                       pwMsg.type === "success"
                         ? "bg-green-50 text-green-800 border-green-200"
-                        : "bg-primary-container/10 text-primary-container border-primary-container/20",
+                        : "bg-[#FF3344]/10 text-[#FF3344] border-[#FF3344]/20",
                     )}
                   >
                     {pwMsg.text}
@@ -468,7 +468,7 @@ export function ProfileContent() {
                     type="button"
                     onClick={() => void handleChangePassword()}
                     disabled={savingPw}
-                    className="px-4 py-2 bg-primary hover:bg-on-primary-fixed-variant text-white font-bold text-xs rounded-xl active:scale-95 transition-all disabled:opacity-50 shadow-sm cursor-pointer"
+                    className="px-4 py-2 bg-[#E3000F] hover:bg-[#C40009] text-white font-bold text-xs rounded-xl active:scale-95 transition-all disabled:opacity-50 shadow-sm cursor-pointer"
                   >
                     {savingPw ? "Đang xử lý..." : "Cập nhật mật khẩu"}
                   </button>
@@ -478,8 +478,8 @@ export function ProfileContent() {
           </div>
 
           <div className="col-span-12 lg:col-span-4 min-w-0">
-            <div className="rounded-xl border border-outline-variant bg-surface p-6 space-y-4 shadow-sm">
-              <h3 className="text-xs font-bold text-on-surface border-b border-outline-variant pb-2">
+            <div className="rounded-xl border border-[#E5E5E5] bg-white p-6 space-y-4 shadow-sm">
+              <h3 className="text-xs font-bold text-[#1A1A1A] border-b border-[#E5E5E5] pb-2">
                 Quy định mật khẩu
               </h3>
               <ul className="space-y-3">
@@ -490,9 +490,9 @@ export function ProfileContent() {
                 ].map((t) => (
                   <li
                     key={t}
-                    className="flex items-center gap-2 text-xs text-on-surface-variant font-medium"
+                    className="flex items-center gap-2 text-xs text-[#666666] font-medium"
                   >
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#E3000F] shrink-0" />
                     <span>{t}</span>
                   </li>
                 ))}

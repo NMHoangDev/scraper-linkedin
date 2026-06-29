@@ -236,7 +236,7 @@ export function ZaloInboxMonitorPanel({ flow }: ZaloInboxMonitorPanelProps) {
       setHasOlderMessages((response.total ?? 0) > messages.length);
       setMessages((current) => {
         const latestMap = new Map(latestMessages.map(m => [messageKey(m), m]));
-
+        
         // Update existing messages
         const updated = current.map(m => {
           const key = messageKey(m);
@@ -245,11 +245,11 @@ export function ZaloInboxMonitorPanel({ flow }: ZaloInboxMonitorPanelProps) {
           }
           return m;
         });
-
+        
         // Find messages in latestMessages that are not in current
         const existingKeys = new Set(current.map(messageKey));
         const newMessages = latestMessages.filter(m => !existingKeys.has(messageKey(m)));
-
+        
         if (newMessages.length === 0) {
           const hasChanges = current.some((m, idx) => {
             const key = messageKey(m);
@@ -259,10 +259,10 @@ export function ZaloInboxMonitorPanel({ flow }: ZaloInboxMonitorPanelProps) {
           });
           return hasChanges ? updated : current;
         }
-
+        
         if (!shouldStickToBottom) setNewMessageCount((count) => count + newMessages.length);
         if (shouldStickToBottom) pendingScrollRef.current = "bottom";
-
+        
         return [...updated, ...newMessages];
       });
     } catch {
@@ -577,7 +577,7 @@ export function ZaloInboxMonitorPanel({ flow }: ZaloInboxMonitorPanelProps) {
                   ) : (
                     <div
                       className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
-                        active ? "bg-on-primary/20" : "bg-primary-container text-on-primary-container"
+                        active ? "bg-white/20" : "bg-primary-container text-on-primary-container"
                       }`}
                     >
                       {initials(title)}
@@ -588,7 +588,7 @@ export function ZaloInboxMonitorPanel({ flow }: ZaloInboxMonitorPanelProps) {
                       <div className="min-w-0 truncate font-semibold">{title}</div>
                       <span
                         className={`shrink-0 rounded-full px-sm py-0.5 text-xs font-semibold ${
-                          active ? "bg-on-primary/20 text-on-primary" : "bg-surface-container-high text-on-surface"
+                          active ? "bg-white/20 text-on-primary" : "bg-surface-container-high text-on-surface"
                         }`}
                       >
                         {conversation.message_count}
@@ -600,18 +600,18 @@ export function ZaloInboxMonitorPanel({ flow }: ZaloInboxMonitorPanelProps) {
                           {(() => {
                             const cleanSender = conversation.latest_sender_name?.trim();
                             if (!cleanSender) return "";
-
+                            
                             const lowerName = cleanSender.toLowerCase();
                             const isSelf = lowerName === "__me__" || lowerName === "me" || lowerName === "bạn" || lowerName === "ban";
                             if (isSelf) {
                               return "Bạn: ";
                             }
-
+                            
                             const isGroup = !conversation.conversation_id.startsWith("fb_") && conversation.conversation_id.startsWith("g");
                             if (isGroup) {
                               return `${cleanSender}: `;
                             }
-
+                            
                             return "";
                           })()}
                           {conversation.latest_content || "Tin nhắn mới"}
@@ -705,7 +705,7 @@ export function ZaloInboxMonitorPanel({ flow }: ZaloInboxMonitorPanelProps) {
                         href={asset.storage_url || "#"}
                         target="_blank"
                         rel="noreferrer"
-                        className="block overflow-hidden rounded-md border border-outline-variant bg-surface"
+                        className="block overflow-hidden rounded-md border border-outline-variant bg-white"
                       >
                         <Image
                           src={asset.storage_url || ""}

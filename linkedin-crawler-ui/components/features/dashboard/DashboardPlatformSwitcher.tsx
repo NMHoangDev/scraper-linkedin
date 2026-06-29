@@ -33,12 +33,12 @@ export function DashboardPlatformSwitcher() {
   };
 
   return (
-    <div className="px-md py-sm">
-      <p className="mb-xs px-xs text-body-sm font-semibold text-on-surface-variant">
+    <div className="mb-4 px-2">
+      <p className="text-on-surface-variant mb-2 px-2 font-sans text-[10px] font-bold tracking-wider uppercase">
         Nền tảng
       </p>
       <div
-        className="border-outline-variant bg-surface-container-low flex rounded-lg border p-1"
+        className="border-outline-variant bg-surface-container-low flex rounded-lg border p-0.5"
         role="group"
         aria-label="Chọn nền tảng crawler"
       >
@@ -48,7 +48,7 @@ export function DashboardPlatformSwitcher() {
             type="button"
             onClick={() => handlePlatformChange(p)}
             className={cn(
-              "flex-1 rounded-md px-xs py-xs text-body-sm font-semibold transition-colors",
+              "flex-1 rounded-md px-2 py-2 font-sans text-[10px] font-bold tracking-wide uppercase transition-colors",
               platform === p
                 ? "bg-primary text-on-primary shadow-sm"
                 : "text-on-surface-variant hover:bg-surface-container-high/80",

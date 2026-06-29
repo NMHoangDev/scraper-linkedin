@@ -39,7 +39,7 @@ export function SheetCommentStatus({
           className="text-on-surface shrink-0 text-[22px] leading-none"
         />
         <span className="flex min-w-0 flex-col items-start leading-tight">
-          <span className="text-on-surface text-xs font-bold">
+          <span className="text-on-surface text-xs font-bold tracking-tight">
             Đã có {countLabel} bình luận
           </span>
           <span className="text-on-surface-variant text-[10px] font-medium">

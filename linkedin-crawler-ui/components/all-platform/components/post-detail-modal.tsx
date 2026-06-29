@@ -87,16 +87,16 @@ export function PostDetailModal({
   };
 
   const score = post.score || 0;
-  let scoreBg = "bg-surface-container-low text-on-surface border-outline-variant";
-  if (score >= 85) scoreBg = "bg-red-50 text-primary border-red-100";
+  let scoreBg = "bg-slate-100 text-slate-700 border-slate-200";
+  if (score >= 85) scoreBg = "bg-red-50 text-[#E3000F] border-red-100";
   else if (score >= 60) scoreBg = "bg-amber-50 text-amber-600 border-amber-100";
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-3xl rounded-xl bg-surface shadow-xl flex flex-col max-h-[90vh]">
+      <div className="w-full max-w-3xl rounded-2xl bg-white shadow-xl flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-outline-variant px-6 py-4">
-          <h2 className="text-lg font-bold text-on-surface flex items-center gap-2">
+        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
             {post.platform === "facebook" ? (
               <FaFacebook className="text-blue-600" />
             ) : (
@@ -106,7 +106,7 @@ export function PostDetailModal({
           </h2>
           <button
             onClick={onClose}
-            className="rounded-full p-2 text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface-variant transition"
+            className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -119,14 +119,14 @@ export function PostDetailModal({
           <div className="flex gap-4 items-start mb-6">
             <div className={cn("w-16 h-16 rounded-xl flex flex-col items-center justify-center shrink-0 border", scoreBg)}>
               <span className="text-2xl font-black leading-tight">{score}</span>
-              <span className="text-[10px] font-bold uppercaseer mt-0.5 opacity-80">AI Score</span>
+              <span className="text-[10px] font-bold uppercase tracking-tighter mt-0.5 opacity-80">AI Score</span>
             </div>
             <div>
-              <a
-                href={post.post_url}
-                target="_blank"
+              <a 
+                href={post.post_url} 
+                target="_blank" 
                 rel="noopener noreferrer"
-                className="text-base font-bold text-on-surface hover:text-indigo-600 hover:underline mb-2 block"
+                className="text-base font-bold text-slate-900 hover:text-indigo-600 hover:underline mb-2 block"
               >
                 {post.group_name || "Unknown Group"}
               </a>
@@ -137,14 +137,14 @@ export function PostDetailModal({
                 {post.team && <span className="rounded bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-600">{post.team}</span>}
                 {post.tier !== undefined && <span className="rounded bg-orange-50 px-2 py-0.5 text-xs font-bold text-orange-600">Tier {post.tier}</span>}
               </div>
-              <span className="text-xs text-on-surface-variant font-medium block mt-2">
-                Tác giả: <span className="font-bold text-on-surface">{post.author || "Người tham gia ẩn danh"}</span> • Đăng lúc: {post.post_time ? new Date(post.post_time).toLocaleString("vi-VN") : "Không rõ"} • Cào lúc: {post.crawl_date ? new Date(post.crawl_date).toLocaleString("vi-VN") : ""}
+              <span className="text-xs text-slate-500 font-medium block mt-2">
+                Tác giả: <span className="font-bold text-slate-700">{post.author || "Người tham gia ẩn danh"}</span> • Đăng lúc: {post.post_time ? new Date(post.post_time).toLocaleString("vi-VN") : "Không rõ"} • Cào lúc: {post.crawl_date ? new Date(post.crawl_date).toLocaleString("vi-VN") : ""}
               </span>
             </div>
           </div>
 
-          <div className="bg-surface-container-low rounded-xl border border-outline-variant p-4 mb-6">
-            <p className="text-sm text-on-surface whitespace-pre-wrap leading-relaxed">
+          <div className="bg-slate-50/50 rounded-xl border border-slate-100 p-4 mb-6">
+            <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
               {post.content || "Nội dung bài viết rỗng hoặc chứa thuần hình ảnh/video."}
             </p>
           </div>
@@ -153,11 +153,11 @@ export function PostDetailModal({
             <div className="mb-6 grid grid-cols-2 gap-2 rounded-xl overflow-hidden">
               {post.media_url && (
                 <div className="col-span-full">
-                  <video src={post.media_url} controls className="w-full max-h-64 object-contain bg-black/5 rounded-lg border border-outline-variant" />
+                  <video src={post.media_url} controls className="w-full max-h-64 object-contain bg-black/5 rounded-lg border border-slate-100" />
                 </div>
               )}
               {post.image_urls?.map((url, i) => (
-                <img key={i} src={url} alt={`Post media ${i}`} className="w-full h-48 object-cover rounded-lg border border-outline-variant hover:opacity-90 transition-opacity cursor-pointer" onClick={() => window.open(url, '_blank')} />
+                <img key={i} src={url} alt={`Post media ${i}`} className="w-full h-48 object-cover rounded-lg border border-slate-100 hover:opacity-90 transition-opacity cursor-pointer" onClick={() => window.open(url, '_blank')} />
               ))}
             </div>
           ) : null}
@@ -165,22 +165,22 @@ export function PostDetailModal({
           {post.seeding_content && (
             <div className="bg-emerald-50/50 rounded-xl border border-emerald-100 p-4 mb-6">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs font-bold text-emerald-700 uppercase bg-emerald-100/50 px-2 py-0.5 rounded">Tài khoản Seeding:</span>
-                <span className="text-sm font-bold text-on-surface">{post.seeding_name || "Unknown"}</span>
+                <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider bg-emerald-100/50 px-2 py-0.5 rounded">Tài khoản Seeding:</span>
+                <span className="text-sm font-bold text-slate-800">{post.seeding_name || "Unknown"}</span>
               </div>
-              <p className="text-sm text-on-surface whitespace-pre-wrap leading-relaxed italic border-l-4 border-emerald-300 pl-3 py-1">
+              <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed italic border-l-4 border-emerald-300 pl-3 py-1">
                 {post.seeding_content}
               </p>
               {post.link_comment && !isRejected(post.link_comment) && (
                 <div className="mt-3">
-                  <a href={post.link_comment} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline inline-flex items-center gap-1.5 bg-surface px-3 py-1.5 rounded-lg border border-blue-100 shadow-sm transition hover:shadow">
+                  <a href={post.link_comment} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline inline-flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-blue-100 shadow-sm transition hover:shadow">
                     <FiExternalLink className="w-4 h-4" /> Đi tới bình luận trên Facebook
                   </a>
                 </div>
               )}
               {post.link_comment && isRejected(post.link_comment) && (
                 <div className="mt-3">
-                  <span className="text-sm font-medium text-red-600 inline-flex items-center gap-1.5 bg-surface px-3 py-1.5 rounded-lg border border-red-100 shadow-sm">
+                  <span className="text-sm font-medium text-red-600 inline-flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-red-100 shadow-sm">
                     <span className="material-symbols-outlined text-[16px]">error</span>
                     Bị từ chối / Lỗi
                   </span>
@@ -193,7 +193,7 @@ export function PostDetailModal({
             <span className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50/60 text-amber-700 rounded-lg text-sm font-bold border border-amber-100/40">
               👍 {post.reactions?.toLocaleString() || 0}
             </span>
-            <span className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-container-low text-on-surface-variant rounded-lg text-sm font-bold border border-outline-variant">
+            <span className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold border border-slate-200/50">
               💬 {post.comments?.toLocaleString() || 0}
             </span>
             <span className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-sm font-bold border border-blue-100/50">
@@ -203,7 +203,7 @@ export function PostDetailModal({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-outline-variant bg-surface-container-low px-6 py-4 flex items-center justify-between rounded-b-2xl">
+        <div className="border-t border-slate-100 bg-slate-50/50 px-6 py-4 flex items-center justify-between rounded-b-2xl">
           <div>
             {verifyStatus === "yes" && !isRejected(post.link_comment) ? (
               <span className="px-3 py-1.5 rounded-lg text-xs font-bold border bg-green-100 text-green-700 border-green-200">
@@ -218,7 +218,7 @@ export function PostDetailModal({
                 ✓ Đã seeding
               </span>
             ) : (
-              <span className="px-3 py-1.5 rounded-lg text-xs font-bold border bg-surface-container-low text-on-surface-variant border-outline-variant">
+              <span className="px-3 py-1.5 rounded-lg text-xs font-bold border bg-slate-100 text-slate-500 border-slate-200">
                 Chưa seeding
               </span>
             )}
@@ -226,13 +226,13 @@ export function PostDetailModal({
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 bg-surface border border-outline-variant text-on-surface hover:bg-surface-container-low rounded-xl text-sm font-bold transition shadow-sm"
+              className="px-4 py-2 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-xl text-sm font-bold transition shadow-xs"
             >
               Đóng
             </button>
             <button
               onClick={handleView}
-              className="px-4 py-2 bg-surface border border-primary text-primary hover:bg-primary hover:text-white rounded-xl text-sm font-bold transition shadow-sm flex items-center gap-1.5"
+              className="px-4 py-2 bg-white border border-[#E3000F] text-[#E3000F] hover:bg-[#E3000F] hover:text-white rounded-xl text-sm font-bold transition shadow-xs flex items-center gap-1.5"
             >
               <FiExternalLink />
               Xem chi tiết
@@ -240,7 +240,7 @@ export function PostDetailModal({
             {onVerify && !(post.seeding_content && post.link_comment) && (
               <button
                 onClick={() => onVerify(post)}
-                className="px-5 py-2 bg-gradient-to-r from-primary to-on-primary-fixed-variant hover:from-on-primary-fixed-variant hover:to-primary text-white rounded-xl text-sm font-bold transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 flex items-center gap-1.5"
+                className="px-5 py-2 bg-gradient-to-r from-[#E3000F] to-[#C40009] hover:from-[#C40009] hover:to-[#E3000F] text-white rounded-xl text-sm font-bold transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 flex items-center gap-1.5"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -255,26 +255,26 @@ export function PostDetailModal({
                 <button
                   type="button"
                   onClick={() => setIsInboxOpen(!isInboxOpen)}
-                  className="px-4 py-2 bg-primary hover:bg-on-primary-fixed-variant text-white rounded-xl text-sm font-bold transition shadow-sm cursor-pointer flex items-center gap-1.5"
+                  className="px-4 py-2 bg-[#E3000F] hover:bg-[#C40009] text-white rounded-xl text-sm font-bold transition shadow-xs cursor-pointer flex items-center gap-1.5"
                 >
                   Inbox ngay <span className="text-[10px]">▼</span>
                 </button>
                 {isInboxOpen && (
-                  <div className="absolute bottom-full mb-2 right-0 w-[340px] bg-surface border border-outline-variant rounded-xl shadow-2xl z-[100] py-1 overflow-hidden">
-                    <div className="px-3 py-2 text-xs font-black text-on-surface border-b border-outline-variant uppercase flex items-center justify-between bg-surface-container-low">
+                  <div className="absolute bottom-full mb-2 right-0 w-[340px] bg-white border border-slate-200 rounded-xl shadow-2xl z-[100] py-1 overflow-hidden">
+                    <div className="px-3 py-2 text-xs font-black text-slate-800 border-b border-slate-100 uppercase tracking-wider flex items-center justify-between bg-slate-50/50">
                       <span>Chọn mẫu câu</span>
-                      <span className="text-[10px] font-bold text-primary normal-case bg-red-50 border border-red-100 px-2 py-0.5 rounded">Tự động Copy</span>
+                      <span className="text-[10px] font-bold text-[#E3000F] normal-case bg-red-50 border border-red-100 px-2 py-0.5 rounded">Tự động Copy</span>
                     </div>
                     <div className="max-h-[320px] overflow-y-auto custom-scrollbar text-left">
                       {INBOX_TEMPLATES.map((group, gIdx) => (
                         <div key={gIdx}>
-                          <div className="px-3 py-1.5 text-[11px] font-bold text-on-surface-variant bg-surface-container-low uppercase sticky top-0 border-b border-outline-variant backdrop-blur-sm z-10 text-left">
+                          <div className="px-3 py-1.5 text-[11px] font-bold text-slate-500 bg-slate-50/90 uppercase tracking-wider sticky top-0 border-b border-slate-100/60 backdrop-blur-sm z-10 text-left">
                             {group.category}
                           </div>
                           {group.templates.map((template, tIdx) => (
                             <button
                               key={tIdx}
-                              className="w-full text-left px-3 py-2.5 hover:bg-red-50 group/item transition border-b border-outline-variant last:border-0"
+                              className="w-full text-left px-3 py-2.5 hover:bg-red-50 group/item transition border-b border-slate-50 last:border-0"
                               onClick={() => {
                                 navigator.clipboard.writeText(template.content).then(() => {
                                   setIsInboxOpen(false);
@@ -286,10 +286,10 @@ export function PostDetailModal({
                                 });
                               }}
                             >
-                              <div className="font-bold text-xs text-on-surface group-hover/item:text-primary mb-1 transition-colors leading-tight">
+                              <div className="font-bold text-xs text-slate-800 group-hover/item:text-[#E3000F] mb-1 transition-colors leading-tight">
                                 {template.title}
                               </div>
-                              <div className="text-[11px] text-on-surface-variant line-clamp-2 leading-relaxed opacity-90">
+                              <div className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed opacity-90">
                                 {template.content}
                               </div>
                             </button>

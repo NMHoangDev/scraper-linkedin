@@ -62,26 +62,26 @@ export function SeedingModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="w-full max-w-[512px] rounded-xl bg-surface p-6 shadow-xl">
-        <h2 className="mb-4 text-lg font-bold text-on-surface">
+      <div className="w-full max-w-[512px] rounded-2xl bg-white p-6 shadow-xl">
+        <h2 className="mb-4 text-lg font-bold text-slate-900">
           {existingMark ? "Cập nhật Seeding" : "Đánh dấu Seeding"}
         </h2>
 
         <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-xs font-semibold text-on-surface-variant">
+            <label className="mb-1 block text-xs font-semibold text-slate-600">
               Link bài viết
             </label>
             <input
               type="url"
               value={postUrl}
               readOnly
-              className="w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2 text-sm text-on-surface-variant"
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-on-surface-variant">
+            <label className="mb-1 block text-xs font-semibold text-slate-600">
               Facebook Profile ID
             </label>
             <input
@@ -89,12 +89,12 @@ export function SeedingModal({
               value={profileId}
               onChange={(e) => setProfileId(e.target.value)}
               placeholder="Ví dụ: 1000000000"
-              className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-on-surface-variant">
+            <label className="mb-1 block text-xs font-semibold text-slate-600">
               Tên Facebook
             </label>
             <input
@@ -102,12 +102,12 @@ export function SeedingModal({
               value={fbName}
               onChange={(e) => setFbName(e.target.value)}
               placeholder="Ví dụ: Nguyễn Văn A"
-              className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-on-surface-variant">
+            <label className="mb-1 block text-xs font-semibold text-slate-600">
               Link bình luận (sau khi comment)
             </label>
             <input
@@ -115,11 +115,11 @@ export function SeedingModal({
               value={linkComment}
               onChange={(e) => setLinkComment(e.target.value)}
               placeholder="https://www.facebook.com/..."
-              className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
 
-          <p className="rounded-lg bg-primary/10 p-3 text-xs text-primary">
+          <p className="rounded-lg bg-[#E3000F]/10 p-3 text-xs text-[#E3000F]">
             1. Mở bài viết → 2. Để lại bình luận → 3. Copy link bình luận vào đây → 4. Nhấn Xác minh
           </p>
         </div>
@@ -128,7 +128,7 @@ export function SeedingModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-outline-variant px-4 py-2 text-sm font-medium text-on-surface-variant transition-colors hover:bg-surface-container-low"
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
           >
             Đóng
           </button>

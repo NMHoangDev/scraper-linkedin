@@ -335,7 +335,7 @@ export function ZaloSupabaseLibraryPanel({
   }
 
   return (
-    <section className="border-outline-variant bg-surface-container-lowest rounded-xl border p-lg shadow-sm">
+    <section className="border-outline-variant bg-surface-container-lowest rounded-2xl border p-lg shadow-sm">
       <div className="mb-lg flex flex-col gap-md lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 className="text-h2 font-semibold text-on-surface">Thư viện tin nhắn</h2>
@@ -381,7 +381,7 @@ export function ZaloSupabaseLibraryPanel({
       <div className="grid gap-lg xl:grid-cols-[300px_1fr]">
         <aside className="border-outline-variant bg-surface rounded-xl border p-md">
           <div className="mb-md">
-            <label className="text-label-sm font-semibold uppercase text-on-surface-variant">
+            <label className="text-label-sm font-semibold uppercase tracking-wide text-on-surface-variant">
               Group đã crawl
             </label>
             <input

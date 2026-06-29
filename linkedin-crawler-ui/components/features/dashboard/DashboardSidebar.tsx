@@ -65,10 +65,10 @@ function RoleSwitchModal({
 
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center p-md bg-black/50 backdrop-blur-sm">
-      <div className="w-[min(92vw,400px)] bg-surface rounded-xl border border-outline-variant p-xl shadow-2xl space-y-lg">
+      <div className="w-[min(92vw,400px)] bg-surface rounded-2xl border border-outline-variant p-xl shadow-2xl space-y-lg animate-in fade-in zoom-in duration-200">
         <div className="text-center space-y-xs">
           <div className={`inline-flex h-12 w-12 items-center justify-center rounded-full mb-md ${
-            isToLeader ? "bg-amber-100 text-amber-700" : "bg-primary/10 text-primary"
+            isToLeader ? "bg-amber-100 text-amber-700" : "bg-[#E3000F]/10 text-[#E3000F]"
           }`}>
             <MaterialIcon name={isToLeader ? "shield_person" : "person"} className="text-3xl" />
           </div>
@@ -101,7 +101,7 @@ function RoleSwitchModal({
               <input
                 type="password"
                 placeholder="••••"
-                className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-md py-sm text-center text-xl outline-none focus:ring-2 focus:ring-primary"
+                className="w-full bg-surface-container-low border border-outline-variant rounded-lg px-md py-sm text-center text-xl tracking-[1em] outline-none focus:ring-2 focus:ring-primary"
                 value={code}
                 onChange={(e) => { setCode(e.target.value); setError(null); }}
                 disabled={busy}
@@ -139,9 +139,9 @@ function RoleSwitchModal({
 }
 
 const sideActive =
-  "flex items-center gap-3 rounded-lg bg-primary px-md py-sm text-body-sm font-semibold text-on-primary shadow-sm transition active:scale-[0.98]";
+  "flex items-center gap-3 border-r-4 border-[#E3000F] bg-[#F5F5F5] px-4 py-3 font-sans text-xs font-bold tracking-wider text-[#E3000F] uppercase transition-all duration-150 active:scale-95 dark:border-[#E3000F] dark:bg-zinc-800/50 dark:text-[#E3000F]";
 const sideIdle =
-  "flex items-center gap-3 rounded-lg px-md py-sm text-body-sm font-semibold text-on-surface-variant transition hover:bg-surface-container-low hover:text-on-surface active:scale-[0.98]";
+  "flex items-center gap-3 px-4 py-3 font-sans text-xs font-bold tracking-wider text-[#666666] uppercase transition-all duration-150 hover:bg-[#F5F5F5] hover:text-[#1A1A1A] active:scale-95 dark:text-zinc-400 dark:hover:bg-zinc-800/50 dark:hover:text-[#E3000F]";
 
 export function DashboardSidebar() {
   const d = useDashboard();
@@ -167,7 +167,7 @@ export function DashboardSidebar() {
   const isAccountMgmt = pathname === "/quan-ly-tai-khoan" || pathname === "/all-platform/quan-ly-tai-khoan";
   const isCategoryMgmt = pathname === "/quan-ly-danh-muc" || pathname === "/all-platform/quan-ly-danh-muc";
   const isProfile = pathname === "/profile" || pathname === "/all-platform/profile";
-
+  
   /** Leader role: chỉ dùng màn quản lý đội và KPI. */
   const isLeader = d.role === "leader";
 
@@ -182,33 +182,31 @@ export function DashboardSidebar() {
   };
 
   return (
-    <aside className="fixed top-0 left-0 z-40 hidden h-screen w-64 flex-col border-r border-outline-variant bg-surface lg:flex">
-      <div className="border-b border-outline-variant px-md py-md">
-        <div className="flex items-center gap-3">
-        <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-outline-variant bg-surface shadow-sm">
+    <aside className="fixed top-0 left-0 z-40 hidden h-screen w-64 flex-col border-r border-slate-200 bg-white pt-20 lg:flex dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="mb-8 flex items-center gap-3 px-6">
+        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-white ring-1 ring-black/5">
           <Image
             src="https://markeeai.com/logo.svg"
             alt="MarkeeAI"
             fill
-            sizes="44px"
-            className="object-contain p-1.5"
+            sizes="40px"
+            className="object-contain p-1"
             priority
           />
         </div>
-        <div className="min-w-0">
-          <h2 className="truncate text-h3 text-on-surface">
+        <div>
+          <h2 className="text-lg leading-tight font-black text-slate-900 dark:text-zinc-100">
             MarkeeAi Seeding
           </h2>
-          <p className="mt-1 truncate text-body-sm font-semibold text-on-surface-variant">
+          <p className="text-on-surface-variant mt-0.5 font-sans text-[10px] font-bold tracking-wider uppercase">
             {isLeader
               ? "Leader workspace"
               : (platform === "linkedin" ? "LinkedIn" : platform === "facebook" ? "Facebook" : "General") + " workspace"}
           </p>
         </div>
-        </div>
       </div>
       {!isLeader && <DashboardPlatformSwitcher />}
-      <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-md">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-2">
         {isLeader ? (
           <Link
             href="/admin/team"
@@ -285,26 +283,26 @@ export function DashboardSidebar() {
           </>
         )}
       </nav>
-      <div className="border-t border-outline-variant bg-surface px-md py-md space-y-3">
+      <div className="border-t border-slate-100 p-4 dark:border-zinc-800 bg-slate-50/30 dark:bg-zinc-900/30 space-y-3">
 
         {/* User profile & Logout Box */}
-        <div className="flex items-center justify-between rounded-lg border border-outline-variant bg-surface-container-low p-sm transition hover:bg-surface">
+        <div className="flex items-center justify-between rounded-xl bg-white dark:bg-zinc-900 p-3 border border-slate-100 dark:border-zinc-800 shadow-[0_2px_10px_rgba(0,0,0,0.01)]">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-8 h-8 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center text-xs shrink-0">
+            <div className="w-8 h-8 rounded-full bg-[#E3000F]/10 text-[#E3000F] font-bold flex items-center justify-center text-xs border border-[#E3000F]/20 shrink-0">
               {getInitials(user?.name)}
             </div>
             <div className="min-w-0">
-              <p className="text-body-sm font-semibold text-on-surface truncate leading-none">
+              <p className="text-[11px] font-bold text-slate-800 dark:text-zinc-200 truncate leading-none">
                 {user?.name || "Người dùng"}
               </p>
-              <p className="text-[10px] text-on-surface-variant truncate mt-0.5 leading-none">
+              <p className="text-[9px] text-slate-400 dark:text-zinc-500 truncate mt-0.5 leading-none">
                 {user?.email || "Chưa đăng nhập"}
               </p>
             </div>
           </div>
           <button
             onClick={() => void logout()}
-            className="p-1.5 text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-lg transition-colors cursor-pointer shrink-0"
+            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer shrink-0"
             title="Đăng xuất"
           >
             <MaterialIcon name="logout" className="text-[16px]" />
