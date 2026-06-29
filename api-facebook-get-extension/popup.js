@@ -24,7 +24,7 @@ btnAutoStart.addEventListener('click', async () => {
     addLog("Đang gọi API lấy danh sách Group...");
 
     try {
-        const response = await fetch("http://127.0.0.1:8000/api/all-platform/groups?platform=facebook");
+        const response = await fetch("https://seeding.markeeai.com/api/all-platform/groups?platform=facebook");
         if (!response.ok) throw new Error("Backend không phản hồi danh sách group.");
         
         const data = await response.json();

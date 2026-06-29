@@ -1,0 +1,1 @@
+fix: restore extension-launcher.tsx with correct UTF-8 Vietnamese encoding

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "FB API Crawler",
+  "name": "FB Bulk Comment Extension",
   "version": "1.0",
-  "description": "Lấy bài viết Group Facebook siêu tốc qua API GraphQL",
+  "description": "Seeding Comment hàng loạt trên Facebook",
   "permissions": [
     "activeTab",
     "scripting",
@@ -16,7 +16,7 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_popup": "popup.html"
+    "default_title": "Bulk Comment Extension"
   },
   "content_scripts": [
     {

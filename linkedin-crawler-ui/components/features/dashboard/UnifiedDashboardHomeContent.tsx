@@ -11,6 +11,7 @@ import { PostCard } from "@/components/all-platform/components/post-card";
 import { PostDetailModal } from "@/components/all-platform/components/post-detail-modal";
 import { VerifyAccountModal } from "@/components/all-platform/components/verify-account-modal";
 import { KpiProgressCard } from "@/components/all-platform/components/kpi-progress-card";
+import { BulkCommentModal } from "@/components/all-platform/components/bulk-comment-modal";
 import { allPlatformPostsService, allPlatformCategoriesService, teamsService, usersService, type AppUserProfile } from "@/services/all-platform.service";
 import type { UnifiedPost, UnifiedStats, Category, FeedPlatform } from "@/types/unified.types";
 
@@ -199,6 +200,7 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
   const [feedPlatform, setFeedPlatform] = useState<FeedPlatform>("facebook");
   const [showCrawlPopup, setShowCrawlPopup] = useState(false);
   const [showFacebookCrawlPopup, setShowFacebookCrawlPopup] = useState(false);
+  const [showBulkCommentModal, setShowBulkCommentModal] = useState(false);
 
   const [detailModalPost, setDetailModalPost] = useState<UnifiedPost | null>(null);
   const [verifyModalPost, setVerifyModalPost] = useState<UnifiedPost | null>(null);
@@ -449,7 +451,13 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
               <span className="material-symbols-outlined text-[18px]">download</span>
               Cào dữ liệu
             </button>
-
+            <button
+              onClick={() => setShowBulkCommentModal(true)}
+              className="flex items-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold px-4 py-2 rounded-xl text-sm transition-all shadow-md shadow-emerald-500/20 hover:shadow-lg hover:shadow-emerald-500/30 active:scale-[0.98]"
+            >
+              <span className="material-symbols-outlined text-[18px]">forum</span>
+              Seeding hàng loạt
+            </button>
           </div>
         </div>
       )}
@@ -596,6 +604,11 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
           fetchPosts();
           fetchStats();
         }}
+      />
+      <BulkCommentModal
+        open={showBulkCommentModal}
+        onClose={() => setShowBulkCommentModal(false)}
+        posts={posts}
       />
 
       <PostDetailModal

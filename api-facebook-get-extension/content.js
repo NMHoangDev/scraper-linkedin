@@ -124,22 +124,37 @@ async function fetchPosts(count = 20) {
             server_timestamps: "true",
         });
 
-        const response = await fetch("https://www.facebook.com/api/graphql/", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/x-www-form-urlencoded"
-            },
-            body: body.toString(),
-        });
+        let response = null;
+        let text = "";
+        let retryCount = 0;
+        const MAX_RETRIES = 2;
 
-        if (!response.ok) {
-            const errText = await response.text();
-            const err = new Error(`Lỗi HTTP: ${response.status} - ${errText.substring(0, 50)}`);
-            err.logs = logs;
-            throw err;
+        while (retryCount <= MAX_RETRIES) {
+            try {
+                response = await fetch("https://www.facebook.com/api/graphql/", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/x-www-form-urlencoded"
+                    },
+                    body: body.toString(),
+                });
+
+                if (!response.ok) {
+                    const errText = await response.text();
+                    throw new Error(`Lỗi HTTP: ${response.status} - ${errText.substring(0, 50)}`);
+                }
+                text = await response.text();
+                break; // Thành công, thoát vòng lặp retry
+            } catch (err) {
+                if (retryCount >= MAX_RETRIES) {
+                    err.logs = logs;
+                    throw err;
+                }
+                retryCount++;
+                logs.push(`⚠️ Lỗi khi gọi API Facebook, thử lại lần ${retryCount}/${MAX_RETRIES}...`);
+                await new Promise(r => setTimeout(r, 2000)); // Đợi 2 giây trước khi retry
+            }
         }
-
-        const text = await response.text();
         const lines = text.trim().split("\n");
         let parsedInThisPage = 0;
         

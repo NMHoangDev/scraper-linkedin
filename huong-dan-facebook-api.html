@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hướng dẫn lấy bài viết Facebook Group</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #222635;
+    --border: #2e3247;
+    --accent: #4f8ef7;
+    --accent2: #7c5af7;
+    --green: #3dd68c;
+    --yellow: #f5c542;
+    --red: #f76f6f;
+    --text: #e2e6f3;
+    --muted: #8b92b3;
+    --code-bg: #12151f;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  /* HEADER */
+  header {
+    background: linear-gradient(135deg, #1a1d27 0%, #0f1117 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 40px 24px 32px;
+    text-align: center;
+  }
+  .badge {
+    display: inline-block;
+    background: rgba(79,142,247,0.12);
+    color: var(--accent);
+    border: 1px solid rgba(79,142,247,0.3);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 10px;
+  }
+  header p {
+    color: var(--muted);
+    font-size: 14px;
+    max-width: 520px;
+    margin: 0 auto;
+  }
+
+  /* MAIN LAYOUT */
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 32px 24px 60px;
+  }
+
+  /* STEP */
+  .step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+  .step-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+  }
+  .step-header:hover { background: rgba(255,255,255,0.02); }
+  .step-num {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+    color: #fff;
+  }
+  .step-title { font-weight: 600; font-size: 15px; flex: 1; }
+  .step-arrow {
+    color: var(--muted);
+    font-size: 12px;
+    transition: transform 0.2s;
+  }
+  .step.open .step-arrow { transform: rotate(180deg); }
+  .step-body {
+    padding: 20px 22px;
+    display: none;
+  }
+  .step.open .step-body { display: block; }
+
+  /* STATUS TAGS */
+  .tag {
+    display: inline-block;
+    border-radius: 6px;
+    padding: 2px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-left: 8px;
+  }
+  .tag-green { background: rgba(61,214,140,0.12); color: var(--green); }
+  .tag-yellow { background: rgba(245,197,66,0.12); color: var(--yellow); }
+  .tag-red { background: rgba(247,111,111,0.12); color: var(--red); }
+
+  /* DESCRIPTION */
+  .desc {
+    color: var(--muted);
+    font-size: 14px;
+    margin-bottom: 16px;
+    line-height: 1.6;
+  }
+
+  /* ALERT */
+  .alert {
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .alert-info { background: rgba(79,142,247,0.08); border: 1px solid rgba(79,142,247,0.25); color: #a0bfff; }
+  .alert-warn { background: rgba(245,197,66,0.08); border: 1px solid rgba(245,197,66,0.25); color: #f5d87a; }
+  .alert-success { background: rgba(61,214,140,0.08); border: 1px solid rgba(61,214,140,0.25); color: #6edcb0; }
+  .alert-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+  /* CODE BLOCK */
+  .code-wrap {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin: 12px 0;
+    overflow: hidden;
+  }
+  .code-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,0.02);
+  }
+  .code-lang {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .copy-btn {
+    background: rgba(79,142,247,0.12);
+    color: var(--accent);
+    border: 1px solid rgba(79,142,247,0.25);
+    border-radius: 5px;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .copy-btn:hover { background: rgba(79,142,247,0.22); }
+  .copy-btn.copied { color: var(--green); border-color: rgba(61,214,140,0.3); background: rgba(61,214,140,0.1); }
+  pre {
+    padding: 16px;
+    overflow-x: auto;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #c9d1f0;
+  }
+  /* Syntax colors */
+  .kw { color: #7c5af7; }
+  .fn { color: #4f8ef7; }
+  .str { color: #3dd68c; }
+  .cmt { color: #4e5a7a; font-style: italic; }
+  .num { color: #f5c542; }
+  .prop { color: #f79a4f; }
+
+  /* CHECKLIST */
+  .checklist {
+    list-style: none;
+    margin: 12px 0;
+  }
+  .checklist li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 7px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-size: 14px;
+  }
+  .checklist li:last-child { border-bottom: none; }
+  .check-icon { flex-shrink: 0; margin-top: 2px; }
+
+  /* IMAGE PLACEHOLDER */
+  .img-placeholder {
+    background: var(--surface2);
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    margin: 12px 0;
+  }
+  .img-placeholder .icon { font-size: 28px; margin-bottom: 8px; }
+
+  /* TABLE */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin: 12px 0;
+  }
+  th {
+    text-align: left;
+    padding: 10px 12px;
+    background: var(--surface2);
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  td code {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: 'Cascadia Code', monospace;
+    font-size: 12px;
+    color: var(--accent);
+  }
+
+  /* DIVIDER */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 24px 0;
+  }
+
+  /* RESULT PREVIEW */
+  .result-preview {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    font-size: 13px;
+    font-family: monospace;
+    color: #8b92b3;
+    line-height: 1.8;
+  }
+  .result-preview .r-key { color: var(--accent); }
+  .result-preview .r-val { color: var(--green); }
+  .result-preview .r-num { color: var(--yellow); }
+  .result-preview .r-url { color: #f79a4f; }
+
+  /* SECTION TITLE */
+  .section-title {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin: 20px 0 10px;
+  }
+
+  /* PROGRESS BAR */
+  .progress-bar {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 28px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .progress-steps {
+    display: flex;
+    gap: 4px;
+    flex: 1;
+  }
+  .progress-step {
+    height: 4px;
+    flex: 1;
+    border-radius: 2px;
+    background: var(--border);
+  }
+  .progress-step.done { background: var(--accent); }
+  .progress-label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="badge">📚 Học tập & Luyện code</div>
+  <h1>Lấy bài viết Facebook Group bằng Console</h1>
+  <p>Hướng dẫn từng bước — không cần cài thêm gì, chạy thẳng trong trình duyệt</p>
+</header>
+
+<main>
+
+  <!-- PROGRESS -->
+  <div class="progress-bar">
+    <div class="progress-steps">
+      <div class="progress-step done"></div>
+      <div class="progress-step done"></div>
+      <div class="progress-step done"></div>
+      <div class="progress-step done"></div>
+      <div class="progress-step done"></div>
+    </div>
+    <div class="progress-label">5 bước · ~10 phút</div>
+  </div>
+
+  <div class="alert alert-warn">
+    <span class="alert-icon">⚠️</span>
+    <span><strong>Lưu ý:</strong> Hướng dẫn này chỉ dành cho mục đích <strong>học tập</strong>. Chỉ dùng với account của chính bạn, không scrape số lượng lớn liên tục. Việc sử dụng sai mục đích vi phạm ToS của Facebook.</span>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="step open">
+    <div class="step-header" onclick="toggle(this)">
+      <div class="step-num">1</div>
+      <div class="step-title">Mở Facebook và vào trang Group</div>
+      <div class="step-arrow">▼</div>
+    </div>
+    <div class="step-body">
+      <p class="desc">Đăng nhập Facebook và truy cập vào Group bạn muốn lấy bài viết. URL sẽ có dạng:</p>
+      <div class="code-wrap">
+        <div class="code-header"><span class="code-lang">URL</span></div>
+        <pre>https://www.facebook.com/groups/<span class="num">727550767618720</span>/</pre>
+      </div>
+      <div class="alert alert-info">
+        <span class="alert-icon">💡</span>
+        <span>Group ID chính là dãy số trong URL. Lưu lại con số này để dùng ở bước sau.</span>
+      </div>
+      <div class="img-placeholder">
+        <div class="icon">🌐</div>
+        <div>Ví dụ URL: facebook.com/groups/<strong>727550767618720</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step open">
+    <div class="step-header" onclick="toggle(this)">
+      <div class="step-num">2</div>
+      <div class="step-title">Mở DevTools Console</div>
+      <div class="step-arrow">▼</div>
+    </div>
+    <div class="step-body">
+      <p class="desc">Mở Developer Tools của trình duyệt theo một trong các cách sau:</p>
+      <ul class="checklist">
+        <li>
+          <span class="check-icon">⌨️</span>
+          <span>Nhấn <strong>F12</strong> (hoặc <strong>Ctrl + Shift + I</strong> trên Windows/Linux, <strong>Cmd + Option + I</strong> trên Mac)</span>
+        </li>
+        <li>
+          <span class="check-icon">🖱️</span>
+          <span>Click chuột phải vào trang → chọn <strong>"Inspect"</strong> hoặc <strong>"Kiểm tra"</strong></span>
+        </li>
+        <li>
+          <span class="check-icon">📌</span>
+          <span>Sau khi DevTools mở, click vào tab <strong>"Console"</strong></span>
+        </li>
+      </ul>
+      <div class="alert alert-warn">
+        <span class="alert-icon">⚠️</span>
+        <span>Nếu thấy cảnh báo <em>"Don't paste code you don't trust"</em> — gõ <code>allow pasting</code> rồi Enter để bỏ qua.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="step open">
+    <div class="step-header" onclick="toggle(this)">
+      <div class="step-num">3</div>
+      <div class="step-title">Lấy Token tự động <span class="tag tag-green">Tự động</span></div>
+      <div class="step-arrow">▼</div>
+    </div>
+    <div class="step-body">
+      <p class="desc">Copy đoạn code bên dưới, dán vào Console và nhấn Enter. Script sẽ tự động lấy tất cả token cần thiết:</p>
+
+      <div class="code-wrap">
+        <div class="code-header">
+          <span class="code-lang">JavaScript — Console</span>
+          <button class="copy-btn" onclick="copyCode(this, 'code1')">Copy</button>
+        </div>
+        <pre id="code1"><span class="cmt">// Lấy các token cần thiết từ Facebook</span>
+<span class="kw">const</span> <span class="prop">FB_DTSG</span> = require(<span class="str">"DTSGInitialData"</span>).token;
+<span class="kw">const</span> <span class="prop">LSD</span>     = require(<span class="str">"LSD"</span>).token;
+<span class="kw">const</span> <span class="prop">USER_ID</span>  = require(<span class="str">"CurrentUserInitialData"</span>).USER_ID;
+<span class="kw">const</span> <span class="prop">GROUP_ID</span> = window.location.pathname.match(<span class="str">/groups\/(\d+)/</span>)?.[<span class="num">1</span>];
+
+console.log(<span class="str">"✅ Token lấy được:"</span>);
+console.table({ FB_DTSG, LSD, USER_ID, GROUP_ID });</pre>
+      </div>
+
+      <p class="desc">Kết quả mong đợi trong Console:</p>
+      <div class="result-preview">
+✅ Token lấy được:<br>
+┌──────────┬────────────────────────────────┐<br>
+│ <span class="r-key">FB_DTSG</span>  │ <span class="r-val">"NAfxkNrIvn0Cuaj-ANPbt9Ag..."</span>  │<br>
+│ <span class="r-key">LSD</span>      │ <span class="r-val">"y85zJnQfclmxr4hN0FpSmw"</span>     │<br>
+│ <span class="r-key">USER_ID</span>  │ <span class="r-val">"100087403596874"</span>            │<br>
+│ <span class="r-key">GROUP_ID</span> │ <span class="r-val">"727550767618720"</span>            │<br>
+└──────────┴────────────────────────────────┘
+      </div>
+
+      <div class="alert alert-info">
+        <span class="alert-icon">ℹ️</span>
+        <span>Nếu <code>GROUP_ID</code> hiển thị <code>null</code> → bạn chưa vào đúng trang Group. Quay lại bước 1.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="step open">
+    <div class="step-header" onclick="toggle(this)">
+      <div class="step-num">4</div>
+      <div class="step-title">Gọi API lấy bài viết <span class="tag tag-green">Chính</span></div>
+      <div class="step-arrow">▼</div>
+    </div>
+    <div class="step-body">
+      <p class="desc">Đây là đoạn code chính — gọi API GraphQL của Facebook để lấy 20 bài viết mới nhất. Dán tiếp vào Console:</p>
+
+      <div class="code-wrap">
+        <div class="code-header">
+          <span class="code-lang">JavaScript — Console</span>
+          <button class="copy-btn" onclick="copyCode(this, 'code2')">Copy</button>
+        </div>
+        <pre id="code2"><span class="cmt">// ============================================
+// GỌI API LẤY BÀI VIẾT FACEBOOK GROUP
+// ============================================</span>
+
+<span class="kw">async function</span> <span class="fn">getGroupPosts</span>(count = <span class="num">20</span>, cursor = <span class="kw">null</span>) {
+
+  <span class="cmt">// 1. Lấy token</span>
+  <span class="kw">const</span> fb_dtsg   = require(<span class="str">"DTSGInitialData"</span>).token;
+  <span class="kw">const</span> lsd       = require(<span class="str">"LSD"</span>).token;
+  <span class="kw">const</span> group_id  = window.location.pathname.match(<span class="str">/groups\/(\d+)/</span>)?.[<span class="num">1</span>];
+
+  <span class="kw">if</span> (!group_id) {
+    console.error(<span class="str">"❌ Không tìm thấy Group ID. Hãy vào trang Group trước!"</span>);
+    <span class="kw">return</span>;
+  }
+
+  <span class="cmt">// 2. Chuẩn bị variables</span>
+  <span class="kw">const</span> variables = {
+    count,
+    <span class="prop">feedLocation</span>: <span class="str">"GROUP"</span>,
+    <span class="prop">feedType</span>: <span class="str">"DISCUSSION"</span>,
+    <span class="prop">id</span>: group_id,
+    <span class="prop">sortingSetting</span>: <span class="str">"RECENT_ACTIVITY"</span>,
+    <span class="prop">feedbackSource</span>: <span class="num">0</span>,
+    <span class="prop">filterTopicId</span>: <span class="kw">null</span>,
+    <span class="prop">focusCommentID</span>: <span class="kw">null</span>,
+    <span class="prop">privacySelectorRenderLocation</span>: <span class="str">"COMET_STREAM"</span>,
+    <span class="prop">renderLocation</span>: <span class="str">"group"</span>,
+    <span class="prop">scale</span>: <span class="num">1</span>,
+    <span class="prop">stream_initial_count</span>: <span class="num">3</span>,
+    <span class="prop">useDefaultActor</span>: <span class="kw">false</span>,
+  };
+  <span class="kw">if</span> (cursor) variables.cursor = cursor;
+
+  <span class="cmt">// 3. Gửi request</span>
+  <span class="kw">const</span> body = <span class="kw">new</span> URLSearchParams({
+    fb_dtsg,
+    lsd,
+    <span class="prop">fb_api_caller_class</span>: <span class="str">"RelayModern"</span>,
+    <span class="prop">fb_api_req_friendly_name</span>: <span class="str">"GroupsCometFeedRegularStoriesPaginationQuery"</span>,
+    <span class="prop">variables</span>: JSON.stringify(variables),
+    <span class="prop">doc_id</span>: <span class="str">"27224875563850383"</span>,
+    <span class="prop">server_timestamps</span>: <span class="str">"true"</span>,
+  });
+
+  <span class="kw">const</span> res = <span class="kw">await</span> fetch(<span class="str">"https://www.facebook.com/api/graphql/"</span>, {
+    <span class="prop">method</span>: <span class="str">"POST"</span>,
+    <span class="prop">headers</span>: { <span class="str">"Content-Type"</span>: <span class="str">"application/x-www-form-urlencoded"</span> },
+    body,
+    <span class="prop">credentials</span>: <span class="str">"include"</span>, <span class="cmt">// gửi cookie tự động</span>
+  });
+
+  <span class="kw">const</span> text = <span class="kw">await</span> res.text();
+
+  <span class="cmt">// 4. Parse kết quả</span>
+  <span class="kw">const</span> posts = [];
+  <span class="kw">let</span> nextCursor = <span class="kw">null</span>;
+  <span class="kw">let</span> hasNextPage = <span class="kw">false</span>;
+
+  <span class="kw">for</span> (<span class="kw">const</span> line <span class="kw">of</span> text.trim().split(<span class="str">"\n"</span>)) {
+    <span class="kw">try</span> {
+      <span class="kw">const</span> data = JSON.parse(line);
+
+      <span class="cmt">// Lấy danh sách bài</span>
+      <span class="kw">const</span> edges = data?.data?.node?.group_feed?.edges ?? [];
+      <span class="kw">for</span> (<span class="kw">const</span> edge <span class="kw">of</span> edges) {
+        <span class="kw">const</span> n = edge.node;
+        posts.push({
+          <span class="prop">post_id</span>     : n.post_id,
+          <span class="prop">author</span>      : n.actors?.[<span class="num">0</span>]?.name ?? <span class="str">"Ẩn danh"</span>,
+          <span class="prop">message</span>     : n.message?.text ?? <span class="str">""</span>,
+          <span class="prop">url</span>         : n.url,
+          <span class="prop">created_at</span>  : <span class="kw">new</span> Date(n.creation_time * <span class="num">1000</span>).toLocaleString(<span class="str">"vi-VN"</span>),
+          <span class="prop">likes</span>       : n.feedback?.reaction_count?.count ?? <span class="num">0</span>,
+          <span class="prop">comments</span>    : n.feedback?.comment_rendering_instance?.comments?.total_count ?? <span class="num">0</span>,
+          <span class="prop">has_image</span>   : (n.attachments?.length ?? <span class="num">0</span>) > <span class="num">0</span>,
+        });
+      }
+
+      <span class="cmt">// Lấy cursor trang tiếp</span>
+      <span class="kw">const</span> pageInfo = data?.data?.node?.group_feed?.page_info;
+      <span class="kw">if</span> (pageInfo) {
+        nextCursor  = pageInfo.end_cursor;
+        hasNextPage = pageInfo.has_next_page;
+      }
+
+    } <span class="kw">catch</span> {}
+  }
+
+  <span class="kw">return</span> { posts, nextCursor, hasNextPage };
+}
+
+<span class="cmt">// ====== CHẠY ======</span>
+console.log(<span class="str">"⏳ Đang lấy bài viết..."</span>);
+<span class="kw">const</span> result = <span class="kw">await</span> getGroupPosts(<span class="num">20</span>);
+
+console.log(<span class="str">`✅ Lấy được <span class="kw">${result.posts.length}</span> bài viết`</span>);
+console.log(<span class="str">`📄 Còn trang tiếp: <span class="kw">${result.hasNextPage}</span>`</span>);
+console.table(result.posts);</pre>
+      </div>
+
+      <div class="alert alert-success">
+        <span class="alert-icon">✅</span>
+        <span>Sau khi chạy, bảng kết quả sẽ hiện ra ngay trong Console với đầy đủ thông tin từng bài viết.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 5 -->
+  <div class="step open">
+    <div class="step-header" onclick="toggle(this)">
+      <div class="step-num">5</div>
+      <div class="step-title">Xem kết quả và Export <span class="tag tag-yellow">Bonus</span></div>
+      <div class="step-arrow">▼</div>
+    </div>
+    <div class="step-body">
+      <p class="desc">Sau khi có kết quả, bạn có thể xem chi tiết hoặc export ra JSON/CSV:</p>
+
+      <div class="section-title">Xem chi tiết 1 bài</div>
+      <div class="code-wrap">
+        <div class="code-header">
+          <span class="code-lang">JavaScript</span>
+          <button class="copy-btn" onclick="copyCode(this, 'code3')">Copy</button>
+        </div>
+        <pre id="code3"><span class="cmt">// Xem nội dung đầy đủ bài đầu tiên</span>
+console.log(result.posts[<span class="num">0</span>].message);
+
+<span class="cmt">// Xem tất cả bài</span>
+result.posts.forEach((p, i) => {
+  console.log(<span class="str">`\n--- Bài <span class="kw">${i+1}</span> ---`</span>);
+  console.log(<span class="str">"👤"</span>, p.author);
+  console.log(<span class="str">"🕐"</span>, p.created_at);
+  console.log(<span class="str">"❤️ "</span>, p.likes, <span class="str">"| 💬"</span>, p.comments);
+  console.log(<span class="str">"🔗"</span>, p.url);
+  console.log(p.message.slice(<span class="num">0</span>, <span class="num">150</span>) + <span class="str">"..."</span>);
+});</pre>
+      </div>
+
+      <div class="section-title">Export ra JSON</div>
+      <div class="code-wrap">
+        <div class="code-header">
+          <span class="code-lang">JavaScript</span>
+          <button class="copy-btn" onclick="copyCode(this, 'code4')">Copy</button>
+        </div>
+        <pre id="code4"><span class="cmt">// Tải file JSON về máy</span>
+<span class="kw">const</span> json = JSON.stringify(result.posts, <span class="kw">null</span>, <span class="num">2</span>);
+<span class="kw">const</span> blob = <span class="kw">new</span> Blob([json], { <span class="prop">type</span>: <span class="str">"application/json"</span> });
+<span class="kw">const</span> url  = URL.createObjectURL(blob);
+<span class="kw">const</span> a    = document.createElement(<span class="str">"a"</span>);
+a.href     = url;
+a.download = <span class="str">"fb_posts.json"</span>;
+a.click();</pre>
+      </div>
+
+      <div class="section-title">Load trang tiếp (pagination)</div>
+      <div class="code-wrap">
+        <div class="code-header">
+          <span class="code-lang">JavaScript</span>
+          <button class="copy-btn" onclick="copyCode(this, 'code5')">Copy</button>
+        </div>
+        <pre id="code5"><span class="cmt">// Lấy thêm 20 bài tiếp theo</span>
+<span class="kw">if</span> (result.hasNextPage) {
+  <span class="kw">const</span> page2 = <span class="kw">await</span> getGroupPosts(<span class="num">20</span>, result.nextCursor);
+  console.log(<span class="str">"📄 Trang 2:"</span>, page2.posts.length, <span class="str">"bài"</span>);
+  console.table(page2.posts);
+}</pre>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section-title">Cấu trúc data trả về</div>
+      <table>
+        <tr><th>Field</th><th>Kiểu</th><th>Ý nghĩa</th></tr>
+        <tr><td><code>post_id</code></td><td>string</td><td>ID duy nhất của bài viết</td></tr>
+        <tr><td><code>author</code></td><td>string</td><td>Tên người đăng</td></tr>
+        <tr><td><code>message</code></td><td>string</td><td>Nội dung bài viết (full text)</td></tr>
+        <tr><td><code>url</code></td><td>string</td><td>Link trực tiếp đến bài viết</td></tr>
+        <tr><td><code>created_at</code></td><td>string</td><td>Thời gian đăng (định dạng VN)</td></tr>
+        <tr><td><code>likes</code></td><td>number</td><td>Số lượt react</td></tr>
+        <tr><td><code>comments</code></td><td>number</td><td>Số bình luận</td></tr>
+        <tr><td><code>has_image</code></td><td>boolean</td><td>Bài có đính kèm ảnh không</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- TROUBLESHOOT -->
+  <div class="step">
+    <div class="step-header" onclick="toggle(this)">
+      <div class="step-num">🔧</div>
+      <div class="step-title">Xử lý lỗi thường gặp</div>
+      <div class="step-arrow">▼</div>
+    </div>
+    <div class="step-body">
+      <table>
+        <tr><th>Lỗi</th><th>Nguyên nhân</th><th>Cách fix</th></tr>
+        <tr>
+          <td><code>GROUP_ID = null</code></td>
+          <td>Chưa vào trang Group</td>
+          <td>Truy cập URL group trước rồi chạy lại</td>
+        </tr>
+        <tr>
+          <td><code>posts = []</code> (rỗng)</td>
+          <td><code>doc_id</code> bị cũ</td>
+          <td>Vào DevTools → Network → tìm request graphql → lấy <code>doc_id</code> mới</td>
+        </tr>
+        <tr>
+          <td>Lỗi <code>require is not defined</code></td>
+          <td>Không phải trang Facebook</td>
+          <td>Phải chạy console trên trang facebook.com</td>
+        </tr>
+        <tr>
+          <td>Response 200 nhưng data rỗng</td>
+          <td>Token hết hạn</td>
+          <td>Reload trang Facebook, lấy lại token</td>
+        </tr>
+        <tr>
+          <td><code>Don't paste code...</code></td>
+          <td>Chrome security warning</td>
+          <td>Gõ <code>allow pasting</code> + Enter rồi thử lại</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<script>
+function toggle(header) {
+  const step = header.parentElement;
+  step.classList.toggle('open');
+}
+
+function copyCode(btn, id) {
+  const el = document.getElementById(id);
+  const text = el.innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = '✓ Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+}
+</script>
+</body>
+</html>

@@ -98,12 +98,21 @@ async function startAutoCrawl(groups, config = {}) {
 
             // Bước 3: Tiêm Content Script để gọi API GraphQL
             sendLog(`Đang tiêm lệnh gọi GraphQL API vào trang...`);
-            const results = await chrome.scripting.executeScript({
+            let results = await chrome.scripting.executeScript({
                 target: { tabId: currentTabId },
                 files: ['content.js']
-            }).catch(e => {
-                sendLog(`❌ Lỗi tiêm script: ${e.message}`);
-                return null;
+            }).catch(async (e) => {
+                sendLog(`❌ Lỗi tiêm script: ${e.message}. Tiến hành tải lại tab và thử lại...`);
+                await chrome.tabs.reload(currentTabId);
+                await sleep(5000);
+                return chrome.scripting.executeScript({
+                    target: { tabId: currentTabId },
+                    files: ['content.js']
+                }).catch(err => {
+                    sendLog(`❌ Lỗi tiêm script (lần 2): ${err.message}. Extension sẽ tự động khởi động lại!`);
+                    chrome.runtime.reload();
+                    return null;
+                });
             });
 
             if (!results || !results[0]) {
@@ -134,26 +143,38 @@ async function startAutoCrawl(groups, config = {}) {
                     sendLog(`Đang gửi ${postCount} bài lên Backend để lọc lấy 3 bài tốt nhất...`, false, 'info');
                     
                     // Bước 4: Gửi đống này lên backend
-                    const pushRes = await fetch("http://127.0.0.1:8000/api/all-platform/extension/save-posts", {
-                        method: "POST",
-                        headers: { 
-                            "Content-Type": "application/json",
-                            "x-api-key": "markee-extension-key-2024"
-                        },
-                        body: JSON.stringify({
-                            posts: response.data,
-                            group_id: '',
-                            group_url: group.url,
-                            id_member: idMember,
-                            extension_version: "API-Automated-1.0"
-                        })
-                    });
+                    let pushRes = null;
+                    let backendRetry = 0;
+                    while (backendRetry <= 2) {
+                        try {
+                            pushRes = await fetch("https://seeding.markeeai.com/api/all-platform/extension/save-posts", {
+                                method: "POST",
+                                headers: { 
+                                    "Content-Type": "application/json",
+                                    "x-api-key": "markee-extension-key-2024"
+                                },
+                                body: JSON.stringify({
+                                    posts: response.data,
+                                    group_id: '',
+                                    group_url: group.url,
+                                    id_member: idMember,
+                                    extension_version: "API-Automated-1.0"
+                                })
+                            });
+                            break;
+                        } catch(err) {
+                            if (backendRetry >= 2) throw err;
+                            backendRetry++;
+                            sendLog(`⚠️ Backend mất kết nối, thử lại lần ${backendRetry}/2...`, false, 'warn');
+                            await sleep(2000);
+                        }
+                    }
 
-                    if (pushRes.ok) {
+                    if (pushRes && pushRes.ok) {
                         const pushData = await pushRes.json();
                         sendLog(`🎉 Backend phản hồi: Đã lưu ${pushData.count || 0} bài!`, false, 'success');
                     } else {
-                        sendLog(`❌ Lỗi Backend: ${pushRes.status}`, false, 'error');
+                        sendLog(`❌ Lỗi Backend: ${pushRes ? pushRes.status : 'Disconnected'}`, false, 'error');
                     }
                 } else {
                     sendLog(`⚠️ Không nhận được dữ liệu bài viết.`, false, 'warn');
