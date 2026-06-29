@@ -25,6 +25,7 @@ function AllPlatformShellInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Force platform to "general" for all-platform routes
   useEffect(() => {
@@ -60,15 +61,15 @@ function AllPlatformShellInner({ children }: { children: React.ReactNode }) {
         <div className="flex items-center gap-2">
           <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-lg border border-outline-variant bg-surface">
             <Image
-              src="https://markeeai.com/logo.svg"
-              alt="MarkeeAI"
+              src="/markeeai_logo.svg"
+              alt="Marketing Agents"
               fill
               sizes="32px"
               className="object-contain p-1"
               priority
             />
           </div>
-          <span className="text-h3 text-on-surface">MarkeeAI</span>
+          <span className="text-h3 text-primary">Marketing Agents</span>
         </div>
         <button
           onClick={() => setSidebarOpen(true)}
@@ -79,9 +80,16 @@ function AllPlatformShellInner({ children }: { children: React.ReactNode }) {
         </button>
       </div>
 
-      <AllPlatformSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <AllPlatformSidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        isCollapsed={sidebarCollapsed}
+        onCollapsedChange={setSidebarCollapsed}
+      />
 
-      <main className={`min-w-0 max-w-full flex-1 w-full transition-all flex flex-col lg:ml-64 lg:w-[calc(100%-16rem)] ${
+      <main className={`min-w-0 max-w-full flex-1 w-full transition-all duration-300 flex flex-col ${
+        sidebarCollapsed ? "lg:ml-[70px] lg:w-[calc(100%-70px)]" : "lg:ml-[280px] lg:w-[calc(100%-280px)]"
+      } ${
         isChatPage ? "h-screen p-0 overflow-hidden" : "overflow-x-hidden p-3 sm:p-5 lg:p-8"
       }`}>
         <GlobalCrawlNotification />
