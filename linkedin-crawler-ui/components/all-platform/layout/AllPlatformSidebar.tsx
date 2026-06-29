@@ -1,88 +1,383 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import Image from "next/image";
+
 import { MaterialIcon, type MaterialSymbolName } from "@/components/ui";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { cn } from "@/lib/utils";
 
-/* ── Sidebar link styles (copy y nguyên từ DashboardSidebar) ───────────────── */
-const sideActive =
-  "flex items-center gap-3 border-r-4 border-[#E3000F] bg-[#F5F5F5] px-4 py-3 font-sans text-xs font-bold tracking-wider text-[#E3000F] uppercase transition-all duration-150 active:scale-95 dark:border-[#E3000F] dark:bg-zinc-800/50 dark:text-[#E3000F]";
-const sideIdle =
-  "flex items-center gap-3 px-4 py-3 font-sans text-xs font-bold tracking-wider text-[#666666] uppercase transition-all duration-150 hover:bg-[#F5F5F5] hover:text-[#1A1A1A] active:scale-95 dark:text-zinc-400 dark:hover:bg-zinc-800/50 dark:hover:text-[#E3000F]";
-
-/* ── Menu items per role ────────────────────────────────────────────────────── */
-interface NavItem {
+interface NavLeafItem {
+  type: "item";
   href: string;
   icon: MaterialSymbolName;
   label: string;
+  matchStartsWith?: string[];
+  badge?: number;
 }
 
-/** Admin: Dashboard → Quản lý Teams → Quản lý groups → Post Feed → Tài khoản → Trang cá nhân → Quản lý danh mục → Cào Zalo */
-const ADMIN_NAV: NavItem[] = [
-  { href: "/all-platform/admin/dashboard", icon: "dashboard", label: "Dashboard" },
-  { href: "/all-platform/admin/teams-management", icon: "shield_person", label: "Quản lý Teams" },
-  { href: "/all-platform/quan-ly-nhom", icon: "group", label: "Quản lý groups" },
-  { href: "/all-platform/quan-ly-vps", icon: "database", label: "Quản lý VPS" },
-  { href: "/all-platform/vps-vnc-ssh-rdp", icon: "computer" as any, label: "Giám sát VPS" },
-  { href: "/all-platform/post-feed", icon: "radar", label: "Post Feed" },
-  { href: "/all-platform/dang-bai", icon: "send", label: "Đăng bài FB" },
-  { href: "/all-platform/inbox", icon: "inbox", label: "Inbox FB" },
-  { href: "/all-platform/quan-ly-tai-khoan", icon: "account_circle", label: "Tài khoản" },
-  { href: "/all-platform/tai-khoan", icon: "manage_accounts", label: "Quản lý TK Zalo" },
-  { href: "/all-platform/profile", icon: "person", label: "Trang cá nhân" },
-  { href: "/all-platform/quan-ly-danh-muc", icon: "category", label: "Quản lý danh mục" }
+interface NavGroupItem {
+  type: "group";
+  id: string;
+  icon: MaterialSymbolName;
+  label: string;
+  items: NavLeafItem[];
+}
+
+type SidebarEntry = NavLeafItem | NavGroupItem;
+
+const itemBaseClass =
+  "mx-2 flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all";
+const itemActiveClass = "bg-[#DC2626] text-white";
+const itemIdleClass = "text-slate-700 hover:bg-slate-50 hover:text-slate-900";
+const iconBaseClass = "shrink-0 text-[18px]";
+
+function buildWorkspaceEntries(dashboardHref: string, teamHref: string): SidebarEntry[] {
+  return [
+    {
+      type: "item",
+      href: dashboardHref,
+      icon: "dashboard",
+      label: "Dashboard",
+      matchStartsWith: [dashboardHref],
+    },
+    {
+      type: "item",
+      href: teamHref,
+      icon: "groups",
+      label: "Quản lý teams",
+      matchStartsWith: [teamHref],
+    },
+    {
+      type: "item",
+      href: "/all-platform/post-feed",
+      icon: "radar",
+      label: "Post feed",
+      matchStartsWith: ["/all-platform/post-feed"],
+    },
+    {
+      type: "group",
+      id: "seeding",
+      icon: "article",
+      label: "Hệ thống seeding",
+      items: [
+        {
+          type: "item",
+          href: "/all-platform/quan-ly-nhom",
+          icon: "folder",
+          label: "Quản lý groups",
+        },
+        {
+          type: "item",
+          href: "/all-platform/dang-bai",
+          icon: "send",
+          label: "Đăng bài FB",
+        },
+      ],
+    },
+    {
+      type: "group",
+      id: "chat-accounts",
+      icon: "inbox",
+      label: "Hội thoại & tài khoản",
+      items: [
+        {
+          type: "item",
+          href: "/all-platform/inbox",
+          icon: "inbox",
+          label: "Inbox FB",
+        },
+        {
+          type: "item",
+          href: "/all-platform/quan-ly-tai-khoan",
+          icon: "manage_accounts",
+          label: "Quản lý tài khoản",
+        },
+        {
+          type: "item",
+          href: "/all-platform/tai-khoan",
+          icon: "account_circle",
+          label: "Quản lý TK Zalo",
+        },
+      ],
+    },
+    {
+      type: "group",
+      id: "resources",
+      icon: "database",
+      label: "Quản lý tài nguyên",
+      items: [
+        {
+          type: "item",
+          href: "/all-platform/quan-ly-vps",
+          icon: "database",
+          label: "Quản lý VPS",
+        },
+        {
+          type: "item",
+          href: "/all-platform/vps-vnc-ssh-rdp",
+          icon: "monitoring",
+          label: "Giám sát VPS",
+        },
+        {
+          type: "item",
+          href: "/all-platform/quan-ly-danh-muc",
+          icon: "category",
+          label: "Quản lý danh mục",
+        },
+      ],
+    },
+  ];
+}
+
+const adminEntries = buildWorkspaceEntries(
+  "/all-platform/admin/dashboard",
+  "/all-platform/admin/teams-management",
+);
+const leaderEntries = buildWorkspaceEntries(
+  "/all-platform/leader/dashboard",
+  "/all-platform/leader/team",
+);
+
+const personalEntries: SidebarEntry[] = [
+  {
+    type: "item",
+    href: "/all-platform/member/my-tasks",
+    icon: "assignment",
+    label: "Công việc của tôi",
+    badge: 5,
+  },
+  {
+    type: "item",
+    href: "/all-platform/inbox",
+    icon: "inbox",
+    label: "Inbox",
+    badge: 3,
+  },
+  {
+    type: "item",
+    href: "/all-platform/member/nop-lead",
+    icon: "send",
+    label: "Nộp lead",
+  },
+  {
+    type: "item",
+    href: "/all-platform/member/activity",
+    icon: "history",
+    label: "Hoạt động",
+  },
+  {
+    type: "item",
+    href: "/all-platform/post-feed",
+    icon: "radar",
+    label: "Post feed",
+  },
+  {
+    type: "item",
+    href: "/all-platform/member/utm",
+    icon: "link",
+    label: "Tạo UTM link",
+  },
+  {
+    type: "item",
+    href: "/all-platform/member/progress",
+    icon: "trending_up",
+    label: "Tiến độ của tôi",
+  },
 ];
 
-/** Leader: Quản lý Team → Quản lý groups → Post Feed → Tài khoản → Trang cá nhân → Quản lý danh mục */
-const LEADER_NAV: NavItem[] = [
-  { href: "/all-platform/leader/team", icon: "groups", label: "Quản lý Team" },
-  { href: "/all-platform/quan-ly-nhom", icon: "group", label: "Quản lý groups" },
-  { href: "/all-platform/quan-ly-vps", icon: "database", label: "Quản lý VPS" },
-  { href: "/all-platform/vps-vnc-ssh-rdp", icon: "computer" as any, label: "Giám sát VPS" },
-  { href: "/all-platform/post-feed", icon: "radar", label: "Post Feed" },
-  { href: "/all-platform/dang-bai", icon: "send", label: "Đăng bài FB" },
-  { href: "/all-platform/inbox", icon: "inbox", label: "Inbox FB" },
-  { href: "/all-platform/quan-ly-tai-khoan", icon: "account_circle", label: "Tài khoản" },
-  { href: "/all-platform/profile", icon: "person", label: "Trang cá nhân" },
-  { href: "/all-platform/quan-ly-danh-muc", icon: "category", label: "Quản lý danh mục" },
-  { href: "/all-platform/tai-khoan", icon: "manage_accounts", label: "Quản lý TK Zalo" },
+const memberEntries: SidebarEntry[] = [
+  {
+    type: "item",
+    href: "/all-platform/post-feed",
+    icon: "radar",
+    label: "Post feed",
+  },
+  {
+    type: "item",
+    href: "/all-platform/quan-ly-nhom",
+    icon: "folder",
+    label: "Quản lý groups",
+  },
+  {
+    type: "item",
+    href: "/all-platform/dang-bai",
+    icon: "send",
+    label: "Đăng bài FB",
+  },
+  {
+    type: "item",
+    href: "/all-platform/inbox",
+    icon: "inbox",
+    label: "Inbox FB",
+  },
+  {
+    type: "item",
+    href: "/all-platform/quan-ly-tai-khoan",
+    icon: "manage_accounts",
+    label: "Quản lý tài khoản",
+  },
+  {
+    type: "item",
+    href: "/all-platform/quan-ly-danh-muc",
+    icon: "category",
+    label: "Quản lý danh mục",
+  },
 ];
 
-/** Member: Post Feed → Quản lý groups → Tài khoản → Trang cá nhân → Quản lý danh mục */
-const MEMBER_NAV: NavItem[] = [
-  { href: "/all-platform/post-feed", icon: "radar", label: "Post Feed" },
-  { href: "/all-platform/dang-bai", icon: "send", label: "Đăng bài FB" },
-  { href: "/all-platform/inbox", icon: "inbox", label: "Inbox FB" },
-  { href: "/all-platform/quan-ly-nhom", icon: "group", label: "Quản lý groups" },
-  { href: "/all-platform/quan-ly-vps", icon: "database", label: "Quản lý VPS" },
-  { href: "/all-platform/vps-vnc-ssh-rdp", icon: "computer" as any, label: "Giám sát VPS" },
-  { href: "/all-platform/quan-ly-tai-khoan", icon: "account_circle", label: "Tài khoản" },
-  { href: "/all-platform/profile", icon: "person", label: "Trang cá nhân" },
-  { href: "/all-platform/quan-ly-danh-muc", icon: "category", label: "Quản lý danh mục" },
-  { href: "/all-platform/tai-khoan", icon: "manage_accounts", label: "Quản lý TK Zalo" },
-];
+function isLeafActive(pathname: string, item: NavLeafItem) {
+  if (pathname === item.href) return true;
+  if (item.matchStartsWith?.some((prefix) => pathname.startsWith(prefix))) return true;
+  return pathname.startsWith(item.href) && item.href !== "/all-platform/post-feed";
+}
 
-/* ── Component ─────────────────────────────────────────────────────────────── */
-export function AllPlatformSidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }) {
+function SidebarLink({
+  item,
+  active,
+  indented = false,
+  onNavigate,
+}: {
+  item: NavLeafItem;
+  active?: boolean;
+  indented?: boolean;
+  onNavigate?: () => void;
+}) {
+  return (
+    <Link
+      href={item.href}
+      className={cn(itemBaseClass, active ? itemActiveClass : itemIdleClass, indented && "pl-10")}
+      onClick={onNavigate}
+    >
+      <MaterialIcon
+        name={item.icon}
+        className={cn(iconBaseClass, active ? "text-white" : "text-slate-500")}
+      />
+      <span className="min-w-0 truncate leading-5">{item.label}</span>
+      {item.badge !== undefined ? (
+        <span
+          className={cn(
+            "ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-bold",
+            active ? "bg-white/20 text-white" : "bg-[#DC2626] text-white",
+          )}
+        >
+          {item.badge}
+        </span>
+      ) : null}
+    </Link>
+  );
+}
+
+function SidebarGroup({
+  pathname,
+  entry,
+  onNavigate,
+}: {
+  pathname: string;
+  entry: NavGroupItem;
+  onNavigate?: () => void;
+}) {
+  const hasActiveChild = entry.items.some((item) => isLeafActive(pathname, item));
+  const [isOpen, setIsOpen] = useState(hasActiveChild);
+
+  useEffect(() => {
+    if (hasActiveChild) setIsOpen(true);
+  }, [hasActiveChild]);
+
+  return (
+    <div className="space-y-1">
+      <button
+        type="button"
+        onClick={() => setIsOpen((current) => !current)}
+        className={cn(
+          itemBaseClass,
+          "w-[calc(100%-1rem)] justify-between",
+          hasActiveChild ? "text-[#DC2626]" : itemIdleClass,
+        )}
+      >
+        <span className="flex min-w-0 items-center gap-3">
+          <MaterialIcon
+            name={entry.icon}
+            className={cn(iconBaseClass, hasActiveChild ? "text-[#DC2626]" : "text-slate-500")}
+          />
+          <span className="truncate leading-5">{entry.label}</span>
+        </span>
+        <MaterialIcon
+          name="arrow_drop_down"
+          className={cn(
+            "shrink-0 text-[18px] transition-transform duration-200",
+            hasActiveChild ? "text-[#DC2626]" : "text-slate-400",
+            isOpen && "rotate-180",
+          )}
+        />
+      </button>
+
+      <div
+        className={cn(
+          "grid overflow-hidden transition-all duration-200",
+          isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+        )}
+      >
+        <div className="min-h-0">
+          <div className="ml-6 border-l border-slate-200/80 pl-1">
+            {entry.items.map((item) => (
+              <SidebarLink
+                key={item.href}
+                item={item}
+                active={isLeafActive(pathname, item)}
+                indented
+                onNavigate={onNavigate}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function AllPlatformSidebar({
+  isOpen,
+  onClose,
+}: {
+  isOpen?: boolean;
+  onClose?: () => void;
+}) {
   const { user, logout } = useAppAuth();
   const pathname = usePathname();
   const router = useRouter();
+  const [viewMode, setViewMode] = useState<"system" | "personal">("system");
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
 
-  const isLeader = user?.role === "leader";
   const isAdmin = user?.role === "admin";
+  const isLeader = user?.role === "leader";
+  const showWorkspaceTabs = isAdmin || isLeader;
+  const isMember = !showWorkspaceTabs;
 
-  const navItems = isAdmin ? ADMIN_NAV : isLeader ? LEADER_NAV : MEMBER_NAV;
+  const entries = useMemo(() => {
+    if (isAdmin) return viewMode === "system" ? adminEntries : personalEntries;
+    if (isLeader) return viewMode === "system" ? leaderEntries : personalEntries;
+    return memberEntries;
+  }, [isAdmin, isLeader, viewMode]);
+
+  const workspaceLabel = isAdmin
+    ? "Admin workspace"
+    : isLeader
+      ? "Leader workspace"
+      : "Member workspace";
 
   const getInitials = (name?: string) => {
     if (!name) return "U";
     const parts = name.trim().split(/\s+/);
     if (parts.length >= 2) {
-      return parts.slice(-2).map(p => p[0]).join("").toUpperCase();
+      return parts
+        .slice(-2)
+        .map((part) => part[0])
+        .join("")
+        .toUpperCase();
     }
-    return parts[0] ? parts[0][0].toUpperCase() : "U";
+    return parts[0]?.[0]?.toUpperCase() || "U";
   };
 
   const handleLogout = async () => {
@@ -92,93 +387,158 @@ export function AllPlatformSidebar({ isOpen, onClose }: { isOpen?: boolean; onCl
 
   return (
     <>
-      {/* Mobile Overlay */}
-      {isOpen && (
-        <div 
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden backdrop-blur-sm" 
-          onClick={onClose} 
+      {isOpen ? (
+        <div
+          className="fixed inset-0 z-40 bg-slate-950/30 backdrop-blur-sm lg:hidden"
+          onClick={onClose}
         />
-      )}
-      
-      <aside className={cn(
-        "fixed top-0 left-0 z-50 h-screen w-64 flex-col border-r border-slate-200 bg-white pt-6 lg:pt-20 transition-transform duration-300 dark:border-zinc-800 dark:bg-zinc-900",
-        isOpen ? "translate-x-0 flex" : "-translate-x-full lg:translate-x-0 flex"
-      )}>
-        {/* Mobile Close Button */}
-        {isOpen && (
-          <button 
-            onClick={onClose} 
-            className="absolute top-4 right-4 p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg lg:hidden cursor-pointer"
+      ) : null}
+
+      <aside
+        className={cn(
+          "fixed left-0 top-0 z-50 flex h-screen w-64 flex-col border-r border-slate-100 bg-white transition-transform duration-300 lg:translate-x-0 lg:shadow-none",
+          isOpen ? "translate-x-0" : "-translate-x-full",
+        )}
+      >
+        {isOpen ? (
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute right-3 top-3 rounded-lg p-2 text-slate-500 transition hover:bg-slate-50 hover:text-slate-800 lg:hidden"
           >
             <MaterialIcon name="close" />
           </button>
-        )}
-      {/* ── Logo & Workspace Label ── */}
-      <div className="mb-8 flex items-center gap-3 px-6">
-        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-white ring-1 ring-black/5">
-          <Image
-            src="https://markeeai.com/logo.svg"
-            alt="MarkeeAI"
-            fill
-            sizes="40px"
-            className="object-contain p-1"
-            priority
-          />
-        </div>
-        <div>
-          <h2 className="text-lg leading-tight font-black text-slate-900 dark:text-zinc-100">
-            MarkeeAi Seeding
-          </h2>
-          <p className="text-on-surface-variant mt-0.5 font-sans text-[10px] font-bold tracking-wider uppercase">
-            {isAdmin ? "Admin workspace" : isLeader ? "Leader workspace" : "General workspace"}
-          </p>
-        </div>
-      </div>
+        ) : null}
 
-      {/* ── Navigation ── */}
-      <nav className="flex-1 space-y-1 overflow-y-auto px-2">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(isActive ? sideActive : sideIdle)}
-            >
-              <MaterialIcon name={item.icon} className="shrink-0" />
-              <span className="min-w-0 leading-snug">{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* ── User Profile & Logout ── */}
-      <div className="border-t border-slate-100 p-4 dark:border-zinc-800 bg-slate-50/30 dark:bg-zinc-900/30 space-y-3">
-        <div className="flex items-center justify-between rounded-xl bg-white dark:bg-zinc-900 p-3 border border-slate-100 dark:border-zinc-800 shadow-[0_2px_10px_rgba(0,0,0,0.01)]">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-8 h-8 rounded-full bg-[#E3000F]/10 text-[#E3000F] font-bold flex items-center justify-center text-xs border border-[#E3000F]/20 shrink-0">
-              {getInitials(user?.name)}
+        <div className="border-b border-slate-100 px-4 py-4">
+          <div className="flex items-center gap-3">
+            <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-slate-100 bg-white">
+              <Image
+                src="https://markeeai.com/logo.svg"
+                alt="MarkeeAI"
+                fill
+                sizes="48px"
+                className="object-contain p-1.5"
+                priority
+              />
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-bold text-slate-800 dark:text-zinc-200 truncate leading-none">
-                {user?.name || "Người dùng"}
+              <p className="truncate text-[19px] font-black leading-none text-slate-900">
+                MarkeeAI
               </p>
-              <p className="text-[9px] text-slate-400 dark:text-zinc-500 truncate mt-0.5 leading-none">
-                {user?.email || "Chưa đăng nhập"}
+              <p className="mt-1 text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">
+                {workspaceLabel}
               </p>
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer shrink-0"
-            title="Đăng xuất"
-          >
-            <MaterialIcon name="logout" className="text-[16px]" />
-          </button>
         </div>
-      </div>
-    </aside>
+
+        {showWorkspaceTabs ? (
+          <div className="mx-4 mb-4 mt-3 shrink-0 rounded-2xl bg-slate-100/80 p-0.5">
+            <div className="flex gap-0.5">
+              <button
+                type="button"
+                onClick={() => setViewMode("system")}
+                className={cn(
+                  "flex-1 rounded-xl py-1.5 text-sm transition-all",
+                  viewMode === "system"
+                    ? "bg-[#DC2626] font-semibold text-white"
+                    : "font-semibold text-slate-500 hover:text-slate-800",
+                )}
+              >
+                Hệ thống
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("personal")}
+                className={cn(
+                  "flex-1 rounded-xl py-1.5 text-sm transition-all",
+                  viewMode === "personal"
+                    ? "bg-[#DC2626] font-semibold text-white"
+                    : "font-semibold text-slate-500 hover:text-slate-800",
+                )}
+              >
+                Cá nhân
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="px-2 pt-1">
+          <p className="mb-4 px-4 text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">
+            {isMember ? "Điều hướng" : "Workspace"}
+          </p>
+        </div>
+
+        <div className="flex-1 space-y-1 overflow-y-auto pb-4">
+          {entries.map((entry) =>
+            entry.type === "group" ? (
+              <SidebarGroup
+                key={entry.id}
+                pathname={pathname}
+                entry={entry}
+                onNavigate={onClose}
+              />
+            ) : (
+              <SidebarLink
+                key={entry.href}
+                item={entry}
+                active={isLeafActive(pathname, entry)}
+                onNavigate={onClose}
+              />
+            ),
+          )}
+        </div>
+
+        <div className="relative mt-auto border-t border-slate-100 px-4 py-4">
+          {showProfileDropdown ? (
+            <div className="absolute bottom-[78px] left-4 right-4 rounded-xl border border-slate-100 bg-white p-2 shadow-lg">
+              <Link
+                href="/all-platform/profile"
+                onClick={() => {
+                  setShowProfileDropdown(false);
+                  onClose?.();
+                }}
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-[#DC2626]"
+              >
+                <MaterialIcon name="person" className="text-[18px]" />
+                Trang cá nhân
+              </Link>
+            </div>
+          ) : null}
+
+          <div
+            className="flex cursor-pointer items-center justify-between rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-3 transition hover:bg-slate-50"
+            onClick={() => setShowProfileDropdown((current) => !current)}
+          >
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
+                {getInitials(user?.name)}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-slate-900">
+                  {user?.name || "Người dùng"}
+                </p>
+                <p className="truncate text-xs text-slate-400">
+                  {user?.email || "Chưa đăng nhập"}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                void handleLogout();
+              }}
+              className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-[#DC2626]"
+              title="Đăng xuất"
+            >
+              <MaterialIcon name="logout" className="text-[18px]" />
+            </button>
+          </div>
+        </div>
+      </aside>
     </>
   );
 }
-
