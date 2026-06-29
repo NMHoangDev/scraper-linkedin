@@ -11,6 +11,7 @@ import { useAppAuth } from "@/contexts/AppAuthContext";
 import { useRouter } from "next/navigation";
 import { KpiModal } from "@/components/all-platform/components/kpi-modal";
 import { useAppPlatform } from "@/components/providers/AppPlatformProvider";
+import { ApiExtensionLauncher } from "@/components/all-platform/components/api-extension-launcher";
 
 type ActiveTab = "facebook" | "linkedin";
 
@@ -538,6 +539,15 @@ export default function PostFeedPage() {
           </button>
         </div>
       </div>
+
+      {activeTab === "facebook" && (
+        <ApiExtensionLauncher
+          onComplete={() => {
+            loadPosts();
+            loadStats();
+          }}
+        />
+      )}
 
       {/* ── STATS BENTO ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">

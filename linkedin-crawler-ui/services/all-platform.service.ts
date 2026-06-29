@@ -557,6 +557,7 @@ export const allPlatformPostsService = {
     icp?: string;
     content_type?: string;
     product_seeding?: string;
+    id_member?: string;
     search?: string;
     sort?: string;
     page?: number;
@@ -654,13 +655,14 @@ export const allPlatformCategoriesService = {
 export const allPlatformGroupsService = {
   getAll: (
     platform: string,
-    params?: { intent?: string; team?: string; tier?: number; status?: string },
+    params?: { intent?: string; team?: string; tier?: number; status?: string; id_member?: string },
   ): Promise<ApiResponse<(FacebookGroup | LinkedInGroup)[]>> => {
     const searchParams = new URLSearchParams();
     if (params?.intent) searchParams.set("intent", params.intent);
     if (params?.team) searchParams.set("team", params.team);
     if (params?.tier) searchParams.set("tier", String(params.tier));
     if (params?.status) searchParams.set("status", params.status);
+    if (params?.id_member) searchParams.set("id_member", params.id_member);
     const qs = searchParams.toString();
     const url = `${BASE}/${platform}/groups${qs ? `?${qs}` : ""}`;
     return requestJson(url);
@@ -671,7 +673,7 @@ export const allPlatformGroupsService = {
    * Backend tự động filter theo id_member từ auth token.
    */
   getForExtension: (): Promise<ApiResponse<FacebookGroup[]>> => {
-    return requestJson(`${BASE}/facebook/groups`);
+    return requestJson(`${BASE}/facebook/groups?for_extension=true`);
   },
 
   add: (

@@ -39,7 +39,7 @@ interface CrawlState {
 class FeedCrawler {
   public isRunning = false;
 
-  private state: CrawlState = {
+  public state: CrawlState = {
     isRunning: false,
     shouldStop: false,
     posts: [],
@@ -87,6 +87,7 @@ class FeedCrawler {
       await this.sleep(2000); // Thêm thời gian để Facebook render
 
       // ─── Bước 2: Cào từng group trên CÙNG TAB ───
+      let totalCrawledPosts = 0;
       for (let i = 0; i < groups.length; i++) {
         if (this.state.shouldStop) {
           this.sendLogToUI('warn', 'Đã dừng theo yêu cầu');
@@ -153,27 +154,13 @@ class FeedCrawler {
           // Chỉ lấy bài trong ngày
           let todayPosts = allPosts.filter((p: any) => p.is_today);
           
-          // Tính điểm tương tác để xếp hạng
-          todayPosts = todayPosts.map((p: any) => {
-             const reactions = p.reactions || 0;
-             const comments = p.comments || 0;
-             const shares = p.shares || 0;
-             const score = reactions + (comments * 2) + (shares * 3);
-             return { ...p, score };
-          });
-          
-          // Sắp xếp điểm số từ cao xuống thấp
-          todayPosts.sort((a: any, b: any) => b.score - a.score);
-          
-          // Chỉ lấy tối đa 3 bài cao nhất
-          const postsToSave = todayPosts.slice(0, 3);
+          totalCrawledPosts += allPosts.length;
 
-          if (postsToSave.length > 0) {
+          if (todayPosts.length > 0) {
             // Lấy group_id từ group hiện tại
             const groupId = group.id || config.groupId || '';
-            this.sendLogToUI('info', `Lưu ${postsToSave.length} bài vào Supabase...`);
-            await this.savePostsToSupabase(postsToSave, group, groupId, idMember);
-            this.sendLogToUI('success', `Đã lưu ${postsToSave.length} bài vào Supabase (schema mới)`);
+            this.sendLogToUI('info', `Gửi ${todayPosts.length} bài lên máy chủ (đang lọc và kiểm tra trùng lặp)...`);
+            await this.savePostsToSupabase(todayPosts, group, groupId, idMember);
           } else {
             this.sendLogToUI('warn', `Không có bài nào để lưu cho group "${group.name}"`);
           }
@@ -195,9 +182,7 @@ class FeedCrawler {
       }
 
       // ─── Bước 6: Hoàn tất ───
-      const totalPosts = groups.length > 0
-        ? groups.reduce((sum, _, idx) => sum + (this.state.posts.length || 0), 0)
-        : 0;
+      const totalPosts = totalCrawledPosts;
 
       this.sendDone(totalPosts, groups.length);
       this.sendLogToUI('success', `🎉 Hoàn tất! Đã cào ${totalPosts} bài từ ${groups.length} groups`);
@@ -311,7 +296,7 @@ class FeedCrawler {
   private async savePostsToSupabase(posts: any[], group: FeedGroup, groupId: string, idMember: string): Promise<void> {
     try {
       // Gọi API mới: /save-posts (schema đúng facebook_posts)
-      const response = await fetch('https://seeding.markeeai.com/api/all-platform/extension/save-posts', {
+      const response = await fetch('http://127.0.0.1:8000/api/all-platform/extension/save-posts', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -348,7 +333,13 @@ class FeedCrawler {
       } else {
         const result = await response.json();
         console.log('[FeedCrawler] Lưu thành công:', result);
-        this.sendLogToUI('success', `Đã lưu ${result.count || 0} bài vào Supabase (schema mới)`);
+        const savedCount = result.count || 0;
+        if (savedCount < posts.length) {
+            const skipped = posts.length - savedCount;
+            this.sendLogToUI('success', `Đã lưu ${savedCount} bài mới (bỏ qua ${skipped} bài đã tồn tại).`);
+        } else {
+            this.sendLogToUI('success', `Đã lưu thành công ${savedCount} bài mới vào hệ thống.`);
+        }
       }
     } catch (err) {
       console.error('[FeedCrawler] Lỗi lưu Supabase:', err);
@@ -362,7 +353,7 @@ class FeedCrawler {
   // Legacy: Gọi API cũ /crawl-result (lưu vào bảng fb_posts)
   private async savePostsToSupabaseLegacy(posts: any[], group: FeedGroup): Promise<void> {
     try {
-      const response = await fetch('https://seeding.markeeai.com/api/all-platform/extension/crawl-result', {
+      const response = await fetch('http://127.0.0.1:8000/api/all-platform/extension/crawl-result', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -516,6 +507,10 @@ chrome.runtime.onMessage.addListener((message: Message, sender: chrome.runtime.M
     case 'CRAWL_COMPLETE': {
       // Nhận kết quả từ content script, forward về frontend
       console.log('[BG] CRAWL_COMPLETE:', message.data);
+      if (feedCrawler.isRunning) {
+         message.data.groupName = feedCrawler.state.groupName;
+         message.data.groupUrl = feedCrawler.state.groupUrl;
+      }
       sendToFrontend('CRAWL_COMPLETE', message.data);
       sendResponse({ success: true });
       break;

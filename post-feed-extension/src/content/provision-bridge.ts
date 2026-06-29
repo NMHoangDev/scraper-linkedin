@@ -18,7 +18,7 @@ window.addEventListener('message', (event: MessageEvent) => {
   console.log('[ProvisionBridge] Từ app:', data.type, data.data);
 
   // 1) App ping để hỏi extension đã cài chưa
-  if (data.type === 'MARKEE_FB_PING') {
+  if (data.type === 'MARKEE_FB_PING' || data.type === 'MARKEE_POST_FEED_PING') {
     console.log('[ProvisionBridge] Nhận PING, hỏi background...');
     try {
       chrome.runtime.sendMessage({ action: 'getServiceStatus' }, (resp: any) => {
@@ -128,6 +128,7 @@ chrome.runtime.onMessage.addListener((message: any) => {
       window.postMessage({
         type: 'CRAWL_COMPLETE',
         groupUrl: message.data?.groupUrl,
+        groupName: message.data?.groupName,
         posts: message.data?.posts,
         totalPosts: message.data?.totalPosts,
         scrolls: message.data?.scrolls,

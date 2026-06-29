@@ -4,14 +4,14 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { CrawlLinkedInPopup } from "@/components/all-platform/crawl-linkedin-popup";
 import { CrawlFacebookPopup } from "@/components/all-platform/crawl-facebook-popup";
-import { ExtensionLauncher } from "@/components/all-platform/components/extension-launcher";
+import { ApiExtensionLauncher } from "@/components/all-platform/components/api-extension-launcher";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { FilterBar, type FilterState } from "@/components/all-platform/components/filter-bar";
 import { PostCard } from "@/components/all-platform/components/post-card";
 import { PostDetailModal } from "@/components/all-platform/components/post-detail-modal";
 import { VerifyAccountModal } from "@/components/all-platform/components/verify-account-modal";
 import { KpiProgressCard } from "@/components/all-platform/components/kpi-progress-card";
-import { allPlatformPostsService, allPlatformCategoriesService, teamsService } from "@/services/all-platform.service";
+import { allPlatformPostsService, allPlatformCategoriesService, teamsService, usersService, type AppUserProfile } from "@/services/all-platform.service";
 import type { UnifiedPost, UnifiedStats, Category, FeedPlatform } from "@/types/unified.types";
 
 // ─── Retry helper ────────────────────────────────────────────────────────────────
@@ -223,7 +223,8 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
 
   // Filter & Taxonomy States
   const [categories, setCategories] = useState<Category[]>([]);
-  const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
+  const [teams, setTeams] = useState<{ id: string; name: string; id_leader?: string; members?: { id: string }[] }[]>([]);
+  const [usersList, setUsersList] = useState<AppUserProfile[]>([]);
   const [filters, setFilters] = useState<FilterState>({
     search: "",
     intent: "",
@@ -233,29 +234,33 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
     icp: "",
     content_type: "",
     product_seeding: "",
+    member: "",
     sort: "latest",
     dateRange: "",
   });
   const filterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Fetch Taxonomy
   const fetchCategories = useCallback(async () => {
     try {
-      const [catRes, teamRes] = await Promise.all([
+      const [catRes, teamRes, userRes] = await Promise.all([
         allPlatformCategoriesService.getAll(),
         teamsService.getAll(),
+        usersService.getAllProfiles(),
       ]);
       if (catRes.success && catRes.data) setCategories(catRes.data as Category[]);
       if (teamRes.success && teamRes.data) {
         const seen = new Set<string>();
-        const list: { id: string; name: string }[] = [];
+        const list: { id: string; name: string; id_leader?: string; members?: { id: string }[] }[] = [];
         for (const t of teamRes.data as any[]) {
           if (t.id && t.name_team && !seen.has(t.id)) {
             seen.add(t.id);
-            list.push({ id: t.id, name: t.name_team });
+            list.push({ id: t.id, name: t.name_team, id_leader: t.id_leader, members: t.members });
           }
         }
         setTeams(list);
+      }
+      if (userRes.success && userRes.data) {
+        setUsersList(userRes.data);
       }
     } catch {}
   }, []);
@@ -299,6 +304,7 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
           icp: filters.icp || undefined,
           content_type: filters.content_type || undefined,
           product_seeding: filters.product_seeding || undefined,
+          id_member: filters.member || undefined,
           search: filters.search || undefined,
           sort: filters.sort,
           page,
@@ -376,6 +382,24 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
     category_type: "team",
     platform: "all",
   }));
+  
+  const isAdmin = user?.role === "admin";
+  const isLeader = user?.role === "leader";
+
+  const memberOptions = usersList
+    .filter(u => {
+      if (isAdmin) return true;
+      if (isLeader) {
+        if (String(u.id) === String(user?.id)) return true;
+        return teams.some(t => String(t.id_leader) === String(user?.id) && t.members?.some(m => String(m.id) === String(u.id)));
+      }
+      return false;
+    })
+    .map(u => ({
+      id: u.id,
+      name: (u as any).full_name || (u as any).name || u.email,
+      code: u.email,
+    }));
 
   const fbDiff = stats.totalPostsToday - stats.postsYesterday;
 
@@ -476,7 +500,7 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
             type="comment"
           />
           {feedPlatform === "facebook" && (
-            <ExtensionLauncher
+            <ApiExtensionLauncher
               onComplete={() => {
                 fetchPosts();
                 fetchStats();
@@ -494,6 +518,7 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
         icps={icps}
         contentTypes={contentTypes}
         productSeedings={productSeedings}
+        members={memberOptions}
         onFilter={handleFilter}
         isLoading={isLoadingPosts}
       />

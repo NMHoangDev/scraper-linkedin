@@ -187,6 +187,12 @@ all_platform_router.include_router(
     tags=["Customer Leads"]
 )
 
+# ── WebSocket ────────────────────────────────────────────────────────────────
+all_platform_router.include_router(
+    websocket_router,
+    tags=["All-Platform WebSockets"]
+)
+
 # ── Zalo ───────────────────────────────────────────────────────────────────────
 from app.modules.all_platform.zalo.api.routes.auth import router as zalo_auth_router
 from app.modules.all_platform.zalo.api.routes.crawler import router as zalo_crawl_router

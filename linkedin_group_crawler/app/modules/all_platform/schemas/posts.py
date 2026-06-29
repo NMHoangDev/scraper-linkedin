@@ -53,6 +53,7 @@ class UnifiedFilterRequest(BaseModel):
     content_type: Optional[str] = None
     product_seeding: Optional[str] = None
     search: Optional[str] = None
+    id_member: Optional[str] = None
     sort: str = "latest"
     page: int = 1
     page_size: int = 20

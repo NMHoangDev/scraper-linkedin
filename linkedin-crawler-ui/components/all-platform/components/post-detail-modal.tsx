@@ -134,7 +134,7 @@ export function PostDetailModal({
                 {post.tier !== undefined && <span className="rounded bg-orange-50 px-2 py-0.5 text-xs font-bold text-orange-600">Tier {post.tier}</span>}
               </div>
               <span className="text-xs text-slate-500 font-medium block mt-2">
-                Đăng lúc: {post.post_time ? new Date(post.post_time).toLocaleString("vi-VN") : "Không rõ"} • Cào lúc: {post.crawl_date ? new Date(post.crawl_date).toLocaleString("vi-VN") : ""}
+                Tác giả: <span className="font-bold text-slate-700">{post.author || "Người tham gia ẩn danh"}</span> • Đăng lúc: {post.post_time ? new Date(post.post_time).toLocaleString("vi-VN") : "Không rõ"} • Cào lúc: {post.crawl_date ? new Date(post.crawl_date).toLocaleString("vi-VN") : ""}
               </span>
             </div>
           </div>
@@ -144,6 +144,19 @@ export function PostDetailModal({
               {post.content || "Nội dung bài viết rỗng hoặc chứa thuần hình ảnh/video."}
             </p>
           </div>
+
+          {(post.image_urls && post.image_urls.length > 0) || post.media_url ? (
+            <div className="mb-6 grid grid-cols-2 gap-2 rounded-xl overflow-hidden">
+              {post.media_url && (
+                <div className="col-span-full">
+                  <video src={post.media_url} controls className="w-full max-h-64 object-contain bg-black/5 rounded-lg border border-slate-100" />
+                </div>
+              )}
+              {post.image_urls?.map((url, i) => (
+                <img key={i} src={url} alt={`Post media ${i}`} className="w-full h-48 object-cover rounded-lg border border-slate-100 hover:opacity-90 transition-opacity cursor-pointer" onClick={() => window.open(url, '_blank')} />
+              ))}
+            </div>
+          ) : null}
 
           {post.seeding_content && (
             <div className="bg-emerald-50/50 rounded-xl border border-emerald-100 p-4 mb-6">
