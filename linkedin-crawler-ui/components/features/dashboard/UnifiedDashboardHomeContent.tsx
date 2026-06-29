@@ -424,14 +424,6 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
               <span className="material-symbols-outlined text-[18px]">download</span>
               Cào dữ liệu
             </button>
-            <button
-              onClick={() => setShowBulkCommentModal(true)}
-              className="flex items-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold px-4 py-2 rounded-xl text-sm transition-all shadow-md shadow-emerald-500/20 hover:shadow-lg hover:shadow-emerald-500/30 active:scale-[0.98]"
-            >
-              <span className="material-symbols-outlined text-[18px]">forum</span>
-              Seeding hàng loạt
-            </button>
-
           </div>
         </div>
       )}
