@@ -30,7 +30,7 @@ export function ZaloGroupResultCollapse({
   const [open, setOpen] = useState(job.status !== "running");
 
   return (
-    <div className="border-outline-variant bg-surface-container-lowest rounded-2xl border shadow-sm">
+    <div className="border-outline-variant bg-surface-container-lowest rounded-xl border shadow-sm">
       <button
         type="button"
         className="flex w-full items-center justify-between gap-md px-lg py-md text-left"

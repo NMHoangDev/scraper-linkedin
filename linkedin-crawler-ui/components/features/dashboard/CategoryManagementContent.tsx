@@ -24,7 +24,7 @@ function TeamModal({ isOpen, onClose, onSave, editing }: { isOpen: boolean; onCl
   const [nameTeam, setNameTeam] = useState("");
   const [leaderEmail, setLeaderEmail] = useState("");
   const [memberEmails, setMemberEmails] = useState<string[]>([]);
-  
+
   const [leaders, setLeaders] = useState<AppUserProfile[]>([]);
   const [allUsers, setAllUsers] = useState<AppUserProfile[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -68,26 +68,26 @@ function TeamModal({ isOpen, onClose, onSave, editing }: { isOpen: boolean; onCl
   };
 
   const toggleMember = (email: string) => {
-    setMemberEmails(prev => 
+    setMemberEmails(prev =>
       prev.includes(email) ? prev.filter(e => e !== email) : [...prev, email]
     );
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[1px] animate-in fade-in duration-200">
-      <div style={{ width: "100%", maxWidth: "448px" }} className="rounded-2xl bg-[#FFFFFF] border border-slate-100 shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-50 bg-slate-50/50 shrink-0">
-          <h3 className="font-bold text-slate-800">
+      <div style={{ width: "100%", maxWidth: "448px" }} className="rounded-xl bg-surface border border-outline-variant shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant bg-surface-container-low shrink-0">
+          <h3 className="font-bold text-on-surface">
             {editing ? "Sửa Team" : "Thêm Team"}
           </h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100">
+          <button onClick={onClose} className="text-on-surface-variant hover:text-on-surface-variant p-1.5 rounded-lg hover:bg-surface-container-low">
             <MaterialIcon name="close" className="text-xl" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
           <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+            <label className="block text-[10px] font-bold text-on-surface-variant uppercase mb-1">
               Tên Team {editing ? "(không đổi)" : "*"}
             </label>
             <input
@@ -96,18 +96,18 @@ function TeamModal({ isOpen, onClose, onSave, editing }: { isOpen: boolean; onCl
               onChange={(e) => setNameTeam(e.target.value)}
               disabled={!!editing}
               placeholder="Vd: Growth Team"
-              className="w-full px-4 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] transition disabled:opacity-50"
+              className="w-full px-4 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-xs text-on-surface outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary transition disabled:opacity-50"
             />
           </div>
           <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+            <label className="block text-[10px] font-bold text-on-surface-variant uppercase mb-1">
               Trưởng nhóm (Leader) {editing ? "(không đổi)" : "*"}
             </label>
             <select
               value={leaderEmail}
               onChange={(e) => setLeaderEmail(e.target.value)}
               disabled={!!editing}
-              className="w-full px-4 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] transition cursor-pointer disabled:opacity-50"
+              className="w-full px-4 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-xs text-on-surface outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary transition cursor-pointer disabled:opacity-50"
             >
               <option value="">-- Chọn Leader --</option>
               {leaders.map(l => (
@@ -118,39 +118,39 @@ function TeamModal({ isOpen, onClose, onSave, editing }: { isOpen: boolean; onCl
               )}
             </select>
           </div>
-          
+
           <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Thành viên (Members)</label>
-            <div className="border border-slate-200/80 rounded-xl max-h-48 overflow-y-auto bg-slate-50 p-2 space-y-1">
+            <label className="block text-[10px] font-bold text-on-surface-variant uppercase mb-1">Thành viên (Members)</label>
+            <div className="border border-outline-variant rounded-xl max-h-48 overflow-y-auto bg-surface-container-low p-2 space-y-1">
               {allUsers.length === 0 ? (
-                <div className="text-xs text-center p-2 text-slate-500">Đang tải tài khoản...</div>
+                <div className="text-xs text-center p-2 text-on-surface-variant">Đang tải tài khoản...</div>
               ) : (
                 allUsers.map(u => {
                   const selected = memberEmails.includes(u.email);
                   return (
-                    <div 
-                      key={u.email} 
+                    <div
+                      key={u.email}
                       onClick={() => toggleMember(u.email)}
-                      className={cn("flex items-center gap-2 p-2 rounded-lg cursor-pointer text-xs transition border", selected ? "bg-[#E3000F]/10 border-[#E3000F]/30" : "bg-white border-transparent hover:border-slate-200")}
+                      className={cn("flex items-center gap-2 p-2 rounded-lg cursor-pointer text-xs transition border", selected ? "bg-primary/10 border-primary/30" : "bg-surface border-transparent hover:border-outline-variant")}
                     >
-                      <input type="checkbox" checked={selected} readOnly className="cursor-pointer accent-[#E3000F]" />
+                      <input type="checkbox" checked={selected} readOnly className="cursor-pointer accent-primary" />
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-slate-900 truncate">{u.name || u.email.split("@")[0]}</div>
-                        <div className="text-slate-500 text-[10px] truncate">{u.email}</div>
+                        <div className="font-semibold text-on-surface truncate">{u.name || u.email.split("@")[0]}</div>
+                        <div className="text-on-surface-variant text-[10px] truncate">{u.email}</div>
                       </div>
                     </div>
                   )
                 })
               )}
             </div>
-            <div className="text-[10px] text-slate-500 mt-1 text-right font-medium">Đã chọn: {memberEmails.length} người</div>
+            <div className="text-[10px] text-on-surface-variant mt-1 text-right font-medium">Đã chọn: {memberEmails.length} người</div>
           </div>
-          
-          <div className="flex gap-3 pt-3 border-t border-slate-50 shrink-0">
-            <button type="button" onClick={onClose} className="flex-1 border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-2 rounded-xl text-xs transition">
+
+          <div className="flex gap-3 pt-3 border-t border-outline-variant shrink-0">
+            <button type="button" onClick={onClose} className="flex-1 border border-outline-variant hover:bg-surface-container-low text-on-surface font-bold py-2 rounded-xl text-xs transition">
               Hủy bỏ
             </button>
-            <button type="submit" disabled={isSubmitting || !nameTeam.trim() || !leaderEmail} className="flex-1 bg-[#E3000F] hover:bg-[#C40009] text-white font-bold py-2 rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50">
+            <button type="submit" disabled={isSubmitting || !nameTeam.trim() || !leaderEmail} className="flex-1 bg-primary hover:bg-on-primary-fixed-variant text-white font-bold py-2 rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50">
               {isSubmitting ? "Đang lưu..." : (editing ? "Lưu thay đổi" : "Thêm mới")}
             </button>
           </div>
@@ -578,7 +578,7 @@ export function CategoryManagementContent() {
       </PlatformStatsRow>
 
       {/* ── TABS SELECTOR ────────────────────────────────────── */}
-      <div className="border-b border-slate-100 overflow-x-auto whitespace-nowrap">
+      <div className="border-b border-outline-variant overflow-x-auto whitespace-nowrap">
         <div className="flex gap-8 px-2">
           {CATEGORIES_METADATA.map((meta) => {
             const isActive = selectedTab === meta.key;
@@ -592,17 +592,17 @@ export function CategoryManagementContent() {
                   setSearchTerm("");
                 }}
                 className={cn(
-                  "py-4 text-xs font-bold border-b-2 transition-all uppercase tracking-wider cursor-pointer flex items-center gap-1.5",
+                  "py-4 text-xs font-bold border-b-2 transition-all uppercase cursor-pointer flex items-center gap-1.5",
                   isActive
-                    ? "border-[#E3000F] text-[#E3000F]"
-                    : "border-transparent text-slate-400 hover:text-[#E3000F]",
+                    ? "border-primary text-primary"
+                    : "border-transparent text-on-surface-variant hover:text-primary",
                 )}
               >
                 <span>{meta.emoji}</span>
                 <span>{meta.label}</span>
                 <span className={cn(
                   "px-1.5 py-0.5 rounded-full text-[9px] font-black",
-                  isActive ? "bg-[#E3000F]/10 text-[#E3000F]" : "bg-slate-100 text-slate-500"
+                  isActive ? "bg-primary/10 text-primary" : "bg-surface-container-low text-on-surface-variant"
                 )}>
                   {count}
                 </span>
@@ -613,11 +613,11 @@ export function CategoryManagementContent() {
       </div>
 
       {/* ── MAIN CRUD CARD ──────────────────────────────────── */}
-      <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm space-y-6">
+      <div className="rounded-xl border border-outline-variant bg-surface p-6 shadow-sm space-y-6">
         {/* Description box */}
-        <div className="bg-slate-50/75 border border-slate-100 rounded-xl px-4 py-2.5 flex items-center gap-2">
-          <MaterialIcon name="info" className="text-[#E3000F]" />
-          <p className="text-slate-500 text-xs font-medium leading-normal">
+        <div className="bg-surface-container-low border border-outline-variant rounded-xl px-4 py-2.5 flex items-center gap-2">
+          <MaterialIcon name="info" className="text-primary" />
+          <p className="text-on-surface-variant text-xs font-medium leading-normal">
             {currentMetadata.description}
           </p>
         </div>
@@ -625,7 +625,7 @@ export function CategoryManagementContent() {
         {/* Filter & Action bar */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
           <div className="relative w-full sm:max-w-[280px] flex items-center">
-            <span className="material-symbols-outlined absolute left-3 text-slate-400 text-[20px] pointer-events-none select-none">
+            <span className="material-symbols-outlined absolute left-3 text-on-surface-variant text-[20px] pointer-events-none select-none">
               search
             </span>
             <input
@@ -633,14 +633,14 @@ export function CategoryManagementContent() {
               placeholder={`Tìm kiếm ${currentMetadata.label.toLowerCase()}...`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition"
+              className="w-full pl-9 pr-4 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-xs text-on-surface outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition"
             />
           </div>
 
           <button
             type="button"
             onClick={handleOpenAddModal}
-            className="w-full sm:w-auto flex items-center justify-center gap-1.5 bg-[#E3000F] hover:bg-[#C40009] text-white px-4 py-2 rounded-xl text-xs font-bold transition active:scale-95 shadow-sm cursor-pointer"
+            className="w-full sm:w-auto flex items-center justify-center gap-1.5 bg-primary hover:bg-on-primary-fixed-variant text-white px-4 py-2 rounded-xl text-xs font-bold transition active:scale-95 shadow-sm cursor-pointer"
           >
             <MaterialIcon name="add" className="text-base" />
             Thêm tùy chọn
@@ -648,9 +648,9 @@ export function CategoryManagementContent() {
         </div>
 
         {/* Table representation */}
-        <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm">
           <table className="w-full border-collapse text-left text-xs">
-            <thead className="bg-slate-50/75 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            <thead className="bg-surface-container-low border-b border-outline-variant text-[10px] font-bold text-on-surface-variant uppercase">
               <tr>
                 <th className="py-3 px-4">{currentMetadata.valueLabel}</th>
                 <th className="py-3 px-4">{currentMetadata.nameLabel}</th>
@@ -659,12 +659,12 @@ export function CategoryManagementContent() {
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-slate-50 text-slate-600">
+            <tbody className="divide-y divide-outline-variant text-on-surface-variant">
               {isLoading ? (
                 <tr>
-                  <td colSpan={4} className="py-12 text-center text-slate-400">
+                  <td colSpan={4} className="py-12 text-center text-on-surface-variant">
                     <div className="flex items-center justify-center gap-2">
-                      <div className="w-4 h-4 border-2 border-[#E3000F] border-t-transparent rounded-full animate-spin" />
+                      <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                       <span>Đang tải danh sách danh mục...</span>
                     </div>
                   </td>
@@ -677,7 +677,7 @@ export function CategoryManagementContent() {
                 </tr>
               ) : filteredOptions.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-12 text-center text-slate-400 italic">
+                  <td colSpan={4} className="py-12 text-center text-on-surface-variant italic">
                     Chưa có tùy chọn nào. Bấm nút "Thêm tùy chọn" để đăng ký mới.
                   </td>
                 </tr>
@@ -687,18 +687,18 @@ export function CategoryManagementContent() {
                   const itemVal = (item as any)[valueKey] || "";
                   const itemName = (item as any)[nameKey] || "";
                   return (
-                    <tr key={item.id} className="hover:bg-slate-50/30 transition">
-                      <td className="py-3.5 px-4 font-mono text-[11px] font-semibold text-slate-700">
+                    <tr key={item.id} className="hover:bg-surface-container-low transition">
+                      <td className="py-3.5 px-4 font-mono text-[11px] font-semibold text-on-surface">
                         {itemVal}
                       </td>
-                      <td className="py-3.5 px-4 font-bold text-slate-900">
+                      <td className="py-3.5 px-4 font-bold text-on-surface">
                         {itemName}
                       </td>
                       <td className="py-3.5 px-4">
                         <span className={cn(
                           "px-2 py-0.5 rounded-full text-[9px] font-bold border uppercase",
                           !item.platform || item.platform === "all"
-                            ? "bg-slate-50 text-slate-500 border-slate-100"
+                            ? "bg-surface-container-low text-on-surface-variant border-outline-variant"
                             : item.platform === "facebook"
                             ? "bg-indigo-50 text-indigo-700 border-indigo-100"
                             : "bg-sky-50 text-sky-700 border-sky-100"
@@ -711,7 +711,7 @@ export function CategoryManagementContent() {
                           <button
                             type="button"
                             onClick={() => handleOpenEditModal(item)}
-                            className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+                            className="p-1.5 text-on-surface-variant hover:bg-surface-container-low rounded-lg transition cursor-pointer"
                             title="Sửa"
                           >
                             <MaterialIcon name="edit" className="text-base" />
@@ -736,7 +736,7 @@ export function CategoryManagementContent() {
 
       {/* ── DIALOG / MODAL FORM ──────────────────────────────── */}
       {isModalOpen && selectedTab === "team" && (
-        <TeamModal 
+        <TeamModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           onSave={handleSaveTeam}
@@ -748,18 +748,18 @@ export function CategoryManagementContent() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[1px] animate-in fade-in duration-200">
           <div
             style={{ width: "100%", maxWidth: "448px" }}
-            className="bg-white rounded-2xl border border-slate-100 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+            className="bg-surface rounded-xl border border-outline-variant shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
             role="dialog"
             aria-modal="true"
           >
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-50 bg-slate-50/50">
-              <h3 className="font-bold text-slate-800">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant bg-surface-container-low">
+              <h3 className="font-bold text-on-surface">
                 {modalMode === "add" ? `Thêm ${currentMetadata.label}` : `Sửa ${currentMetadata.label}`}
               </h3>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 transition-colors p-1.5 rounded-lg hover:bg-slate-100"
+                className="text-on-surface-variant hover:text-on-surface-variant transition-colors p-1.5 rounded-lg hover:bg-surface-container-low"
                 aria-label="Đóng"
               >
                 <MaterialIcon name="close" className="text-xl" />
@@ -769,13 +769,13 @@ export function CategoryManagementContent() {
             <form onSubmit={(e) => void handleSaveCategory(e)} className="p-6 space-y-4">
               {/* Platform dropdown */}
               <div className="space-y-1">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                <label className="block text-[10px] font-bold text-on-surface-variant uppercase">
                   Nền tảng (Platform) <span className="text-error">*</span>
                 </label>
                 <select
                   value={modalPlatform}
                   onChange={(e) => setModalPlatform(e.target.value)}
-                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition cursor-pointer"
+                  className="w-full px-4 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-xs text-on-surface outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition cursor-pointer"
                 >
                   <option value="all">Tổng hợp (Cả hai)</option>
                   <option value="facebook">Facebook</option>
@@ -785,7 +785,7 @@ export function CategoryManagementContent() {
 
               {/* Value / Key Input */}
               <div className="space-y-1">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                <label className="block text-[10px] font-bold text-on-surface-variant uppercase">
                   {currentMetadata.valueLabel} <span className="text-error">*</span>
                 </label>
                 <input
@@ -794,10 +794,10 @@ export function CategoryManagementContent() {
                   value={modalValue}
                   onChange={(e) => setModalValue(e.target.value)}
                   disabled={modalMode === "edit"}
-                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-xs text-on-surface outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 {modalMode === "add" && (selectedTab === "intent" || selectedTab === "industry" || selectedTab === "tier") && (
-                  <p className="text-[9px] text-slate-400 mt-1 italic">
+                  <p className="text-[9px] text-on-surface-variant mt-1 italic">
                     Gồm chữ cái viết liền, số, dấu gạch ngang (-), gạch dưới (_) hoặc gạch chéo (/).
                   </p>
                 )}
@@ -805,7 +805,7 @@ export function CategoryManagementContent() {
 
               {/* Name / Display label Input */}
               <div className="space-y-1">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                <label className="block text-[10px] font-bold text-on-surface-variant uppercase">
                   {currentMetadata.nameLabel} <span className="text-error">*</span>
                 </label>
                 <input
@@ -813,7 +813,7 @@ export function CategoryManagementContent() {
                   placeholder={currentMetadata.placeholderName}
                   value={modalName}
                   onChange={(e) => setModalName(e.target.value)}
-                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition"
+                  className="w-full px-4 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-xs text-on-surface outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition"
                   autoFocus
                 />
               </div>
@@ -825,18 +825,18 @@ export function CategoryManagementContent() {
               )}
 
               {/* Footer controls */}
-              <div className="flex gap-3 pt-3 border-t border-slate-50">
+              <div className="flex gap-3 pt-3 border-t border-outline-variant">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="flex-1 border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold py-2 rounded-xl text-xs transition"
+                  className="flex-1 border border-outline-variant hover:bg-surface-container-low text-on-surface font-bold py-2 rounded-xl text-xs transition"
                 >
                   Hủy bỏ
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-1 bg-[#E3000F] hover:bg-[#C40009] text-white font-bold py-2 rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="flex-1 bg-primary hover:bg-on-primary-fixed-variant text-white font-bold py-2 rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   {isSubmitting && (
                     <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -854,15 +854,15 @@ export function CategoryManagementContent() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[1px] animate-in fade-in duration-200">
           <div
             style={{ width: "100%", maxWidth: "448px" }}
-            className="bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100"
+            className="bg-surface rounded-xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-outline-variant"
           >
-            <div className="px-6 py-4 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
-              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+            <div className="px-6 py-4 border-b border-outline-variant flex justify-between items-center bg-surface-container-low">
+              <h3 className="font-bold text-on-surface flex items-center gap-2">
                 <span className="text-xl">⚠️</span> Xác nhận xóa
               </h3>
               <button
                 onClick={() => setDeleteModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 transition-colors p-1.5 rounded-lg hover:bg-slate-100"
+                className="text-on-surface-variant hover:text-on-surface-variant transition-colors p-1.5 rounded-lg hover:bg-surface-container-low"
                 disabled={isDeleting}
               >
                 <MaterialIcon name="close" className="text-xl" />
@@ -870,9 +870,9 @@ export function CategoryManagementContent() {
             </div>
 
             <div className="p-6 space-y-4">
-              <p className="text-slate-700 text-xs leading-relaxed">
+              <p className="text-on-surface text-xs leading-relaxed">
                 Bạn có chắc chắn muốn xóa danh mục{" "}
-                <span className="font-semibold text-slate-900">
+                <span className="font-semibold text-on-surface">
                   {categoryToDelete?.name}
                 </span>{" "}
                 không?
@@ -882,11 +882,11 @@ export function CategoryManagementContent() {
               </div>
             </div>
 
-            <div className="px-6 py-4 bg-slate-50/50 flex justify-end gap-3 border-t border-slate-50">
+            <div className="px-6 py-4 bg-surface-container-low flex justify-end gap-3 border-t border-outline-variant">
               <button
                 type="button"
                 onClick={() => setDeleteModalOpen(false)}
-                className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition"
+                className="px-4 py-2 bg-surface border border-outline-variant hover:bg-surface-container-low text-on-surface rounded-xl text-xs font-semibold transition"
                 disabled={isDeleting}
               >
                 Hủy bỏ

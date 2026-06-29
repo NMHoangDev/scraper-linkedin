@@ -31,14 +31,14 @@ export function AdminDashboardSummary({ data, isLoading }: AdminDashboardSummary
     <div className="mb-6">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {cards.map((card, idx) => (
-          <div 
+          <div
             key={idx}
-            className="bg-white border border-slate-100 border-l-4 border-l-[#DC2626] rounded-xl p-4 shadow-none flex flex-col relative overflow-hidden"
+            className="bg-surface border border-outline-variant border-l-4 border-l-primary rounded-xl p-4 shadow-none flex flex-col relative overflow-hidden"
           >
-            <p className="text-slate-500 text-[10px] sm:text-xs font-medium tracking-wide capitalize">
+            <p className="text-on-surface-variant text-[10px] sm:text-xs font-medium capitalize">
               {card.title}
             </p>
-            <p className="text-slate-900 mt-2 text-2xl sm:text-3xl font-black tabular-nums leading-none">
+            <p className="text-on-surface mt-2 text-2xl sm:text-3xl font-black tabular-nums leading-none">
               {typeof card.value === "number" ? card.value.toLocaleString("vi-VN") : card.value}
             </p>
           </div>

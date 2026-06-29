@@ -59,7 +59,7 @@ export function LinkedInTopPostsPage() {
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
-                className="border-outline-variant text-primary font-label-md flex items-center gap-2 rounded border bg-white px-md py-xs shadow-sm transition-all hover:bg-surface-container"
+                className="border-outline-variant text-primary font-label-md flex items-center gap-2 rounded border bg-surface px-md py-xs shadow-sm transition-all hover:bg-surface-container"
               >
                 <MaterialIcon name="filter_list" className="text-[18px]" />
                 Lọc

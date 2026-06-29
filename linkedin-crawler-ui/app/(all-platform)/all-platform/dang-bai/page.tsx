@@ -126,7 +126,7 @@ export default function DangBaiPage() {
 
       const sessionMap = new Map<string, FbSession>((s.sessions || []).map((item: FbSession) => [item.user_id, item]));
       setExts((e.extensions || []).map((ext: Ext) => ({ ...(sessionMap.get(ext.user_id) || {}), ...ext })));
-      
+
       setGroups(((g.data || []) as FacebookGroup[])
         .filter(group => group.group_url)
         .map(group => ({
@@ -312,7 +312,7 @@ export default function DangBaiPage() {
   };
 
   const clearAllAccountGroups = () => setSelectedAccountGroupKeys(new Set());
-  
+
   const toggle = (uid: string) => {
     const next = new Set(selected);
     if (next.has(uid)) next.delete(uid);
@@ -432,7 +432,7 @@ export default function DangBaiPage() {
       if (selectedAccountGroupKeys.size === 0) return toast.error("Chưa chọn group");
       if (jobs.length === 0) return toast.error("Các group đã chọn chưa có tài khoản online nào phù hợp");
     }
-    
+
     setSending(true);
     const results = await Promise.all(jobs.map(async job => {
       try {
@@ -450,20 +450,20 @@ export default function DangBaiPage() {
         return { uid: job.user_id, group: job.group_name, ok: r.ok, detail: d.detail };
       } catch { return { uid: job.user_id, group: job.group_name, ok: false, detail: "không kết nối được" }; }
     }));
-    
+
     const ok = results.filter(x => x.ok).length;
     const fail = results.filter(x => !x.ok);
-    
-    if (fail.length === 0) { 
-      toast.success(`Đã gửi ${ok}/${jobs.length} lệnh đăng!`); 
-      setContent(""); 
-      setMediaUrls([]); 
+
+    if (fail.length === 0) {
+      toast.success(`Đã gửi ${ok}/${jobs.length} lệnh đăng!`);
+      setContent("");
+      setMediaUrls([]);
       setSelectedAccountGroupKeys(new Set());
       setIsPostModalOpen(false);
     }
     else if (ok > 0) toast.error(`Gửi OK ${ok}, lỗi ${fail.length}: ${fail.map(f => f.uid).join(", ")}`);
     else toast.error(fail[0].detail || "Không gửi được");
-    
+
     setSending(false);
     setTimeout(refresh, 800);
   }
@@ -576,10 +576,10 @@ export default function DangBaiPage() {
                            Thành công
                         </span>
                         {j.post_url && (
-                          <a 
-                            href={j.post_url} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
+                          <a
+                            href={j.post_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="text-body-sm text-primary font-bold hover:underline inline-flex items-center gap-0.5 transition"
                           >
                             <MaterialIcon name="open_in_new" className="text-[13px]" /> Xem bài viết
@@ -597,11 +597,11 @@ export default function DangBaiPage() {
 
       {/* Modal Đăng Bài Seeding Mới */}
       {isPostModalOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center p-md transition-all"
           onClick={() => setIsPostModalOpen(false)}
         >
-          <div 
+          <div
             className="bg-surface border border-outline-variant rounded-xl shadow-2xl w-[95vw] md:w-[820px] max-w-[52rem] flex flex-col max-h-[92vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
@@ -613,8 +613,8 @@ export default function DangBaiPage() {
                 </div>
                 <h3 className="text-h3 text-on-surface">Đăng bài Facebook Seeding mới</h3>
               </div>
-              <button 
-                onClick={() => setIsPostModalOpen(false)} 
+              <button
+                onClick={() => setIsPostModalOpen(false)}
                 className={DS.iconButton}
               >
                 <MaterialIcon name="close" className="text-[20px]" />
@@ -628,7 +628,7 @@ export default function DangBaiPage() {
                 <div className="flex items-center justify-between">
                   <label className={DS.label}>Tài khoản đăng (đang online: {online.length})</label>
                   {online.length > 0 && (
-                    <button 
+                    <button
                       className="text-body-sm font-semibold text-primary hover:underline transition"
                       onClick={() => setSelected(new Set(online.map(e => e.user_id)))}
                     >
@@ -643,10 +643,10 @@ export default function DangBaiPage() {
                     online.map(e => {
                       const isSel = selected.has(e.user_id);
                       return (
-                        <div 
+                        <div
                           key={e.user_id}
                           className={`${DS.chip} pl-sm pr-xs cursor-pointer select-none ${
-                            isSel 
+                            isSel
                               ? DS.selectedChip
                               : DS.subtleChip
                           }`}
@@ -654,11 +654,11 @@ export default function DangBaiPage() {
                         >
                           <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
                           <span className="max-w-[140px] truncate leading-tight">{labelOf(e)}</span>
-                          <button 
+                          <button
                             onClick={(ev) => {
                               ev.stopPropagation();
                               renameAcc(e.user_id, labelOf(e));
-                            }} 
+                            }}
                             title="Đổi tên hiển thị"
                             className={`hover:text-primary transition p-0.5 rounded ${isSel ? "text-primary/70" : "text-on-surface-variant"}`}
                           >
@@ -684,7 +684,7 @@ export default function DangBaiPage() {
                     type="button"
                     onClick={() => setTargetType("profile")}
                     className={`py-sm text-body-sm font-bold rounded-lg flex items-center justify-center gap-xs transition-all ${
-                      targetType === "profile" 
+                      targetType === "profile"
                         ? "bg-surface text-primary shadow-sm"
                         : "text-on-surface-variant hover:text-on-surface"
                     }`}
@@ -695,7 +695,7 @@ export default function DangBaiPage() {
                     type="button"
                     onClick={() => setTargetType("group")}
                     className={`py-sm text-body-sm font-bold rounded-lg flex items-center justify-center gap-xs transition-all ${
-                      targetType === "group" 
+                      targetType === "group"
                         ? "bg-surface text-primary shadow-sm"
                         : "text-on-surface-variant hover:text-on-surface"
                     }`}
@@ -914,10 +914,10 @@ export default function DangBaiPage() {
               {/* Step 3: Nội dung */}
               <div className="space-y-1.5">
                 <label className={DS.label}>Nội dung bài viết seeding</label>
-                <textarea 
-                  value={content} 
-                  onChange={ev => setContent(ev.target.value)} 
-                  placeholder="Nhập nội dung bài viết muốn đăng..." 
+                <textarea
+                  value={content}
+                  onChange={ev => setContent(ev.target.value)}
+                  placeholder="Nhập nội dung bài viết muốn đăng..."
                   className={`${DS.field} min-h-[128px] resize-y`}
                 />
               </div>
@@ -931,12 +931,12 @@ export default function DangBaiPage() {
                       <MaterialIcon name="image" className="mb-1 text-2xl text-on-surface-variant" />
                       <p className="text-body-sm font-medium text-on-surface-variant">Click để chọn tải ảnh từ máy tính</p>
                     </div>
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      multiple 
-                      onChange={ev => upload(ev.target.files)} 
-                      className="hidden" 
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={ev => upload(ev.target.files)}
+                      className="hidden"
                     />
                   </label>
                 </div>
@@ -946,8 +946,8 @@ export default function DangBaiPage() {
                     {mediaUrls.map((u, i) => (
                       <div key={i} className="relative h-16 w-16 overflow-hidden rounded-lg border border-outline-variant bg-surface-container-low shadow-sm group">
                         <img src={u} className="w-full h-full object-cover" alt="uploaded-preview" />
-                        <button 
-                          onClick={() => setMediaUrls(prev => prev.filter((_, j) => j !== i))} 
+                        <button
+                          onClick={() => setMediaUrls(prev => prev.filter((_, j) => j !== i))}
                           className="absolute top-1 right-1 bg-black/60 hover:bg-black text-white rounded-full w-4.5 h-4.5 flex items-center justify-center text-[10px] leading-none transition"
                         >
                           &times;
@@ -961,15 +961,15 @@ export default function DangBaiPage() {
 
             {/* Modal Footer */}
             <div className="flex justify-end gap-sm border-t border-outline-variant bg-surface-container-low px-lg py-md">
-              <button 
+              <button
                 onClick={() => setIsPostModalOpen(false)}
                 className={DS.secondaryButton}
               >
                 Hủy
               </button>
-              <button 
-                onClick={submit} 
-                disabled={sending} 
+              <button
+                onClick={submit}
+                disabled={sending}
                 className={DS.primaryButton}
               >
                 {sending ? (

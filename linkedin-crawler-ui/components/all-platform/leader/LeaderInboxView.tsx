@@ -360,7 +360,7 @@ export function LeaderInboxView({
     setSending(true);
     setSendError(null);
     const mediaToSend = [...selectedMedia];
-    
+
     // Clear inputs immediately for better UX
     setDraft("");
     setSelectedMedia([]);
@@ -383,7 +383,7 @@ export function LeaderInboxView({
           text: textToSend,
         });
       }
-      
+
       mediaToSend.forEach((m) => {
         if (m.previewUrl) URL.revokeObjectURL(m.previewUrl);
       });
@@ -438,16 +438,16 @@ export function LeaderInboxView({
         }}
       />
       <div
-        className="relative z-10 w-full h-full sm:h-[85vh] sm:max-w-4xl bg-white sm:rounded-2xl rounded-none sm:border border-slate-200 shadow-xl flex flex-col overflow-hidden"
+        className="relative z-10 w-full h-full sm:h-[85vh] sm:max-w-4xl bg-surface sm:rounded-xl rounded-none sm:border border-outline-variant shadow-xl flex flex-col overflow-hidden"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-slate-50">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-outline-variant bg-surface-container-low">
           <div>
-            <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+            <h2 className="text-base font-bold text-on-surface flex items-center gap-2">
               <MaterialIcon name="visibility" className="text-red-600 text-[20px]" />
               Xem Inbox (KPI verification)
             </h2>
-            <p className="text-[11px] text-slate-500 mt-0.5">
+            <p className="text-[11px] text-on-surface-variant mt-0.5">
               {memberName || memberEmail || "—"} · {sharedList.length} hội thoại đã share
               {totalCount > 0 && (
                 <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold">
@@ -458,7 +458,7 @@ export function LeaderInboxView({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <label className="flex items-center gap-1 text-[11px] text-slate-500 cursor-pointer">
+            <label className="flex items-center gap-1 text-[11px] text-on-surface-variant cursor-pointer">
               <input
                 type="checkbox"
                 checked={autoRefresh}
@@ -469,7 +469,7 @@ export function LeaderInboxView({
             </label>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/50"
+              className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface-variant hover:bg-surface-container-highest/50"
               title="Đóng"
             >
               <MaterialIcon name="close" className="text-[20px]" />
@@ -480,16 +480,16 @@ export function LeaderInboxView({
         {/* Body: sidebar + chat */}
         <div className="flex-1 flex min-h-0">
           {/* Sidebar */}
-          <div className={`w-full md:w-72 border-r border-slate-200 flex-col bg-slate-50/50 ${activeConversationId ? "hidden md:flex" : "flex"}`}>
-            <div className="p-3 border-b border-slate-200">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+          <div className={`w-full md:w-72 border-r border-outline-variant flex-col bg-surface-container-low ${activeConversationId ? "hidden md:flex" : "flex"}`}>
+            <div className="p-3 border-b border-outline-variant">
+              <label className="text-[10px] font-bold text-on-surface-variant uppercase">
                 Member
               </label>
               <input
                 value={memberEmail}
                 onChange={(e) => setMemberEmail(e.target.value.toLowerCase())}
                 placeholder="email@company.com"
-                className="w-full mt-1 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20"
+                className="w-full mt-1 bg-surface border border-outline-variant rounded-lg px-2 py-1.5 text-xs outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20"
               />
               <button
                 onClick={refreshList}
@@ -504,7 +504,7 @@ export function LeaderInboxView({
             </div>
             <div className="flex-1 overflow-y-auto p-2 space-y-2">
               {grouped.length === 0 && !loadingList && (
-                <p className="text-center text-[11px] text-slate-400 py-8 leading-relaxed">
+                <p className="text-center text-[11px] text-on-surface-variant py-8 leading-relaxed">
                   Member này chưa share hội thoại nào với bạn.
                   <br />
                   Nhắc member tick 👁 ở Zalo Chat.
@@ -512,7 +512,7 @@ export function LeaderInboxView({
               )}
               {grouped.map(([accId, group]) => (
                 <div key={accId} className="space-y-1">
-                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-1.5 pt-1">
+                  <div className="text-[10px] font-bold text-on-surface-variant uppercase px-1.5 pt-1">
                     {group.account?.label || accId.slice(0, 10)}…
                   </div>
                   {group.rows.map((row) => {
@@ -524,7 +524,7 @@ export function LeaderInboxView({
                         className={`w-full text-left px-2 py-1.5 rounded-lg text-[11px] transition ${
                           isActive
                             ? "bg-red-50 text-red-600 font-bold"
-                            : "hover:bg-slate-200/50 text-slate-700"
+                            : "hover:bg-surface-container-highest/50 text-on-surface"
                         }`}
                       >
                         <div
@@ -556,7 +556,7 @@ export function LeaderInboxView({
                               className={`inline-flex items-center justify-center shrink-0 w-7 h-7 rounded-full transition cursor-pointer disabled:opacity-50 ${
                                 isVerified
                                   ? "text-emerald-500 hover:bg-emerald-50"
-                                  : "text-slate-300 hover:text-slate-500 hover:bg-slate-100"
+                                  : "text-outline hover:text-on-surface-variant hover:bg-surface-container-low"
                               }`}
                               title={
                                 isVerified
@@ -574,7 +574,7 @@ export function LeaderInboxView({
                             </button>
                           </div>
                           {row.note && (
-                            <div className="text-[11px] text-slate-400 mt-0.5 truncate pr-8">
+                            <div className="text-[11px] text-on-surface-variant mt-0.5 truncate pr-8">
                               “{row.note}”
                             </div>
                           )}
@@ -588,19 +588,19 @@ export function LeaderInboxView({
           </div>
 
           {/* Message area */}
-          <div className={`flex-1 flex-col min-w-0 bg-white ${!activeConversationId ? "hidden md:flex" : "flex"}`}>
+          <div className={`flex-1 flex-col min-w-0 bg-surface ${!activeConversationId ? "hidden md:flex" : "flex"}`}>
             {activeConversationId ? (
               <>
-                <div className="px-4 py-2 border-b border-slate-200 bg-white">
+                <div className="px-4 py-2 border-b border-outline-variant bg-surface">
                   <div className="flex items-center gap-2 flex-wrap">
                     <button
                       onClick={() => setActiveConversationId(null)}
-                      className="md:hidden p-1.5 -ml-2 rounded-lg text-slate-500 hover:bg-slate-100 shrink-0"
+                      className="md:hidden p-1.5 -ml-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low shrink-0"
                       title="Quay lại danh sách"
                     >
                       <MaterialIcon name="arrow_back" className="text-[20px]" />
                     </button>
-                    <p className="text-xs font-bold text-slate-700 truncate max-w-[160px] sm:max-w-[250px]">
+                    <p className="text-xs font-bold text-on-surface truncate max-w-[160px] sm:max-w-[250px]">
                       {sharedList.find((r) => r.conversation_id === activeConversationId)?.group_name || activeConversationId}
                     </p>
                     <button
@@ -646,7 +646,7 @@ export function LeaderInboxView({
                                 ? "Đã xác minh KPI"
                                 : "Xác minh KPI Inbox"}
                           </button>
-                          
+
                           {isVerified && (
                             <button
                               onClick={(e) => {
@@ -657,13 +657,13 @@ export function LeaderInboxView({
                               className={`inline-flex items-center gap-1 px-3 py-1 rounded-md text-[11px] font-bold transition disabled:opacity-50 ${
                                 active.is_lead
                                   ? "bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200"
-                                  : "bg-white hover:bg-slate-50 text-slate-600 border border-slate-200"
+                                  : "bg-surface hover:bg-surface-container-low text-on-surface-variant border border-outline-variant"
                               }`}
                               title="Đánh dấu hội thoại này là có tiềm năng"
                             >
                               <MaterialIcon
                                 name={active.is_lead ? "star" : "star_border"}
-                                className={`text-[14px] ${active.is_lead ? "text-blue-500" : "text-slate-400"}`}
+                                className={`text-[14px] ${active.is_lead ? "text-blue-500" : "text-on-surface-variant"}`}
                               />
                               {togglingLeadId === active.id
                                 ? "Đang xử lý..."
@@ -676,15 +676,15 @@ export function LeaderInboxView({
                       );
                     })()}
                   </div>
-                  <p className="text-[10px] text-slate-400">
+                  <p className="text-[10px] text-on-surface-variant">
                     Account: {activeAccountId}
                   </p>
                 </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-slate-50/30">
+                <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-surface-container-low">
                   {loadingMessages && messages.length === 0 ? (
-                    <p className="text-center text-xs text-slate-400 py-8">Đang tải…</p>
+                    <p className="text-center text-xs text-on-surface-variant py-8">Đang tải…</p>
                   ) : messages.length === 0 ? (
-                    <p className="text-center text-xs text-slate-400 py-8">Chưa có tin nhắn</p>
+                    <p className="text-center text-xs text-on-surface-variant py-8">Chưa có tin nhắn</p>
                   ) : (
                     messages.map((m, idx) => (
                       <div
@@ -692,10 +692,10 @@ export function LeaderInboxView({
                         className={`flex ${m.is_sent ? "justify-end" : "justify-start"}`}
                       >
                         <div
-                          className={`max-w-[70%] rounded-2xl px-3 py-1.5 text-xs ${
+                          className={`max-w-[70%] rounded-xl px-3 py-1.5 text-xs ${
                             m.is_sent
                               ? "bg-red-600 text-white"
-                              : "bg-white border border-slate-200 text-slate-800"
+                              : "bg-surface border border-outline-variant text-on-surface"
                           }`}
                         >
                           {m.sender_name && !m.is_sent && (
@@ -705,23 +705,23 @@ export function LeaderInboxView({
                             {m.type === "image" && m.assets && m.assets.length > 0 ? (
                               <div className="flex flex-col gap-2 mt-1">
                                 {m.assets.map((asset, aidx) => (
-                                  <img 
-                                    key={aidx} 
-                                    src={asset.storage_url || asset.source_url} 
-                                    alt="Zalo asset" 
-                                    className="max-w-[150px] object-cover rounded shadow-sm border border-slate-200"
+                                  <img
+                                    key={aidx}
+                                    src={asset.storage_url || asset.source_url}
+                                    alt="Zalo asset"
+                                    className="max-w-[150px] object-cover rounded shadow-sm border border-outline-variant"
                                   />
                                 ))}
                               </div>
                             ) : m.type === "image" ? (
-                                <span className="italic text-slate-400">[Hình ảnh]</span>
+                                <span className="italic text-on-surface-variant">[Hình ảnh]</span>
                             ) : (
                               m.content || "(trống)"
                             )}
                           </div>
                           <div
                             className={`text-[9px] mt-0.5 ${
-                              m.is_sent ? "text-white/70" : "text-slate-400"
+                              m.is_sent ? "text-white/70" : "text-on-surface-variant"
                             }`}
                           >
                             {m.created_at ? new Date(m.created_at).toLocaleString("vi-VN") : ""}
@@ -732,7 +732,7 @@ export function LeaderInboxView({
                   )}
                   <div ref={messagesEndRef} />
                 </div>
-                <div className="border-t border-slate-200 p-3 bg-white relative">
+                <div className="border-t border-outline-variant p-3 bg-surface relative">
                   {/* Invisible Inputs */}
                   <input
                     type="file"
@@ -755,11 +755,11 @@ export function LeaderInboxView({
                   {showEmojiPicker && (
                     <div
                       ref={emojiPickerRef}
-                      className="absolute bottom-full mb-3 left-4 z-50 w-72 h-80 bg-white border border-slate-200 rounded-2xl shadow-xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200"
+                      className="absolute bottom-full mb-3 left-4 z-50 w-72 h-80 bg-surface border border-outline-variant rounded-xl shadow-xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200"
                       style={{ maxHeight: '320px' }}
                     >
                       {/* Category selector */}
-                      <div className="flex border-b border-slate-200 bg-slate-50 px-2 py-1">
+                      <div className="flex border-b border-outline-variant bg-surface-container-low px-2 py-1">
                         {EMOJI_CATEGORIES.map((cat, i) => (
                           <button
                             key={i}
@@ -767,8 +767,8 @@ export function LeaderInboxView({
                             onClick={() => setActiveEmojiTab(i)}
                             className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition ${
                               activeEmojiTab === i
-                                ? "bg-white text-red-600 shadow-sm"
-                                : "text-slate-500 hover:text-slate-800"
+                                ? "bg-surface text-red-600 shadow-sm"
+                                : "text-on-surface-variant hover:text-on-surface"
                             }`}
                           >
                             {cat.name}
@@ -783,7 +783,7 @@ export function LeaderInboxView({
                             key={idx}
                             type="button"
                             onClick={() => handleEmojiClick(emoji)}
-                            className="h-9 w-9 flex items-center justify-center text-xl rounded-lg hover:bg-slate-100 active:scale-95 transition"
+                            className="h-9 w-9 flex items-center justify-center text-xl rounded-lg hover:bg-surface-container-low active:scale-95 transition"
                           >
                             {emoji}
                           </button>
@@ -796,11 +796,11 @@ export function LeaderInboxView({
                   {showQuickReplies && (
                     <div
                       ref={quickRepliesRef}
-                      className="absolute bottom-full mb-3 left-14 z-50 w-80 max-h-80 bg-white border border-slate-200 rounded-2xl shadow-xl flex flex-col overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-200"
+                      className="absolute bottom-full mb-3 left-14 z-50 w-80 max-h-80 bg-surface border border-outline-variant rounded-xl shadow-xl flex flex-col overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-200"
                     >
-                      <div className="px-3 py-2 border-b border-slate-200 bg-slate-50 sticky top-0 z-10 flex justify-between items-center">
-                        <span className="text-xs font-bold text-slate-700">Mẫu câu trả lời nhanh</span>
-                        <button onClick={() => setShowQuickReplies(false)} className="text-slate-400 hover:text-red-500">
+                      <div className="px-3 py-2 border-b border-outline-variant bg-surface-container-low sticky top-0 z-10 flex justify-between items-center">
+                        <span className="text-xs font-bold text-on-surface">Mẫu câu trả lời nhanh</span>
+                        <button onClick={() => setShowQuickReplies(false)} className="text-on-surface-variant hover:text-red-500">
                           <MaterialIcon name="close" className="text-[14px]" />
                         </button>
                       </div>
@@ -813,7 +813,7 @@ export function LeaderInboxView({
                               setShowQuickReplies(false);
                             }}
                             disabled={sending}
-                            className="text-left shrink-0 w-[240px] md:w-auto px-3 py-2 text-[12px] hover:bg-red-50 hover:text-[#E3000F] text-slate-700 bg-white border border-slate-200 md:border-transparent rounded-lg transition-all hover:border-red-200 disabled:opacity-50 whitespace-normal"
+                            className="text-left shrink-0 w-[240px] md:w-auto px-3 py-2 text-[12px] hover:bg-red-50 hover:text-primary text-on-surface bg-surface border border-outline-variant md:border-transparent rounded-lg transition-all hover:border-red-200 disabled:opacity-50 whitespace-normal"
                           >
                             <span className="line-clamp-2 md:line-clamp-none">{text}</span>
                           </button>
@@ -831,13 +831,13 @@ export function LeaderInboxView({
 
                   {/* Selected Media Previews */}
                   {selectedMedia.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 p-1.5 mb-2 rounded-lg border border-slate-200 bg-slate-50 max-h-24 overflow-y-auto">
+                    <div className="flex flex-wrap gap-1.5 p-1.5 mb-2 rounded-lg border border-outline-variant bg-surface-container-low max-h-24 overflow-y-auto">
                       {selectedMedia.map((item, index) => {
                         const isImage = !!item.previewUrl;
                         return (
                           <div
                             key={index}
-                            className="relative group w-10 h-10 rounded border border-slate-200 bg-white overflow-hidden flex items-center justify-center shadow-sm hover:border-[#E3000F]/50 transition"
+                            className="relative group w-10 h-10 rounded border border-outline-variant bg-surface overflow-hidden flex items-center justify-center shadow-sm hover:border-primary/50 transition"
                           >
                             {isImage ? (
                               <img
@@ -847,8 +847,8 @@ export function LeaderInboxView({
                               />
                             ) : (
                               <div className="flex flex-col items-center justify-center p-0.5 text-center w-full h-full">
-                                <MaterialIcon name="description" className="text-base text-[#E3000F]" />
-                                <span className="text-[8px] truncate w-full px-0.5 text-slate-500 font-medium">
+                                <MaterialIcon name="description" className="text-base text-primary" />
+                                <span className="text-[8px] truncate w-full px-0.5 text-on-surface-variant font-medium">
                                   {item.file.name}
                                 </span>
                               </div>
@@ -871,7 +871,7 @@ export function LeaderInboxView({
                     <button
                       type="button"
                       onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                      className={`text-slate-400 hover:text-blue-500 p-1.5 rounded-full hover:bg-blue-50 transition ${
+                      className={`text-on-surface-variant hover:text-blue-500 p-1.5 rounded-full hover:bg-blue-50 transition ${
                         showEmojiPicker ? "text-blue-600 bg-blue-100" : ""
                       }`}
                       title="Biểu cảm"
@@ -881,7 +881,7 @@ export function LeaderInboxView({
                     <button
                       type="button"
                       onClick={() => setShowQuickReplies(!showQuickReplies)}
-                      className={`text-slate-400 hover:text-blue-500 p-1.5 rounded-full hover:bg-blue-50 transition ${
+                      className={`text-on-surface-variant hover:text-blue-500 p-1.5 rounded-full hover:bg-blue-50 transition ${
                         showQuickReplies ? "text-blue-600 bg-blue-100" : ""
                       }`}
                       title="Mẫu câu nhanh"
@@ -891,7 +891,7 @@ export function LeaderInboxView({
                     <button
                       type="button"
                       onClick={() => imageInputRef.current?.click()}
-                      className="text-slate-400 hover:text-blue-500 p-1.5 rounded-full hover:bg-blue-50 transition"
+                      className="text-on-surface-variant hover:text-blue-500 p-1.5 rounded-full hover:bg-blue-50 transition"
                       title="Gửi hình ảnh"
                     >
                       <MaterialIcon name="image" className="text-[18px]" />
@@ -899,7 +899,7 @@ export function LeaderInboxView({
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="text-slate-400 hover:text-blue-500 p-1.5 rounded-full hover:bg-blue-50 transition"
+                      className="text-on-surface-variant hover:text-blue-500 p-1.5 rounded-full hover:bg-blue-50 transition"
                       title="Gửi file tài liệu"
                     >
                       <MaterialIcon name="attach_file" className="text-[18px]" />
@@ -915,7 +915,7 @@ export function LeaderInboxView({
                           : "Nhập tin nhắn, Enter để gửi..."
                       }
                       disabled={sending}
-                      className="flex-1 bg-slate-50 rounded-xl px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:bg-white border border-slate-200 focus:border-[#E3000F]/30 transition-all disabled:opacity-60"
+                      className="flex-1 bg-surface-container-low rounded-xl px-3 py-2 text-xs text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary/15 focus:bg-surface border border-outline-variant focus:border-primary/30 transition-all disabled:opacity-60"
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault();
@@ -927,7 +927,7 @@ export function LeaderInboxView({
                     <button
                       onClick={() => void handleSend()}
                       disabled={sending || (!draft.trim() && selectedMedia.length === 0)}
-                      className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#E3000F] hover:bg-[#C40009] transition disabled:opacity-50 flex items-center gap-1"
+                      className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-primary hover:bg-on-primary-fixed-variant transition disabled:opacity-50 flex items-center gap-1"
                     >
                       <MaterialIcon name="send" className="text-[14px]" />
                       Gửi
@@ -938,8 +938,8 @@ export function LeaderInboxView({
             ) : (
               <div className="flex-1 flex items-center justify-center p-8 text-center">
                 <div>
-                  <MaterialIcon name="forum" className="text-[48px] text-slate-300" />
-                  <p className="text-sm text-slate-400 mt-2">
+                  <MaterialIcon name="forum" className="text-[48px] text-outline" />
+                  <p className="text-sm text-on-surface-variant mt-2">
                     Chọn 1 hội thoại ở sidebar để xem
                   </p>
                 </div>
@@ -982,7 +982,7 @@ async function fetchMessagesFallback(
     if (!res.ok) return [];
     const json = await res.json();
     const rawItems = Array.isArray(json?.messages) ? json.messages : Array.isArray(json?.items) ? json.items : Array.isArray(json) ? json : [];
-    
+
     const seen = new Set<string>();
     const deduplicated = [];
     for (const m of rawItems) {
@@ -992,7 +992,7 @@ async function fetchMessagesFallback(
         deduplicated.push(m);
       }
     }
-    
+
     if (deduplicated.length > 1) {
       const d1 = new Date(deduplicated[0].created_at || 0).getTime();
       const d2 = new Date(deduplicated[deduplicated.length - 1].created_at || 0).getTime();
@@ -1000,7 +1000,7 @@ async function fetchMessagesFallback(
         deduplicated.reverse();
       }
     }
-    
+
     return deduplicated;
   } catch {
     return [];

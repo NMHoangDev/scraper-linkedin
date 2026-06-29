@@ -239,20 +239,20 @@ export default function InboxModernLayout(props: Props) {
   const panelH = "h-[590px] xl:h-[676px]";
 
   return (
-    <div className="w-full max-w-full overflow-x-hidden text-[#1A1A1A]">
+    <div className="w-full max-w-full overflow-x-hidden text-on-surface">
       {/* Header */}
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <MaterialIcon name="inbox" className="text-[#E3000F]" />
+            <MaterialIcon name="inbox" className="text-primary" />
             <h1 className="text-xl font-black">Inbox Facebook</h1>
           </div>
-          <p className="mt-1 text-sm text-[#666666]">Quản lý hội thoại Messenger, lọc lead và trả lời nhanh bằng mẫu có sẵn.</p>
+          <p className="mt-1 text-sm text-on-surface-variant">Quản lý hội thoại Messenger, lọc lead và trả lời nhanh bằng mẫu có sẵn.</p>
         </div>
         <button
           onClick={scan}
           disabled={scanning || !acc || !accOnline || needRelogin}
-          className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#E3000F] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#C40009] disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-white shadow-sm transition hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-50"
         >
           <MaterialIcon name={scanning ? "sync" : "travel_explore"} className={`text-base ${scanning ? "animate-spin" : ""}`} />
           {scanning ? "Đang quét" : "Quét ngay"}
@@ -275,10 +275,10 @@ export default function InboxModernLayout(props: Props) {
           ["Lead đã lưu", stats.customers, stats.pushed],
           ["Online", sessions.filter(s => s.status === "online").length, sessions.length],
         ].map(([label, val, sub], i) => (
-          <div key={label} className="rounded-lg border border-[#E5E5E5] bg-white px-4 py-3">
-            <div className="text-[11px] font-bold uppercase text-[#A0A0A0]">{String(label)}</div>
-            <div className="mt-1 text-2xl font-black" style={i === 1 ? { color: "#E3000F" } : {}}>{val}</div>
-            {sub !== null && <div className="text-xs text-[#A0A0A0]">{sub} {i === 0 ? "chưa đọc" : i === 2 ? "đẩy Zalo" : "tài khoản"}</div>}
+          <div key={label} className="rounded-lg border border-outline-variant bg-surface px-4 py-3">
+            <div className="text-[11px] font-bold uppercase text-on-surface-variant">{String(label)}</div>
+            <div className="mt-1 text-2xl font-black" style={i === 1 ? { color: "var(--color-primary)" } : {}}>{val}</div>
+            {sub !== null && <div className="text-xs text-on-surface-variant">{sub} {i === 0 ? "chưa đọc" : i === 2 ? "đẩy Zalo" : "tài khoản"}</div>}
           </div>
         ))}
       </div>
@@ -297,27 +297,27 @@ export default function InboxModernLayout(props: Props) {
         </div>
       )}
 
-      <div className="mb-4 min-w-0 rounded-xl border border-[#E5E5E5] bg-white p-3 shadow-sm">
+      <div className="mb-4 min-w-0 rounded-xl border border-outline-variant bg-surface p-3 shadow-sm">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <div className="text-xs font-bold uppercase text-[#A0A0A0]">Tài khoản nhân viên</div>
+            <div className="text-xs font-bold uppercase text-on-surface-variant">Tài khoản nhân viên</div>
             <div className="mt-0.5 flex items-center gap-2 text-sm font-bold">
               <span className={`h-2 w-2 rounded-full ${statusClasses(selectedSession?.status)}`} />
               {selectedSession ? accLabel(selectedSession) : "Chưa chọn tài khoản"}
-              {selectedSession && <span className="text-xs font-semibold text-[#A0A0A0]">({statusLabel(selectedSession.status)})</span>}
+              {selectedSession && <span className="text-xs font-semibold text-on-surface-variant">({statusLabel(selectedSession.status)})</span>}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             {(role === "admin" || role === "leader") ? (
               <div className="flex items-center gap-2">
-                <input 
-                  type="date" 
-                  value={targetDate} 
+                <input
+                  type="date"
+                  value={targetDate}
                   onChange={e => setTargetDate(e.target.value)}
-                  className="rounded border border-[#E5E5E5] px-2 py-1 text-xs outline-none focus:border-[#E3000F]"
+                  className="rounded border border-outline-variant px-2 py-1 text-xs outline-none focus:border-primary"
                 />
-                <button 
-                  onClick={handleBulkVerify} 
+                <button
+                  onClick={handleBulkVerify}
                   disabled={isBulkVerifying}
                   className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
                 >
@@ -325,19 +325,19 @@ export default function InboxModernLayout(props: Props) {
                 </button>
               </div>
             ) : (
-              <button 
-                onClick={handleBulkSuggest} 
+              <button
+                onClick={handleBulkSuggest}
                 disabled={isBulkSuggesting || !acc}
                 className="rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-blue-700 disabled:opacity-50"
               >
                 {isBulkSuggesting ? "ĐANG ĐỀ XUẤT..." : "ĐỀ XUẤT TÍNH KPI HÀNG LOẠT"}
               </button>
             )}
-            <div className="text-xs text-[#A0A0A0] hidden md:block">Online realtime, offline chỉ xem dữ liệu.</div>
+            <div className="text-xs text-on-surface-variant hidden md:block">Online realtime, offline chỉ xem dữ liệu.</div>
           </div>
         </div>
         {sessions.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-[#E5E5E5] bg-[#FAFAFA] px-3 py-4 text-sm text-[#666666]">
+          <div className="rounded-lg border border-dashed border-outline-variant bg-[#FAFAFA] px-3 py-4 text-sm text-on-surface-variant">
             {extInstalled === false ? "Chưa thấy extension. Hãy cài và mở extension." : "Chưa có tài khoản Facebook nào."}
           </div>
         ) : (role === "admin" || role === "leader") ? (
@@ -348,7 +348,7 @@ export default function InboxModernLayout(props: Props) {
               <button
                 key={session.user_id}
                 onClick={() => selectAcc(session.user_id)}
-                className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition ${acc === session.user_id ? "border-[#E3000F] bg-[#E3000F] text-white" : "border-[#E5E5E5] bg-white text-[#1A1A1A] hover:border-[#E3000F]"}`}
+                className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition ${acc === session.user_id ? "border-primary bg-primary text-white" : "border-outline-variant bg-surface text-on-surface hover:border-primary"}`}
               >
                 <span className={`h-2 w-2 rounded-full ${statusClasses(session.status)}`} />
                 {accLabel(session)}
@@ -362,17 +362,17 @@ export default function InboxModernLayout(props: Props) {
       {/* 3-Pane layout — always visible */}
       <div className="grid min-w-0 grid-cols-[280px_1fr_260px] gap-4">
         {/* Pane 1: Conversation list */}
-        <section className="min-w-0 overflow-hidden rounded-xl border border-[#E5E5E5] bg-white shadow-sm">
-          <div className="border-b border-[#E5E5E5] p-4">
+        <section className="min-w-0 overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm">
+          <div className="border-b border-outline-variant p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-base font-black">Hộp thư</h2>
-                <p className="text-xs text-[#A0A0A0]">{loadingConvs ? "Đang cập nhật..." : `${filtered.length} hội thoại`}</p>
+                <p className="text-xs text-on-surface-variant">{loadingConvs ? "Đang cập nhật..." : `${filtered.length} hội thoại`}</p>
               </div>
               <select
                 value={filter}
                 onChange={e => setFilter(e.target.value as InboxFilter)}
-                className="h-9 rounded-lg border border-[#E5E5E5] bg-white px-3 text-sm font-semibold outline-none focus:border-[#E3000F]"
+                className="h-9 rounded-lg border border-outline-variant bg-surface px-3 text-sm font-semibold outline-none focus:border-primary"
               >
                 <option value="all">Tất cả</option>
                 <option value="need_reply">Cần trả lời</option>
@@ -381,30 +381,30 @@ export default function InboxModernLayout(props: Props) {
                 <option value="need_verify">Chưa tính KPI</option>
               </select>
             </div>
-            <div className="inline-flex rounded-lg border border-[#E5E5E5] bg-[#F8F8F8] p-0.5">
-              <button onClick={switchInbox} className={`rounded-md px-3 py-1.5 text-xs font-bold transition ${viewMode === "inbox" ? "bg-white text-[#E3000F] shadow-sm" : "text-[#666666]"}`}>Hộp thư</button>
-              <button onClick={() => setViewMode("archive")} className={`rounded-md px-3 py-1.5 text-xs font-bold transition ${viewMode === "archive" ? "bg-white text-[#E3000F] shadow-sm" : "text-[#666666]"}`}>Lưu trữ</button>
+            <div className="inline-flex rounded-lg border border-outline-variant bg-[#F8F8F8] p-0.5">
+              <button onClick={switchInbox} className={`rounded-md px-3 py-1.5 text-xs font-bold transition ${viewMode === "inbox" ? "bg-surface text-primary shadow-sm" : "text-on-surface-variant"}`}>Hộp thư</button>
+              <button onClick={() => setViewMode("archive")} className={`rounded-md px-3 py-1.5 text-xs font-bold transition ${viewMode === "archive" ? "bg-surface text-primary shadow-sm" : "text-on-surface-variant"}`}>Lưu trữ</button>
             </div>
           </div>
 
           <div className="h-[560px] overflow-auto p-3 xl:h-[620px]">
             {viewMode === "archive" ? (
               loadingArchives && archives.length === 0 ? (
-                <div className="py-12 text-center text-sm text-[#A0A0A0]">Đang tải lưu trữ...</div>
+                <div className="py-12 text-center text-sm text-on-surface-variant">Đang tải lưu trữ...</div>
               ) : archives.length === 0 ? (
-                <div className="py-12 text-center text-sm text-[#A0A0A0]">Chưa có hội thoại lưu trữ.</div>
+                <div className="py-12 text-center text-sm text-on-surface-variant">Chưa có hội thoại lưu trữ.</div>
               ) : archives.map(item => (
                 <button
                   key={item.conv_id}
                   onClick={() => openArchive(item.conv_id)}
-                  className={`mb-2 block w-full rounded-lg border p-3 text-left transition hover:border-[#E3000F] ${openConv === item.conv_id && archiveReading ? "border-[#E3000F] bg-[#FFF5F5]" : "border-[#E5E5E5] bg-white"}`}
+                  className={`mb-2 block w-full rounded-lg border p-3 text-left transition hover:border-primary ${openConv === item.conv_id && archiveReading ? "border-primary bg-[#FFF5F5]" : "border-outline-variant bg-surface"}`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="truncate text-sm font-black">{item.name || item.conv_id}</div>
-                      <div className="mt-1 truncate text-xs text-[#A0A0A0]">{item.preview || "—"}</div>
+                      <div className="mt-1 truncate text-xs text-on-surface-variant">{item.preview || "—"}</div>
                     </div>
-                    <span className="whitespace-nowrap text-xs text-[#A0A0A0]">{item.messages_count || 0} tin</span>
+                    <span className="whitespace-nowrap text-xs text-on-surface-variant">{item.messages_count || 0} tin</span>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {item.is_customer && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">khách</span>}
@@ -413,22 +413,22 @@ export default function InboxModernLayout(props: Props) {
                 </button>
               ))
             ) : loadingConvs && filtered.length === 0 ? (
-              <div className="py-12 text-center text-sm text-[#A0A0A0]">Đang tải hộp thư...</div>
+              <div className="py-12 text-center text-sm text-on-surface-variant">Đang tải hộp thư...</div>
             ) : filtered.length === 0 ? (
-              <div className="py-12 text-center text-sm text-[#A0A0A0]">Chưa có hội thoại.</div>
+              <div className="py-12 text-center text-sm text-on-surface-variant">Chưa có hội thoại.</div>
             ) : filtered.map(conv => (
               <button
                 key={conv.conv_id}
                 onClick={() => openChat(conv.conv_id)}
                 onMouseEnter={() => hoverConv?.(conv.conv_id)}
-                className={`mb-2 block w-full rounded-lg border p-3 text-left transition hover:border-[#E3000F] ${openConv === conv.conv_id && !archiveReading ? "border-[#E3000F] bg-[#FFF5F5]" : "border-[#E5E5E5] bg-white"}`}
+                className={`mb-2 block w-full rounded-lg border p-3 text-left transition hover:border-primary ${openConv === conv.conv_id && !archiveReading ? "border-primary bg-[#FFF5F5]" : "border-outline-variant bg-surface"}`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className={`truncate text-sm ${conv.unread ? "font-black" : "font-bold"}`}>{conv.name || "Người dùng"}</div>
-                    <div className="mt-1 truncate text-xs text-[#A0A0A0]">{conv.preview || "—"}</div>
+                    <div className="mt-1 truncate text-xs text-on-surface-variant">{conv.preview || "—"}</div>
                   </div>
-                  <span className="whitespace-nowrap text-xs text-[#A0A0A0]">{conv.time}</span>
+                  <span className="whitespace-nowrap text-xs text-on-surface-variant">{conv.time}</span>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {needsReply(conv) && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">cần trả lời</span>}
@@ -442,34 +442,34 @@ export default function InboxModernLayout(props: Props) {
         </section>
 
         {/* Pane 2: Chat */}
-        <section className="flex h-[656px] min-w-0 flex-col overflow-hidden rounded-xl border border-[#E5E5E5] bg-white shadow-sm xl:h-[716px]">
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#E5E5E5] px-4 py-3 bg-[#FAFAFA]">
+        <section className="flex h-[656px] min-w-0 flex-col overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm xl:h-[716px]">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-outline-variant px-4 py-3 bg-[#FAFAFA]">
             <div className="min-w-0">
               <h2 className="truncate text-base font-black">{selectedName || "Hội thoại"}</h2>
-              <p className="truncate text-xs text-[#A0A0A0]">{selectedPreview || (openConv ? "Đang xem nội dung" : "Chọn hội thoại để bắt đầu")}</p>
+              <p className="truncate text-xs text-on-surface-variant">{selectedPreview || (openConv ? "Đang xem nội dung" : "Chọn hội thoại để bắt đầu")}</p>
             </div>
             {selectedConv && !archiveReading && (
               <div className="flex flex-wrap gap-2">
-                <button onClick={() => mark(selectedConv.conv_id, "is_customer", !selectedConv.is_customer)} className="rounded-lg border border-[#E5E5E5] px-3 py-1.5 text-xs font-bold hover:border-[#E3000F]">
+                <button onClick={() => mark(selectedConv.conv_id, "is_customer", !selectedConv.is_customer)} className="rounded-lg border border-outline-variant px-3 py-1.5 text-xs font-bold hover:border-primary">
                   {selectedConv.is_customer ? "Bỏ khách" : "Là khách"}
                 </button>
                 {selectedConv.is_customer && (
-                  <button onClick={() => mark(selectedConv.conv_id, "pushed_to_zalo", !selectedConv.pushed_to_zalo)} className="rounded-lg border border-[#E5E5E5] px-3 py-1.5 text-xs font-bold hover:border-[#E3000F]">
+                  <button onClick={() => mark(selectedConv.conv_id, "pushed_to_zalo", !selectedConv.pushed_to_zalo)} className="rounded-lg border border-outline-variant px-3 py-1.5 text-xs font-bold hover:border-primary">
                     {selectedConv.pushed_to_zalo ? "Bỏ Zalo" : "Đẩy Zalo"}
                   </button>
                 )}
-                <button onClick={() => saveArchive(selectedConv.conv_id, false)} className="rounded-lg border border-[#E5E5E5] px-3 py-1.5 text-xs font-bold hover:border-[#E3000F]">Lưu</button>
+                <button onClick={() => saveArchive(selectedConv.conv_id, false)} className="rounded-lg border border-outline-variant px-3 py-1.5 text-xs font-bold hover:border-primary">Lưu</button>
                 <button onClick={() => confirmHide(selectedConv)} className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-bold text-red-500 hover:bg-red-50">Ẩn</button>
               </div>
             )}
             {archiveReading && openConv && (
-              <button onClick={() => { switchInbox(); openChat(openConv); }} className="rounded-lg border border-[#E5E5E5] px-3 py-1.5 text-xs font-bold hover:border-[#E3000F]">Mở inbox</button>
+              <button onClick={() => { switchInbox(); openChat(openConv); }} className="rounded-lg border border-outline-variant px-3 py-1.5 text-xs font-bold hover:border-primary">Mở inbox</button>
             )}
           </div>
 
           <div ref={chatScrollRef} className="flex-1 overflow-auto bg-[#FCFCFC] px-4 py-4">
             {!openConv ? (
-              <div className="flex h-full items-center justify-center text-sm text-[#A0A0A0]">Chọn một hội thoại để xem tin nhắn.</div>
+              <div className="flex h-full items-center justify-center text-sm text-on-surface-variant">Chọn một hội thoại để xem tin nhắn.</div>
             ) : loadingChat && msgs.length === 0 ? (
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">Đang tải hội thoại...</div>
             ) : msgs.length === 0 ? (
@@ -487,20 +487,20 @@ export default function InboxModernLayout(props: Props) {
                   return (
                     <div key={`${index}-${message.clientId || time}`} className={`flex ${message.from === "me" ? "justify-end" : "justify-start"}`}>
                       <div className={`max-w-[78%] ${message.from === "me" ? "text-right" : "text-left"}`}>
-                        <div className={`whitespace-pre-wrap rounded-lg px-3 py-2 text-sm leading-relaxed ${message.from === "me" ? "bg-[#E3000F] text-white" : "bg-white text-[#1A1A1A] shadow-sm ring-1 ring-[#E5E5E5]"}`}>
+                        <div className={`whitespace-pre-wrap rounded-lg px-3 py-2 text-sm leading-relaxed ${message.from === "me" ? "bg-primary text-white" : "bg-surface text-on-surface shadow-sm ring-1 ring-outline-variant"}`}>
                           {content}
                         </div>
-                        {time && <div className="mt-1 px-1 text-[10px] text-[#A0A0A0]">{time}</div>}
+                        {time && <div className="mt-1 px-1 text-[10px] text-on-surface-variant">{time}</div>}
                       </div>
                     </div>
                   );
                 })}
-                {loadingFresh && <div className="text-center text-[11px] text-[#A0A0A0]">Đang cập nhật...</div>}
+                {loadingFresh && <div className="text-center text-[11px] text-on-surface-variant">Đang cập nhật...</div>}
               </div>
             )}
           </div>
 
-          <div className="border-t border-[#E5E5E5] bg-white p-3">
+          <div className="border-t border-outline-variant bg-surface p-3">
             <div className="mb-2 flex flex-wrap gap-2">
               {activeTemplateGroup.items.slice(0, 3).map(item => (
                 <button key={item} onClick={() => appendTemplate(item)} disabled={!openConv || archiveReading}
@@ -517,10 +517,10 @@ export default function InboxModernLayout(props: Props) {
                 disabled={!canSend}
                 rows={2}
                 placeholder={archiveReading ? "Đang xem lưu trữ..." : needRelogin ? "Cookie hết hạn..." : !accOnline ? "Offline..." : "Nhập trả lời..."}
-                className="min-h-[44px] flex-1 resize-none rounded-lg border border-[#E5E5E5] px-3 py-2 text-sm outline-none transition focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 disabled:cursor-not-allowed disabled:bg-[#F5F5F5]"
+                className="min-h-[44px] flex-1 resize-none rounded-lg border border-outline-variant px-3 py-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-surface-container-low"
               />
               <button onClick={sendReply} disabled={!canSend || !reply.trim()}
-                className="shrink-0 rounded-lg bg-[#E3000F] px-5 text-sm font-black text-white transition hover:bg-[#C40009] disabled:cursor-not-allowed disabled:opacity-50">
+                className="shrink-0 rounded-lg bg-primary px-5 text-sm font-black text-white transition hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-50">
                 Gửi
               </button>
             </div>
@@ -528,14 +528,14 @@ export default function InboxModernLayout(props: Props) {
         </section>
 
         {/* Pane 3: Panel (Templates / Customer / KPI) */}
-        <aside className="min-w-0 overflow-hidden rounded-xl border border-[#E5E5E5] bg-white shadow-sm flex flex-col">
-          <div className="grid grid-cols-3 border-b border-[#E5E5E5] bg-[#FAFAFA] text-xs font-black shrink-0">
+        <aside className="min-w-0 overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm flex flex-col">
+          <div className="grid grid-cols-3 border-b border-outline-variant bg-[#FAFAFA] text-xs font-black shrink-0">
             <button onClick={() => { setPanelTab("templates"); panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" }); }}
-              className={`py-3 ${panelTab === "templates" ? "bg-white text-[#E3000F]" : "text-[#666666]"}`}>Mẫu</button>
+              className={`py-3 ${panelTab === "templates" ? "bg-surface text-primary" : "text-on-surface-variant"}`}>Mẫu</button>
             <button onClick={() => { setPanelTab("customer"); panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" }); }}
-              className={`py-3 ${panelTab === "customer" ? "bg-white text-[#E3000F]" : "text-[#666666]"}`}>Khách</button>
+              className={`py-3 ${panelTab === "customer" ? "bg-surface text-primary" : "text-on-surface-variant"}`}>Khách</button>
             <button onClick={() => { setPanelTab("kpi"); panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" }); }}
-              className={`py-3 ${panelTab === "kpi" ? "bg-white text-[#E3000F]" : "text-[#666666]"}`}>KPI</button>
+              className={`py-3 ${panelTab === "kpi" ? "bg-surface text-primary" : "text-on-surface-variant"}`}>KPI</button>
           </div>
 
           <div ref={panelScrollRef} className={`overflow-auto p-4 ${panelH}`}>
@@ -545,7 +545,7 @@ export default function InboxModernLayout(props: Props) {
                 <div className="mb-3 flex flex-wrap gap-1.5">
                   {QUICK_REPLY_GROUPS.map(group => (
                     <button key={group.id} onClick={() => setTemplateGroupId(group.id)}
-                      className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${templateGroupId === group.id ? "bg-[#E3000F] text-white" : "bg-[#F5F5F5] text-[#666666] hover:text-[#1A1A1A]"}`}>
+                      className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${templateGroupId === group.id ? "bg-primary text-white" : "bg-surface-container-low text-on-surface-variant hover:text-on-surface"}`}>
                       {group.label}
                     </button>
                   ))}
@@ -553,7 +553,7 @@ export default function InboxModernLayout(props: Props) {
                 <div className="space-y-2">
                   {activeTemplateGroup.items.map(item => (
                     <button key={item} onClick={() => appendTemplate(item)} disabled={!openConv || archiveReading}
-                      className="block w-full rounded-lg border border-[#E5E5E5] bg-white p-3 text-left text-sm leading-relaxed transition hover:border-[#E3000F] hover:bg-[#FFF8F8] disabled:opacity-40 disabled:cursor-not-allowed">
+                      className="block w-full rounded-lg border border-outline-variant bg-surface p-3 text-left text-sm leading-relaxed transition hover:border-primary hover:bg-[#FFF8F8] disabled:opacity-40 disabled:cursor-not-allowed">
                       {item}
                     </button>
                   ))}
@@ -565,19 +565,19 @@ export default function InboxModernLayout(props: Props) {
             {panelTab === "customer" && (
               <div>
                 {!openConv ? (
-                  <div className="rounded-lg border border-dashed border-[#E5E5E5] bg-[#FAFAFA] p-4 text-sm text-[#A0A0A0]">Chọn hội thoại để xem thông tin.</div>
+                  <div className="rounded-lg border border-dashed border-outline-variant bg-[#FAFAFA] p-4 text-sm text-on-surface-variant">Chọn hội thoại để xem thông tin.</div>
                 ) : (
                   <div className="space-y-3">
-                    <div className="rounded-lg border border-[#E5E5E5] p-3">
-                      <div className="text-xs font-bold uppercase text-[#A0A0A0]">Tên</div>
+                    <div className="rounded-lg border border-outline-variant p-3">
+                      <div className="text-xs font-bold uppercase text-on-surface-variant">Tên</div>
                       <div className="mt-1 text-sm font-black">{selectedName || openConv}</div>
-                      <div className="mt-1 text-xs text-[#A0A0A0]">{selectedPreview || "—"}</div>
+                      <div className="mt-1 text-xs text-on-surface-variant">{selectedPreview || "—"}</div>
                     </div>
-                    <div className="rounded-lg border border-[#E5E5E5] bg-[#FFFDF7] p-3">
+                    <div className="rounded-lg border border-outline-variant bg-[#FFFDF7] p-3">
                       <div className="mb-2 flex items-center justify-between gap-2">
                         <div>
-                          <div className="text-xs font-bold uppercase text-[#A0A0A0]">Ghi chú nhu cầu</div>
-                          <div className="text-[11px] text-[#A0A0A0]">Lưu điểm cần nhớ về khách.</div>
+                          <div className="text-xs font-bold uppercase text-on-surface-variant">Ghi chú nhu cầu</div>
+                          <div className="text-[11px] text-on-surface-variant">Lưu điểm cần nhớ về khách.</div>
                         </div>
                         {selectedNote && !noteChanged && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">đã lưu</span>}
                       </div>
@@ -587,14 +587,14 @@ export default function InboxModernLayout(props: Props) {
                         rows={5}
                         maxLength={1000}
                         placeholder="VD: khách cần app booking..."
-                        className="w-full resize-none rounded-lg border border-[#E5E5E5] bg-white px-3 py-2 text-sm leading-relaxed outline-none transition focus:border-[#E3000F] disabled:bg-[#F5F5F5] disabled:cursor-not-allowed"
+                        className="w-full resize-none rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm leading-relaxed outline-none transition focus:border-primary disabled:bg-surface-container-low disabled:cursor-not-allowed"
                       />
                       <div className="mt-2 flex items-center justify-between gap-2">
-                        <span className="text-[11px] text-[#A0A0A0]">{noteDraft.trim().length}/1000</span>
+                        <span className="text-[11px] text-on-surface-variant">{noteDraft.trim().length}/1000</span>
                         <button
                           onClick={() => saveCustomerNote(openConv, noteDraft)}
                           disabled={!openConv || savingNoteConv === openConv || !noteChanged}
-                          className="rounded-lg bg-[#E3000F] px-3 py-1.5 text-xs font-black text-white transition hover:bg-[#C40009] disabled:opacity-40 disabled:cursor-not-allowed"
+                          className="rounded-lg bg-primary px-3 py-1.5 text-xs font-black text-white transition hover:bg-on-primary-fixed-variant disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           {savingNoteConv === openConv ? "Đang lưu..." : "Lưu ghi chú"}
                         </button>
@@ -610,16 +610,16 @@ export default function InboxModernLayout(props: Props) {
                           Lưu vào CRM (Leads)
                         </button>
                         <button onClick={() => mark(selectedConv.conv_id, "is_customer", !selectedConv.is_customer)}
-                          className="rounded-lg border border-[#E5E5E5] px-3 py-2 text-sm font-bold hover:border-[#E3000F]">
+                          className="rounded-lg border border-outline-variant px-3 py-2 text-sm font-bold hover:border-primary">
                           {selectedConv.is_customer ? "Bỏ đánh dấu khách" : "Đánh dấu là khách"}
                         </button>
                         <button onClick={() => saveArchive(selectedConv.conv_id, false)}
-                          className="rounded-lg border border-[#E5E5E5] px-3 py-2 text-sm font-bold hover:border-[#E3000F]">Lưu khách</button>
+                          className="rounded-lg border border-outline-variant px-3 py-2 text-sm font-bold hover:border-primary">Lưu khách</button>
                         <button onClick={() => confirmHide(selectedConv)}
                           className="rounded-lg border border-red-200 px-3 py-2 text-sm font-bold text-red-500 hover:bg-red-50">Ẩn khỏi hộp thư</button>
                       </div>
                     )}
-                    {archiveReading && <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">Đây là bản lưu trữ.</div>}
+                    {archiveReading && <div className="rounded-lg bg-surface-container-low p-3 text-sm text-on-surface-variant">Đây là bản lưu trữ.</div>}
                   </div>
                 )}
               </div>
@@ -630,30 +630,30 @@ export default function InboxModernLayout(props: Props) {
               <div>
                 {/* Admin / Leader: Xác nhận KPI */}
                 {(role === "admin" || role === "leader") && (
-                  <div className={cn("mb-5 rounded-xl border p-4 shadow-sm transition-colors", 
-                    verifiedConvIds?.has(openConv) ? "border-emerald-200 bg-emerald-50" : "border-[#E3000F]/20 bg-white")}>
-                    
+                  <div className={cn("mb-5 rounded-xl border p-4 shadow-sm transition-colors",
+                    verifiedConvIds?.has(openConv) ? "border-emerald-200 bg-emerald-50" : "border-primary/20 bg-surface")}>
+
                     <div className="mb-1 flex items-center justify-between">
-                      <div className={cn("text-xs font-black uppercase tracking-wider", verifiedConvIds?.has(openConv) ? "text-emerald-700" : "text-[#1A1A1A]")}>
+                      <div className={cn("text-xs font-black uppercase", verifiedConvIds?.has(openConv) ? "text-emerald-700" : "text-on-surface")}>
                         {verifiedConvIds?.has(openConv) ? "Đã xác nhận KPI" : "Xác nhận KPI"}
                       </div>
                       {verifiedConvIds?.has(openConv) && <MaterialIcon name="check_circle" className="text-emerald-500 text-lg" />}
                     </div>
-                    
+
                     {!verifiedConvIds?.has(openConv) && (
-                      <div className="mb-3 text-xs text-[#666666]">Chọn hội thoại bên trái rồi bấm xác nhận để tính KPI cho nhân sự.</div>
+                      <div className="mb-3 text-xs text-on-surface-variant">Chọn hội thoại bên trái rồi bấm xác nhận để tính KPI cho nhân sự.</div>
                     )}
 
                     {openConv && selectedConv ? (
-                      <div className="mb-4 rounded-xl border border-[#E5E5E5] bg-white p-3 shadow-sm">
-                        <div className="truncate text-sm font-bold text-[#1A1A1A]">{selectedName || "Hội thoại FB"}</div>
+                      <div className="mb-4 rounded-xl border border-outline-variant bg-surface p-3 shadow-sm">
+                        <div className="truncate text-sm font-bold text-on-surface">{selectedName || "Hội thoại FB"}</div>
                         <div className="mt-2 flex flex-wrap gap-1.5">
                           {selectedConv.is_customer && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700 flex items-center gap-1"><MaterialIcon name="star" className="text-[12px]" /> Đã đánh dấu khách</span>}
                           {selectedConv.pushed_to_zalo && <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700 flex items-center gap-1"><MaterialIcon name="send" className="text-[12px]" /> Đã đẩy Zalo</span>}
                         </div>
                       </div>
                     ) : (
-                      <div className="mb-4 rounded-xl border border-dashed border-[#E5E5E5] bg-[#FAFAFA] p-4 text-center text-xs text-[#A0A0A0]">
+                      <div className="mb-4 rounded-xl border border-dashed border-outline-variant bg-[#FAFAFA] p-4 text-center text-xs text-on-surface-variant">
                         Chưa chọn hội thoại
                       </div>
                     )}
@@ -672,7 +672,7 @@ export default function InboxModernLayout(props: Props) {
                               showToastKpi("Đã xác nhận inbox!", true);
                             } catch { showToastKpi("Lỗi xác nhận", false); }
                           }}
-                            className="group relative flex w-full items-center justify-center gap-2 rounded-xl bg-[#E3000F] px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#C40009] active:scale-[0.98]">
+                            className="group relative flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-on-primary-fixed-variant active:scale-[0.98]">
                             <MaterialIcon name="check" className="text-[16px]" /> Xác nhận Inbox
                           </button>
                           <button onClick={async () => {
@@ -700,12 +700,12 @@ export default function InboxModernLayout(props: Props) {
                       <button
                         disabled={verifiedConvIds?.has(openConv) || suggestedConvIds?.has(openConv)}
                         onClick={async () => { if (!acc || !userEmail) return; handleSuggestKpi({ member_email: userEmail, conv_ids: [openConv], user_id: acc }); }}
-                        className={`w-full rounded-lg px-4 py-2.5 text-sm font-bold transition ${verifiedConvIds?.has(openConv) || suggestedConvIds?.has(openConv) ? "cursor-not-allowed bg-gray-200 text-gray-500" : "bg-blue-600 text-white hover:bg-blue-700"}`}
+                        className={`w-full rounded-lg px-4 py-2.5 text-sm font-bold transition ${verifiedConvIds?.has(openConv) || suggestedConvIds?.has(openConv) ? "cursor-not-allowed bg-surface-container-highest text-on-surface-variant" : "bg-blue-600 text-white hover:bg-blue-700"}`}
                       >
                         {verifiedConvIds?.has(openConv) ? "Đã tính KPI" : suggestedConvIds?.has(openConv) ? "Đã đề xuất" : "Đề xuất tính KPI"}
                       </button>
                     ) : (
-                      <div className="rounded-lg border border-dashed border-blue-300 bg-white p-3 text-center text-xs text-blue-500">Chọn hội thoại để đề xuất KPI</div>
+                      <div className="rounded-lg border border-dashed border-blue-300 bg-surface p-3 text-center text-xs text-blue-500">Chọn hội thoại để đề xuất KPI</div>
                     )}
                   </div>
                 )}
@@ -713,14 +713,14 @@ export default function InboxModernLayout(props: Props) {
                 {/* Stats summary */}
                 <div className="mb-3 text-sm font-black">Tổng quan inbox</div>
                 {[
-                  ["Cần trả lời", stats.need, activeConvs.length || 1, "bg-[#E3000F]"],
+                  ["Cần trả lời", stats.need, activeConvs.length || 1, "bg-primary"],
                   ["Chưa đọc",    stats.unread,    activeConvs.length || 1, "bg-amber-500"],
                   ["Lead đã lưu", stats.customers, activeConvs.length || 1, "bg-emerald-500"],
                   ["Đã đẩy Zalo", stats.pushed,    activeConvs.length || 1, "bg-blue-500"],
                 ].map(([label, value, total, color]) => {
                   const pct = Math.min(100, Math.round((Number(value) / Number(total)) * 100));
                   return (
-                    <div key={String(label)} className="mb-3 rounded-lg border border-[#E5E5E5] p-3">
+                    <div key={String(label)} className="mb-3 rounded-lg border border-outline-variant p-3">
                       <div className="mb-2 flex justify-between text-xs font-bold">
                         <span>{String(label)}</span>
                         <span>{Number(value)}</span>

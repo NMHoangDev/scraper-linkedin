@@ -141,23 +141,23 @@ export function AdminTeamFormBlock({
   };
 
   const inputClass =
-    "w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-all focus:border-[#DC2626] focus:ring-2 focus:ring-red-100";
+    "w-full rounded-xl border border-outline-variant bg-surface px-4 py-2.5 text-sm outline-none transition-all focus:border-primary focus:ring-2 focus:ring-red-100";
 
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex h-full flex-col rounded-2xl border border-slate-100 bg-white p-4 shadow-none"
+      className="flex h-full flex-col rounded-xl border border-outline-variant bg-surface p-4 shadow-none"
     >
       {!hideHeader ? (
-        <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
-          <h3 className="text-sm font-bold text-slate-800">
+        <div className="mb-4 flex items-center justify-between border-b border-outline-variant pb-3">
+          <h3 className="text-sm font-bold text-on-surface">
             {team ? "Sửa thông tin team" : "Thêm team mới"}
           </h3>
           {team ? (
             <button
               type="button"
               onClick={onCancelEdit}
-              className="text-xs font-medium text-slate-500 transition-colors hover:text-[#DC2626]"
+              className="text-xs font-medium text-on-surface-variant transition-colors hover:text-primary"
             >
               Hủy sửa
             </button>
@@ -174,8 +174,8 @@ export function AdminTeamFormBlock({
         ) : null}
 
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-slate-700">
-            Tên team <span className="text-[#DC2626]">*</span>
+          <label className="mb-1.5 block text-xs font-medium text-on-surface">
+            Tên team <span className="text-primary">*</span>
           </label>
           <input
             type="text"
@@ -187,7 +187,7 @@ export function AdminTeamFormBlock({
         </div>
 
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-slate-700">Chỉ định leader</label>
+          <label className="mb-1.5 block text-xs font-medium text-on-surface">Chỉ định leader</label>
           <input
             type="text"
             placeholder="Tìm theo tên / email..."
@@ -196,30 +196,30 @@ export function AdminTeamFormBlock({
             onChange={(event) => setLeaderSearchQuery(event.target.value)}
           />
 
-          <div className="max-h-32 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50">
+          <div className="max-h-32 overflow-y-auto rounded-xl border border-outline-variant bg-surface-container-low">
             {isLoadingUsers ? (
-              <div className="p-3 text-center text-xs text-slate-500">Đang tải...</div>
+              <div className="p-3 text-center text-xs text-on-surface-variant">Đang tải...</div>
             ) : filteredLeaders.length === 0 ? (
-              <div className="p-3 text-center text-xs text-slate-500">Không tìm thấy user</div>
+              <div className="p-3 text-center text-xs text-on-surface-variant">Không tìm thấy user</div>
             ) : (
               <div className="flex flex-col p-1.5">
                 {filteredLeaders.map((user) => (
                   <label
                     key={user.id}
-                    className="flex cursor-pointer items-center gap-2 rounded-xl p-2 transition hover:bg-white"
+                    className="flex cursor-pointer items-center gap-2 rounded-xl p-2 transition hover:bg-surface"
                   >
                     <input
                       type="radio"
                       name="leaderSelection"
                       checked={selectedLeaderId === user.id}
                       onChange={() => setSelectedLeaderId(user.id)}
-                      className="accent-[#DC2626]"
+                      className="accent-primary"
                     />
                     <div className="min-w-0">
-                      <span className="block truncate text-[11px] font-bold text-slate-800">
+                      <span className="block truncate text-[11px] font-bold text-on-surface">
                         {user.name || "Chưa đặt tên"}
                       </span>
-                      <span className="block truncate text-[10px] text-slate-500">{user.email}</span>
+                      <span className="block truncate text-[10px] text-on-surface-variant">{user.email}</span>
                     </div>
                   </label>
                 ))}
@@ -229,7 +229,7 @@ export function AdminTeamFormBlock({
         </div>
 
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-slate-700">Chọn thành viên</label>
+          <label className="mb-1.5 block text-xs font-medium text-on-surface">Chọn thành viên</label>
           <input
             type="text"
             placeholder="Tìm theo tên / email..."
@@ -238,29 +238,29 @@ export function AdminTeamFormBlock({
             onChange={(event) => setSearchQuery(event.target.value)}
           />
 
-          <div className="max-h-48 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50">
+          <div className="max-h-48 overflow-y-auto rounded-xl border border-outline-variant bg-surface-container-low">
             {isLoadingUsers ? (
-              <div className="p-3 text-center text-xs text-slate-500">Đang tải...</div>
+              <div className="p-3 text-center text-xs text-on-surface-variant">Đang tải...</div>
             ) : filteredMembers.length === 0 ? (
-              <div className="p-3 text-center text-xs text-slate-500">Không tìm thấy thành viên</div>
+              <div className="p-3 text-center text-xs text-on-surface-variant">Không tìm thấy thành viên</div>
             ) : (
               <div className="flex flex-col p-1.5">
                 {filteredMembers.map((member) => (
                   <label
                     key={member.id}
-                    className="flex cursor-pointer items-center gap-2 rounded-xl p-2 transition hover:bg-white"
+                    className="flex cursor-pointer items-center gap-2 rounded-xl p-2 transition hover:bg-surface"
                   >
                     <input
                       type="checkbox"
                       checked={selectedMemberIds.includes(member.id)}
                       onChange={() => handleToggleMember(member.id)}
-                      className="rounded-sm accent-[#DC2626]"
+                      className="rounded-sm accent-primary"
                     />
                     <div className="min-w-0">
-                      <span className="block truncate text-[11px] font-bold text-slate-800">
+                      <span className="block truncate text-[11px] font-bold text-on-surface">
                         {member.name || "Chưa đặt tên"}
                       </span>
-                      <span className="block truncate text-[10px] text-slate-500">{member.email}</span>
+                      <span className="block truncate text-[10px] text-on-surface-variant">{member.email}</span>
                     </div>
                   </label>
                 ))}
@@ -274,7 +274,7 @@ export function AdminTeamFormBlock({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full rounded-xl bg-[#DC2626] px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#B91C1C] disabled:opacity-50"
+          className="w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-on-primary-fixed-variant disabled:opacity-50"
         >
           {isSubmitting ? "Đang xử lý..." : team ? "Lưu thay đổi" : "Tạo team mới"}
         </button>

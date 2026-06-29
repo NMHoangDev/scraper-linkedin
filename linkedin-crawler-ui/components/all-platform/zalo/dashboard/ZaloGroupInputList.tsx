@@ -117,7 +117,7 @@ export function ZaloGroupInputList({
 
             <div className="grid gap-md md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
               <div className="flex flex-col gap-base">
-                <label className="text-label-md font-semibold uppercase tracking-wide text-on-surface-variant">
+                <label className="text-label-md font-semibold uppercase text-on-surface-variant">
                   Ten nhom Zalo
                 </label>
                 <input
@@ -133,7 +133,7 @@ export function ZaloGroupInputList({
               </div>
 
               <div className="flex flex-col gap-base">
-                <label className="text-label-md font-semibold uppercase tracking-wide text-on-surface-variant">
+                <label className="text-label-md font-semibold uppercase text-on-surface-variant">
                   Ten luu tru
                 </label>
                 <input

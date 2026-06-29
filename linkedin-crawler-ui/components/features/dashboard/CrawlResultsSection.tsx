@@ -26,14 +26,14 @@ export function CrawlResultsSection() {
         <h2 className="text-h2 text-on-surface font-semibold">
           Kết quả Crawl
         </h2>
-        
+
       </div>
 
       <div className="border-outline-variant bg-surface-container-low/50 mb-md flex flex-col gap-md rounded-lg border px-md py-md">
         <div className="flex flex-wrap items-center justify-between gap-md">
           <div className="flex flex-wrap items-center gap-x-md gap-y-sm">
             <span
-              className={`rounded-full px-md py-1 text-xs font-bold uppercase tracking-wide ${
+              className={`rounded-full px-md py-1 text-xs font-bold uppercase ${
                 isFiltered
                   ? "bg-secondary-container text-on-secondary-container"
                   : "bg-surface-container-high text-on-surface-variant"
@@ -52,7 +52,7 @@ export function CrawlResultsSection() {
               <>
                 <button
                   type="button"
-                  className="border-primary text-primary hover:bg-primary/5 rounded-lg border bg-transparent px-md py-sm text-xs font-bold uppercase tracking-wide"
+                  className="border-primary text-primary hover:bg-primary/5 rounded-lg border bg-transparent px-md py-sm text-xs font-bold uppercase"
                   onClick={d.showAllCrawlSessions}
                   disabled={d.isGettingAllPosts}
                 >
@@ -60,7 +60,7 @@ export function CrawlResultsSection() {
                 </button>
                 <button
                   type="button"
-                  className="border-outline-variant bg-surface text-on-surface hover:bg-surface-container-high flex items-center gap-2 rounded-lg border px-md py-sm text-xs font-bold uppercase tracking-wide transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                  className="border-outline-variant bg-surface text-on-surface hover:bg-surface-container-high flex items-center gap-2 rounded-lg border px-md py-sm text-xs font-bold uppercase transition-all disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={d.handleClearCrawlFilter}
                   disabled={d.isGettingAllPosts}
                 >
@@ -74,7 +74,7 @@ export function CrawlResultsSection() {
             ) : null}
             <button
               type="button"
-              className="bg-primary text-on-primary hover:bg-primary-container flex items-center gap-2 rounded-lg px-md py-sm text-xs font-bold tracking-wider uppercase transition-all disabled:cursor-not-allowed disabled:opacity-50"
+              className="bg-primary text-on-primary hover:bg-primary-container flex items-center gap-2 rounded-lg px-md py-sm text-xs font-bold uppercase transition-all disabled:cursor-not-allowed disabled:opacity-50"
               onClick={() => {
                 d.handleGetAllPosts();
               }}
@@ -88,13 +88,13 @@ export function CrawlResultsSection() {
 
         <div className="border-outline-variant flex flex-col gap-md border-t pt-md">
           <div>
-            <p className="text-label-md text-on-surface-variant mb-sm font-semibold tracking-wide uppercase">
+            <p className="text-label-md text-on-surface-variant mb-sm font-semibold uppercase">
               Lọc nhanh
             </p>
             <div className="flex flex-wrap gap-sm">
               <button
                 type="button"
-                className="border-outline-variant bg-surface text-on-surface hover:bg-surface-container-high rounded-lg border px-md py-sm text-xs font-bold uppercase tracking-wide transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                className="border-outline-variant bg-surface text-on-surface hover:bg-surface-container-high rounded-lg border px-md py-sm text-xs font-bold uppercase transition-all disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={d.handleFilterToday}
                 disabled={d.isFiltering || d.isGettingAllPosts}
               >
@@ -102,7 +102,7 @@ export function CrawlResultsSection() {
               </button>
               <button
                 type="button"
-                className="border-outline-variant bg-surface text-on-surface hover:bg-surface-container-high rounded-lg border px-md py-sm text-xs font-bold uppercase tracking-wide transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                className="border-outline-variant bg-surface text-on-surface hover:bg-surface-container-high rounded-lg border px-md py-sm text-xs font-bold uppercase transition-all disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={d.handleFilterYesterday}
                 disabled={d.isFiltering || d.isGettingAllPosts}
               >
@@ -110,7 +110,7 @@ export function CrawlResultsSection() {
               </button>
               <button
                 type="button"
-                className="border-outline-variant bg-surface text-on-surface hover:bg-surface-container-high rounded-lg border px-md py-sm text-xs font-bold uppercase tracking-wide transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                className="border-outline-variant bg-surface text-on-surface hover:bg-surface-container-high rounded-lg border px-md py-sm text-xs font-bold uppercase transition-all disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={d.handleFilterLast7Days}
                 disabled={d.isFiltering || d.isGettingAllPosts}
               >
@@ -118,7 +118,7 @@ export function CrawlResultsSection() {
               </button>
               <button
                 type="button"
-                className="border-outline-variant bg-surface text-on-surface hover:bg-surface-container-high rounded-lg border px-md py-sm text-xs font-bold uppercase tracking-wide transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                className="border-outline-variant bg-surface text-on-surface hover:bg-surface-container-high rounded-lg border px-md py-sm text-xs font-bold uppercase transition-all disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={d.handleFilterLast30Days}
                 disabled={d.isFiltering || d.isGettingAllPosts}
               >
@@ -131,7 +131,7 @@ export function CrawlResultsSection() {
             <div className="flex min-w-0 flex-1 flex-col gap-base">
               <label
                 htmlFor="crawl-results-filter-from"
-                className="text-label-md text-on-surface-variant font-semibold tracking-wide uppercase"
+                className="text-label-md text-on-surface-variant font-semibold uppercase"
               >
                 Từ ngày
               </label>
@@ -147,7 +147,7 @@ export function CrawlResultsSection() {
             <div className="flex min-w-0 flex-1 flex-col gap-base">
               <label
                 htmlFor="crawl-results-filter-to"
-                className="text-label-md text-on-surface-variant font-semibold tracking-wide uppercase"
+                className="text-label-md text-on-surface-variant font-semibold uppercase"
               >
                 Đến ngày
               </label>
@@ -174,9 +174,9 @@ export function CrawlResultsSection() {
             <div className="flex min-w-0 flex-1 flex-col gap-base">
               <label
                 htmlFor="crawl-results-filter-date"
-                className="text-label-md text-on-surface-variant font-semibold tracking-wide uppercase"
+                className="text-label-md text-on-surface-variant font-semibold uppercase"
               >
-                Một ngày 
+                Một ngày
               </label>
               <input
                 id="crawl-results-filter-date"
@@ -316,7 +316,7 @@ export function CrawlResultsSection() {
                     </td>
                     <td className="px-md py-md">
                       <span
-                        className={`rounded px-2 py-0.5 text-[10px] font-bold tracking-tight uppercase ${statusBadgeClasses(row.status)}`}
+                        className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${statusBadgeClasses(row.status)}`}
                       >
                         {statusLabel(row.status)}
                       </span>

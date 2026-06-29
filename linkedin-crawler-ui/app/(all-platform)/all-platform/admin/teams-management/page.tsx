@@ -21,14 +21,14 @@ function getRecentWeeks(numWeeks = 8) {
     monday.setDate(d.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
-    
+
     const yearStart = new Date(monday.getFullYear(), 0, 1);
     const weekNo = Math.ceil((((monday.getTime() - yearStart.getTime()) / 86400000) + yearStart.getDay() + 1) / 7);
-    
+
     const fmt = (dt: Date) => dt.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
     const valStart = monday.toISOString().split("T")[0];
     const valEnd = sunday.toISOString().split("T")[0];
-    
+
     weeks.push({
       label: `Tuần ${weekNo} (${fmt(monday)} - ${fmt(sunday)})`,
       value: `${valStart}_${valEnd}`
@@ -102,7 +102,7 @@ export default function TeamsManagementPage() {
   const stats = useMemo(() => {
     const totalTeams = teams.length;
     const totalMembers = teams.reduce((acc, t) => acc + (t.number_of_member || 0), 0);
-    
+
     let totalTarget = 0;
     let totalCurrent = 0;
     let achievedTeams = 0;
@@ -115,7 +115,7 @@ export default function TeamsManagementPage() {
       team.members?.forEach(member => {
         const kpiInfo = teamKpis.find((k: any) => k.id === member.id) || {};
         const seedingStats = kpiInfo.seeding_stats || {};
-        
+
         teamTarget += (seedingStats.kpi_target || 0) + (seedingStats.kpi_post || 0) + (seedingStats.kpi_lead || 0) + (seedingStats.kpi_inbox || 0);
         teamCurrent += (seedingStats.verified_count || 0) + (seedingStats.kpi_post_current || 0) + (seedingStats.kpi_lead_current || 0) + (seedingStats.kpi_inbox_current || 0);
       });
@@ -177,9 +177,9 @@ export default function TeamsManagementPage() {
 
   if (!isAdmin) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-[#666666] space-y-2">
-        <MaterialIcon name="block" className="text-5xl text-[#FF3344]" />
-        <p className="font-bold text-base text-[#1A1A1A]">Quyền truy cập bị từ chối</p>
+      <div className="flex flex-col items-center justify-center py-20 text-on-surface-variant space-y-2">
+        <MaterialIcon name="block" className="text-5xl text-primary-container" />
+        <p className="font-bold text-base text-on-surface">Quyền truy cập bị từ chối</p>
         <p className="text-sm">Trang này chỉ khả dụng đối với tài khoản Admin.</p>
       </div>
     );
@@ -190,16 +190,16 @@ export default function TeamsManagementPage() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-bold text-[#1A1A1A]">Quản lý Teams (Admin)</h2>
-          <p className="text-sm text-[#A0A0A0]">Quản lý toàn bộ danh sách team, gán leader và theo dõi KPI thành viên</p>
+          <h2 className="text-xl font-bold text-on-surface">Quản lý Teams (Admin)</h2>
+          <p className="text-sm text-on-surface-variant">Quản lý toàn bộ danh sách team, gán leader và theo dõi KPI thành viên</p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <div className="flex items-center gap-2 border border-[#E5E5E5] rounded-lg px-3 py-1.5 bg-white shadow-sm">
-            <label className="text-xs font-bold text-slate-600">Lọc theo Tuần:</label>
+          <div className="flex items-center gap-2 border border-outline-variant rounded-lg px-3 py-1.5 bg-surface shadow-sm">
+            <label className="text-xs font-bold text-on-surface-variant">Lọc theo Tuần:</label>
             <select
               value={selectedWeek}
               onChange={(e) => setSelectedWeek(e.target.value)}
-              className="text-sm font-semibold text-slate-800 outline-none bg-transparent"
+              className="text-sm font-semibold text-on-surface outline-none bg-transparent"
             >
               {recentWeeks.map(w => (
                 <option key={w.value} value={w.value}>{w.label}</option>
@@ -208,7 +208,7 @@ export default function TeamsManagementPage() {
           </div>
           <button
             onClick={handleCreateTeam}
-            className="flex items-center justify-center gap-2 bg-[#E3000F] text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-[#C40009] transition shrink-0 cursor-pointer shadow-sm active:scale-95"
+            className="flex items-center justify-center gap-2 bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-on-primary-fixed-variant transition shrink-0 cursor-pointer shadow-sm active:scale-95"
           >
             <MaterialIcon name="group_add" className="text-base" />
             Thêm Team Mới
@@ -246,14 +246,14 @@ export default function TeamsManagementPage() {
 
       {/* Inbox Comparison Chart */}
       {!isLoading && teams.length > 0 && (
-        <div className="bg-white p-5 rounded-xl border border-[#E5E5E5] shadow-sm">
-          <h3 className="text-sm font-bold text-[#1A1A1A] mb-4">So sánh tỷ lệ hoàn thành KPI Inbox các Team</h3>
+        <div className="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm">
+          <h3 className="text-sm font-bold text-on-surface mb-4">So sánh tỷ lệ hoàn thành KPI Inbox các Team</h3>
           <div className="flex flex-col gap-4">
             {teams.map(team => {
               const teamKpis = kpiResultsData.find(r => r.teamId === team.id)?.members || [];
               const totalMembers = team.members?.length || 0;
               let achievedMembers = 0;
-              
+
               team.members?.forEach(member => {
                 const kpiInfo = teamKpis.find((k: any) => k.id === member.id) || {};
                 const seedingStats = kpiInfo.seeding_stats || {};
@@ -267,14 +267,14 @@ export default function TeamsManagementPage() {
               const percentage = totalMembers > 0 ? Math.min(Math.round((achievedMembers / totalMembers) * 100), 100) : 0;
               const barColor = percentage >= 100 ? "bg-emerald-500" : percentage >= 50 ? "bg-orange-500" : "bg-red-500";
               const textColor = percentage >= 100 ? "text-emerald-600" : percentage >= 50 ? "text-orange-600" : "text-red-600";
-              
+
               return (
                 <div key={team.id} className="flex flex-col gap-1.5">
                   <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-[#1A1A1A]">{team.name_team} <span className="text-[#A0A0A0] font-medium text-[10px] ml-1">({achievedMembers}/{totalMembers} TV hoàn thành)</span></span>
+                    <span className="font-bold text-on-surface">{team.name_team} <span className="text-on-surface-variant font-medium text-[10px] ml-1">({achievedMembers}/{totalMembers} TV hoàn thành)</span></span>
                     <span className={`font-bold ${textColor}`}>{percentage}%</span>
                   </div>
-                  <div className="h-2 w-full bg-[#F5F5F5] rounded-full overflow-hidden">
+                  <div className="h-2 w-full bg-surface-container-low rounded-full overflow-hidden">
                     <div className={`h-full ${barColor} transition-all duration-500`} style={{ width: `${percentage}%` }} />
                   </div>
                 </div>
@@ -300,68 +300,68 @@ export default function TeamsManagementPage() {
 
       {/* Teams Table */}
       {isLoading ? (
-        <div className="text-center py-16 text-[#666666] flex flex-col items-center justify-center gap-2 bg-white rounded-xl border border-[#E5E5E5]">
-          <div className="w-8 h-8 border-4 border-[#E3000F] border-t-transparent rounded-full animate-spin" />
+        <div className="text-center py-16 text-on-surface-variant flex flex-col items-center justify-center gap-2 bg-surface rounded-xl border border-outline-variant">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
           <p className="text-sm font-semibold">Đang tải danh sách team...</p>
         </div>
       ) : teams.length === 0 ? (
-        <div className="text-center py-16 bg-[#F5F5F5]/50 rounded-xl border border-dashed border-[#E5E5E5] flex flex-col items-center justify-center">
-          <MaterialIcon name="groups" className="text-4xl text-[#A0A0A0] mb-2" />
-          <p className="text-[#666666] text-sm font-semibold">Chưa có team nào</p>
+        <div className="text-center py-16 bg-surface-container-low rounded-xl border border-dashed border-outline-variant flex flex-col items-center justify-center">
+          <MaterialIcon name="groups" className="text-4xl text-on-surface-variant mb-2" />
+          <p className="text-on-surface-variant text-sm font-semibold">Chưa có team nào</p>
           <button
             onClick={handleCreateTeam}
-            className="mt-3 text-[#E3000F] text-sm font-bold hover:underline cursor-pointer"
+            className="mt-3 text-primary text-sm font-bold hover:underline cursor-pointer"
           >
             + Tạo team đầu tiên
           </button>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-[#E5E5E5] shadow-sm overflow-hidden">
+        <div className="bg-surface rounded-xl border border-outline-variant shadow-sm overflow-hidden">
           {/* DESKTOP TABLE VIEW */}
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
-            <thead className="bg-[#F5F5F5] border-b border-[#E5E5E5] text-[#1A1A1A]">
+            <thead className="bg-surface-container-low border-b border-outline-variant text-on-surface">
               <tr>
-                <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider">
+                <th className="text-left px-4 py-3 font-bold text-on-surface-variant text-xs uppercase">
                   Tên Team
                 </th>
-                <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider">
+                <th className="text-left px-4 py-3 font-bold text-on-surface-variant text-xs uppercase">
                   Leader
                 </th>
-                <th className="text-center px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[120px]">
+                <th className="text-center px-4 py-3 font-bold text-on-surface-variant text-xs uppercase w-[120px]">
                   Số thành viên
                 </th>
-                <th className="text-center px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[320px]">
+                <th className="text-center px-4 py-3 font-bold text-on-surface-variant text-xs uppercase w-[320px]">
                   Hành động
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#E5E5E5] text-[#1A1A1A]">
+            <tbody className="divide-y divide-outline-variant text-on-surface">
               {teams.map((team) => (
-                <tr key={team.id} className="hover:bg-[#F5F5F5]/30 transition">
-                  <td className="px-4 py-3 font-bold text-[#1A1A1A] align-middle">
+                <tr key={team.id} className="hover:bg-surface-container-low/30 transition">
+                  <td className="px-4 py-3 font-bold text-on-surface align-middle">
                     {team.name_team}
                   </td>
                   <td className="px-4 py-3 align-middle">
-                    <div className="font-bold text-xs text-[#1A1A1A]">{team.leader_name || "Chưa đặt tên"}</div>
-                    <div className="text-[10px] text-[#666666] font-medium">{team.leader_email}</div>
+                    <div className="font-bold text-xs text-on-surface">{team.leader_name || "Chưa đặt tên"}</div>
+                    <div className="text-[10px] text-on-surface-variant font-medium">{team.leader_email}</div>
                   </td>
-                  <td className="px-4 py-3 text-center font-bold text-xs text-[#666666] align-middle">
+                  <td className="px-4 py-3 text-center font-bold text-xs text-on-surface-variant align-middle">
                     {team.number_of_member || 0}
                   </td>
                   <td className="px-4 py-3 align-middle">
                     <div className="flex items-center justify-center gap-1.5 flex-wrap">
                       <button
                         onClick={() => handleViewMembers(team)}
-                        className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-[#E3000F]/5 text-[#E3000F] hover:bg-[#E3000F]/10 transition text-[11px] font-bold cursor-pointer shrink-0"
+                        className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-primary/5 text-primary hover:bg-primary/10 transition text-[11px] font-bold cursor-pointer shrink-0"
                       >
                         <FaEye size={10} /> Xem TV
                       </button>
                       <button
                         onClick={() => {
-                          setSelectedLeaderForInbox({ 
-                            email: team.leader_email, 
-                            name: team.name_team 
+                          setSelectedLeaderForInbox({
+                            email: team.leader_email,
+                            name: team.name_team
                           });
                           setInboxModalOpen(true);
                         }}
@@ -372,13 +372,13 @@ export default function TeamsManagementPage() {
                       </button>
                       <button
                         onClick={() => handleEditTeam(team)}
-                        className="inline-flex items-center gap-1 px-2 py-1.5 text-[#666666] hover:text-[#1A1A1A] hover:bg-[#F5F5F5] border border-slate-200 rounded-lg transition text-[11px] font-bold cursor-pointer shrink-0"
+                        className="inline-flex items-center gap-1 px-2 py-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low border border-outline-variant rounded-lg transition text-[11px] font-bold cursor-pointer shrink-0"
                       >
                         <FaEdit size={10} /> Sửa
                       </button>
                       <button
                         onClick={() => handleDeleteTeam(team)}
-                        className="inline-flex items-center gap-1 px-2 py-1.5 text-[#666666] hover:text-[#FF3344] hover:bg-[#FF3344]/5 border border-slate-200 hover:border-red-200 rounded-lg transition text-[11px] font-bold cursor-pointer shrink-0"
+                        className="inline-flex items-center gap-1 px-2 py-1.5 text-on-surface-variant hover:text-primary-container hover:bg-primary-container/5 border border-outline-variant hover:border-red-200 rounded-lg transition text-[11px] font-bold cursor-pointer shrink-0"
                       >
                         <FaTrash size={10} /> Xóa
                       </button>
@@ -391,27 +391,27 @@ export default function TeamsManagementPage() {
           </div>
 
           {/* MOBILE CARD VIEW */}
-          <div className="md:hidden flex flex-col divide-y divide-[#E5E5E5]">
+          <div className="md:hidden flex flex-col divide-y divide-outline-variant">
             {teams.map((team) => (
-              <div key={team.id} className="p-4 hover:bg-[#F5F5F5]/30 transition flex flex-col gap-3">
+              <div key={team.id} className="p-4 hover:bg-surface-container-low/30 transition flex flex-col gap-3">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <h3 className="font-bold text-[#1A1A1A] text-sm">{team.name_team}</h3>
-                    <div className="text-xs text-[#666666] mt-1 flex flex-col gap-0.5">
-                      <span className="font-medium text-[#1A1A1A]">{team.leader_name || "Chưa đặt tên"}</span>
-                      <span className="text-[10px] text-[#A0A0A0]">{team.leader_email}</span>
+                    <h3 className="font-bold text-on-surface text-sm">{team.name_team}</h3>
+                    <div className="text-xs text-on-surface-variant mt-1 flex flex-col gap-0.5">
+                      <span className="font-medium text-on-surface">{team.leader_name || "Chưa đặt tên"}</span>
+                      <span className="text-[10px] text-on-surface-variant">{team.leader_email}</span>
                     </div>
                   </div>
-                  <div className="bg-[#F5F5F5] px-3 py-1.5 rounded-lg text-center shrink-0 border border-slate-100 shadow-sm">
-                    <div className="text-[9px] text-[#A0A0A0] uppercase font-bold mb-0.5">Số TV</div>
-                    <div className="text-sm font-black text-[#1A1A1A] leading-none">{team.number_of_member || 0}</div>
+                  <div className="bg-surface-container-low px-3 py-1.5 rounded-lg text-center shrink-0 border border-outline-variant shadow-sm">
+                    <div className="text-[9px] text-on-surface-variant uppercase font-bold mb-0.5">Số TV</div>
+                    <div className="text-sm font-black text-on-surface leading-none">{team.number_of_member || 0}</div>
                   </div>
                 </div>
-                
-                <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100">
+
+                <div className="grid grid-cols-2 gap-2 pt-3 border-t border-outline-variant">
                   <button
                     onClick={() => handleViewMembers(team)}
-                    className="flex items-center justify-center gap-1.5 p-2 rounded-xl bg-[#E3000F]/5 text-[#E3000F] hover:bg-[#E3000F]/10 transition cursor-pointer shadow-sm active:scale-95"
+                    className="flex items-center justify-center gap-1.5 p-2 rounded-xl bg-primary/5 text-primary hover:bg-primary/10 transition cursor-pointer shadow-sm active:scale-95"
                   >
                     <FaEye size={14} /> <span className="text-[11px] font-bold">Thành viên</span>
                   </button>
@@ -426,13 +426,13 @@ export default function TeamsManagementPage() {
                   </button>
                   <button
                     onClick={() => handleEditTeam(team)}
-                    className="flex items-center justify-center gap-1.5 p-2 text-[#666666] hover:text-[#1A1A1A] bg-[#F5F5F5] hover:bg-[#E5E5E5] border border-slate-200 rounded-xl transition cursor-pointer shadow-sm active:scale-95"
+                    className="flex items-center justify-center gap-1.5 p-2 text-on-surface-variant hover:text-on-surface bg-surface-container-low hover:bg-surface-container-highest border border-outline-variant rounded-xl transition cursor-pointer shadow-sm active:scale-95"
                   >
                     <FaEdit size={14} /> <span className="text-[11px] font-bold">Sửa Team</span>
                   </button>
                   <button
                     onClick={() => handleDeleteTeam(team)}
-                    className="flex items-center justify-center gap-1.5 p-2 text-[#666666] hover:text-[#FF3344] bg-red-50 hover:bg-red-100 border border-red-100 rounded-xl transition cursor-pointer shadow-sm active:scale-95"
+                    className="flex items-center justify-center gap-1.5 p-2 text-on-surface-variant hover:text-primary-container bg-red-50 hover:bg-red-100 border border-red-100 rounded-xl transition cursor-pointer shadow-sm active:scale-95"
                   >
                     <FaTrash size={14} /> <span className="text-[11px] font-bold">Xóa Team</span>
                   </button>

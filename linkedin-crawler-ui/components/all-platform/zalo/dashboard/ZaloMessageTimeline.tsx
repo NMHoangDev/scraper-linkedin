@@ -40,7 +40,7 @@ export function ZaloMessageTimeline({ messages }: ZaloMessageTimelineProps) {
           <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
             <MaterialIcon name="chat_bubble" className="text-lg" />
           </div>
-          <div className="border-outline-variant bg-surface rounded-2xl border px-md py-sm shadow-sm">
+          <div className="border-outline-variant bg-surface rounded-xl border px-md py-sm shadow-sm">
             <div className="mb-xs flex flex-wrap items-center gap-sm">
               <span className="text-body-sm text-on-surface font-semibold">
                 {message.sender}

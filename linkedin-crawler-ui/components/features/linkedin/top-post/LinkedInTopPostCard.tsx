@@ -19,7 +19,7 @@ export function LinkedInTopPostCard({ post }: LinkedInTopPostCardProps) {
     <article className="enterprise-card group flex flex-col overflow-hidden rounded-xl">
       <div className="border-outline-variant flex items-start justify-between gap-3 border-b p-md">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-slate-200">
+          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-surface-container-high">
             <Image
               src={post.avatarUrl}
               alt={post.authorName}
@@ -38,7 +38,7 @@ export function LinkedInTopPostCard({ post }: LinkedInTopPostCardProps) {
           </div>
         </div>
         <span
-          className={`shrink-0 rounded px-2 py-1 text-[10px] font-bold tracking-wide uppercase ${linkedInTopPostStatusClass(post.status)}`}
+          className={`shrink-0 rounded px-2 py-1 text-[10px] font-bold uppercase ${linkedInTopPostStatusClass(post.status)}`}
         >
           {linkedInTopPostStatusLabel(post.status)}
         </span>
@@ -50,7 +50,7 @@ export function LinkedInTopPostCard({ post }: LinkedInTopPostCardProps) {
           className="mt-0.5 shrink-0 text-[18px] text-primary"
         />
         <div className="min-w-0 text-body-sm">
-          <span className="text-on-surface-variant font-semibold uppercase tracking-wide">
+          <span className="text-on-surface-variant font-semibold uppercase">
             Nguồn nhóm:{" "}
           </span>
           <a
@@ -98,7 +98,7 @@ export function LinkedInTopPostCard({ post }: LinkedInTopPostCardProps) {
           </div>
         </div>
         <div
-          className="h-1 w-24 overflow-hidden rounded-full bg-slate-200"
+          className="h-1 w-24 overflow-hidden rounded-full bg-surface-container-high"
           title={`Mức tương tác ước lượng: ${post.engagementPct}%`}
         >
           <div

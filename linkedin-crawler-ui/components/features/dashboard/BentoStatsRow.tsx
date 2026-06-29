@@ -16,7 +16,7 @@ export function BentoStatsRow() {
             +12.4%
           </span>
         </div>
-        <h4 className="text-label-md text-on-surface-variant mb-xs font-semibold tracking-wide uppercase">
+        <h4 className="text-label-md text-on-surface-variant mb-xs font-semibold uppercase">
           Tổng thành viên tìm thấy
         </h4>
         <p className="text-on-surface text-2xl font-bold">{d.bentoStats.members}</p>
@@ -28,7 +28,7 @@ export function BentoStatsRow() {
             Tối ưu
           </span>
         </div>
-        <h4 className="text-label-md text-on-surface-variant mb-xs font-semibold tracking-wide uppercase">
+        <h4 className="text-label-md text-on-surface-variant mb-xs font-semibold uppercase">
           Tốc độ Crawler
         </h4>
         <p className="text-on-surface text-2xl font-bold">
@@ -42,7 +42,7 @@ export function BentoStatsRow() {
             Sẵn sàng
           </span>
         </div>
-        <h4 className="text-label-md text-on-surface-variant mb-xs font-semibold tracking-wide uppercase">
+        <h4 className="text-label-md text-on-surface-variant mb-xs font-semibold uppercase">
           Sẵn sàng xuất dữ liệu
         </h4>
         <p className="text-on-surface text-2xl font-bold">

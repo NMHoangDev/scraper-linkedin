@@ -4,13 +4,13 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { FaFacebook, FaLinkedin, FaPlus, FaEdit, FaTrash, FaSearch } from "react-icons/fa";
 import { MaterialIcon } from "@/components/ui";
 import { useAppAuth } from "@/contexts/AppAuthContext";
-import { 
-  allPlatformGroupsService, 
+import {
+  allPlatformGroupsService,
   allPlatformCategoriesService,
   teamsService,
   usersService,
   type AppUserProfile,
-  type TeamRow 
+  type TeamRow
 } from "@/services/all-platform.service";
 import type { FacebookGroup, LinkedInGroup, FeedPlatform, Category } from "@/types/unified.types";
 
@@ -91,13 +91,13 @@ function SearchableDropdown({
 
   return (
     <div ref={containerRef} className="relative flex flex-col">
-      <label className="text-xs font-bold text-[#666666] block mb-1">
+      <label className="text-xs font-bold text-on-surface-variant block mb-1">
         {label} {required && "*"}
       </label>
       <div className="relative">
         <input
           type="text"
-          className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] pr-8 text-[#1A1A1A]"
+          className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary pr-8 text-on-surface"
           placeholder={placeholder}
           value={search}
           onChange={(e) => {
@@ -119,7 +119,7 @@ function SearchableDropdown({
             setIsOpen(!isOpen);
             setIsTyping(false);
           }}
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-[#666666] hover:text-[#1A1A1A] cursor-pointer"
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface cursor-pointer"
         >
           <span className="material-symbols-outlined text-[20px] select-none pointer-events-none">
             {isOpen ? "arrow_drop_up" : "arrow_drop_down"}
@@ -128,9 +128,9 @@ function SearchableDropdown({
       </div>
 
       {isOpen && (
-        <div className="absolute top-full z-[60] left-0 right-0 mt-1 bg-white border border-[#E5E5E5] rounded-lg shadow-lg max-h-48 overflow-y-auto">
+        <div className="absolute top-full z-[60] left-0 right-0 mt-1 bg-surface border border-outline-variant rounded-lg shadow-lg max-h-48 overflow-y-auto">
           {filteredOptions.length === 0 ? (
-            <div className="p-3 text-xs text-[#A0A0A0] text-center">Không tìm thấy danh mục</div>
+            <div className="p-3 text-xs text-on-surface-variant text-center">Không tìm thấy danh mục</div>
           ) : (
             filteredOptions.map((opt) => (
               <button
@@ -142,10 +142,10 @@ function SearchableDropdown({
                   setIsTyping(false);
                   setIsOpen(false);
                 }}
-                className={`w-full text-left px-3 py-2 text-xs hover:bg-[#F5F5F5] transition border-b border-[#E5E5E5] last:border-0 cursor-pointer ${
+                className={`w-full text-left px-3 py-2 text-xs hover:bg-surface-container-low transition border-b border-outline-variant last:border-0 cursor-pointer ${
                   (value || "") === optionValue(opt)
-                    ? "bg-[#E3000F]/10 font-bold text-[#E3000F]"
-                    : "text-[#1A1A1A]"
+                    ? "bg-primary/10 font-bold text-primary"
+                    : "text-on-surface"
                 }`}
               >
                 <div className="font-bold">{opt.name || opt.code}</div>
@@ -311,9 +311,9 @@ function FacebookGroupForm({
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="md:col-span-2">
-          <label className="text-xs font-bold text-[#666666] block mb-1">Tên nhóm *</label>
+          <label className="text-xs font-bold text-on-surface-variant block mb-1">Tên nhóm *</label>
           <input
-            className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A]"
+            className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary text-on-surface"
             value={form.group_name}
             onChange={(e) => set("group_name", e.target.value)}
             required
@@ -321,9 +321,9 @@ function FacebookGroupForm({
           />
         </div>
         <div className="md:col-span-2">
-          <label className="text-xs font-bold text-[#666666] block mb-1">URL nhóm *</label>
+          <label className="text-xs font-bold text-on-surface-variant block mb-1">URL nhóm *</label>
           <input
-            className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A]"
+            className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary text-on-surface"
             value={form.group_url}
             onChange={(e) => set("group_url", e.target.value)}
             required
@@ -434,68 +434,68 @@ function FacebookGroupForm({
           />
         </div>
         <div>
-          <label className="text-xs font-bold text-[#666666] block mb-1">Số thành viên</label>
+          <label className="text-xs font-bold text-on-surface-variant block mb-1">Số thành viên</label>
           <input
-            className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A]"
+            className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary text-on-surface"
             value={form.members}
             onChange={(e) => set("members", e.target.value)}
             placeholder="50000"
           />
         </div>
         <div>
-          <label className="text-xs font-bold text-[#666666] block mb-1">Posts/tuần</label>
+          <label className="text-xs font-bold text-on-surface-variant block mb-1">Posts/tuần</label>
           <input
-            className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A]"
+            className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary text-on-surface"
             value={form.posts_per_week}
             onChange={(e) => set("posts_per_week", e.target.value)}
             placeholder="10"
           />
         </div>
         <div className="md:col-span-2">
-          <label className="text-xs font-bold text-[#666666] block mb-1">Ghi chú rủi ro</label>
+          <label className="text-xs font-bold text-on-surface-variant block mb-1">Ghi chú rủi ro</label>
           <textarea
-            className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A] resize-y min-h-[60px]"
+            className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary text-on-surface resize-y min-h-[60px]"
             value={form.risk_note}
             onChange={(e) => set("risk_note", e.target.value)}
             placeholder="Nhập cảnh báo/rủi ro nếu có..."
           />
         </div>
         <div className="md:col-span-2">
-          <label className="text-xs font-bold text-[#666666] block mb-1">Ghi chú</label>
+          <label className="text-xs font-bold text-on-surface-variant block mb-1">Ghi chú</label>
           <textarea
-            className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A] resize-y min-h-[80px]"
+            className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary text-on-surface resize-y min-h-[80px]"
             value={form.note}
             onChange={(e) => set("note", e.target.value)}
             placeholder="Nhập ghi chú chung..."
           />
         </div>
-        <div className="md:col-span-2 p-4 border border-[#E5E5E5] rounded-lg bg-[#F5F5F5]/50 space-y-4">
+        <div className="md:col-span-2 p-4 border border-outline-variant rounded-lg bg-surface-container-low space-y-4">
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
               checked={form.chay_24h}
               onChange={(e) => set("chay_24h", e.target.checked)}
-              className="w-4 h-4 rounded text-[#E3000F] border-[#E5E5E5] focus:ring-[#E3000F]"
+              className="w-4 h-4 rounded text-primary border-outline-variant focus:ring-primary/20"
             />
-            <span className="text-sm font-bold text-[#1A1A1A]">Bật cào tự động 24h (Cronjob)</span>
+            <span className="text-sm font-bold text-on-surface">Bật cào tự động 24h (Cronjob)</span>
           </label>
-          
+
           {form.chay_24h && (
             <div className="space-y-3">
-              <div className="text-xs text-[#666666] bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 leading-relaxed">
+              <div className="text-xs text-on-surface-variant bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 leading-relaxed">
                 ⚡ <b>Cách hoạt động:</b> Mỗi phút scheduler sẽ kiểm tra — nếu thời điểm hiện tại nằm trong khung giờ và chia hết cho khoảng cách cào (theo phút) thì sẽ cào nhóm này.
                 <br/>Ví dụ: Khung giờ <b>7h–22h</b>, khoảng cách <b>60 phút</b> → cào vào 7:00, 8:00, 9:00... cho đến 22:00.
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-[#666666] block mb-1">
+                  <label className="text-xs font-bold text-on-surface-variant block mb-1">
                     Giờ bắt đầu trong ngày <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
                     min={0}
                     max={23}
-                    className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A]"
+                    className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary text-on-surface"
                     value={form.start_time_in_day}
                     onChange={(e) => set("start_time_in_day", e.target.value)}
                     placeholder="VD: 7 (7 giờ sáng)"
@@ -503,14 +503,14 @@ function FacebookGroupForm({
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-[#666666] block mb-1">
+                  <label className="text-xs font-bold text-on-surface-variant block mb-1">
                     Giờ kết thúc trong ngày <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
                     min={0}
                     max={23}
-                    className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A]"
+                    className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary text-on-surface"
                     value={form.end_time_in_day}
                     onChange={(e) => set("end_time_in_day", e.target.value)}
                     placeholder="VD: 22 (10 giờ tối)"
@@ -518,11 +518,11 @@ function FacebookGroupForm({
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-[#666666] block mb-1">
+                  <label className="text-xs font-bold text-on-surface-variant block mb-1">
                     Khoảng cách cào (phút) <span className="text-red-500">*</span>
                   </label>
                   <select
-                    className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A] bg-white"
+                    className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary text-on-surface bg-surface"
                     value={form.time_crawl}
                     onChange={(e) => set("time_crawl", e.target.value)}
                     required={form.chay_24h}
@@ -540,16 +540,16 @@ function FacebookGroupForm({
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-[#666666] block mb-1">
+                  <label className="text-xs font-bold text-on-surface-variant block mb-1">
                     Ngày kết thúc cào tự động
                   </label>
                   <input
                     type="date"
-                    className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A]"
+                    className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary text-on-surface"
                     value={form.end_date_hour}
                     onChange={(e) => set("end_date_hour", e.target.value)}
                   />
-                  <p className="text-[10px] text-[#A0A0A0] mt-1">Để trống = không có ngày hết hạn</p>
+                  <p className="text-[10px] text-on-surface-variant mt-1">Để trống = không có ngày hết hạn</p>
                 </div>
               </div>
               {form.start_time_in_day && form.end_time_in_day && Number(form.start_time_in_day) >= Number(form.end_time_in_day) && (
@@ -559,18 +559,18 @@ function FacebookGroupForm({
           )}
         </div>
       </div>
-      <div className="flex gap-3 border-t border-[#E5E5E5] pt-4 mt-6">
+      <div className="flex gap-3 border-t border-outline-variant pt-4 mt-6">
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 border border-[#E5E5E5] text-[#666666] hover:text-[#1A1A1A] font-bold py-2 rounded-lg hover:bg-[#F5F5F5] text-sm transition cursor-pointer"
+          className="flex-1 border border-outline-variant text-on-surface-variant hover:text-on-surface font-bold py-2 rounded-lg hover:bg-surface-container-low text-sm transition cursor-pointer"
         >
           Hủy
         </button>
         <button
           type="submit"
           disabled={busy}
-          className="flex-1 bg-[#E3000F] text-white font-bold py-2 rounded-lg hover:bg-[#C40009] text-sm transition disabled:opacity-50 cursor-pointer"
+          className="flex-1 bg-primary text-white font-bold py-2 rounded-lg hover:bg-on-primary-fixed-variant text-sm transition disabled:opacity-50 cursor-pointer"
         >
           {busy ? "Đang lưu..." : initial?.group_name ? "Cập nhật" : "Thêm mới"}
         </button>
@@ -686,18 +686,18 @@ function LinkedInGroupForm({
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="md:col-span-2">
-          <label className="text-xs font-bold text-[#666666] block mb-1">Tên nhóm</label>
+          <label className="text-xs font-bold text-on-surface-variant block mb-1">Tên nhóm</label>
           <input
-            className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A]"
+            className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary text-on-surface"
             value={form.group_name}
             onChange={(e) => set("group_name", e.target.value)}
             placeholder="LinkedIn Group Name"
           />
         </div>
         <div className="md:col-span-2">
-          <label className="text-xs font-bold text-[#666666] block mb-1">URL nhóm *</label>
+          <label className="text-xs font-bold text-on-surface-variant block mb-1">URL nhóm *</label>
           <input
-            className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A]"
+            className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary text-on-surface"
             value={form.group_url}
             onChange={(e) => set("group_url", e.target.value)}
             required
@@ -809,36 +809,36 @@ function LinkedInGroupForm({
           </div>
         )}
         <div className="md:col-span-2">
-          <label className="text-xs font-bold text-[#666666] block mb-1">Ghi chú rủi ro</label>
+          <label className="text-xs font-bold text-on-surface-variant block mb-1">Ghi chú rủi ro</label>
           <textarea
-            className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A] resize-y min-h-[60px]"
+            className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary text-on-surface resize-y min-h-[60px]"
             value={form.risk_note}
             onChange={(e) => set("risk_note", e.target.value)}
             placeholder="Nhập cảnh báo/rủi ro nếu có..."
           />
         </div>
         <div className="md:col-span-2">
-          <label className="text-xs font-bold text-[#666666] block mb-1">Ghi chú</label>
+          <label className="text-xs font-bold text-on-surface-variant block mb-1">Ghi chú</label>
           <textarea
-            className="w-full border border-[#E5E5E5] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-[#1A1A1A] resize-y min-h-[80px]"
+            className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary text-on-surface resize-y min-h-[80px]"
             value={form.note}
             onChange={(e) => set("note", e.target.value)}
             placeholder="Nhập ghi chú chung..."
           />
         </div>
       </div>
-      <div className="flex gap-3 border-t border-[#E5E5E5] pt-4 mt-6">
+      <div className="flex gap-3 border-t border-outline-variant pt-4 mt-6">
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 border border-[#E5E5E5] text-[#666666] hover:text-[#1A1A1A] font-bold py-2 rounded-lg hover:bg-[#F5F5F5] text-sm transition cursor-pointer"
+          className="flex-1 border border-outline-variant text-on-surface-variant hover:text-on-surface font-bold py-2 rounded-lg hover:bg-surface-container-low text-sm transition cursor-pointer"
         >
           Hủy
         </button>
         <button
           type="submit"
           disabled={busy}
-          className="flex-1 bg-[#E3000F] text-white font-bold py-2 rounded-lg hover:bg-[#C40009] text-sm transition disabled:opacity-50 cursor-pointer"
+          className="flex-1 bg-primary text-white font-bold py-2 rounded-lg hover:bg-on-primary-fixed-variant text-sm transition disabled:opacity-50 cursor-pointer"
         >
           {busy ? "Đang lưu..." : initial?.group_name ? "Cập nhật" : "Thêm mới"}
         </button>
@@ -914,7 +914,7 @@ export function GroupManagementContent() {
   const [success, setSuccess] = useState<string | null>(null);
   const [viewingGroupClassification, setViewingGroupClassification] = useState<FacebookGroup | LinkedInGroup | null>(null);
   const [deletingGroupItem, setDeletingGroupItem] = useState<FacebookGroup | LinkedInGroup | null>(null);
-  
+
   // States bộ lọc
   const [intentFilter, setIntentFilter] = useState("all");
   const [industryFilter, setIndustryFilter] = useState("all");
@@ -1025,10 +1025,10 @@ export function GroupManagementContent() {
         const matchesSearch = !search ||
           g.group_name?.toLowerCase().includes(search.toLowerCase()) ||
           g.group_url?.toLowerCase().includes(search.toLowerCase());
-        
+
         const matchesIntent = intentFilter === "all" || String((g as any).id_intent ?? "") === intentFilter;
         const matchesIndustry = industryFilter === "all" || String((g as any).id_industry ?? "") === industryFilter;
-        
+
         // Team filter: for admin, filter by member's team. Otherwise filter by category id_team.
         let matchesTeam = true;
         if (teamFilter !== "all") {
@@ -1086,10 +1086,10 @@ export function GroupManagementContent() {
         const matchesSearch = !search ||
           g.group_name?.toLowerCase().includes(search.toLowerCase()) ||
           g.group_url?.toLowerCase().includes(search.toLowerCase());
-        
+
         const matchesIntent = intentFilter === "all" || String((g as any).id_intent ?? "") === intentFilter;
         const matchesIndustry = industryFilter === "all" || String((g as any).id_industry ?? "") === industryFilter;
-        
+
         let matchesTeam = true;
         if (teamFilter !== "all") {
           if (isAdmin) {
@@ -1202,7 +1202,7 @@ export function GroupManagementContent() {
     <div className="max-w-7xl mx-auto space-y-6">
       {/* Header and Platform Tabs */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4 bg-white p-1 rounded-2xl shadow-sm border border-[#E5E5E5] w-fit">
+        <div className="flex items-center gap-4 bg-surface p-1 rounded-xl shadow-sm border border-outline-variant w-fit">
           {PLATFORMS.map(({ key, label, Icon }) => (
             <button
               key={key}
@@ -1212,14 +1212,14 @@ export function GroupManagementContent() {
               }}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition cursor-pointer ${
                 platform === key
-                  ? "bg-[#E3000F] text-white shadow-md shadow-[#E3000F]/20"
-                  : "text-[#666666] hover:bg-[#F5F5F5] hover:text-[#1A1A1A]"
+                  ? "bg-primary text-white shadow-md shadow-primary/20"
+                  : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
               }`}
             >
               <Icon className="text-lg" />
               {label}
               {platform === key && (
-                <span className="ml-2 bg-white/20 px-2 py-0.5 rounded-full text-xs">
+                <span className="ml-2 bg-on-primary/20 px-2 py-0.5 rounded-full text-xs">
                   {currentGroups.length}
                 </span>
               )}
@@ -1232,7 +1232,7 @@ export function GroupManagementContent() {
             setShowAddForm(true);
             setEditingGroup(null);
           }}
-          className="flex items-center gap-2 bg-[#E3000F] text-white px-4 py-3 rounded-xl text-sm font-bold hover:bg-[#C40009] transition shrink-0 cursor-pointer shadow-md shadow-[#E3000F]/20"
+          className="flex items-center gap-2 bg-primary text-white px-4 py-3 rounded-xl text-sm font-bold hover:bg-on-primary-fixed-variant transition shrink-0 cursor-pointer shadow-md shadow-primary/20"
         >
           <FaPlus />
           Thêm nhóm
@@ -1259,14 +1259,14 @@ export function GroupManagementContent() {
             }}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition cursor-pointer ${
               platform === key
-                ? "bg-[#E3000F]/10 text-[#E3000F] border border-[#E3000F]/20"
-                : "bg-[#F5F5F5] text-[#666666] hover:bg-[#E5E5E5] hover:text-[#1A1A1A]"
+                ? "bg-primary/10 text-primary border border-primary/20"
+                : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface"
             }`}
           >
             <Icon />
             {label}
             <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-black ${
-              platform === key ? "bg-[#E3000F]/20 text-[#E3000F]" : "bg-[#E5E5E5] text-[#666666]"
+              platform === key ? "bg-primary/20 text-primary" : "bg-surface-container-highest text-on-surface-variant"
             }`}>
               {key === "facebook" ? filteredFb.length : filteredLi.length}
             </span>
@@ -1276,9 +1276,9 @@ export function GroupManagementContent() {
 
       {/* Alerts */}
       {error && (
-        <div className="bg-[#FF3344]/10 border border-[#FF3344]/20 text-[#FF3344] rounded-lg px-4 py-2 text-sm flex items-center justify-between animate-in fade-in">
+        <div className="bg-primary-container/10 border border-primary-container/20 text-primary-container rounded-lg px-4 py-2 text-sm flex items-center justify-between animate-in fade-in">
           <span>{error}</span>
-          <button onClick={() => setError(null)} className="text-[#FF3344] hover:text-[#C40009] font-bold">
+          <button onClick={() => setError(null)} className="text-primary-container hover:text-on-primary-fixed-variant font-bold">
             ✕
           </button>
         </div>
@@ -1293,22 +1293,22 @@ export function GroupManagementContent() {
       )}
 
       {/* Search and Filters */}
-      <div className="bg-[#F5F5F5]/50 flex flex-wrap items-center gap-3 rounded-2xl border border-[#E5E5E5] p-4 shadow-[0_4px_20px_rgba(0,0,0,0.015)]">
+      <div className="bg-surface-container-low flex flex-wrap items-center gap-3 rounded-xl border border-outline-variant p-4 shadow-[0_4px_20px_rgba(0,0,0,0.015)]">
         <div className="relative min-w-[200px] flex-1">
-          <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0A0A0] text-sm" />
+          <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm" />
           <input
             type="text"
             placeholder="Tìm kiếm nhóm theo tên hoặc URL..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full border border-[#333333] bg-[#FFFFFF] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl pl-9 pr-4 py-2 text-xs font-semibold text-[#1A1A1A] outline-none transition shadow-sm"
+            className="w-full border border-[#333333] bg-surface focus:border-primary focus:ring-2 focus:ring-primary/15 rounded-xl pl-9 pr-4 py-2 text-xs font-semibold text-on-surface outline-none transition shadow-sm"
           />
         </div>
 
         <select
           value={intentFilter}
           onChange={(e) => setIntentFilter(e.target.value)}
-          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
+          className="border border-outline-variant bg-surface hover:bg-surface-container-low focus:border-primary focus:ring-2 focus:ring-primary/15 rounded-xl px-3 py-2 text-xs font-bold text-on-surface outline-none transition cursor-pointer shadow-sm min-w-[130px]"
         >
           <option value="all">Tất cả Lĩnh vực</option>
           {categories.filter(c => c.category_type === 'intent').map((opt) => (
@@ -1319,7 +1319,7 @@ export function GroupManagementContent() {
         <select
           value={industryFilter}
           onChange={(e) => setIndustryFilter(e.target.value)}
-          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
+          className="border border-outline-variant bg-surface hover:bg-surface-container-low focus:border-primary focus:ring-2 focus:ring-primary/15 rounded-xl px-3 py-2 text-xs font-bold text-on-surface outline-none transition cursor-pointer shadow-sm min-w-[130px]"
         >
           <option value="all">Tất cả Industry</option>
           {categories.filter(c => c.category_type === 'industry').map((opt) => (
@@ -1330,7 +1330,7 @@ export function GroupManagementContent() {
         <select
           value={teamFilter}
           onChange={(e) => setTeamFilter(e.target.value)}
-          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
+          className="border border-outline-variant bg-surface hover:bg-surface-container-low focus:border-primary focus:ring-2 focus:ring-primary/15 rounded-xl px-3 py-2 text-xs font-bold text-on-surface outline-none transition cursor-pointer shadow-sm min-w-[130px]"
         >
           <option value="all">Tất cả Team</option>
           {teamCategories.map((opt) => (
@@ -1343,7 +1343,7 @@ export function GroupManagementContent() {
         <select
           value={tierFilter}
           onChange={(e) => setTierFilter(e.target.value)}
-          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[120px]"
+          className="border border-outline-variant bg-surface hover:bg-surface-container-low focus:border-primary focus:ring-2 focus:ring-primary/15 rounded-xl px-3 py-2 text-xs font-bold text-on-surface outline-none transition cursor-pointer shadow-sm min-w-[120px]"
         >
           <option value="all">Tất cả Tier</option>
           {categories.filter(c => c.category_type === 'tier').map((opt) => (
@@ -1354,7 +1354,7 @@ export function GroupManagementContent() {
         <select
           value={icpFilter}
           onChange={(e) => setIcpFilter(e.target.value)}
-          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
+          className="border border-outline-variant bg-surface hover:bg-surface-container-low focus:border-primary focus:ring-2 focus:ring-primary/15 rounded-xl px-3 py-2 text-xs font-bold text-on-surface outline-none transition cursor-pointer shadow-sm min-w-[130px]"
         >
           <option value="all">Tất cả ICP</option>
           {categories.filter(c => c.category_type === 'icp').map((opt) => (
@@ -1368,7 +1368,7 @@ export function GroupManagementContent() {
           <select
             value={memberFilter}
             onChange={(e) => setMemberFilter(e.target.value)}
-            className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
+            className="border border-outline-variant bg-surface hover:bg-surface-container-low focus:border-primary focus:ring-2 focus:ring-primary/15 rounded-xl px-3 py-2 text-xs font-bold text-on-surface outline-none transition cursor-pointer shadow-sm min-w-[130px]"
           >
             <option value="all">Tất cả Thành viên</option>
             {userOptions
@@ -1390,7 +1390,7 @@ export function GroupManagementContent() {
         <select
           value={contentTypeFilter}
           onChange={(e) => setContentTypeFilter(e.target.value)}
-          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
+          className="border border-outline-variant bg-surface hover:bg-surface-container-low focus:border-primary focus:ring-2 focus:ring-primary/15 rounded-xl px-3 py-2 text-xs font-bold text-on-surface outline-none transition cursor-pointer shadow-sm min-w-[130px]"
         >
           <option value="all">Tất cả Loại nội dung</option>
           {categories.filter(c => c.category_type === 'content_type').map((opt) => (
@@ -1403,7 +1403,7 @@ export function GroupManagementContent() {
         <select
           value={productSeedingFilter}
           onChange={(e) => setProductSeedingFilter(e.target.value)}
-          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
+          className="border border-outline-variant bg-surface hover:bg-surface-container-low focus:border-primary focus:ring-2 focus:ring-primary/15 rounded-xl px-3 py-2 text-xs font-bold text-on-surface outline-none transition cursor-pointer shadow-sm min-w-[130px]"
         >
           <option value="all">Tất cả SP Seeding</option>
           {categories.filter(c => c.category_type === 'product_seeding').map((opt) => (
@@ -1435,7 +1435,7 @@ export function GroupManagementContent() {
                 setContentTypeFilter("all");
                 setProductSeedingFilter("all");
               }}
-              className="border border-[#FF3344]/20 hover:border-[#FF3344]/30 bg-[#FF3344]/5 hover:bg-[#FF3344]/10 hover:text-[#C40009] text-[#FF3344] flex items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold transition cursor-pointer shadow-sm active:scale-95"
+              className="border border-primary-container/20 hover:border-primary-container/30 bg-primary-container/5 hover:bg-primary-container/10 hover:text-on-primary-fixed-variant text-primary-container flex items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold transition cursor-pointer shadow-sm active:scale-95"
               title="Xóa tất cả bộ lọc"
             >
               <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>
@@ -1446,7 +1446,7 @@ export function GroupManagementContent() {
 
       {/* Center Modal Dialog Overlay for Add / Edit */}
       {(showAddForm || editingGroup) && (
-        <div 
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
           style={{
             position: "fixed",
@@ -1466,7 +1466,7 @@ export function GroupManagementContent() {
           }}
         >
           <div
-            className="bg-[#FFFFFF] rounded-2xl border border-[#E5E5E5] shadow-xl overflow-hidden animate-in zoom-in-95 duration-200"
+            className="bg-surface rounded-xl border border-outline-variant shadow-xl overflow-hidden animate-in zoom-in-95 duration-200"
             style={{
               width: "100%",
               maxWidth: "680px",
@@ -1478,9 +1478,9 @@ export function GroupManagementContent() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E5E5E5] bg-[#F5F5F5]/50">
-              <h3 className="text-base font-bold text-[#1A1A1A] flex items-center gap-2">
-                <span className="material-symbols-outlined text-[20px] text-[#E3000F]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant bg-surface-container-low">
+              <h3 className="text-base font-bold text-on-surface flex items-center gap-2">
+                <span className="material-symbols-outlined text-[20px] text-primary">
                   {editingGroup ? "edit_square" : "add_circle"}
                 </span>
                 {editingGroup
@@ -1493,7 +1493,7 @@ export function GroupManagementContent() {
                   setShowAddForm(false);
                   setEditingGroup(null);
                 }}
-                className="text-[#666666] hover:text-[#1A1A1A] transition cursor-pointer"
+                className="text-on-surface-variant hover:text-on-surface transition cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
@@ -1593,81 +1593,81 @@ export function GroupManagementContent() {
 
       {/* Groups table */}
       {loading ? (
-        <div className="text-center py-16 text-[#666666]">Đang tải...</div>
+        <div className="text-center py-16 text-on-surface-variant">Đang tải...</div>
       ) : currentGroups.length === 0 ? (
-        <div className="text-center py-16 bg-[#F5F5F5]/50 rounded-xl border border-dashed border-[#E5E5E5]">
-          <MaterialIcon name="group" className="text-4xl text-[#A0A0A0] mx-auto mb-2" />
-          <p className="text-[#666666] text-sm">Chưa có nhóm nào</p>
+        <div className="text-center py-16 bg-surface-container-low rounded-xl border border-dashed border-outline-variant">
+          <MaterialIcon name="group" className="text-4xl text-on-surface-variant mx-auto mb-2" />
+          <p className="text-on-surface-variant text-sm">Chưa có nhóm nào</p>
           <button
             onClick={() => setShowAddForm(true)}
-            className="mt-3 text-[#E3000F] text-sm font-bold hover:underline cursor-pointer"
+            className="mt-3 text-primary text-sm font-bold hover:underline cursor-pointer"
           >
             + Thêm nhóm đầu tiên
           </button>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-[#E5E5E5]">
+        <div className="overflow-x-auto rounded-xl border border-outline-variant">
           <table className="w-full text-sm">
-            <thead className="bg-[#F5F5F5] border-b border-[#E5E5E5]">
+            <thead className="bg-surface-container-low border-b border-outline-variant">
               <tr>
-                <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider">
+                <th className="text-left px-4 py-3 font-bold text-on-surface-variant text-xs uppercase">
                   Tên nhóm
                 </th>
-                <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[280px]">
+                <th className="text-left px-4 py-3 font-bold text-on-surface-variant text-xs uppercase w-[280px]">
                   Phân loại
                 </th>
                 {isLeader ? (
                   <>
-                    <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[150px]">
+                    <th className="text-left px-4 py-3 font-bold text-on-surface-variant text-xs uppercase w-[150px]">
                       Người phụ trách
                     </th>
-                    <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[150px]">
+                    <th className="text-left px-4 py-3 font-bold text-on-surface-variant text-xs uppercase w-[150px]">
                       Đồng phụ trách
                     </th>
-                    <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[150px]">
+                    <th className="text-left px-4 py-3 font-bold text-on-surface-variant text-xs uppercase w-[150px]">
                       Thành viên
                     </th>
                   </>
                 ) : (
                   <>
-                    <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[150px]">
+                    <th className="text-left px-4 py-3 font-bold text-on-surface-variant text-xs uppercase w-[150px]">
                       {isAdmin ? "Thành viên" : "Người phụ trách"}
                     </th>
-                    <th className="text-left px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[150px]">
+                    <th className="text-left px-4 py-3 font-bold text-on-surface-variant text-xs uppercase w-[150px]">
                       {isAdmin ? "Team" : "Đồng phụ trách"}
                     </th>
                   </>
                 )}
-                <th className="text-right px-4 py-3 font-bold text-[#A0A0A0] text-xs uppercase tracking-wider w-[120px]">
+                <th className="text-right px-4 py-3 font-bold text-on-surface-variant text-xs uppercase w-[120px]">
                   Hành động
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#E5E5E5]">
+            <tbody className="divide-y divide-outline-variant">
               {paginatedGroups.map((g) => {
                 const isLeaderGroup = isLeader && user && String(g.id_member) === String(user.id);
                 return (
-                  <tr 
-                    key={g.id} 
+                  <tr
+                    key={g.id}
                     className={`transition ${
-                      isLeaderGroup 
-                        ? "bg-green-50/70 hover:bg-green-100/80" 
-                        : "hover:bg-[#F5F5F5]/30"
+                      isLeaderGroup
+                        ? "bg-green-50/70 hover:bg-green-100/80"
+                        : "hover:bg-surface-container-low/30"
                     }`}
                   >
                     <td className="px-4 py-3">
-                      <a 
-                        href={g.group_url} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="font-bold text-[#1A1A1A] hover:text-[#E3000F] hover:underline transition block leading-snug"
+                      <a
+                        href={g.group_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-bold text-on-surface hover:text-primary hover:underline transition block leading-snug"
                         title={g.group_name}
                       >
                         {g.group_name || "—"}
                       </a>
                       {platform === "facebook" && (
-                        <div className="mt-1.5 text-xs text-[#666666]">
-                          Thành viên: <span className="font-semibold text-[#1A1A1A]">{Number((g as FacebookGroup).members) > 0 ? Number((g as FacebookGroup).members).toLocaleString("vi-VN") : "?"}</span> thành viên
+                        <div className="mt-1.5 text-xs text-on-surface-variant">
+                          Thành viên: <span className="font-semibold text-on-surface">{Number((g as FacebookGroup).members) > 0 ? Number((g as FacebookGroup).members).toLocaleString("vi-VN") : "?"}</span> thành viên
                         </div>
                       )}
                       {platform === "linkedin" && (
@@ -1691,7 +1691,7 @@ export function GroupManagementContent() {
                             <span className="material-symbols-outlined text-[10px]">bolt</span> 24h Tự động
                           </span>
                         )}
-                        {g.intent_name && <span className="px-1.5 py-0.5 bg-[#E3000F]/10 text-[#E3000F] rounded text-[10px] font-bold" title="Lĩnh vực">{g.intent_name}</span>}
+                        {g.intent_name && <span className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-[10px] font-bold" title="Lĩnh vực">{g.intent_name}</span>}
                         {(g as any).id_team && getTeamName((g as any).id_team) !== "—" && <span className="px-1.5 py-0.5 bg-teal-50 text-teal-700 rounded text-[10px] font-bold" title="Team">{getTeamName((g as any).id_team)}</span>}
                         {g.industry_name && <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[10px] font-bold" title="Industry">{g.industry_name}</span>}
                         {(g as any).content_type_name && <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-bold" title="Content Type">{(g as any).content_type_name}</span>}
@@ -1700,7 +1700,7 @@ export function GroupManagementContent() {
                         {g.icp_name && <span className="px-1.5 py-0.5 bg-pink-50 text-pink-700 rounded text-[10px] font-bold" title="ICP">{g.icp_name}</span>}
                         <button
                           onClick={() => setViewingGroupClassification(g)}
-                          className="px-1.5 py-0.5 bg-[#F5F5F5] text-[#666666] hover:bg-[#E5E5E5] rounded text-[10px] font-bold transition flex items-center gap-1 cursor-pointer"
+                          className="px-1.5 py-0.5 bg-surface-container-low text-on-surface-variant hover:bg-surface-container-highest rounded text-[10px] font-bold transition flex items-center gap-1 cursor-pointer"
                         >
                           <span className="material-symbols-outlined text-[10px]">more_horiz</span>
                           Thêm
@@ -1709,22 +1709,22 @@ export function GroupManagementContent() {
                     </td>
                     {isLeader ? (
                       <>
-                        <td className="px-4 py-3 text-xs font-medium text-[#1A1A1A]">
+                        <td className="px-4 py-3 text-xs font-medium text-on-surface">
                           {getUserName((g as any).assignee_id)}
                         </td>
-                        <td className="px-4 py-3 text-xs font-medium text-[#1A1A1A]">
+                        <td className="px-4 py-3 text-xs font-medium text-on-surface">
                           {getUserName((g as any).co_assignee_id)}
                         </td>
-                        <td className="px-4 py-3 text-xs font-medium text-[#1A1A1A]">
+                        <td className="px-4 py-3 text-xs font-medium text-on-surface">
                           {getUserName((g as any).id_member)}
                         </td>
                       </>
                     ) : (
                       <>
-                        <td className="px-4 py-3 text-xs font-medium text-[#1A1A1A]">
+                        <td className="px-4 py-3 text-xs font-medium text-on-surface">
                           {isAdmin ? getUserName((g as any).id_member) : getUserName((g as any).assignee_id)}
                         </td>
-                        <td className="px-4 py-3 text-xs font-medium text-[#1A1A1A]">
+                        <td className="px-4 py-3 text-xs font-medium text-on-surface">
                           {isAdmin ? getUserTeamName((g as any).id_member) : getUserName((g as any).co_assignee_id)}
                         </td>
                       </>
@@ -1735,13 +1735,13 @@ export function GroupManagementContent() {
                           setEditingGroup(g);
                           setShowAddForm(false);
                         }}
-                        className="inline-flex items-center gap-1 px-2 py-1 text-[#666666] hover:text-[#E3000F] transition text-xs font-bold cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2 py-1 text-on-surface-variant hover:text-primary transition text-xs font-bold cursor-pointer"
                       >
                         <FaEdit size={12} /> Sửa
                       </button>
                       <button
                         onClick={() => setDeletingGroupItem(g)}
-                        className="inline-flex items-center gap-1 px-2 py-1 text-[#666666] hover:text-[#FF3344] transition text-xs font-bold ml-2 cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2 py-1 text-on-surface-variant hover:text-primary-container transition text-xs font-bold ml-2 cursor-pointer"
                       >
                         <FaTrash size={12} /> Xóa
                       </button>
@@ -1751,27 +1751,27 @@ export function GroupManagementContent() {
               })}
             </tbody>
           </table>
-          
+
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-[#E5E5E5] bg-white rounded-b-xl">
-              <div className="text-sm text-[#666666]">
-                Hiển thị <span className="font-bold text-[#1A1A1A]">{(page - 1) * pageSize + 1}</span> đến <span className="font-bold text-[#1A1A1A]">{Math.min(page * pageSize, totalItems)}</span> trong số <span className="font-bold text-[#1A1A1A]">{totalItems}</span> nhóm
+            <div className="flex items-center justify-between px-4 py-3 border-t border-outline-variant bg-surface rounded-b-xl">
+              <div className="text-sm text-on-surface-variant">
+                Hiển thị <span className="font-bold text-on-surface">{(page - 1) * pageSize + 1}</span> đến <span className="font-bold text-on-surface">{Math.min(page * pageSize, totalItems)}</span> trong số <span className="font-bold text-on-surface">{totalItems}</span> nhóm
               </div>
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setPage(p => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="px-3 py-1 border border-[#E5E5E5] rounded-lg text-sm font-bold text-[#666666] hover:bg-[#F5F5F5] disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer"
+                  className="px-3 py-1 border border-outline-variant rounded-lg text-sm font-bold text-on-surface-variant hover:bg-surface-container-low disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer"
                 >
                   Trước
                 </button>
-                <div className="px-3 py-1 text-sm font-bold text-[#1A1A1A] bg-[#F5F5F5] rounded-lg border border-[#E5E5E5]">
+                <div className="px-3 py-1 text-sm font-bold text-on-surface bg-surface-container-low rounded-lg border border-outline-variant">
                   {page} / {totalPages}
                 </div>
                 <button
                   onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="px-3 py-1 border border-[#E5E5E5] rounded-lg text-sm font-bold text-[#666666] hover:bg-[#F5F5F5] disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer"
+                  className="px-3 py-1 border border-outline-variant rounded-lg text-sm font-bold text-on-surface-variant hover:bg-surface-container-low disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer"
                 >
                   Sau
                 </button>
@@ -1783,7 +1783,7 @@ export function GroupManagementContent() {
 
       {/* Modal xem phân loại */}
       {viewingGroupClassification && (
-        <div 
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
           style={{
             position: "fixed",
@@ -1800,7 +1800,7 @@ export function GroupManagementContent() {
           onClick={() => setViewingGroupClassification(null)}
         >
           <div
-            className="bg-[#FFFFFF] rounded-2xl border border-[#E5E5E5] shadow-xl overflow-hidden animate-in zoom-in-95 duration-200"
+            className="bg-surface rounded-xl border border-outline-variant shadow-xl overflow-hidden animate-in zoom-in-95 duration-200"
             style={{
               width: "100%",
               maxWidth: "600px",
@@ -1812,9 +1812,9 @@ export function GroupManagementContent() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E5E5E5] bg-[#F5F5F5]/50 flex-shrink-0">
-              <h3 className="text-sm font-bold text-[#1A1A1A] flex items-center gap-2">
-                <span className="material-symbols-outlined text-[20px] text-[#E3000F]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant bg-surface-container-low flex-shrink-0">
+              <h3 className="text-sm font-bold text-on-surface flex items-center gap-2">
+                <span className="material-symbols-outlined text-[20px] text-primary">
                   info
                 </span>
                 Chi tiết phân loại nhóm
@@ -1822,7 +1822,7 @@ export function GroupManagementContent() {
               <button
                 type="button"
                 onClick={() => setViewingGroupClassification(null)}
-                className="text-[#666666] hover:text-[#1A1A1A] transition cursor-pointer"
+                className="text-on-surface-variant hover:text-on-surface transition cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
@@ -1831,107 +1831,107 @@ export function GroupManagementContent() {
             {/* Modal Body */}
             <div className="p-6 space-y-4 overflow-y-auto">
               <div>
-                <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Tên nhóm</span>
-                <span className="text-sm font-bold text-[#1A1A1A] break-all">{viewingGroupClassification.group_name || "—"}</span>
+                <span className="text-[10px] font-bold text-on-surface-variant uppercase block mb-1">Tên nhóm</span>
+                <span className="text-sm font-bold text-on-surface break-all">{viewingGroupClassification.group_name || "—"}</span>
               </div>
-              <div className="grid grid-cols-2 gap-4 border-t border-[#E5E5E5] pt-4">
+              <div className="grid grid-cols-2 gap-4 border-t border-outline-variant pt-4">
                 <div>
-                  <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Lĩnh vực</span>
-                  <span className="inline-flex bg-[#E3000F]/10 text-[#E3000F] border border-[#E3000F]/20 px-2.5 py-0.5 rounded-lg text-xs font-bold">
+                  <span className="text-[10px] font-bold text-on-surface-variant uppercase block mb-1">Lĩnh vực</span>
+                  <span className="inline-flex bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 rounded-lg text-xs font-bold">
                     {(viewingGroupClassification as any).intent_name || "—"}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Team</span>
+                  <span className="text-[10px] font-bold text-on-surface-variant uppercase block mb-1">Team</span>
                   <span className="inline-flex bg-teal-50 text-teal-700 border border-teal-200 px-2.5 py-0.5 rounded-lg text-xs font-bold">
                     {getTeamName((viewingGroupClassification as any).id_team)}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Ngành (Industry)</span>
+                  <span className="text-[10px] font-bold text-on-surface-variant uppercase block mb-1">Ngành (Industry)</span>
                   <span className="inline-flex bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-0.5 rounded-lg text-xs font-bold">
                     {(viewingGroupClassification as any).industry_name || "—"}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">ICP Target</span>
+                  <span className="text-[10px] font-bold text-on-surface-variant uppercase block mb-1">ICP Target</span>
                   <span className="inline-flex bg-pink-50 text-pink-700 border border-pink-200 px-2.5 py-0.5 rounded-lg text-xs font-bold">
                     {(viewingGroupClassification as any).icp_name || "—"}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Tier</span>
+                  <span className="text-[10px] font-bold text-on-surface-variant uppercase block mb-1">Tier</span>
                   <span className="inline-flex bg-purple-50 text-purple-700 border border-purple-200 px-2.5 py-0.5 rounded-lg text-xs font-bold">
                     {(viewingGroupClassification as any).tier_name || "—"}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Loại nội dung</span>
+                  <span className="text-[10px] font-bold text-on-surface-variant uppercase block mb-1">Loại nội dung</span>
                   <span className="inline-flex bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-0.5 rounded-lg text-xs font-bold">
                     {(viewingGroupClassification as any).content_type_name || "—"}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">SP Seeding</span>
+                  <span className="text-[10px] font-bold text-on-surface-variant uppercase block mb-1">SP Seeding</span>
                   <span className="inline-flex bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-0.5 rounded-lg text-xs font-bold">
                     {(viewingGroupClassification as any).product_seeding_name || "—"}
                   </span>
                 </div>
                 <div className="col-span-2">
-                  <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Ghi chú rủi ro</span>
-                  <div className={`text-sm p-3 rounded-lg border whitespace-pre-wrap ${(viewingGroupClassification as any).risk_note ? 'bg-[#FFF0F0] border-[#FFE0E0] text-red-700 font-medium' : 'bg-[#F9F9F9] border-[#E5E5E5] text-[#A0A0A0]'}`}>
+                  <span className="text-[10px] font-bold text-on-surface-variant uppercase block mb-1">Ghi chú rủi ro</span>
+                  <div className={`text-sm p-3 rounded-lg border whitespace-pre-wrap ${(viewingGroupClassification as any).risk_note ? 'bg-[#FFF0F0] border-[#FFE0E0] text-red-700 font-medium' : 'bg-[#F9F9F9] border-outline-variant text-on-surface-variant'}`}>
                     {(viewingGroupClassification as any).risk_note || "—"}
                   </div>
                 </div>
                 <div className="col-span-2">
-                  <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Ghi chú chung</span>
-                  <div className={`text-sm p-3 rounded-lg border whitespace-pre-wrap ${(viewingGroupClassification as any).note ? 'bg-[#F5F5F5] border-[#E5E5E5] text-[#1A1A1A]' : 'bg-[#F9F9F9] border-[#E5E5E5] text-[#A0A0A0]'}`}>
+                  <span className="text-[10px] font-bold text-on-surface-variant uppercase block mb-1">Ghi chú chung</span>
+                  <div className={`text-sm p-3 rounded-lg border whitespace-pre-wrap ${(viewingGroupClassification as any).note ? 'bg-surface-container-low border-outline-variant text-on-surface' : 'bg-[#F9F9F9] border-outline-variant text-on-surface-variant'}`}>
                     {(viewingGroupClassification as any).note || "—"}
                   </div>
                 </div>
                 {platform === "facebook" ? (
                   <>
                   <div>
-                    <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Chạy 24h</span>
-                    <span className={`inline-flex px-2.5 py-0.5 rounded-lg text-xs font-bold border ${(viewingGroupClassification as FacebookGroup).chay_24h ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-[#F5F5F5] text-[#666666] border-[#E5E5E5]"}`}>
+                    <span className="text-[10px] font-bold text-on-surface-variant uppercase block mb-1">Chạy 24h</span>
+                    <span className={`inline-flex px-2.5 py-0.5 rounded-lg text-xs font-bold border ${(viewingGroupClassification as FacebookGroup).chay_24h ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-surface-container-low text-on-surface-variant border-outline-variant"}`}>
                       {(viewingGroupClassification as FacebookGroup).chay_24h ? "Có (⚡ Tự động)" : "Không"}
                     </span>
                   </div>
                   {(viewingGroupClassification as FacebookGroup).chay_24h && (
                     <>
                       <div>
-                        <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Giờ chạy</span>
-                        <span className="text-sm font-bold text-[#1A1A1A]">
+                        <span className="text-[10px] font-bold text-on-surface-variant uppercase block mb-1">Giờ chạy</span>
+                        <span className="text-sm font-bold text-on-surface">
                           {String((viewingGroupClassification as any).crawl_time || "—").substring(0, 5)}
                         </span>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Tần suất</span>
-                        <span className="text-sm font-bold text-[#1A1A1A]">
+                        <span className="text-[10px] font-bold text-on-surface-variant uppercase block mb-1">Tần suất</span>
+                        <span className="text-sm font-bold text-on-surface">
                           {(viewingGroupClassification as any).crawl_frequency === "weekly" ? "Hàng tuần" : "Hàng ngày"}
                         </span>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Khung giờ</span>
-                        <span className="text-sm font-bold text-[#1A1A1A]">
+                        <span className="text-[10px] font-bold text-on-surface-variant uppercase block mb-1">Khung giờ</span>
+                        <span className="text-sm font-bold text-on-surface">
                           {(viewingGroupClassification as FacebookGroup).start_time_in_day ?? "—"}h - {(viewingGroupClassification as FacebookGroup).end_time_in_day ?? "—"}h
                         </span>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Khoảng cách cào</span>
-                        <span className="text-sm font-bold text-[#1A1A1A]">
+                        <span className="text-[10px] font-bold text-on-surface-variant uppercase block mb-1">Khoảng cách cào</span>
+                        <span className="text-sm font-bold text-on-surface">
                           {(viewingGroupClassification as FacebookGroup).time_crawl || "—"}
                         </span>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Đến (khoảng giờ)</span>
-                        <span className="text-sm font-bold text-[#1A1A1A]">
+                        <span className="text-[10px] font-bold text-on-surface-variant uppercase block mb-1">Đến (khoảng giờ)</span>
+                        <span className="text-sm font-bold text-on-surface">
                           {(viewingGroupClassification as FacebookGroup).end_date_hour ? String((viewingGroupClassification as FacebookGroup).end_date_hour).substring(0, 10) : "—"}
                         </span>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Đến (24h)</span>
-                        <span className="text-sm font-bold text-[#1A1A1A]">
+                        <span className="text-[10px] font-bold text-on-surface-variant uppercase block mb-1">Đến (24h)</span>
+                        <span className="text-sm font-bold text-on-surface">
                           {(viewingGroupClassification as FacebookGroup).end_time_24h ? String((viewingGroupClassification as FacebookGroup).end_time_24h).substring(0, 10) : "—"}
                         </span>
                       </div>
@@ -1940,7 +1940,7 @@ export function GroupManagementContent() {
                   </>
                 ) : (
                   <div>
-                    <span className="text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider block mb-1">Trạng thái</span>
+                    <span className="text-[10px] font-bold text-on-surface-variant uppercase block mb-1">Trạng thái</span>
                     <span className={`inline-flex px-2.5 py-0.5 rounded-lg text-xs font-bold uppercase ${(viewingGroupClassification as LinkedInGroup).status === "success" ? "bg-green-100 text-green-700" : (viewingGroupClassification as LinkedInGroup).status === "failed" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
                       {(viewingGroupClassification as LinkedInGroup).status || "idle"}
                     </span>
@@ -1950,11 +1950,11 @@ export function GroupManagementContent() {
             </div>
 
             {/* Modal Footer */}
-            <div className="flex gap-3 border-t border-[#E5E5E5] px-6 py-4 bg-[#F5F5F5]/50 justify-end flex-shrink-0">
+            <div className="flex gap-3 border-t border-outline-variant px-6 py-4 bg-surface-container-low justify-end flex-shrink-0">
               <button
                 type="button"
                 onClick={() => setViewingGroupClassification(null)}
-                className="bg-[#FFFFFF] border border-[#E5E5E5] text-[#666666] hover:text-[#1A1A1A] font-bold px-5 py-2 rounded-xl hover:bg-[#F5F5F5] text-sm transition shadow-sm active:scale-95 cursor-pointer"
+                className="bg-surface border border-outline-variant text-on-surface-variant hover:text-on-surface font-bold px-5 py-2 rounded-xl hover:bg-surface-container-low text-sm transition shadow-sm active:scale-95 cursor-pointer"
               >
                 Đóng
               </button>
@@ -1965,7 +1965,7 @@ export function GroupManagementContent() {
 
       {/* Modal xác nhận xóa */}
       {deletingGroupItem && (
-        <div 
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
           style={{
             position: "fixed",
@@ -1982,7 +1982,7 @@ export function GroupManagementContent() {
           onClick={() => setDeletingGroupItem(null)}
         >
           <div
-            className="bg-[#FFFFFF] rounded-2xl border border-[#E5E5E5] shadow-xl overflow-hidden animate-in zoom-in-95 duration-200"
+            className="bg-surface rounded-xl border border-outline-variant shadow-xl overflow-hidden animate-in zoom-in-95 duration-200"
             style={{
               width: "100%",
               maxWidth: "440px",
@@ -1993,9 +1993,9 @@ export function GroupManagementContent() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E5E5E5] bg-[#FF3344]/5">
-              <h3 className="text-sm font-bold text-[#FF3344] flex items-center gap-2">
-                <span className="material-symbols-outlined text-[20px] text-[#FF3344]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant bg-primary-container/5">
+              <h3 className="text-sm font-bold text-primary-container flex items-center gap-2">
+                <span className="material-symbols-outlined text-[20px] text-primary-container">
                   warning
                 </span>
                 Xác nhận xóa nhóm
@@ -2003,7 +2003,7 @@ export function GroupManagementContent() {
               <button
                 type="button"
                 onClick={() => setDeletingGroupItem(null)}
-                className="text-[#666666] hover:text-[#1A1A1A] transition cursor-pointer"
+                className="text-on-surface-variant hover:text-on-surface transition cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
@@ -2011,25 +2011,25 @@ export function GroupManagementContent() {
 
             {/* Modal Body */}
             <div className="p-6 space-y-3">
-              <p className="text-sm text-[#666666] leading-relaxed">
-                Bạn có chắc chắn muốn xóa nhóm <strong className="text-[#1A1A1A] font-bold">{deletingGroupItem.group_name || "—"}</strong>?
+              <p className="text-sm text-on-surface-variant leading-relaxed">
+                Bạn có chắc chắn muốn xóa nhóm <strong className="text-on-surface font-bold">{deletingGroupItem.group_name || "—"}</strong>?
               </p>
-              <div className="bg-[#FF3344]/10 border border-[#FF3344]/20 rounded-xl p-3 flex gap-2">
-                <span className="material-symbols-outlined text-[18px] text-[#FF3344] shrink-0 select-none">
+              <div className="bg-primary-container/10 border border-primary-container/20 rounded-xl p-3 flex gap-2">
+                <span className="material-symbols-outlined text-[18px] text-primary-container shrink-0 select-none">
                   info
                 </span>
-                <span className="text-xs text-[#FF3344] leading-normal">
+                <span className="text-xs text-primary-container leading-normal">
                   <strong>Chú ý:</strong> Hành động này sẽ xóa vĩnh viễn nhóm này cùng với <strong>tất cả các bài viết</strong> thuộc nhóm này trong hệ thống. Thao tác này không thể hoàn tác!
                 </span>
               </div>
             </div>
 
             {/* Modal Footer */}
-            <div className="flex gap-3 border-t border-[#E5E5E5] px-6 py-4 bg-[#F5F5F5]/50 justify-end">
+            <div className="flex gap-3 border-t border-outline-variant px-6 py-4 bg-surface-container-low justify-end">
               <button
                 type="button"
                 onClick={() => setDeletingGroupItem(null)}
-                className="bg-[#FFFFFF] border border-[#E5E5E5] text-[#666666] hover:text-[#1A1A1A] font-bold px-4 py-2 rounded-xl hover:bg-[#F5F5F5] text-xs transition shadow-sm active:scale-95 cursor-pointer"
+                className="bg-surface border border-outline-variant text-on-surface-variant hover:text-on-surface font-bold px-4 py-2 rounded-xl hover:bg-surface-container-low text-xs transition shadow-sm active:scale-95 cursor-pointer"
               >
                 Hủy
               </button>
@@ -2040,7 +2040,7 @@ export function GroupManagementContent() {
                   setDeletingGroupItem(null);
                   await handleDeleteGroup(targetId);
                 }}
-                className="bg-[#FF3344] text-white font-bold px-4 py-2 rounded-xl hover:bg-[#C40009] text-xs transition shadow-sm active:scale-95 cursor-pointer"
+                className="bg-primary-container text-white font-bold px-4 py-2 rounded-xl hover:bg-on-primary-fixed-variant text-xs transition shadow-sm active:scale-95 cursor-pointer"
               >
                 Xác nhận xóa
               </button>

@@ -56,7 +56,7 @@ export function ZaloEmptyChat({
         {onLogin && (
           <button
             onClick={onLogin}
-            className="bg-[#E3000F] hover:bg-red-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold transition-all shadow-md hover:shadow-lg active:scale-95 flex items-center justify-center gap-2"
+            className="bg-primary hover:bg-red-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold transition-all shadow-md hover:shadow-lg active:scale-95 flex items-center justify-center gap-2"
           >
             <MaterialIcon name="open_in_new" className="text-base" />
             Tiến hành đăng nhập

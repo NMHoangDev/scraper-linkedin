@@ -16,12 +16,12 @@ export function ZaloChatHeaderSkeleton() {
     <div
       role="status"
       aria-label="Đang tải thông tin hội thoại"
-      className="flex items-center gap-3 px-4 h-16 border-b border-slate-200 bg-white shrink-0"
+      className="flex items-center gap-3 px-4 h-16 border-b border-outline-variant bg-surface shrink-0"
     >
-      <div className="h-10 w-10 rounded-full bg-slate-200 animate-pulse" />
+      <div className="h-10 w-10 rounded-full bg-surface-container-highest animate-pulse" />
       <div className="flex-1 space-y-2">
-        <div className="h-4 w-32 bg-slate-200 rounded animate-pulse" />
-        <div className="h-3 w-20 bg-slate-100 rounded animate-pulse" />
+        <div className="h-4 w-32 bg-surface-container-highest rounded animate-pulse" />
+        <div className="h-3 w-20 bg-surface-container-low rounded animate-pulse" />
       </div>
     </div>
   );
@@ -48,14 +48,14 @@ export function ZaloMessageListSkeleton({ count = 8 }: { count?: number }) {
               }`}
             >
               {!isMe && (
-                <div className="h-8 w-8 rounded-full bg-slate-200 animate-pulse flex-shrink-0" />
+                <div className="h-8 w-8 rounded-full bg-surface-container-highest animate-pulse flex-shrink-0" />
               )}
               <div className="space-y-1.5">
                 <div
-                  className={`h-12 ${widthClass} bg-slate-200 rounded-2xl animate-pulse`}
+                  className={`h-12 ${widthClass} bg-surface-container-highest rounded-xl animate-pulse`}
                 />
                 <div
-                  className={`h-2.5 w-12 bg-slate-100 rounded animate-pulse ${
+                  className={`h-2.5 w-12 bg-surface-container-low rounded animate-pulse ${
                     isMe ? "ml-auto" : ""
                   }`}
                 />
@@ -77,15 +77,15 @@ export function ZaloConversationListSkeleton({ count = 10 }: { count?: number })
     >
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="flex items-center gap-3 p-2 rounded-lg">
-          <div className="h-12 w-12 rounded-full bg-slate-200 animate-pulse flex-shrink-0" />
+          <div className="h-12 w-12 rounded-full bg-surface-container-highest animate-pulse flex-shrink-0" />
           <div className="flex-1 space-y-2">
             <div
-              className={`h-3.5 bg-slate-200 rounded animate-pulse ${
+              className={`h-3.5 bg-surface-container-highest rounded animate-pulse ${
                 i % 2 === 0 ? "w-3/4" : "w-2/3"
               }`}
             />
             <div
-              className={`h-3 bg-slate-100 rounded animate-pulse ${
+              className={`h-3 bg-surface-container-low rounded animate-pulse ${
                 i % 3 === 0 ? "w-1/2" : "w-3/5"
               }`}
             />
@@ -98,13 +98,13 @@ export function ZaloConversationListSkeleton({ count = 10 }: { count?: number })
 
 export function ZaloChatInputSkeleton() {
   return (
-    <div className="bg-white p-4 border-t border-slate-200">
+    <div className="bg-surface p-4 border-t border-outline-variant">
       <div className="flex items-center gap-3">
-        <div className="h-9 w-9 rounded-full bg-slate-100 animate-pulse" />
-        <div className="h-9 w-9 rounded-full bg-slate-100 animate-pulse" />
-        <div className="h-9 w-9 rounded-full bg-slate-100 animate-pulse" />
-        <div className="flex-1 h-12 bg-slate-100 rounded-full animate-pulse" />
-        <div className="h-12 w-12 rounded-full bg-slate-200 animate-pulse" />
+        <div className="h-9 w-9 rounded-full bg-surface-container-low animate-pulse" />
+        <div className="h-9 w-9 rounded-full bg-surface-container-low animate-pulse" />
+        <div className="h-9 w-9 rounded-full bg-surface-container-low animate-pulse" />
+        <div className="flex-1 h-12 bg-surface-container-low rounded-full animate-pulse" />
+        <div className="h-12 w-12 rounded-full bg-surface-container-highest animate-pulse" />
       </div>
     </div>
   );
