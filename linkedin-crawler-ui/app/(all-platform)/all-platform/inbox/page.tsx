@@ -1005,6 +1005,11 @@ function InboxPageContent() {
         saveThreadCache(conv_id, merged, d.loaded_at ?? undefined);
       }
     } catch { /* ignore */ }
+    finally {
+      if (selectedAccRef.current === accountId && openConvRef.current === conv_id) {
+        setLoadingFresh(false);
+      }
+    }
   }
 
   useEffect(() => {
@@ -1106,23 +1111,30 @@ function InboxPageContent() {
       if (!r.ok) { showToast(d.detail || "Lỗi gửi", false); setStatus("✗ Gửi lỗi"); replyInFlightRef.current = false; return; }
       const cmd = d.command_id;
       if (!cmd) { setStatus("Đã gửi (đang xác nhận)"); replyInFlightRef.current = false; return; }
-      pollReplyStatus(cmd, setStatus, 12, acc, convIdForSend, () => { replyInFlightRef.current = false; });
+      pollReplyStatus(cmd, setStatus, 12, acc, convIdForSend, text, () => { replyInFlightRef.current = false; });
     } catch {
       showToast("Không kết nối được", false); setStatus("✗ Gửi lỗi");
       replyInFlightRef.current = false;
     }
   }
 
-  async function pollReplyStatus(cmd: string, setStatus: (t: string) => void, attemptsLeft: number, accountId: string, convId: string, finish: () => void) {
+  async function pollReplyStatus(cmd: string, setStatus: (t: string) => void, attemptsLeft: number, accountId: string, convId: string, sentText: string, finish: () => void) {
     try {
       const r = await fbFetch(`/inbox/reply_status?command_id=${encodeURIComponent(cmd)}&user_id=${encodeURIComponent(accountId)}`);
       const d = await r.json();
       if (d.done) {
         if (d.sent) {
           setStatus("Đã gửi ✓");
+          setConvs(prev => {
+            const next = prev.map(c => c.conv_id === convId ? { ...c, preview: sentText, unread: false, time: "Vừa xong" } : c);
+            const sentConv = next.find(c => c.conv_id === convId);
+            return sentConv ? [sentConv, ...next.filter(c => c.conv_id !== convId)] : next;
+          });
           if (openConvRef.current === convId) {
             saveThreadCache(convId, msgsRef.current);
-            setTimeout(() => fetchThread(convId), 7000);
+            setLoadingFresh(true);
+            setTimeout(() => { void fetchThread(convId); }, 1200);
+            setTimeout(() => { void fetchThread(convId); }, 7000);
           }
           showToast("Đã gửi tin thành công", true);
         }
@@ -1132,7 +1144,7 @@ function InboxPageContent() {
       }
     } catch { /* ignore, thử lại */ }
     if (attemptsLeft <= 1) { setStatus("Đã gửi (chưa rõ kết quả)"); finish(); return; }
-    setTimeout(() => pollReplyStatus(cmd, setStatus, attemptsLeft - 1, accountId, convId, finish), 2000);
+    setTimeout(() => pollReplyStatus(cmd, setStatus, attemptsLeft - 1, accountId, convId, sentText, finish), 2000);
   }
 
   // chưa có cache → tạm dựa vào cờ unread (chưa đọc thường là khách vừa nhắn).
