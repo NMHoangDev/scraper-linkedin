@@ -11,7 +11,7 @@ class BaseResponse(BaseModel):
     """Common response envelope."""
 
     success: bool
-    message: str
+    message: str = ""
     data: Optional[Any] = None
 
 

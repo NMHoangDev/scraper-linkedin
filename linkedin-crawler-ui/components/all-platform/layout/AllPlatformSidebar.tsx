@@ -91,6 +91,12 @@ function buildWorkspaceEntries(dashboardHref: string, teamHref: string): Sidebar
         },
         {
           type: "item",
+          href: "/all-platform/customers",
+          icon: "group",
+          label: "Khách hàng",
+        },
+        {
+          type: "item",
           href: "/all-platform/quan-ly-tai-khoan",
           icon: "manage_accounts",
           label: "Quản lý tài khoản",
@@ -158,6 +164,12 @@ const personalEntries: SidebarEntry[] = [
   },
   {
     type: "item",
+    href: "/all-platform/customers",
+    icon: "group",
+    label: "Khách hàng",
+  },
+  {
+    type: "item",
     href: "/all-platform/member/nop-lead",
     icon: "send",
     label: "Nộp lead",
@@ -212,6 +224,12 @@ const memberEntries: SidebarEntry[] = [
     href: "/all-platform/inbox",
     icon: "inbox",
     label: "Inbox FB",
+  },
+  {
+    type: "item",
+    href: "/all-platform/customers",
+    icon: "group",
+    label: "Khách hàng",
   },
   {
     type: "item",

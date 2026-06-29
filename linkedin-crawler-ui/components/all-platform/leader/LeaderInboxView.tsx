@@ -7,6 +7,7 @@ import { zaloInboxShareService } from "@/services/all-platform.service";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { API_KEY } from "@/lib/env";
 import { sendZaloMessage, sendZaloMessageWithFiles } from "@/services/zaloCrawlerService";
+import { CustomerLeadModal } from "@/components/all-platform/components/customer-lead-modal";
 
 interface SelectedMedia {
   file: File;
@@ -279,6 +280,9 @@ export function LeaderInboxView({
   );
 
   const [togglingLeadId, setTogglingLeadId] = useState<number | null>(null);
+
+  const [showLeadModal, setShowLeadModal] = useState(false);
+  const { user: appUser } = useAppAuth();
 
   const handleToggleLead = useCallback(
     async (rowId: number, currentlyLead: boolean) => {
@@ -599,6 +603,14 @@ export function LeaderInboxView({
                     <p className="text-xs font-bold text-slate-700 truncate max-w-[160px] sm:max-w-[250px]">
                       {sharedList.find((r) => r.conversation_id === activeConversationId)?.group_name || activeConversationId}
                     </p>
+                    <button
+                      onClick={() => setShowLeadModal(true)}
+                      className="ml-2 inline-flex items-center gap-1 px-2 py-1 rounded bg-yellow-100 text-yellow-800 hover:bg-yellow-200 text-xs font-bold transition-colors"
+                      title="Lưu khách hàng (Lead) này"
+                    >
+                      <MaterialIcon name="person_add" className="text-[14px]" />
+                      Lưu Lead
+                    </button>
                     {(() => {
                       const active = sharedList.find(
                         (r) => r.conversation_id === activeConversationId,
@@ -936,6 +948,13 @@ export function LeaderInboxView({
           </div>
         </div>
       </div>
+      <CustomerLeadModal
+        isOpen={showLeadModal}
+        onClose={() => setShowLeadModal(false)}
+        defaultConvId={activeConversationId || undefined}
+        defaultCustomerName={sharedList.find((r) => r.conversation_id === activeConversationId)?.group_name || undefined}
+        currentUserRole={appUser?.role}
+      />
     </div>
   );
 }

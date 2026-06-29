@@ -332,3 +332,19 @@ export interface UnifiedStats {
   kpiTarget?: number;
   kpiProgressPercent?: number;
 }
+
+export interface CustomerLead {
+  id?: string;
+  customer_name?: string;
+  company_name?: string;
+  leaded_by?: string;
+  is_assigned?: boolean;
+  sdr_id?: string;
+  conv_id?: string;
+  status?: string;
+  note?: string;
+  reject_reason?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+

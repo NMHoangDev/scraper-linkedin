@@ -1305,3 +1305,22 @@ export const fbInboxAccountService = {
     });
   },
 };
+
+export const customerLeadsService = {
+  async getLeads() {
+    return requestJson<import('@/types/unified.types').CustomerLead[]>('/customer-leads');
+  },
+  async getSDRs() {
+    return requestJson<any[]>('/customer-leads/sdrs');
+  },
+  async createLead(data: any) {
+    return requestJson('/customer-leads', { method: 'POST', body: JSON.stringify(data) });
+  },
+  async updateLead(id: string, data: any) {
+    return requestJson('/customer-leads/' + id, { method: 'PUT', body: JSON.stringify(data) });
+  },
+  async deleteLead(id: string) {
+    return requestJson('/customer-leads/' + id, { method: 'DELETE' });
+  }
+};
+

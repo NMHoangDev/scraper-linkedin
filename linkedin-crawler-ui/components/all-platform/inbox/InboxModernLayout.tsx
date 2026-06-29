@@ -6,6 +6,8 @@ import { MaterialIcon } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import TeamAccountTree from "@/components/all-platform/inbox/TeamAccountTree";
 import { KpiProgressCard } from "@/components/all-platform/components/kpi-progress-card";
+import { CustomerLeadModal } from "@/components/all-platform/components/customer-lead-modal";
+import { useAppAuth } from "@/contexts/AppAuthContext";
 
 interface Session { user_id: string; fb_user_id?: string; label?: string; owner?: string; online?: boolean; inbox_enabled?: boolean; status?: string; }
 interface Conv { conv_id: string; name: string; preview: string; unread: boolean; time: string; is_customer: boolean; pushed_to_zalo: boolean; deleted: boolean; archived?: boolean; archived_at?: string; }
@@ -162,6 +164,8 @@ export default function InboxModernLayout(props: Props) {
   const [targetDate, setTargetDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [isBulkSuggesting, setIsBulkSuggesting] = useState(false);
   const [isBulkVerifying, setIsBulkVerifying] = useState(false);
+  const [showLeadModal, setShowLeadModal] = useState(false);
+  const { user } = useAppAuth();
 
   const selectedSession = sessions.find(s => s.user_id === acc);
   const selectedConv = activeConvs.find(c => c.conv_id === openConv) || filtered.find(c => c.conv_id === openConv);
@@ -598,6 +602,13 @@ export default function InboxModernLayout(props: Props) {
                     </div>
                     {selectedConv && !archiveReading && (
                       <div className="grid gap-2">
+                        <button
+                          onClick={() => setShowLeadModal(true)}
+                          className="flex items-center justify-center gap-2 rounded-lg bg-yellow-100 text-yellow-800 px-3 py-2 text-sm font-bold transition hover:bg-yellow-200 border border-yellow-200"
+                        >
+                          <MaterialIcon name="person_add" className="text-[18px]" />
+                          Lưu vào CRM (Leads)
+                        </button>
                         <button onClick={() => mark(selectedConv.conv_id, "is_customer", !selectedConv.is_customer)}
                           className="rounded-lg border border-[#E5E5E5] px-3 py-2 text-sm font-bold hover:border-[#E3000F]">
                           {selectedConv.is_customer ? "Bỏ đánh dấu khách" : "Đánh dấu là khách"}
@@ -728,6 +739,14 @@ export default function InboxModernLayout(props: Props) {
 
       {toast && <div className={`fixed bottom-6 right-6 z-50 rounded-lg px-5 py-3.5 font-semibold text-white shadow-lg ${toast.ok ? "bg-green-600" : "bg-red-600"}`}>{toast.msg}</div>}
       {kpiToast && <div className={`fixed bottom-6 right-6 z-50 rounded-lg px-5 py-3.5 font-semibold text-white shadow-lg ${kpiToast.ok ? "bg-green-600" : "bg-red-600"}`}>{kpiToast.msg}</div>}
+
+      <CustomerLeadModal
+        isOpen={showLeadModal}
+        onClose={() => setShowLeadModal(false)}
+        defaultConvId={openConv || undefined}
+        defaultCustomerName={selectedName || undefined}
+        currentUserRole={user?.role}
+      />
     </div>
   );
 }
