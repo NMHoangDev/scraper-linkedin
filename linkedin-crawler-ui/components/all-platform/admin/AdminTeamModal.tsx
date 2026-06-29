@@ -205,7 +205,7 @@ export function AdminTeamModal({ isOpen, onClose, team, onSuccess }: AdminTeamMo
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
           <div>
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              <MaterialIcon name="group_add" className="text-[#E3000F]" />
+              <MaterialIcon name="group_add" className="text-red-600" />
               {team ? "Chỉnh sửa Team (Admin)" : "Thêm Team Mới"}
             </h2>
             <p className="text-xs text-slate-500 font-medium mt-0.5">
@@ -233,7 +233,7 @@ export function AdminTeamModal({ isOpen, onClose, team, onSuccess }: AdminTeamMo
               onChange={(e) => setNameTeam(e.target.value)}
               disabled={!!team}
               placeholder="VD: Growth Team, Dev Team..."
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 outline-none focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 transition disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition disabled:opacity-60 disabled:cursor-not-allowed"
               required
             />
           </div>
@@ -246,7 +246,7 @@ export function AdminTeamModal({ isOpen, onClose, team, onSuccess }: AdminTeamMo
                 value={leaderSearchQuery}
                 onChange={(e) => setLeaderSearchQuery(e.target.value)}
                 placeholder="Tìm leader theo email hoặc tên..."
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-700 outline-none focus:border-[#E3000F] transition"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-700 outline-none focus:border-red-600 transition"
               />
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 flex items-center">
                 <MaterialIcon name="search" className="text-[16px]" />
@@ -255,7 +255,7 @@ export function AdminTeamModal({ isOpen, onClose, team, onSuccess }: AdminTeamMo
             <select
               value={selectedLeaderId}
               onChange={(e) => setSelectedLeaderId(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 outline-none focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 transition"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition"
               required
             >
               <option value="">-- Chọn Leader --</option>
@@ -284,7 +284,7 @@ export function AdminTeamModal({ isOpen, onClose, team, onSuccess }: AdminTeamMo
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Tìm thành viên theo email hoặc tên..."
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-700 outline-none focus:border-[#E3000F] transition"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-700 outline-none focus:border-red-600 transition"
               />
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 flex items-center">
                 <MaterialIcon name="search" className="text-[16px]" />
@@ -295,7 +295,7 @@ export function AdminTeamModal({ isOpen, onClose, team, onSuccess }: AdminTeamMo
             <div className="border border-slate-100 rounded-xl max-h-[160px] overflow-y-auto divide-y divide-slate-50 bg-slate-50/50">
               {isLoadingUsers ? (
                 <div className="py-8 text-center text-xs text-slate-400 flex flex-col items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-[#E3000F] border-t-transparent rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
                   <span>Đang tải danh sách...</span>
                 </div>
               ) : filteredMembers.length === 0 ? (
@@ -317,7 +317,7 @@ export function AdminTeamModal({ isOpen, onClose, team, onSuccess }: AdminTeamMo
                       </div>
                       <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition shrink-0 ${
                         isSelected 
-                          ? "bg-[#E3000F] border-[#E3000F] text-white" 
+                          ? "bg-red-600 border-red-600 text-white" 
                           : "border-slate-300 bg-white"
                       }`}>
                         {isSelected && <MaterialIcon name="check" className="text-[14px]" />}
@@ -340,7 +340,7 @@ export function AdminTeamModal({ isOpen, onClose, team, onSuccess }: AdminTeamMo
             <button 
               type="submit" 
               disabled={isSubmitting} 
-              className="px-5 py-2 rounded-xl text-sm font-bold text-white bg-[#E3000F] hover:bg-[#C40009] transition disabled:opacity-50 flex items-center gap-2"
+              className="px-5 py-2 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 transition disabled:opacity-50 flex items-center gap-2"
             >
               {isSubmitting && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
               {isSubmitting ? "Đang lưu..." : team ? "Lưu thay đổi" : "Tạo Team"}

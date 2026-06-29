@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { PlatformStatCard, PlatformStatsRow } from "@/components/features/shared/PlatformStatCard";
 import { MaterialIcon } from "@/components/ui";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_FACEBOOK_BASE_URL || "http://127.0.0.1:8000";
@@ -37,11 +36,9 @@ export function QuanLyVps() {
 
   const [cookieModalVpsId, setCookieModalVpsId] = useState<number | null>(null);
   
-  // State form thêm cookie
   const [newCookieEmail, setNewCookieEmail] = useState("");
   const [newCookieJson, setNewCookieJson] = useState("");
 
-  // Fetch dữ liệu từ router FastAPI
   const { data: vpsList = [], isLoading, error } = useQuery<VpsFb[]>({
     queryKey: ["vps_fb_list"],
     queryFn: async () => {
@@ -90,7 +87,6 @@ export function QuanLyVps() {
     }
   });
 
-  // Mutation thêm cookie
   const createCookieMutation = useMutation({
     mutationFn: async (newData: any) => {
       await axios.post(`${API_BASE}/api/all-platform/vps_fb/cookies`, newData);
@@ -104,7 +100,7 @@ export function QuanLyVps() {
       alert("Lỗi khi thêm cookie: " + (err?.response?.data?.detail || err.message));
     }
   });
-  // Mutation xóa cookie
+
   const deleteCookieMutation = useMutation({
     mutationFn: async (cookieId: string) => {
       await axios.delete(`${API_BASE}/api/all-platform/vps_fb/cookies/${cookieId}`);
@@ -125,13 +121,7 @@ export function QuanLyVps() {
 
   const openModalForEdit = (vps: VpsFb) => {
     setIsEditMode(true);
-    setFormData({
-      id: vps.id,
-      name: vps.name,
-      http: vps.http,
-      active_session: vps.active_session,
-      active: vps.active,
-    });
+    setFormData({ id: vps.id, name: vps.name, http: vps.http, active_session: vps.active_session, active: vps.active });
     setIsModalOpen(true);
   };
 
@@ -145,11 +135,7 @@ export function QuanLyVps() {
       alert("Vui lòng điền tên và http proxy.");
       return;
     }
-    const payload: any = {
-      name: formData.name,
-      http: formData.http,
-    };
-
+    const payload: any = { name: formData.name, http: formData.http };
     if (isEditMode && formData.id) {
       updateMutation.mutate({ id: formData.id, data: payload });
     } else {
@@ -170,7 +156,6 @@ export function QuanLyVps() {
       alert("Vui lòng nhập Email. (Bắt buộc)");
       return;
     }
-
     let parsedCookie = {};
     if (newCookieJson.trim()) {
       try {
@@ -180,7 +165,6 @@ export function QuanLyVps() {
         return;
       }
     }
-
     createCookieMutation.mutate({
       vps_fb_id: cookieModalVpsId,
       cookie: parsedCookie,
@@ -195,89 +179,49 @@ export function QuanLyVps() {
     }
   };
 
-  // Tính toán số liệu thống kê hiển thị
   const totalVps = vpsList.length;
   const activeVps = vpsList.filter(v => v.active).length;
   const inactiveVps = totalVps - activeVps;
   const totalCookies = vpsList.reduce((sum, v) => sum + (v.cookie_count || 0), 0);
   const totalErrorCookies = vpsList.reduce((sum, v) => sum + (v.error_cookie_count || 0), 0);
 
-  // Lọc tìm kiếm và trạng thái
   const filteredList = vpsList.filter(v => {
     const searchStr = searchTerm.toLowerCase();
-    const matchSearch = (v.name || "").toLowerCase().includes(searchStr) ||
-                        (v.http || "").toLowerCase().includes(searchStr) ||
-                        v.id.toString() === searchStr.trim();
-    const matchStatus = statusFilter === "all" || 
-                        (statusFilter === "active" && v.active) || 
-                        (statusFilter === "inactive" && !v.active);
+    const matchSearch = (v.name || "").toLowerCase().includes(searchStr) || (v.http || "").toLowerCase().includes(searchStr) || v.id.toString() === searchStr.trim();
+    const matchStatus = statusFilter === "all" || (statusFilter === "active" && v.active) || (statusFilter === "inactive" && !v.active);
     return matchSearch && matchStatus;
   });
 
   const getCookieStatusBadge = (status: string | null) => {
     if (!status || status === "null") {
-      return <span className="inline-flex px-2.5 py-1 bg-slate-100 text-slate-500 rounded-md text-xs font-bold border border-slate-200">Chưa có cookie</span>;
+      return <span className="inline-flex px-2 py-0.5 bg-slate-100 text-slate-500 rounded-md text-[11px] font-medium">Chưa có cookie</span>;
     }
     switch(status) {
-      case "idle":
-        return <span className="inline-flex px-2.5 py-1 bg-slate-100 text-slate-600 rounded-md text-xs font-bold border border-slate-200">Chưa sử dụng</span>;
+      case "idle": return <span className="inline-flex px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[11px] font-medium">Chưa sử dụng</span>;
       case "in_use":
-      case "in_idle":
-        return <span className="inline-flex px-2.5 py-1 bg-blue-50 text-blue-600 rounded-md text-xs font-bold border border-blue-100">Đang sử dụng</span>;
-      case "cooldown":
-        return <span className="inline-flex px-2.5 py-1 bg-orange-50 text-orange-600 rounded-md text-xs font-bold border border-orange-100">Đang làm lạnh</span>;
-      case "error":
-        return <span className="inline-flex px-2.5 py-1 bg-red-50 text-red-600 rounded-md text-xs font-bold border border-red-100">Lỗi</span>;
-      default:
-        return <span className="inline-flex px-2.5 py-1 bg-slate-100 text-slate-600 rounded-md text-xs font-bold border border-slate-200">{status}</span>;
+      case "in_idle": return <span className="inline-flex px-2 py-0.5 bg-blue-50 text-blue-600 rounded-md text-[11px] font-medium">Đang sử dụng</span>;
+      case "cooldown": return <span className="inline-flex px-2 py-0.5 bg-orange-50 text-orange-600 rounded-md text-[11px] font-medium">Đang làm lạnh</span>;
+      case "error": return <span className="inline-flex px-2 py-0.5 bg-red-50 text-[#DC2626] rounded-md text-[11px] font-medium">Lỗi</span>;
+      default: return <span className="inline-flex px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[11px] font-medium">{status}</span>;
     }
   };
 
-  // Vps đang được chọn xem cookies
   const currentCookieVps = vpsList.find(v => v.id === cookieModalVpsId) || null;
+  const inputClass = "bg-white border border-slate-200 rounded-2xl px-4 py-2.5 text-sm focus:border-[#DC2626] focus:ring-2 focus:ring-red-100 outline-none transition-all";
+  const selectClass = "w-full appearance-none cursor-pointer rounded-2xl border border-slate-200 bg-white px-4 py-2.5 pr-10 text-sm text-slate-700 outline-none transition-all focus:border-[#DC2626] focus:ring-2 focus:ring-red-100";
 
   return (
-    <div className="flex w-full flex-col gap-6 font-sans">
-      <PlatformStatsRow>
-        <PlatformStatCard
-          label="Tổng số VPS"
-          value={totalVps}
-          accent="primary"
-          hint="Đang lưu trữ"
-        />
-        <PlatformStatCard
-          label="Đang hoạt động"
-          value={activeVps}
-          accent="success"
-          hintTone="up"
-          hint="Hoạt động"
-        />
-        <PlatformStatCard
-          label="Chưa hoạt động"
-          value={inactiveVps}
-          accent="warning"
-          hintTone="down"
-        />
-        <PlatformStatCard
-          label="Tổng Cookies"
-          value={totalCookies}
-          accent="primary"
-          hint="Tất cả VPS"
-        />
-        <PlatformStatCard
-          label="Cookies lỗi"
-          value={totalErrorCookies}
-          accent="error"
-          hintTone="down"
-          hint="Status = error"
-        />
-      </PlatformStatsRow>
-
-      <div className="flex items-center justify-between mt-4">
-        <h2 className="text-xl font-bold text-slate-800">Quản lý VPS & Cấu hình</h2>
+    <div className="bg-white min-h-screen pb-12 font-sans w-full flex flex-col gap-6">
+      
+      {/* Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900">Quản lý VPS & Cấu hình</h2>
+          <p className="text-sm text-slate-500">Giám sát trạng thái VPS và quản lý cookies Facebook</p>
+        </div>
         <button
           onClick={openModalForCreate}
-          className="bg-primary text-white hover:bg-primary/90 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition cursor-pointer"
+          className="bg-[#DC2626] hover:bg-[#B91C1C] text-white flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all cursor-pointer shadow-none active:scale-95"
         >
           <MaterialIcon name="add" className="text-[18px]" />
           Thêm VPS Mới
@@ -285,13 +229,41 @@ export function QuanLyVps() {
       </div>
 
       {error && (
-        <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm border border-red-200">
-          Không thể tải danh sách VPS. Vui lòng kiểm tra lại API backend.
+        <div className="p-3 bg-red-50 text-[#DC2626] rounded-lg text-sm border border-red-100 flex items-center gap-2">
+          <MaterialIcon name="error" /> Không thể tải danh sách VPS. Vui lòng kiểm tra lại API backend.
         </div>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-        <div className="p-4 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-center gap-3">
+      {/* FLAT STATS BOX */}
+      <div className="bg-white border border-slate-100 rounded-2xl p-5">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="bg-white rounded-xl p-4 flex flex-col justify-between border border-slate-100 shadow-none ">
+            <span className="text-xs font-medium text-slate-500 uppercase">Tổng số VPS</span>
+            <span className="text-2xl font-black text-slate-900 mt-2">{totalVps}</span>
+          </div>
+          <div className="bg-white rounded-xl p-4 flex flex-col justify-between border border-slate-100 shadow-none ">
+            <span className="text-xs font-medium text-slate-500 uppercase">Đang hoạt động</span>
+            <span className="text-2xl font-black text-slate-900 mt-2">{activeVps}</span>
+          </div>
+          <div className="bg-white rounded-xl p-4 flex flex-col justify-between border border-slate-100 shadow-none ">
+            <span className="text-xs font-medium text-slate-500 uppercase">Chưa hoạt động</span>
+            <span className="text-2xl font-black text-slate-900 mt-2">{inactiveVps}</span>
+          </div>
+          <div className="bg-white rounded-xl p-4 flex flex-col justify-between border border-slate-100 shadow-none ">
+            <span className="text-xs font-medium text-slate-500 uppercase">Tổng Cookies</span>
+            <span className="text-2xl font-black text-slate-900 mt-2">{totalCookies}</span>
+          </div>
+          <div className="bg-white rounded-xl p-4 flex flex-col justify-between border border-slate-100 shadow-none ">
+            <span className="text-xs font-medium text-slate-500 uppercase">Cookies Lỗi</span>
+            <span className="text-2xl font-black text-slate-900 mt-2">{totalErrorCookies}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* MAIN CONTENT / TABLE BOX */}
+      <div className="bg-white border border-slate-100 rounded-2xl p-5 flex flex-col gap-4">
+        
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
           <div className="relative w-full sm:w-[400px] md:w-[500px] shrink-0">
             <MaterialIcon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]" />
             <input
@@ -299,211 +271,144 @@ export function QuanLyVps() {
               placeholder="Tìm kiếm theo ID, tên VPS, Proxy..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white pl-10 pr-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors text-slate-800"
+              className={"w-full pl-10 " + inputClass}
             />
           </div>
-          <div className="w-full sm:w-48">
+          <div className="relative w-full sm:w-56">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors cursor-pointer text-slate-800"
+              className={selectClass}
             >
               <option value="all">Tất cả trạng thái</option>
               <option value="active">Đang hoạt động</option>
               <option value="inactive">Tạm ngưng</option>
             </select>
+            <MaterialIcon
+              name="arrow_drop_down"
+              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[20px] text-slate-400"
+            />
           </div>
         </div>
 
-        <div className="overflow-x-auto min-h-[300px]">
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-slate-50/75 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
-              <tr>
-                <th className="py-3 px-5">ID</th>
-                <th className="py-3 px-5">Tên VPS</th>
-                <th className="py-3 px-5">HTTP Proxy</th>
-                <th className="py-3 px-5 text-center">Active Session</th>
-                <th className="py-3 px-5 text-center">Cookies (Tổng / Lỗi)</th>
-                <th className="py-3 px-5 text-center">Trạng thái</th>
-                <th className="py-3 px-5 text-center">Hành động</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
-              {isLoading ? (
+        <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden">
+          <div className="overflow-x-auto min-h-[300px]">
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-slate-50/70 border-b border-slate-100">
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
-                    <div className="flex flex-col items-center justify-center gap-2">
-                      <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                      <span>Đang tải dữ liệu VPS...</span>
-                    </div>
-                  </td>
+                  <th className="py-3 px-4 font-semibold text-xs text-slate-500 border-b border-slate-100 capitalize">ID</th>
+                  <th className="py-3 px-4 font-semibold text-xs text-slate-500 border-b border-slate-100 capitalize">Tên VPS</th>
+                  <th className="py-3 px-4 font-semibold text-xs text-slate-500 border-b border-slate-100 capitalize">HTTP Proxy</th>
+                  <th className="py-3 px-4 font-semibold text-xs text-slate-500 border-b border-slate-100 capitalize text-center">Active Session</th>
+                  <th className="py-3 px-4 font-semibold text-xs text-slate-500 border-b border-slate-100 capitalize text-center">Cookies (Tổng / Lỗi)</th>
+                  <th className="py-3 px-4 font-semibold text-xs text-slate-500 border-b border-slate-100 capitalize text-center">Trạng thái</th>
+                  <th className="py-3 px-4 font-semibold text-xs text-slate-500 border-b border-slate-100 capitalize text-center">Hành động</th>
                 </tr>
-              ) : filteredList.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400 italic">
-                    {searchTerm || statusFilter !== 'all' ? "Không tìm thấy kết quả nào phù hợp." : "Chưa có dữ liệu VPS nào."}
-                  </td>
-                </tr>
-              ) : (
-                filteredList.map((vps) => (
-                  <tr key={vps.id} className="hover:bg-slate-50/50 transition duration-150">
-                    <td className="py-4 px-5 font-medium text-slate-500">#{vps.id}</td>
-                    <td className="py-4 px-5 font-bold text-slate-900">{vps.name}</td>
-                    <td className="py-4 px-5 text-slate-500 text-xs font-mono">{vps.http}</td>
-                    <td className="py-4 px-5 text-center font-medium">{vps.active_session}</td>
-                    <td className="py-4 px-5 text-center">
-                      <div className="flex flex-col items-center justify-center gap-1">
-                        <span className="bg-blue-50 text-blue-700 border border-blue-200 font-bold px-2.5 py-0.5 rounded-full text-xs">
-                          Tổng: {vps.cookie_count}
-                        </span>
-                        {vps.error_cookie_count > 0 && (
-                          <span className="bg-red-50 text-red-700 border border-red-200 font-bold px-2.5 py-0.5 rounded-full text-xs" title="Số cookie đang bị lỗi">
-                            Lỗi: {vps.error_cookie_count}
+              </thead>
+              <tbody className="text-sm text-slate-700">
+                {isLoading ? (
+                  <tr><td colSpan={7} className="py-12 text-center text-slate-400">Đang tải dữ liệu VPS...</td></tr>
+                ) : filteredList.length === 0 ? (
+                  <tr><td colSpan={7} className="py-12 text-center text-slate-400 italic">Không tìm thấy dữ liệu.</td></tr>
+                ) : (
+                  filteredList.map((vps) => (
+                    <tr key={vps.id} className="hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-b-0">
+                      <td className="py-4 px-5 font-medium text-slate-500">#{vps.id}</td>
+                      <td className="py-4 px-5 font-bold text-slate-900">{vps.name}</td>
+                      <td className="py-4 px-5 text-slate-500 text-xs font-mono">{vps.http}</td>
+                      <td className="py-4 px-5 text-center font-medium">{vps.active_session}</td>
+                      <td className="py-4 px-5 text-center">
+                        <div className="flex flex-col items-center justify-center gap-1.5">
+                          <div className="flex items-center gap-1">
+                            <span className="bg-blue-50 text-blue-600 font-semibold px-2 py-0.5 rounded-md text-[11px]">Tổng: {vps.cookie_count}</span>
+                            {vps.error_cookie_count > 0 && (
+                              <span className="bg-red-50 text-[#DC2626] font-semibold px-2 py-0.5 rounded-md text-[11px]">Lỗi: {vps.error_cookie_count}</span>
+                            )}
+                          </div>
+                          <button 
+                            onClick={() => setCookieModalVpsId(vps.id)}
+                            className="text-[11px] text-[#DC2626] hover:text-[#B91C1C] hover:underline font-bold cursor-pointer transition-colors"
+                          >
+                            Xem chi tiết
+                          </button>
+                        </div>
+                      </td>
+                      <td className="py-4 px-5 text-center">
+                        {vps.active ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium bg-emerald-50 text-emerald-600 mx-auto">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Hoạt động
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-500 mx-auto">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span> Tạm ngưng
                           </span>
                         )}
-                        <button 
-                          onClick={() => setCookieModalVpsId(vps.id)}
-                          className="text-[10px] text-blue-500 hover:text-blue-700 hover:underline mt-1 font-bold cursor-pointer"
-                        >
-                          Xem chi tiết
-                        </button>
-                      </div>
-                    </td>
-                    <td className="py-4 px-5 text-center">
-                      {vps.active ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-600 border border-emerald-100 w-max mx-auto">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                          Hoạt động
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-500 border border-slate-200 w-max mx-auto">
-                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                          Tạm ngưng
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-4 px-5 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => openModalForEdit(vps)}
-                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md transition cursor-pointer"
-                          title="Chỉnh sửa VPS"
-                        >
-                          <MaterialIcon name="edit" className="text-[16px]" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(vps.id)}
-                          className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition cursor-pointer"
-                          title="Xóa VPS"
-                        >
-                          <MaterialIcon name="delete" className="text-[16px]" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                      </td>
+                      <td className="py-4 px-5 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <button onClick={() => openModalForEdit(vps)} className="p-1.5 text-slate-500 hover:text-[#DC2626] hover:bg-red-50 rounded-lg transition-colors cursor-pointer" title="Chỉnh sửa VPS">
+                            <MaterialIcon name="edit" className="text-[18px]" />
+                          </button>
+                          <button onClick={() => handleDelete(vps.id)} className="p-1.5 text-slate-500 hover:text-[#DC2626] hover:bg-red-50 rounded-lg transition-colors cursor-pointer" title="Xóa VPS">
+                            <MaterialIcon name="delete" className="text-[18px]" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
       {/* MODAL CHI TIẾT COOKIES */}
       {currentCookieVps && (
-        <div 
-          className="fixed inset-0 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
-          style={{ zIndex: 9999 }}
-          onClick={() => setCookieModalVpsId(null)}
-        >
-          <div 
-            className="bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
-            style={{ width: "100%", maxWidth: "650px", maxHeight: "90vh", display: "flex", flexDirection: "column" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 flex-shrink-0">
-              <h3 className="font-bold text-lg text-slate-800">
-                Quản lý Cookies - VPS #{currentCookieVps.id}
-              </h3>
-              <button 
-                onClick={() => setCookieModalVpsId(null)} 
-                className="text-slate-400 hover:text-slate-700 bg-white hover:bg-slate-100 rounded-md p-1 transition cursor-pointer"
-              >
+        <div className="fixed inset-0 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm z-[9999]" onClick={() => setCookieModalVpsId(null)}>
+          <div className="bg-white rounded-2xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200 w-full max-w-[650px] max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+              <h3 className="font-bold text-lg text-slate-800">Quản lý Cookies - VPS #{currentCookieVps.id}</h3>
+              <button onClick={() => setCookieModalVpsId(null)} className="text-slate-400 hover:text-[#DC2626] bg-white rounded-md p-1 transition cursor-pointer shadow-sm">
                 <MaterialIcon name="close" />
               </button>
             </div>
             
             <div className="flex-1 overflow-hidden flex flex-col">
-              {/* Form thêm cookie */}
-              <div className="p-4 bg-white border-b border-slate-100 flex-shrink-0 space-y-3">
+              <div className="p-4 bg-white border-b border-slate-100 shrink-0 space-y-3">
                 <h4 className="text-sm font-bold text-slate-800">Thêm Cookie mới</h4>
                 <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    placeholder="Email (Bắt buộc)" 
-                    className="w-40 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary outline-none transition"
-                    value={newCookieEmail}
-                    onChange={e => setNewCookieEmail(e.target.value)}
-                  />
-                  <input 
-                    type="text" 
-                    placeholder="Dán mã JSON cookie vào đây (Tùy chọn)..." 
-                    className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary outline-none transition"
-                    value={newCookieJson}
-                    onChange={e => setNewCookieJson(e.target.value)}
-                  />
-                  <button 
-                    onClick={handleAddCookie}
-                    disabled={createCookieMutation.isPending}
-                    className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap hover:bg-primary/90 transition disabled:opacity-60 cursor-pointer flex items-center gap-1.5"
-                  >
-                    {createCookieMutation.isPending ? (
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : (
-                      <MaterialIcon name="add" className="text-[16px]" />
-                    )}
-                    Thêm
+                  <input type="text" placeholder="Email (Bắt buộc)" className={"w-40 " + inputClass} value={newCookieEmail} onChange={e => setNewCookieEmail(e.target.value)} />
+                  <input type="text" placeholder="Dán mã JSON cookie vào đây..." className={"flex-1 " + inputClass} value={newCookieJson} onChange={e => setNewCookieJson(e.target.value)} />
+                  <button onClick={handleAddCookie} disabled={createCookieMutation.isPending} className="bg-[#DC2626] hover:bg-[#B91C1C] text-white px-4 py-2 rounded-xl text-sm font-semibold transition cursor-pointer disabled:opacity-50">
+                    {createCookieMutation.isPending ? "Đang xử lý..." : "Thêm"}
                   </button>
                 </div>
               </div>
 
-              {/* Danh sách cookie */}
-              <div className="flex-1 overflow-y-auto bg-slate-50">
-                {(!currentCookieVps.Vps_cookies || currentCookieVps.Vps_cookies.length === 0) ? (
-                  <div className="p-10 flex flex-col items-center justify-center text-slate-400">
-                    <MaterialIcon name="key" className="text-[48px] mb-3 text-slate-300" />
-                    <p className="font-medium text-sm">Chưa có cookie nào trong VPS này.</p>
+              <div className="flex-1 overflow-y-auto p-4 bg-slate-50">
+                <h4 className="text-sm font-bold text-slate-800 mb-3">Danh sách Cookies</h4>
+                {currentCookieVps.Vps_cookies && currentCookieVps.Vps_cookies.length > 0 ? (
+                  <div className="flex flex-col gap-2">
+                    {currentCookieVps.Vps_cookies.map((cookie, idx) => (
+                      <div key={cookie.id} className="bg-white border border-slate-100 rounded-xl p-3 flex justify-between items-center shadow-none">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm text-slate-800">{idx + 1}. {cookie.email || "Không rõ email"}</span>
+                            {getCookieStatusBadge(cookie.status)}
+                          </div>
+                          <span className="text-xs text-slate-500 font-mono" title={cookie.id}>ID: {cookie.id.substring(0, 15)}...</span>
+                        </div>
+                        <button onClick={() => handleDeleteCookie(cookie.id)} disabled={deleteCookieMutation.isPending} className="text-slate-400 hover:text-[#DC2626] bg-slate-50 hover:bg-red-50 p-1.5 rounded-lg transition cursor-pointer">
+                          <MaterialIcon name="delete" className="text-[18px]" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 ) : (
-                  <table className="w-full text-left border-collapse bg-white">
-                    <thead className="bg-slate-50 sticky top-0 border-b border-slate-200">
-                      <tr>
-                        <th className="py-3 px-5 text-xs font-bold text-slate-500 uppercase">STT</th>
-                        <th className="py-3 px-5 text-xs font-bold text-slate-500 uppercase">Email</th>
-                        <th className="py-3 px-5 text-xs font-bold text-slate-500 uppercase text-center">Trạng thái</th>
-                        <th className="py-3 px-5 text-xs font-bold text-slate-500 uppercase text-center w-20">Xóa</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {currentCookieVps.Vps_cookies.map((c, index) => (
-                        <tr key={c.id || index} className="hover:bg-slate-50 transition">
-                          <td className="py-3 px-5 text-sm font-bold text-slate-400 w-12 text-center">{index + 1}</td>
-                          <td className="py-3 px-5 text-sm font-medium text-slate-700">{c.email || <span className="text-slate-300 italic">Không có email</span>}</td>
-                          <td className="py-3 px-5 text-center">
-                            {getCookieStatusBadge(c.status)}
-                          </td>
-                          <td className="py-3 px-5 text-center">
-                            <button
-                              onClick={() => handleDeleteCookie(c.id.toString())}
-                              className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition cursor-pointer"
-                              title="Xóa Cookie"
-                            >
-                              <MaterialIcon name="delete" className="text-[16px]" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <div className="text-center text-sm text-slate-500 py-8 bg-white rounded-xl border border-dashed border-slate-200">
+                    Chưa có cookie nào trong VPS này.
+                  </div>
                 )}
               </div>
             </div>
@@ -511,76 +416,48 @@ export function QuanLyVps() {
         </div>
       )}
 
-      {/* MODAL THÊM / CẬP NHẬT VPS */}
+      {/* MODAL THÊM/SỬA VPS */}
       {isModalOpen && (
-        <div 
-          className="fixed inset-0 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
-          style={{ zIndex: 9999 }}
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-sm"
           onClick={closeModal}
         >
-          <div 
-            className="bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
-            style={{ width: "100%", maxWidth: "450px", maxHeight: "90vh", display: "flex", flexDirection: "column" }}
+          <div
+            className="w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 flex-shrink-0">
-              <h3 className="font-bold text-lg text-slate-800">
-                {isEditMode ? "Cập nhật VPS" : "Thêm VPS mới"}
-              </h3>
-              <button 
-                onClick={closeModal} 
-                className="text-slate-400 hover:text-slate-700 bg-white hover:bg-slate-100 rounded-md p-1 transition cursor-pointer"
-              >
+            <div className="px-5 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+              <h3 className="font-bold text-lg text-slate-800">{isEditMode ? "Chỉnh sửa VPS" : "Thêm VPS Mới"}</h3>
+              <button onClick={closeModal} className="text-slate-400 hover:text-[#DC2626] bg-white rounded-md p-1 transition cursor-pointer shadow-sm">
                 <MaterialIcon name="close" />
               </button>
             </div>
             
-            <div className="p-6 flex flex-col gap-5 overflow-y-auto flex-1">
+            <div className="max-h-[70vh] space-y-4 overflow-y-auto p-5">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                  Tên VPS <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.name || ""}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none transition"
-                  placeholder="Ví dụ: VPS USA 01"
-                  autoFocus
-                />
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">Tên VPS <span className="text-[#DC2626]">*</span></label>
+                <input type="text" className={inputClass + " w-full"} value={formData.name || ""} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Nhập tên VPS" />
               </div>
               
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                  HTTP Proxy <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.http || ""}
-                  onChange={(e) => setFormData({ ...formData, http: e.target.value })}
-                  className="w-full border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none transition font-mono"
-                  placeholder="Ví dụ: http://10.30.195.41:8888"
-                />
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">HTTP Proxy <span className="text-[#DC2626]">*</span></label>
+                <input type="text" className={inputClass + " w-full"} value={formData.http || ""} onChange={(e) => setFormData({ ...formData, http: e.target.value })} placeholder="http://ip:port" />
               </div>
+
+              {isEditMode && (
+                <div className="flex items-center gap-2 pt-2">
+                  <input type="checkbox" id="vps-active" checked={formData.active || false} onChange={(e) => setFormData({ ...formData, active: e.target.checked })} className="accent-[#DC2626] w-4 h-4 rounded-sm cursor-pointer" />
+                  <label htmlFor="vps-active" className="text-sm font-medium text-slate-800 cursor-pointer">Trạng thái Hoạt động</label>
+                </div>
+              )}
             </div>
-            
-            <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 flex-shrink-0">
-              <button
-                onClick={closeModal}
-                className="px-4 py-2 text-sm font-bold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 transition cursor-pointer"
-              >
-                Hủy bỏ
+
+            <div className="p-5 border-t border-slate-100 flex justify-end gap-3 bg-slate-50">
+              <button onClick={closeModal} className="px-4 py-2 text-sm font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 transition cursor-pointer">
+                Hủy
               </button>
-              <button
-                onClick={handleSave}
-                disabled={createMutation.isPending || updateMutation.isPending}
-                className="flex items-center justify-center min-w-[100px] px-4 py-2 text-sm font-bold text-white bg-primary rounded-lg hover:bg-primary/90 transition disabled:opacity-60 cursor-pointer"
-              >
-                {createMutation.isPending || updateMutation.isPending ? (
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  isEditMode ? "Lưu thay đổi" : "Tạo mới"
-                )}
+              <button onClick={handleSave} disabled={createMutation.isPending || updateMutation.isPending} className="px-4 py-2 text-sm font-semibold text-white bg-[#DC2626] hover:bg-[#B91C1C] rounded-xl transition cursor-pointer shadow-none">
+                {isEditMode ? "Cập nhật" : "Tạo mới"}
               </button>
             </div>
           </div>

@@ -54,7 +54,7 @@ function AllPlatformShellInner({ children }: { children: React.ReactNode }) {
   const isChatPage = pathname === "/zalo-chat" || pathname.startsWith("/zalo-chat");
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-on-background flex flex-col lg:flex-row">
+    <div className="min-h-screen bg-white text-on-background flex flex-col lg:flex-row">
       {/* Mobile Top Header */}
       <div className="lg:hidden flex items-center justify-between bg-white border-b border-slate-200 px-4 py-3 sticky top-0 z-30 shadow-sm">
         <div className="flex items-center gap-2">

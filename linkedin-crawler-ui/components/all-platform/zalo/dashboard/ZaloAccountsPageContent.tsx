@@ -18,7 +18,7 @@ export function ZaloAccountsPageContent() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 bg-[#f8f9fa]">
+    <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-white p-3 sm:p-6">
       <ZaloDashboardView flow={flow} onEnterChat={handleEnterChat} />
     </div>
   );

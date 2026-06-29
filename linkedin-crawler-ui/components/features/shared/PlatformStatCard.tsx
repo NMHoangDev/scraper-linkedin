@@ -10,12 +10,12 @@ export interface PlatformStatCardProps {
   accent?: "primary" | "secondary" | "success" | "warning" | "error";
 }
 
-const accentBorder: Record<NonNullable<PlatformStatCardProps["accent"]>, string> = {
-  primary: "border-l-primary",
-  secondary: "border-l-slate-400",
-  success: "border-l-[var(--color-success,#22c55e)]",
-  warning: "border-l-[var(--color-warning,#f59e0b)]",
-  error: "border-l-error",
+const accentTone: Record<NonNullable<PlatformStatCardProps["accent"]>, string> = {
+  primary: "text-[#DC2626]",
+  secondary: "text-slate-500",
+  success: "text-emerald-600",
+  warning: "text-amber-600",
+  error: "text-rose-600",
 };
 
 const hintCls: Record<NonNullable<PlatformStatCardProps["hintTone"]>, string> = {
@@ -34,14 +34,13 @@ export function PlatformStatCard({
   return (
     <div
       className={cn(
-        "border-outline-variant bg-surface relative overflow-hidden rounded-xl border border-l-4 p-md",
-        accentBorder[accent],
+        "bg-white border border-slate-100 rounded-xl p-4 shadow-none flex flex-col relative overflow-hidden",
       )}
     >
-      <p className="text-on-surface-variant text-[10px] font-bold tracking-wide uppercase">
+      <p className="text-slate-500 text-xs font-semibold">
         {label}
       </p>
-      <p className="text-on-surface mt-1 text-2xl font-extrabold tabular-nums leading-none">
+      <p className={cn("mt-1 text-2xl font-extrabold tabular-nums leading-none", accentTone[accent])}>
         {typeof value === "number" ? value.toLocaleString("vi-VN") : value}
       </p>
       {hint ? (
@@ -55,7 +54,7 @@ export function PlatformStatCard({
 
 export function PlatformStatsRow({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mb-lg grid grid-cols-1 gap-sm sm:grid-cols-2 xl:grid-cols-4">
+    <div className="mb-lg grid grid-cols-2 gap-sm xl:grid-cols-4">
       {children}
     </div>
   );

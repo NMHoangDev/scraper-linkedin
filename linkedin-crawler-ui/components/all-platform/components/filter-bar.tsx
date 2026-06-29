@@ -2,10 +2,15 @@
 
 import { useState } from "react";
 import { FaSearch } from "react-icons/fa";
-import { cn } from "@/lib/utils";
+
 import type { Category } from "@/types/unified.types";
 
-export type SortOption = "latest" | "score_high" | "score_low" | "comments_high" | "crawler";
+export type SortOption =
+  | "latest"
+  | "score_high"
+  | "score_low"
+  | "comments_high"
+  | "crawler";
 
 interface FilterBarProps {
   intents: Category[];
@@ -37,7 +42,7 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "score_high", label: "Score cao nhất" },
   { value: "score_low", label: "Score thấp nhất" },
   { value: "comments_high", label: "Bình luận nhiều nhất" },
-  { value: "crawler", label: "Theo người cào (Team & Tên)" },
+  { value: "crawler", label: "Theo người cào (team & tên)" },
 ];
 
 const DATE_OPTIONS = [
@@ -48,7 +53,19 @@ const DATE_OPTIONS = [
   { value: "30days", label: "30 ngày" },
 ];
 
-export function FilterBar({ intents, industries, teams, tiers, icps, contentTypes = [], productSeedings = [], onFilter, isLoading }: FilterBarProps) {
+const selectClassName =
+  "w-full rounded-lg border border-slate-100 bg-white px-3 py-1.5 text-xs text-slate-900 outline-none transition focus:border-[#DC2626] focus:ring-1 focus:ring-[#DC2626]/20";
+
+export function FilterBar({
+  intents,
+  industries,
+  teams,
+  tiers,
+  icps,
+  contentTypes = [],
+  productSeedings = [],
+  onFilter,
+}: FilterBarProps) {
   const [search, setSearch] = useState("");
   const [intent, setIntent] = useState("");
   const [industry, setIndustry] = useState("");
@@ -59,30 +76,32 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
   const [productSeeding, setProductSeeding] = useState("");
   const [sort, setSort] = useState<SortOption>("latest");
   const [dateRange, setDateRange] = useState("");
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+
+  const hasActiveFilters =
+    search !== "" ||
+    intent !== "" ||
+    industry !== "" ||
+    team !== "" ||
+    tier !== "" ||
+    icp !== "" ||
+    contentType !== "" ||
+    productSeeding !== "" ||
+    sort !== "latest" ||
+    dateRange !== "";
 
   const handleChange = (updates: Partial<FilterState>) => {
-    const s = updates.search !== undefined ? updates.search : search;
-    const i = updates.intent !== undefined ? updates.intent : intent;
-    const ind = updates.industry !== undefined ? updates.industry : industry;
-    const t = updates.team !== undefined ? updates.team : team;
-    const ti = updates.tier !== undefined ? updates.tier : tier;
-    const ic = updates.icp !== undefined ? updates.icp : icp;
-    const ct = updates.content_type !== undefined ? updates.content_type : contentType;
-    const ps = updates.product_seeding !== undefined ? updates.product_seeding : productSeeding;
-    const so = updates.sort !== undefined ? updates.sort : sort;
-    const dr = updates.dateRange !== undefined ? updates.dateRange : dateRange;
-
     onFilter({
-      search: s,
-      intent: i,
-      industry: ind,
-      team: t,
-      tier: ti,
-      icp: ic,
-      content_type: ct,
-      product_seeding: ps,
-      sort: so,
-      dateRange: dr,
+      search: updates.search ?? search,
+      intent: updates.intent ?? intent,
+      industry: updates.industry ?? industry,
+      team: updates.team ?? team,
+      tier: updates.tier ?? tier,
+      icp: updates.icp ?? icp,
+      content_type: updates.content_type ?? contentType,
+      product_seeding: updates.product_seeding ?? productSeeding,
+      sort: updates.sort ?? sort,
+      dateRange: updates.dateRange ?? dateRange,
     });
   };
 
@@ -112,178 +131,190 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
   };
 
   return (
-    <div className="bg-[#F5F5F5]/50 flex flex-wrap items-center gap-3 rounded-2xl border border-[#E5E5E5] p-4 shadow-[0_4px_20px_rgba(0,0,0,0.015)]">
-      <div className="relative min-w-[200px] flex-1">
-        <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0A0A0] text-sm" />
-        <input
-          type="text"
-          placeholder="Tìm kiếm nội dung, tên nhóm..."
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            handleChange({ search: e.target.value });
-          }}
-          className="w-full border border-[#333333] bg-[#FFFFFF] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl pl-9 pr-4 py-2 text-xs font-semibold text-[#1A1A1A] outline-none transition shadow-sm"
-        />
+    <div className="relative mb-4 rounded-2xl border border-slate-100 bg-white p-4 sm:p-5">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+        <div className="relative min-w-0 flex-1">
+          <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400" />
+          <input
+            type="text"
+            placeholder="Tìm kiếm nội dung, tên nhóm..."
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              handleChange({ search: event.target.value });
+            }}
+            className="w-full rounded-lg border border-slate-100 bg-white py-1.5 pl-9 pr-4 text-xs text-slate-900 outline-none transition focus:border-[#DC2626] focus:ring-1 focus:ring-[#DC2626]/20"
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 lg:shrink-0">
+          <button
+            type="button"
+            onClick={() => setShowAdvancedFilters((current) => !current)}
+            className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-slate-100 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 whitespace-nowrap"
+          >
+            <span>🎛️</span>
+            <span>Lọc nâng cao</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={clearFilters}
+            disabled={!hasActiveFilters}
+            className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-100 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50 whitespace-nowrap"
+          >
+            Xóa lọc
+          </button>
+        </div>
       </div>
 
-      <select
-        value={dateRange}
-        onChange={(e) => {
-          setDateRange(e.target.value);
-          handleChange({ dateRange: e.target.value });
-        }}
-        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[110px]"
-      >
-        {DATE_OPTIONS.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
+      {showAdvancedFilters ? (
+        <div className="mt-3 rounded-2xl border border-slate-100 bg-white p-3 sm:absolute sm:left-4 sm:right-4 sm:top-full sm:z-20 sm:mt-2 sm:p-4">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
+            <select
+              value={dateRange}
+              onChange={(event) => {
+                setDateRange(event.target.value);
+                handleChange({ dateRange: event.target.value });
+              }}
+              className={selectClassName}
+            >
+              {DATE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
 
-      <select
-        value={sort}
-        onChange={(e) => {
-          setSort(e.target.value as SortOption);
-          handleChange({ sort: e.target.value as SortOption });
-        }}
-        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
-      >
-        {SORT_OPTIONS.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
+            <select
+              value={sort}
+              onChange={(event) => {
+                setSort(event.target.value as SortOption);
+                handleChange({ sort: event.target.value as SortOption });
+              }}
+              className={selectClassName}
+            >
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
 
-      <select
-        value={intent}
-        onChange={(e) => {
-          setIntent(e.target.value);
-          handleChange({ intent: e.target.value });
-        }}
-        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[120px]"
-      >
-        <option value="">Tất cả Lĩnh vực</option>
-        {intents.map((i) => (
-          <option key={i.id} value={i.id}>
-            {i.name || i.code}
-          </option>
-        ))}
-      </select>
+            <select
+              value={intent}
+              onChange={(event) => {
+                setIntent(event.target.value);
+                handleChange({ intent: event.target.value });
+              }}
+              className={selectClassName}
+            >
+              <option value="">Tất cả lĩnh vực</option>
+              {intents.map((option) => (
+                <option key={option.id} value={String(option.id)}>
+                  {option.name || option.code}
+                </option>
+              ))}
+            </select>
 
-      <select
-        value={industry}
-        onChange={(e) => {
-          setIndustry(e.target.value);
-          handleChange({ industry: e.target.value });
-        }}
-        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[120px]"
-      >
-        <option value="">Tất cả Ngành</option>
-        {industries.map((i) => (
-          <option key={i.id} value={i.id}>
-            {i.name || i.code}
-          </option>
-        ))}
-      </select>
+            <select
+              value={industry}
+              onChange={(event) => {
+                setIndustry(event.target.value);
+                handleChange({ industry: event.target.value });
+              }}
+              className={selectClassName}
+            >
+              <option value="">Tất cả ngành</option>
+              {industries.map((option) => (
+                <option key={option.id} value={String(option.id)}>
+                  {option.name || option.code}
+                </option>
+              ))}
+            </select>
 
-      <select
-        value={team}
-        onChange={(e) => {
-          setTeam(e.target.value);
-          handleChange({ team: e.target.value });
-        }}
-        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[120px]"
-      >
-        <option value="">Tất cả Team</option>
-        {teams.map((t) => (
-          <option key={t.id} value={t.id}>
-            {t.name || t.code}
-          </option>
-        ))}
-      </select>
+            <select
+              value={team}
+              onChange={(event) => {
+                setTeam(event.target.value);
+                handleChange({ team: event.target.value });
+              }}
+              className={selectClassName}
+            >
+              <option value="">Tất cả team</option>
+              {teams.map((option) => (
+                <option key={option.id} value={String(option.id)}>
+                  {option.name || option.code}
+                </option>
+              ))}
+            </select>
 
-      <select
-        value={tier}
-        onChange={(e) => {
-          setTier(e.target.value);
-          handleChange({ tier: e.target.value });
-        }}
-        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[110px]"
-      >
-        <option value="">Tất cả Tier</option>
-        {tiers.map((t) => (
-          <option key={t.id} value={t.id}>
-            {t.name || t.code}
-          </option>
-        ))}
-      </select>
+            <select
+              value={tier}
+              onChange={(event) => {
+                setTier(event.target.value);
+                handleChange({ tier: event.target.value });
+              }}
+              className={selectClassName}
+            >
+              <option value="">Tất cả tier</option>
+              {tiers.map((option) => (
+                <option key={option.id} value={String(option.id)}>
+                  {option.name || option.code}
+                </option>
+              ))}
+            </select>
 
-      {icps.length > 0 && (
-        <select
-          value={icp}
-          onChange={(e) => {
-            setIcp(e.target.value);
-            handleChange({ icp: e.target.value });
-          }}
-          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[110px]"
-        >
-          <option value="">Tất cả ICP</option>
-          {icps.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name || c.code}
-            </option>
-          ))}
-        </select>
-      )}
+            <select
+              value={icp}
+              onChange={(event) => {
+                setIcp(event.target.value);
+                handleChange({ icp: event.target.value });
+              }}
+              className={selectClassName}
+            >
+              <option value="">Tất cả ICP</option>
+              {icps.map((option) => (
+                <option key={option.id} value={String(option.id)}>
+                  {option.name || option.code}
+                </option>
+              ))}
+            </select>
 
-      {contentTypes.length > 0 && (
-        <select
-          value={contentType}
-          onChange={(e) => {
-            setContentType(e.target.value);
-            handleChange({ content_type: e.target.value });
-          }}
-          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[120px]"
-        >
-          <option value="">Loại nội dung</option>
-          {contentTypes.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name || c.code}
-            </option>
-          ))}
-        </select>
-      )}
+            <select
+              value={contentType}
+              onChange={(event) => {
+                setContentType(event.target.value);
+                handleChange({ content_type: event.target.value });
+              }}
+              className={selectClassName}
+            >
+              <option value="">Loại nội dung</option>
+              {contentTypes.map((option) => (
+                <option key={option.id} value={String(option.id)}>
+                  {option.name || option.code}
+                </option>
+              ))}
+            </select>
 
-      {productSeedings.length > 0 && (
-        <select
-          value={productSeeding}
-          onChange={(e) => {
-            setProductSeeding(e.target.value);
-            handleChange({ product_seeding: e.target.value });
-          }}
-          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
-        >
-          <option value="">Sản phẩm Seeding</option>
-          {productSeedings.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name || c.code}
-            </option>
-          ))}
-        </select>
-      )}
-
-      {/* Cụm Xóa Lọc */}
-      <button
-        type="button"
-        onClick={clearFilters}
-        disabled={isLoading}
-        className="ml-auto rounded-xl bg-white border border-[#E5E5E5] px-4 py-2 text-xs font-bold text-[#E3000F] hover:bg-[#E3000F]/5 hover:border-[#E3000F]/30 transition shadow-sm cursor-pointer disabled:opacity-50"
-      >
-        Xóa lọc
-      </button>
+            <select
+              value={productSeeding}
+              onChange={(event) => {
+                setProductSeeding(event.target.value);
+                handleChange({ product_seeding: event.target.value });
+              }}
+              className={selectClassName}
+            >
+              <option value="">Sản phẩm seeding</option>
+              {productSeedings.map((option) => (
+                <option key={option.id} value={String(option.id)}>
+                  {option.name || option.code}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

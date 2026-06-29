@@ -334,6 +334,92 @@ export function FbInboxAccountsTab({ onChange }: FbInboxAccountsTabProps) {
             <p className="text-[#A0A0A0] text-[10px] mt-1">Hãy cài extension và thêm tài khoản để bắt đầu</p>
           </div>
         ) : (
+          <>
+            <div className="space-y-3 p-4 md:hidden">
+              {unifiedList.map((acc) => (
+                <div key={acc.user_id} className="rounded-2xl border border-slate-100 bg-white p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0866FF]/10 text-[#0866FF]">
+                          <FaFacebook size={14} />
+                        </span>
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-bold text-slate-900">{acc.label}</div>
+                          <div className="mt-1 truncate text-[11px] text-slate-500">{acc.email || acc.fb_user_id || acc.user_id}</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      {acc.hasKpi ? (
+                        <span className="inline-flex rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-600">
+                          KPI on
+                        </span>
+                      ) : (
+                        <span className="inline-flex rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+                          KPI off
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-600">
+                    <div className="rounded-xl bg-slate-50 px-3 py-2">
+                      <p className="font-semibold text-slate-500">UID</p>
+                      <p className="mt-1 break-all font-mono text-[11px] text-slate-900">
+                        {acc.fb_user_id || acc.user_id.replace(/^fb_/, "")}
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-slate-50 px-3 py-2">
+                      <p className="font-semibold text-slate-500">Trạng thái</p>
+                      <p className="mt-1 font-semibold text-slate-900">
+                        {!acc.session ? "Offline (lưu KPI)" : acc.online ? "Sẵn sàng" : "Cần đăng nhập lại"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {!acc.hasKpi ? (
+                      <button
+                        onClick={() => linkKpi(acc)}
+                        className="inline-flex items-center gap-1 rounded-xl border border-[#E3000F]/20 bg-[#E3000F]/10 px-3 py-2 text-xs font-semibold text-[#E3000F] transition hover:bg-[#E3000F]/15"
+                      >
+                        <FaLink size={10} />
+                        Bật KPI
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => acc.inboxAccountId && unlinkKpi(acc.inboxAccountId)}
+                        className="rounded-xl border border-slate-100 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+                      >
+                        Hủy KPI
+                      </button>
+                    )}
+
+                    {acc.session && acc.needs_relogin ? (
+                      <button
+                        onClick={() => addAccount(true)}
+                        disabled={adding}
+                        className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50"
+                      >
+                        Đăng nhập lại
+                      </button>
+                    ) : null}
+
+                    {acc.session ? (
+                      <button
+                        onClick={() => removeSession(acc.user_id, acc.label)}
+                        className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100"
+                      >
+                        Xóa extension
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden md:block">
           <table className="w-full border-collapse text-left text-xs">
             <thead className="bg-[#F5F5F5] border-b border-[#E5E5E5] text-[10px] font-bold text-[#A0A0A0] uppercase tracking-wider">
               <tr>
@@ -429,6 +515,8 @@ export function FbInboxAccountsTab({ onChange }: FbInboxAccountsTabProps) {
               ))}
             </tbody>
           </table>
+            </div>
+          </>
         )}
       </div>
 

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useRef, useEffect } from "react";
 import { FaFacebook, FaLinkedin } from "react-icons/fa";
@@ -29,15 +29,15 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
 
   const INBOX_TEMPLATES = [
     {
-      category: "Dịch vụ Website",
+      category: "Dá»‹ch vá»¥ Website",
       templates: [
         {
-          title: "Thiết kế Web Doanh Nghiệp",
-          content: "Chào bạn, mình thấy bạn đang có nhu cầu phát triển kinh doanh. Bên mình chuyên thiết kế Website chuyên nghiệp, chuẩn SEO và tối ưu chuyển đổi. Một Website xịn sẽ là 'nhân viên sale' làm việc 24/7 cho bạn. Bạn có muốn mình gửi thêm một số mẫu Web bên mình đã làm để tham khảo không?"
+          title: "Thiáº¿t káº¿ Web Doanh Nghiá»‡p",
+          content: "ChÃ o báº¡n, mÃ¬nh tháº¥y báº¡n Ä‘ang cÃ³ nhu cáº§u phÃ¡t triá»ƒn kinh doanh. BÃªn mÃ¬nh chuyÃªn thiáº¿t káº¿ Website chuyÃªn nghiá»‡p, chuáº©n SEO vÃ  tá»‘i Æ°u chuyá»ƒn Ä‘á»•i. Má»™t Website xá»‹n sáº½ lÃ  'nhÃ¢n viÃªn sale' lÃ m viá»‡c 24/7 cho báº¡n. Báº¡n cÃ³ muá»‘n mÃ¬nh gá»­i thÃªm má»™t sá»‘ máº«u Web bÃªn mÃ¬nh Ä‘Ã£ lÃ m Ä‘á»ƒ tham kháº£o khÃ´ng?"
         },
         {
-          title: "Tối ưu/Nâng cấp Web hiện tại",
-          content: "Dạ chào anh/chị, em thấy lĩnh vực của mình rất tiềm năng. Không biết hiện tại anh/chị đã có Website riêng để đẩy mạnh thương hiệu chưa ạ? Bên em nhận thiết kế mới và nâng cấp Website với chi phí cực kì hợp lý. Anh/chị check tin nhắn để em tư vấn chi tiết hơn nhé!"
+          title: "Tá»‘i Æ°u/NÃ¢ng cáº¥p Web hiá»‡n táº¡i",
+          content: "Dáº¡ chÃ o anh/chá»‹, em tháº¥y lÄ©nh vá»±c cá»§a mÃ¬nh ráº¥t tiá»m nÄƒng. KhÃ´ng biáº¿t hiá»‡n táº¡i anh/chá»‹ Ä‘Ã£ cÃ³ Website riÃªng Ä‘á»ƒ Ä‘áº©y máº¡nh thÆ°Æ¡ng hiá»‡u chÆ°a áº¡? BÃªn em nháº­n thiáº¿t káº¿ má»›i vÃ  nÃ¢ng cáº¥p Website vá»›i chi phÃ­ cá»±c kÃ¬ há»£p lÃ½. Anh/chá»‹ check tin nháº¯n Ä‘á»ƒ em tÆ° váº¥n chi tiáº¿t hÆ¡n nhÃ©!"
         }
       ]
     },
@@ -45,25 +45,25 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
       category: "Chatbot AI & CSKH",
       templates: [
         {
-          title: "Chatbot AI Chăm sóc khách hàng",
-          content: "Chào bạn, mình thấy mảng dịch vụ của bạn thường xuyên phải trả lời nhiều câu hỏi từ khách hàng. Bên mình đang cung cấp giải pháp Chatbot AI thông minh có khả năng tự động trả lời, tư vấn và chốt đơn 24/7 như người thật. Mình gửi bạn xem thử bản demo Chatbot AI bên mình nhé?"
+          title: "Chatbot AI ChÄƒm sÃ³c khÃ¡ch hÃ ng",
+          content: "ChÃ o báº¡n, mÃ¬nh tháº¥y máº£ng dá»‹ch vá»¥ cá»§a báº¡n thÆ°á»ng xuyÃªn pháº£i tráº£ lá»i nhiá»u cÃ¢u há»i tá»« khÃ¡ch hÃ ng. BÃªn mÃ¬nh Ä‘ang cung cáº¥p giáº£i phÃ¡p Chatbot AI thÃ´ng minh cÃ³ kháº£ nÄƒng tá»± Ä‘á»™ng tráº£ lá»i, tÆ° váº¥n vÃ  chá»‘t Ä‘Æ¡n 24/7 nhÆ° ngÆ°á»i tháº­t. MÃ¬nh gá»­i báº¡n xem thá»­ báº£n demo Chatbot AI bÃªn mÃ¬nh nhÃ©?"
         },
         {
-          title: "Tích hợp AI tư vấn chuyên sâu",
-          content: "Dạ chào anh/chị, em chuyên triển khai các hệ thống Chatbot AI (Tích hợp ChatGPT/Claude) vào quy trình chăm sóc khách hàng. Chatbot bên em có thể học theo data riêng của doanh nghiệp để tư vấn cá nhân hóa. Anh/chị có hứng thú nâng cấp hệ thống CSKH của mình không ạ?"
+          title: "TÃ­ch há»£p AI tÆ° váº¥n chuyÃªn sÃ¢u",
+          content: "Dáº¡ chÃ o anh/chá»‹, em chuyÃªn triá»ƒn khai cÃ¡c há»‡ thá»‘ng Chatbot AI (TÃ­ch há»£p ChatGPT/Claude) vÃ o quy trÃ¬nh chÄƒm sÃ³c khÃ¡ch hÃ ng. Chatbot bÃªn em cÃ³ thá»ƒ há»c theo data riÃªng cá»§a doanh nghiá»‡p Ä‘á»ƒ tÆ° váº¥n cÃ¡ nhÃ¢n hÃ³a. Anh/chá»‹ cÃ³ há»©ng thÃº nÃ¢ng cáº¥p há»‡ thá»‘ng CSKH cá»§a mÃ¬nh khÃ´ng áº¡?"
         }
       ]
     },
     {
-      category: "n8n & Tự động hoá",
+      category: "n8n & Tá»± Ä‘á»™ng hoÃ¡",
       templates: [
         {
-          title: "Giải pháp Automation (n8n)",
-          content: "Xin chào! Mình thấy quy trình vận hành của bạn đang phải xử lý thủ công khá nhiều bước. Bên mình chuyên thiết kế các luồng tự động hoá bằng n8n, giúp đồng bộ dữ liệu giữa các nền tảng hoàn toàn tự động. Việc này sẽ giúp bạn giảm thiểu sai sót và tối ưu hiệu suất x10 lần. Mình trao đổi thêm nhé?"
+          title: "Giáº£i phÃ¡p Automation (n8n)",
+          content: "Xin chÃ o! MÃ¬nh tháº¥y quy trÃ¬nh váº­n hÃ nh cá»§a báº¡n Ä‘ang pháº£i xá»­ lÃ½ thá»§ cÃ´ng khÃ¡ nhiá»u bÆ°á»›c. BÃªn mÃ¬nh chuyÃªn thiáº¿t káº¿ cÃ¡c luá»“ng tá»± Ä‘á»™ng hoÃ¡ báº±ng n8n, giÃºp Ä‘á»“ng bá»™ dá»¯ liá»‡u giá»¯a cÃ¡c ná»n táº£ng hoÃ n toÃ n tá»± Ä‘á»™ng. Viá»‡c nÃ y sáº½ giÃºp báº¡n giáº£m thiá»ƒu sai sÃ³t vÃ  tá»‘i Æ°u hiá»‡u suáº¥t x10 láº§n. MÃ¬nh trao Ä‘á»•i thÃªm nhÃ©?"
         },
         {
-          title: "Tối ưu quy trình đa nền tảng",
-          content: "Chào anh/chị, việc lặp đi lặp lại các tác vụ thủ công thường tốn rất nhiều nguồn lực. Bên em cung cấp giải pháp Tự động hoá doanh nghiệp với n8n, giúp tự động kết nối các phần mềm (Lead FB -> Zalo -> CRM). Chi phí triển khai 1 lần, dùng trọn đời. Anh/chị check inbox em gửi demo nhé!"
+          title: "Tá»‘i Æ°u quy trÃ¬nh Ä‘a ná»n táº£ng",
+          content: "ChÃ o anh/chá»‹, viá»‡c láº·p Ä‘i láº·p láº¡i cÃ¡c tÃ¡c vá»¥ thá»§ cÃ´ng thÆ°á»ng tá»‘n ráº¥t nhiá»u nguá»“n lá»±c. BÃªn em cung cáº¥p giáº£i phÃ¡p Tá»± Ä‘á»™ng hoÃ¡ doanh nghiá»‡p vá»›i n8n, giÃºp tá»± Ä‘á»™ng káº¿t ná»‘i cÃ¡c pháº§n má»m (Lead FB -> Zalo -> CRM). Chi phÃ­ triá»ƒn khai 1 láº§n, dÃ¹ng trá»n Ä‘á»i. Anh/chá»‹ check inbox em gá»­i demo nhÃ©!"
         }
       ]
     }
@@ -96,18 +96,23 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
 
   const score = post.score || 0;
   let scoreBg = "bg-slate-100 text-slate-700 border-slate-200";
-  if (score >= 85) scoreBg = "bg-red-50 text-[#E3000F] border-red-100";
+  if (score >= 85) scoreBg = "bg-red-50 text-[#DC2626] border-red-100";
   else if (score >= 60) scoreBg = "bg-amber-50 text-amber-600 border-amber-100";
 
   return (
-    <div className="bg-white rounded-xl shadow-xs border border-slate-200/80 p-4 flex gap-4 items-start transition duration-200 hover:border-slate-300">
-      {/* KHỐI AI SCORE BÊN TRÁI */}
-      <div className={cn("w-[60px] h-[60px] rounded-xl flex flex-col items-center justify-center shrink-0 border", scoreBg)}>
+    <div className="mb-2 flex flex-col gap-4 border-b border-slate-100 bg-white p-4 pb-6 transition-none sm:flex-row sm:items-start">
+      {/* KHá»I AI SCORE BÃŠN TRÃI */}
+      <div
+        className={cn(
+          "flex h-[60px] w-full shrink-0 items-center justify-center gap-2 rounded-xl border sm:w-[60px] sm:flex-col sm:gap-0",
+          scoreBg,
+        )}
+      >
         <span className="text-xl font-black leading-tight">{score}</span>
         <span className="text-[9px] font-bold uppercase tracking-tighter mt-0.5 opacity-80">AI Score</span>
       </div>
 
-      {/* NỘI DUNG CHÍNH */}
+      {/* Ná»˜I DUNG CHÃNH */}
       <div className="flex-1 flex flex-col justify-between min-w-0">
         
         {/* Header */}
@@ -153,14 +158,14 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
           <span className="text-[11px] text-slate-400 shrink-0 font-medium text-right leading-tight">
             <span className="block">
               {post.crawl_date ? new Date(post.crawl_date).toLocaleDateString("vi-VN") : ""}
-              {post.posted_at ? ` • ${new Date(post.posted_at).toLocaleTimeString("vi-VN", {hour: '2-digit', minute:'2-digit'})}` : ""}
+              {post.posted_at ? ` â€¢ ${new Date(post.posted_at).toLocaleTimeString("vi-VN", {hour: '2-digit', minute:'2-digit'})}` : ""}
             </span>
           </span>
         </div>
 
-        {/* Nội dung */}
+        {/* Ná»™i dung */}
         <p className="text-xs text-slate-700 italic line-clamp-2 leading-relaxed bg-slate-50/50 px-3 py-2 rounded-lg border border-slate-100/60 mb-2">
-          "{post.content || "Nội dung bài viết rỗng hoặc chứa thuần hình ảnh/video."}"
+          "{post.content || "Ná»™i dung bÃ i viáº¿t rá»—ng hoáº·c chá»©a thuáº§n hÃ¬nh áº£nh/video."}"
         </p>
 
         {(userRole === "admin" || userRole === "leader") && post.all_seedings && post.all_seedings.length > 0 ? (
@@ -168,7 +173,7 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
             {post.all_seedings.map((seed, idx) => (
               <div key={idx} className="px-3 py-2 bg-emerald-50/50 border border-emerald-100 rounded-lg flex flex-col gap-1">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Đã seeding bởi <span className="font-bold text-slate-800">{seed.member_name}</span> (Tài khoản: {seed.seeding_name || "Unknown"}):</span>
+                  <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">ÄÃ£ seeding bá»Ÿi <span className="font-bold text-slate-800">{seed.member_name}</span> (TÃ i khoáº£n: {seed.seeding_name || "Unknown"}):</span>
                 </div>
                 <p className="text-xs text-slate-600 line-clamp-2">
                   <span className="text-emerald-500 font-serif font-bold text-lg leading-none mr-1">"</span>
@@ -178,13 +183,13 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
                 <div className="flex items-center justify-between mt-1">
                   {seed.link_comment && (
                     <a href={seed.link_comment} target="_blank" rel="noopener noreferrer" className="text-[10px] font-medium text-blue-600 hover:underline inline-flex items-center gap-1">
-                      Xem bình luận <FiExternalLink className="w-3 h-3" />
+                      Xem bÃ¬nh luáº­n <FiExternalLink className="w-3 h-3" />
                     </a>
                   )}
                   {seed.verify_status === "yes" ? (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700">✓ Đã xác minh</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700">âœ“ ÄÃ£ xÃ¡c minh</span>
                   ) : (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700">Chờ xác minh</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700">Chá» xÃ¡c minh</span>
                   )}
                 </div>
               </div>
@@ -193,7 +198,7 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
         ) : post.seeding_content ? (
           <div className="mb-3 px-3 py-2 bg-emerald-50/50 border border-emerald-100 rounded-lg flex flex-col gap-1">
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Đã seeding bằng tài khoản:</span>
+              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">ÄÃ£ seeding báº±ng tÃ i khoáº£n:</span>
               <span className="text-xs font-bold text-slate-800">{post.seeding_name || "Unknown"}</span>
             </div>
             <p className="text-xs text-slate-600 line-clamp-2">
@@ -203,7 +208,7 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
             </p>
             {post.link_comment && (
               <a href={post.link_comment} target="_blank" rel="noopener noreferrer" className="text-[10px] font-medium text-blue-600 hover:underline inline-flex items-center gap-1 mt-0.5">
-                Xem bình luận <FiExternalLink className="w-3 h-3" />
+                Xem bÃ¬nh luáº­n <FiExternalLink className="w-3 h-3" />
               </a>
             )}
           </div>
@@ -213,36 +218,36 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
         <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
           
           <div className="flex items-center gap-2.5 flex-wrap">
-            <span className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50/60 text-amber-700 rounded-md text-[11px] font-bold border border-amber-100/40" title="Lượt thích/Cảm xúc">
-              👍 {post.reactions?.toLocaleString() || 0}
+            <span className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50/60 text-amber-700 rounded-md text-[11px] font-bold border border-amber-100/40" title="LÆ°á»£t thÃ­ch/Cáº£m xÃºc">
+              ðŸ‘ {post.reactions?.toLocaleString() || 0}
             </span>
-            <span className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-600 rounded-md text-[11px] font-bold border border-slate-200/50" title="Lượt bình luận">
-              💬 {post.comments?.toLocaleString() || 0}
+            <span className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-600 rounded-md text-[11px] font-bold border border-slate-200/50" title="LÆ°á»£t bÃ¬nh luáº­n">
+              ðŸ’¬ {post.comments?.toLocaleString() || 0}
             </span>
-            <span className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-600 rounded-md text-[11px] font-bold border border-blue-100/50" title="Lượt chia sẻ">
-              🔁 {post.shares?.toLocaleString() || 0}
+            <span className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-600 rounded-md text-[11px] font-bold border border-blue-100/50" title="LÆ°á»£t chia sáº»">
+              ðŸ” {post.shares?.toLocaleString() || 0}
             </span>
 
             {(userRole === "admin" || userRole === "leader") && post.crawler_name && (
               <span className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-500 rounded-md text-[11px] font-medium border border-slate-200/50">
-                👤 {post.crawler_name}
+                ðŸ‘¤ {post.crawler_name}
                 {userRole === "admin" && post.crawler_team ? ` - ${post.crawler_team}` : ""}
               </span>
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
             {verifyStatus === "yes" ? (
               <span className="px-2.5 py-1 rounded-md text-[11px] font-bold border bg-green-100 text-green-700 border-green-200">
-                ✓ Đã xác minh
+                âœ“ ÄÃ£ xÃ¡c minh
               </span>
             ) : verifyStatus === "pending" ? (
               <span className="px-2.5 py-1 rounded-md text-[11px] font-bold border bg-emerald-100 text-emerald-700 border-emerald-200">
-                ✓ Đã seeding
+                âœ“ ÄÃ£ seeding
               </span>
             ) : (
               <span className="px-2.5 py-1 rounded-md text-[11px] font-bold border bg-slate-100 text-slate-500 border-slate-200">
-                Chưa seeding
+                ChÆ°a seeding
               </span>
             )}
 
@@ -251,22 +256,22 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
             <button
               type="button"
               onClick={handleView}
-              className="px-4 py-1.5 bg-white border border-[#E3000F] text-[#E3000F] hover:bg-[#E3000F] hover:text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer"
+              className="whitespace-nowrap rounded-xl border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-50 shadow-none cursor-pointer"
             >
-              Xem chi tiết
+              Xem chi tiáº¿t
             </button>
 
             {onVerify && !(post.seeding_content && post.link_comment) && (
               <button
                 type="button"
                 onClick={handleVerify}
-                className="group relative px-3 py-1.5 bg-gradient-to-r from-[#E3000F] to-[#C40009] hover:from-[#C40009] hover:to-[#E3000F] text-white rounded-lg text-[11px] font-bold transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5 cursor-pointer"
+                className="whitespace-nowrap rounded-xl bg-[#DC2626] px-3 py-1.5 text-[11px] font-bold text-white transition-all duration-200 hover:bg-[#B91C1C] shadow-none cursor-pointer"
               >
                 <span className="flex items-center gap-1.5">
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  Xác minh
+                  XÃ¡c minh
                 </span>
               </button>
             )}
@@ -277,15 +282,15 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
                 <button
                   type="button"
                   onClick={() => setIsInboxOpen(!isInboxOpen)}
-                  className="px-3 py-1.5 bg-[#E3000F] hover:bg-[#C40009] text-white rounded-lg text-[11px] font-bold transition shadow-xs cursor-pointer flex items-center gap-1"
+                  className="flex items-center gap-1 whitespace-nowrap rounded-xl bg-[#DC2626] px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-[#B91C1C] shadow-none cursor-pointer"
                 >
-                  Inbox ngay <span className="text-[9px]">▼</span>
+                  Inbox ngay <span className="text-[9px]">â–¼</span>
                 </button>
                 {isInboxOpen && (
                   <div className="absolute bottom-full mb-2 right-0 w-[320px] bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1 overflow-hidden">
                     <div className="px-3 py-2 text-[11px] font-black text-slate-800 border-b border-slate-100 uppercase tracking-wider flex items-center justify-between bg-slate-50/50">
-                      <span>Chọn mẫu câu</span>
-                      <span className="text-[9px] font-bold text-[#E3000F] normal-case bg-red-50 border border-red-100 px-1.5 py-0.5 rounded">Tự động Copy</span>
+                      <span>Chá»n máº«u cÃ¢u</span>
+                      <span className="text-[9px] font-bold text-[#DC2626] normal-case bg-red-50 border border-red-100 px-1.5 py-0.5 rounded">Tá»± Ä‘á»™ng Copy</span>
                     </div>
                     <div className="max-h-[320px] overflow-y-auto custom-scrollbar">
                       {INBOX_TEMPLATES.map((group, gIdx) => (
@@ -308,7 +313,7 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
                                 });
                               }}
                             >
-                              <div className="font-bold text-[11px] text-slate-800 group-hover/item:text-[#E3000F] mb-1 transition-colors leading-tight">
+                              <div className="font-bold text-[11px] text-slate-800 group-hover/item:text-[#DC2626] mb-1 transition-colors leading-tight">
                                 {template.title}
                               </div>
                               <div className="text-[10px] text-slate-500 line-clamp-2 leading-relaxed opacity-90">
@@ -330,3 +335,4 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
     </div>
   );
 }
+

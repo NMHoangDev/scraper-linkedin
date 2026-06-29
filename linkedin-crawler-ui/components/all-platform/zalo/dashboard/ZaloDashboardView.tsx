@@ -64,7 +64,7 @@ export function ZaloDashboardView({ flow, onEnterChat }: ZaloDashboardViewProps)
   return (
     <div className="flex flex-col gap-5">
       {/* HEADER */}
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+      <header className="flex flex-col gap-3 border-b border-slate-100 pb-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-2.5">
           <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-[#E3000F] to-red-700 flex items-center justify-center shadow-sm">
             <MaterialIcon name="account_circle" className="text-white text-[22px]" />
@@ -77,7 +77,7 @@ export function ZaloDashboardView({ flow, onEnterChat }: ZaloDashboardViewProps)
             {flow.accounts.length} TK
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <div className="relative">
             <MaterialIcon name="search" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[16px]" />
             <input
@@ -85,14 +85,14 @@ export function ZaloDashboardView({ flow, onEnterChat }: ZaloDashboardViewProps)
               placeholder="Tìm tên, SĐT, UID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="border border-slate-200 bg-white rounded-lg py-1.5 pl-8 pr-3 text-[13px] w-[220px] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 focus:outline-none transition-all placeholder:text-slate-400"
+              className="w-full rounded-xl border border-slate-100 bg-white py-1.5 pl-8 pr-3 text-xs focus:border-[#DC2626] focus:ring-1 focus:ring-[#DC2626]/20 focus:outline-none transition-all placeholder:text-slate-400 sm:w-[220px]"
             />
           </div>
-          <button className="bg-white border border-slate-200 inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition">
+          <button className="inline-flex items-center justify-center gap-1 rounded-xl border border-slate-100 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
             <MaterialIcon name="group_add" className="text-[16px]" />
             Gộp TK
           </button>
-          <button className="bg-[#E3000F] text-white inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold hover:bg-red-700 transition shadow-sm shadow-red-500/20">
+          <button className="inline-flex items-center justify-center gap-1 rounded-xl bg-[#DC2626] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#B91C1C]">
             <MaterialIcon name="support_agent" className="text-[16px]" />
             Hỗ trợ
           </button>
@@ -101,8 +101,8 @@ export function ZaloDashboardView({ flow, onEnterChat }: ZaloDashboardViewProps)
 
       {/* KPI CARDS */}
       {flow.userId && flow.userId !== "default" && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-          <div className="bg-gradient-to-br from-orange-50 to-amber-50/60 border border-orange-200/60 rounded-lg px-3 py-2.5">
+        <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
+          <div className="rounded-xl border border-slate-100 bg-white px-3 py-3">
             <div className="flex items-center gap-1 text-[10.5px] font-bold text-orange-700 uppercase tracking-wide">
               <MaterialIcon name="chat" className="text-[13px]" />
               Tin nhắn KPI
@@ -111,7 +111,7 @@ export function ZaloDashboardView({ flow, onEnterChat }: ZaloDashboardViewProps)
               <ZaloKpiPanel accountId={flow.userId} compact={false} />
             </div>
           </div>
-          <div className="bg-gradient-to-br from-blue-50 to-sky-50/60 border border-blue-200/60 rounded-lg px-3 py-2.5">
+          <div className="rounded-xl border border-slate-100 bg-white px-3 py-3">
             <div className="flex items-center gap-1 text-[10.5px] font-bold text-blue-700 uppercase tracking-wide">
               <MaterialIcon name="inbox" className="text-[13px]" />
               Cuộc trò chuyện
@@ -119,7 +119,7 @@ export function ZaloDashboardView({ flow, onEnterChat }: ZaloDashboardViewProps)
             <p className="text-xl font-bold text-slate-800 mt-1.5 leading-none">{flow.accounts.length}</p>
             <p className="text-[10px] text-slate-500 mt-0.5">đang theo dõi</p>
           </div>
-          <div className="bg-gradient-to-br from-emerald-50 to-green-50/60 border border-emerald-200/60 rounded-lg px-3 py-2.5">
+          <div className="rounded-xl border border-slate-100 bg-white px-3 py-3">
             <div className="flex items-center gap-1 text-[10.5px] font-bold text-emerald-700 uppercase tracking-wide">
               <MaterialIcon name="forum" className="text-[13px]" />
               Online
@@ -129,7 +129,7 @@ export function ZaloDashboardView({ flow, onEnterChat }: ZaloDashboardViewProps)
             </p>
             <p className="text-[10px] text-slate-500 mt-0.5">đang kết nối Zalo</p>
           </div>
-          <div className="bg-gradient-to-br from-violet-50 to-purple-50/60 border border-violet-200/60 rounded-lg px-3 py-2.5">
+          <div className="rounded-xl border border-slate-100 bg-white px-3 py-3">
             <div className="flex items-center gap-1 text-[10.5px] font-bold text-violet-700 uppercase tracking-wide">
               <MaterialIcon name="sync" className="text-[13px]" />
               Đang chạy
@@ -142,7 +142,7 @@ export function ZaloDashboardView({ flow, onEnterChat }: ZaloDashboardViewProps)
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 shadow-sm">
+      <div className="rounded-2xl border border-slate-100 bg-white px-4 py-4 shadow-none">
         <div className="flex items-center gap-2 mb-2.5">
           <div className="h-6 w-6 rounded-md bg-red-50 flex items-center justify-center">
             <MaterialIcon name="person_add" className="text-[#E3000F] text-[14px]" />
@@ -150,7 +150,7 @@ export function ZaloDashboardView({ flow, onEnterChat }: ZaloDashboardViewProps)
           <h3 className="text-[12.5px] font-bold text-slate-700">Thêm tài khoản Zalo mới</h3>
           <span className="text-[10.5px] text-slate-400 ml-auto">Label + SĐT tùy chọn</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center">
           <div className="relative flex-1">
             <MaterialIcon name="person" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[14px]" />
             <input
@@ -158,7 +158,7 @@ export function ZaloDashboardView({ flow, onEnterChat }: ZaloDashboardViewProps)
               onChange={(event) => setNewAccountLabel(event.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") void handleCreateAccount(); }}
               placeholder="Tên tài khoản (vd: Nam, Mai...)"
-              className="border border-slate-200 bg-white h-9 w-full rounded-lg pl-8 pr-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] transition-all placeholder:text-slate-400"
+              className="h-9 w-full rounded-xl border border-slate-100 bg-white pl-8 pr-3 text-xs focus:outline-none focus:ring-1 focus:ring-[#DC2626]/20 focus:border-[#DC2626] transition-all placeholder:text-slate-400"
             />
           </div>
           <div className="relative flex-1">
@@ -168,14 +168,14 @@ export function ZaloDashboardView({ flow, onEnterChat }: ZaloDashboardViewProps)
               onChange={(event) => setNewAccountPhone(event.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") void handleCreateAccount(); }}
               placeholder="Số điện thoại (tùy chọn)"
-              className="border border-slate-200 bg-white h-9 w-full rounded-lg pl-8 pr-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] transition-all placeholder:text-slate-400"
+              className="h-9 w-full rounded-xl border border-slate-100 bg-white pl-8 pr-3 text-xs focus:outline-none focus:ring-1 focus:ring-[#DC2626]/20 focus:border-[#DC2626] transition-all placeholder:text-slate-400"
             />
           </div>
           <button
             type="button"
             onClick={() => void handleCreateAccount()}
             disabled={!newAccountLabel.trim()}
-            className="h-9 bg-[#E3000F] text-white inline-flex items-center justify-center gap-1 rounded-lg px-4 text-[12.5px] font-semibold disabled:cursor-not-allowed disabled:opacity-50 transition hover:bg-red-700 shadow-sm shadow-red-500/20"
+            className="inline-flex h-9 items-center justify-center gap-1 rounded-xl bg-[#DC2626] px-4 text-xs font-semibold text-white transition hover:bg-[#B91C1C] disabled:cursor-not-allowed disabled:opacity-50"
           >
             <MaterialIcon name="add" className="text-[16px]" />
             Thêm

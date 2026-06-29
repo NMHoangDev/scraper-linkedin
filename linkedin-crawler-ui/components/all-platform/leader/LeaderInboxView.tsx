@@ -434,26 +434,13 @@ export function LeaderInboxView({
         }}
       />
       <div
-        style={{
-          position: "relative",
-          zIndex: 10,
-          width: "100%",
-          maxWidth: 960,
-          height: "85vh",
-          backgroundColor: "#ffffff",
-          borderRadius: 16,
-          border: "1px solid #e2e8f0",
-          boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
+        className="relative z-10 w-full h-full sm:h-[85vh] sm:max-w-4xl bg-white sm:rounded-2xl rounded-none sm:border border-slate-200 shadow-xl flex flex-col overflow-hidden"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 bg-slate-50">
           <div>
             <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-              <MaterialIcon name="visibility" className="text-[#E3000F] text-[20px]" />
+              <MaterialIcon name="visibility" className="text-red-600 text-[20px]" />
               Xem Inbox (KPI verification)
             </h2>
             <p className="text-[11px] text-slate-500 mt-0.5">
@@ -498,12 +485,12 @@ export function LeaderInboxView({
                 value={memberEmail}
                 onChange={(e) => setMemberEmail(e.target.value.toLowerCase())}
                 placeholder="email@company.com"
-                className="w-full mt-1 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20"
+                className="w-full mt-1 bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20"
               />
               <button
                 onClick={refreshList}
                 disabled={loadingList || !memberEmail}
-                className="mt-2 w-full rounded-lg bg-[#E3000F] text-white text-xs font-bold py-1.5 hover:bg-[#C40009] transition disabled:opacity-50"
+                className="mt-2 w-full rounded-lg bg-red-600 text-white text-xs font-bold py-1.5 hover:bg-red-700 transition disabled:opacity-50"
               >
                 {loadingList ? "Đang tải…" : "Tải danh sách share"}
               </button>
@@ -532,7 +519,7 @@ export function LeaderInboxView({
                         key={row.conversation_id}
                         className={`w-full text-left px-2 py-1.5 rounded-lg text-[11px] transition ${
                           isActive
-                            ? "bg-[#E3000F]/10 text-[#E3000F]"
+                            ? "bg-red-50 text-red-600 font-bold"
                             : "hover:bg-slate-200/50 text-slate-700"
                         }`}
                       >
@@ -629,7 +616,7 @@ export function LeaderInboxView({
                             className={`inline-flex items-center gap-1 px-3 py-1 rounded-md text-[11px] font-bold transition disabled:opacity-50 ${
                               isVerified
                                 ? "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200"
-                                : "bg-[#E3000F] hover:bg-[#C40009] text-white border border-[#E3000F]"
+                                : "bg-red-700 hover:bg-red-800 text-white border border-red-700"
                             }`}
                             title={
                               isVerified
@@ -695,7 +682,7 @@ export function LeaderInboxView({
                         <div
                           className={`max-w-[70%] rounded-2xl px-3 py-1.5 text-xs ${
                             m.is_sent
-                              ? "bg-[#E3000F] text-white"
+                              ? "bg-red-600 text-white"
                               : "bg-white border border-slate-200 text-slate-800"
                           }`}
                         >
@@ -768,7 +755,7 @@ export function LeaderInboxView({
                             onClick={() => setActiveEmojiTab(i)}
                             className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition ${
                               activeEmojiTab === i
-                                ? "bg-white text-[#E3000F] shadow-sm"
+                                ? "bg-white text-red-600 shadow-sm"
                                 : "text-slate-500 hover:text-slate-800"
                             }`}
                           >

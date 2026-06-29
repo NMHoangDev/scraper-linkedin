@@ -232,7 +232,7 @@ export default function InboxModernLayout(props: Props) {
     }
   };
 
-  const panelH = "h-[590px] xl:h-[676px]";
+  const panelH = "max-h-[420px] xl:h-[676px]";
 
   return (
     <div className="w-full max-w-full overflow-x-hidden text-[#1A1A1A]">
@@ -241,7 +241,7 @@ export default function InboxModernLayout(props: Props) {
         <div>
           <div className="flex items-center gap-2">
             <MaterialIcon name="inbox" className="text-[#E3000F]" />
-            <h1 className="text-xl font-black">Inbox Facebook</h1>
+            <h1 className="text-2xl font-bold tracking-[-0.02em]">Inbox Facebook</h1>
           </div>
           <p className="mt-1 text-sm text-[#666666]">Quản lý hội thoại Messenger, lọc lead và trả lời nhanh bằng mẫu có sẵn.</p>
         </div>
@@ -293,7 +293,7 @@ export default function InboxModernLayout(props: Props) {
         </div>
       )}
 
-      <div className="mb-4 min-w-0 rounded-xl border border-[#E5E5E5] bg-white p-3 shadow-sm">
+      <div className="mb-4 min-w-0 rounded-2xl border border-slate-100 bg-white p-3 shadow-none">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div>
             <div className="text-xs font-bold uppercase text-[#A0A0A0]">Tài khoản nhân viên</div>
@@ -310,12 +310,12 @@ export default function InboxModernLayout(props: Props) {
                   type="date" 
                   value={targetDate} 
                   onChange={e => setTargetDate(e.target.value)}
-                  className="rounded border border-[#E5E5E5] px-2 py-1 text-xs outline-none focus:border-[#E3000F]"
+                  className="rounded-xl border border-slate-100 px-2.5 py-1.5 text-xs outline-none focus:border-[#DC2626] focus:ring-1 focus:ring-[#DC2626]/20"
                 />
                 <button 
                   onClick={handleBulkVerify} 
                   disabled={isBulkVerifying}
-                  className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                  className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
                 >
                   {isBulkVerifying ? "ĐANG TÍNH..." : "TÍNH KPI HÀNG LOẠT"}
                 </button>
@@ -356,9 +356,9 @@ export default function InboxModernLayout(props: Props) {
       </div>
 
       {/* 3-Pane layout — always visible */}
-      <div className="grid min-w-0 grid-cols-[280px_1fr_260px] gap-4">
+      <div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-[280px_1fr_260px]">
         {/* Pane 1: Conversation list */}
-        <section className="min-w-0 overflow-hidden rounded-xl border border-[#E5E5E5] bg-white shadow-sm">
+        <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-none">
           <div className="border-b border-[#E5E5E5] p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
@@ -383,7 +383,7 @@ export default function InboxModernLayout(props: Props) {
             </div>
           </div>
 
-          <div className="h-[560px] overflow-auto p-3 xl:h-[620px]">
+          <div className="max-h-[360px] overflow-auto p-3 xl:h-[620px] xl:max-h-none">
             {viewMode === "archive" ? (
               loadingArchives && archives.length === 0 ? (
                 <div className="py-12 text-center text-sm text-[#A0A0A0]">Đang tải lưu trữ...</div>
@@ -438,8 +438,8 @@ export default function InboxModernLayout(props: Props) {
         </section>
 
         {/* Pane 2: Chat */}
-        <section className="flex h-[656px] min-w-0 flex-col overflow-hidden rounded-xl border border-[#E5E5E5] bg-white shadow-sm xl:h-[716px]">
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#E5E5E5] px-4 py-3 bg-[#FAFAFA]">
+        <section className="flex min-h-[420px] min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-none xl:h-[716px]">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 bg-slate-50/70 px-4 py-3">
             <div className="min-w-0">
               <h2 className="truncate text-base font-black">{selectedName || "Hội thoại"}</h2>
               <p className="truncate text-xs text-[#A0A0A0]">{selectedPreview || (openConv ? "Đang xem nội dung" : "Chọn hội thoại để bắt đầu")}</p>
@@ -483,7 +483,7 @@ export default function InboxModernLayout(props: Props) {
                   return (
                     <div key={`${index}-${message.clientId || time}`} className={`flex ${message.from === "me" ? "justify-end" : "justify-start"}`}>
                       <div className={`max-w-[78%] ${message.from === "me" ? "text-right" : "text-left"}`}>
-                        <div className={`whitespace-pre-wrap rounded-lg px-3 py-2 text-sm leading-relaxed ${message.from === "me" ? "bg-[#E3000F] text-white" : "bg-white text-[#1A1A1A] shadow-sm ring-1 ring-[#E5E5E5]"}`}>
+                        <div className={`whitespace-pre-wrap rounded-lg px-3 py-2 text-sm leading-relaxed ${message.from === "me" ? "bg-[#DC2626]/10 text-[#DC2626]" : "bg-slate-100 text-slate-800"}`}>
                           {content}
                         </div>
                         {time && <div className="mt-1 px-1 text-[10px] text-[#A0A0A0]">{time}</div>}
@@ -513,10 +513,10 @@ export default function InboxModernLayout(props: Props) {
                 disabled={!canSend}
                 rows={2}
                 placeholder={archiveReading ? "Đang xem lưu trữ..." : needRelogin ? "Cookie hết hạn..." : !accOnline ? "Offline..." : "Nhập trả lời..."}
-                className="min-h-[44px] flex-1 resize-none rounded-lg border border-[#E5E5E5] px-3 py-2 text-sm outline-none transition focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 disabled:cursor-not-allowed disabled:bg-[#F5F5F5]"
+                className="min-h-[44px] flex-1 resize-none rounded-xl border border-slate-100 px-3 py-2 text-sm outline-none transition focus:border-[#DC2626] focus:ring-1 focus:ring-[#DC2626]/20 disabled:cursor-not-allowed disabled:bg-[#F5F5F5]"
               />
               <button onClick={sendReply} disabled={!canSend || !reply.trim()}
-                className="shrink-0 rounded-lg bg-[#E3000F] px-5 text-sm font-black text-white transition hover:bg-[#C40009] disabled:cursor-not-allowed disabled:opacity-50">
+                className="shrink-0 rounded-xl bg-[#DC2626] px-5 text-sm font-black text-white transition hover:bg-[#B91C1C] disabled:cursor-not-allowed disabled:opacity-50">
                 Gửi
               </button>
             </div>
@@ -524,8 +524,8 @@ export default function InboxModernLayout(props: Props) {
         </section>
 
         {/* Pane 3: Panel (Templates / Customer / KPI) */}
-        <aside className="min-w-0 overflow-hidden rounded-xl border border-[#E5E5E5] bg-white shadow-sm flex flex-col">
-          <div className="grid grid-cols-3 border-b border-[#E5E5E5] bg-[#FAFAFA] text-xs font-black shrink-0">
+        <aside className="min-w-0 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-none flex flex-col">
+          <div className="grid grid-cols-3 shrink-0 border-b border-slate-100 bg-slate-50/70 text-xs font-black">
             <button onClick={() => { setPanelTab("templates"); panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" }); }}
               className={`py-3 ${panelTab === "templates" ? "bg-white text-[#E3000F]" : "text-[#666666]"}`}>Mẫu</button>
             <button onClick={() => { setPanelTab("customer"); panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" }); }}

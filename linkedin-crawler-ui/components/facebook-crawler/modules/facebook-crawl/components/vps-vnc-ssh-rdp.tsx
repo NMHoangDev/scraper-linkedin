@@ -155,17 +155,17 @@ const SshScreen = ({ vps, isFocused, onFocus }: { vps: Vps, isFocused: boolean, 
       onClick={!isFocused ? handleClick : undefined}
     >
       {/* Header Bar */}
-      <div className={`flex items-center justify-between px-3 py-1.5 font-bold shrink-0 z-20 ${isFocused ? "bg-emerald-600 text-white py-3 px-4 text-sm" : "bg-slate-800 text-slate-300 text-xs"}`}>
+      <div className={`flex items-center justify-between px-3 py-1.5 font-medium shrink-0 z-20 capitalize ${isFocused ? "bg-slate-800 text-white py-3 px-4 text-sm" : "bg-slate-800 text-slate-300 text-xs"}`}>
         <div className="flex items-center gap-2">
           <MaterialIcon name={"terminal" as any} className="text-[14px]" />
           <span>{vps.display_name || "Khuyết danh"} ({vps.ip}) {vps.port ? `:${vps.port}` : ""}</span>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            {status === "connecting" && <span className="text-yellow-400 animate-pulse">Đang kết nối...</span>}
-            {status === "connected" && <span className="text-emerald-300 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-300"></span> Trực tuyến</span>}
-            {status === "disconnected" && <span className="text-slate-400">Đã ngắt kết nối</span>}
-            {status === "error" && <span className="text-red-400">Lỗi kết nối</span>}
+            {status === "connecting" && <span className="bg-yellow-50 text-yellow-600 px-2 py-0.5 rounded-md font-medium text-[10px]">Đang kết nối...</span>}
+            {status === "connected" && <span className="bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-md font-medium text-[10px] flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Trực tuyến</span>}
+            {status === "disconnected" && <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md font-medium text-[10px]">Đã ngắt kết nối</span>}
+            {status === "error" && <span className="bg-red-50 text-red-600 px-2 py-0.5 rounded-md font-medium text-[10px]">Lỗi kết nối</span>}
           </div>
         </div>
       </div>
@@ -265,18 +265,17 @@ const VncScreen = ({ vps, isFocused, onFocus, onClose }: { vps: Vps, isFocused: 
       onClick={!isFocused ? handleClick : undefined}
     >
       {/* Header Bar của màn hình */}
-      <div className={`flex items-center justify-between px-3 py-1.5 font-bold shrink-0 z-20 ${isFocused ? "bg-blue-600 text-white py-3 px-4 text-sm" : "bg-slate-800 text-slate-300 text-xs"
-        }`}>
+      <div className={`flex items-center justify-between px-3 py-1.5 font-medium shrink-0 z-20 capitalize ${isFocused ? "bg-slate-800 text-white py-3 px-4 text-sm" : "bg-slate-800 text-slate-300 text-xs"}`}>
         <div className="flex items-center gap-2">
           <MaterialIcon name={"computer" as any} className="text-[14px]" />
           <span>{vps.display_name || "Khuyết danh"} ({vps.ip}) {vps.port ? `:${vps.port}` : ""}</span>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            {status === "connecting" && <span className="text-yellow-400 animate-pulse">Đang kết nối...</span>}
-            {status === "connected" && <span className="text-emerald-400 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Trực tuyến</span>}
-            {status === "disconnected" && <span className="text-slate-400">Đã ngắt kết nối</span>}
-            {status === "error" && <span className="text-red-400">Lỗi kết nối</span>}
+            {status === "connecting" && <span className="bg-yellow-50 text-yellow-600 px-2 py-0.5 rounded-md font-medium text-[10px]">Đang kết nối...</span>}
+            {status === "connected" && <span className="bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-md font-medium text-[10px] flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Trực tuyến</span>}
+            {status === "disconnected" && <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md font-medium text-[10px]">Đã ngắt kết nối</span>}
+            {status === "error" && <span className="bg-red-50 text-red-600 px-2 py-0.5 rounded-md font-medium text-[10px]">Lỗi kết nối</span>}
           </div>
           {isFocused && (
             <button
@@ -349,14 +348,14 @@ prompt for credentials:i:1
       onClick={!isFocused ? onFocus : undefined}
     >
       {/* Header Bar */}
-      <div className={`flex items-center justify-between px-3 py-1.5 font-bold shrink-0 z-20 ${isFocused ? "bg-purple-600 text-white py-3 px-4 text-sm" : "bg-slate-800 text-slate-300 text-xs"}`}>
+      <div className={`flex items-center justify-between px-3 py-1.5 font-medium shrink-0 z-20 capitalize ${isFocused ? "bg-slate-800 text-white py-3 px-4 text-sm" : "bg-slate-800 text-slate-300 text-xs"}`}>
         <div className="flex items-center gap-2">
           <MaterialIcon name={"desktop_windows" as any} className="text-[14px]" />
           <span>{vps.display_name || "Khuyết danh"} ({vps.ip}) {vps.port ? `:${vps.port}` : ""}</span>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <span className="text-purple-400 font-medium">Chế độ RDP</span>
+            <span className="bg-purple-50 text-purple-600 px-2 py-0.5 rounded-md font-medium text-[10px]">Chế độ RDP</span>
           </div>
           {isFocused && (
             <button
@@ -459,10 +458,10 @@ export function VpsVncManager() {
   });
 
   return (
-    <div className="flex w-full h-full flex-col gap-4 font-sans bg-slate-50 p-4 min-h-screen">
+    <div className="flex w-full flex-col gap-4 font-sans bg-white min-h-screen">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">Giám Sát Đa VPS (VNC/SSH/RDP)</h1>
+          <h1 className="text-2xl font-bold tracking-[-0.02em] text-slate-900">Giám sát đa VPS (VNC/SSH/RDP)</h1>
           <p className="text-sm text-slate-500 font-medium mt-1">
             Quản lý trực tiếp giao diện đồ họa và dòng lệnh máy ảo từ trình duyệt.
           </p>
@@ -470,40 +469,40 @@ export function VpsVncManager() {
 
         <div className="flex flex-wrap items-center gap-3">
           {/* Bộ lọc giao thức */}
-          <div className="bg-white p-1 rounded-lg shadow-sm border border-slate-200 flex text-sm font-bold">
+          <div className="bg-slate-100/80 p-0.5 rounded-lg flex gap-0.5 text-sm font-medium">
             <button
-              className={`px-4 py-1.5 rounded-md transition cursor-pointer ${protocolFilter === "all" ? "bg-slate-800 text-white shadow-sm" : "text-slate-500 hover:bg-slate-100"}`}
+              className={`px-4 py-1.5 transition cursor-pointer ${protocolFilter === "all" ? "bg-[#DC2626] text-white shadow-sm rounded-md" : "text-slate-500 hover:text-slate-700 rounded-md"}`}
               onClick={() => setProtocolFilter("all")}
             >
               Tất cả
             </button>
             <button
-              className={`px-4 py-1.5 rounded-md transition cursor-pointer flex items-center gap-1 ${protocolFilter === "vnc" ? "bg-blue-600 text-white shadow-sm" : "text-slate-500 hover:bg-slate-100"}`}
+              className={`px-4 py-1.5 transition cursor-pointer flex items-center gap-1 ${protocolFilter === "vnc" ? "bg-[#DC2626] text-white shadow-sm rounded-md" : "text-slate-500 hover:text-slate-700 rounded-md"}`}
               onClick={() => setProtocolFilter("vnc")}
             >
               <MaterialIcon name={"computer" as any} className="text-[16px]" /> VNC
             </button>
             <button
-              className={`px-4 py-1.5 rounded-md transition cursor-pointer flex items-center gap-1 ${protocolFilter === "ssh" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-500 hover:bg-slate-100"}`}
+              className={`px-4 py-1.5 transition cursor-pointer flex items-center gap-1 ${protocolFilter === "ssh" ? "bg-[#DC2626] text-white shadow-sm rounded-md" : "text-slate-500 hover:text-slate-700 rounded-md"}`}
               onClick={() => setProtocolFilter("ssh")}
             >
               <MaterialIcon name={"terminal" as any} className="text-[16px]" /> SSH
             </button>
             <button
-              className={`px-4 py-1.5 rounded-md transition cursor-pointer flex items-center gap-1 ${protocolFilter === "rdp" ? "bg-purple-600 text-white shadow-sm" : "text-slate-500 hover:bg-slate-100"}`}
+              className={`px-4 py-1.5 transition cursor-pointer flex items-center gap-1 ${protocolFilter === "rdp" ? "bg-[#DC2626] text-white shadow-sm rounded-md" : "text-slate-500 hover:text-slate-700 rounded-md"}`}
               onClick={() => setProtocolFilter("rdp")}
             >
               <MaterialIcon name={"desktop_windows" as any} className="text-[16px]" /> RDP
             </button>
           </div>
 
-          <div className="bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200 flex items-center gap-3">
-            <div className="text-sm font-bold text-slate-600">
-              Tổng: <span className="text-blue-600">{filteredVpsList.length}</span>
+          <div className="bg-white border border-slate-100 px-3 py-1.5 rounded-lg flex items-center gap-3">
+            <div className="text-sm font-medium text-slate-600">
+              Tổng: <span className="text-[#DC2626] font-bold">{filteredVpsList.length}</span>
             </div>
-            <div className="w-px h-4 bg-slate-300"></div>
+            <div className="w-px h-4 bg-slate-200"></div>
             <button
-              className="text-sm font-bold text-slate-500 hover:text-slate-800 transition flex items-center gap-1 cursor-pointer"
+              className="text-sm font-medium text-slate-500 hover:text-[#DC2626] transition flex items-center gap-1 cursor-pointer"
               onClick={() => setFocusedVpsId(null)}
             >
               <MaterialIcon name={"close" as any} className="text-[16px]" />
@@ -535,7 +534,8 @@ export function VpsVncManager() {
 
       {/* Grid Layout chứa các màn hình VPS */}
       {!isLoading && !error && filteredVpsList.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 flex-1 auto-rows-fr">
+        <div className="bg-white border border-slate-100 rounded-2xl p-6 mt-4 flex-1">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 auto-rows-fr h-full">
           {filteredVpsList.map((vps) => {
             const protocol = vps.vps_protocol_enum?.toLowerCase() || "vnc";
 
@@ -570,6 +570,7 @@ export function VpsVncManager() {
               />
             );
           })}
+          </div>
         </div>
       )}
 

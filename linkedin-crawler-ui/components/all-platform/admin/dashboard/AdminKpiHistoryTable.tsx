@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { MaterialIcon } from "@/components/ui";
 import { allPlatformKpiService } from "@/services/all-platform.service";
+import { FaChevronDown, FaChevronUp } from "react-icons/fa";
 
 interface KpiTeamStats {
   team_id: string; team_name: string;
@@ -24,6 +25,7 @@ export function AdminKpiHistoryTable({ leaderEmail, weeks = 4 }: Props) {
   const [data, setData] = useState<WeeklySnapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [openAccordion, setOpenAccordion] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -46,21 +48,125 @@ export function AdminKpiHistoryTable({ leaderEmail, weeks = 4 }: Props) {
   };
 
   const PctCell = ({ pct }: { pct: number }) => {
-    let colorClass = "text-[#1A1A1A]";
-    let bgClass = "";
-    if (pct >= 100) { colorClass = "text-emerald-700 font-bold"; bgClass = "bg-emerald-50"; }
-    else if (pct >= 70) { colorClass = "text-amber-700 font-bold"; bgClass = "bg-amber-50"; }
-    else { colorClass = "text-red-600 font-bold"; bgClass = "bg-red-50"; }
-    return <td className={`border border-slate-200 px-2 py-1.5 text-right ${colorClass} ${bgClass}`}>{pct}%</td>;
+    let colorClass = "text-[#000000] font-bold";
+    let bgClass = "bg-white";
+    if (pct === 0) { 
+      colorClass = "text-[#DC2626] font-black"; 
+    } else if (pct >= 100) {
+      bgClass = "bg-emerald-200";
+      colorClass = "text-emerald-800 font-bold";
+    }
+    return <td className={`border-b border-r border-slate-50 px-2 py-1.5 text-right ${colorClass} ${bgClass}`}>{pct}%</td>;
+  };
+
+  const renderMobileAccordion = () => {
+    if (loading || error || data.length === 0) return null;
+    return (
+      <div className="block lg:hidden divide-y divide-slate-100 p-2">
+        {data.map((snapshot) => (
+          <div key={snapshot.week_name} className="py-2">
+            <h4 className="text-xs font-bold text-slate-500 uppercase px-2 mb-2">{snapshot.week_name}</h4>
+            <div className="flex flex-col gap-2">
+              {snapshot.teams.map((team) => {
+                const id = `${snapshot.week_name}-${team.team_id}`;
+                const isOpen = openAccordion === id;
+
+                const pctLead = calcPct(team.lead_actual, team.lead_target);
+                const pctInbox = calcPct(team.inbox_actual, team.inbox_target);
+                const pctPost = calcPct(team.post_actual, team.post_target);
+                const pctCmm = calcPct(team.comment_actual, team.comment_target);
+                const cap = (v: number) => Math.min(v, 150);
+                const totalPct = Math.round(cap(pctLead)*0.4 + cap(pctInbox)*0.4 + cap(pctPost)*0.15 + cap(pctCmm)*0.05);
+
+                const totalColor = totalPct < 100 ? "text-red-600" : "text-emerald-600";
+
+                return (
+                  <div key={team.team_id} className="border-b border-r border-slate-50 rounded-lg overflow-hidden bg-white">
+                    {/* Header Card */}
+                    <button 
+                      onClick={() => setOpenAccordion(isOpen ? null : id)}
+                      className="w-full flex items-center justify-between p-3 bg-white hover:bg-slate-50 transition active:bg-slate-100 cursor-pointer"
+                    >
+                      <div className="text-sm font-bold text-slate-800 text-left">
+                        {team.team_name}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-bold ${totalColor}`}>
+                          Tổng: {totalPct}%
+                        </span>
+                        {isOpen ? <FaChevronUp className="text-slate-400 text-[10px]" /> : <FaChevronDown className="text-slate-400 text-[10px]" />}
+                      </div>
+                    </button>
+
+                    {/* Content Card */}
+                    {isOpen && (
+                      <div className="grid grid-cols-2 gap-2 border-t border-slate-200 bg-slate-50 p-3">
+                        {/* Lead */}
+                        <div className="rounded-xl border border-slate-200 bg-white p-2.5 text-[10px] shadow-sm">
+                          <div className="mb-1 font-bold uppercase text-amber-600">Lead</div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-700 font-medium">Số: {team.lead_actual}</span>
+                            <span className="text-slate-500 font-medium">KPI: {team.lead_target}</span>
+                          </div>
+                          <div className="mt-1 font-black text-right text-slate-900">
+                            %: {pctLead}%
+                          </div>
+                        </div>
+
+                        {/* Inbox */}
+                        <div className="rounded-xl border border-slate-200 bg-white p-2.5 text-[10px] shadow-sm">
+                          <div className="mb-1 font-bold uppercase text-sky-600">Inbox</div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-700 font-medium">Số: {team.inbox_actual}</span>
+                            <span className="text-slate-500 font-medium">KPI: {team.inbox_target}</span>
+                          </div>
+                          <div className="mt-1 font-black text-right text-slate-900">
+                            %: {pctInbox}%
+                          </div>
+                        </div>
+
+                        {/* Post */}
+                        <div className="rounded-xl border border-slate-200 bg-white p-2.5 text-[10px] shadow-sm">
+                          <div className="mb-1 font-bold uppercase text-violet-600">Post</div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-700 font-medium">Số: {team.post_actual}</span>
+                            <span className="text-slate-500 font-medium">KPI: {team.post_target}</span>
+                          </div>
+                          <div className="mt-1 font-black text-right text-slate-900">
+                            %: {pctPost}%
+                          </div>
+                        </div>
+
+                        {/* Comment */}
+                        <div className="rounded-xl border border-slate-200 bg-white p-2.5 text-[10px] shadow-sm">
+                          <div className="mb-1 font-bold uppercase text-emerald-600">Comment</div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-700 font-medium">Số: {team.comment_actual}</span>
+                            <span className="text-slate-500 font-medium">KPI: {team.comment_target}</span>
+                          </div>
+                          <div className="mt-1 font-black text-right text-slate-900">
+                            %: {pctCmm}%
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   return (
-    <div className="bg-white rounded-xl border border-[#E5E5E5] shadow-sm overflow-hidden flex flex-col mt-6">
-      <div className="p-4 border-b border-[#E5E5E5] flex items-center justify-between bg-slate-50/50">
+    <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden flex flex-col mb-6">
+      <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-white">
         <div>
           <h2 className="text-base font-bold text-[#1A1A1A] flex items-center gap-2">
-            <MaterialIcon name="table_view" className="text-emerald-600" />
-            Bảng Tổng hợp KPI theo Tuần (History)
+            <MaterialIcon name="table_view" className="text-red-600" />
+            Bảng Tổng hợp KPI theo Tuần 
           </h2>
           <p className="text-xs text-[#666666] mt-0.5">
             {loading ? "Đang tải..." : error ? error : `${weeks} tuần gần nhất • Inbox + Post KPI thực tế`}
@@ -81,25 +187,29 @@ export function AdminKpiHistoryTable({ leaderEmail, weeks = 4 }: Props) {
         <div className="p-8 text-center text-slate-400 text-sm">Chưa có dữ liệu KPI</div>
       )}
 
+      {/* Render Mobile Accordion */}
+      {renderMobileAccordion()}
+
+      {/* Render Desktop Table */}
       {!loading && !error && data.length > 0 && (
-        <div className="overflow-x-auto p-4">
+        <div className="hidden lg:block overflow-x-auto p-4">
           <table className="w-full text-[11px] border-collapse min-w-[1000px]">
-            <thead>
+            <thead className="bg-[#DC2626] text-white">
               <tr>
-                <th className="border border-slate-300 bg-slate-100 p-2 text-center font-bold text-slate-700 w-[80px]" rowSpan={2}>TUẦN</th>
-                <th className="border border-slate-300 bg-slate-100 p-2 text-left font-bold text-slate-700 min-w-[120px]" rowSpan={2}>TEAM</th>
-                <th className="border border-indigo-200 bg-indigo-50 p-1.5 text-center font-black text-indigo-700" colSpan={3}>LEAD (40%)</th>
-                <th className="border border-amber-200 bg-amber-50 p-1.5 text-center font-black text-amber-700" colSpan={3}>INBOX (40%)</th>
-                <th className="border border-blue-200 bg-blue-50 p-1.5 text-center font-black text-blue-700" colSpan={3}>POST (15%)</th>
-                <th className="border border-teal-200 bg-teal-50 p-1.5 text-center font-black text-teal-700" colSpan={3}>COMMENT (5%)</th>
-                <th className="border border-slate-300 bg-slate-800 p-1.5 text-center font-black text-white" colSpan={2}>TỔNG KẾT</th>
+                <th className="text-white font-bold text-xs py-3 px-4 border-r border-white/20 text-center uppercase w-[80px]" rowSpan={2}>Tuần</th>
+                <th className="text-white font-bold text-xs py-3 px-4 border-r border-white/20 text-left uppercase min-w-[120px]" rowSpan={2}>Team</th>
+                <th className="text-white font-bold text-xs py-2 px-2 border-r border-b border-white/20 text-center uppercase" colSpan={3}>Lead (40%)</th>
+                <th className="text-white font-bold text-xs py-2 px-2 border-r border-b border-white/20 text-center uppercase" colSpan={3}>Inbox (40%)</th>
+                <th className="text-white font-bold text-xs py-2 px-2 border-r border-b border-white/20 text-center uppercase" colSpan={3}>Post (15%)</th>
+                <th className="text-white font-bold text-xs py-2 px-2 border-r border-b border-white/20 text-center uppercase" colSpan={3}>Comment (5%)</th>
+                <th className="text-white font-bold text-xs py-2 px-2 border-b border-white/20 text-center uppercase" colSpan={2}>Tổng kết</th>
               </tr>
-              <tr className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase">
+              <tr>
                 {["Số", "KPI", "%", "Số", "KPI", "%", "Số", "KPI", "%", "Số", "KPI", "%"].map((h, i) => (
-                  <th key={i} className="border border-slate-200 px-2 py-1 text-center w-[40px]">{h}</th>
+                  <th key={i} className="text-white font-bold text-[10px] py-1.5 px-2 border-r border-white/20 text-center uppercase w-[40px]">{h}</th>
                 ))}
-                <th className="border border-slate-300 px-2 py-1 text-center w-[60px] bg-slate-100 text-slate-700">TỔNG %</th>
-                <th className="border border-slate-300 px-2 py-1 text-center w-[80px] bg-slate-100 text-slate-700">THƯỞNG</th>
+                <th className="text-white font-bold text-[10px] py-1.5 px-2 border-r border-white/20 text-center uppercase w-[60px]">Tổng %</th>
+                <th className="text-white font-bold text-[10px] py-1.5 px-2 text-center uppercase w-[80px]">Thưởng</th>
               </tr>
             </thead>
             <tbody>
@@ -125,48 +235,48 @@ export function AdminKpiHistoryTable({ leaderEmail, weeks = 4 }: Props) {
                       const bonusColor = totalPct >= 100 ? "text-emerald-600 font-bold" : totalPct >= 80 ? "text-amber-600 font-bold" : "text-slate-400";
 
                       return (
-                        <tr key={team.team_id} className="hover:bg-blue-50/30 transition-colors">
+                        <tr key={team.team_id} className="bg-white hover:bg-slate-50 transition-colors">
                           {idx === 0 && (
-                            <td className="border border-slate-300 px-2 py-1.5 text-center font-black text-slate-800 align-middle bg-white" rowSpan={snapshot.teams.length + 1}>
+                            <td className="border-b border-r border-slate-50 px-2 py-1.5 text-center font-black text-slate-800 align-middle bg-white" rowSpan={snapshot.teams.length + 1}>
                               {snapshot.week_name}
                             </td>
                           )}
-                          <td className="border border-slate-200 px-2 py-1.5 text-left font-bold text-slate-800">{team.team_name}</td>
-                          <td className="border border-slate-200 px-2 py-1.5 text-right font-medium">{team.lead_actual}</td>
-                          <td className="border border-slate-200 px-2 py-1.5 text-right text-slate-500">{team.lead_target}</td>
+                          <td className="border-b border-r border-slate-50 px-2 py-1.5 text-left font-bold text-slate-800">{team.team_name}</td>
+                          <td className="border-b border-r border-slate-50 px-2 py-1.5 text-right font-medium">{team.lead_actual}</td>
+                          <td className="border-b border-r border-slate-50 px-2 py-1.5 text-right text-slate-500">{team.lead_target}</td>
                           <PctCell pct={pctLead} />
-                          <td className="border border-slate-200 px-2 py-1.5 text-right font-medium">{team.inbox_actual}</td>
-                          <td className="border border-slate-200 px-2 py-1.5 text-right text-slate-500">{team.inbox_target}</td>
+                          <td className="border-b border-r border-slate-50 px-2 py-1.5 text-right font-medium">{team.inbox_actual}</td>
+                          <td className="border-b border-r border-slate-50 px-2 py-1.5 text-right text-slate-500">{team.inbox_target}</td>
                           <PctCell pct={pctInbox} />
-                          <td className="border border-slate-200 px-2 py-1.5 text-right font-medium">{team.post_actual}</td>
-                          <td className="border border-slate-200 px-2 py-1.5 text-right text-slate-500">{team.post_target}</td>
+                          <td className="border-b border-r border-slate-50 px-2 py-1.5 text-right font-medium">{team.post_actual}</td>
+                          <td className="border-b border-r border-slate-50 px-2 py-1.5 text-right text-slate-500">{team.post_target}</td>
                           <PctCell pct={pctPost} />
-                          <td className="border border-slate-200 px-2 py-1.5 text-right font-medium">{team.comment_actual}</td>
-                          <td className="border border-slate-200 px-2 py-1.5 text-right text-slate-500">{team.comment_target}</td>
+                          <td className="border-b border-r border-slate-50 px-2 py-1.5 text-right font-medium">{team.comment_actual}</td>
+                          <td className="border-b border-r border-slate-50 px-2 py-1.5 text-right text-slate-500">{team.comment_target}</td>
                           <PctCell pct={pctCmm} />
-                          <td className={`border border-slate-300 px-2 py-1.5 text-center font-black ${totalPct >= 100 ? 'text-emerald-600 bg-emerald-50/50' : totalPct >= 80 ? 'text-amber-600 bg-amber-50/50' : 'text-red-600 bg-red-50/50'}`}>{totalPct}%</td>
-                          <td className={`border border-slate-300 px-2 py-1.5 text-right bg-slate-50/50 ${bonusColor}`}>{bonus}</td>
+                          <td className={`border-b border-r border-slate-50 px-2 py-1.5 text-center font-black ${totalPct >= 100 ? 'text-emerald-800 bg-emerald-200' : totalPct >= 80 ? 'text-amber-700 bg-amber-100' : 'text-[#DC2626] bg-white'}`}>{totalPct}%</td>
+                          <td className={`border-b border-r border-slate-50 px-2 py-1.5 text-right bg-slate-50/50 ${bonusColor}`}>{bonus}</td>
                         </tr>
                       );
                     })}
                     <tr className="bg-slate-100 font-bold text-slate-700">
-                      <td className="border border-slate-300 px-2 py-1.5 text-right text-[10px] uppercase">Tổng {snapshot.week_name}</td>
-                      <td className="border border-slate-300 px-2 py-1.5 text-right">{weekSum.lead_a}</td>
-                      <td className="border border-slate-300 px-2 py-1.5 text-right text-slate-500">{weekSum.lead_t}</td>
+                      <td className="border-b border-r border-slate-50 px-2 py-1.5 text-right text-[10px] uppercase">Tổng {snapshot.week_name}</td>
+                      <td className="border-b border-r border-slate-50 px-2 py-1.5 text-right">{weekSum.lead_a}</td>
+                      <td className="border-b border-r border-slate-50 px-2 py-1.5 text-right text-slate-500">{weekSum.lead_t}</td>
                       <PctCell pct={calcPct(weekSum.lead_a, weekSum.lead_t)} />
-                      <td className="border border-slate-300 px-2 py-1.5 text-right">{weekSum.inbox_a}</td>
-                      <td className="border border-slate-300 px-2 py-1.5 text-right text-slate-500">{weekSum.inbox_t}</td>
+                      <td className="border-b border-r border-slate-50 px-2 py-1.5 text-right">{weekSum.inbox_a}</td>
+                      <td className="border-b border-r border-slate-50 px-2 py-1.5 text-right text-slate-500">{weekSum.inbox_t}</td>
                       <PctCell pct={calcPct(weekSum.inbox_a, weekSum.inbox_t)} />
-                      <td className="border border-slate-300 px-2 py-1.5 text-right">{weekSum.post_a}</td>
-                      <td className="border border-slate-300 px-2 py-1.5 text-right text-slate-500">{weekSum.post_t}</td>
+                      <td className="border-b border-r border-slate-50 px-2 py-1.5 text-right">{weekSum.post_a}</td>
+                      <td className="border-b border-r border-slate-50 px-2 py-1.5 text-right text-slate-500">{weekSum.post_t}</td>
                       <PctCell pct={calcPct(weekSum.post_a, weekSum.post_t)} />
-                      <td className="border border-slate-300 px-2 py-1.5 text-right">{weekSum.cmm_a}</td>
-                      <td className="border border-slate-300 px-2 py-1.5 text-right text-slate-500">{weekSum.cmm_t}</td>
+                      <td className="border-b border-r border-slate-50 px-2 py-1.5 text-right">{weekSum.cmm_a}</td>
+                      <td className="border-b border-r border-slate-50 px-2 py-1.5 text-right text-slate-500">{weekSum.cmm_t}</td>
                       <PctCell pct={calcPct(weekSum.cmm_a, weekSum.cmm_t)} />
-                      <td className="border border-slate-300 px-2 py-1.5 text-center bg-slate-200">
+                      <td className="border-b border-r border-slate-50 px-2 py-1.5 text-center bg-slate-200">
                         {Math.round(calcPct(weekSum.lead_a,weekSum.lead_t)*0.4 + calcPct(weekSum.inbox_a,weekSum.inbox_t)*0.4 + calcPct(weekSum.post_a,weekSum.post_t)*0.15 + calcPct(weekSum.cmm_a,weekSum.cmm_t)*0.05)}%
                       </td>
-                      <td className="border border-slate-300 px-2 py-1.5 bg-slate-200"></td>
+                      <td className="border-b border-r border-slate-50 px-2 py-1.5 bg-slate-200"></td>
                     </tr>
                   </React.Fragment>
                 );
