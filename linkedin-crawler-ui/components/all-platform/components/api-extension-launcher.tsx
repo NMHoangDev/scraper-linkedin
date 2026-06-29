@@ -10,6 +10,7 @@ declare const chrome: any;
 import { useState, useCallback, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { allPlatformGroupsService, authService } from "@/services/all-platform.service";
+import { API_BASE_URL } from "@/lib/env";
 
 interface ExtensionGroup {
   id: string;
@@ -201,7 +202,8 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
 
     const connect = () => {
       try {
-        const wsUrl = `${process.env.NEXT_PUBLIC_API_WS_URL || 'ws://localhost:8000'}/api/all-platform/ws/crawl-status`;
+        const baseUrl = API_BASE_URL || "http://localhost:8000";
+        const wsUrl = `${baseUrl.replace("http://", "ws://").replace("https://", "wss://")}/api/all-platform/ws/crawl-status`;
         ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
