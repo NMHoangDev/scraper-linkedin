@@ -94,6 +94,10 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
     }
   };
 
+  const isRejected = (link?: string) => {
+    return link && link.startsWith("Bị từ chối");
+  };
+
   const score = post.score || 0;
   let scoreBg = "bg-slate-100 text-slate-700 border-slate-200";
   if (score >= 85) scoreBg = "bg-red-50 text-[#E3000F] border-red-100";
@@ -176,13 +180,20 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
                   <span className="text-emerald-500 font-serif font-bold text-lg leading-none ml-1">"</span>
                 </p>
                 <div className="flex items-center justify-between mt-1">
-                  {seed.link_comment && (
+                  {seed.link_comment && !isRejected(seed.link_comment) && (
                     <a href={seed.link_comment} target="_blank" rel="noopener noreferrer" className="text-[10px] font-medium text-blue-600 hover:underline inline-flex items-center gap-1">
                       Xem bình luận <FiExternalLink className="w-3 h-3" />
                     </a>
                   )}
-                  {seed.verify_status === "yes" ? (
+                  {seed.link_comment && isRejected(seed.link_comment) && (
+                    <span className="text-[10px] font-medium text-red-600 inline-flex items-center gap-1">
+                      Bị từ chối / Lỗi
+                    </span>
+                  )}
+                  {seed.verify_status === "yes" && !isRejected(seed.link_comment) ? (
                     <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700">✓ Đã xác minh</span>
+                  ) : seed.verify_status === "yes" && isRejected(seed.link_comment) ? (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700">X Bị từ chối</span>
                   ) : (
                     <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700">Chờ xác minh</span>
                   )}
@@ -201,10 +212,15 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
               {post.seeding_content}
               <span className="text-emerald-500 font-serif font-bold text-lg leading-none ml-1">"</span>
             </p>
-            {post.link_comment && (
+            {post.link_comment && !isRejected(post.link_comment) && (
               <a href={post.link_comment} target="_blank" rel="noopener noreferrer" className="text-[10px] font-medium text-blue-600 hover:underline inline-flex items-center gap-1 mt-0.5">
                 Xem bình luận <FiExternalLink className="w-3 h-3" />
               </a>
+            )}
+            {post.link_comment && isRejected(post.link_comment) && (
+              <span className="text-[10px] font-medium text-red-600 inline-flex items-center gap-1 mt-0.5">
+                Bị từ chối / Lỗi
+              </span>
             )}
           </div>
         ) : null}
@@ -232,9 +248,13 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
           </div>
 
           <div className="flex items-center gap-2">
-            {verifyStatus === "yes" ? (
+            {verifyStatus === "yes" && !isRejected(post.link_comment) ? (
               <span className="px-2.5 py-1 rounded-md text-[11px] font-bold border bg-green-100 text-green-700 border-green-200">
                 ✓ Đã xác minh
+              </span>
+            ) : verifyStatus === "yes" && isRejected(post.link_comment) ? (
+              <span className="px-2.5 py-1 rounded-md text-[11px] font-bold border bg-red-100 text-red-700 border-red-200">
+                X Bị từ chối
               </span>
             ) : verifyStatus === "pending" ? (
               <span className="px-2.5 py-1 rounded-md text-[11px] font-bold border bg-emerald-100 text-emerald-700 border-emerald-200">

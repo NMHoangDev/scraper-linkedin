@@ -40,23 +40,40 @@ function getDefaultHeaders(): Record<string, string> {
 async function requestJson<T = any>(
   path: string,
   init?: RequestInit,
+  retries: number = 1
 ): Promise<ApiResponse<T>> {
-  try {
-    const res = await fetch(path, {
-      ...init,
-      credentials: "include",
-      headers: {
-        ...getDefaultHeaders(),
-        ...(init?.headers || {}),
-      },
-    });
-    return res.json();
-  } catch (err) {
-    return {
-      success: false,
-      message: err instanceof Error ? err.message : "Network error",
-    };
+  let lastError: any = null;
+  
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(path, {
+        ...init,
+        credentials: "include",
+        headers: {
+          ...getDefaultHeaders(),
+          ...(init?.headers || {}),
+        },
+      });
+      
+      // Nếu server trả về lỗi 5xx, có thể do đang khởi động lại hoặc load balancer ngắt kết nối
+      if (!res.ok && res.status >= 500) {
+        throw new Error(`Lỗi máy chủ (${res.status})`);
+      }
+      
+      return await res.json();
+    } catch (err) {
+      lastError = err;
+      if (attempt < retries) {
+        // Đợi 1 giây trước khi thử lại
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
   }
+
+  return {
+    success: false,
+    message: lastError instanceof Error ? lastError.message : "Mất kết nối tới máy chủ (Server disconnected).",
+  };
 }
 
 async function requestJsonWithTimeout<T = any>(
@@ -115,6 +132,9 @@ export const allPlatformSeedingService = {
     content?: string;
     profile_id?: string;
     facebook_name?: string;
+    id_post?: string;
+    id_social_account?: string;
+    id_platform?: number;
   }): Promise<ApiResponse<SeedingMark>> => {
     return requestJson(`${BASE}/facebook/seeding-mark/verify`, {
       method: "POST",
@@ -557,6 +577,7 @@ export const allPlatformPostsService = {
     icp?: string;
     content_type?: string;
     product_seeding?: string;
+    id_member?: string;
     search?: string;
     sort?: string;
     page?: number;
@@ -654,13 +675,14 @@ export const allPlatformCategoriesService = {
 export const allPlatformGroupsService = {
   getAll: (
     platform: string,
-    params?: { intent?: string; team?: string; tier?: number; status?: string },
+    params?: { intent?: string; team?: string; tier?: number; status?: string; id_member?: string },
   ): Promise<ApiResponse<(FacebookGroup | LinkedInGroup)[]>> => {
     const searchParams = new URLSearchParams();
     if (params?.intent) searchParams.set("intent", params.intent);
     if (params?.team) searchParams.set("team", params.team);
     if (params?.tier) searchParams.set("tier", String(params.tier));
     if (params?.status) searchParams.set("status", params.status);
+    if (params?.id_member) searchParams.set("id_member", params.id_member);
     const qs = searchParams.toString();
     const url = `${BASE}/${platform}/groups${qs ? `?${qs}` : ""}`;
     return requestJson(url);
@@ -671,7 +693,7 @@ export const allPlatformGroupsService = {
    * Backend tự động filter theo id_member từ auth token.
    */
   getForExtension: (): Promise<ApiResponse<FacebookGroup[]>> => {
-    return requestJson(`${BASE}/facebook/groups`);
+    return requestJson(`${BASE}/facebook/groups?for_extension=true`);
   },
 
   add: (
@@ -1283,3 +1305,22 @@ export const fbInboxAccountService = {
     });
   },
 };
+
+export const customerLeadsService = {
+  async getLeads() {
+    return requestJson<import('@/types/unified.types').CustomerLead[]>('/customer-leads');
+  },
+  async getSDRs() {
+    return requestJson<any[]>('/customer-leads/sdrs');
+  },
+  async createLead(data: any) {
+    return requestJson('/customer-leads', { method: 'POST', body: JSON.stringify(data) });
+  },
+  async updateLead(id: string, data: any) {
+    return requestJson('/customer-leads/' + id, { method: 'PUT', body: JSON.stringify(data) });
+  },
+  async deleteLead(id: string) {
+    return requestJson('/customer-leads/' + id, { method: 'DELETE' });
+  }
+};
+

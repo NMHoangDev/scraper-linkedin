@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { MaterialIcon, type MaterialSymbolName } from "@/components/ui";
-import { allPlatformKpiService } from "@/services/all-platform.service";
+import { allPlatformKpiService, allPlatformSeedingService } from "@/services/all-platform.service";
 
 /** ─── KPI Type definitions ─────────────────────────────────────────────── */
 export type KpiType = "comment" | "post" | "inbox" | "lead";
@@ -78,9 +78,19 @@ async function fetchKpiData(
 
     if (type === "comment") {
       target  = Number(activeKpi.kpi_comment || 0);
-      // actual seeding comment count → kpi_inbox_current is inbox proxy;
-      // verified_count requires separate seeding_stats fetch (not in getByEmail)
-      current = 0;
+      if (target > 0 && startDate && endDate) {
+        try {
+          const commentRes = await allPlatformSeedingService.getActualCount({
+            email_member: email,
+            date_from: startDate,
+            date_to: endDate,
+            platform: "facebook"
+          });
+          if (commentRes?.success && commentRes.data) {
+            current = Number(commentRes.data.verified_count || 0);
+          }
+        } catch { /* ignore */ }
+      }
     } else if (type === "post") {
       target  = Number(activeKpi.kpi_post || 0);
       // actual FB posts posted in KPI period → call getFbPostKpiSummary

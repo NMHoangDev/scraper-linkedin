@@ -48,17 +48,31 @@ def fb_groups_get_all(
     id_intent: str | None = Query(None),
     id_team: str | None = Query(None),
     id_tier: str | None = Query(None),
+    id_member: str | None = Query(None),
+    for_extension: bool = Query(False),
     authorization: str | None = Header(None),
 ) -> BaseResponse:
     """Get all Facebook groups."""
     try:
         user = _get_user_from_header(authorization, request)
-        id_member = None if user.get("role") in ("admin", "leader") else user["id"]
+        
+        # Determine the effective id_member for filtering
+        if for_extension:
+            # Cho Extension: Leader hay Member đều chỉ cào nhóm của CHÍNH MÌNH (trừ phi admin/leader sau này muốn chọn)
+            effective_id_member = user["id"]
+        else:
+            if user.get("role") in ("admin", "leader"):
+                # Leader/Admin có thể xem all (None) hoặc lọc theo id_member cụ thể
+                effective_id_member = id_member
+            else:
+                # Member chỉ xem được của chính mình
+                effective_id_member = user["id"]
+
         data = get_facebook_groups(
             id_intent=id_intent, 
             id_team=id_team, 
             id_tier=id_tier,
-            id_member=id_member
+            id_member=effective_id_member
         )
         return BaseResponse(success=True, data=data)
     except HTTPException as e:

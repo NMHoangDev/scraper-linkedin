@@ -921,6 +921,7 @@ export function GroupManagementContent() {
   const [teamFilter, setTeamFilter] = useState("all");
   const [tierFilter, setTierFilter] = useState("all");
   const [icpFilter, setIcpFilter] = useState("all");
+  const [memberFilter, setMemberFilter] = useState("all");
   const [contentTypeFilter, setContentTypeFilter] = useState("all");
   const [productSeedingFilter, setProductSeedingFilter] = useState("all");
   const [page, setPage] = useState(1);
@@ -1041,10 +1042,11 @@ export function GroupManagementContent() {
 
         const matchesTier = tierFilter === "all" || String((g as any).id_tier ?? "") === tierFilter;
         const matchesIcp = icpFilter === "all" || String((g as any).id_icp ?? "") === icpFilter;
+        const matchesMember = memberFilter === "all" || String(g.id_member ?? "") === memberFilter;
         const matchesContentType = contentTypeFilter === "all" || String((g as any).id_content_type ?? "") === contentTypeFilter;
         const matchesProductSeeding = productSeedingFilter === "all" || String((g as any).id_product_seeding ?? "") === productSeedingFilter;
 
-        return matchesSearch && matchesIntent && matchesIndustry && matchesTeam && matchesTier && matchesIcp && matchesContentType && matchesProductSeeding;
+        return matchesSearch && matchesIntent && matchesIndustry && matchesTeam && matchesTier && matchesIcp && matchesMember && matchesContentType && matchesProductSeeding;
       })
       .sort((g1, g2) => {
         if (isLeader && user) {
@@ -1068,7 +1070,7 @@ export function GroupManagementContent() {
         const name2 = g2.group_name || "";
         return name1.localeCompare(name2, "vi");
       });
-  }, [fbGroups, search, intentFilter, industryFilter, teamFilter, tierFilter, icpFilter, contentTypeFilter, productSeedingFilter, isAdmin, isLeader, user, myTeamMemberIds, teamsData, getUserName]);
+  }, [fbGroups, search, intentFilter, industryFilter, teamFilter, tierFilter, icpFilter, memberFilter, contentTypeFilter, productSeedingFilter, isAdmin, isLeader, user, myTeamMemberIds, teamsData, getUserName]);
 
   const filteredLi = useMemo(() => {
     return liGroups
@@ -1100,10 +1102,11 @@ export function GroupManagementContent() {
 
         const matchesTier = tierFilter === "all" || String((g as any).id_tier ?? "") === tierFilter;
         const matchesIcp = icpFilter === "all" || String((g as any).id_icp ?? "") === icpFilter;
+        const matchesMember = memberFilter === "all" || String(g.id_member ?? "") === memberFilter;
         const matchesContentType = contentTypeFilter === "all" || String((g as any).id_content_type ?? "") === contentTypeFilter;
         const matchesProductSeeding = productSeedingFilter === "all" || String((g as any).id_product_seeding ?? "") === productSeedingFilter;
 
-        return matchesSearch && matchesIntent && matchesIndustry && matchesTeam && matchesTier && matchesIcp && matchesContentType && matchesProductSeeding;
+        return matchesSearch && matchesIntent && matchesIndustry && matchesTeam && matchesTier && matchesIcp && matchesMember && matchesContentType && matchesProductSeeding;
       })
       .sort((g1, g2) => {
         if (isLeader && user) {
@@ -1127,7 +1130,7 @@ export function GroupManagementContent() {
         const name2 = g2.group_name || "";
         return name1.localeCompare(name2, "vi");
       });
-  }, [liGroups, search, intentFilter, industryFilter, teamFilter, tierFilter, icpFilter, contentTypeFilter, productSeedingFilter, isAdmin, isLeader, user, myTeamMemberIds, teamsData, getUserName]);
+  }, [liGroups, search, intentFilter, industryFilter, teamFilter, tierFilter, icpFilter, memberFilter, contentTypeFilter, productSeedingFilter, isAdmin, isLeader, user, myTeamMemberIds, teamsData, getUserName]);
 
   const handleDeleteGroup = async (id: string) => {
     const res = await allPlatformGroupsService.delete(id, platform);
@@ -1193,29 +1196,49 @@ export function GroupManagementContent() {
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [platform, search, intentFilter, industryFilter, teamFilter, tierFilter, icpFilter, contentTypeFilter, productSeedingFilter]);
+  }, [platform, search, intentFilter, industryFilter, teamFilter, tierFilter, icpFilter, memberFilter, contentTypeFilter, productSeedingFilter]);
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-[#1A1A1A]">Quản lý Groups</h2>
-          <p className="text-sm text-[#A0A0A0]">Thêm, sửa, xóa nhóm Facebook & LinkedIn</p>
+    <div className="max-w-7xl mx-auto space-y-6">
+      {/* Header and Platform Tabs */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4 bg-white p-1 rounded-2xl shadow-sm border border-[#E5E5E5] w-fit">
+          {PLATFORMS.map(({ key, label, Icon }) => (
+            <button
+              key={key}
+              onClick={() => {
+                setPlatform(key);
+                setPage(1);
+              }}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition cursor-pointer ${
+                platform === key
+                  ? "bg-[#E3000F] text-white shadow-md shadow-[#E3000F]/20"
+                  : "text-[#666666] hover:bg-[#F5F5F5] hover:text-[#1A1A1A]"
+              }`}
+            >
+              <Icon className="text-lg" />
+              {label}
+              {platform === key && (
+                <span className="ml-2 bg-white/20 px-2 py-0.5 rounded-full text-xs">
+                  {currentGroups.length}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
+
         <button
           onClick={() => {
             setShowAddForm(true);
             setEditingGroup(null);
           }}
-          className="flex items-center gap-2 bg-[#E3000F] text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-[#C40009] transition shrink-0 cursor-pointer"
+          className="flex items-center gap-2 bg-[#E3000F] text-white px-4 py-3 rounded-xl text-sm font-bold hover:bg-[#C40009] transition shrink-0 cursor-pointer shadow-md shadow-[#E3000F]/20"
         >
           <FaPlus />
           Thêm nhóm
         </button>
       </div>
 
-      {/* Platform tabs */}
       <div className="flex gap-2">
         {PLATFORMS.map(({ key, label, Icon }) => (
           <button
@@ -1341,6 +1364,29 @@ export function GroupManagementContent() {
           ))}
         </select>
 
+        {(isAdmin || isLeader) && (
+          <select
+            value={memberFilter}
+            onChange={(e) => setMemberFilter(e.target.value)}
+            className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
+          >
+            <option value="all">Tất cả Thành viên</option>
+            {userOptions
+              .filter(u => {
+                if (isAdmin) return true;
+                if (isLeader) {
+                  return String(u.id) === String(user?.id) || myTeamMemberIds.has(String(u.id));
+                }
+                return false;
+              })
+              .map((opt) => (
+              <option key={opt.id} value={String(opt.id)}>
+                {opt.name || opt.code}
+              </option>
+            ))}
+          </select>
+        )}
+
         <select
           value={contentTypeFilter}
           onChange={(e) => setContentTypeFilter(e.target.value)}
@@ -1373,6 +1419,7 @@ export function GroupManagementContent() {
           teamFilter !== "all" ||
           tierFilter !== "all" ||
           icpFilter !== "all" ||
+          memberFilter !== "all" ||
           contentTypeFilter !== "all" ||
           productSeedingFilter !== "all") && (
             <button
@@ -1384,6 +1431,7 @@ export function GroupManagementContent() {
                 setTeamFilter("all");
                 setTierFilter("all");
                 setIcpFilter("all");
+                setMemberFilter("all");
                 setContentTypeFilter("all");
                 setProductSeedingFilter("all");
               }}

@@ -62,6 +62,7 @@ def _fetch_posts(
     icp: Optional[str] = None,
     content_type: Optional[str] = None,
     product_seeding: Optional[str] = None,
+    id_member: Optional[str] = None,
     search: Optional[str] = None,
     sort: str = "latest",
     page: int = 1,
@@ -132,6 +133,13 @@ def _fetch_posts(
     else:
         # Member role
         allowed_member_ids = [user_id] if user_id else ["00000000-0000-0000-0000-000000000000"]
+
+    # If id_member is specified, ensure it is within allowed_member_ids
+    if id_member:
+        if allowed_member_ids is None or id_member in allowed_member_ids:
+            allowed_member_ids = [id_member]
+        else:
+            allowed_member_ids = ["00000000-0000-0000-0000-000000000000"]
     
     if table == "facebook_posts":
         if allowed_member_ids is not None:
@@ -299,10 +307,13 @@ def _fetch_posts(
             p["crawler_name"] = member_map[mid].get("name")
             p["crawler_team"] = member_map[mid].get("team_name")
 
-        # Map author_url from author_post relationship
+        # Map author_url and author name from author_post relationship
         author_post_data = p.pop("author_post", None)
         if author_post_data and isinstance(author_post_data, dict):
             p["author_url"] = author_post_data.get("url_profile") or ""
+            author_name = author_post_data.get("name") or author_post_data.get("author_name") or ""
+            p["author"] = author_name
+            p["author_name"] = author_name
 
     return posts, total
 
@@ -501,6 +512,7 @@ def get_unified_posts(
     icp: Optional[str] = None,
     content_type: Optional[str] = None,
     product_seeding: Optional[str] = None,
+    id_member: Optional[str] = None,
     search: Optional[str] = None,
     sort: str = "latest",
     page: int = 1,
@@ -544,6 +556,7 @@ def get_unified_posts(
                 icp=icp,
                 content_type=content_type,
                 product_seeding=product_seeding,
+                id_member=id_member,
                 search=search,
                 sort=db_sort,
                 page=1,
@@ -595,6 +608,7 @@ def get_unified_posts(
             icp=icp,
             content_type=content_type,
             product_seeding=product_seeding,
+            id_member=id_member,
             search=search,
             sort=db_sort,
             page=page,
@@ -697,6 +711,7 @@ def filter_unified_posts(
     icp: Optional[str] = None,
     content_type: Optional[str] = None,
     product_seeding: Optional[str] = None,
+    id_member: Optional[str] = None,
     search: Optional[str] = None,
     sort: str = "latest",
     page: int = 1,
@@ -716,6 +731,7 @@ def filter_unified_posts(
         icp=icp,
         content_type=content_type,
         product_seeding=product_seeding,
+        id_member=id_member,
         search=search,
         sort=sort,
         page=page,

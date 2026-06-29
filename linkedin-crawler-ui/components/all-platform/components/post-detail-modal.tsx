@@ -24,6 +24,10 @@ export function PostDetailModal({
   const [isInboxOpen, setIsInboxOpen] = React.useState(false);
   const inboxRef = React.useRef<HTMLDivElement>(null);
 
+  const isRejected = (link?: string) => {
+    return link && link.startsWith("Bị từ chối");
+  };
+
   const INBOX_TEMPLATES = [
     {
       category: "Dịch vụ Website",
@@ -134,7 +138,7 @@ export function PostDetailModal({
                 {post.tier !== undefined && <span className="rounded bg-orange-50 px-2 py-0.5 text-xs font-bold text-orange-600">Tier {post.tier}</span>}
               </div>
               <span className="text-xs text-slate-500 font-medium block mt-2">
-                Đăng lúc: {post.post_time ? new Date(post.post_time).toLocaleString("vi-VN") : "Không rõ"} • Cào lúc: {post.crawl_date ? new Date(post.crawl_date).toLocaleString("vi-VN") : ""}
+                Tác giả: <span className="font-bold text-slate-700">{post.author || "Người tham gia ẩn danh"}</span> • Đăng lúc: {post.post_time ? new Date(post.post_time).toLocaleString("vi-VN") : "Không rõ"} • Cào lúc: {post.crawl_date ? new Date(post.crawl_date).toLocaleString("vi-VN") : ""}
               </span>
             </div>
           </div>
@@ -145,6 +149,19 @@ export function PostDetailModal({
             </p>
           </div>
 
+          {(post.image_urls && post.image_urls.length > 0) || post.media_url ? (
+            <div className="mb-6 grid grid-cols-2 gap-2 rounded-xl overflow-hidden">
+              {post.media_url && (
+                <div className="col-span-full">
+                  <video src={post.media_url} controls className="w-full max-h-64 object-contain bg-black/5 rounded-lg border border-slate-100" />
+                </div>
+              )}
+              {post.image_urls?.map((url, i) => (
+                <img key={i} src={url} alt={`Post media ${i}`} className="w-full h-48 object-cover rounded-lg border border-slate-100 hover:opacity-90 transition-opacity cursor-pointer" onClick={() => window.open(url, '_blank')} />
+              ))}
+            </div>
+          ) : null}
+
           {post.seeding_content && (
             <div className="bg-emerald-50/50 rounded-xl border border-emerald-100 p-4 mb-6">
               <div className="flex items-center gap-2 mb-2">
@@ -154,11 +171,19 @@ export function PostDetailModal({
               <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed italic border-l-4 border-emerald-300 pl-3 py-1">
                 {post.seeding_content}
               </p>
-              {post.link_comment && (
+              {post.link_comment && !isRejected(post.link_comment) && (
                 <div className="mt-3">
                   <a href={post.link_comment} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline inline-flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-blue-100 shadow-sm transition hover:shadow">
                     <FiExternalLink className="w-4 h-4" /> Đi tới bình luận trên Facebook
                   </a>
+                </div>
+              )}
+              {post.link_comment && isRejected(post.link_comment) && (
+                <div className="mt-3">
+                  <span className="text-sm font-medium text-red-600 inline-flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-red-100 shadow-sm">
+                    <span className="material-symbols-outlined text-[16px]">error</span>
+                    Bị từ chối / Lỗi
+                  </span>
                 </div>
               )}
             </div>
@@ -180,9 +205,13 @@ export function PostDetailModal({
         {/* Footer */}
         <div className="border-t border-slate-100 bg-slate-50/50 px-6 py-4 flex items-center justify-between rounded-b-2xl">
           <div>
-            {verifyStatus === "yes" ? (
+            {verifyStatus === "yes" && !isRejected(post.link_comment) ? (
               <span className="px-3 py-1.5 rounded-lg text-xs font-bold border bg-green-100 text-green-700 border-green-200">
                 ✓ Đã xác minh seeding
+              </span>
+            ) : verifyStatus === "yes" && isRejected(post.link_comment) ? (
+              <span className="px-3 py-1.5 rounded-lg text-xs font-bold border bg-red-100 text-red-700 border-red-200">
+                X Bị từ chối
               </span>
             ) : verifyStatus === "pending" ? (
               <span className="px-3 py-1.5 rounded-lg text-xs font-bold border bg-emerald-100 text-emerald-700 border-emerald-200">

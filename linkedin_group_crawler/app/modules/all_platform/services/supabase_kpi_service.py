@@ -174,9 +174,9 @@ def get_all_kpis_for_leader(
     )
     user_map = {str(u["id"]): u for u in (user_result.data or [])}
 
-    # Calculate default weekly range (current week: Monday to Sunday)
-    from datetime import date, timedelta
-    today = date.today()
+    # Calculate default weekly range (current week: Monday to Sunday) in VN timezone
+    from datetime import datetime, timedelta
+    today = datetime.now(VN_TZ).date()
     monday = today - timedelta(days=today.weekday())
     sunday = monday + timedelta(days=6)
     default_start = start_date or monday.isoformat()
@@ -338,9 +338,9 @@ def get_kpi_by_email(email: str) -> dict:
     user = user_result.data[0]
     user_id = user["id"]
 
-    # Determine current week
-    from datetime import date, timedelta
-    today = date.today()
+    # Determine current week in VN timezone
+    from datetime import datetime, timedelta
+    today = datetime.now(VN_TZ).date()
     monday = today - timedelta(days=today.weekday())
     sunday = monday + timedelta(days=6)
     current_monday = monday.isoformat()
@@ -368,6 +368,11 @@ def get_kpi_by_email(email: str) -> dict:
             .limit(1)
             .execute()
         )
+        # Virtual carry-over: keep targets from old KPI, but update dates to current week
+        # so the progress is correctly calculated for the new week (reset to 0).
+        if result.data:
+            result.data[0]["start_date"] = current_monday
+            result.data[0]["end_date"] = current_sunday
 
     if result.data:
         kpi = result.data[0]
@@ -576,7 +581,7 @@ def _compute_fb_inbox_progress(
     from app.core.config import settings
 
     if start_date is None or end_date is None:
-        today_d = date.today()
+        today_d = datetime.now(VN_TZ).date()
         monday = today_d - timedelta(days=today_d.weekday())
         sunday = monday + timedelta(days=6)
         start_date = start_date or monday.isoformat()
@@ -669,7 +674,7 @@ def compute_kpi_inbox_progress(
 
     # Chuẩn hoá khoảng thời gian
     if start_date is None or end_date is None:
-        today = date.today()
+        today = datetime.now(VN_TZ).date()
         monday = today - timedelta(days=today.weekday())
         sunday = monday + timedelta(days=6)
         start_date = start_date or monday.isoformat()

@@ -4,12 +4,19 @@ from app.core.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
-def get_all_customer_leads() -> List[Dict[str, Any]]:
+def get_all_customer_leads(current_user: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     try:
         supabase = get_supabase_client()
-        res = supabase.table("customer_leads").select(
+        query = supabase.table("customer_leads").select(
             "*, leader:leaded_by(name), sdr:sdr_id(name)"
-        ).order("created_at", desc=True).execute()
+        ).order("created_at", desc=True)
+        
+        if current_user and current_user.get("role") not in ["admin", "leader"]:
+            user_id = current_user.get("id")
+            if user_id:
+                query = query.or_(f"leaded_by.eq.{user_id},sdr_id.eq.{user_id}")
+                
+        res = query.execute()
         
         data = res.data or []
         for row in data:

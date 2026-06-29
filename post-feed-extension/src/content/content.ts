@@ -23,6 +23,7 @@ let _bottomRetries = 0;
 let _olderPostsCount = 0;
 let _hasNewPost = false;
 let _scannedPostsCount = 0;
+let _modalCloseAttempts = 0;
 
 // ─── Helper ───────────────────────────────────────────────────
 function randomBetween(min: number, max: number): number {
@@ -47,23 +48,18 @@ function isToday(timestamp: string): boolean {
   const lower = timestamp.toLowerCase();
   
   if (lower.includes('vừa xong') || lower.includes('just now')) return true;
-  if (lower.includes('phút') || lower.includes('min')) return true;
-  if (lower.includes('giờ') || lower.includes('hour')) return true;
+  if (lower.includes('phút') || lower.includes('min') || /\d+\s*m(?!o)/.test(lower)) return true;
+  if (lower.includes('giờ') || lower.includes('hour') || /\d+\s*h(?!o)/.test(lower)) return true;
   if (lower.includes('hôm nay') || lower.includes('today')) return true;
   
   // "1 ngày" = hôm qua → KHÔNG lấy
-  const dayMatch = lower.match(/(\d+)\s*ngày/);
+  const dayMatch = lower.match(/(\d+)\s*(?:ngày|day|d)(?:\s|$)/);
   if (dayMatch) {
     return parseInt(dayMatch[1]) <= 0;
   }
-  
-  const shortDayMatch = lower.match(/(\d+)d/);
-  if (shortDayMatch) {
-    return parseInt(shortDayMatch[1]) <= 0;
-  }
 
   if (lower.includes('hôm qua') || lower.includes('yesterday')) return false;
-  if (lower.includes('tháng') || lower.includes('năm') || lower.includes('thg') || lower.includes('tuần') || lower.includes('week') || lower.includes('month') || lower.includes('year')) return false;
+  if (lower.includes('tháng') || lower.includes('năm') || lower.includes('thg') || lower.includes('tuần') || lower.includes('week') || lower.includes('month') || lower.includes('year') || /\d+\s*w/.test(lower) || /\d+\s*y/.test(lower)) return false;
 
   // Không parse được → thử so sánh với ngày hiện tại
   const dateMatch = timestamp.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
@@ -82,6 +78,8 @@ function isToday(timestamp: string): boolean {
 // ─── Crawl Functions ──────────────────────────────────────────
 
 function showBlockingOverlay() {
+  // Tạm thời vô hiệu hóa theo yêu cầu user để xem rõ luồng trên Facebook
+  return;
   if (document.getElementById('fb-crawl-overlay')) return;
   const overlay = document.createElement('div');
   overlay.id = 'fb-crawl-overlay';
@@ -190,6 +188,7 @@ function startFeedCrawl(config: CrawlConfig = {}) {
   _olderPostsCount = 0;
   _hasNewPost = false;
   _scannedPostsCount = 0;
+  _modalCloseAttempts = 0;
 
   showBlockingOverlay();
 
@@ -204,6 +203,69 @@ function doScroll(maxPosts: number, baseDelay: number, todayOnly: boolean) {
   }
 
   _crawlScrolls++;
+
+  // 1. Tự động giải cứu nếu có Modal/Layer che màn hình (ưu tiên kiểm tra DOM trước)
+  const closeSelectors = [
+    'div[aria-label="Đóng"][role="button"]',
+    'div[aria-label="Close"][role="button"]',
+    'div[role="dialog"] [aria-label="Đóng"]',
+    'div[role="dialog"] [aria-label="Close"]',
+    '[aria-label="Đóng"]',
+    '[aria-label="Close"]'
+  ];
+  
+  const currentUrl = window.location.href;
+  const isSuspiciousUrl = currentUrl.includes('/posts/') || currentUrl.includes('/permalink/') || currentUrl.includes('multi_permalinks=') || currentUrl.includes('story.php') || currentUrl.includes('/photo/') || currentUrl.includes('/photo.php') || currentUrl.includes('/reel/') || currentUrl.includes('/watch');
+  
+  // Kiểm tra xem có Modal bài viết nào ĐANG HIỂN THỊ và CHE MÀN HÌNH không (bỏ qua các thẻ div ẩn hoặc hộp chat nhỏ)
+  const dialogs = Array.from(document.querySelectorAll('div[role="dialog"]'));
+  const hasVisibleLargeDialog = dialogs.some(d => {
+    const el = d as HTMLElement;
+    // Phải hiển thị và chiếm ít nhất 30% chiều cao màn hình (loại trừ hộp thoại chat nhỏ)
+    return el.offsetWidth > 0 && el.offsetHeight > (window.innerHeight * 0.3);
+  });
+  
+  if (isSuspiciousUrl || hasVisibleLargeDialog) {
+    _modalCloseAttempts++;
+    
+    if (_modalCloseAttempts > 3) {
+      safeLog('Đã thử đóng nhiều lần nhưng vẫn kẹt! Ép buộc reload về link nhóm...');
+      const match = currentUrl.match(/(https:\/\/(?:www\.)?facebook\.com\/groups\/[^\/]+)/);
+      if (match) {
+          window.location.href = match[1];
+      } else {
+          window.history.back();
+      }
+      return;
+    }
+    
+    let clickedModalClose = false;
+    for (const sel of closeSelectors) {
+      const btns = document.querySelectorAll(sel);
+      for (const btn of Array.from(btns)) {
+        const el = btn as HTMLElement;
+        if (el.offsetWidth > 0 && el.offsetHeight > 0) {
+          safeLog(`Thử click nút Đóng (selector: ${sel}), lần ${_modalCloseAttempts}...`);
+          try { el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window })); } catch(e) {}
+          try { el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window })); } catch(e) {}
+          el.click();
+          clickedModalClose = true;
+          break;
+        }
+      }
+      if (clickedModalClose) break;
+    }
+    
+    if (!clickedModalClose) {
+      safeLog('Không click được nút Đóng, dùng window.history.back()...');
+      window.history.back();
+    }
+    
+    _scrollTimer = setTimeout(() => doScroll(maxPosts, baseDelay, todayOnly), 2000);
+    return;
+  } else {
+    _modalCloseAttempts = 0; // Đã thoát được modal
+  }
 
   // Tính scroll
   const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
@@ -233,8 +295,8 @@ function doScroll(maxPosts: number, baseDelay: number, todayOnly: boolean) {
     _bottomRetries = 0;
   }
 
-  // Random scroll 200-400px
-  const scrollAmount = Math.min(randomBetween(200, 400), remaining);
+  // Random scroll 500-900px để lướt dài hơn
+  const scrollAmount = Math.min(randomBetween(500, 900), remaining);
   const newScrollY = scrollTop + scrollAmount;
   
   // Scroll
@@ -259,9 +321,18 @@ async function extractAndProcess(maxPosts: number, baseDelay: number, todayOnly:
   let clickedAny = false;
 
   for (const btn of Array.from(expandButtons)) {
+    // Không click vào thẻ a hoặc bất kỳ element nào nằm trong thẻ a để tránh bị chuyển trang (vào permalink)
+    if (btn.tagName === 'A' || btn.closest('a')) continue;
+
     const text = (btn.textContent || '').trim().toLowerCase();
-    // Bắt các trường hợp chứa "xem thêm", "see more", "xem thm" và giới hạn độ dài để không click nhầm đoạn văn
-    if ((text.includes('xem thêm') || text.includes('see more') || text.includes('xem th')) && text.length < 30) {
+    
+    // NẾU chứa chữ "bình luận", "comment", "tất cả", "all" -> tuyệt đối không click vì nó sẽ mở Modal/Popup!
+    if (text.includes('bình luận') || text.includes('comment') || text.includes('tất cả') || text.includes('all')) {
+      continue;
+    }
+
+    // Bắt các trường hợp chứa "xem thêm", "see more", "xem thm" và giới hạn độ dài cực ngắn (< 15) để chỉ click text
+    if ((text.includes('xem thêm') || text.includes('see more') || text.includes('xem th')) && text.length < 15) {
       try {
         (btn as HTMLElement).click();
         clickedAny = true;
@@ -296,26 +367,15 @@ async function extractAndProcess(maxPosts: number, baseDelay: number, todayOnly:
         
         if (isPostToday) {
           _hasNewPost = true;
-          _olderPostsCount = 0;
+          // Loại bỏ việc reset _olderPostsCount để tính TỔNG CỘNG số bài cũ
         } else {
           _olderPostsCount++;
           
-          if (_scannedPostsCount <= 3) {
-            safeLog(`[Skip] Bài cũ ở top 3: "${postTime}"`);
-            // Kiểm tra ngay: Nếu quét bài số 3 mà chưa có bài mới -> Cả 3 bài đầu đều cũ -> Dừng!
-            if (_scannedPostsCount === 3 && !_hasNewPost) {
-              safeLog(`3 bài đầu tiên đều là bài cũ ("${postTime}"). Chuyển nhóm!`);
-              finishCrawl('3 bài đầu đều cũ');
-              return;
-            }
-            continue; // Bỏ qua bài cũ, KHÔNG lưu
+          if (_olderPostsCount >= 3) {
+            safeLog(`Đã phát hiện tổng cộng 3 bài cũ ("${postTime}"). Dừng crawl.`);
+            finishCrawl('Phát hiện 3 bài cũ');
+            return;
           } else {
-            // Từ bài thứ 4 trở đi, nếu gặp bài cũ liên tiếp quá 3 bài -> Dừng luôn cho nhanh
-            if (_olderPostsCount >= 3) {
-              safeLog(`Gặp 3 bài cũ liên tiếp ("${postTime}"). Dừng crawl.`);
-              finishCrawl('Quá giới hạn bài cũ liên tiếp');
-              return;
-            }
             safeLog(`[Skip] Bài cũ: "${postTime}" (${_olderPostsCount}/3)`);
             continue; // Bỏ qua bài cũ, KHÔNG lưu
           }
@@ -534,30 +594,56 @@ function extractPostData(el: Element): any {
   let author = 'Ẩn danh';
   let authorUrl = '';
 
-  const authorNode = el.querySelector('h2 a:not([href*="comment"]), h3 a:not([href*="comment"]), h4 a:not([href*="comment"]), strong a:not([href*="comment"])') as HTMLAnchorElement;
+  // Ưu tiên 1: Quét toàn bộ thẻ strong/span/h2/h3/h4 để tìm chữ ẩn danh chính xác
+  const possibleAnonymous = Array.from(el.querySelectorAll('strong, span, h2, h3, h4')).find(e => {
+    // Chỉ lấy text trực tiếp của node đó, không lấy text của child nodes để tránh bị ghép chuỗi
+    const txt = (e.textContent || '').trim().toLowerCase();
+    return txt === 'người tham gia ẩn danh' || txt === 'thành viên ẩn danh' || txt === 'anonymous participant' || txt === 'anonymous' || txt === 'group participant';
+  });
 
-  if (authorNode) {
-    author = authorNode.innerText.trim();
-    const href = authorNode.href || '';
-    
-    let urlObj;
-    try { urlObj = new URL(href); } catch(e) {}
-    
-    if (urlObj) {
-      const cleanUrl = new URL(urlObj.origin + urlObj.pathname);
-      if (urlObj.searchParams.has('id')) {
-        cleanUrl.searchParams.set('id', urlObj.searchParams.get('id')!);
+  if (possibleAnonymous) {
+    author = 'Người tham gia ẩn danh';
+  }
+
+  if (author === 'Ẩn danh') {
+    const exclude = ':not([href*="comment"]):not([href*="/posts/"]):not([href*="/permalink/"]):not([href*="story.php"]):not([href*="stories"])';
+    // Tìm a tag chứa tên tác giả, loại bỏ các a tag của timestamp (thường chứa /permalink/ hoặc /posts/ v.v.)
+    const authorNode = el.querySelector(`h2 a${exclude}, h3 a${exclude}, h4 a${exclude}, strong a${exclude}`) as HTMLAnchorElement;
+
+    if (authorNode) {
+      author = authorNode.innerText.trim();
+      const href = authorNode.href || '';
+      
+      let urlObj;
+      try { urlObj = new URL(href); } catch(e) {}
+      
+      if (urlObj) {
+        const cleanUrl = new URL(urlObj.origin + urlObj.pathname);
+        if (urlObj.searchParams.has('id')) {
+          cleanUrl.searchParams.set('id', urlObj.searchParams.get('id')!);
+        }
+        authorUrl = cleanUrl.href;
+      } else {
+        authorUrl = href;
       }
-      authorUrl = cleanUrl.href;
     } else {
-      authorUrl = href;
+      // Xử lý bài ẩn danh (hoặc Facebook Ad format)
+      const strongNode = el.querySelector('h2 strong, h3 strong, h4 strong, span > strong, [data-ad-rendering-role="profile_name"]');
+      if (strongNode) {
+        author = (strongNode as HTMLElement).innerText.trim();
+      }
     }
-  } else {
-    // Xử lý bài ẩn danh (hoặc Facebook Ad format)
-    const strongNode = el.querySelector('h2 strong, h3 strong, h4 strong, span > strong, [data-ad-rendering-role="profile_name"]');
-    if (strongNode) {
-      author = (strongNode as HTMLElement).innerText.trim();
-    }
+  }
+
+  // Dọn dẹp tác giả nếu dính rác (obfuscated text của FB như oSndtropes...)
+  if (author && (
+    author.includes(':') || 
+    author.length > 30 || 
+    author.includes('S p o n s o r e d') ||
+    /\d{3,}/.test(author) || // Nếu tên chứa từ 3 chữ số liên tiếp trở lên -> 100% là chuỗi mã hóa rác
+    /[a-zA-Z0-9]{15,}/.test(author) // Hoặc 1 chuỗi dài 15 ký tự liền nhau không dấu cách
+  )) {
+    author = 'Người tham gia ẩn danh';
   }
 
   // URL & Timestamp - Gộp chung quét như luồng Python (chính xác 100%)
@@ -610,11 +696,17 @@ function extractPostData(el: Element): any {
       // Kiểm tra xem thẻ a này có chứa thời gian không (đặc trưng của link bài viết thật)
       const rawText = link.getAttribute('aria-label') || (link as HTMLElement).innerText || '';
       if (rawText && rawText.trim()) {
-        const timeMatch = rawText.match(/(\d+\s*(?:phút|giờ|ngày|tuần|tháng|năm|sec|min|hour|day|week|month|year|d|m|h)\w*)|(?:vừa xong|hôm qua|just now|yesterday)/i);
-        if (timeMatch || rawText.includes(' tháng ') || rawText.includes(' năm ') || rawText.includes(' thg ')) {
+        const cleanText = rawText.replace(/[\n\r\t]/g, ' ').replace(/\s+/g, ' ').trim();
+        const timeMatch = cleanText.match(/(\d+\s*(?:phút|giờ|ngày|tuần|tháng|năm|sec|min|hour|day|week|month|year|d|m|h)\w*)|(?:vừa xong|hôm qua|just now|yesterday)/i);
+        if (timeMatch) {
           postUrl = candidateUrl; // Chốt link
-          timestamp = rawText.trim(); // Chốt thời gian
+          timestamp = timeMatch[0]; // Chốt thời gian sạch
           break; // Tìm thấy cặp Link + Time hoàn hảo, thoát vòng lặp
+        } else if (cleanText.includes(' tháng ') || cleanText.includes(' năm ') || cleanText.includes(' thg ')) {
+          postUrl = candidateUrl;
+          timestamp = cleanText;
+          if (timestamp.length > 40) timestamp = 'Vừa xong'; // Nếu quá dài -> rác -> chốt Vừa xong
+          break;
         }
       }
     }
@@ -636,22 +728,29 @@ function extractPostData(el: Element): any {
       if (href.includes('/user/') || href.includes('/hashtag/')) continue;
       
       const rawText = a.getAttribute('aria-label') || (a as HTMLElement).innerText || '';
-      const timeMatch = rawText.match(/(\d+\s*(?:phút|giờ|ngày|tuần|tháng|năm|sec|min|hour|day|week|month|year|d|m|h)\w*)|(?:vừa xong|hôm qua|just now|yesterday)/i);
+      const cleanText = rawText.replace(/[\n\r\t]/g, ' ').replace(/\s+/g, ' ').trim();
+      const timeMatch = cleanText.match(/(\d+\s*(?:phút|giờ|ngày|tuần|tháng|năm|sec|min|hour|day|week|month|year|d|m|h)\w*)|(?:vừa xong|hôm qua|just now|yesterday)/i);
       
-      if (timeMatch || rawText.includes(' tháng ') || rawText.includes(' năm ') || rawText.includes(' thg ')) {
+      if (timeMatch) {
         postUrl = href.split('?')[0];
-        timestamp = rawText.trim();
+        timestamp = timeMatch[0];
+        safeLog(`[MẸO] Đã vớt được link bị giấu qua Timestamp: ${postUrl}`);
+        break;
+      } else if (cleanText.includes(' tháng ') || cleanText.includes(' năm ') || cleanText.includes(' thg ')) {
+        postUrl = href.split('?')[0];
+        timestamp = cleanText;
+        if (timestamp.length > 40) timestamp = 'Vừa xong';
         safeLog(`[MẸO] Đã vớt được link bị giấu qua Timestamp: ${postUrl}`);
         break;
       }
     }
   }
 
-  // Fallback cuối cùng nếu vẫn bế tắc
+  // BỎ HOÀN TOÀN FALLBACK VÀO WINDOW.LOCATION.HREF.
+  // Nếu không tìm thấy link bài viết thực sự, chúng ta vứt bỏ bài này luôn để tránh bị gán link sai (như khi đang ở trong permalink)
   if (!postUrl) {
-    const allHrefs = Array.from(el.querySelectorAll('a[href]')).map(a => (a as HTMLAnchorElement).href).slice(0, 5).join(' | ');
-    postUrl = window.location.href.split('?')[0];
-    safeLog(`[CẢNH BÁO] Không tìm thấy link bài viết, fallback về link nhóm. Các link có trong thẻ: ${allHrefs}`);
+    safeLog(`[CẢNH BÁO] Không tìm thấy link bài viết hợp lệ, BỎ QUA bài này để tránh sai lệch data.`);
+    return null;
   }
 
   // Stats - dùng JS để lấy chính xác từ aria-label

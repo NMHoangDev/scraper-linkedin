@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 import asyncio
 from typing import List, Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
@@ -74,50 +75,141 @@ def sync_process_and_save_posts_db(payload: ExtensionCrawlRequest, legacy: bool)
         except Exception as e:
             logger.warning(f"Could not check existing urls in facebook_posts: {e}")
 
-    # 3. Resolve authors (author_post)
-    author_urls = [p.author_url for p in payload.posts if p.author_url]
+
+    # 4. Lọc bài viết: chỉ giữ bài TRONG NGÀY HÔM NAY (giờ Việt Nam UTC+7)
+    vietnam_tz = timezone(timedelta(hours=7))
+    now_vn = datetime.now(vietnam_tz)
+    today_vn_str = now_vn.strftime('%Y-%m-%d')
+
+    today_posts = []  # List of (post, raw_time_str)
+    skipped_old = 0
+    skipped_no_time = 0
+
+    for p in payload.posts:
+        post_url = p.post_url or p.url
+        if not post_url or post_url in existing_urls:
+            continue
+
+        raw_time = p.timestamp_raw or p.date or None
+        if not raw_time:
+            skipped_no_time += 1
+            continue
+
+        try:
+            # Extension gửi ISO: "2026-06-29T08:50:42.000Z"
+            # Supabase lưu:      "2026-06-29 08:50:42+00"
+            # Chuẩn hoá để Python fromisoformat() đọc được:
+            clean = raw_time.replace('Z', '+00:00')   # bỏ Z
+            clean = re.sub(r'\.\d+', '', clean)        # bỏ .000 milliseconds
+            clean = clean.replace(' ', 'T')            # thay space bằng T nếu cần
+
+            dt_utc = datetime.fromisoformat(clean)
+            if dt_utc.tzinfo is None:
+                dt_utc = dt_utc.replace(tzinfo=timezone.utc)
+
+            dt_vn = dt_utc.astimezone(vietnam_tz)
+            post_date_vn = dt_vn.strftime('%Y-%m-%d')
+
+            if post_date_vn != today_vn_str:
+                skipped_old += 1
+                continue
+
+            today_posts.append((p, raw_time))
+        except Exception as e:
+            logger.warning(f"[DATE-FILTER] Không parse được '{raw_time}': {e}")
+            skipped_no_time += 1
+            continue
+
+    logger.info(
+        f"[FILTER] Tổng={len(payload.posts)} | Trùng URL={len(existing_urls)} "
+        f"| Bài cũ (không phải hôm nay)={skipped_old} | Không có time={skipped_no_time} "
+        f"| Bài HÔM NAY={len(today_posts)} (today_vn={today_vn_str})"
+    )
+
+    # 5. Sắp xếp bài hôm nay theo Reactions + Comments (cao nhất lên đầu)
+    today_posts.sort(key=lambda x: (x[0].reactions or 0, x[0].comments or 0), reverse=True)
+
+    # 6. Chỉ lấy tối đa 3 bài xịn nhất
+    top_posts = today_posts[:3]
+    top_posts_objects = [p for p, raw_time in top_posts]
+
+    # 7. Resolve authors (chỉ lấy tác giả cho những bài top 3 sẽ lưu)
+    author_urls = [p.author_url for p in top_posts_objects if p.author_url and p.author_url.strip()]
     author_map = {}
     if author_urls:
         try:
             res_authors = supabase.table("author_post").select("id, url_profile").in_("url_profile", author_urls).execute()
             author_map = {item["url_profile"]: item["id"] for item in (res_authors.data or [])}
+            logger.info(f"[AUTHOR] Tìm thấy {len(author_map)} tác giả đã có trong DB cho top 3")
         except Exception as e:
             logger.warning(f"Error fetching authors: {e}")
 
     new_authors = []
-    for p in payload.posts:
-        if p.author_url and p.author_url not in author_map:
+    for p in top_posts_objects:
+        url = p.author_url.strip() if p.author_url else ""
+        name = p.author_name.strip() if p.author_name else ""
+        logger.info(f"[AUTHOR-DEBUG] author_name='{name}' | author_url='{url}'")
+        
+        if url and url not in author_map:
             new_id = str(uuid.uuid4())
-            author_map[p.author_url] = new_id
+            author_map[url] = new_id
             new_authors.append({
                 "id": new_id,
-                "name": p.author_name or "",
-                "url_profile": p.author_url,
+                "name": name or "Ẩn danh",
+                "url_profile": url,
                 "create_at": now_iso
             })
+        elif not url and name and name not in ("Ẩn danh", ""):
+            fallback_key = f"__name__{name}"
+            if fallback_key not in author_map:
+                new_id = str(uuid.uuid4())
+                author_map[fallback_key] = new_id
+                new_authors.append({
+                    "id": new_id,
+                    "name": name,
+                    "url_profile": fallback_key,
+                    "create_at": now_iso
+                })
             
     if new_authors:
+        unique_new_authors = list({a["url_profile"]: a for a in new_authors}.values())
+        logger.info(f"[AUTHOR] Đang insert {len(unique_new_authors)} tác giả mới cho top 3")
+        inserted_author_urls = set()
         try:
-            unique_new_authors = {a["url_profile"]: a for a in new_authors}.values()
-            supabase.table("author_post").insert(list(unique_new_authors)).execute()
+            supabase.table("author_post").insert(unique_new_authors, upsert=False).execute()
+            inserted_author_urls = {a["url_profile"] for a in unique_new_authors}
+            logger.info(f"[AUTHOR] Insert thành công {len(inserted_author_urls)} tác giả")
         except Exception as e:
-            logger.warning(f"Error inserting authors: {e}")
-
-    # 4. Prepare posts for insertion
-    posts_to_insert = []
-    for p in payload.posts:
-        post_url = p.post_url or p.url
-        if not post_url or post_url in existing_urls:
-            continue
-            
-        post_time_str = p.timestamp_raw or p.date
-        parsed_time = parse_facebook_time(post_time_str) if post_time_str else None
+            logger.warning(f"[AUTHOR] Insert author lỗi: {e} — Đang thử insert từng người một...")
+            for a in unique_new_authors:
+                try:
+                    supabase.table("author_post").insert(a).execute()
+                    inserted_author_urls.add(a["url_profile"])
+                except Exception as e2:
+                    logger.warning(f"[AUTHOR] Bỏ qua '{a['url_profile']}': {e2}")
         
+        for a in unique_new_authors:
+            if a["url_profile"] not in inserted_author_urls:
+                author_map.pop(a["url_profile"], None)
+                logger.warning(f"[AUTHOR] Đã xoá UUID ảo cho '{a['url_profile']}' khỏi author_map")
+
+    # 8. Chuẩn bị dữ liệu để insert vào Supabase
+    posts_to_insert = []
+    for p, raw_time in top_posts:
+        post_url = p.post_url or p.url
+        author_url_key = (p.author_url or "").strip()
+        author_name_key = (p.author_name or "").strip()
+        # Tìm id_author: ưu tiên URL, sau đó fallback theo tên
+        id_author = (
+            author_map.get(author_url_key) or
+            (author_map.get(f"__name__{author_name_key}") if author_name_key and author_name_key not in ("Ẩn danh", "") else None)
+        )
+        logger.info(f"[SAVE-AUTHOR] post={post_url[:60]} | author_url='{author_url_key}' | id_author={id_author}")
         post_data = {
             "group_id": group_id,
             "post_url": post_url,
             "crawl_date": now_iso,
-            "post_time": parsed_time,
+            "post_time": raw_time,
             "content": p.content,
             "score": 0,
             "reactions": p.reactions,
@@ -127,10 +219,12 @@ def sync_process_and_save_posts_db(payload: ExtensionCrawlRequest, legacy: bool)
             "image_urls": p.images or [],
             "created_at": p.crawled_at if legacy else now_iso,
             "updated_at": now_iso,
-            "id_author": author_map.get(p.author_url),
+            "id_author": id_author,
             "id_member": payload.id_member or None
         }
         posts_to_insert.append(post_data)
+
+    logger.info(f"[SAVE] Sẽ lưu {len(posts_to_insert)} bài (top 3 hôm nay) vào DB")
 
     inserted_count = 0
     if posts_to_insert:
@@ -140,7 +234,7 @@ def sync_process_and_save_posts_db(payload: ExtensionCrawlRequest, legacy: bool)
         except Exception as e:
             logger.error(f"Error saving to facebook_posts: {e}")
             raise HTTPException(status_code=500, detail=str(e))
-            
+
     return inserted_count
 
 

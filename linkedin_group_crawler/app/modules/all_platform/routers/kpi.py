@@ -11,6 +11,7 @@ from supabase import Client
 from loguru import logger
 
 from app.core.supabase_client import get_supabase_client
+from app.modules.all_platform.services.supabase_kpi_service import VN_TZ
 
 from app.modules.all_platform.schemas import (
     AssignKpiRequest,
@@ -158,7 +159,7 @@ def fb_inbox_progress(payload: FbInboxProgressRequest) -> BaseResponse:
         end = payload.end_date.strip()
 
         if not start or not end:
-            today_d = date.today()
+            today_d = datetime.now(VN_TZ).date()
             monday = today_d - timedelta(days=today_d.weekday())
             sunday = monday + timedelta(days=6)
             start = start or monday.isoformat()
@@ -481,7 +482,7 @@ def get_verified_fb_inbox_ids(payload: GetVerifiedConvIdsRequest) -> BaseRespons
         start = payload.start_date.strip()
         end = payload.end_date.strip()
         if not start or not end:
-            today_d = date.today()
+            today_d = datetime.now(VN_TZ).date()
             monday = today_d - timedelta(days=today_d.weekday())
             sunday = monday + timedelta(days=6)
             start = start or monday.isoformat()

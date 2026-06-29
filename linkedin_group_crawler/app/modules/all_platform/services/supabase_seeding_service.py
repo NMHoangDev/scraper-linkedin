@@ -70,10 +70,28 @@ def verify_seeding_mark(payload: dict) -> dict:
         update_data["content"] = payload["content"]
     if payload.get("id_social_account"):
         update_data["id_social_account"] = payload["id_social_account"]
-    if payload.get("id_platform"):
+    elif payload.get("profile_id"):
+        try:
+            sa_res = supabase.table("social_accounts").select("id, id_platform").eq("app_user_id", id_member).eq("account_profile_id", payload["profile_id"]).limit(1).execute()
+            if sa_res.data:
+                update_data["id_social_account"] = sa_res.data[0]["id"]
+                if sa_res.data[0].get("id_platform"):
+                    update_data["id_platform"] = sa_res.data[0]["id_platform"]
+        except Exception:
+            pass
+
+    if payload.get("id_platform") and "id_platform" not in update_data:
         update_data["id_platform"] = payload["id_platform"]
+
     if payload.get("id_post"):
         update_data["id_post"] = payload["id_post"]
+    elif payload.get("link_post"):
+        try:
+            post_res = supabase.table("facebook_posts").select("id").eq("post_url", payload["link_post"]).limit(1).execute()
+            if post_res.data:
+                update_data["id_post"] = post_res.data[0]["id"]
+        except Exception:
+            pass
         
     update_data["verify"] = "yes"
     update_data["updated_at"] = "now()"

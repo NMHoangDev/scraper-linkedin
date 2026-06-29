@@ -23,7 +23,7 @@ interface ExtensionLauncherProps {
   onCrawlSaved?: (data: { count: number; groupId: string; groupUrl: string }) => void;
 }
 
-export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: ExtensionLauncherProps) {
+export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: ExtensionLauncherProps) {
   const [isLaunching, setIsLaunching] = useState(false);
   const [isDone, setIsDone] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -31,6 +31,10 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
   const [launchLog, setLaunchLog] = useState<string[]>([]);
   const [scrapedGroups, setScrapedGroups] = useState<{ groupUrl: string, posts: any[], groupName?: string }[]>([]);
   const [crawlProgress, setCrawlProgress] = useState({ posts: 0, scrolls: 0, groupIndex: 0, totalGroups: 0 });
+  const [availableGroups, setAvailableGroups] = useState<ExtensionGroup[]>([]);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+  const [isLoadingGroups, setIsLoadingGroups] = useState(false);
+  const [showGroupList, setShowGroupList] = useState(false);
 
   const onCompleteRef = useRef(onComplete);
   const onCrawlSavedRef = useRef(onCrawlSaved);
@@ -43,6 +47,24 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
     onCrawlSavedRef.current = onCrawlSaved;
   }, [onCrawlSaved]);
 
+  useEffect(() => {
+    const loadGroups = async () => {
+      setIsLoadingGroups(true);
+      try {
+        const res = await allPlatformGroupsService.getForExtension();
+        if (res.data) {
+          setAvailableGroups(res.data);
+          setSelectedGroupIds(res.data.map((g: any) => g.id));
+        }
+      } catch (err) {
+        console.error("Failed to load groups for extension", err);
+      } finally {
+        setIsLoadingGroups(false);
+      }
+    };
+    loadGroups();
+  }, []);
+
 
   // ── Listen for extension messages + WebSocket (SSE) ────────────────────────
   useEffect(() => {
@@ -50,39 +72,24 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
       const msg = event.data;
       if (!msg || typeof msg !== 'object') return;
 
-      if (msg.type === 'MARKEE_POST_FEED_READY' && msg.extension === 'fb-post-feed-crawler') {
+      if (msg.type === 'API_MARKEE_FB_EXTENSION_READY') {
         setExtensionReady(true);
       }
-      if (msg.type === 'MARKEE_POST_FEED_PONG' && msg.extension === 'fb-post-feed-crawler' && msg.installed) {
+      if (msg.type === 'API_MARKEE_FB_PONG' && msg.installed) {
         setExtensionReady(true);
         if (msg.isRunning) {
           setIsLaunching(true);
-          if (msg.progress) {
-            setCrawlProgress(p => ({
-              ...p,
-              groupIndex: msg.progress.groupIndex ?? p.groupIndex,
-              totalGroups: msg.progress.totalGroups ?? p.totalGroups,
-              posts: msg.progress.posts ?? p.posts,
-              scrolls: msg.progress.scrolls ?? p.scrolls,
-            }));
-            setLaunchLog(prev => {
-              if (prev.length === 0) {
-                return [`🔄 Đã khôi phục trạng thái: Group ${msg.progress.groupIndex + 1}/${msg.progress.totalGroups}, ${msg.progress.posts} bài`];
-              }
-              return prev;
-            });
-          }
         }
       }
-      if (msg.type === 'MARKEE_POST_FEED_CRAWL_STATUS') {
+      if (msg.type === 'API_CRAWL_STATUS') {
         setLaunchLog((prev) => [...prev, `🔄 ${msg.message}`]);
-      } else if (msg.type === 'MARKEE_POST_FEED_CRAWL_LOG') {
+      } else if (msg.type === 'API_CRAWL_LOG') {
         const icon =
           msg.level === 'success' ? '✅' :
           msg.level === 'error' ? '❌' :
           msg.level === 'warn' ? '⚠️' : '📋';
         setLaunchLog((prev) => [...prev, `${icon} ${msg.message}`]);
-      } else if (msg.type === 'MARKEE_POST_FEED_CRAWL_PROGRESS') {
+      } else if (msg.type === 'API_CRAWL_PROGRESS') {
         setCrawlProgress((p) => ({
           ...p,
           groupIndex: msg.groupIndex !== undefined ? msg.groupIndex : p.groupIndex,
@@ -90,11 +97,11 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
           posts: msg.posts !== undefined ? msg.posts : p.posts,
           scrolls: msg.scrolls !== undefined ? msg.scrolls : p.scrolls,
         }));
-      } else if (msg.type === 'MARKEE_POST_FEED_CRAWL_POST') {
+      } else if (msg.type === 'API_CRAWL_POST') {
         setCrawlProgress((p) => ({ ...p, posts: msg.posts ?? p.posts + 1 }));
-      } else if (msg.type === 'MARKEE_POST_FEED_CRAWL_SCROLL') {
+      } else if (msg.type === 'API_CRAWL_SCROLL') {
         setCrawlProgress((p) => ({ ...p, scrolls: p.scrolls + 1 }));
-      } else if (msg.type === 'MARKEE_POST_FEED_CRAWL_DONE') {
+      } else if (msg.type === 'API_CRAWL_DONE') {
         setIsLaunching(false);
         setIsDone(true);
         setLaunchLog((prev) => [
@@ -102,23 +109,11 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
           `🎉 Hoàn tất! ${msg.totalPosts ?? 0} bài viết từ ${msg.totalGroups ?? 0} groups`,
         ]);
         onCompleteRef.current?.(msg.totalPosts ?? 0);
-      } else if (msg.type === 'MARKEE_POST_FEED_CRAWL_COMPLETE') {
-        const posts = msg.posts ?? [];
-        setCrawlProgress((p) => ({ ...p, posts: posts.length }));
-        setScrapedGroups((prev) => [{ groupUrl: msg.groupUrl || msg.data?.groupUrl || '', posts, groupName: msg.groupName || msg.data?.groupName || 'Group' }, ...prev]);
-        setLaunchLog((prev) => {
-          const lines = [...prev];
-          lines.push(`✅ Group hoàn tất: ${posts.length} bài viết mới`);
-          return lines;
-        });
-      } else if (msg.type === 'MARKEE_POST_FEED_CRAWL_ERROR') {
-        setLaunchLog((prev) => [...prev, `❌ Lỗi: ${msg.message}`]);
-        setIsLaunching(false);
-      } else if (msg.type === 'MARKEE_POST_FEED_LAUNCH_RESULT') {
+      } else if (msg.type === 'API_LAUNCH_FROM_APP_RESULT') {
         if (msg.success) {
           setLaunchLog((prev) => [
             ...prev,
-            `🚀 Extension đã nhận lệnh! Tab đang được redirect...`,
+            `🚀 Siêu Extension API đã nhận lệnh! Tab đang được mở...`,
           ]);
         } else {
           setLaunchLog((prev) => [
@@ -127,13 +122,13 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
           ]);
           setIsLaunching(false);
         }
-      } else if (msg.type === 'MARKEE_POST_FEED_INVALIDATED') {
+      } else if (msg.type === 'API_EXTENSION_INVALIDATED') {
         setLaunchLog((prev) => [
           ...prev,
           "🔄 Extension vừa được cập nhật. Đang tải lại trang web để kết nối lại...",
         ]);
         setTimeout(() => window.location.reload(), 1500);
-      } else if (msg.type === 'MARKEE_POST_FEED_CRAWL_SAVED') {
+      } else if (msg.type === 'CRAWL_SAVED') {
         const savedData = msg.data || msg;
         setCrawlProgress((p) => ({
           ...p,
@@ -184,6 +179,21 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
     };
   }, []);
 
+  // Gửi Ping liên tục trong 3 giây đầu để hỏi xem Extension có sống không
+  useEffect(() => {
+    let attempts = 0;
+    const interval = setInterval(() => {
+      if (extensionReady || attempts >= 5) {
+        clearInterval(interval);
+        return;
+      }
+      window.postMessage({ type: 'API_MARKEE_FB_PING' }, '*');
+      attempts++;
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [extensionReady]);
+
   // ── WebSocket connection for real-time crawl_saved events ────────────────────
   useEffect(() => {
     let ws: WebSocket | null = null;
@@ -191,7 +201,7 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
 
     const connect = () => {
       try {
-        const wsUrl = `${process.env.NEXT_PUBLIC_API_WS_URL || 'ws://localhost:8000'}/ws/crawl-status`;
+        const wsUrl = `${process.env.NEXT_PUBLIC_API_WS_URL || 'ws://localhost:8000'}/api/all-platform/ws/crawl-status`;
         ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
@@ -201,46 +211,16 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
         ws.onmessage = (event) => {
           try {
             const msg = JSON.parse(event.data);
-            if (msg.event === 'crawl_saved') {
+            if (msg.event === 'extension_crawl_saved' || msg.event === 'extension_crawl_saved_legacy') {
               const savedData = msg.data || msg;
-              const totalCrawled = savedData.total_crawled ?? 0;
-              const saved = savedData.saved ?? savedData.count ?? 0;
+              const totalCrawled = savedData.total_crawled ?? savedData.posts_count ?? 0;
+              const saved = savedData.saved ?? savedData.posts_count ?? 0;
               const failed = savedData.failed ?? 0;
-
-              setCrawlProgress((p) => ({
-                ...p,
-                groupIndex: Math.min(p.groupIndex + 1, Math.max(0, p.totalGroups - 1))
-              }));
 
               setLaunchLog((prev) => [
                 ...prev,
-                `📥 Nhận ${totalCrawled} bài viết từ extension`,
-                `💾 Đã lưu: ${saved}, Thất bại: ${failed}`,
+                `📥 Backend đã lưu thành công ${saved} bài viết mới/xịn nhất vào CSDL!`,
               ]);
-
-              const postsSummary = savedData.posts_summary || [];
-              if (postsSummary.length > 0) {
-                setLaunchLog((prev) => [
-                  ...prev,
-                  `📋 Chi tiết bài viết (${postsSummary.length}/${totalCrawled}):`
-                ]);
-                postsSummary.forEach((post: any, i: number) => {
-                  const reactions = post.reactions || 0;
-                  const comments = post.comments || 0;
-                  const shares = post.shares || 0;
-                  const preview = post.content_preview || post.content || '';
-                  setLaunchLog((prev) => [
-                    ...prev,
-                    `   ${i + 1}. ${post.author || 'N/A'} | 👍${reactions} 💬${comments} 🔄${shares} | "${preview.substring(0, 50)}..."`
-                  ]);
-                });
-                if (totalCrawled > postsSummary.length) {
-                  setLaunchLog((prev) => [
-                    ...prev,
-                    `   ... và ${totalCrawled - postsSummary.length} bài viết khác`
-                  ]);
-                }
-              }
 
               const failedUrls = savedData.failed_urls || [];
               if (failedUrls.length > 0) {
@@ -295,13 +275,14 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
   // ── Ping extension on mount ────────────────────────────────────────────────
   useEffect(() => {
     const timer = setTimeout(() => {
-      window.postMessage({ type: 'MARKEE_POST_FEED_PING' }, '*');
+      window.postMessage({ type: 'MARKEE_FB_PING' }, '*');
     }, 500);
     return () => clearTimeout(timer);
   }, []);
 
   // ── Launch crawl ──────────────────────────────────────────────────────────
   const handleLaunch = useCallback(async () => {
+    setShowModal(false);
     setLaunchLog(["⏳ Đang lấy danh sách groups..."]);
     setScrapedGroups([]);
     setCrawlProgress({ posts: 0, scrolls: 0, groupIndex: 0, totalGroups: 0 });
@@ -331,23 +312,22 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
         return;
       }
 
-      const res = await allPlatformGroupsService.getForExtension();
-      const groups: ExtensionGroup[] = res.data ?? [];
+      const groupsToCrawl = availableGroups.filter(g => selectedGroupIds.includes(g.id));
 
-      if (groups.length === 0) {
-        setLaunchLog((prev) => [...prev, "⚠️ Không có group nào được gán cho bạn."]);
+      if (groupsToCrawl.length === 0) {
+        setLaunchLog((prev) => [...prev, "⚠️ Không có group nào được chọn để cào."]);
         setIsLaunching(false);
         return;
       }
 
       setLaunchLog((prev) => [
         ...prev,
-        `📋 Tìm thấy ${groups.length} groups. Đang khởi động extension...`,
+        `📋 Đang khởi động extension cào ${groupsToCrawl.length} groups đã chọn...`,
       ]);
-      console.log('[App] Groups:', groups.length, JSON.stringify(groups.slice(0, 3)));
-      setCrawlProgress((p) => ({ ...p, totalGroups: groups.length }));
+      console.log('[App] Groups:', groupsToCrawl.length, JSON.stringify(groupsToCrawl.slice(0, 3)));
+      setCrawlProgress((p) => ({ ...p, totalGroups: groupsToCrawl.length }));
 
-      const extensionGroups = groups.map((g) => ({
+      const extensionGroups = groupsToCrawl.map((g) => ({
         id: g.id || '',
         name: g.group_name || 'Group',
         url: g.group_url,
@@ -355,7 +335,7 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
 
       window.postMessage(
         {
-          type: 'MARKEE_POST_FEED_LAUNCH',
+          type: 'API_LAUNCH_FROM_APP',
           data: {
             groups: extensionGroups,
             config: { 
@@ -385,12 +365,12 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
       ]);
       setIsLaunching(false);
     }
-  }, [extensionReady]);
+  }, [extensionReady, availableGroups, selectedGroupIds]);
 
   // ── Stop crawl ────────────────────────────────────────────────────────────
   const handleStop = useCallback(() => {
-    window.postMessage({ type: 'MARKEE_POST_FEED_STOP' }, '*');
-    setLaunchLog((prev) => [...prev, "⏹ Đã gửi lệnh dừng..."]);
+    window.postMessage({ type: 'API_STOP_CRAWL' }, '*');
+    setLaunchLog((prev) => [...prev, "⏹ Đã gửi lệnh dừng API Crawler..."]);
     setIsLaunching(false);
   }, []);
 
@@ -404,17 +384,18 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
             <span className="material-symbols-outlined text-violet-600 text-[22px]">auto_awesome</span>
           </div>
           <div>
-            <h3 className="font-bold text-slate-800 text-sm leading-tight">Cào Dữ Liệu Tự Động (Extension)</h3>
+            <h3 className="font-bold text-slate-800 text-sm leading-tight">Siêu Tốc Cào Dữ Liệu (API Extension)</h3>
             <p className="text-xs text-slate-500 leading-tight mt-0.5">
               {isLaunching
                 ? `Đang xử lý ${crawlProgress.totalGroups} groups...`
-                : "Nhấn bắt đầu để tự động duyệt qua các group."}
+                : "Nhấn bắt đầu để tự động gọi GraphQL API."}
             </p>
           </div>
         </div>
         
         <div className="flex items-center gap-2">
-          <a href="/post-feed-extension.zip" download
+          <a href="https://drive.google.com/uc?export=download&id=1f8e3HQzcxICu9RMYpvYWGWvwV2Jn5VBJ" download
+            target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-violet-200 bg-violet-50 hover:bg-violet-100 text-violet-700 text-xs font-bold transition cursor-pointer">
             <span className="material-symbols-outlined text-[16px]">download</span>
             Tải Extension
@@ -459,15 +440,103 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
           ) : (
             <button
               type="button"
-              onClick={handleLaunch}
+              onClick={() => setShowModal(true)}
               className="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700 text-xs font-bold transition-all shadow-sm hover:shadow active:scale-[0.98] flex items-center gap-1.5 cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px]">play_circle</span>
-              Bắt đầu cào
+              Nút: Siêu Tốc Cào Dữ Liệu
             </button>
           )}
         </div>
       </div>
+
+      {/* Select Groups Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between p-4 border-b border-slate-100">
+              <div>
+                <h3 className="font-bold text-slate-800 text-lg">Chọn nhóm cần cào</h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  Đã chọn {selectedGroupIds.length}/{availableGroups.length} nhóm
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+            
+            <div className="p-4 flex-1 overflow-y-auto bg-slate-50/50">
+              <div className="flex gap-2 mb-4">
+                <button 
+                  onClick={() => setSelectedGroupIds(availableGroups.map(g => g.id))}
+                  className="text-sm font-medium text-violet-600 bg-violet-100 hover:bg-violet-200 px-3 py-1.5 rounded-lg transition"
+                >
+                  Chọn tất cả
+                </button>
+                <button 
+                  onClick={() => setSelectedGroupIds([])}
+                  className="text-sm font-medium text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 px-3 py-1.5 rounded-lg transition"
+                >
+                  Bỏ chọn tất cả
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {availableGroups.map((group) => (
+                  <label key={group.id} className="flex items-start gap-3 p-3 bg-white rounded-xl border border-slate-200 hover:border-violet-300 hover:shadow-sm cursor-pointer transition">
+                    <input 
+                      type="checkbox" 
+                      className="mt-1 w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                      checked={selectedGroupIds.includes(group.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedGroupIds([...selectedGroupIds, group.id]);
+                        } else {
+                          setSelectedGroupIds(selectedGroupIds.filter(id => id !== group.id));
+                        }
+                      }}
+                    />
+                    <div className="flex flex-col overflow-hidden">
+                      <span className="text-sm font-bold text-slate-700 line-clamp-1" title={group.group_name || group.group_url}>
+                        {group.group_name || group.group_url}
+                      </span>
+                      <a 
+                        href={group.group_url} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        className="text-[10px] text-slate-400 hover:text-indigo-500 hover:underline line-clamp-1 mt-0.5 inline-block w-fit"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {group.group_url}
+                      </a>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+            
+            <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-white">
+              <button 
+                onClick={() => setShowModal(false)}
+                className="px-5 py-2.5 rounded-xl font-bold text-sm text-slate-600 hover:bg-slate-100 transition"
+              >
+                Hủy
+              </button>
+              <button 
+                onClick={handleLaunch}
+                disabled={selectedGroupIds.length === 0}
+                className="px-5 py-2.5 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[20px]">play_arrow</span>
+                Bắt đầu cào ({selectedGroupIds.length} nhóm)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Progress & Content (Expanded when launching or has data) */}
       {(isLaunching || isDone || scrapedGroups.length > 0 || launchLog.length > 0) && (
@@ -533,6 +602,11 @@ export function ExtensionLauncher({ className, onComplete, onCrawlSaved }: Exten
                         <div className="flex items-center gap-2 pt-1.5 border-t border-slate-50">
                           <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">👍 {post.reactions || 0}</span>
                           <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">💬 {post.comments || 0}</span>
+                          {post.post_url && (
+                            <a href={post.post_url} target="_blank" rel="noreferrer" className="ml-auto text-[10px] font-bold text-violet-600 bg-violet-50 hover:bg-violet-100 px-2 py-0.5 rounded transition">
+                              Xem bài
+                            </a>
+                          )}
                         </div>
                       </div>
                     ))}

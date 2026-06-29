@@ -58,6 +58,7 @@ def unified_filter_posts(payload: UnifiedFilterRequest) -> BaseResponse:
             content_type=payload.content_type,
             product_seeding=payload.product_seeding,
             search=payload.search,
+            id_member=payload.id_member,
             sort=payload.sort,
             page=payload.page,
             page_size=payload.page_size,

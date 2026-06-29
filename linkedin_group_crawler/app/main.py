@@ -207,6 +207,5 @@ app.include_router(linkedin_app_router)
 app.include_router(api_router, prefix="/facebook/api/v1")
 app.include_router(all_platform_router, prefix="/api/all-platform")
 
-# WebSocket ở root level (không có prefix)
-app.include_router(websocket_router)
+# WebSocket đã được chuyển vào all_platform_router
 

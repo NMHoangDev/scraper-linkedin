@@ -1,6 +1,5 @@
 "use client";
 
-import { PlatformStatsRow, PlatformStatCard } from "@/components/features/shared/PlatformStatCard";
 import type { AdminDashboardSummaryData } from "@/services/all-platform.service";
 
 interface AdminDashboardSummaryProps {
@@ -9,47 +8,42 @@ interface AdminDashboardSummaryProps {
 }
 
 export function AdminDashboardSummary({ data, isLoading }: AdminDashboardSummaryProps) {
-  if (isLoading || !data) {
-    return (
-      <PlatformStatsRow>
-        <PlatformStatCard label="Tổng bài viết đã cào" value="Đang tải..." accent="primary" />
-        <PlatformStatCard label="Tổng seeding đã thực hiện" value="Đang tải..." accent="secondary" />
-        <PlatformStatCard label="Tỷ lệ phê duyệt seeding" value="Đang tải..." accent="success" />
-        <PlatformStatCard label="Hiệu suất KPI công ty" value="Đang tải..." accent="warning" />
-      </PlatformStatsRow>
-    );
-  }
+  const cards = [
+    {
+      title: "TỔNG BÀI VIẾT",
+      value: isLoading || !data ? "..." : data.total_crawled_posts,
+    },
+    {
+      title: "TỔNG SEEDING",
+      value: isLoading || !data ? "..." : data.total_seeding_comments,
+    },
+    {
+      title: "TỶ LỆ DUYỆT",
+      value: isLoading || !data ? "..." : `${data.approval_rate}%`,
+    },
+    {
+      title: "HIỆU SUẤT KPI",
+      value: isLoading || !data ? "..." : `${data.kpi_rate}%`,
+    },
+  ];
 
   return (
-    <PlatformStatsRow>
-      <PlatformStatCard
-        label="Tổng bài viết đã cào"
-        value={data.total_crawled_posts}
-        accent="primary"
-        hint="Facebook & LinkedIn posts"
-        hintTone="neutral"
-      />
-      <PlatformStatCard
-        label="Tổng seeding đã thực hiện"
-        value={data.total_seeding_comments}
-        accent="secondary"
-        hint="Lưu trên hệ thống"
-        hintTone="neutral"
-      />
-      <PlatformStatCard
-        label="Tỷ lệ phê duyệt seeding"
-        value={`${data.approval_rate}%`}
-        accent="success"
-        hint="Tỷ lệ seeding hợp lệ (yes)"
-        hintTone="up"
-      />
-      <PlatformStatCard
-        label="Hiệu suất KPI công ty"
-        value={`${data.kpi_rate}%`}
-        accent="warning"
-        hint="Bình quân hoàn thành KPI các team"
-        hintTone="neutral"
-      />
-    </PlatformStatsRow>
+    <div className="mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {cards.map((card, idx) => (
+          <div 
+            key={idx}
+            className="bg-white border border-slate-100 border-l-4 border-l-[#DC2626] rounded-xl p-4 shadow-none flex flex-col relative overflow-hidden"
+          >
+            <p className="text-slate-500 text-[10px] sm:text-xs font-medium tracking-wide capitalize">
+              {card.title}
+            </p>
+            <p className="text-slate-900 mt-2 text-2xl sm:text-3xl font-black tabular-nums leading-none">
+              {typeof card.value === "number" ? card.value.toLocaleString("vi-VN") : card.value}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

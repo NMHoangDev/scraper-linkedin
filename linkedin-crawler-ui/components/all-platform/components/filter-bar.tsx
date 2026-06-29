@@ -15,6 +15,7 @@ interface FilterBarProps {
   icps: Category[];
   contentTypes?: Category[];
   productSeedings?: Category[];
+  members?: { id: string; name: string; code?: string }[];
   onFilter: (filters: FilterState) => void;
   isLoading?: boolean;
 }
@@ -28,6 +29,7 @@ export interface FilterState {
   icp: string;
   content_type: string;
   product_seeding: string;
+  member: string;
   sort: SortOption;
   dateRange: string;
 }
@@ -48,7 +50,7 @@ const DATE_OPTIONS = [
   { value: "30days", label: "30 ngày" },
 ];
 
-export function FilterBar({ intents, industries, teams, tiers, icps, contentTypes = [], productSeedings = [], onFilter, isLoading }: FilterBarProps) {
+export function FilterBar({ intents, industries, teams, tiers, icps, contentTypes = [], productSeedings = [], members = [], onFilter, isLoading }: FilterBarProps) {
   const [search, setSearch] = useState("");
   const [intent, setIntent] = useState("");
   const [industry, setIndustry] = useState("");
@@ -57,6 +59,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
   const [icp, setIcp] = useState("");
   const [contentType, setContentType] = useState("");
   const [productSeeding, setProductSeeding] = useState("");
+  const [member, setMember] = useState("");
   const [sort, setSort] = useState<SortOption>("latest");
   const [dateRange, setDateRange] = useState("");
 
@@ -69,6 +72,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
     const ic = updates.icp !== undefined ? updates.icp : icp;
     const ct = updates.content_type !== undefined ? updates.content_type : contentType;
     const ps = updates.product_seeding !== undefined ? updates.product_seeding : productSeeding;
+    const m = updates.member !== undefined ? updates.member : member;
     const so = updates.sort !== undefined ? updates.sort : sort;
     const dr = updates.dateRange !== undefined ? updates.dateRange : dateRange;
 
@@ -81,6 +85,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
       icp: ic,
       content_type: ct,
       product_seeding: ps,
+      member: m,
       sort: so,
       dateRange: dr,
     });
@@ -95,6 +100,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
     setIcp("");
     setContentType("");
     setProductSeeding("");
+    setMember("");
     setSort("latest");
     setDateRange("");
     onFilter({
@@ -106,6 +112,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
       icp: "",
       content_type: "",
       product_seeding: "",
+      member: "",
       sort: "latest",
       dateRange: "",
     });
@@ -270,6 +277,24 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
           {productSeedings.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name || c.code}
+            </option>
+          ))}
+        </select>
+      )}
+
+      {members && members.length > 0 && (
+        <select
+          value={member}
+          onChange={(e) => {
+            setMember(e.target.value);
+            handleChange({ member: e.target.value });
+          }}
+          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
+        >
+          <option value="">Tất cả Thành viên</option>
+          {members.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name || m.code}
             </option>
           ))}
         </select>

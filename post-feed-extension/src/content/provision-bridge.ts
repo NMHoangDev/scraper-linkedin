@@ -9,12 +9,6 @@ interface AppMessage {
   data?: any;
 }
 
-const EXTENSION_META = {
-  extension: 'fb-post-feed-crawler',
-  version: '1.0.1',
-  features: ['post_feed_crawl']
-};
-
 // ─── Xử lý message từ app (frontend) ────────────────────────
 window.addEventListener('message', (event: MessageEvent) => {
   if (event.source !== window) return;
@@ -24,15 +18,14 @@ window.addEventListener('message', (event: MessageEvent) => {
   console.log('[ProvisionBridge] Từ app:', data.type, data.data);
 
   // 1) App ping để hỏi extension đã cài chưa
-  if (data.type === 'MARKEE_POST_FEED_PING') {
+  if (data.type === 'MARKEE_FB_PING' || data.type === 'MARKEE_POST_FEED_PING') {
     console.log('[ProvisionBridge] Nhận PING, hỏi background...');
     try {
       chrome.runtime.sendMessage({ action: 'getServiceStatus' }, (resp: any) => {
         const err = chrome.runtime.lastError?.message;
         console.log('[ProvisionBridge] getServiceStatus resp:', resp, 'err:', err);
         window.postMessage({
-          type: 'MARKEE_POST_FEED_PONG',
-          ...EXTENSION_META,
+          type: 'MARKEE_FB_PONG',
           installed: !err,
           connected: !!(resp?.data?.isConnected),
           isRunning: !!(resp?.data?.isRunning),
@@ -41,20 +34,20 @@ window.addEventListener('message', (event: MessageEvent) => {
       });
     } catch (e: any) {
       if (e.message?.includes('Extension context invalidated')) {
-        window.postMessage({ type: 'MARKEE_POST_FEED_INVALIDATED' }, '*');
+        window.postMessage({ type: 'EXTENSION_INVALIDATED' }, '*');
       }
     }
     return;
   }
 
   // 2) App gửi lệnh LAUNCH_FROM_APP -> crawl feed
-  if (data.type === 'MARKEE_POST_FEED_LAUNCH') {
+  if (data.type === 'LAUNCH_FROM_APP') {
     console.log('[ProvisionBridge] Nhận LAUNCH_FROM_APP:', JSON.stringify(data.data));
     const { groups, config } = data.data || {};
 
     if (!groups || !Array.isArray(groups) || groups.length === 0) {
       window.postMessage({
-        type: 'MARKEE_POST_FEED_LAUNCH_RESULT',
+        type: 'LAUNCH_FROM_APP_RESULT',
         success: false,
         error: 'Không có danh sách groups'
       }, '*');
@@ -68,7 +61,7 @@ window.addEventListener('message', (event: MessageEvent) => {
           const err = chrome.runtime.lastError?.message;
           console.log('[ProvisionBridge] Response từ background:', resp, 'err:', err);
           window.postMessage({
-            type: 'MARKEE_POST_FEED_LAUNCH_RESULT',
+            type: 'LAUNCH_FROM_APP_RESULT',
             success: !err && !!(resp?.success),
             error: err || resp?.error,
             data: resp?.data
@@ -77,24 +70,24 @@ window.addEventListener('message', (event: MessageEvent) => {
       );
     } catch (e: any) {
       if (e.message?.includes('Extension context invalidated')) {
-        window.postMessage({ type: 'MARKEE_POST_FEED_INVALIDATED' }, '*');
+        window.postMessage({ type: 'EXTENSION_INVALIDATED' }, '*');
       }
     }
     return;
   }
 
   // 3) App gửi lệnh STOP crawl
-  if (data.type === 'MARKEE_POST_FEED_STOP') {
+  if (data.type === 'STOP_CRAWL') {
     try {
       chrome.runtime.sendMessage({ action: 'STOP_CRAWL' }, (resp: any) => {
         window.postMessage({
-          type: 'MARKEE_POST_FEED_STOP_RESULT',
+          type: 'STOP_CRAWL_RESULT',
           success: !!(resp?.success)
         }, '*');
       });
     } catch (e: any) {
       if (e.message?.includes('Extension context invalidated')) {
-        window.postMessage({ type: 'MARKEE_POST_FEED_INVALIDATED' }, '*');
+        window.postMessage({ type: 'EXTENSION_INVALIDATED' }, '*');
       }
     }
     return;
@@ -112,7 +105,7 @@ chrome.runtime.onMessage.addListener((message: any) => {
     case 'CRAWL_LOG':
       // Forward log tới app
       window.postMessage({
-        type: 'MARKEE_POST_FEED_CRAWL_LOG',
+        type: 'CRAWL_LOG',
         level: message.data?.level || 'info',
         message: message.data?.message || ''
       }, '*');
@@ -121,7 +114,7 @@ chrome.runtime.onMessage.addListener((message: any) => {
     case 'CRAWL_PROGRESS':
       // Forward progress tới app
       window.postMessage({
-        type: 'MARKEE_POST_FEED_CRAWL_PROGRESS',
+        type: 'CRAWL_PROGRESS',
         groupIndex: message.data?.groupIndex,
         totalGroups: message.data?.totalGroups,
         groupName: message.data?.groupName,
@@ -133,8 +126,9 @@ chrome.runtime.onMessage.addListener((message: any) => {
     case 'CRAWL_COMPLETE':
       // Kết quả crawl từ content script (mỗi group)
       window.postMessage({
-        type: 'MARKEE_POST_FEED_CRAWL_COMPLETE',
+        type: 'CRAWL_COMPLETE',
         groupUrl: message.data?.groupUrl,
+        groupName: message.data?.groupName,
         posts: message.data?.posts,
         totalPosts: message.data?.totalPosts,
         scrolls: message.data?.scrolls,
@@ -144,7 +138,7 @@ chrome.runtime.onMessage.addListener((message: any) => {
 
     case 'CRAWL_DONE':
       window.postMessage({
-        type: 'MARKEE_POST_FEED_CRAWL_DONE',
+        type: 'CRAWL_DONE',
         totalPosts: message.data?.totalPosts,
         totalGroups: message.data?.totalGroups
       }, '*');
@@ -152,7 +146,7 @@ chrome.runtime.onMessage.addListener((message: any) => {
 
     case 'CRAWL_ERROR':
       window.postMessage({
-        type: 'MARKEE_POST_FEED_CRAWL_ERROR',
+        type: 'CRAWL_ERROR',
         message: message.data?.message || 'Lỗi không xác định'
       }, '*');
       break;
@@ -160,5 +154,5 @@ chrome.runtime.onMessage.addListener((message: any) => {
 });
 
 // Báo cho app biết extension đã load
-console.log('[ProvisionBridge] Content script loaded, posting MARKEE_POST_FEED_READY');
-window.postMessage({ type: 'MARKEE_POST_FEED_READY', ...EXTENSION_META }, '*');
+console.log('[ProvisionBridge] Content script loaded, posting MARKEE_FB_EXTENSION_READY');
+window.postMessage({ type: 'MARKEE_FB_EXTENSION_READY' }, '*');

@@ -10,8 +10,8 @@ interface AdminKpiPerformanceChartProps {
 export function AdminKpiPerformanceChart({ data, isLoading }: AdminKpiPerformanceChartProps) {
   if (isLoading) {
     return (
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm min-h-[360px] flex flex-col items-center justify-center gap-2">
-        <div className="w-8 h-8 border-4 border-[#E3000F] border-t-transparent rounded-full animate-spin" />
+      <div className="bg-white p-6 rounded-2xl border border-slate-100 min-h-[360px] flex flex-col items-center justify-center gap-2">
+        <div className="w-8 h-8 border-4 border-[#DC2626] border-t-transparent rounded-full animate-spin" />
         <span className="text-sm text-slate-500 font-semibold">Đang tải biểu đồ hiệu suất...</span>
       </div>
     );
@@ -19,7 +19,7 @@ export function AdminKpiPerformanceChart({ data, isLoading }: AdminKpiPerformanc
 
   if (data.length === 0) {
     return (
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm min-h-[360px] flex flex-col items-center justify-center text-slate-400 text-sm italic">
+      <div className="bg-white p-6 rounded-2xl border border-slate-100 min-h-[360px] flex flex-col items-center justify-center text-slate-400 text-sm italic">
         Chưa có dữ liệu hiệu suất KPI của các Team.
       </div>
     );
@@ -29,7 +29,7 @@ export function AdminKpiPerformanceChart({ data, isLoading }: AdminKpiPerformanc
   const maxValue = Math.max(...data.map(d => Math.max(d.target, d.actual)), 10);
 
   return (
-    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col space-y-6">
+    <div className="bg-white p-6 border border-slate-100 rounded-2xl flex flex-col space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h3 className="text-base font-bold text-slate-800">Hiệu suất KPI các Team</h3>
@@ -39,11 +39,11 @@ export function AdminKpiPerformanceChart({ data, isLoading }: AdminKpiPerformanc
         {/* Legend */}
         <div className="flex items-center gap-4 text-xs font-bold shrink-0">
           <div className="flex items-center gap-1.5 text-slate-500">
-            <div className="w-3 h-3 bg-slate-200 rounded-sm" />
+            <div className="w-3 h-3 bg-[#E5E7EB] rounded-sm border border-slate-200" />
             <span>Chỉ tiêu giao</span>
           </div>
-          <div className="flex items-center gap-1.5 text-[#E3000F]">
-            <div className="w-3 h-3 bg-[#E3000F] rounded-sm" />
+          <div className="flex items-center gap-1.5 text-[#DC2626]">
+            <div className="w-3 h-3 bg-[#DC2626] rounded-sm" />
             <span>Thực tế đạt được</span>
           </div>
         </div>
@@ -86,7 +86,7 @@ export function AdminKpiPerformanceChart({ data, isLoading }: AdminKpiPerformanc
                   {/* Target Bar */}
                   <div 
                     style={{ height: `${targetHeight}%` }}
-                    className="w-5 bg-slate-200 rounded-t-md transition-all duration-500 hover:opacity-90 relative group/target cursor-pointer"
+                    className="w-5 bg-[#E5E7EB] rounded-t-md transition-all duration-500 hover:opacity-90 relative group/target cursor-pointer"
                   >
                     {/* Tooltip */}
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/target:block bg-slate-800 text-white text-[10px] font-bold py-1 px-2 rounded-lg whitespace-nowrap shadow-md z-30">
@@ -97,7 +97,7 @@ export function AdminKpiPerformanceChart({ data, isLoading }: AdminKpiPerformanc
                   {/* Actual Bar */}
                   <div 
                     style={{ height: `${actualHeight}%` }}
-                    className="w-5 bg-[#E3000F] rounded-t-md transition-all duration-500 hover:opacity-90 relative group/actual cursor-pointer"
+                    className="w-5 bg-[#DC2626] rounded-t-md transition-all duration-500 hover:opacity-90 relative group/actual cursor-pointer"
                   >
                     {/* Tooltip */}
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/actual:block bg-slate-800 text-white text-[10px] font-bold py-1 px-2 rounded-lg whitespace-nowrap shadow-md z-30">
@@ -107,9 +107,9 @@ export function AdminKpiPerformanceChart({ data, isLoading }: AdminKpiPerformanc
                 </div>
 
                 {/* Team Name Label */}
-                <div className="mt-3 text-[11px] font-bold text-slate-600 group-hover:text-slate-900 transition truncate w-full text-center">
+                <span className="text-[10px] font-bold text-slate-600 truncate px-1 group-hover:text-slate-900 transition-colors mt-2">
                   {team.team_name}
-                </div>
+                </span>
               </div>
             );
           })}

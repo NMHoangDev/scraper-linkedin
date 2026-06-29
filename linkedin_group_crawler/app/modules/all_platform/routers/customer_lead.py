@@ -28,10 +28,10 @@ def get_current_user(request: Request, authorization: str | None = Header(None))
 router = APIRouter(prefix="/customer-leads", tags=["Customer Leads"])
 
 @router.get("", response_model=BaseResponse)
-def get_customer_leads(_: Any = Depends(get_current_user)):
+def get_customer_leads(current_user: Any = Depends(get_current_user)):
     try:
-        data = customer_lead_service.get_all_customer_leads()
-        return BaseResponse(success=True, data=data)
+        data = customer_lead_service.get_all_customer_leads(current_user)
+        return BaseResponse(success=True, data=data, message="Success")
     except Exception as e:
         return BaseResponse(success=False, message=str(e))
 
@@ -39,7 +39,7 @@ def get_customer_leads(_: Any = Depends(get_current_user)):
 def get_sdrs(_: Any = Depends(get_current_user)):
     try:
         data = customer_lead_service.get_all_sdrs()
-        return BaseResponse(success=True, data=data)
+        return BaseResponse(success=True, data=data, message="Success")
     except Exception as e:
         return BaseResponse(success=False, message=str(e))
 
@@ -50,7 +50,7 @@ def create_customer_lead(payload: CustomerLeadCreate, current_user: Any = Depend
         if not data_dict.get("leaded_by") and isinstance(current_user, dict) and current_user.get("id"):
             data_dict["leaded_by"] = current_user.get("id")
         new_lead = customer_lead_service.create_customer_lead(data_dict)
-        return BaseResponse(success=True, data=new_lead)
+        return BaseResponse(success=True, data=new_lead, message="Success")
     except Exception as e:
         return BaseResponse(success=False, message=str(e))
 
@@ -60,7 +60,7 @@ def update_customer_lead(lead_id: str, payload: CustomerLeadUpdate, _: Any = Dep
         updated = customer_lead_service.update_customer_lead(lead_id, payload.model_dump(exclude_unset=True))
         if not updated:
             return BaseResponse(success=False, message="Not found or update failed")
-        return BaseResponse(success=True, data=updated)
+        return BaseResponse(success=True, data=updated, message="Success")
     except Exception as e:
         return BaseResponse(success=False, message=str(e))
 

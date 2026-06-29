@@ -4,17 +4,18 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { CrawlLinkedInPopup } from "@/components/all-platform/crawl-linkedin-popup";
 import { CrawlFacebookPopup } from "@/components/all-platform/crawl-facebook-popup";
-import { ExtensionLauncher } from "@/components/all-platform/components/extension-launcher";
+import { ApiExtensionLauncher } from "@/components/all-platform/components/api-extension-launcher";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { FilterBar, type FilterState } from "@/components/all-platform/components/filter-bar";
 import { PostCard } from "@/components/all-platform/components/post-card";
 import { PostDetailModal } from "@/components/all-platform/components/post-detail-modal";
 import { VerifyAccountModal } from "@/components/all-platform/components/verify-account-modal";
 import { KpiProgressCard } from "@/components/all-platform/components/kpi-progress-card";
+import { BulkCommentModal } from "@/components/all-platform/components/bulk-comment-modal";
 import { allPlatformPostsService, allPlatformCategoriesService, teamsService } from "@/services/all-platform.service";
 import type { UnifiedPost, UnifiedStats, Category, FeedPlatform } from "@/types/unified.types";
 
-// ─── Retry helper ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Retry helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function fetchWithRetry<T>(
   fn: () => Promise<T>,
   retries = 3,
@@ -32,7 +33,7 @@ async function fetchWithRetry<T>(
   throw lastError;
 }
 
-// ─── Timezone Helpers (Vietnam UTC+7) ─────────────────────────────────────────
+// â”€â”€â”€ Timezone Helpers (Vietnam UTC+7) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const VIETNAM_OFFSET_HOURS = 7;
 
 function getVietnamNow(): Date {
@@ -66,7 +67,7 @@ const getDatePart = (dateInput?: Date | string | null) => {
   }
 };
 
-// ─── Stats Card (Redesigned & Premium & Softer) ─────────────────────────────────
+// â”€â”€â”€ Stats Card (Redesigned & Premium & Softer) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface StatCardProps {
   icon: string;
   label: string;
@@ -135,15 +136,11 @@ function StatCard({
 
   return (
     <div
-      onMouseMove={handleMouseMove}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={handleMouseLeave}
-      style={transformStyle}
-      className="bg-white p-5 rounded-2xl border border-slate-100/90 shadow-[0_4px_20px_rgba(0,0,0,0.015)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all duration-300 flex flex-col justify-between relative overflow-hidden group select-none"
+      className="bg-white border border-slate-100 p-4 rounded-xl shadow-none flex flex-col justify-between relative overflow-hidden group select-none"
     >
       <div className="flex justify-between items-start">
         <div className="space-y-1">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</p>
+          <p className="text-[10px] font-bold text-slate-500 capitalize">{label}</p>
           <h3 className="text-xl font-bold text-slate-800 tracking-tight mt-1">
             {typeof value === "number" ? value.toLocaleString("vi-VN") : value}
           </h3>
@@ -191,7 +188,7 @@ function StatCard({
   );
 }
 
-// ─── Main Component ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boolean }) {
   const { user } = useAppAuth();
   const CURRENT_USER_EMAIL = user?.email || "";
@@ -199,6 +196,7 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
   const [feedPlatform, setFeedPlatform] = useState<FeedPlatform>("facebook");
   const [showCrawlPopup, setShowCrawlPopup] = useState(false);
   const [showFacebookCrawlPopup, setShowFacebookCrawlPopup] = useState(false);
+  const [showBulkCommentModal, setShowBulkCommentModal] = useState(false);
 
   const [detailModalPost, setDetailModalPost] = useState<UnifiedPost | null>(null);
   const [verifyModalPost, setVerifyModalPost] = useState<UnifiedPost | null>(null);
@@ -233,6 +231,7 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
     icp: "",
     content_type: "",
     product_seeding: "",
+    member: "",
     sort: "latest",
     dateRange: "",
   });
@@ -311,10 +310,10 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
         setTotalCount(res.data.total || 0);
         setTotalPages(res.data.total_pages || 1);
       } else {
-        setPostsError(res.message || "Không thể tải bài viết.");
+        setPostsError(res.message || "KhÃ´ng thá»ƒ táº£i bÃ i viáº¿t.");
       }
     } catch (err) {
-      setPostsError(err instanceof Error ? err.message : "Lỗi khi tải bài viết.");
+      setPostsError(err instanceof Error ? err.message : "Lá»—i khi táº£i bÃ i viáº¿t.");
     } finally {
       setIsLoadingPosts(false);
     }
@@ -391,7 +390,7 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
           </div>
 
           <div className="flex flex-wrap items-center gap-3 shrink-0">
-            <div className="bg-slate-100/80 rounded-xl p-1 border border-slate-200/50 flex">
+            <div className="bg-slate-100/80 p-0.5 rounded-lg flex gap-0.5">
               {([
                 { key: "facebook", label: "Facebook" },
                 { key: "linkedin", label: "LinkedIn" },
@@ -401,9 +400,9 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
                   type="button"
                   onClick={() => { setFeedPlatform(t.key); setPage(1); }}
                   className={cn(
-                    "px-4 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all cursor-pointer",
+                    "px-4 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer",
                     feedPlatform === t.key
-                      ? "bg-[#E3000F] text-white shadow-sm"
+                      ? "bg-white text-slate-900 shadow-sm"
                       : "text-slate-500 hover:text-slate-800 hover:bg-slate-200/40",
                   )}
                 >
@@ -420,55 +419,64 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
                   setShowFacebookCrawlPopup(true);
                 }
               }}
-              className="px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm hover:shadow transition-all active:scale-[0.98] cursor-pointer text-white bg-[#E3000F] hover:bg-[#C40009]"
+              className="flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-[#DC2626] px-4 py-2 text-xs font-bold text-white transition-all hover:bg-[#B91C1C] active:scale-[0.98] cursor-pointer"
             >
               <span className="material-symbols-outlined text-[18px]">download</span>
               Cào dữ liệu
+            </button>
+            <button
+              onClick={() => setShowBulkCommentModal(true)}
+              className="flex items-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold px-4 py-2 rounded-xl text-sm transition-all shadow-md shadow-emerald-500/20 hover:shadow-lg hover:shadow-emerald-500/30 active:scale-[0.98]"
+            >
+              <span className="material-symbols-outlined text-[18px]">forum</span>
+              Seeding hàng loạt
             </button>
 
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          icon="description"
-          label="Tổng bài hôm nay"
-          value={stats.totalPostsToday}
-          trend={{
-            value: Math.abs(fbDiff),
-            isUp: fbDiff >= 0,
-            label: `${fbDiff >= 0 ? "+" : ""}${fbDiff} so với hôm qua`,
-          }}
-          accent="blue"
-        />
-        <StatCard
-          icon="trending_up"
-          label="Tiến độ KPI"
-          value={stats.kpiProgress || 0}
-          progress={{
-            value: stats.kpiProgressPercent || 0,
-            label: `${stats.kpiProgressPercent || 0}% trong tập bài`,
-          }}
-          accent="green"
-        />
-        <StatCard
-          icon="rocket_launch"
-          label="Đã Seeded hôm nay"
-          value={stats.seededToday}
-          sub="Ước tính từ batch hôm nay"
-          accent="amber"
-        />
-        <StatCard
-          icon="visibility"
-          label="Tổng bài hiển thị"
-          value={totalCount}
-          sub={`${totalCount} bài trong cơ sở dữ liệu`}
-          accent="indigo"
-        />
+      <div className="bg-white border border-slate-100 rounded-2xl p-5 mb-4">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <StatCard
+            icon="description"
+            label="Tổng bài hôm nay"
+            value={stats.totalPostsToday}
+            trend={{
+              value: Math.abs(fbDiff),
+              isUp: fbDiff >= 0,
+              label: `${fbDiff >= 0 ? "+" : ""}${fbDiff} so với hôm qua`,
+            }}
+            accent="blue"
+          />
+          <StatCard
+            icon="trending_up"
+            label="Tiến độ KPI"
+            value={stats.kpiProgress || 0}
+            progress={{
+              value: stats.kpiProgressPercent || 0,
+              label: `${stats.kpiProgressPercent || 0}% trong tập bài`,
+            }}
+            accent="green"
+          />
+          <StatCard
+            icon="rocket_launch"
+            label="Đã seeded hôm nay"
+            value={stats.seededToday}
+            sub="Ước tính từ batch hôm nay"
+            accent="amber"
+          />
+          <StatCard
+            icon="visibility"
+            label="Tổng bài hiển thị"
+            value={totalCount}
+            sub={`${totalCount} bài trong cơ sở dữ liệu`}
+            accent="indigo"
+          />
+        </div>
       </div>
 
-      {/* ── KPI Progress Cards ──────────────────────────────────────────────── */}
+      {/* â”€â”€ KPI Progress Cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {CURRENT_USER_EMAIL && (
         <div className="mb-6 space-y-6">
           <KpiProgressCard
@@ -476,7 +484,7 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
             type="comment"
           />
           {feedPlatform === "facebook" && (
-            <ExtensionLauncher
+            <ApiExtensionLauncher
               onComplete={() => {
                 fetchPosts();
                 fetchStats();
@@ -529,23 +537,23 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
           </div>
 
           {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 mt-6">
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-center">
               <button
                 type="button"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm disabled:opacity-50 cursor-pointer"
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm disabled:opacity-50 cursor-pointer whitespace-nowrap"
               >
                 ‹ Trước
               </button>
-              <span className="text-sm text-slate-600">
+              <span className="w-full whitespace-nowrap text-sm text-slate-600 sm:w-auto">
                 Trang {page} / {totalPages} ({totalCount} bài)
               </span>
               <button
                 type="button"
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm disabled:opacity-50 cursor-pointer"
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm disabled:opacity-50 cursor-pointer whitespace-nowrap"
               >
                 Sau ›
               </button>
@@ -572,6 +580,12 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
           fetchStats();
         }}
       />
+      
+      <BulkCommentModal
+        open={showBulkCommentModal}
+        onClose={() => setShowBulkCommentModal(false)}
+        posts={posts}
+      />
 
       <PostDetailModal
         post={detailModalPost}
@@ -596,3 +610,4 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
     </div>
   );
 }
+

@@ -10,9 +10,10 @@ import type {
   AdminLeaderboardsData 
 } from "@/services/all-platform.service";
 import { AdminDashboardSummary } from "@/components/all-platform/admin/dashboard/AdminDashboardSummary";
-import { AdminKpiPerformanceChart } from "@/components/all-platform/admin/dashboard/AdminKpiPerformanceChart";
-import { AdminLeaderboards } from "@/components/all-platform/admin/dashboard/AdminLeaderboards";
+import { AdminBentoWidgets } from "@/components/all-platform/admin/dashboard/AdminBentoWidgets";
 import { AdminKpiHistoryTable } from "@/components/all-platform/admin/dashboard/AdminKpiHistoryTable";
+import { AdminKpiPerformanceChart } from "@/components/all-platform/admin/dashboard/AdminKpiPerformanceChart";
+import { AdminUnassignedPosts } from "@/components/all-platform/admin/dashboard/AdminUnassignedPosts";
 import { FaSyncAlt } from "react-icons/fa";
 
 export default function AdminDashboardPage() {
@@ -93,27 +94,36 @@ export default function AdminDashboardPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-[#1A1A1A] flex items-center gap-2">
-            <MaterialIcon name="dashboard" className="text-[#E3000F]" />
-            Dashboard Quản Trị (Admin)
+          <h2 className="flex items-center gap-2 text-2xl font-bold tracking-[-0.02em] text-slate-900">
+            Dashboard Quản trị (Admin)
           </h2>
-          
+          <p className="text-sm text-slate-400 hidden lg:block mt-1">
+            Tổng quan toàn bộ hệ thống
+          </p>
         </div>
         
         <button
           onClick={loadDashboardData}
           disabled={loadingSummary || loadingPerformance || loadingLeaderboards}
-          className="flex items-center gap-2 border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold transition shrink-0 cursor-pointer shadow-sm active:scale-95 disabled:opacity-50"
+          className="flex items-center justify-center gap-2 bg-white border border-slate-200 hover:border-[#DC2626] text-[#DC2626] rounded-xl text-sm transition shrink-0 cursor-pointer shadow-none active:scale-95 disabled:opacity-50 w-10 h-10 lg:w-auto lg:px-4 lg:py-1.5 lg:font-medium"
         >
           <FaSyncAlt className={loadingSummary || loadingPerformance || loadingLeaderboards ? "animate-spin" : ""} />
-          Làm mới
+          <span className="hidden lg:inline">Làm mới</span>
         </button>
       </div>
 
+      {/* Account Safety Alert Banner */}
+      <div className="bg-red-50 text-[#DC2626] font-medium border border-red-100 rounded-xl p-3 flex items-center gap-3">
+        <MaterialIcon name="warning" className="text-xl shrink-0" />
+        <div className="text-sm">
+          Cảnh báo hệ thống: <span className="font-bold ml-1">Đã phát hiện 3 nhóm bị khóa và 1 tài khoản seed bị hạn chế tương tác. Cần rà soát và khắc phục ngay!</span>
+        </div>
+      </div>
+
       {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-xs font-semibold flex items-center gap-2 border border-red-100">
+        <div className="bg-red-50 text-[#DC2626] p-4 rounded-xl text-xs font-semibold flex items-center gap-2 border border-red-100">
           <MaterialIcon name="error" className="text-[16px] shrink-0" />
           <span>{error}</span>
         </div>
@@ -125,20 +135,28 @@ export default function AdminDashboardPage() {
         isLoading={loadingSummary} 
       />
 
-      {/* 2. KPI Performance Chart */}
+      {/* 2. Main Content Grid - Bento Style */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Block - Table/Accordion */}
+        <div className="lg:col-span-2 flex flex-col gap-6 min-w-0">
+          <AdminKpiHistoryTable />
+          <AdminUnassignedPosts />
+        </div>
+
+        {/* Right Block - Widgets */}
+        <div className="lg:col-span-1">
+          <AdminBentoWidgets 
+            leaderboardsData={leaderboards} 
+            isLoading={loadingLeaderboards} 
+          />
+        </div>
+      </div>
+
+      {/* 3. KPI Performance Chart (Full width) */}
       <AdminKpiPerformanceChart 
         data={kpiPerformance} 
         isLoading={loadingPerformance} 
       />
-
-      {/* 3. Leaderboards */}
-      <AdminLeaderboards 
-        data={leaderboards} 
-        isLoading={loadingLeaderboards} 
-      />
-
-      {/* 4. Weekly KPI History Table (Google Sheets Style) */}
-      <AdminKpiHistoryTable />
     </div>
   );
 }
