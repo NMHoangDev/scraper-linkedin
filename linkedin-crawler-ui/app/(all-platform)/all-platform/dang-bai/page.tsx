@@ -42,6 +42,33 @@ interface KpiPost {
   posted_at: string;
 }
 
+interface PostJobStatus {
+  job_id?: string;
+  status?: string;
+  message?: string;
+  error?: string;
+  post_url?: string;
+  result?: {
+    error_message?: string;
+    post_url?: string;
+  };
+}
+
+interface PostSubmitResult {
+  uid: string;
+  group: string;
+  ok: boolean;
+  detail?: string;
+  jobId?: string;
+  postUrl?: string;
+  timedOut?: boolean;
+}
+
+const POST_RESULT_TIMEOUT_MS = 90000;
+const POST_RESULT_POLL_MS = 2500;
+const POST_SUCCESS_STATUSES = new Set(["success", "completed", "complete", "done", "succeeded"]);
+const POST_FAILED_STATUSES = new Set(["failed", "failure", "error", "cancelled", "canceled"]);
+
 function accountGroupTargetId(group: AccountGroup) {
   return (group.url || group.group_id || "").trim();
 }
@@ -53,6 +80,18 @@ function accountGroupIdentity(group: AccountGroup) {
 function accountGroupSelectionKey(uid: string, group: AccountGroup) {
   const key = accountGroupIdentity(group);
   return key ? `${uid}::${key}` : "";
+}
+
+function sleep(ms: number) {
+  return new Promise(resolve => window.setTimeout(resolve, ms));
+}
+
+function postJobStatusText(status: unknown) {
+  return String(status || "").trim().toLowerCase();
+}
+
+function postJobErrorMessage(job: PostJobStatus) {
+  return job.error || job.result?.error_message || job.message || "Extension báo đăng thất bại";
 }
 
 export default function DangBaiPage() {
@@ -77,6 +116,7 @@ export default function DangBaiPage() {
   const [deletingAccountGroupKeys, setDeletingAccountGroupKeys] = useState<Set<string>>(new Set());
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
+  const [sendStatusText, setSendStatusText] = useState("");
   const [connErr, setConnErr] = useState(false);
   const [extInstalled, setExtInstalled] = useState<boolean | null>(null);
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
@@ -155,9 +195,29 @@ export default function DangBaiPage() {
   const selectedIdsKey = useMemo(() => selectedIds.join(","), [selectedIds]);
   const selectedOnlineIds = useMemo(() => new Set(selectedOnline.map(e => e.user_id)), [selectedOnline]);
   const hasAccountGroupsFeature = useCallback((e: Ext) => (e.features || []).includes("account_groups"), []);
+  const hasKnownPostFeature = useCallback((e: Ext) => {
+    const features = e.features || [];
+    return features.length > 0 && features.includes("post");
+  }, []);
+  const hasKnownUnsupportedPostFeature = useCallback((e: Ext) => {
+    const features = e.features || [];
+    return features.length > 0 && !features.includes("post");
+  }, []);
+  const isUnknownExtensionBuild = useCallback((e: Ext) => {
+    const features = e.features || [];
+    return !e.version && features.length === 0;
+  }, []);
   const selectedWithoutGroupScan = useMemo(
     () => selectedOnline.filter(e => !hasAccountGroupsFeature(e)),
     [selectedOnline, hasAccountGroupsFeature]
+  );
+  const selectedWithoutPostSupport = useMemo(
+    () => selectedOnline.filter(hasKnownUnsupportedPostFeature),
+    [selectedOnline, hasKnownUnsupportedPostFeature]
+  );
+  const selectedUnknownPostSupport = useMemo(
+    () => selectedOnline.filter(e => !hasKnownPostFeature(e) && isUnknownExtensionBuild(e)),
+    [selectedOnline, hasKnownPostFeature, isUnknownExtensionBuild]
   );
   const accountLabelMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -406,9 +466,49 @@ export default function DangBaiPage() {
     } catch { toast.error("Lỗi đổi tên"); }
   }
 
+  async function waitForPostJob(jobId: string): Promise<{ ok: boolean; detail?: string; postUrl?: string; timedOut?: boolean }> {
+    const deadline = Date.now() + POST_RESULT_TIMEOUT_MS;
+    let lastJob: PostJobStatus | null = null;
+
+    while (Date.now() < deadline) {
+      await sleep(POST_RESULT_POLL_MS);
+      const r = await fbFetch(`/jobs/${encodeURIComponent(jobId)}`);
+      const job = await r.json().catch(() => ({})) as PostJobStatus;
+      if (!r.ok) {
+        return { ok: false, detail: job.message || job.error || "Không kiểm tra được trạng thái job" };
+      }
+      lastJob = job;
+      const status = postJobStatusText(job.status);
+      if (POST_SUCCESS_STATUSES.has(status)) {
+        return { ok: true, detail: job.message, postUrl: job.post_url || job.result?.post_url };
+      }
+      if (POST_FAILED_STATUSES.has(status)) {
+        return { ok: false, detail: postJobErrorMessage(job) };
+      }
+    }
+
+    return {
+      ok: false,
+      detail: lastJob?.message
+        ? `Extension chưa trả kết quả sau ${Math.round(POST_RESULT_TIMEOUT_MS / 1000)}s (${lastJob.message})`
+        : `Extension chưa trả kết quả sau ${Math.round(POST_RESULT_TIMEOUT_MS / 1000)}s`,
+      timedOut: true,
+    };
+  }
+
   async function submit() {
     if (selectedOnline.length === 0) return toast.error("Chưa chọn tài khoản online nào");
     if (!content.trim() && mediaUrls.length === 0) return toast.error("Chưa nhập nội dung hoặc ảnh");
+    if (selectedWithoutPostSupport.length > 0) {
+      const names = selectedWithoutPostSupport.map(labelOf).slice(0, 3).join(", ");
+      const more = selectedWithoutPostSupport.length > 3 ? ` +${selectedWithoutPostSupport.length - 3}` : "";
+      return toast.error(`Có ${selectedWithoutPostSupport.length} tài khoản không hỗ trợ đăng bài: ${names}${more}. Hãy cập nhật extension Seeding Markee.`);
+    }
+    if (selectedUnknownPostSupport.length > 0) {
+      const names = selectedUnknownPostSupport.map(labelOf).slice(0, 3).join(", ");
+      const more = selectedUnknownPostSupport.length > 3 ? ` +${selectedUnknownPostSupport.length - 3}` : "";
+      toast.warning(`Có ${selectedUnknownPostSupport.length} tài khoản dùng extension cũ/không rõ version: ${names}${more}. Nếu bị treo hãy reload hoặc cập nhật extension.`);
+    }
     const jobs = targetType === "group"
       ? groupPostTargets.map(t => ({ user_id: t.user_id, target_type: "group" as const, target_id: t.target_id, group_name: t.group_name }))
       : selectedOnline.map(e => ({ user_id: e.user_id, target_type: "profile" as const, target_id: null as string | null, group_name: "" }));
@@ -418,38 +518,73 @@ export default function DangBaiPage() {
     }
     
     setSending(true);
-    const results = await Promise.all(jobs.map(async job => {
-      try {
-        const r = await fbFetch("/post", {
-          method: "POST", headers: fbHeaders(),
-          body: JSON.stringify({
-            user_id: job.user_id,
-            content,
-            media_urls: mediaUrls,
-            target_type: job.target_type,
-            target_id: job.target_id,
-          }),
-        });
-        const d = await r.json().catch(() => ({}));
-        return { uid: job.user_id, group: job.group_name, ok: r.ok, detail: d.detail };
-      } catch { return { uid: job.user_id, group: job.group_name, ok: false, detail: "không kết nối được" }; }
-    }));
-    
-    const ok = results.filter(x => x.ok).length;
-    const fail = results.filter(x => !x.ok);
-    
-    if (fail.length === 0) { 
-      toast.success(`Đã gửi ${ok}/${jobs.length} lệnh đăng!`); 
-      setContent(""); 
-      setMediaUrls([]); 
-      setSelectedAccountGroupKeys(new Set());
-      setIsPostModalOpen(false);
+    setSendStatusText(`Đang gửi ${jobs.length} lệnh xuống extension...`);
+    try {
+      const acceptedToast = window.setTimeout(() => {
+        toast.info("Đã gửi lệnh, đang chờ extension xác nhận đăng thật...");
+      }, 1200);
+
+      const results: PostSubmitResult[] = await Promise.all(jobs.map(async job => {
+        try {
+          const r = await fbFetch("/post", {
+            method: "POST", headers: fbHeaders(),
+            body: JSON.stringify({
+              user_id: job.user_id,
+              content,
+              media_urls: mediaUrls,
+              target_type: job.target_type,
+              target_id: job.target_id,
+            }),
+          });
+          const d = await r.json().catch(() => ({}));
+          if (!r.ok) {
+            return { uid: job.user_id, group: job.group_name, ok: false, detail: d.detail || "Không gửi được lệnh đăng" };
+          }
+          const jobId = String(d.job_id || "");
+          if (!jobId) {
+            return { uid: job.user_id, group: job.group_name, ok: false, detail: "Service không trả job_id để kiểm tra kết quả" };
+          }
+
+          setSendStatusText("Đã gửi lệnh, đang chờ extension xác nhận...");
+          const final = await waitForPostJob(jobId);
+          return {
+            uid: job.user_id,
+            group: job.group_name,
+            ok: final.ok,
+            detail: final.detail,
+            jobId,
+            postUrl: final.postUrl,
+            timedOut: final.timedOut,
+          };
+        } catch {
+          return { uid: job.user_id, group: job.group_name, ok: false, detail: "không kết nối được" };
+        }
+      }));
+      window.clearTimeout(acceptedToast);
+
+      const ok = results.filter(x => x.ok).length;
+      const fail = results.filter(x => !x.ok);
+
+      if (fail.length === 0) {
+        toast.success(`Đăng thành công ${ok}/${jobs.length} tài khoản`);
+        setContent("");
+        setMediaUrls([]);
+        setSelectedAccountGroupKeys(new Set());
+        setIsPostModalOpen(false);
+      } else {
+        const detail = fail
+          .map(f => `${accountLabelMap.get(f.uid) || shortFbId(f.uid)}${f.group ? ` → ${f.group}` : ""}: ${f.detail || "lỗi không rõ"}`)
+          .slice(0, 3)
+          .join("; ");
+        const more = fail.length > 3 ? `; +${fail.length - 3} tài khoản khác` : "";
+        if (ok > 0) toast.error(`Đăng thành công ${ok}, lỗi ${fail.length}: ${detail}${more}`);
+        else toast.error(detail || "Không đăng được");
+      }
+    } finally {
+      setSending(false);
+      setSendStatusText("");
+      setTimeout(refresh, 800);
     }
-    else if (ok > 0) toast.error(`Gửi OK ${ok}, lỗi ${fail.length}: ${fail.map(f => f.uid).join(", ")}`);
-    else toast.error(fail[0].detail || "Không gửi được");
-    
-    setSending(false);
-    setTimeout(refresh, 800);
   }
 
   async function upload(files: FileList | null) {
@@ -626,6 +761,8 @@ export default function DangBaiPage() {
                   ) : (
                     online.map(e => {
                       const isSel = selected.has(e.user_id);
+                      const unknownPost = isUnknownExtensionBuild(e);
+                      const unsupportedPost = hasKnownUnsupportedPostFeature(e);
                       return (
                         <div 
                           key={e.user_id}
@@ -638,6 +775,14 @@ export default function DangBaiPage() {
                         >
                           <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
                           <span className="max-w-[140px] truncate leading-tight">{labelOf(e)}</span>
+                          {(unknownPost || unsupportedPost) && (
+                            <span title={unsupportedPost ? "Extension không khai báo hỗ trợ đăng bài" : "Extension cũ/không rõ version, có thể cần reload hoặc cập nhật"}>
+                              <MaterialIcon
+                                name="warning"
+                                className={`text-[13px] ${unsupportedPost ? "text-amber-600" : "text-slate-400"}`}
+                              />
+                            </span>
+                          )}
                           <button 
                             onClick={(ev) => {
                               ev.stopPropagation();
@@ -959,7 +1104,7 @@ export default function DangBaiPage() {
                 {sending ? (
                   <>
                     <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Đang gửi ({targetType === "group" ? groupPostTargets.length : selectedOnline.length})...
+                    {sendStatusText || `Đang gửi (${targetType === "group" ? groupPostTargets.length : selectedOnline.length})...`}
                   </>
                 ) : (
                   <>
