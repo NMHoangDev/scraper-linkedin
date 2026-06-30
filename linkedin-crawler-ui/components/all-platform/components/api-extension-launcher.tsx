@@ -144,7 +144,8 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
         onCrawlSavedRef.current?.({
           count: savedData.count ?? 0,
           groupId: savedData.group_id ?? '',
-          groupUrl: savedData.group_url ?? ''
+          groupUrl: savedData.group_url ?? '',
+          postUrls: savedData.post_urls ?? []
         });
       }
     };
@@ -163,7 +164,8 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
         onCrawlSavedRef.current?.({
           count: savedData.count ?? 0,
           groupId: savedData.group_id ?? '',
-          groupUrl: savedData.group_url ?? ''
+          groupUrl: savedData.group_url ?? '',
+          postUrls: savedData.post_urls ?? []
         });
       }
     };
