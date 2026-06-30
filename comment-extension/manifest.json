@@ -10,7 +10,10 @@
     "storage"
   ],
   "host_permissions": [
-    "*://*.facebook.com/*"
+    "*://*.facebook.com/*",
+    "http://localhost:*/*",
+    "http://127.0.0.1:*/*",
+    "*://seeding.markeeai.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -26,8 +29,8 @@
     },
     {
       "matches": [
-        "*://localhost/*", 
-        "*://127.0.0.1/*",
+        "http://localhost:*/*", 
+        "http://127.0.0.1:*/*",
         "*://*.vercel.app/*",
         "*://seeding.markeeai.com/*"
       ],

@@ -169,15 +169,17 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
 
         {(userRole === "admin" || userRole === "leader") && post.all_seedings && post.all_seedings.length > 0 ? (
           <div className="mb-3 flex flex-col gap-2">
-            {post.all_seedings.map((seed, idx) => (
-              <div key={idx} className="px-3 py-2 bg-emerald-50/50 border border-emerald-100 rounded-lg flex flex-col gap-1">
+            {post.all_seedings.map((seed, idx) => {
+              const rejected = isRejected(seed.link_comment);
+              return (
+              <div key={idx} className={cn("px-3 py-2 border rounded-lg flex flex-col gap-1", rejected ? "bg-red-50/50 border-red-100" : "bg-emerald-50/50 border-emerald-100")}>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Đã seeding bởi <span className="font-bold text-slate-800">{seed.member_name}</span> (Tài khoản: {seed.seeding_name || "Unknown"}):</span>
+                  <span className={cn("text-[10px] font-bold uppercase tracking-wider", rejected ? "text-red-600" : "text-emerald-600")}>Đã seeding bởi <span className="font-bold text-slate-800">{seed.member_name}</span> (Tài khoản: {seed.seeding_name || "Unknown"}):</span>
                 </div>
                 <p className="text-xs text-slate-600 line-clamp-2">
-                  <span className="text-emerald-500 font-serif font-bold text-lg leading-none mr-1">"</span>
+                  <span className={cn("font-serif font-bold text-lg leading-none mr-1", rejected ? "text-red-500" : "text-emerald-500")}>"</span>
                   {seed.seeding_content}
-                  <span className="text-emerald-500 font-serif font-bold text-lg leading-none ml-1">"</span>
+                  <span className={cn("font-serif font-bold text-lg leading-none ml-1", rejected ? "text-red-500" : "text-emerald-500")}>"</span>
                 </p>
                 <div className="flex items-center justify-between mt-1">
                   {seed.link_comment && !isRejected(seed.link_comment) && (
@@ -199,18 +201,18 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
                   )}
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         ) : post.seeding_content ? (
-          <div className="mb-3 px-3 py-2 bg-emerald-50/50 border border-emerald-100 rounded-lg flex flex-col gap-1">
+          <div className={cn("mb-3 px-3 py-2 border rounded-lg flex flex-col gap-1", isRejected(post.link_comment) ? "bg-red-50/50 border-red-100" : "bg-emerald-50/50 border-emerald-100")}>
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Đã seeding bằng tài khoản:</span>
+              <span className={cn("text-[10px] font-bold uppercase tracking-wider", isRejected(post.link_comment) ? "text-red-600" : "text-emerald-600")}>Đã seeding bằng tài khoản:</span>
               <span className="text-xs font-bold text-slate-800">{post.seeding_name || "Unknown"}</span>
             </div>
             <p className="text-xs text-slate-600 line-clamp-2">
-              <span className="text-emerald-500 font-serif font-bold text-lg leading-none mr-1">"</span>
+              <span className={cn("font-serif font-bold text-lg leading-none mr-1", isRejected(post.link_comment) ? "text-red-500" : "text-emerald-500")}>"</span>
               {post.seeding_content}
-              <span className="text-emerald-500 font-serif font-bold text-lg leading-none ml-1">"</span>
+              <span className={cn("font-serif font-bold text-lg leading-none ml-1", isRejected(post.link_comment) ? "text-red-500" : "text-emerald-500")}>"</span>
             </p>
             {post.link_comment && !isRejected(post.link_comment) && (
               <a href={post.link_comment} target="_blank" rel="noopener noreferrer" className="text-[10px] font-medium text-blue-600 hover:underline inline-flex items-center gap-1 mt-0.5">
@@ -276,20 +278,6 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
               Xem chi tiết
             </button>
 
-            {onVerify && !(post.seeding_content && post.link_comment) && (
-              <button
-                type="button"
-                onClick={handleVerify}
-                className="group relative px-3 py-1.5 bg-gradient-to-r from-[#E3000F] to-[#C40009] hover:from-[#C40009] hover:to-[#E3000F] text-white rounded-lg text-[11px] font-bold transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5 cursor-pointer"
-              >
-                <span className="flex items-center gap-1.5">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Xác minh
-                </span>
-              </button>
-            )}
 
             {/* Inbox ngay */}
             {post.author_url && (

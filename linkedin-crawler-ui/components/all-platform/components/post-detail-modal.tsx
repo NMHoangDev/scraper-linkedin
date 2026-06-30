@@ -237,17 +237,6 @@ export function PostDetailModal({
               <FiExternalLink />
               Xem chi tiết
             </button>
-            {onVerify && !(post.seeding_content && post.link_comment) && (
-              <button
-                onClick={() => onVerify(post)}
-                className="px-5 py-2 bg-gradient-to-r from-[#E3000F] to-[#C40009] hover:from-[#C40009] hover:to-[#E3000F] text-white rounded-xl text-sm font-bold transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 flex items-center gap-1.5"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Xác minh seeding
-              </button>
-            )}
 
             {/* Inbox ngay */}
             {post.author_url && (

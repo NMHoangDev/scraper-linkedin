@@ -1,0 +1,279 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { UnifiedPost, SocialAccount } from "@/types/unified.types";
+import { socialAccountsService } from "@/services/all-platform.service";
+import { useAppAuth } from "@/contexts/AppAuthContext";
+import { API_BASE_URL } from "@/lib/env";
+import { cn } from "@/lib/utils";
+
+interface BulkCommentLauncherProps {
+  posts: UnifiedPost[];
+  onComplete?: (seededUrls: string[]) => void;
+}
+
+export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [selectedUrls, setSelectedUrls] = useState<Set<string>>(new Set());
+  const [commentText, setCommentText] = useState("");
+  const [progress, setProgress] = useState<{ current: number; total: number; status: string; result?: any } | null>(null);
+  const [isCommenting, setIsCommenting] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+  const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState<string>("");
+
+  const { user } = useAppAuth();
+
+  useEffect(() => {
+    const handleMessage = async (event: MessageEvent) => {
+      if (event.data?.action === "COMMENT_EXTENSION_READY") {
+        setIsReady(true);
+      } else if (event.data?.action === "BULK_COMMENT_STARTED") {
+        setIsCommenting(true);
+        setProgress({ current: 0, total: selectedUrls.size, status: "Bắt đầu..." });
+      } else if (event.data?.action === "BULK_COMMENT_PROGRESS") {
+        setProgress(event.data.payload);
+      } else if (event.data?.action === "BULK_COMMENT_DONE") {
+        setIsCommenting(false);
+        setProgress(p => p ? { ...p, status: "Hoàn tất toàn bộ tiến trình!" } : null);
+        if (onComplete) onComplete(Array.from(selectedUrls));
+      } else if (event.data?.action === "STATUS_RESPONSE") {
+        const { isCommenting: extIsCommenting, currentProgress } = event.data.payload || {};
+        if (extIsCommenting) {
+          setIsCommenting(true);
+          setIsExpanded(true); // Tự động mở khung nếu đang chạy
+          if (currentProgress) setProgress(currentProgress);
+        } else if (isCommenting) { // If it was commenting but extension says it stopped
+          setIsCommenting(false);
+        }
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    const interval = setInterval(() => {
+      if (!isReady) window.postMessage({ action: "PING_COMMENT_EXTENSION" }, "*");
+      // Poll trạng thái liên tục để phục hồi khi chuyển trang về
+      window.postMessage({ action: "GET_STATUS" }, "*");
+    }, 1000);
+
+    return () => {
+      window.removeEventListener("message", handleMessage);
+      clearInterval(interval);
+    };
+  }, [selectedUrls.size, isReady]);
+
+  useEffect(() => {
+    if (isExpanded && socialAccounts.length === 0) {
+      socialAccountsService.getAll('facebook').then(res => {
+        if (res.data) {
+          setSocialAccounts(res.data);
+          if (res.data.length > 0) setSelectedAccountId(res.data[0].id);
+        }
+      });
+    }
+  }, [isExpanded, socialAccounts.length]);
+
+  const validPosts = posts.filter(p => 
+    p.platform === "facebook" && p.post_url && !p.seeding_content && (!p.all_seedings || p.all_seedings.length === 0)
+  );
+
+  const toggleAll = () => {
+    if (selectedUrls.size === validPosts.length) {
+      setSelectedUrls(new Set());
+    } else {
+      setSelectedUrls(new Set(validPosts.map(p => p.post_url as string)));
+    }
+  };
+
+  const toggleUrl = (url: string) => {
+    const next = new Set(selectedUrls);
+    if (next.has(url)) next.delete(url);
+    else next.add(url);
+    setSelectedUrls(next);
+  };
+
+  const handleStart = () => {
+    if (!commentText.trim()) return alert("Vui lòng nhập nội dung comment!");
+    if (selectedUrls.size === 0) return alert("Vui lòng chọn ít nhất 1 bài viết!");
+    if (!isReady) return alert("Chưa kết nối được Extension. Vui lòng cài đặt và tải lại trang!");
+
+    const postsPayload = Array.from(selectedUrls).map(url => {
+        const post = validPosts.find(p => p.post_url === url);
+        return { url, id_post: post?.id };
+    });
+
+    window.postMessage({
+      action: "START_BULK_COMMENT",
+      payload: {
+        posts: postsPayload,
+        text: commentText,
+        verifyConfig: {
+            apiBase: API_BASE_URL || "https://seeding.markeeai.com",
+            email_member: user?.email,
+            id_social_account: selectedAccountId || undefined,
+            id_platform: 1
+        }
+      }
+    }, "*");
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden flex flex-col transition-all duration-300 w-full mb-6 relative z-10">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 bg-slate-50/50">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center shrink-0 border border-red-100">
+            <span className="material-symbols-outlined text-red-600 text-[22px]">forum</span>
+          </div>
+          <div>
+            <h3 className="font-bold text-slate-800 text-sm leading-tight">Seeding Comment Hàng Loạt</h3>
+            <p className="text-xs text-slate-500 leading-tight mt-0.5">
+              Tự động comment chạy ngầm trên trình duyệt. Không làm gián đoạn công việc của bạn.
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <a href="https://drive.google.com/uc?export=download&id=18SWlDWIlXXQZ-t00ZDIG6B4weUwVgBJO"
+            target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold transition cursor-pointer">
+            <span className="material-symbols-outlined text-[16px]">download</span>
+            Tải Extension
+          </a>
+          <button
+            type="button"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="px-4 py-2 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold transition-all shadow-sm hover:shadow active:scale-[0.98] flex items-center gap-1.5 cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-[16px]">
+              {isExpanded ? "expand_less" : "expand_more"}
+            </span>
+            {isExpanded ? "Đóng" : "Mở Cấu Hình"}
+          </button>
+        </div>
+      </div>
+
+      {/* Body - Inline Form */}
+      {isExpanded && (
+        <div className="p-4 border-t border-slate-100 flex flex-col gap-5 bg-white">
+          <div className={`p-3 rounded-xl border text-sm flex items-center gap-2 ${isReady ? 'bg-green-50 border-green-200 text-green-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+            <span className="material-symbols-outlined text-[18px]">
+              {isReady ? "check_circle" : "warning"}
+            </span>
+            {isReady ? "Extension đã sẵn sàng chạy ngầm" : "Đang chờ kết nối Extension. Vui lòng cài đặt và F5 lại trang."}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700">Tài khoản Seeding (Facebook):</label>
+                <select
+                  className="w-full rounded-xl border border-slate-200 p-2.5 text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none"
+                  value={selectedAccountId}
+                  onChange={e => setSelectedAccountId(e.target.value)}
+                  disabled={isCommenting}
+                >
+                  <option value="">-- Tự do (Dùng acc đang đăng nhập FB) --</option>
+                  {socialAccounts.map(acc => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.account_name} {acc.account_email ? `(${acc.account_email})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2 flex-1 flex flex-col">
+                <label className="text-sm font-bold text-slate-700">Nội dung Comment chung:</label>
+                <textarea
+                  className="w-full flex-1 rounded-xl border border-slate-200 p-3 text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none resize-y min-h-[120px]"
+                  placeholder="Nhập nội dung bạn muốn seeding..."
+                  value={commentText}
+                  onChange={e => setCommentText(e.target.value)}
+                  disabled={isCommenting}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2 flex flex-col">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-bold text-slate-700">
+                  Chọn bài viết ({selectedUrls.size}/{validPosts.length})
+                </label>
+                <button type="button" onClick={toggleAll} disabled={isCommenting} className="text-sm text-red-600 hover:underline font-medium cursor-pointer">
+                  {selectedUrls.size === validPosts.length ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+                </button>
+              </div>
+              
+              <div className="border border-slate-200 rounded-xl flex-1 max-h-[200px] overflow-y-auto divide-y divide-slate-100 bg-slate-50/30">
+                {validPosts.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-slate-500">
+                    Không có bài viết Facebook nào trên màn hình này.
+                  </div>
+                ) : (
+                  validPosts.map(post => {
+                    const url = post.post_url as string;
+                    const isChecked = selectedUrls.has(url);
+                    return (
+                      <label key={post.id} className={`flex items-start gap-3 p-3 cursor-pointer hover:bg-slate-50 transition ${isCommenting ? 'opacity-70 pointer-events-none' : ''}`}>
+                        <input 
+                          type="checkbox" 
+                          className="mt-1 rounded border-slate-300 text-red-600 focus:ring-red-500" 
+                          checked={isChecked}
+                          onChange={() => toggleUrl(url)}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-slate-800 line-clamp-2">{post.content || "Bài viết không có nội dung văn bản"}</div>
+                          <div className="text-[10px] text-slate-500 truncate mt-1">{url}</div>
+                        </div>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 pt-3 border-t border-slate-100">
+            {progress && (
+              <div className="bg-red-50 border border-red-100 rounded-xl p-3 space-y-2">
+                <div className="flex justify-between text-xs text-red-800 font-bold">
+                  <span>Tiến trình: {progress.current} / {progress.total}</span>
+                  <span>{Math.round((progress.current / progress.total) * 100)}%</span>
+                </div>
+                <div className="w-full bg-red-200/50 rounded-full h-1.5 overflow-hidden">
+                  <div 
+                    className="bg-red-500 h-full transition-all duration-300"
+                    style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                  />
+                </div>
+                <div className="text-xs text-red-600 font-medium">{progress.status}</div>
+              </div>
+            )}
+            
+            <div className="flex justify-end gap-3">
+              {isCommenting && (
+                <div className="flex items-center text-xs font-medium text-slate-500 mr-auto">
+                  <span className="material-symbols-outlined animate-spin text-[16px] mr-1">progress_activity</span>
+                  Đang chạy ngầm. Bạn có thể làm việc khác.
+                </div>
+              )}
+              <button 
+                onClick={handleStart}
+                disabled={isCommenting || selectedUrls.size === 0 || !isReady || !commentText.trim()}
+                className="px-6 py-2 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 text-white font-bold hover:from-red-700 hover:to-rose-700 transition shadow-sm shadow-red-600/20 disabled:opacity-50 disabled:shadow-none flex items-center gap-2 cursor-pointer"
+              >
+                {isCommenting ? (
+                  <>Đang chạy...</>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-[18px]">send</span>
+                    Bắt đầu Seeding
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

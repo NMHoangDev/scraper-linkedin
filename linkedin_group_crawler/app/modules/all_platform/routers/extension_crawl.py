@@ -227,20 +227,22 @@ def sync_process_and_save_posts_db(payload: ExtensionCrawlRequest, legacy: bool)
     logger.info(f"[SAVE] Sẽ lưu {len(posts_to_insert)} bài (top 3 hôm nay) vào DB")
 
     inserted_count = 0
+    inserted_post_urls = []
     if posts_to_insert:
         try:
             res = supabase.table("facebook_posts").insert(posts_to_insert).execute()
             inserted_count = len(res.data or [])
+            if res.data:
+                inserted_post_urls = [p.get("post_url") for p in res.data if p.get("post_url")]
         except Exception as e:
             logger.error(f"Error saving to facebook_posts: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    return inserted_count
-
+    return inserted_count, inserted_post_urls
 
 async def process_and_save_posts(payload: ExtensionCrawlRequest, event_name: str, legacy: bool = False):
     # Offload sync Supabase DB calls to a separate thread to prevent blocking Uvicorn Asyncio EventLoop
-    inserted_count = await asyncio.to_thread(sync_process_and_save_posts_db, payload, legacy)
+    inserted_count, inserted_post_urls = await asyncio.to_thread(sync_process_and_save_posts_db, payload, legacy)
 
     # Realtime WebSocket Broadcast
     msg_prefix = "Legacy: " if legacy else ""
@@ -250,10 +252,11 @@ async def process_and_save_posts(payload: ExtensionCrawlRequest, event_name: str
         "group_url": payload.group_url,
         "group_name": payload.group_name,
         "posts_count": inserted_count,
+        "post_urls": inserted_post_urls,
         "message": f"{msg_prefix}Đã lưu {inserted_count} bài viết từ {payload.group_name}"
     })
 
-    return {"success": True, "count": inserted_count}
+    return {"success": True, "count": inserted_count, "post_urls": inserted_post_urls}
 
 @router.post("/save-posts")
 async def save_posts(

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { CrawlLinkedInPopup } from "@/components/all-platform/crawl-linkedin-popup";
 import { CrawlFacebookPopup } from "@/components/all-platform/crawl-facebook-popup";
@@ -11,7 +12,7 @@ import { PostCard } from "@/components/all-platform/components/post-card";
 import { PostDetailModal } from "@/components/all-platform/components/post-detail-modal";
 import { VerifyAccountModal } from "@/components/all-platform/components/verify-account-modal";
 import { KpiProgressCard } from "@/components/all-platform/components/kpi-progress-card";
-import { BulkCommentModal } from "@/components/all-platform/components/bulk-comment-modal";
+import { BulkCommentLauncher } from "@/components/all-platform/components/bulk-comment-launcher";
 import { allPlatformPostsService, allPlatformCategoriesService, teamsService } from "@/services/all-platform.service";
 import type { UnifiedPost, UnifiedStats, Category, FeedPlatform } from "@/types/unified.types";
 
@@ -200,6 +201,12 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
 
   const [detailModalPost, setDetailModalPost] = useState<UnifiedPost | null>(null);
   const [verifyModalPost, setVerifyModalPost] = useState<UnifiedPost | null>(null);
+
+  // Result Modals
+  const [showCrawlResultModal, setShowCrawlResultModal] = useState(false);
+  const [crawlResultsSummary, setCrawlResultsSummary] = useState<{ totalPosts: number, groups: { groupUrl: string, count: number }[], launchedGroups: string[], crawledPostUrls: string[] }>({ totalPosts: 0, groups: [], launchedGroups: [], crawledPostUrls: [] });
+  const [showSeedingResultModal, setShowSeedingResultModal] = useState(false);
+  const [recentlySeededUrls, setRecentlySeededUrls] = useState<string[]>([]);
 
   // States
   const [posts, setPosts] = useState<UnifiedPost[]>([]);
@@ -476,12 +483,45 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
             type="comment"
           />
           {feedPlatform === "facebook" && (
-            <ApiExtensionLauncher
-              onComplete={() => {
-                fetchPosts();
-                fetchStats();
-              }}
-            />
+            <>
+              <ApiExtensionLauncher
+                onComplete={(totalPosts, launchedGroups) => {
+                  fetchPosts();
+                  fetchStats();
+                  setCrawlResultsSummary(prev => {
+                    const realTotal = prev.groups.reduce((sum, g) => sum + g.count, 0);
+                    const launchedUrls = launchedGroups ? launchedGroups.map(g => g.url) : [];
+                    return { ...prev, totalPosts: realTotal > 0 ? realTotal : (totalPosts || 0), launchedGroups: launchedUrls };
+                  });
+                  setShowCrawlResultModal(true);
+                }}
+                onCrawlSaved={(data) => {
+                  setCrawlResultsSummary(prev => {
+                    const exists = prev.groups.find(g => g.groupUrl === data.groupUrl);
+                    let newGroups = prev.groups;
+                    if (exists) {
+                      newGroups = prev.groups.map(g => g.groupUrl === data.groupUrl ? { ...g, count: g.count + data.count } : g);
+                    } else {
+                      newGroups = [...prev.groups, { groupUrl: data.groupUrl, count: data.count }];
+                    }
+                    return {
+                      ...prev,
+                      groups: newGroups,
+                      crawledPostUrls: [...prev.crawledPostUrls, ...(data.postUrls || [])]
+                    };
+                  });
+                }}
+              />
+              <BulkCommentLauncher 
+                posts={posts} 
+                onComplete={(seededUrls) => {
+                  fetchPosts();
+                  fetchStats();
+                  if (seededUrls) setRecentlySeededUrls(seededUrls);
+                  setShowSeedingResultModal(true);
+                }}
+              />
+            </>
           )}
         </div>
       )}
@@ -573,11 +613,7 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
         }}
       />
       
-      <BulkCommentModal
-        open={showBulkCommentModal}
-        onClose={() => setShowBulkCommentModal(false)}
-        posts={posts}
-      />
+
 
       <PostDetailModal
         post={detailModalPost}
@@ -598,6 +634,92 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
           platform={verifyModalPost.platform}
           memberEmail={CURRENT_USER_EMAIL}
         />
+      )}
+
+      {/* MODAL KẾT QUẢ CÀO */}
+      {showCrawlResultModal && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-[400px] max-w-[90vw] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="material-symbols-outlined text-green-600 text-3xl">check_circle</span>
+              </div>
+              <h3 className="text-xl font-black text-slate-800 mb-2">Hoàn tất cào dữ liệu!</h3>
+              <p className="text-sm text-slate-500 mb-6">
+                Đã cào thành công tổng cộng <strong className="text-green-600">{crawlResultsSummary.totalPosts}</strong> bài viết mới.
+              </p>
+
+              <button
+                onClick={() => window.location.reload()}
+                className="w-full py-3 bg-[#DC2626] hover:bg-[#B91C1C] text-white rounded-xl font-bold shadow-md transition-all active:scale-95"
+              >
+                Đồng ý & Tải lại trang
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* MODAL KẾT QUẢ SEEDING */}
+      {showSeedingResultModal && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-[400px] max-w-[90vw] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="material-symbols-outlined text-blue-600 text-3xl">task_alt</span>
+              </div>
+              <h3 className="text-xl font-black text-slate-800 mb-2">Hoàn tất Seeding!</h3>
+              <p className="text-sm text-slate-500 mb-6">
+                Tiến trình seeding comment ngầm đã kết thúc. Các bài viết đã được cập nhật trạng thái mới nhất.
+              </p>
+              
+              <div className="text-left bg-slate-50 border border-slate-100 rounded-xl p-3 max-h-[250px] overflow-y-auto mb-6 custom-scrollbar">
+                {isLoadingPosts ? (
+                  <div className="text-sm text-slate-500 text-center py-4 flex flex-col items-center gap-2">
+                    <span className="material-symbols-outlined animate-spin text-slate-400">progress_activity</span>
+                    Đang kiểm tra kết quả...
+                  </div>
+                ) : posts.filter(p => p.post_url && recentlySeededUrls.includes(p.post_url)).length > 0 ? (
+                  posts.filter(p => p.post_url && recentlySeededUrls.includes(p.post_url)).map((p, idx) => {
+                    const isRejected = p.link_comment && p.link_comment.startsWith("Bị từ chối");
+                    return (
+                      <div key={idx} className={cn("bg-white border rounded-lg p-3 mb-2 shadow-sm text-left", isRejected ? "border-red-200" : "border-emerald-200")}>
+                        <div className={cn("text-[11px] font-bold line-clamp-1 mb-1", isRejected ? "text-red-600" : "text-emerald-600")}>
+                          Seeding: {p.seeding_name || "Unknown"}
+                        </div>
+                        <div className="text-xs text-slate-700 line-clamp-2 italic mb-1">
+                          "{p.seeding_content}"
+                        </div>
+                        {isRejected ? (
+                          <div className="text-[10px] font-bold text-red-500 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[14px]">error</span> Bị từ chối / Lỗi
+                          </div>
+                        ) : p.link_comment ? (
+                          <a href={p.link_comment} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-blue-500 hover:underline flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[14px]">open_in_new</span> Xem bình luận
+                          </a>
+                        ) : (
+                          <div className="text-[10px] font-bold text-slate-400">Đang chờ xử lý...</div>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-sm text-slate-500 text-center py-4">Chưa có dữ liệu seeding mới.</div>
+                )}
+              </div>
+              
+              <button
+                onClick={() => window.location.reload()}
+                className="w-full py-3 bg-[#DC2626] hover:bg-[#B91C1C] text-white rounded-xl font-bold shadow-md transition-all active:scale-95"
+              >
+                Đồng ý & Tải lại trang
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

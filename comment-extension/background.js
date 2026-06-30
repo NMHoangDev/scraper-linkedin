@@ -1,4 +1,5 @@
 let isCommenting = false;
+let currentProgress = null;
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "START_BULK_COMMENT") {
@@ -8,9 +9,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
         
         isCommenting = true;
+        currentProgress = null;
         sendResponse({ success: true });
         
         runBulkComment(request.payload, sender.tab ? sender.tab.id : null);
+    } else if (request.action === "GET_STATUS") {
+        sendResponse({ isCommenting, currentProgress });
     }
 });
 
@@ -19,16 +23,19 @@ function delay(ms) {
 }
 
 async function runBulkComment(payload, uiTabId) {
-    const { links, text } = payload;
+    const { links, posts: passedPosts, text, verifyConfig } = payload;
+    const postsToRun = passedPosts || (links ? links.map(l => ({ url: l })) : []);
     
-    for (let i = 0; i < links.length; i++) {
-        const url = links[i];
+    for (let i = 0; i < postsToRun.length; i++) {
+        const currentPost = postsToRun[i];
+        const url = currentPost.url;
         
         // Report progress
+        currentProgress = { current: i + 1, total: postsToRun.length, url, status: "Đang mở tab..." };
         if (uiTabId) {
             chrome.tabs.sendMessage(uiTabId, {
                 action: "BULK_COMMENT_PROGRESS",
-                payload: { current: i + 1, total: links.length, url, status: "Đang mở tab..." }
+                payload: currentProgress
             }).catch(() => {});
         }
         
@@ -63,10 +70,11 @@ async function runBulkComment(payload, uiTabId) {
             // Wait a bit more for React to render (Facebook is heavy SPA)
             await delay(3000);
             
+            currentProgress = { current: i + 1, total: postsToRun.length, url, status: "Đang lấy token và comment..." };
             if (uiTabId) {
                 chrome.tabs.sendMessage(uiTabId, {
                     action: "BULK_COMMENT_PROGRESS",
-                    payload: { current: i + 1, total: links.length, url, status: "Đang lấy token và comment..." }
+                    payload: currentProgress
                 }).catch(() => {});
             }
 
@@ -86,18 +94,48 @@ async function runBulkComment(payload, uiTabId) {
                 });
             });
             
+            currentProgress = { current: i + 1, total: postsToRun.length, url, status: result.success ? "Thành công" : `Lỗi: ${result.error}`, result };
             if (uiTabId) {
                 chrome.tabs.sendMessage(uiTabId, {
                     action: "BULK_COMMENT_PROGRESS",
-                    payload: { current: i + 1, total: links.length, url, status: result.success ? "Thành công" : `Lỗi: ${result.error}`, result }
+                    payload: currentProgress
                 }).catch(() => {});
             }
 
+            // Gọi API tính KPI ngầm từ Background
+            if (result && verifyConfig && verifyConfig.email_member) {
+                try {
+                    const apiBase = verifyConfig.apiBase || "https://seeding.markeeai.com";
+                    const verifyBody = {
+                        email_member: verifyConfig.email_member,
+                        link_post: url,
+                        platform: "facebook",
+                        content: text,
+                        link_comment: result.url || `Bị từ chối / Không lấy được link - ${Date.now()}-${Math.random().toString(36).substring(7)}`,
+                        profile_id: result.uid || "Unknown",
+                        id_post: currentPost.id_post,
+                        id_social_account: verifyConfig.id_social_account || undefined,
+                        id_platform: 1
+                    };
+
+                    await fetch(`${apiBase}/api/all-platform/facebook/seeding-mark/verify`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify(verifyBody)
+                    });
+                } catch(e) {
+                    console.error("Lỗi lưu KPI:", e);
+                }
+            }
+
         } catch (e) {
+            currentProgress = { current: i + 1, total: postsToRun.length, url, status: `Ngoại lệ: ${e.message}`, result: { success: false, error: e.message } };
             if (uiTabId) {
                 chrome.tabs.sendMessage(uiTabId, {
                     action: "BULK_COMMENT_PROGRESS",
-                    payload: { current: i + 1, total: links.length, url, status: `Ngoại lệ: ${e.message}`, result: { success: false, error: e.message } }
+                    payload: currentProgress
                 }).catch(() => {});
             }
         } finally {
@@ -108,11 +146,12 @@ async function runBulkComment(payload, uiTabId) {
         }
         
         // Delay between posts to avoid ban
-        if (i < links.length - 1) {
+        if (i < postsToRun.length - 1) {
+            currentProgress = { current: i + 1, total: postsToRun.length, url, status: "Đợi 5 giây để tiếp tục..." };
             if (uiTabId) {
                 chrome.tabs.sendMessage(uiTabId, {
                     action: "BULK_COMMENT_PROGRESS",
-                    payload: { current: i + 1, total: links.length, url, status: "Đợi 5 giây để tiếp tục..." }
+                    payload: currentProgress
                 }).catch(() => {});
             }
             await delay(5000);
@@ -120,10 +159,11 @@ async function runBulkComment(payload, uiTabId) {
     }
     
     isCommenting = false;
+    currentProgress = null;
     if (uiTabId) {
         chrome.tabs.sendMessage(uiTabId, {
             action: "BULK_COMMENT_DONE",
-            payload: { total: links.length }
+            payload: { total: postsToRun.length }
         }).catch(() => {});
     }
 }

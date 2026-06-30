@@ -17,6 +17,10 @@ window.addEventListener("message", function(event) {
         });
     } else if (event.data.action === "PING_COMMENT_EXTENSION") {
         window.postMessage({ action: "COMMENT_EXTENSION_READY" }, "*");
+    } else if (event.data.action === "GET_STATUS") {
+        chrome.runtime.sendMessage({ action: "GET_STATUS" }, response => {
+            window.postMessage({ action: "STATUS_RESPONSE", payload: response }, "*");
+        });
     }
 });
 

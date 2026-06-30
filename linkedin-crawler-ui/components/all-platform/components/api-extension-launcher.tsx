@@ -8,6 +8,7 @@ declare global {
 declare const chrome: any;
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { allPlatformGroupsService, authService } from "@/services/all-platform.service";
 import { API_BASE_URL } from "@/lib/env";
@@ -20,11 +21,12 @@ interface ExtensionGroup {
 
 interface ExtensionLauncherProps {
   className?: string;
-  onComplete?: (postsCount: number) => void;
-  onCrawlSaved?: (data: { count: number; groupId: string; groupUrl: string }) => void;
+  onComplete?: (postsCount: number, launchedGroups?: any[]) => void;
+  onCrawlSaved?: (data: { count: number; groupId: string; groupUrl: string; postUrls: string[] }) => void;
 }
 
 export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: ExtensionLauncherProps) {
+  const groupsToCrawlRef = useRef<any[]>([]);
   const [isLaunching, setIsLaunching] = useState(false);
   const [isDone, setIsDone] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -109,7 +111,7 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
           ...prev,
           `🎉 Hoàn tất! ${msg.totalPosts ?? 0} bài viết từ ${msg.totalGroups ?? 0} groups`,
         ]);
-        onCompleteRef.current?.(msg.totalPosts ?? 0);
+        onCompleteRef.current?.(msg.totalPosts ?? 0, groupsToCrawlRef.current);
       } else if (msg.type === 'API_LAUNCH_FROM_APP_RESULT') {
         if (msg.success) {
           setLaunchLog((prev) => [
@@ -241,7 +243,8 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
               onCrawlSavedRef.current?.({
                 count: saved,
                 groupId: savedData.group_id ?? '',
-                groupUrl: savedData.group_url ?? ''
+                groupUrl: savedData.group_url ?? '',
+                postUrls: savedData.post_urls ?? []
               });
             }
           } catch (e) {
@@ -334,6 +337,8 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
         name: g.group_name || 'Group',
         url: g.group_url,
       }));
+      
+      groupsToCrawlRef.current = extensionGroups;
 
       window.postMessage(
         {
@@ -382,8 +387,8 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
       {/* Header / Launcher */}
       <div className="flex items-center justify-between p-4 bg-slate-50/50">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-100 to-purple-100 flex items-center justify-center shrink-0 border border-violet-200/50">
-            <span className="material-symbols-outlined text-violet-600 text-[22px]">auto_awesome</span>
+          <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center shrink-0 border border-red-100">
+            <span className="material-symbols-outlined text-red-600 text-[22px]">auto_awesome</span>
           </div>
           <div>
             <h3 className="font-bold text-slate-800 text-sm leading-tight">Siêu Tốc Cào Dữ Liệu (API Extension)</h3>
@@ -398,7 +403,7 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
         <div className="flex items-center gap-2">
           <a href="https://drive.google.com/uc?export=download&id=1wuUVMipbWMTW726F9_XfgGrC3k-gbeRD"
             target="_blank" rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-violet-200 bg-violet-50 hover:bg-violet-100 text-violet-700 text-xs font-bold transition cursor-pointer">
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold transition cursor-pointer">
             <span className="material-symbols-outlined text-[16px]">download</span>
             Tải Extension
           </a>
@@ -419,7 +424,7 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
                   onCompleteRef.current?.(0);
                   handleLaunch();
                 }}
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700 text-xs font-bold transition-all shadow-sm hover:shadow active:scale-[0.98] flex items-center gap-1.5 cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold transition-all shadow-sm hover:shadow active:scale-[0.98] flex items-center gap-1.5 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px]">refresh</span>
                 Cào lại
@@ -443,17 +448,17 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
             <button
               type="button"
               onClick={() => setShowModal(true)}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700 text-xs font-bold transition-all shadow-sm hover:shadow active:scale-[0.98] flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold transition-all shadow-sm hover:shadow active:scale-[0.98] flex items-center gap-1.5 cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px]">play_circle</span>
-              Nút: Siêu Tốc Cào Dữ Liệu
+              Siêu Tốc Cào Dữ Liệu
             </button>
           )}
         </div>
       </div>
 
       {/* Select Groups Modal */}
-      {showModal && (
+      {showModal && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
             <div className="flex items-center justify-between p-4 border-b border-slate-100">
@@ -530,14 +535,15 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
               <button 
                 onClick={handleLaunch}
                 disabled={selectedGroupIds.length === 0}
-                className="px-5 py-2.5 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-5 py-2.5 rounded-xl font-bold text-sm text-white bg-[#DC2626] hover:bg-[#B91C1C] transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 <span className="material-symbols-outlined text-[20px]">play_arrow</span>
                 Bắt đầu cào ({selectedGroupIds.length} nhóm)
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Progress & Content (Expanded when launching or has data) */}
