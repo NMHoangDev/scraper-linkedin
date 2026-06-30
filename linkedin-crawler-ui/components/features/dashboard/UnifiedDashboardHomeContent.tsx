@@ -674,42 +674,6 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
                 Tiến trình seeding comment ngầm đã kết thúc. Các bài viết đã được cập nhật trạng thái mới nhất.
               </p>
               
-              <div className="text-left bg-slate-50 border border-slate-100 rounded-xl p-3 max-h-[250px] overflow-y-auto mb-6 custom-scrollbar">
-                {isLoadingPosts ? (
-                  <div className="text-sm text-slate-500 text-center py-4 flex flex-col items-center gap-2">
-                    <span className="material-symbols-outlined animate-spin text-slate-400">progress_activity</span>
-                    Đang kiểm tra kết quả...
-                  </div>
-                ) : posts.filter(p => p.post_url && recentlySeededUrls.includes(p.post_url)).length > 0 ? (
-                  posts.filter(p => p.post_url && recentlySeededUrls.includes(p.post_url)).map((p, idx) => {
-                    const isRejected = p.link_comment && p.link_comment.startsWith("Bị từ chối");
-                    return (
-                      <div key={idx} className={cn("bg-white border rounded-lg p-3 mb-2 shadow-sm text-left", isRejected ? "border-red-200" : "border-emerald-200")}>
-                        <div className={cn("text-[11px] font-bold line-clamp-1 mb-1", isRejected ? "text-red-600" : "text-emerald-600")}>
-                          Seeding: {p.seeding_name || "Unknown"}
-                        </div>
-                        <div className="text-xs text-slate-700 line-clamp-2 italic mb-1">
-                          "{p.seeding_content}"
-                        </div>
-                        {isRejected ? (
-                          <div className="text-[10px] font-bold text-red-500 flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[14px]">error</span> Bị từ chối / Lỗi
-                          </div>
-                        ) : p.link_comment ? (
-                          <a href={p.link_comment} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-blue-500 hover:underline flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[14px]">open_in_new</span> Xem bình luận
-                          </a>
-                        ) : (
-                          <div className="text-[10px] font-bold text-slate-400">Đang chờ xử lý...</div>
-                        )}
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="text-sm text-slate-500 text-center py-4">Chưa có dữ liệu seeding mới.</div>
-                )}
-              </div>
-              
               <button
                 onClick={() => window.location.reload()}
                 className="w-full py-3 bg-[#DC2626] hover:bg-[#B91C1C] text-white rounded-xl font-bold shadow-md transition-all active:scale-95"
