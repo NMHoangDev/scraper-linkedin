@@ -35,6 +35,7 @@ export default function ZaloAccountAuthView({ accountId, ownerName, autoTrigger,
 
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const accountIdRef = useRef(accountId);
+  const hasTriggeredRef = useRef(false);
 
   useEffect(() => {
     accountIdRef.current = accountId;
@@ -189,9 +190,10 @@ export default function ZaloAccountAuthView({ accountId, ownerName, autoTrigger,
 
   // Auto trigger extension login if requested and available
   useEffect(() => {
-    if (autoTrigger) {
+    if (autoTrigger && !hasTriggeredRef.current) {
       void isZaloExtensionAvailable().then(avail => {
         if (avail) {
+          hasTriggeredRef.current = true;
           void startExtensionLogin();
         }
       });
