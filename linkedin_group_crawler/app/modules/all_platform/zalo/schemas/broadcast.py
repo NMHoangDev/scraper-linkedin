@@ -15,6 +15,8 @@ class ZaloBroadcastRequest(BaseModel):
     message_ids: List[str] = Field(default_factory=list)
     targets: List[ZaloBroadcastTarget] = Field(default_factory=list)
     content_mode: BroadcastContentMode = "both"
+    text_overrides: Optional[dict[str, str]] = None
+
 
 
 class ZaloBroadcastPreviewItem(BaseModel):

@@ -126,6 +126,13 @@ async def preview_broadcast(
     user_id = _normalize_user_id(body.user_id or x_user_id)
     try:
         messages = await fetch_messages_by_ids(user_id, body.message_ids)
+        if body.text_overrides:
+            for msg in messages:
+                msg_id = msg.get("id")
+                src_id = msg.get("source_message_id")
+                override_val = body.text_overrides.get(msg_id) or body.text_overrides.get(src_id)
+                if override_val is not None:
+                    msg["content"] = override_val
         return _build_preview(messages, len(body.targets), body.content_mode)
     except SupabaseNotConfigured as exc:
         raise HTTPException(status_code=503, detail=str(exc))
@@ -157,6 +164,13 @@ async def create_broadcast(
         messages = await fetch_messages_by_ids(user_id, body.message_ids)
         if len(messages) != len(set(body.message_ids)):
             raise HTTPException(status_code=400, detail="Some selected messages were not found")
+        if body.text_overrides:
+            for msg in messages:
+                msg_id = msg.get("id")
+                src_id = msg.get("source_message_id")
+                override_val = body.text_overrides.get(msg_id) or body.text_overrides.get(src_id)
+                if override_val is not None:
+                    msg["content"] = override_val
         preview = _build_preview(messages, len(body.targets), body.content_mode)
         if preview.warnings:
             raise HTTPException(status_code=400, detail="; ".join(preview.warnings))

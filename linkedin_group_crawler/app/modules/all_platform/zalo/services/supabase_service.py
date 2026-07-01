@@ -459,22 +459,38 @@ async def save_crawl_messages(user_id: str, job: JobData, group_id: str, message
     saved_count = 0
     uploaded_images = 0
     failed_images = 0
-    for msg in messages:
-        rows = await _rest(
-            "POST",
-            "zalo_messages",
-            json=[_message_payload(user_id, job, group_id, group_name, msg)],
-            params={"on_conflict": "user_id,group_id,source_message_id"},
-            prefer="resolution=merge-duplicates,return=representation",
-        )
-        if not rows:
+
+    messages_list = list(messages)
+    payloads = []
+    msg_by_source_id = {}
+    for msg in messages_list:
+        if not msg.message_id:
             continue
-        saved_count += 1
-        message_row = rows[0]
-        message_uuid = message_row["id"]
-        asset_stats = await save_message_assets(message_uuid, user_id, job.job_id, msg.image_urls)
-        uploaded_images += asset_stats["uploaded"]
-        failed_images += asset_stats["failed"]
+        payloads.append(_message_payload(user_id, job, group_id, group_name, msg))
+        msg_by_source_id[str(msg.message_id).strip()] = msg
+
+    if payloads:
+        try:
+            rows = await _rest(
+                "POST",
+                "zalo_messages",
+                json=payloads,
+                params={"on_conflict": "user_id,group_id,source_message_id"},
+                prefer="resolution=merge-duplicates,return=representation",
+            ) or []
+
+            for row in rows:
+                saved_count += 1
+                message_uuid = row["id"]
+                source_msg_id = str(row.get("source_message_id") or "").strip()
+                original_msg = msg_by_source_id.get(source_msg_id)
+                if original_msg and original_msg.image_urls:
+                    asset_stats = await save_message_assets(message_uuid, user_id, job.job_id, original_msg.image_urls)
+                    uploaded_images += asset_stats["uploaded"]
+                    failed_images += asset_stats["failed"]
+        except Exception as exc:
+            logger.warning(f"Could not bulk save crawl messages for job={job.job_id}: {exc}")
+
     logger.info(
         "Saved Zalo crawl payload: job={} group={!r} messages={} images_uploaded={} images_failed={}",
         job.job_id,
@@ -588,14 +604,26 @@ async def delete_zalo_account(account_id: str) -> None:
 async def hard_delete_zalo_account_data(account_id: str) -> Dict[str, int]:
     """Xoá thật sự (hard delete) toàn bộ dữ liệu của 1 account Zalo trong Supabase.
 
-    Xoá rows theo ``user_id = account_id`` (và ``account_id = account_id`` cho bảng ``zalo_accounts``)
-    trong 5 bảng: zalo_sessions, zalo_users, zalo_accounts, zalo_groups, zalo_messages.
-
-    Trả về dict ``{table: deleted_count}``. Bảng nào lỗi sẽ bị bỏ qua và ghi vào key ``_errors``.
+    Gọi PostgreSQL RPC fn_hard_delete_zalo_account để xóa toàn bộ các bảng trong 1 transaction.
     """
     if not is_supabase_configured():
         return {}
 
+    try:
+        resp = await _rest(
+            "POST",
+            "rpc/fn_hard_delete_zalo_account",
+            json={"p_account_id": account_id},
+        )
+        if isinstance(resp, dict):
+            return resp
+        return {}
+    except Exception as exc:
+        logger.info(f"fn_hard_delete_zalo_account RPC failed: {exc}. Falling back to sequential deletes...")
+        return await _hard_delete_zalo_account_data_fallback(account_id)
+
+
+async def _hard_delete_zalo_account_data_fallback(account_id: str) -> Dict[str, int]:
     result: Dict[str, int] = {}
 
     def _count(resp: Any) -> int:
@@ -619,16 +647,15 @@ async def hard_delete_zalo_account_data(account_id: str) -> Dict[str, int]:
             resp = await _rest("DELETE", table, params=params, prefer="return=representation")
             result[table] = _count(resp)
         except RuntimeError as exc:
-            # Table không tồn tại hoặc lỗi → ghi log nhưng KHÔNG raise để các bảng khác vẫn xoá được
             msg = str(exc)
             if "Could not find" in msg or "does not exist" in msg or "404" in msg or "PGRST" in msg:
                 result[table] = 0
             else:
                 result.setdefault("_errors", 0)
                 result["_errors"] += 1
-                logger.warning(f"hard_delete_zalo_account_data: failed to delete {table}: {msg}")
+                logger.warning(f"hard_delete_zalo_account_data fallback: failed to delete {table}: {msg}")
         except Exception as exc:
-            logger.warning(f"hard_delete_zalo_account_data: unexpected error on {table}: {exc}")
+            logger.warning(f"hard_delete_zalo_account_data fallback: unexpected error on {table}: {exc}")
             result[table] = 0
 
     return result
@@ -1001,38 +1028,120 @@ async def save_listener_messages(
         if ts_ms > 0:
             last_message_at_value = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).isoformat().replace("+00:00", "Z")
 
-    await upsert_group(
-        user_id=user_id,
-        group_id=group_id,
-        group_name=safe_group_name,
-        unread_count=(current_unread + unread_inc) if unread_inc > 0 else None,
-        last_message_at=last_message_at_value,
-        last_message_content=last_message.content if last_message else None,
-        last_sender_id=last_message.sender_id if last_message else None,
-        last_sender_name=last_message.sender_name if last_message else None,
-        last_message_type=last_message.type if last_message else None,
-    )
+    # Chuẩn bị payload cho group
+    group_payload = {
+        "group_id": group_id,
+        "group_name": safe_group_name,
+        "unread_count": (current_unread + unread_inc) if unread_inc > 0 else None,
+        "last_message_at": last_message_at_value,
+        "last_message_content": last_message.content if last_message else None,
+        "last_sender_id": last_message.sender_id if last_message else None,
+        "last_sender_name": last_message.sender_name if last_message else None,
+        "last_message_type": last_message.type if last_message else None,
+    }
+
+    # Chuẩn bị payload cho messages
+    payloads = []
+    msg_by_source_id = {}
+    for msg in messages_list:
+        if not msg.message_id:
+            continue
+        p = _listener_message_payload(user_id, group_id, safe_group_name, msg)
+        p["message_id"] = msg.message_id
+        payloads.append(p)
+        msg_by_source_id[str(msg.message_id).strip()] = msg
 
     saved_count = 0
     uploaded_images = 0
     failed_images = 0
-    for msg in messages_list:
-        if not msg.message_id:
-            continue
-        rows = await _rest(
-            "POST",
-            "zalo_messages",
-            json=[_listener_message_payload(user_id, group_id, safe_group_name, msg)],
-            params={"on_conflict": "user_id,group_id,source_message_id"},
-            prefer="resolution=merge-duplicates,return=representation",
-        )
-        if not rows:
-            continue
-        saved_count += 1
-        message_uuid = rows[0]["id"]
-        asset_stats = await save_message_assets(message_uuid, user_id, None, msg.image_urls)
-        uploaded_images += asset_stats["uploaded"]
-        failed_images += asset_stats["failed"]
+    use_fallback = True
+
+    # 1. Gọi RPC fn_bulk_save_zalo_messages để gộp Group + Messages thành 1 truy vấn duy nhất
+    if payloads:
+        try:
+            await _rest(
+                "POST",
+                "rpc/fn_bulk_save_zalo_messages",
+                json={
+                    "p_user_id": user_id,
+                    "p_groups": [group_payload],
+                    "p_messages": payloads,
+                }
+            )
+            
+            # Lấy UUIDs của tin nhắn vừa upsert để lưu assets
+            source_ids = list(msg_by_source_id.keys())
+            rows = await _rest(
+                "GET",
+                "zalo_messages",
+                params={
+                    "select": "id,source_message_id",
+                    "user_id": f"eq.{user_id}",
+                    "group_id": f"eq.{group_id}",
+                    "source_message_id": f"in.({','.join(source_ids)})",
+                }
+            ) or []
+
+            for row in rows:
+                saved_count += 1
+                message_uuid = row["id"]
+                source_msg_id = str(row.get("source_message_id") or "").strip()
+                original_msg = msg_by_source_id.get(source_msg_id)
+                if original_msg and original_msg.image_urls:
+                    asset_stats = await save_message_assets(message_uuid, user_id, None, original_msg.image_urls)
+                    uploaded_images += asset_stats["uploaded"]
+                    failed_images += asset_stats["failed"]
+            
+            use_fallback = False
+        except Exception as rpc_exc:
+            logger.warning(
+                "fn_bulk_save_zalo_messages RPC failed, fallback to REST: {}",
+                rpc_exc,
+            )
+            use_fallback = True
+
+    # 2. Luồng Fallback REST truyền thống
+    if use_fallback:
+        try:
+            await upsert_group(
+                user_id=user_id,
+                group_id=group_id,
+                group_name=safe_group_name,
+                unread_count=(current_unread + unread_inc) if unread_inc > 0 else None,
+                last_message_at=last_message_at_value,
+                last_message_content=last_message.content if last_message else None,
+                last_sender_id=last_message.sender_id if last_message else None,
+                last_sender_name=last_message.sender_name if last_message else None,
+                last_message_type=last_message.type if last_message else None,
+            )
+            
+            if payloads:
+                # Remove temporary "message_id" key used only by the RPC to avoid database insert error
+                rest_payloads = []
+                for p in payloads:
+                    p_copy = p.copy()
+                    p_copy.pop("message_id", None)
+                    rest_payloads.append(p_copy)
+
+                rows = await _rest(
+                    "POST",
+                    "zalo_messages",
+                    json=rest_payloads,
+                    params={"on_conflict": "user_id,group_id,source_message_id"},
+                    prefer="resolution=merge-duplicates,return=representation",
+                ) or []
+
+                for row in rows:
+                    saved_count += 1
+                    message_uuid = row["id"]
+                    source_msg_id = str(row.get("source_message_id") or "").strip()
+                    original_msg = msg_by_source_id.get(source_msg_id)
+                    if original_msg and original_msg.image_urls:
+                        asset_stats = await save_message_assets(message_uuid, user_id, None, original_msg.image_urls)
+                        uploaded_images += asset_stats["uploaded"]
+                        failed_images += asset_stats["failed"]
+        except Exception as exc:
+            logger.warning(f"Could not bulk save listener messages (REST) for user={user_id}: {exc}")
 
     if saved_count:
         logger.info(
@@ -1126,6 +1235,7 @@ async def save_message_assets(
     except Exception as exc:
         logger.warning(f"Could not pre-fetch existing zalo_message_assets for message {message_uuid}: {exc}")
 
+    payloads = []
     for source_url in source_urls:
         status = "pending"
         storage_path = None
@@ -1168,23 +1278,29 @@ async def save_message_assets(
         if status == "failed" and source_url.startswith("blob:"):
             stats["failed"] += 1
 
-        await _rest(
-            "POST",
-            "zalo_message_assets",
-            json=[
-                {
-                    "message_id": message_uuid,
-                    "source_url": source_url_ref,
-                    "storage_path": storage_path,
-                    "storage_url": storage_url,
-                    "status": status,
-                    "error": error,
-                    "updated_at": datetime.utcnow().isoformat(),
-                }
-            ],
-            params={"on_conflict": "message_id,source_url"},
-            prefer="resolution=merge-duplicates",
-        )
+        now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        payloads.append({
+            "message_id": message_uuid,
+            "source_url": source_url_ref,
+            "storage_path": storage_path,
+            "storage_url": storage_url,
+            "status": status,
+            "error": error,
+            "updated_at": now_iso,
+        })
+
+    if payloads:
+        try:
+            await _rest(
+                "POST",
+                "zalo_message_assets",
+                json=payloads,
+                params={"on_conflict": "message_id,source_url"},
+                prefer="resolution=merge-duplicates",
+            )
+        except Exception as exc:
+            logger.warning(f"Could not bulk save message assets for message {message_uuid}: {exc}")
+
     return stats
 
 
@@ -1447,6 +1563,44 @@ async def list_conversations(user_id: str, limit: int = 500) -> List[Dict[str, A
 
 
 async def list_conversation_messages(
+    user_id: str,
+    conversation_id: str,
+    limit: int = 100,
+    offset: int = 0,
+) -> Tuple[List[Dict[str, Any]], int]:
+    if not is_supabase_configured():
+        return [], 0
+
+    safe_limit = max(1, min(limit, 500))
+    safe_offset = max(0, offset)
+
+    try:
+        rpc_result = await _rest(
+            "POST",
+            "rpc/fn_get_zalo_conversation_messages",
+            json={
+                "p_user_id": user_id,
+                "p_conversation_id": conversation_id,
+                "p_limit": safe_limit,
+                "p_offset": safe_offset,
+            }
+        )
+        if not rpc_result or not isinstance(rpc_result, list) or len(rpc_result) == 0:
+            return [], 0
+            
+        data = rpc_result[0]
+        messages_list = data.get("messages_json") or []
+        total_count = int(data.get("total_count") or 0)
+        
+        hydrated_rows = await hydrate_message_groups_from_jobs(user_id, messages_list)
+        hydrated_rows.reverse()
+        return hydrated_rows, total_count
+    except Exception as exc:
+        logger.info(f"fn_get_zalo_conversation_messages RPC failed: {exc}. Falling back to manual queries...")
+        return await _list_conversation_messages_fallback(user_id, conversation_id, limit, offset)
+
+
+async def _list_conversation_messages_fallback(
     user_id: str,
     conversation_id: str,
     limit: int = 100,

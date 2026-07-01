@@ -36,6 +36,7 @@ export default function ZaloAccountAuthView({ accountId, ownerName, autoTrigger,
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const accountIdRef = useRef(accountId);
   const hasTriggeredRef = useRef(false);
+  const isConnectingRef = useRef(false);
 
   useEffect(() => {
     accountIdRef.current = accountId;
@@ -147,6 +148,8 @@ export default function ZaloAccountAuthView({ accountId, ownerName, autoTrigger,
   }, [accountId, clearPolling, onSuccess]);
 
   const startExtensionLogin = useCallback(async () => {
+    if (isConnectingRef.current) return;
+    isConnectingRef.current = true;
     setLoading(true);
     setWarning(null);
     setFeedback("Đang kết nối với Chrome Extension...");
@@ -185,16 +188,19 @@ export default function ZaloAccountAuthView({ accountId, ownerName, autoTrigger,
       setMethod("none");
     } finally {
       setLoading(false);
+      isConnectingRef.current = false;
     }
   }, [accountId, onSuccess]);
 
   // Auto trigger extension login if requested and available
   useEffect(() => {
     if (autoTrigger && !hasTriggeredRef.current) {
+      hasTriggeredRef.current = true;
       void isZaloExtensionAvailable().then(avail => {
         if (avail) {
-          hasTriggeredRef.current = true;
           void startExtensionLogin();
+        } else {
+          hasTriggeredRef.current = false;
         }
       });
     }
