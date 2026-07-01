@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { memo, useState, useRef, useEffect, useMemo } from "react";
 import { FaFacebook, FaLinkedin } from "react-icons/fa";
 import { FiExternalLink } from "react-icons/fi";
 import { cn } from "@/lib/utils";
-import type { UnifiedPost, FeedPlatform } from "@/types/unified.types";
+import type { UnifiedPost, FeedPlatform, UnifiedSeedingInfo } from "@/types/unified.types";
+import { SeedingActivityModal } from "@/components/all-platform/feed/SeedingActivityModal";
 
 interface PostCardProps {
   post: UnifiedPost;
@@ -23,8 +24,131 @@ function PlatformIcon({ platform }: { platform: FeedPlatform }) {
   return <FaLinkedin className="text-blue-700 shrink-0" />;
 }
 
-export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, seeded, verifyStatus }: PostCardProps) {
+/**
+ * Sort order for `all_seedings` so admin/leader sees actionable items first:
+ * 1. rejected (bị từ chối — cần xử lý gấp)
+ * 2. verified=yes (đã xác minh)
+ * 3. pending (chờ verify)
+ * 4. other / no data
+ */
+function sortSeedings(seedings: UnifiedSeedingInfo[] | undefined): UnifiedSeedingInfo[] {
+  if (!seedings || seedings.length === 0) return [];
+  return [...seedings].sort((a, b) => {
+    const rank = (s: UnifiedSeedingInfo): number => {
+      const isRejected =
+        (s.link_comment || "").startsWith("Bị từ chối") ||
+        s.verify_status === "no";
+      if (isRejected) return 0;
+      if (s.verify_status === "yes") return 1;
+      return 2; // pending or unknown
+    };
+    return rank(a) - rank(b);
+  });
+}
+
+interface SeedingBadgeCounts {
+  total: number;
+  verified: number;
+  pending: number;
+  rejected: number;
+  uniqueMembers: number;
+}
+
+function summarizeSeedings(
+  seedings: UnifiedSeedingInfo[] | undefined,
+): SeedingBadgeCounts {
+  const empty: SeedingBadgeCounts = {
+    total: 0,
+    verified: 0,
+    pending: 0,
+    rejected: 0,
+    uniqueMembers: 0,
+  };
+  if (!seedings || seedings.length === 0) return empty;
+  const memberSet = new Set<string>();
+  let verified = 0;
+  let pending = 0;
+  let rejected = 0;
+  for (const s of seedings) {
+    if (s.member_name) memberSet.add(s.member_name);
+    const isRejected =
+      (s.link_comment || "").startsWith("Bị từ chối") ||
+      s.verify_status === "no";
+    if (isRejected) {
+      rejected += 1;
+    } else if (s.verify_status === "yes") {
+      verified += 1;
+    } else {
+      pending += 1;
+    }
+  }
+  return {
+    total: seedings.length,
+    verified,
+    pending,
+    rejected,
+    uniqueMembers: memberSet.size,
+  };
+}
+
+function SeedingCountBadges({
+  counts,
+  onClick,
+}: {
+  counts: SeedingBadgeCounts;
+  onClick?: () => void;
+}) {
+  if (counts.total === 0) return null;
+  const interactive = !!onClick;
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={!interactive}
+        className={cn(
+          "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100",
+          interactive && "hover:bg-emerald-100 hover:border-emerald-200 transition cursor-pointer",
+        )}
+        title={
+          interactive
+            ? `Click để xem chi tiết ${counts.total} lượt seeding`
+            : `${counts.uniqueMembers} thành viên đã thực hiện ${counts.total} lượt seeding`
+        }
+      >
+        <span className="material-symbols-outlined text-[12px]">groups</span>
+        {counts.total} lượt · {counts.uniqueMembers} người
+      </button>
+      {counts.verified > 0 && (
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700">
+          ✓ {counts.verified}
+        </span>
+      )}
+      {counts.pending > 0 && (
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">
+          ⏳ {counts.pending}
+        </span>
+      )}
+      {counts.rejected > 0 && (
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700">
+          ✗ {counts.rejected}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function PostCardImpl({
+  post,
+  userRole,
+  onVerify,
+  onSeeding,
+  onViewDetail,
+  seeded,
+  verifyStatus,
+}: PostCardProps) {
   const [isInboxOpen, setIsInboxOpen] = useState(false);
+  const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
   const inboxRef = useRef<HTMLDivElement>(null);
 
   const INBOX_TEMPLATES = [
@@ -103,6 +227,10 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
   if (score >= 85) scoreBg = "bg-red-50 text-[#E3000F] border-red-100";
   else if (score >= 60) scoreBg = "bg-amber-50 text-amber-600 border-amber-100";
 
+  const sortedSeedings = useMemo(() => sortSeedings(post.all_seedings), [post.all_seedings]);
+  const seedingCounts = useMemo(() => summarizeSeedings(post.all_seedings), [post.all_seedings]);
+  const showAllSeedings = (userRole === "admin" || userRole === "leader") && sortedSeedings.length > 0;
+
   return (
     <div className="bg-white rounded-xl shadow-xs border border-slate-200/80 p-4 flex gap-4 items-start transition duration-200 hover:border-slate-300">
       {/* KHỐI AI SCORE BÊN TRÁI */}
@@ -167,9 +295,20 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
           "{post.content || "Nội dung bài viết rỗng hoặc chứa thuần hình ảnh/video."}"
         </p>
 
-        {(userRole === "admin" || userRole === "leader") && post.all_seedings && post.all_seedings.length > 0 ? (
+        {/* Seeding summary badges — chỉ admin/leader thấy, hiển thị ngay sau content
+            để dễ scan mà không cần mở PostDetailModal. Click mở modal chi tiết. */}
+        {showAllSeedings && (
+          <div className="mb-3 flex items-center gap-2 flex-wrap">
+            <SeedingCountBadges
+              counts={seedingCounts}
+              onClick={() => setIsActivityModalOpen(true)}
+            />
+          </div>
+        )}
+
+        {showAllSeedings ? (
           <div className="mb-3 flex flex-col gap-2">
-            {post.all_seedings.map((seed, idx) => {
+            {sortedSeedings.map((seed, idx) => {
               const rejected = isRejected(seed.link_comment);
               return (
               <div key={idx} className={cn("px-3 py-2 border rounded-lg flex flex-col gap-1", rejected ? "bg-red-50/50 border-red-100" : "bg-emerald-50/50 border-emerald-100")}>
@@ -193,11 +332,11 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
                     </span>
                   )}
                   {seed.verify_status === "yes" && !isRejected(seed.link_comment) ? (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700">✓ Đã xác minh</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700">✓ Đã comment</span>
                   ) : seed.verify_status === "yes" && isRejected(seed.link_comment) ? (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700">X Bị từ chối</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700">✗ Bị từ chối</span>
                   ) : (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700">Chờ xác minh</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700">Chờ verify</span>
                   )}
                 </div>
               </div>
@@ -252,11 +391,11 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
           <div className="flex items-center gap-2">
             {verifyStatus === "yes" && !isRejected(post.link_comment) ? (
               <span className="px-2.5 py-1 rounded-md text-[11px] font-bold border bg-green-100 text-green-700 border-green-200">
-                ✓ Đã xác minh
+                ✓ Đã comment
               </span>
             ) : verifyStatus === "yes" && isRejected(post.link_comment) ? (
               <span className="px-2.5 py-1 rounded-md text-[11px] font-bold border bg-red-100 text-red-700 border-red-200">
-                X Bị từ chối
+                ✗ Bị từ chối
               </span>
             ) : verifyStatus === "pending" ? (
               <span className="px-2.5 py-1 rounded-md text-[11px] font-bold border bg-emerald-100 text-emerald-700 border-emerald-200">
@@ -335,6 +474,37 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
         </div>
 
       </div>
+
+      {/* Seeding Activity Modal - click từ badge count ở admin/leader */}
+      {isActivityModalOpen && (
+        <SeedingActivityModal
+          postId={post.id}
+          postUrl={post.post_url}
+          postTitle={post.group_name || post.content || "Bài viết"}
+          initialSeedings={sortedSeedings}
+          userRole={userRole}
+          onClose={() => setIsActivityModalOpen(false)}
+        />
+      )}
     </div>
   );
 }
+
+export const PostCard = memo(PostCardImpl, (prev, next) => {
+  // Custom comparator: re-render chỉ khi các field thực sự thay đổi
+  // (tránh re-render toàn bộ list khi chỉ 1 post thay đổi verify_status)
+  return (
+    prev.post.id === next.post.id &&
+    prev.post.score === next.post.score &&
+    prev.post.reactions === next.post.reactions &&
+    prev.post.comments === next.post.comments &&
+    prev.post.shares === next.post.shares &&
+    prev.post.content === next.post.content &&
+    prev.post.all_seedings === next.post.all_seedings &&
+    prev.post.verify_status === next.post.verify_status &&
+    prev.post.link_comment === next.post.link_comment &&
+    prev.userRole === next.userRole &&
+    prev.verifyStatus === next.verifyStatus &&
+    prev.seeded === next.seeded
+  );
+});

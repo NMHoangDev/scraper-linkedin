@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from typing import Any, Optional
 
+from fastapi import APIRouter
+from pydantic import BaseModel
+
+from app.core.supabase_client import execute_supabase_query, get_supabase_client
 from app.modules.all_platform.schemas import BaseResponse
 from app.modules.all_platform.schemas.posts import (
     UnifiedPostsRequest,
@@ -16,6 +20,21 @@ from app.modules.all_platform.services.unified_posts_service import (
 )
 
 router = APIRouter()
+
+
+class FeedOverviewRequest(BaseModel):
+    """Request payload for /unified/feed/overview RPC.
+
+    Wraps the Phase 6 SQL RPC `get_unified_feed_overview` so the FE can
+    fetch all dashboard KPIs + admin/leader aggregations in 1 round-trip
+    instead of N HTTP requests (stats + N×kpi get-by-email + team-view).
+    """
+    email: str
+    platform: Optional[str] = "all"
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
+    limit: Optional[int] = 15
+    offset: Optional[int] = 0
 
 
 @router.post("/posts")
@@ -77,5 +96,48 @@ def unified_get_stats(payload: UnifiedPostsRequest) -> BaseResponse:
             platform=payload.platform,
         )
         return BaseResponse(success=True, data=data)
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@router.post("/feed/overview")
+def unified_feed_overview(payload: FeedOverviewRequest) -> BaseResponse:
+    """Phase 6: Single RPC for unified feed dashboard.
+
+    Returns:
+      - quick_stats: dashboard KPIs (same shape as /unified/stats)
+      - my_kpi: member's personal KPI target/current/remaining/percent
+      - team_kpi: leader's team overview (only role=leader)
+      - top_seeding_today: top 5 posts by seeding count today (admin/leader)
+      - top_seeders_today: top 5 members by seeding count today (admin/leader)
+
+    Called in parallel with /unified/posts/filter by FE — saves
+    N+ round-trips that fan-out into:
+      - 1 × /unified/stats
+      - 1 × kpi/get-by-email (per member)
+      - 1 × leader-view inbox-share (per leader)
+      - 1 × seeding aggregation query (admin/leader)
+    """
+    try:
+        sb = get_supabase_client()
+        # RPC params follow SQL signature: p_email, p_platform, p_date_from,
+        # p_date_to, p_limit, p_offset
+        params: dict[str, Any] = {
+            "p_email": payload.email,
+            "p_platform": payload.platform or "all",
+            "p_limit": payload.limit or 15,
+            "p_offset": payload.offset or 0,
+        }
+        if payload.date_from:
+            params["p_date_from"] = payload.date_from
+        if payload.date_to:
+            params["p_date_to"] = payload.date_to
+
+        res = execute_supabase_query(
+            lambda: sb.rpc("get_unified_feed_overview", params).execute()
+        )
+        rpc_data = res.data if res and res.data else {}
+        # SQL RPC returns JSONB; supabase-py decodes it to dict already.
+        return BaseResponse(success=True, data=rpc_data)
     except Exception as e:
         return BaseResponse(success=False, message=str(e))

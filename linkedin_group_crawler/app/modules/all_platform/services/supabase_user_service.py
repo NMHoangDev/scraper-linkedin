@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import copy
+import logging
 import time
+from typing import Any, Dict, Optional
 
 from supabase import Client
 
 from app.core.supabase_client import execute_supabase_query, get_supabase_client, reset_supabase_client
+
+logger = logging.getLogger(__name__)
 
 
 _TEAMS_CACHE: dict[str, object] = {"expires_at": 0.0, "data": []}
@@ -334,6 +338,84 @@ def get_all_teams() -> list[dict]:
     if last_exc:
         raise last_exc
     return []
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 5 — Admin teams-management combined RPC (replaces 1 + N HTTP)
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Trước: FE gọi `/teams` (1 endpoint, có cache 60s) + N lần `/kpi/get-team-overview-v3`
+# song song (mỗi team 1 RPC). Với 10 team → tổng ~2-3s.
+#
+# Sau: 1 RPC duy nhất `get_admin_teams_kpi_overview` trả về
+#   { teams: [{id, name_team, leader_email, members, number_of_member}, ...],
+#     kpi_data: [{team_id, member_id, kpi_*, post/inbox/lead actual}, ...],
+#     range: {start, end} }
+# ─────────────────────────────────────────────────────────────────────────────
+
+_TEAMS_WITH_KPI_CACHE_TTL_SECONDS = 30.0
+_TEAMS_WITH_KPI_CACHE: dict[str, tuple[float, dict]] = {}
+
+
+def _teams_with_kpi_cache_get(key: str) -> dict | None:
+    item = _TEAMS_WITH_KPI_CACHE.get(key)
+    if not item:
+        return None
+    expires_at, value = item
+    if expires_at > time.monotonic():
+        return value
+    _TEAMS_WITH_KPI_CACHE.pop(key, None)
+    return None
+
+
+def _teams_with_kpi_cache_set(key: str, value: dict) -> dict:
+    _TEAMS_WITH_KPI_CACHE[key] = (time.monotonic() + _TEAMS_WITH_KPI_CACHE_TTL_SECONDS, value)
+    return value
+
+
+def get_all_teams_with_kpi(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Trả về teams + KPI combined cho admin teams-management page.
+
+    Cache TTL 30s (khoảng ngày thường ít thay đổi trong phiên admin).
+    Fallback graceful nếu RPC fail → trả teams rỗng để FE không crash.
+    QUAN TRỌNG: KHÔNG cache empty payload — nếu RPC fail ta vẫn retry cache
+    miss lần sau (vd migration chưa chạy xong hoặc network blip).
+    """
+    cache_key = f"teams_kpi|{start_date or ''}|{end_date or ''}"
+    cached = _teams_with_kpi_cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    supabase: Client = get_supabase_client()
+    payload: dict = {"teams": [], "kpi_data": [], "range": {}}
+    try:
+        res = execute_supabase_query(
+            lambda: supabase.rpc(
+                "get_admin_teams_kpi_overview",
+                {"p_start": start_date, "p_end": end_date},
+            ).execute()
+        )
+        if res and res.data:
+            payload = res.data if isinstance(res.data, dict) else dict(res.data)
+    except Exception as exc:
+        # Fallback: trả rỗng, FE vẫn render bảng rỗng (không crash).
+        # KHÔNG cache — lần gọi tới sẽ thử lại (hữu ích khi migration
+        # vừa được apply hoặc Supabase vừa thoát khỏi transient outage).
+        try:
+            logger.warning(
+                "get_admin_teams_kpi_overview RPC failed (no cache): %s", exc
+            )
+        except Exception:
+            pass
+        return payload
+
+    # Chỉ cache khi RPC thành công VÀ có data (không cache empty)
+    if payload.get("teams") or payload.get("kpi_data"):
+        return _teams_with_kpi_cache_set(cache_key, payload)
+    return payload
 
 
 def create_team(name_team: str, leader_email_or_id: str, member_emails_or_ids: list[str]) -> list[dict]:

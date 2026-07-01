@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, memo } from "react";
+import dynamic from "next/dynamic";
 import { MaterialIcon } from "@/components/ui";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { teamsService, allPlatformKpiService } from "@/services/all-platform.service";
@@ -8,11 +9,42 @@ import { cn } from "@/lib/utils";
 import type { TeamRow } from "@/services/all-platform.service";
 import { PlatformStatsRow, PlatformStatCard } from "@/components/features/shared/PlatformStatCard";
 import { AssignKpiModal } from "./AssignKpiModal";
+import { BulkAssignKpiModal } from "./BulkAssignKpiModal";
 import { TeamModal } from "./TeamModal";
-import { SeedingModal } from "./SeedingModal";
-import { LeaderInboxView } from "./LeaderInboxView";
-import { LeaderPostView } from "./LeaderPostView";
 import { toast } from "sonner";
+import { useKpiRefresh, dispatchKpiRefresh } from "@/lib/useKpiRefresh";
+
+// Phase 3: dynamic import cho các modal nặng (chỉ tải khi cần mở).
+const SeedingModal = dynamic(
+  () => import("./SeedingModal").then((m) => ({ default: m.SeedingModal })),
+  { ssr: false },
+);
+const LeaderInboxView = dynamic(
+  () => import("./LeaderInboxView").then((m) => ({ default: m.LeaderInboxView })),
+  { ssr: false },
+);
+const LeaderPostView = dynamic(
+  () => import("./LeaderPostView").then((m) => ({ default: m.LeaderPostView })),
+  { ssr: false },
+);
+
+// Phase 3: skeleton row khi đang fetch KPI — tránh "đứng hình" toàn bảng.
+function MemberRowSkeleton() {
+  return (
+    <tr>
+      {Array.from({ length: 8 }).map((_, idx) => (
+        <td key={idx} className="px-3 py-2.5">
+          <div
+            className={cn(
+              "h-3 w-full animate-pulse rounded bg-slate-100",
+              idx === 0 ? "max-w-[140px]" : "max-w-[60px] mx-auto",
+            )}
+          />
+        </td>
+      ))}
+    </tr>
+  );
+}
 
 function getRecentWeeks(numWeeks = 8) {
   const weeks = [];
@@ -55,6 +87,9 @@ export function TeamManagement() {
   // Inbox KPI verification modal
   const [inboxModalOpen, setInboxModalOpen] = useState(false);
   const [inboxMember, setInboxMember] = useState<{ email: string; name: string } | null>(null);
+
+  // Bulk Assign KPI modal
+  const [bulkAssignModalOpen, setBulkAssignModalOpen] = useState(false);
 
   // FB Post KPI modal
   const [postModalOpen, setPostModalOpen] = useState(false);
@@ -102,19 +137,21 @@ export function TeamManagement() {
       setKpiData([]);
       return;
     }
-    
+
     const [startDate, endDate] = selectedWeek.split("_");
-    
+
     setIsLoading(true);
-    allPlatformKpiService.getAll(user.email, selectedTeamId, startDate, endDate)
-      .then(kpiRes => {
+    // Phase 3: dùng endpoint V3 (RPC + cache). Giữ data cũ trong state để UI không nháy trắng.
+    allPlatformKpiService
+      .getTeamOverviewV3(user.email, selectedTeamId, startDate, endDate)
+      .then((kpiRes) => {
         if (kpiRes.success && kpiRes.data?.members) {
           setKpiData(kpiRes.data.members);
         } else {
           setKpiData([]);
         }
       })
-      .catch(err => {
+      .catch((err) => {
         console.error("Error fetching KPI:", err);
         setKpiData([]);
       })
@@ -161,8 +198,9 @@ export function TeamManagement() {
     if (user?.email && selectedTeamId) {
       const [startDate, endDate] = selectedWeek.split("_");
       setIsLoading(true);
-      allPlatformKpiService.getAll(user.email, selectedTeamId, startDate, endDate)
-        .then(kpiRes => {
+      allPlatformKpiService
+        .getTeamOverviewV3(user.email, selectedTeamId, startDate, endDate)
+        .then((kpiRes) => {
           if (kpiRes.success && kpiRes.data?.members) {
             setKpiData(kpiRes.data.members);
           }
@@ -174,6 +212,9 @@ export function TeamManagement() {
   const handleKpiAssigned = () => {
     refreshKpi();
   };
+
+  // Listen for KPI refresh events (from bulk verify inbox, bulk assign, etc.)
+  useKpiRefresh(refreshKpi);
 
   const selectedTeam = teams.find(t => t.id === selectedTeamId);
   const teamMembers = selectedTeam?.members || [];
@@ -384,6 +425,17 @@ export function TeamManagement() {
               <>
                 <button
                   type="button"
+                  onClick={() => setBulkAssignModalOpen(true)}
+                  className={cn(
+                    toolbarButtonClass,
+                    "bg-blue-600 text-white hover:bg-blue-700",
+                  )}
+                >
+                  <MaterialIcon name="group_add" className="text-[16px]" />
+                  Giao KPI Hàng Loạt
+                </button>
+                <button
+                  type="button"
                   onClick={() => {
                     setIsEditingTeam(true);
                     setTeamModalOpen(true);
@@ -414,9 +466,27 @@ export function TeamManagement() {
 
         <div className="space-y-3 p-4 md:hidden">
           {isLoading ? (
-            <div className="py-12 text-center text-slate-400">
-              <div className="mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-[#E3000F] border-t-transparent" />
-              <span className="text-sm font-medium">Đang tải dữ liệu KPI...</span>
+            // Phase 3: skeleton thay vì spinner — giữ layout, tránh nháy
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 animate-pulse">
+                  <div className="flex justify-between gap-3">
+                    <div className="space-y-2 flex-1">
+                      <div className="h-3 w-32 rounded bg-slate-100" />
+                      <div className="h-2 w-44 rounded bg-slate-100" />
+                    </div>
+                    <div className="h-5 w-12 rounded-full bg-slate-100" />
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    {Array.from({ length: 4 }).map((_, j) => (
+                      <div key={j} className="rounded-xl bg-slate-50 px-3 py-2">
+                        <div className="h-2 w-10 rounded bg-slate-100" />
+                        <div className="mt-2 h-3 w-14 rounded bg-slate-100" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           ) : membersWithKpi.length === 0 ? (
             <div className="py-12 text-center text-sm text-slate-400">
@@ -545,14 +615,8 @@ export function TeamManagement() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {isLoading ? (
-                <tr>
-                  <td colSpan={8} className="px-3 py-12 text-center text-slate-400">
-                    <div className="flex flex-col items-center justify-center gap-3">
-                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#E3000F] border-t-transparent" />
-                      <span className="text-sm font-medium">Đang tải dữ liệu KPI...</span>
-                    </div>
-                  </td>
-                </tr>
+                // Phase 3: skeleton rows giữ layout, không nháy
+                Array.from({ length: 6 }).map((_, i) => <MemberRowSkeleton key={`sk-${i}`} />)
               ) : membersWithKpi.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-3 py-12 text-center text-slate-400 italic">
@@ -667,6 +731,17 @@ export function TeamManagement() {
           isOpen={assignModalOpen}
           onClose={() => setAssignModalOpen(false)}
           member={selectedMember}
+          teamId={selectedTeamId}
+          selectedWeekValue={selectedWeek}
+          onSuccess={handleKpiAssigned}
+        />
+      )}
+
+      {bulkAssignModalOpen && selectedTeam && (
+        <BulkAssignKpiModal
+          isOpen={bulkAssignModalOpen}
+          onClose={() => setBulkAssignModalOpen(false)}
+          members={selectedTeam.members || []}
           teamId={selectedTeamId}
           selectedWeekValue={selectedWeek}
           onSuccess={handleKpiAssigned}

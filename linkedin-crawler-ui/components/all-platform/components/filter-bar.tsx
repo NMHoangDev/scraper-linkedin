@@ -5,7 +5,9 @@ import { FaSearch } from "react-icons/fa";
 import { cn } from "@/lib/utils";
 import type { Category } from "@/types/unified.types";
 
-export type SortOption = "latest" | "score_high" | "score_low" | "comments_high" | "crawler";
+export type SortOption = "latest" | "score_high" | "score_low" | "comments_high" | "crawler" | "most_seeded" | "verified_first";
+
+export type SeedingStatusFilter = "all" | "seeded" | "verified" | "pending" | "rejected";
 
 interface FilterBarProps {
   intents: Category[];
@@ -32,6 +34,8 @@ export interface FilterState {
   member: string;
   sort: SortOption;
   dateRange: string;
+  /** Phase 6: filter posts by seeding status (admin/leader) */
+  seeding_status: SeedingStatusFilter;
 }
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
@@ -40,6 +44,9 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "score_low", label: "Score thấp nhất" },
   { value: "comments_high", label: "Bình luận nhiều nhất" },
   { value: "crawler", label: "Theo người cào (Team & Tên)" },
+  // Phase 6: sort by seeding
+  { value: "most_seeded", label: "Nhiều seeding nhất" },
+  { value: "verified_first", label: "Verified nhiều nhất" },
 ];
 
 const DATE_OPTIONS = [
@@ -48,6 +55,14 @@ const DATE_OPTIONS = [
   { value: "yesterday", label: "Hôm qua" },
   { value: "7days", label: "7 ngày" },
   { value: "30days", label: "30 ngày" },
+];
+
+const SEEDING_STATUS_OPTIONS: { value: SeedingStatusFilter; label: string; color: string }[] = [
+  { value: "all", label: "Tất cả", color: "slate" },
+  { value: "seeded", label: "Đã seeding", color: "emerald" },
+  { value: "verified", label: "Đã verify", color: "green" },
+  { value: "pending", label: "Chờ verify", color: "amber" },
+  { value: "rejected", label: "Bị từ chối", color: "red" },
 ];
 
 export function FilterBar({ intents, industries, teams, tiers, icps, contentTypes = [], productSeedings = [], members = [], onFilter, isLoading }: FilterBarProps) {
@@ -62,6 +77,8 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
   const [member, setMember] = useState("");
   const [sort, setSort] = useState<SortOption>("latest");
   const [dateRange, setDateRange] = useState("");
+  // Phase 6: seeding status filter (admin/leader)
+  const [seedingStatus, setSeedingStatus] = useState<SeedingStatusFilter>("all");
 
   const handleChange = (updates: Partial<FilterState>) => {
     const s = updates.search !== undefined ? updates.search : search;
@@ -75,6 +92,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
     const m = updates.member !== undefined ? updates.member : member;
     const so = updates.sort !== undefined ? updates.sort : sort;
     const dr = updates.dateRange !== undefined ? updates.dateRange : dateRange;
+    const ss = updates.seeding_status !== undefined ? updates.seeding_status : seedingStatus;
 
     onFilter({
       search: s,
@@ -103,6 +121,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
     setMember("");
     setSort("latest");
     setDateRange("");
+    setSeedingStatus("all");
     onFilter({
       search: "",
       intent: "",
@@ -115,6 +134,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
       member: "",
       sort: "latest",
       dateRange: "",
+      seeding_status: "all",
     });
   };
 
@@ -158,6 +178,24 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
         className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
       >
         {SORT_OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+
+      {/* Phase 6: seeding status filter */}
+      <select
+        value={seedingStatus}
+        onChange={(e) => {
+          const val = e.target.value as SeedingStatusFilter;
+          setSeedingStatus(val);
+          handleChange({ seeding_status: val });
+        }}
+        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
+        title="Lọc theo trạng thái seeding"
+      >
+        {SEEDING_STATUS_OPTIONS.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}
           </option>

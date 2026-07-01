@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { memo, useEffect, useState } from "react";
 import { MaterialIcon } from "@/components/ui";
 import { allPlatformKpiService } from "@/services/all-platform.service";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa";
@@ -19,18 +19,39 @@ interface Props {
   /** Leader email — bỏ trống nếu admin (lấy tất cả team) */
   leaderEmail?: string;
   weeks?: number;
+  /**
+   * Phase 4: nếu parent đã có dữ liệu (từ RPC overview), truyền xuống đây
+   * để khỏi gọi API trùng → giảm 1 HTTP request khi load admin dashboard.
+   */
+  initialData?: WeeklySnapshot[];
+  /** Phase 4: nếu true thì KHÔNG gọi getTeamHistoryV2 ngay cả khi initialData rỗng
+   *  (parent đang fetch overview, đợi). */
+  skipFetch?: boolean;
 }
 
-export function AdminKpiHistoryTable({ leaderEmail, weeks = 4 }: Props) {
+function AdminKpiHistoryTableInner({ leaderEmail, weeks = 4, initialData, skipFetch }: Props) {
   const [data, setData] = useState<WeeklySnapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [openAccordion, setOpenAccordion] = useState<string | null>(null);
 
   useEffect(() => {
+    // Phase 4: nếu parent đã truyền initialData thì dùng luôn.
+    if (initialData && initialData.length > 0) {
+      setData(initialData);
+      setLoading(false);
+      setError("");
+      return;
+    }
+    if (skipFetch) {
+      setLoading(true);
+      setError("");
+      return;
+    }
     setLoading(true);
     setError("");
-    allPlatformKpiService.getTeamHistory(leaderEmail, weeks)
+    // Phase 4: dùng V2 (cache 30s + pre-index) — admin load nhanh hơn nhiều.
+    allPlatformKpiService.getTeamHistoryV2(leaderEmail, weeks)
       .then(res => {
         if (res.success && Array.isArray(res.data)) {
           setData(res.data);
@@ -40,7 +61,7 @@ export function AdminKpiHistoryTable({ leaderEmail, weeks = 4 }: Props) {
       })
       .catch(() => setError("Lỗi kết nối API"))
       .finally(() => setLoading(false));
-  }, [leaderEmail, weeks]);
+  }, [leaderEmail, weeks, initialData, skipFetch]);
 
   const calcPct = (actual: number, target: number) => {
     if (target === 0) return 0;
@@ -288,3 +309,6 @@ export function AdminKpiHistoryTable({ leaderEmail, weeks = 4 }: Props) {
     </div>
   );
 }
+
+// Phase 4: memo để không re-render khi parent (AdminDashboardPage) đổi state khác.
+export const AdminKpiHistoryTable = memo(AdminKpiHistoryTableInner);

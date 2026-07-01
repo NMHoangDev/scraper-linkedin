@@ -17,6 +17,7 @@ from app.modules.all_platform.services import (
     get_all_users,
     get_users_by_role,
     get_all_teams,
+    get_all_teams_with_kpi,
     create_team,
     update_team,
     delete_team,
@@ -117,6 +118,35 @@ def teams_get_all() -> BaseResponse:
     """Get all teams."""
     try:
         data = get_all_teams()
+        return BaseResponse(success=True, data=data)
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@teams_router.get("/with-kpi")
+def teams_get_with_kpi(
+    start_date: str | None = Query(None, description="ISO date YYYY-MM-DD (VN). Mặc định = tuần hiện tại."),
+    end_date:   str | None = Query(None, description="ISO date YYYY-MM-DD (VN). Mặc định = CN tuần hiện tại."),
+) -> BaseResponse:
+    """Phase 5: All-in-one teams + KPI cho admin teams-management page.
+
+    Thay thế 1 + N HTTP request song song:
+      • `/teams` (1 endpoint, có cache 60s)
+      • N × `/kpi/get-team-overview-v3` (N = số team)
+
+    bằng 1 RPC duy nhất `get_admin_teams_kpi_overview` →
+    1 round-trip Postgres, aggregate hoàn toàn server-side.
+    Cache 30s (khoảng ngày thay đổi chậm trong phiên admin).
+
+    Schema response:
+      {
+        "teams":    [{id, name_team, leader_email, members, number_of_member}, ...],
+        "kpi_data": [{team_id, member_id, member_email, kpi_*, post/inbox/lead actual}, ...],
+        "range":    {start, end}
+      }
+    """
+    try:
+        data = get_all_teams_with_kpi(start_date=start_date, end_date=end_date)
         return BaseResponse(success=True, data=data)
     except Exception as e:
         return BaseResponse(success=False, message=str(e))

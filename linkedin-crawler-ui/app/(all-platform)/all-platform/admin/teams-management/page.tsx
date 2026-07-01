@@ -64,24 +64,45 @@ export default function TeamsManagementPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await teamsService.getAll();
+      const [startDate, endDate] = selectedWeek.split("_");
+      // Phase 5: 1 RPC duy nhất trả teams + KPI combined — thay vì 1 + N request.
+      const res = await teamsService.getWithKpi(startDate, endDate);
       if (res.success && res.data) {
-        const teamsData = res.data;
-        setTeams(teamsData);
+        const teamsData = (res.data.teams || []) as TeamRow[];
+        const kpiData = (res.data.kpi_data || []) as Array<{
+          team_id: string;
+          members: any[];
+        }>;
 
-        // Fetch KPI data for all teams' leaders in parallel
-        const [startDate, endDate] = selectedWeek.split("_");
-        const kpiPromises = teamsData.map(async (t) => {
-          if (!t.leader_email) return { teamId: t.id, members: [] };
-          try {
-            const kpiRes = await allPlatformKpiService.getAll(t.leader_email, undefined, startDate, endDate);
-            return { teamId: t.id, members: kpiRes.success ? (kpiRes.data?.members || []) : [] };
-          } catch {
-            return { teamId: t.id, members: [] };
-          }
-        });
-        const kpiResults = await Promise.all(kpiPromises);
-        setKpiResultsData(kpiResults);
+        // Reshape kpi_data: gom theo team_id (giống cấu trúc cũ để FE không phá)
+        const grouped: any[] = kpiData.map((row) => ({
+          teamId: row.team_id,
+          members: kpiData.filter((r) => r.team_id === row.team_id).map((r) => ({
+            id: r.member_id,
+            email: r.member_email,
+            name: r.member_name,
+            seeding_stats: {
+              kpi_post: r.kpi_post ?? 0,
+              kpi_inbox: r.kpi_inbox ?? 0,
+              kpi_lead: r.kpi_lead ?? 0,
+              // Giữ nguyên semantic cũ: kpi_target = comment target (dùng để tính %)
+              kpi_target: r.kpi_comment ?? 0,
+              verified_count: r.verified_count ?? 0,
+              kpi_post_current: r.kpi_post_current ?? 0,
+              kpi_inbox_current: r.kpi_inbox_current ?? 0,
+              kpi_lead_current: r.kpi_lead_current ?? 0,
+              kpi_inbox_range: r.kpi_inbox_range,
+            },
+          })),
+        }));
+        // Dedupe theo team_id (vì flatten ở trên đã tạo bản sao cho mỗi member)
+        const dedupMap = new Map<string, any>();
+        for (const g of grouped) {
+          if (!dedupMap.has(g.teamId)) dedupMap.set(g.teamId, g);
+        }
+
+        setTeams(teamsData);
+        setKpiResultsData(Array.from(dedupMap.values()));
       } else {
         setError(res.message || "Không thể tải danh sách team");
       }

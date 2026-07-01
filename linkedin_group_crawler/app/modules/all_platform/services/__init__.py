@@ -56,6 +56,7 @@ from app.modules.all_platform.services.supabase_user_service import (
     get_all_users,
     get_users_by_role,
     get_all_teams,
+    get_all_teams_with_kpi,
     create_team,
     update_team,
     delete_team,

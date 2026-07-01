@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import date, timedelta, timezone
 from typing import Dict, List, Any
 import time
 from app.core.supabase_client import execute_supabase_query, get_supabase_client
+
+logger = logging.getLogger(__name__)
 
 VN_TZ = timezone(timedelta(hours=7))
 
@@ -325,3 +328,182 @@ def get_leaderboards() -> Dict[str, List[Dict[str, Any]]]:
         "top_seeders": top_seeders,
         "top_groups": top_groups
     })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 4 — Single RPC admin dashboard overview (thay thế 4 endpoint song song)
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Thay vì FE gọi 4 HTTP request (/summary + /kpi-performance + /leaderboards
+# + /team-history-v2), endpoint /admin/dashboard/overview mới gọi 1 RPC duy nhất
+# `get_admin_dashboard_overview` — mọi aggregate được thực hiện server-side
+# trong 1 round-trip Postgres.
+#
+# Cache TTL dài hơn (90s) vì admin dashboard data ít thay đổi theo giây.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_OVERVIEW_CACHE_TTL = 90.0
+_OVERVIEW_CACHE: dict[str, tuple[float, Any]] = {}
+
+
+def _get_overview_cached(key: str) -> Any | None:
+    item = _OVERVIEW_CACHE.get(key)
+    if not item:
+        return None
+    expires_at, value = item
+    if expires_at > time.monotonic():
+        return value
+    _OVERVIEW_CACHE.pop(key, None)
+    return None
+
+
+def _set_overview_cached(key: str, value: Any) -> Any:
+    _OVERVIEW_CACHE[key] = (time.monotonic() + _OVERVIEW_CACHE_TTL, value)
+    return value
+
+
+def get_admin_dashboard_overview(weeks: int = 4) -> Dict[str, Any]:
+    """1 round-trip RPC trả về summary + kpi_performance + leaderboards + weekly_history.
+
+    Schema response (key giống endpoint cũ để FE có thể hydrate thẳng):
+      {
+        "summary":        {total_crawled_posts, total_seeding_comments,
+                           approved_count, approval_rate, kpi_rate},
+        "kpi_performance":[{team_name, target, actual}, ...],
+        "leaderboards":   {top_seeders: [...], top_groups: [...]},
+        "weekly_history": [{week_name, teams: [...]}, ...],
+        "range":          {start, end}
+      }
+    """
+    cache_key = f"overview|weeks={weeks}"
+    cached = _get_overview_cached(cache_key)
+    if cached is not None:
+        return cached
+
+    try:
+        res = execute_supabase_query(
+            lambda: get_supabase_client().rpc(
+                "get_admin_dashboard_overview",
+                {"p_weeks": weeks},
+            ).execute()
+        )
+        payload = (res.data or {}) if res else {}
+    except Exception as exc:
+        # Fallback graceful — vẫn trả rỗng, FE không crash
+        logger.warning(f"get_admin_dashboard_overview RPC failed: {exc}")
+        return _set_overview_cached(cache_key, {
+            "summary": {"total_crawled_posts": 0, "total_seeding_comments": 0,
+                        "approved_count": 0, "approval_rate": 0, "kpi_rate": 0},
+            "kpi_performance": [],
+            "leaderboards": {"top_seeders": [], "top_groups": []},
+            "weekly_history": [],
+            "range": {},
+        })
+
+    # Chuẩn hoá summary → thêm approval_rate FE đang kỳ vọng
+    summary = dict(payload.get("summary") or {})
+    total_seeding = int(summary.get("total_seeding_comments") or 0)
+    approved = int(summary.get("approved_count") or 0)
+    if "approval_rate" not in summary:
+        summary["approval_rate"] = round((approved / total_seeding * 100), 1) if total_seeding else 0.0
+    payload["summary"] = summary
+
+    return _set_overview_cached(cache_key, payload)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 7 — High-Interaction Unseeded Posts
+# ─────────────────────────────────────────────────────────────────────────────
+
+_UNSEEDED_CACHE_TTL = 60.0  # 60s cache
+_UNSEEDED_CACHE: dict[str, tuple[float, Any]] = {}
+
+
+def _get_unseeded_cached(key: str) -> Any | None:
+    item = _UNSEEDED_CACHE.get(key)
+    if not item:
+        return None
+    expires_at, value = item
+    if expires_at > time.monotonic():
+        return value
+    _UNSEEDED_CACHE.pop(key, None)
+    return None
+
+
+def _set_unseeded_cached(key: str, value: Any) -> Any:
+    _UNSEEDED_CACHE[key] = (time.monotonic() + _UNSEEDED_CACHE_TTL, value)
+    return value
+
+
+def get_high_interaction_unseeded_posts(limit: int = 10) -> Any:
+    """Get high-interaction posts (score>=60) not yet seeded.
+
+    Returns posts from facebook_posts + linkedin_posts where score >= 60,
+    ordered by total interactions (reactions + comments) DESC.
+    Filters out posts already in seeding_content_kpi.
+    Cache TTL 60s — refreshes automatically when admin opens dashboard.
+    """
+    cache_key = f"unseeded|limit={limit}"
+    cached = _get_unseeded_cached(cache_key)
+    if cached is not None:
+        return cached
+
+    try:
+        res = execute_supabase_query(
+            lambda: get_supabase_client().rpc(
+                "get_high_interaction_unseeded_posts",
+                {"p_limit": limit},
+            ).execute()
+        )
+        payload = res.data if res and res.data else []
+    except Exception as exc:
+        logger.warning(f"get_high_interaction_unseeded_posts RPC failed: {exc}")
+        payload = []
+
+    return _set_unseeded_cached(cache_key, payload)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 7b — Groups Health Stats
+# ─────────────────────────────────────────────────────────────────────────────
+
+_GROUPS_HEALTH_CACHE_TTL = 60.0
+_GROUPS_HEALTH_CACHE: dict[str, tuple[float, Any]] = {}
+
+
+def _get_groups_health_cached() -> Any | None:
+    item = _GROUPS_HEALTH_CACHE.get("groups_health")
+    if not item:
+        return None
+    expires_at, value = item
+    if expires_at > time.monotonic():
+        return value
+    _GROUPS_HEALTH_CACHE.pop("groups_health", None)
+    return None
+
+
+def _set_groups_health_cached(value: Any) -> Any:
+    _GROUPS_HEALTH_CACHE["groups_health"] = (time.monotonic() + _GROUPS_HEALTH_CACHE_TTL, value)
+    return value
+
+
+def get_groups_health_stats() -> Any:
+    """Get groups health statistics from facebook_groups + linkedin_groups.
+
+    Returns: {total_groups, alive, low_activity, dead, no_taxonomy, by_tier}.
+    Cache TTL 60s.
+    """
+    cached = _get_groups_health_cached()
+    if cached is not None:
+        return cached
+
+    try:
+        res = execute_supabase_query(
+            lambda: get_supabase_client().rpc("get_groups_health_stats").execute()
+        )
+        payload = res.data if res and res.data else {}
+    except Exception as exc:
+        logger.warning(f"get_groups_health_stats RPC failed: {exc}")
+        payload = {}
+
+    return _set_groups_health_cached(payload)

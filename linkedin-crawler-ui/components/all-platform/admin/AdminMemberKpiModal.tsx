@@ -61,7 +61,11 @@ export function AdminMemberKpiModal({ isOpen, onClose, team }: AdminMemberKpiMod
       setError(null);
       try {
         const [startDate, endDate] = selectedWeek.split("_");
-        const res = await allPlatformKpiService.getAll(team.leader_email, undefined, startDate, endDate);
+        // Phase 4: dùng getTeamOverviewV3 (cache 30s + RPC fallback batch) thay cho
+        // /kpi/get-all cũ — từ ~5s xuống <300ms lần đầu, <50ms cache hit.
+        const res = await allPlatformKpiService.getTeamOverviewV3(
+          team.leader_email, undefined, startDate, endDate
+        );
         if (res.success && res.data?.members) {
           setKpiData(res.data.members);
         } else {

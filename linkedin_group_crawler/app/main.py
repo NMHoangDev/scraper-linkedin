@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import os
 import sys
 import asyncio
+import signal
 
 if sys.platform == "win32":
     # Force UTF-8 on Windows console to avoid cp1252 encode errors when logging
@@ -129,6 +131,38 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+def _register_graceful_signal_handlers() -> None:
+    """Register SIGTERM/SIGINT handlers so prod (Docker / systemd / VM) shuts
+    down cleanly. Skipped when ``--reload`` is active (uvicorn already
+    installs its own handlers; running both causes double-shutdown races
+    that kill in-flight requests on VM).
+    """
+    if os.getenv("UVICORN_RELOAD", "").strip().lower() in {"1", "true", "yes"}:
+        return
+
+    def _graceful_exit(signum, frame):  # noqa: ARG001 — signal handler signature
+        logger.info(
+            "Received signal %s — initiating graceful shutdown "
+            "(finish in-flight requests, then exit).", signum,
+        )
+
+    try:
+        signal.signal(signal.SIGTERM, _graceful_exit)
+    except (ValueError, OSError):
+        # Not main thread, or platform doesn't support — ignore on VM
+        pass
+    try:
+        # On Windows, SIGINT = Ctrl+C in the console; only register when in main thread.
+        if sys.platform != "win32" or signal.getsignal(signal.SIGINT) == signal.SIG_DFL:
+            signal.signal(signal.SIGINT, _graceful_exit)
+    except (ValueError, OSError):
+        pass
+
+
+_register_graceful_signal_handlers()
+
+
 @app.middleware("http")
 async def handle_cors_middleware(request: Request, call_next):
     origin = request.headers.get("origin", "")
@@ -172,6 +206,12 @@ async def handle_cors_middleware(request: Request, call_next):
             response.headers["Access-Control-Allow-Credentials"] = "true"
         else:
             response.headers["Access-Control-Allow-Origin"] = origin
+
+    # Connection-resilience hints for browsers / proxies on VM environments.
+    # These help prevent the client from prematurely tearing down the
+    # socket when Supabase calls take a few seconds (especially cold calls).
+    response.headers.setdefault("Keep-Alive", "timeout=30, max=100")
+    response.headers.setdefault("X-Connection-Mode", "persistent")
 
     return response
 

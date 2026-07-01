@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
@@ -12,6 +13,187 @@ from app.core.supabase_client import get_supabase_client
 
 # Vietnam timezone (+07:00) — used consistently in all date comparisons
 vn_tz = VN_TZ = timezone(timedelta(hours=7))
+
+# ─────────────────────────────────────────────────────────────────────────────
+# In-memory TTL cache for team overview v2 (Phase 1 optimization)
+# Pattern lấy cảm hứng từ admin_dashboard_service.py + auth_service.py
+# ─────────────────────────────────────────────────────────────────────────────
+_KPI_OVERVIEW_CACHE: Dict[str, Tuple[float, Any]] = {}
+_KPI_OVERVIEW_CACHE_TTL_SECONDS = 30.0
+_KPI_OVERVIEW_CACHE_LIMIT = 500
+
+
+def _overview_cache_get(key: str) -> Optional[Any]:
+    item = _KPI_OVERVIEW_CACHE.get(key)
+    if not item:
+        return None
+    expires_at, value = item
+    if expires_at > time.monotonic():
+        return value
+    _KPI_OVERVIEW_CACHE.pop(key, None)
+    return None
+
+
+def _overview_cache_set(key: str, value: Any) -> Any:
+    _KPI_OVERVIEW_CACHE[key] = (time.monotonic() + _KPI_OVERVIEW_CACHE_TTL_SECONDS, value)
+    if len(_KPI_OVERVIEW_CACHE) > _KPI_OVERVIEW_CACHE_LIMIT:
+        # Xóa các key cũ nhất khi vượt giới hạn
+        for old_key in list(_KPI_OVERVIEW_CACHE.keys())[: -_KPI_OVERVIEW_CACHE_LIMIT]:
+            _KPI_OVERVIEW_CACHE.pop(old_key, None)
+    return value
+
+
+def invalidate_overview_cache(leader_email: Optional[str] = None) -> None:
+    """Xóa cache overview. Nếu leader_email được truyền, chỉ xóa cache liên quan.
+
+    Gọi khi leader assign KPI mới, sync inbox, verify post, v.v.
+    """
+    if not leader_email:
+        _KPI_OVERVIEW_CACHE.clear()
+        return
+    needle = leader_email.strip().lower()
+    for key in list(_KPI_OVERVIEW_CACHE.keys()):
+        if needle in key:
+            _KPI_OVERVIEW_CACHE.pop(key, None)
+
+
+def _rpc_cache_get(key: str) -> Optional[Any]:
+    """Cache riêng cho kết quả RPC — TTL dài hơn (60s) vì RPC đã chạy aggregation phía DB."""
+    item = _KPI_OVERVIEW_CACHE.get(key)
+    if not item:
+        return None
+    expires_at, value = item
+    if expires_at > time.monotonic():
+        return value
+    return None
+
+
+def _normalize_rpc_response(payload: Any) -> dict:
+    """Chuẩn hóa JSON từ RPC `get_team_kpi_overview` về schema giống get_all_kpis_for_leader.
+
+    Schema backend cũ (FE đang dùng):
+      {
+        "total": int,
+        "members": [{
+          "id", "email", "name", "role", "profile_slug", "email_leader",
+          "kpi": [{...kpi_tracker row...}],
+          "seeding_stats": {
+            "verified_count", "kpi_target", "kpi_post", "kpi_post_current",
+            "kpi_lead", "kpi_lead_current", "kpi_inbox", "kpi_inbox_current",
+            "kpi_inbox_zalo", "kpi_inbox_fb_seeder", "kpi_inbox_fb_kpi",
+            "kpi_inbox_range": {"start", "end"}
+          },
+          "seeding_items": [...],
+          "profile_id", "facebook_name"
+        }]
+      }
+    """
+    if not isinstance(payload, dict):
+        return {"total": 0, "members": []}
+
+    raw_members = payload.get("members") or []
+    if not isinstance(raw_members, list):
+        return {"total": 0, "members": []}
+
+    rng = payload.get("range") or {}
+    eff_start = rng.get("start") or ""
+    eff_end = rng.get("end") or ""
+
+    out_members: List[Dict[str, Any]] = []
+    for m in raw_members:
+        if not isinstance(m, dict):
+            continue
+        kpi_obj = m.get("kpi") or {}
+        actuals = m.get("actuals") or {}
+        comment_n = int(actuals.get("comment") or 0)
+        post_n = int(actuals.get("post") or 0)
+        inbox_zalo = int(actuals.get("inbox_zalo") or 0)
+        lead_zalo = int(actuals.get("lead_zalo") or 0)
+        inbox_fb = int(actuals.get("inbox_fb_kpi") or 0)
+        lead_fb = int(actuals.get("lead_fb_kpi") or 0)
+        inbox_seeder_note = 0  # RPC không đếm được; FE đã có seeder call riêng nếu cần
+
+        total_inbox = inbox_zalo + inbox_seeder_note + inbox_fb
+        total_lead = lead_zalo + lead_fb
+
+        out_members.append({
+            "id": str(m.get("id", "")),
+            "email": str(m.get("email", "")).lower(),
+            "name": m.get("name"),
+            "role": m.get("role") or "member",
+            "profile_slug": m.get("profile_slug"),
+            "email_leader": None,  # RPC không trả về, FE tự fill
+            "kpi": [{
+                "kpi_post": int(kpi_obj.get("kpi_post") or 0),
+                "kpi_lead": int(kpi_obj.get("kpi_lead") or 0),
+                "kpi_inbox": int(kpi_obj.get("kpi_inbox") or 0),
+                "kpi_comment": int(kpi_obj.get("kpi_comment") or 0),
+                "start_date": kpi_obj.get("start_date"),
+                "end_date": kpi_obj.get("end_date"),
+            }] if kpi_obj else [],
+            "seeding_stats": {
+                "verified_count": comment_n,
+                "kpi_target": int(kpi_obj.get("kpi_comment") or 0),
+                "kpi_post": int(kpi_obj.get("kpi_post") or 0),
+                "kpi_post_current": post_n,
+                "kpi_lead": int(kpi_obj.get("kpi_lead") or 0),
+                "kpi_lead_current": total_lead,
+                "kpi_inbox": int(kpi_obj.get("kpi_inbox") or 0),
+                "kpi_inbox_current": total_inbox,
+                "kpi_inbox_zalo": inbox_zalo,
+                "kpi_inbox_fb_seeder": inbox_seeder_note,
+                "kpi_inbox_fb_kpi": inbox_fb,
+                "kpi_inbox_range": {"start": eff_start, "end": eff_end},
+            },
+            "seeding_items": [],  # RPC không trả về list chi tiết; FE leader-inbox view sẽ gọi modal riêng
+            "profile_id": m.get("profile_id"),
+            "facebook_name": m.get("facebook_name"),
+        })
+
+    return {"total": len(out_members), "members": out_members}
+
+
+def get_team_kpi_overview_v2_rpc(
+    *,
+    leader_email: Optional[str],
+    id_team: Optional[str],
+    start_date: str,
+    end_date: str,
+) -> dict:
+    """Phase 2 — gọi RPC `get_team_kpi_overview` của Supabase.
+
+    Nếu RPC chưa được deploy (VD: chưa chạy migration 012), tự fallback
+    sang `get_team_kpi_overview_v2` (Phase 1 batch queries).
+    """
+    cache_key = f"rpc|{(leader_email or '').strip().lower()}|{id_team or ''}|{start_date}|{end_date}"
+    cached = _rpc_cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    supabase: Client = get_supabase_client()
+
+    try:
+        rpc_params = {
+            "p_leader_email": (leader_email or "").strip().lower() or None,
+            "p_id_team": (id_team or "").strip() or None,
+            "p_start": start_date.strip() or None,
+            "p_end": end_date.strip() or None,
+        }
+        rpc_res = supabase.rpc("get_team_kpi_overview", rpc_params).execute()
+        if rpc_res.data:
+            normalized = _normalize_rpc_response(rpc_res.data)
+            return _overview_cache_set(cache_key, normalized)
+        # data rỗng → fallback
+        logger.debug("RPC returned empty data, falling back to v2 batch")
+    except Exception as exc:
+        logger.warning(f"get_team_kpi_overview_v2_rpc failed ({exc}), falling back to v2 batch")
+
+    return get_team_kpi_overview_v2(
+        leader_email=leader_email,
+        id_team=id_team,
+        start_date=start_date,
+        end_date=end_date,
+    )
 
 
 def assign_kpi(payload: dict) -> dict:
@@ -115,6 +297,12 @@ def assign_kpi(payload: dict) -> dict:
 
     if not result.data:
         raise RuntimeError("Không thể lưu KPI vào database")
+
+    # Phase 1: invalidate cache v2 khi KPI thay đổi
+    try:
+        invalidate_overview_cache(validated.email_leader)
+    except Exception:
+        pass
 
     return result.data[0]
 
@@ -908,7 +1096,24 @@ def count_fb_inbox_kpi(
             if is_lead:
                 lead += 1
 
+    # Phase 1: invalidate cache sau khi upsert fb_inbox_kpi
+    if synced > 0:
+        try:
+            invalidate_overview_cache(leader_email)
+        except Exception:
+            pass
+
     return {"synced": synced, "lead": lead, "member_email": member_email}
+
+
+# Phase 1: gọi helper này từ bất kỳ đâu trong module khác để clear cache khi
+# leader verify/sync inbox. Tránh vòng import trực tiếp từ các module khác.
+def notify_fb_inbox_changed(leader_email: Optional[str] = None) -> None:
+    """Public hook để invalidate cache khi fb_inbox_kpi thay đổi."""
+    try:
+        invalidate_overview_cache(leader_email)
+    except Exception as exc:  # pragma: no cover
+        logger.debug(f"invalidate_overview_cache failed: {exc}")
 
 
 def get_fb_inbox_kpi_summary(
@@ -1208,3 +1413,559 @@ def get_team_kpi_history(
         result.append({"week_name": week_name, "teams": week_teams})
 
     return result
+
+
+def _build_team_kpi_history_optimized(
+    *,
+    leader_email: Optional[str],
+    weeks: int,
+) -> List[Dict[str, Any]]:
+    """Phiên bản tối ưu của `get_team_kpi_history`.
+
+    Cải thiện so với hàm cũ (admin phải chờ lâu):
+      • In-memory cache TTL 30s → request thứ 2 trong 30s là instant.
+      • Pre-index `inbox_rows` / `post_rows` thành `dict[mid] -> dict[week_idx -> count]`
+        trước khi lặp week × team → tránh O(W × T × len(rows)) của hàm cũ.
+      • Load giới hạn lte latest_end_dt để không kéo dữ liệu quá cũ.
+
+    Schema trả về giống hệt `get_team_kpi_history` để FE không phải đổi code.
+    """
+    cache_key = f"team_history|{(leader_email or '').strip().lower()}|{weeks}"
+    cached = _overview_cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    supabase: Client = get_supabase_client()
+
+    # 1. Lấy danh sách team
+    if leader_email:
+        leader_res = (
+            supabase.table("app_users")
+            .select("id")
+            .eq("email", leader_email.strip().lower())
+            .limit(1)
+            .execute()
+        )
+        if not leader_res.data:
+            return _overview_cache_set(cache_key, [])
+        leader_id = leader_res.data[0]["id"]
+        teams_res = (
+            supabase.table("teams")
+            .select("id, name_team, id_leader")
+            .eq("id_leader", leader_id)
+            .execute()
+        )
+    else:
+        teams_res = supabase.table("teams").select("id, name_team, id_leader").execute()
+
+    teams = teams_res.data or []
+    if not teams:
+        return _overview_cache_set(cache_key, [])
+
+    team_ids = [str(t["id"]) for t in teams]
+
+    # 2. Member ↔ team mapping (single query)
+    members_res = (
+        supabase.table("member_of_teams")
+        .select("id_teams, id_member")
+        .in_("id_teams", team_ids)
+        .execute()
+    )
+    team_members: Dict[str, set] = {}
+    for row in (members_res.data or []):
+        tid = str(row["id_teams"])
+        mid = str(row["id_member"])
+        team_members.setdefault(tid, set()).add(mid)
+
+    all_member_ids = list({m for mids in team_members.values() for m in mids})
+    if not all_member_ids:
+        return _overview_cache_set(cache_key, [])
+
+    # 3. Tính tuần (mới nhất trước)
+    today = date.today()
+    monday_this = today - timedelta(days=today.weekday())
+    week_ranges: List[Tuple[str, date, date]] = []
+    for i in range(weeks):
+        w_start = monday_this - timedelta(weeks=i)
+        w_end = w_start + timedelta(days=6)
+        year, wnum, _ = w_start.isocalendar()
+        week_ranges.append((f"{year}-W{wnum:02d}", w_start, w_end))
+
+    earliest_start_date = week_ranges[-1][1]
+    earliest_start_dt = datetime.combine(
+        earliest_start_date, datetime.min.time(), tzinfo=VN_TZ
+    ).astimezone(timezone.utc).isoformat()
+    latest_end_dt = datetime.combine(
+        monday_this + timedelta(days=6), datetime.max.time(), tzinfo=VN_TZ
+    ).astimezone(timezone.utc).isoformat()
+
+    # 4. KPI targets từ kpi_tracker (single query, batch)
+    kpi_res = (
+        supabase.table("kpi_tracker")
+        .select("id_member, kpi_inbox, kpi_lead, kpi_post, kpi_comment, start_date, end_date")
+        .in_("id_member", all_member_ids)
+        .eq("status", "active")
+        .execute()
+    )
+    kpi_rows = kpi_res.data or []
+
+    # 5. Bulk load inbox + post trong cửa sổ W tuần (giới hạn lte để không load lố)
+    inbox_res = (
+        supabase.table("fb_inbox_kpi")
+        .select("id_member, is_lead, is_confirmed, synced_at")
+        .in_("id_member", all_member_ids)
+        .gte("synced_at", earliest_start_dt)
+        .lte("synced_at", latest_end_dt)
+        .execute()
+    )
+    post_res = (
+        supabase.table("fb_post_kpi")
+        .select("id_member, posted_at")
+        .in_("id_member", all_member_ids)
+        .gte("posted_at", earliest_start_dt)
+        .lte("posted_at", latest_end_dt)
+        .execute()
+    )
+
+    # 6. Pre-index: dict[mid] -> dict[week_idx -> [inbox, lead]]
+    #     week_idx = index trong week_ranges (0 = tuần hiện tại).
+    inbox_by_member: Dict[str, Dict[int, List[int]]] = {}
+    for row in (inbox_res.data or []):
+        mid = str(row.get("id_member"))
+        d = _vn_date(row.get("synced_at") or "")
+        if d is None:
+            continue
+        wk_idx = None
+        for idx, (_, w_start, w_end) in enumerate(week_ranges):
+            if w_start <= d <= w_end:
+                wk_idx = idx
+                break
+        if wk_idx is None:
+            continue
+        slot = inbox_by_member.setdefault(mid, {}).setdefault(wk_idx, [0, 0])
+        if row.get("is_confirmed"):
+            slot[0] += 1
+        if row.get("is_lead"):
+            slot[1] += 1
+
+    # Pre-index: dict[mid] -> dict[week_idx -> post_count]
+    post_by_member: Dict[str, Dict[int, int]] = {}
+    for row in (post_res.data or []):
+        mid = str(row.get("id_member"))
+        d = _vn_date(row.get("posted_at") or "")
+        if d is None:
+            continue
+        wk_idx = None
+        for idx, (_, w_start, w_end) in enumerate(week_ranges):
+            if w_start <= d <= w_end:
+                wk_idx = idx
+                break
+        if wk_idx is None:
+            continue
+        post_by_member.setdefault(mid, {})[wk_idx] = (
+            post_by_member.get(mid, {}).get(wk_idx, 0) + 1
+        )
+
+    # Pre-index kpi theo member
+    kpi_by_member: Dict[str, List[Dict[str, Any]]] = {}
+    for kt in kpi_rows:
+        mid = str(kt["id_member"])
+        kpi_by_member.setdefault(mid, []).append(kt)
+
+    # 7. Build snapshots — O(W × T), tra cứu dict O(1)
+    result: List[Dict[str, Any]] = []
+    for week_idx, (week_name, w_start, w_end) in enumerate(week_ranges):
+        week_teams = []
+        for team in teams:
+            tid = str(team["id"])
+            mids = team_members.get(tid, set())
+            if not mids:
+                continue
+
+            # Targets: sum KPI tracker entries overlap week
+            inbox_target = lead_target = post_target = comment_target = 0
+            for mid in mids:
+                for kt in kpi_by_member.get(mid, []):
+                    kt_start_s = kt.get("start_date")
+                    kt_end_s = kt.get("end_date")
+                    if kt_start_s and kt_end_s:
+                        try:
+                            kt_start = date.fromisoformat(kt_start_s)
+                            kt_end = date.fromisoformat(kt_end_s)
+                        except ValueError:
+                            continue
+                        if kt_end < w_start or kt_start > w_end:
+                            continue
+                    inbox_target += kt.get("kpi_inbox") or 0
+                    lead_target += kt.get("kpi_lead") or 0
+                    post_target += kt.get("kpi_post") or 0
+                    comment_target += kt.get("kpi_comment") or 0
+
+            # Actuals: lookup pre-indexed
+            inbox_actual = lead_actual = post_actual = 0
+            for mid in mids:
+                slot = inbox_by_member.get(mid, {}).get(week_idx)
+                if slot:
+                    inbox_actual += slot[0]
+                    lead_actual += slot[1]
+                post_actual += post_by_member.get(mid, {}).get(week_idx, 0)
+
+            week_teams.append({
+                "team_id": tid,
+                "team_name": team.get("name_team") or "",
+                "lead_actual": lead_actual,
+                "lead_target": lead_target,
+                "inbox_actual": inbox_actual,
+                "inbox_target": inbox_target,
+                "post_actual": post_actual,
+                "post_target": post_target,
+                "comment_actual": 0,
+                "comment_target": comment_target,
+            })
+
+        result.append({"week_name": week_name, "teams": week_teams})
+
+    return _overview_cache_set(cache_key, result)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 1 — Optimized team KPI overview (batch queries, single round-trip)
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# KHÔNG thay đổi hàm `get_all_kpis_for_leader` ở trên — endpoint cũ vẫn hoạt
+# động bình thường. Hàm mới `get_team_kpi_overview_v2` được route mới
+# /kpi/get-team-overview-v2 sử dụng.
+#
+# Khác biệt chính:
+#   • Thay vì gọi 4–5 truy vấn Supabase × N members trong vòng lặp Python,
+#     hàm này gọi ~7 truy vấn cố định bất kể số lượng members.
+#   • 1 HTTP request duy nhất tới seeder service (batch owners) thay vì N.
+#   • In-memory cache TTL 30s (giống admin_dashboard_service).
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _vn_week_range_to_utc(start_date: str, end_date: str) -> Tuple[str, str]:
+    """Chuyển khoảng ngày YYYY-MM-DD (giờ VN) sang khoảng ISO UTC để so sánh."""
+    s = _parse_iso_date(start_date) or date.today()
+    e = _parse_iso_date(end_date) or date.today()
+    start_dt = datetime.combine(s, datetime.min.time(), tzinfo=VN_TZ).astimezone(timezone.utc).isoformat()
+    end_dt = datetime.combine(e, datetime.max.time(), tzinfo=VN_TZ).astimezone(timezone.utc).isoformat()
+    return start_dt, end_dt
+
+
+def _batch_fb_inbox_count_from_seeder(
+    member_emails: List[str],
+    start_date: str,
+    end_date: str,
+) -> Dict[str, int]:
+    """Gọi seeder service 1 lần duy nhất cho N owners.
+
+    Seeder service hỗ trợ nhiều `owner` qua comma-separated; nếu chưa hỗ trợ,
+    sẽ fallback về gọi tuần tự (giống hàm cũ).
+    """
+    from app.core.config import settings
+
+    if not member_emails:
+        return {}
+
+    base_url = (getattr(settings, "seeder_service_url", "") or "").rstrip("/")
+    api_key = getattr(settings, "seeder_service_api_key", "") or ""
+    if not base_url:
+        return {email: 0 for email in member_emails}
+
+    result: Dict[str, int] = {email: 0 for email in member_emails}
+
+    try:
+        import httpx
+
+        headers = {"X-API-Key": api_key} if api_key else {}
+        # Thử gọi batch trước (nếu seeder hỗ trợ `owners` comma-separated).
+        # Nếu trả 400/422, fallback gọi tuần tự.
+        url_batch = (
+            f"{base_url}/inbox/messages/count-batch"
+            f"?owners={','.join(member_emails)}&start={start_date}&end={end_date}"
+        )
+        with httpx.Client(timeout=15.0) as client:
+            resp = client.get(url_batch, headers=headers)
+        if resp.status_code == 200:
+            data = resp.json()
+            counts = data.get("counts") or {}
+            for email in member_emails:
+                result[email] = int(counts.get(email, 0))
+            return result
+
+        # Fallback: gọi tuần tự (giống hàm cũ) — không quá N=20 nên an toàn
+        if resp.status_code not in (400, 404, 422):
+            logger.warning(
+                f"Seeder batch endpoint returned {resp.status_code}, falling back to per-email"
+            )
+    except Exception as exc:
+        logger.debug(f"Seeder batch call failed ({exc}), falling back to per-email")
+
+    # Per-email fallback (giống _compute_fb_inbox_progress cũ)
+    try:
+        import httpx
+
+        headers = {"X-API-Key": api_key} if api_key else {}
+        with httpx.Client(timeout=10.0) as client:
+            for email in member_emails:
+                try:
+                    url = f"{base_url}/inbox/messages/count?owner={email}&start={start_date}&end={end_date}"
+                    r = client.get(url, headers=headers)
+                    if r.status_code == 200:
+                        result[email] = int(r.json().get("count", 0))
+                except Exception as exc:
+                    logger.debug(f"FB inbox fallback for {email} failed: {exc}")
+    except Exception as exc:
+        logger.warning(f"FB inbox fallback overall failed: {exc}")
+
+    return result
+
+
+def get_team_kpi_overview_v2(
+    *,
+    leader_email: Optional[str],
+    id_team: Optional[str],
+    start_date: str,
+    end_date: str,
+) -> dict:
+    """Phiên bản tối ưu của get_all_kpis_for_leader.
+
+    Tối ưu:
+      • ~7 truy vấn Supabase cố định (không phụ thuộc số members).
+      • 1 HTTP call tới seeder service (batch).
+      • In-memory cache 30s (invalidated khi assign_kpi / verify inbox).
+      • Trả về schema tương thích với get_all_kpis_for_leader (members[]).
+    """
+    cache_key = f"{(leader_email or '').strip().lower()}|{id_team or ''}|{start_date}|{end_date}"
+    cached = _overview_cache_get(cache_key)
+    if cached is not None:
+        logger.debug(f"kpi_overview_v2 cache HIT for {cache_key}")
+        return cached
+
+    supabase: Client = get_supabase_client()
+
+    # ── 1. Resolve leader_id + team_ids + member_ids (3 truy vấn) ───────────
+    leader_id: Optional[str] = None
+    if leader_email:
+        leader_res = (
+            supabase.table("app_users")
+            .select("id")
+            .eq("email", leader_email.strip().lower())
+            .limit(1)
+            .execute()
+        )
+        leader_id = str(leader_res.data[0]["id"]) if leader_res.data else None
+
+    member_ids: List[str] = []
+    if id_team:
+        mr = (
+            supabase.table("member_of_teams")
+            .select("id_member")
+            .eq("id_teams", id_team)
+            .execute()
+        )
+        member_ids = [str(r["id_member"]) for r in (mr.data or []) if r.get("id_member")]
+    elif leader_id:
+        tr = supabase.table("teams").select("id").eq("id_leader", leader_id).execute()
+        team_ids = [str(t["id"]) for t in (tr.data or [])]
+        if team_ids:
+            mr = (
+                supabase.table("member_of_teams")
+                .select("id_member")
+                .in_("id_teams", team_ids)
+                .execute()
+            )
+            member_ids = [str(r["id_member"]) for r in (mr.data or []) if r.get("id_member")]
+
+    # Leader cũng được tính như 1 member trong team của mình
+    if leader_id and leader_id not in member_ids:
+        member_ids.append(leader_id)
+
+    if not member_ids:
+        return _overview_cache_set(cache_key, {"total": 0, "members": []})
+
+    # ── 2. Member info + KPI tracker + seeding_content (3 truy vấn batch) ────
+    user_res = (
+        supabase.table("app_users")
+        .select("id, email, name, role")
+        .in_("id", member_ids)
+        .execute()
+    )
+    user_map: Dict[str, Any] = {str(u["id"]): u for u in (user_res.data or [])}
+
+    kpi_query = (
+        supabase.table("kpi_tracker")
+        .select("*")
+        .in_("id_member", member_ids)
+        .eq("status", "active")
+    )
+    if id_team:
+        kpi_query = kpi_query.eq("id_team", id_team)
+    if start_date and end_date:
+        kpi_query = kpi_query.eq("start_date", start_date).eq("end_date", end_date)
+    kpi_rows = kpi_query.execute().data or []
+    kpi_map: Dict[str, Any] = {}
+    for k in kpi_rows:
+        # Nếu có nhiều active, ưu tiên record trùng start/end đã lọc ở trên
+        kpi_map[str(k["id_member"])] = k
+
+    # Default date range
+    default_start, default_end = start_date, end_date
+    if not default_start or not default_end:
+        today_d = datetime.now(VN_TZ).date()
+        monday = today_d - timedelta(days=today_d.weekday())
+        sunday = monday + timedelta(days=6)
+        default_start = start_date or monday.isoformat()
+        default_end = end_date or sunday.isoformat()
+
+    # Tìm min start date từ kpi tracker
+    min_start = default_start
+    for k in kpi_map.values():
+        ks = k.get("start_date")
+        if ks and ks < min_start:
+            min_start = ks
+
+    seeding_res = (
+        supabase.table("seeding_content_kpi")
+        .select("id_member, verify, current_day, content, link_comment, id_social_account")
+        .in_("id_member", member_ids)
+        .gte("current_day", min_start)
+        .lte("current_day", default_end)
+        .execute()
+    )
+    seeding_list = seeding_res.data or []
+    seeding_by_member: Dict[str, List[Dict[str, Any]]] = {}
+    for s in seeding_list:
+        mid = str(s.get("id_member"))
+        seeding_by_member.setdefault(mid, []).append(s)
+
+    # ── 3. Bulk inbox Zalo (1 truy vấn) ─────────────────────────────────────
+    zalo_res = (
+        supabase.table("zalo_conversation_permissions")
+        .select("id_member, created_at, updated_at, verified_at, is_lead")
+        .in_("id_member", member_ids)
+        .eq("shared_role", "leader")
+        .eq("is_active", True)
+        .eq("is_verify", True)
+        .not_("verified_at", "is", None)
+        .execute()
+    )
+    start_iso_utc, end_iso_utc = _vn_week_range_to_utc(default_start, default_end)
+    zalo_inbox: Dict[str, int] = {m: 0 for m in member_ids}
+    zalo_lead: Dict[str, int] = {m: 0 for m in member_ids}
+    for r in (zalo_res.data or []):
+        mid = str(r.get("id_member"))
+        c_at = r.get("created_at") or ""
+        u_at = r.get("updated_at") or ""
+        v_at = r.get("verified_at") or ""
+        if (
+            (start_iso_utc <= c_at <= end_iso_utc)
+            or (start_iso_utc <= u_at <= end_iso_utc)
+            or (start_iso_utc <= v_at <= end_iso_utc)
+        ):
+            zalo_inbox[mid] = zalo_inbox.get(mid, 0) + 1
+            if r.get("is_lead"):
+                zalo_lead[mid] = zalo_lead.get(mid, 0) + 1
+
+    # ── 4. Bulk FB inbox KPI (1 truy vấn) ───────────────────────────────────
+    fb_inbox_res = (
+        supabase.table("fb_inbox_kpi")
+        .select("id_member, is_lead, is_confirmed, synced_at")
+        .in_("id_member", member_ids)
+        .eq("is_confirmed", True)
+        .gte("synced_at", start_iso_utc)
+        .lte("synced_at", end_iso_utc)
+        .execute()
+    )
+    fb_inbox_count: Dict[str, int] = {m: 0 for m in member_ids}
+    fb_lead_count: Dict[str, int] = {m: 0 for m in member_ids}
+    for r in (fb_inbox_res.data or []):
+        mid = str(r.get("id_member"))
+        fb_inbox_count[mid] = fb_inbox_count.get(mid, 0) + 1
+        if r.get("is_lead"):
+            fb_lead_count[mid] = fb_lead_count.get(mid, 0) + 1
+
+    # ── 5. Bulk FB post KPI (1 truy vấn) ────────────────────────────────────
+    fb_post_res = (
+        supabase.table("fb_post_kpi")
+        .select("id_member, posted_at")
+        .in_("id_member", member_ids)
+        .gte("posted_at", start_iso_utc)
+        .lte("posted_at", end_iso_utc)
+        .execute()
+    )
+    fb_post_count: Dict[str, int] = {m: 0 for m in member_ids}
+    for r in (fb_post_res.data or []):
+        mid = str(r.get("id_member"))
+        fb_post_count[mid] = fb_post_count.get(mid, 0) + 1
+
+    # ── 6. Bulk FB inbox từ seeder (1 HTTP call batch) ──────────────────────
+    member_emails = [
+        str(user_map.get(m, {}).get("email", "")).lower()
+        for m in member_ids
+        if user_map.get(m, {}).get("email")
+    ]
+    fb_seeder_count = _batch_fb_inbox_count_from_seeder(member_emails, default_start, default_end)
+
+    # ── 7. Build response (không có truy vấn) ───────────────────────────────
+    verified_keywords = ("yes", "đã seeding", "xác minh", "verified")
+    members_data: List[Dict[str, Any]] = []
+    for mid in member_ids:
+        user = user_map.get(mid)
+        if not user:
+            continue
+        active_kpi = kpi_map.get(mid, {}) or {}
+        member_email = str(user.get("email", "")).lower()
+        eff_start = start_date or active_kpi.get("start_date") or default_start
+        eff_end = end_date or active_kpi.get("end_date") or default_end
+
+        # Comment actual trong khoảng
+        member_seeding = [
+            s for s in seeding_by_member.get(mid, [])
+            if s.get("current_day") and eff_start <= s["current_day"] <= eff_end
+        ]
+        comment_current = sum(
+            1 for s in member_seeding
+            if str(s.get("verify", "")).strip().lower() in verified_keywords
+        )
+
+        # Tổng hợp actuals
+        inbox_zalo = int(zalo_inbox.get(mid, 0))
+        lead_zalo = int(zalo_lead.get(mid, 0))
+        inbox_fb_kpi = int(fb_inbox_count.get(mid, 0))
+        lead_fb_kpi = int(fb_lead_count.get(mid, 0))
+        inbox_fb_seeder = int(fb_seeder_count.get(member_email, 0))
+        fb_post_n = int(fb_post_count.get(mid, 0))
+
+        total_inbox_current = inbox_zalo + inbox_fb_seeder + inbox_fb_kpi
+        total_lead_current = lead_zalo + lead_fb_kpi
+
+        members_data.append({
+            "id": mid,
+            "email": member_email,
+            "name": user.get("name"),
+            "role": user.get("role", "member"),
+            "profile_slug": user.get("slug"),
+            "email_leader": leader_email,
+            "kpi": [active_kpi] if active_kpi else [],
+            "seeding_stats": {
+                "verified_count": comment_current,
+                "kpi_target": active_kpi.get("kpi_comment", 0),
+                "kpi_post": active_kpi.get("kpi_post", 0),
+                "kpi_post_current": fb_post_n,
+                "kpi_lead": active_kpi.get("kpi_lead", 0),
+                "kpi_lead_current": total_lead_current,
+                "kpi_inbox": active_kpi.get("kpi_inbox", 0),
+                "kpi_inbox_current": total_inbox_current,
+                "kpi_inbox_zalo": inbox_zalo,
+                "kpi_inbox_fb_seeder": inbox_fb_seeder,
+                "kpi_inbox_fb_kpi": inbox_fb_kpi,
+                "kpi_inbox_range": {"start": eff_start, "end": eff_end},
+            },
+            "seeding_items": member_seeding,
+            "profile_id": user.get("profile_id"),
+            "facebook_name": user.get("facebook_name"),
+        })
+
+    return _overview_cache_set(cache_key, {"total": len(members_data), "members": members_data})

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, useRef, type ReactNode, memo, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -14,8 +14,30 @@ import {
   type TeamRow,
 } from "@/services/all-platform.service";
 import type { FacebookGroup, LinkedInGroup, UnifiedPost } from "@/types/unified.types";
+import { useKpiRefresh } from "@/lib/useKpiRefresh";
 
 type GroupRecord = FacebookGroup | LinkedInGroup;
+
+// Phase 3: memo MetricCard để tránh re-render cả grid khi đổi team/tuần.
+const MetricCard = memo(function MetricCard({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string | number;
+  hint?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-none">
+      <p className="text-xs font-semibold capitalize text-slate-500">{label}</p>
+      <p className="mt-2 text-2xl font-bold text-slate-900">
+        {typeof value === "number" ? value.toLocaleString("vi-VN") : value}
+      </p>
+      {hint ? <p className="mt-1 text-xs text-slate-400">{hint}</p> : null}
+    </div>
+  );
+});
 
 function getRecentWeeks(numWeeks = 8) {
   const weeks: Array<{ label: string; value: string }> = [];
@@ -69,26 +91,6 @@ function getGroupHealthScore(group: GroupRecord) {
   return "health_score" in group && typeof group.health_score === "number"
     ? group.health_score
     : 60;
-}
-
-function MetricCard({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: string | number;
-  hint?: string;
-}) {
-  return (
-    <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-none">
-      <p className="text-xs font-semibold capitalize text-slate-500">{label}</p>
-      <p className="mt-2 text-2xl font-bold text-slate-900">
-        {typeof value === "number" ? value.toLocaleString("vi-VN") : value}
-      </p>
-      {hint ? <p className="mt-1 text-xs text-slate-400">{hint}</p> : null}
-    </div>
-  );
 }
 
 function ProgressListCard({
@@ -184,6 +186,16 @@ export function LeaderDashboardContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Refs to avoid stale closures in event listener
+  const userRef = useRef(user);
+  const teamsRef = useRef(teams);
+  const selectedTeamIdRef = useRef(selectedTeamId);
+  const selectedWeekRef = useRef(selectedWeek);
+  userRef.current = user;
+  teamsRef.current = teams;
+  selectedTeamIdRef.current = selectedTeamId;
+  selectedWeekRef.current = selectedWeek;
+
   useEffect(() => {
     if (!user?.id || user.role !== "leader") return;
 
@@ -202,72 +214,80 @@ export function LeaderDashboardContent() {
     void loadTeams();
   }, [user?.id, user?.role]);
 
-  useEffect(() => {
-    if (!user?.email || !selectedTeamId) return;
+  const loadOverview = useCallback(async () => {
+    const currentUser = userRef.current;
+    const currentTeams = teamsRef.current;
+    const currentTeamId = selectedTeamIdRef.current;
+    const currentWeek = selectedWeekRef.current;
 
-    const [startDate, endDate] = selectedWeek.split("_");
-    const selectedTeam = teams.find((team) => team.id === selectedTeamId);
+    if (!currentUser?.email || !currentTeamId) return;
+
+    const [startDate, endDate] = currentWeek.split("_");
+    const selectedTeam = currentTeams.find((team) => team.id === currentTeamId);
     if (!selectedTeam) return;
 
-    const loadOverview = async () => {
-      setLoading(true);
-      setError(null);
+    setLoading(true);
+    setError(null);
 
-      try {
-        const [kpiRes, fbGroupsRes, liGroupsRes, fbPostsRes, liPostsRes] = await Promise.all([
-          allPlatformKpiService.getAll(user.email, selectedTeamId, startDate, endDate),
-          allPlatformGroupsService.getAll("facebook"),
-          allPlatformGroupsService.getAll("linkedin"),
-          allPlatformPostsService.filter({
-            email: user.email,
-            platform: "facebook",
-            team: selectedTeam.name_team,
-            date_from: startDate,
-            date_to: endDate,
-            page: 1,
-            page_size: 20,
-          }),
-          allPlatformPostsService.filter({
-            email: user.email,
-            platform: "linkedin",
-            team: selectedTeam.name_team,
-            date_from: startDate,
-            date_to: endDate,
-            page: 1,
-            page_size: 20,
-          }),
-        ]);
+    try {
+      const [kpiRes, fbGroupsRes, liGroupsRes, fbPostsRes, liPostsRes] = await Promise.all([
+        allPlatformKpiService.getTeamOverviewV3(currentUser.email, currentTeamId, startDate, endDate),
+        allPlatformGroupsService.getAll("facebook"),
+        allPlatformGroupsService.getAll("linkedin"),
+        allPlatformPostsService.filter({
+          email: currentUser.email,
+          platform: "facebook",
+          team: selectedTeam.name_team,
+          date_from: startDate,
+          date_to: endDate,
+          page: 1,
+          page_size: 20,
+        }),
+        allPlatformPostsService.filter({
+          email: currentUser.email,
+          platform: "linkedin",
+          team: selectedTeam.name_team,
+          date_from: startDate,
+          date_to: endDate,
+          page: 1,
+          page_size: 20,
+        }),
+      ]);
 
-        setKpiMembers(kpiRes.success && kpiRes.data?.members ? kpiRes.data.members : []);
+      setKpiMembers(kpiRes.success && kpiRes.data?.members ? kpiRes.data.members : []);
 
-        const allGroups = [
-          ...((fbGroupsRes.success && fbGroupsRes.data ? fbGroupsRes.data : []) as FacebookGroup[]),
-          ...((liGroupsRes.success && liGroupsRes.data ? liGroupsRes.data : []) as LinkedInGroup[]),
-        ].filter((group) => {
-          const matchesTeamId = String((group as FacebookGroup).id_team || "") === selectedTeamId;
-          const matchesTeamName =
-            String((group as FacebookGroup).team_name || "").trim() === selectedTeam.name_team;
-          return matchesTeamId || matchesTeamName;
-        });
+      const allGroups = [
+        ...((fbGroupsRes.success && fbGroupsRes.data ? fbGroupsRes.data : []) as FacebookGroup[]),
+        ...((liGroupsRes.success && liGroupsRes.data ? liGroupsRes.data : []) as LinkedInGroup[]),
+      ].filter((group) => {
+        const matchesTeamId = String((group as FacebookGroup).id_team || "") === currentTeamId;
+        const matchesTeamName =
+          String((group as FacebookGroup).team_name || "").trim() === selectedTeam.name_team;
+        return matchesTeamId || matchesTeamName;
+      });
 
-        setGroups(allGroups);
+      setGroups(allGroups);
 
-        const combinedPosts = [
-          ...(fbPostsRes.success && fbPostsRes.data?.posts ? fbPostsRes.data.posts : []),
-          ...(liPostsRes.success && liPostsRes.data?.posts ? liPostsRes.data.posts : []),
-        ].sort((a, b) => (b.score || 0) - (a.score || 0));
+      const combinedPosts = [
+        ...(fbPostsRes.success && fbPostsRes.data?.posts ? fbPostsRes.data.posts : []),
+        ...(liPostsRes.success && liPostsRes.data?.posts ? liPostsRes.data.posts : []),
+      ].sort((a, b) => (b.score || 0) - (a.score || 0));
 
-        setPosts(combinedPosts);
-      } catch (overviewError) {
-        console.error("Failed to load leader dashboard", overviewError);
-        setError("Không thể tải dashboard leader.");
-      } finally {
-        setLoading(false);
-      }
-    };
+      setPosts(combinedPosts);
+    } catch (overviewError) {
+      console.error("Failed to load leader dashboard", overviewError);
+      setError("Không thể tải dashboard leader.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
+  // Listen for KPI refresh events (triggered after bulk verify, etc.)
+  useKpiRefresh(loadOverview);
+
+  useEffect(() => {
     void loadOverview();
-  }, [selectedTeamId, selectedWeek, teams, user?.email]);
+  }, [selectedTeamId, selectedWeek, teams, user?.email]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedTeam = useMemo(
     () => teams.find((team) => team.id === selectedTeamId) || null,
@@ -447,8 +467,8 @@ export function LeaderDashboardContent() {
             <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-none">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900">
-                  <MaterialIcon name="assignment" className="text-[18px] text-[#DC2626]" />
-                  Bài post điểm cao chưa assign
+                  <MaterialIcon name="trending_up" className="text-[18px] text-[#DC2626]" />
+                  Bài viết có lượt tương tác cao
                 </h3>
                 <span className="rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
                   {unassignedPosts.length} bài
@@ -457,7 +477,7 @@ export function LeaderDashboardContent() {
 
               <div className="mt-4 divide-y divide-slate-100">
                 {unassignedPosts.length === 0 ? (
-                  <p className="py-8 text-xs text-slate-400">Chưa có bài nổi bật cần assign.</p>
+                  <p className="py-8 text-xs text-slate-400">Chưa có bài nào cần seeding.</p>
                 ) : (
                   unassignedPosts.map((post) => (
                     <div key={post.id} className="flex flex-col gap-3 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">

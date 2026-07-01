@@ -36,7 +36,13 @@ from app.modules.all_platform.services import (
     get_fb_inbox_kpi_summary,
     get_pending_fb_inbox_kpi,
 )
-from app.modules.all_platform.services.supabase_kpi_service import _compute_fb_inbox_progress
+from app.modules.all_platform.services.supabase_kpi_service import (
+    _compute_fb_inbox_progress,
+    get_team_kpi_overview_v2,
+    get_team_kpi_overview_v2_rpc,
+    _build_team_kpi_history_optimized,
+    invalidate_overview_cache,
+)
 
 router = APIRouter()
 
@@ -48,6 +54,86 @@ def kpi_assign(payload: AssignKpiRequest) -> BaseResponse:
         data = assign_kpi(payload.model_dump(exclude_none=True))
         return BaseResponse(success=True, message="KPI assigned", data=data)
     except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+# ── Bulk Assign KPI ───────────────────────────────────────────────────────────
+
+from pydantic import BaseModel, Field
+
+
+class BulkAssignMemberItem(BaseModel):
+    email: str
+    profile_slug: str = ""
+    kpi_comment: int = 0
+    kpi_post: int = 0
+    kpi_lead: int = 0
+    kpi_inbox: int = 0
+
+
+class BulkAssignKpiRequest(BaseModel):
+    leader_email: str
+    id_team: str
+    start_day: str
+    end_day: str
+    members: List[BulkAssignMemberItem] = Field(..., min_length=1)
+    platform: str = "Facebook"
+
+
+@router.post("/bulk-assign")
+def kpi_bulk_assign(payload: BulkAssignKpiRequest) -> BaseResponse:
+    """Leader assigns KPI hàng loạt cho nhiều thành viên cùng lúc.
+
+    Nhanh hơn gọi /assign N lần vì chỉ cần 1 round-trip.
+    """
+    try:
+        from app.modules.all_platform.services.supabase_kpi_service import assign_kpi as _assign_one
+
+        results: List[dict] = []
+        for member in payload.members:
+            try:
+                result = _assign_one({
+                    "leader_role": "leader",
+                    "role": "member",
+                    "email": member.email,
+                    "profile_slug": member.profile_slug or member.email,
+                    "email_leader": payload.leader_email,
+                    "id_team": payload.id_team,
+                    "kpi": [{
+                        "start_day": payload.start_day,
+                        "end_day": payload.end_day,
+                        "kpi_comment": member.kpi_comment,
+                        "kpi_post": member.kpi_post,
+                        "kpi_lead": member.kpi_lead,
+                        "kpi_inbox": member.kpi_inbox,
+                    }],
+                    "platform": payload.platform,
+                })
+                results.append({
+                    "email": member.email,
+                    "success": True,
+                    "message": "KPI assigned",
+                })
+            except Exception as exc:
+                results.append({
+                    "email": member.email,
+                    "success": False,
+                    "message": str(exc),
+                })
+
+        success_count = sum(1 for r in results if r["success"])
+        # Invalidate cache để dashboard reload data mới
+        invalidate_overview_cache(payload.leader_email)
+
+        return BaseResponse(success=True, data={
+            "total": len(results),
+            "success_count": success_count,
+            "failed_count": len(results) - success_count,
+            "results": results,
+            "message": f"Đã giao KPI cho {success_count}/{len(results)} thành viên",
+        })
+    except Exception as e:
+        logger.error(f"kpi_bulk_assign error: {e}")
         return BaseResponse(success=False, message=str(e))
 
 
@@ -63,6 +149,77 @@ def kpi_get_all(payload: GetAllKpiRequest) -> BaseResponse:
         )
         return BaseResponse(success=True, data=data)
     except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@router.post("/team-history-v2")
+def team_kpi_history_v2(payload: TeamKpiHistoryRequest) -> BaseResponse:
+    """Phase 4 (admin perf) — phiên bản tối ưu của /team-history.
+
+    Cải thiện so với endpoint cũ (admin dashboard load chậm):
+      • In-memory cache TTL 30s (key theo leader_email|weeks) — request thứ 2
+        trong 30s là instant, dùng chung cache với V2/V3 overview.
+      • Pre-index `inbox_rows` / `post_rows` thành dict theo member + week
+        trước khi lặp week × team → tránh O(W × T × len(rows)) của hàm cũ.
+      • Bulk query giới hạn lte `latest_end_dt` → không kéo dữ liệu quá cũ.
+
+    Schema trả về giống hệt /team-history để FE có thể swap endpoint dễ dàng.
+    Endpoint cũ /team-history vẫn hoạt động bình thường cho leader (đã ổn định).
+    """
+    try:
+        data = _build_team_kpi_history_optimized(
+            leader_email=payload.leader_email,
+            weeks=payload.weeks,
+        )
+        return BaseResponse(success=True, data=data)
+    except Exception as e:
+        logger.error(f"team-history-v2 error: {e}")
+        return BaseResponse(success=False, message=str(e))
+
+
+@router.post("/get-team-overview-v2")
+def kpi_get_team_overview_v2(payload: GetAllKpiRequest) -> BaseResponse:
+    """Phase 1 — phiên bản tối ưu của /kpi/get-all.
+
+    Khác biệt so với endpoint cũ:
+      • Batch queries (≈7 truy vấn cố định thay vì N×5).
+      • 1 HTTP call tới seeder service (batch) thay vì N.
+      • In-memory cache 30s (tự invalidate khi assign_kpi / verify inbox).
+      • Schema trả về tương thích với /kpi/get-all — FE có thể swap dần.
+
+    FE nên chuyển sang endpoint này để cải thiện tốc độ tải team lớn.
+    Endpoint /kpi/get-all vẫn được giữ nguyên để rollback an toàn.
+    """
+    try:
+        data = get_team_kpi_overview_v2(
+            leader_email=payload.email_leader,
+            id_team=payload.id_team,
+            start_date=payload.start_date or "",
+            end_date=payload.end_date or "",
+        )
+        return BaseResponse(success=True, data=data)
+    except Exception as e:
+        logger.error(f"kpi_get_team_overview_v2 error: {e}")
+        return BaseResponse(success=False, message=str(e))
+
+
+@router.post("/get-team-overview-v3")
+def kpi_get_team_overview_v3(payload: GetAllKpiRequest) -> BaseResponse:
+    """Phase 2 — gọi RPC `get_team_kpi_overview` của Supabase (1 round-trip).
+
+    Nhanh nhất trong 3 phiên bản (RPC + server-side aggregate).
+    Tự fallback về /get-team-overview-v2 nếu RPC chưa được deploy.
+    """
+    try:
+        data = get_team_kpi_overview_v2_rpc(
+            leader_email=payload.email_leader,
+            id_team=payload.id_team,
+            start_date=payload.start_date or "",
+            end_date=payload.end_date or "",
+        )
+        return BaseResponse(success=True, data=data)
+    except Exception as e:
+        logger.error(f"kpi_get_team_overview_v3 error: {e}")
         return BaseResponse(success=False, message=str(e))
 
 
@@ -272,6 +429,9 @@ def fb_inbox_bulk_verify(payload: BulkVerifyInboxRequest) -> BaseResponse:
         )
         
         updated_count = len(update_res.data or [])
+
+        # Invalidate KPI overview cache so dashboard refreshes immediately
+        invalidate_overview_cache(leader_email)
 
         return BaseResponse(success=True, data={
             "synced": updated_count,

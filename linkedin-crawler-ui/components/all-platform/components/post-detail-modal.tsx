@@ -207,11 +207,11 @@ export function PostDetailModal({
           <div>
             {verifyStatus === "yes" && !isRejected(post.link_comment) ? (
               <span className="px-3 py-1.5 rounded-lg text-xs font-bold border bg-green-100 text-green-700 border-green-200">
-                ✓ Đã xác minh seeding
+                ✓ Đã comment
               </span>
             ) : verifyStatus === "yes" && isRejected(post.link_comment) ? (
               <span className="px-3 py-1.5 rounded-lg text-xs font-bold border bg-red-100 text-red-700 border-red-200">
-                X Bị từ chối
+                ✗ Bị từ chối
               </span>
             ) : verifyStatus === "pending" ? (
               <span className="px-3 py-1.5 rounded-lg text-xs font-bold border bg-emerald-100 text-emerald-700 border-emerald-200">

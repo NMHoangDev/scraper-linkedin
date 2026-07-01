@@ -23,6 +23,73 @@ const authHeaders = () => ({});
 const AUTH_SUBMIT_TIMEOUT_MS = 12000;
 
 /**
+ * Lightweight in-memory TTL cache for read-mostly taxonomies & teams.
+ *
+ * - Avoids re-fetching categories + teams every time user changes platform or filter
+ * - Works across React component instances (module-level singleton)
+ * - Per-key TTL so different cache buckets expire independently
+ * - SSR-safe: returns `null` on server (component is "use client" so this is rare)
+ *
+ * Not for: anything that must reflect real-time writes (post lists, stats).
+ */
+interface CacheEntry<T> {
+  expiresAt: number;
+  data: T;
+}
+
+const taxonomyCache = new Map<string, CacheEntry<unknown>>();
+
+/**
+ * Get-or-fetch helper. Caches the resolved value of `fetcher()` under `key`
+ * for `ttlMs` milliseconds. Concurrent callers share a single in-flight request.
+ */
+const inflightRequests = new Map<string, Promise<unknown>>();
+
+async function cachedFetch<T>(
+  key: string,
+  ttlMs: number,
+  fetcher: () => Promise<T>,
+): Promise<T> {
+  if (typeof window === "undefined") {
+    return fetcher(); // SSR
+  }
+  const now = Date.now();
+  const cached = taxonomyCache.get(key) as CacheEntry<T> | undefined;
+  if (cached && cached.expiresAt > now) {
+    return cached.data;
+  }
+  // Coalesce concurrent requests
+  const inflight = inflightRequests.get(key);
+  if (inflight) {
+    return (await inflight) as T;
+  }
+  const promise = (async () => {
+    try {
+      const data = await fetcher();
+      taxonomyCache.set(key, { data, expiresAt: Date.now() + ttlMs });
+      return data;
+    } finally {
+      inflightRequests.delete(key);
+    }
+  })();
+  inflightRequests.set(key, promise);
+  return promise;
+}
+
+/**
+ * Invalidate one (or all) cache buckets.
+ * - `invalidateTaxonomyCache()` — clear everything (after admin edit)
+ * - `invalidateTaxonomyCache('categories')` — clear specific bucket
+ */
+export function invalidateTaxonomyCache(key?: string): void {
+  if (!key) {
+    taxonomyCache.clear();
+    return;
+  }
+  taxonomyCache.delete(key);
+}
+
+/**
  * Trả về header mặc định cho mọi request — bao gồm:
  *  - X-API-Key: backend yêu cầu (verify_zalo_api_key), đọc từ NEXT_PUBLIC_LINKEDIN_CRAWLER_API_KEY
  *  - Có thể bị override bởi `init.headers` nếu caller cần custom
@@ -218,8 +285,60 @@ export const allPlatformKpiService = {
     });
   },
 
+  /**
+   * Leader giao KPI hàng loạt cho nhiều thành viên cùng lúc.
+   * Nhanh hơn gọi /assign N lần vì chỉ 1 HTTP request.
+   */
+  bulkAssignKpi: (payload: {
+    leader_email: string;
+    id_team: string;
+    start_day: string;
+    end_day: string;
+    members: Array<{
+      email: string;
+      profile_slug?: string;
+      kpi_comment?: number;
+      kpi_post?: number;
+      kpi_lead?: number;
+      kpi_inbox?: number;
+    }>;
+    platform?: string;
+  }): Promise<ApiResponse<{
+    total: number;
+    success_count: number;
+    failed_count: number;
+    results: Array<{ email: string; success: boolean; message: string }>;
+    message: string;
+  }>> => {
+    return requestJson(`${BASE}/kpi/bulk-assign`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
   getAll: (leader_email: string, id_team?: string, start_date?: string, end_date?: string): Promise<ApiResponse<{ total: number; members: KpiMember[] }>> => {
     return requestJson(`${BASE}/kpi/get-all`, {
+      method: "POST",
+      body: JSON.stringify({ email_leader: leader_email, id_team, start_date, end_date }),
+    });
+  },
+
+  /**
+   * Phase 3 — gọi endpoint backend tối ưu (RPC hoặc batch fallback).
+   * Schema trả về tương thích với `getAll`. FE nên chuyển sang method này.
+   */
+  getTeamOverviewV3: (leader_email: string, id_team?: string, start_date?: string, end_date?: string): Promise<ApiResponse<{ total: number; members: KpiMember[] }>> => {
+    return requestJson(`${BASE}/kpi/get-team-overview-v3`, {
+      method: "POST",
+      body: JSON.stringify({ email_leader: leader_email, id_team, start_date, end_date }),
+    });
+  },
+
+  /**
+   * Phase 1 — batch queries endpoint.
+   */
+  getTeamOverviewV2: (leader_email: string, id_team?: string, start_date?: string, end_date?: string): Promise<ApiResponse<{ total: number; members: KpiMember[] }>> => {
+    return requestJson(`${BASE}/kpi/get-team-overview-v2`, {
       method: "POST",
       body: JSON.stringify({ email_leader: leader_email, id_team, start_date, end_date }),
     });
@@ -308,6 +427,27 @@ export const allPlatformKpiService = {
     }>;
   }>>> => {
     return requestJson(`${BASE}/kpi/team-history`, {
+      method: "POST",
+      body: JSON.stringify({ leader_email: leaderEmail ?? null, weeks }),
+    });
+  },
+
+  /**
+   * Phase 4 — phiên bản tối ưu của getTeamHistory.
+   * Ưu tiên dùng cho admin (nhiều team × nhiều tuần). Có cache 30s phía backend.
+   * Schema trả về giống hệt getTeamHistory.
+   */
+  getTeamHistoryV2: (leaderEmail?: string, weeks = 4): Promise<ApiResponse<Array<{
+    week_name: string;
+    teams: Array<{
+      team_id: string; team_name: string;
+      lead_actual: number; lead_target: number;
+      inbox_actual: number; inbox_target: number;
+      post_actual: number; post_target: number;
+      comment_actual: number; comment_target: number;
+    }>;
+  }>>> => {
+    return requestJson(`${BASE}/kpi/team-history-v2`, {
       method: "POST",
       body: JSON.stringify({ leader_email: leaderEmail ?? null, weeks }),
     });
@@ -582,14 +722,41 @@ export const allPlatformPostsService = {
     sort?: string;
     page?: number;
     page_size?: number;
-  }): Promise<ApiResponse<{ posts: UnifiedPost[]; total: number; page: number; page_size: number; total_pages: number }>> => {
+  }): Promise<ApiResponse<{
+    posts: UnifiedPost[];
+    total: number;
+    page: number;
+    page_size: number;
+    total_pages: number;
+    /**
+     * Phase 6: dashboard stats gộp vào response (thay vì gọi /unified/stats riêng).
+     * FE có thể fallback /unified/stats nếu backend cũ chưa trả field này.
+     */
+    quick_stats?: {
+      totalPostsToday: number;
+      postsYesterday: number;
+      totalPosts: number;
+      highScoreCount: number;
+      highScorePercent: number;
+      seededToday: number;
+      totalVisible: number;
+      kpiProgress: number;
+      kpiTarget: number;
+      kpiProgressPercent: number;
+    };
+  }>> => {
     return requestJson(`${BASE}/unified/posts/filter`, {
       method: "POST",
       body: JSON.stringify(payload),
     });
   },
 
-  /** Stats from database — no cache */
+  /**
+   * Stats from database — no cache.
+   * NOTE: từ Phase 6, FE nên ưu tiên đọc `quick_stats` từ /unified/posts/filter
+   * (gộp vào 1 round-trip). Method này vẫn dùng cho page load lần đầu hoặc
+   * fallback nếu backend cũ.
+   */
   getStats: (payload: {
     email: string;
     platform: string;
@@ -601,8 +768,76 @@ export const allPlatformPostsService = {
     highScorePercent: number;
     seededToday: number;
     totalVisible: number;
+    kpiProgress: number;
+    kpiTarget: number;
+    kpiProgressPercent: number;
   }>> => {
     return requestJson(`${BASE}/unified/stats`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /**
+   * Phase 6: single RPC call for unified feed dashboard.
+   * Returns: quick_stats + my_kpi (member) | team_kpi (leader) +
+   *   top_seeding_today + top_seeders_today (admin/leader).
+   * Called in parallel with `filter()` — saves N+ round-trips.
+   */
+  getFeedOverview: (payload: {
+    email: string;
+    platform?: string;
+    date_from?: string;
+    date_to?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<ApiResponse<{
+    quick_stats?: {
+      totalPostsToday: number;
+      postsYesterday: number;
+      totalPosts: number;
+      highScoreCount: number;
+      highScorePercent: number;
+      seededToday: number;
+      totalVisible: number;
+      kpiProgress: number;
+      kpiTarget: number;
+      kpiProgressPercent: number;
+    };
+    my_kpi?: null | {
+      kpi_comment_target: number;
+      kpi_comment_current: number;
+      remaining: number;
+      percent: number;
+    };
+    team_kpi?: null | {
+      team_id: string;
+      team_name: string;
+      total_members: number;
+      total_seeded_today: number;
+      total_verified_today: number;
+      active_members_today: number;
+    };
+    top_seeding_today?: Array<{
+      post_id: string;
+      post_url: string;
+      content: string;
+      group_name: string;
+      seeding_count: number;
+      verified_count: number;
+      unique_members: number;
+    }>;
+    top_seeders_today?: Array<{
+      member_id: string;
+      member_email: string;
+      member_name: string;
+      team_name: string;
+      seeding_count: number;
+      verified_count: number;
+    }>;
+    range?: { start: string; end: string };
+  }>> => {
+    return requestJson(`${BASE}/unified/feed/overview`, {
       method: "POST",
       body: JSON.stringify(payload),
     });
@@ -629,7 +864,11 @@ export const allPlatformCategoriesService = {
     const url = category_type
       ? `${BASE}/categories?category_type=${encodeURIComponent(category_type)}`
       : `${BASE}/categories`;
-    return requestJson(url);
+    // Cache the entire categories list for 30s. Categories rarely change;
+    // admin can invalidateTaxonomyCache() after edits.
+    return cachedFetch(`categories:${category_type || "all"}`, 30_000, () =>
+      requestJson<Category[]>(url),
+    );
   },
 
   add: (payload: {
@@ -1094,7 +1333,33 @@ export const usersService = {
 
 export const teamsService = {
   getAll: (): Promise<ApiResponse<TeamRow[]>> => {
-    return requestJson(`${BASE}/teams`);
+    // Teams change infrequently — cache 30s to avoid refetch on every
+    // platform toggle or filter change in the dashboard.
+    return cachedFetch("teams:all", 30_000, () => requestJson<TeamRow[]>(`${BASE}/teams`));
+  },
+
+  /**
+   * Phase 5: trả về teams + KPI combined trong 1 round-trip.
+   * Thay thế 1 + N HTTP request (1 × /teams + N × /kpi/get-team-overview-v3).
+   * Cache 30s phía backend.
+   */
+  getWithKpi: (startDate?: string, endDate?: string): Promise<ApiResponse<{
+    teams: TeamRow[];
+    kpi_data: Array<{
+      team_id: string; team_name: string; leader_email: string;
+      member_id: string; member_email: string; member_name: string;
+      kpi_post: number; kpi_lead: number; kpi_inbox: number; kpi_comment: number;
+      verified_count: number; post_count: number; inbox_count: number; lead_count: number;
+      kpi_post_current: number; kpi_inbox_current: number; kpi_lead_current: number;
+      kpi_inbox_range?: { start: string; end: string };
+    }>;
+    range: { start: string; end: string };
+  }>> => {
+    const params = new URLSearchParams();
+    if (startDate) params.set("start_date", startDate);
+    if (endDate) params.set("end_date", endDate);
+    const qs = params.toString();
+    return requestJson(`${BASE}/teams/with-kpi${qs ? `?${qs}` : ""}`);
   },
   create: (payload: {
     name_team: string;
@@ -1213,6 +1478,31 @@ export interface AdminLeaderboardsData {
   }>;
 }
 
+export interface HighInteractionPost {
+  post_id: string;
+  post_url: string;
+  content: string;
+  group_name: string;
+  score: number;
+  interactions: number;
+  time_ago: string;
+  platform: "facebook" | "linkedin";
+}
+
+export interface GroupsHealthStats {
+  total_groups: number;
+  alive: number;
+  low_activity: number;
+  dead: number;
+  no_taxonomy: number;
+  by_tier: Array<{ tier_name: string; count: number }>;
+}
+
+export interface HighInteractionPostsData {
+  posts: HighInteractionPost[];
+  total: number;
+}
+
 export const adminDashboardService = {
   getSummary: (): Promise<ApiResponse<AdminDashboardSummaryData>> => {
     return requestJson(`${BASE}/admin/dashboard/summary`);
@@ -1222,6 +1512,47 @@ export const adminDashboardService = {
   },
   getLeaderboards: (): Promise<ApiResponse<AdminLeaderboardsData>> => {
     return requestJson(`${BASE}/admin/dashboard/leaderboards`);
+  },
+
+  /**
+   * Phase 4: 1 RPC duy nhất trả về tất cả dữ liệu admin dashboard
+   * (summary + kpi_performance + leaderboards + weekly_history).
+   * Thay thế 3 endpoint song song ở trên. Nhanh hơn 5-10x.
+   */
+  getOverview: (weeks = 4): Promise<ApiResponse<{
+    summary: AdminDashboardSummaryData;
+    kpi_performance: AdminKpiPerformanceData[];
+    leaderboards: AdminLeaderboardsData;
+    weekly_history: Array<{
+      week_name: string;
+      teams: Array<{
+        team_id: string; team_name: string;
+        lead_actual: number; lead_target: number;
+        inbox_actual: number; inbox_target: number;
+        post_actual: number; post_target: number;
+        comment_actual: number; comment_target: number;
+      }>;
+    }>;
+    range: { start: string; end: string };
+  }>> => {
+    return requestJson(`${BASE}/admin/dashboard/overview?weeks=${weeks}`);
+  },
+
+  /**
+   * Phase 7: Lấy các bài post có tương tác cao (score>=60) nhưng chưa seeding.
+   * Dùng cho widget "Bài post có lượt tương tác cao chưa seeding".
+   * Cache 60s ở backend — FE nên debounce request.
+   */
+  getHighInteractionUnseeded: (limit = 10): Promise<ApiResponse<HighInteractionPost[]>> => {
+    return requestJson(`${BASE}/admin/dashboard/high-interaction-unseeded?limit=${limit}`);
+  },
+
+  /**
+   * Phase 7b: Lấy thống kê sức khoẻ groups (alive/dead/low_activity/no_taxonomy).
+   * Dùng cho Groups Health widget trong admin dashboard.
+   */
+  getGroupsHealth: (): Promise<ApiResponse<GroupsHealthStats>> => {
+    return requestJson(`${BASE}/admin/dashboard/groups-health`);
   },
 };
 

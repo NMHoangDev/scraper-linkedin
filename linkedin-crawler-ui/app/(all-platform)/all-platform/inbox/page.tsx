@@ -17,6 +17,7 @@ import { API_BASE_URL } from "@/lib/env";
 import { idbSetThread, idbGetAllThreadsForAcc, idbSetConvs, idbGetConvs, idbPruneOld } from "@/lib/inbox-cache";
 import TeamAccountTree from "@/components/all-platform/inbox/TeamAccountTree";
 import InboxModernLayout from "@/components/all-platform/inbox/InboxModernLayout";
+import { dispatchKpiRefresh } from "@/lib/useKpiRefresh";
 import { allPlatformKpiService } from "@/services/all-platform.service";
 
 interface Session { user_id: string; fb_user_id?: string; label?: string; owner?: string; online?: boolean; inbox_enabled?: boolean; status?: string; }
@@ -872,6 +873,8 @@ function InboxPageContent() {
     try {
       await allPlatformKpiService.bulkVerifyFbInbox(payload);
       await fetchVerifiedConvIds();
+      // Refresh leader dashboard KPIs immediately
+      dispatchKpiRefresh();
       showToast(`Đã tính KPI hàng loạt thành công!`, true);
     } catch {
       showToast("Lỗi tính KPI hàng loạt", false);

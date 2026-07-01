@@ -452,7 +452,7 @@ export function LeaderInboxView({
               {totalCount > 0 && (
                 <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold">
                   <MaterialIcon name="verified" className="text-[12px]" />
-                  {verifiedCount}/{totalCount} đã xác minh
+                  {verifiedCount}/{totalCount} đã comment
                 </span>
               )}
             </p>

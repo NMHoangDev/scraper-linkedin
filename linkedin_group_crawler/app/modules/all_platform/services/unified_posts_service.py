@@ -497,7 +497,85 @@ def _fetch_stats(
     }
 
 
+def _compute_quick_stats(
+    *,
+    email: str,
+    platform: str,
+    tables: list[str],
+) -> dict[str, Any]:
+    """Compute global dashboard stats for the active platform(s).
+
+    Reused between `/unified/posts/filter` (as `quick_stats`) and
+    `/unified/stats` (top-level endpoint). Returns the same shape in both
+    so FE can use either source interchangeably.
+    """
+    if len(tables) == 1:
+        try:
+            return _fetch_stats(table=tables[0], email=email)
+        except Exception as exc:
+            # Stats failure must NOT break the feed — log and return zeros
+            try:
+                logger = _get_logger()
+                logger.warning("quick_stats fetch failed: %s", exc)
+            except Exception:
+                pass
+            return _zero_stats()
+
+    # Multi-platform: query both, merge
+    try:
+        fb = _fetch_stats(table="facebook_posts", email=email)
+    except Exception:
+        fb = _zero_stats()
+    try:
+        li = _fetch_stats(table="linkedin_posts", email=email)
+    except Exception:
+        li = _zero_stats()
+
+    total = fb["totalPosts"] + li["totalPosts"]
+    high = fb["highScoreCount"] + li["highScoreCount"]
+    kpi_p = fb.get("kpiProgress", 0) + li.get("kpiProgress", 0)
+    kpi_t = fb.get("kpiTarget", 0) + li.get("kpiTarget", 0)
+    return {
+        "totalPostsToday": fb["totalPostsToday"] + li["totalPostsToday"],
+        "postsYesterday": fb["postsYesterday"] + li["postsYesterday"],
+        "totalPosts": total,
+        "highScoreCount": high,
+        "highScorePercent": round((high / total) * 100, 1) if total > 0 else 0,
+        "seededToday": fb["seededToday"] + li["seededToday"],
+        "totalVisible": total,
+        "kpiProgress": kpi_p,
+        "kpiTarget": kpi_t,
+        "kpiProgressPercent": round((kpi_p / kpi_t) * 100, 1) if kpi_t > 0 else 0,
+    }
+
+
+def _zero_stats() -> dict[str, Any]:
+    return {
+        "totalPostsToday": 0,
+        "postsYesterday": 0,
+        "totalPosts": 0,
+        "highScoreCount": 0,
+        "highScorePercent": 0,
+        "seededToday": 0,
+        "totalVisible": 0,
+        "kpiProgress": 0,
+        "kpiTarget": 0,
+        "kpiProgressPercent": 0,
+    }
+
+
+def _get_logger():
+    """Lazy logger accessor to avoid module-level import cycles."""
+    try:
+        from app.core.logger import get_logger
+        return get_logger(__name__)
+    except Exception:
+        import logging
+        return logging.getLogger(__name__)
+
+
 # ── Public API ──────────────────────────────────────────────────────────────────
+
 
 def get_unified_posts(
     *,
@@ -694,7 +772,26 @@ def get_unified_posts(
         "page": page,
         "page_size": page_size,
         "total_pages": (total_count + page_size - 1) // page_size,
+        # Phase 6: gộp dashboard stats vào filter response để tiết kiệm 1 round-trip
+        # (thay vì gọi /unified/stats riêng). FE fallback về /unified/stats nếu thiếu.
+        "quick_stats": _compute_quick_stats(
+            email=email,
+            platform=platform,
+            tables=_tables_for_platform(platform),
+        ),
     }
+
+
+def _tables_for_platform(platform: str) -> list[str]:
+    """Resolve platform token -> table list."""
+    p = (platform or "").lower()
+    if p in ("all", "general", ""):
+        return ["facebook_posts", "linkedin_posts"]
+    if p == "facebook":
+        return ["facebook_posts"]
+    if p == "linkedin":
+        return ["linkedin_posts"]
+    return ["facebook_posts", "linkedin_posts"]
 
 
 def filter_unified_posts(

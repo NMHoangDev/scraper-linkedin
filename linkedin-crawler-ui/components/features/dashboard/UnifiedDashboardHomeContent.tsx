@@ -3,8 +3,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
-import { CrawlLinkedInPopup } from "@/components/all-platform/crawl-linkedin-popup";
-import { CrawlFacebookPopup } from "@/components/all-platform/crawl-facebook-popup";
 import { ApiExtensionLauncher } from "@/components/all-platform/components/api-extension-launcher";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { FilterBar, type FilterState } from "@/components/all-platform/components/filter-bar";
@@ -13,6 +11,8 @@ import { PostDetailModal } from "@/components/all-platform/components/post-detai
 import { VerifyAccountModal } from "@/components/all-platform/components/verify-account-modal";
 import { KpiProgressCard } from "@/components/all-platform/components/kpi-progress-card";
 import { BulkCommentLauncher } from "@/components/all-platform/components/bulk-comment-launcher";
+import { SeedingActivityPanel } from "@/components/all-platform/feed/SeedingActivityPanel";
+import { PostFeedSkeleton } from "@/components/all-platform/feed/PostFeedSkeleton";
 import { allPlatformPostsService, allPlatformCategoriesService, teamsService } from "@/services/all-platform.service";
 import type { UnifiedPost, UnifiedStats, Category, FeedPlatform } from "@/types/unified.types";
 
@@ -195,8 +195,6 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
   const CURRENT_USER_EMAIL = user?.email || "";
 
   const [feedPlatform, setFeedPlatform] = useState<FeedPlatform>("facebook");
-  const [showCrawlPopup, setShowCrawlPopup] = useState(false);
-  const [showFacebookCrawlPopup, setShowFacebookCrawlPopup] = useState(false);
   const [showBulkCommentModal, setShowBulkCommentModal] = useState(false);
 
   const [detailModalPost, setDetailModalPost] = useState<UnifiedPost | null>(null);
@@ -241,6 +239,7 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
     member: "",
     sort: "latest",
     dateRange: "",
+    seeding_status: "all",
   });
   const filterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -266,7 +265,7 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
     } catch {}
   }, []);
 
-  // Fetch Posts
+  // Fetch Posts (Phase 6: dùng luôn quick_stats từ response, tiết kiệm 1 round-trip)
   const fetchPosts = useCallback(async () => {
     if (!CURRENT_USER_EMAIL) return;
     setIsLoadingPosts(true);
@@ -313,14 +312,66 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
       );
 
       if (res.success && res.data) {
-        setPosts(res.data.posts || []);
+        let posts = res.data.posts || [];
+
+        // Phase 6: FE-side seeding filter + sort
+        // Backend trả đủ posts với all_seedings → FE filter/sort không cần refetch
+        if (filters.seeding_status && filters.seeding_status !== "all") {
+          posts = posts.filter((p) => {
+            const seedings = p.all_seedings ?? [];
+            if (filters.seeding_status === "seeded") {
+              return seedings.length > 0;
+            }
+            if (filters.seeding_status === "verified") {
+              return seedings.some(
+                (s) => s.verify_status === "yes" && !s.link_comment?.startsWith("Bị từ chối"),
+              );
+            }
+            if (filters.seeding_status === "pending") {
+              return seedings.some(
+                (s) => s.verify_status !== "yes" && !s.link_comment?.startsWith("Bị từ chối"),
+              );
+            }
+            if (filters.seeding_status === "rejected") {
+              return seedings.some(
+                (s) => s.link_comment?.startsWith("Bị từ chối") || s.verify_status === "no",
+              );
+            }
+            return true;
+          });
+        }
+
+        // FE-side sort by seeding (backend chưa hỗ trợ sort=most_seeded/verified_first)
+        if (filters.sort === "most_seeded") {
+          posts = [...posts].sort(
+            (a, b) => (b.all_seedings?.length ?? 0) - (a.all_seedings?.length ?? 0),
+          );
+        } else if (filters.sort === "verified_first") {
+          posts = [...posts].sort((a, b) => {
+            const verCount = (p: typeof posts[0]) =>
+              (p.all_seedings ?? []).filter(
+                (s) => s.verify_status === "yes" && !s.link_comment?.startsWith("Bị từ chối"),
+              ).length;
+            return verCount(b) - verCount(a);
+          });
+        }
+
+        setPosts(posts);
         setTotalCount(res.data.total || 0);
-        setTotalPages(res.data.total_pages || 1);
+        // Khi filter seeding: totalPages = 1 vì FE-side filter không có pagination thực
+        setTotalPages(filters.seeding_status && filters.seeding_status !== "all" ? 1 : res.data.total_pages || 1);
+        // Phase 6: ưu tiên quick_stats từ response (1 round-trip), fallback /stats nếu thiếu
+        if (res.data.quick_stats) {
+          setStats(res.data.quick_stats as UnifiedStats);
+        } else {
+          // Backend cũ chưa trả quick_stats → gọi /unified/stats riêng
+          fetchStats();
+        }
       } else {
-        setPostsError(res.message || "KhÃ´ng thá»ƒ táº£i bÃ i viáº¿t.");
+        setPostsError(res.message || "Không thể tải bài viết.");
       }
     } catch (err) {
-      setPostsError(err instanceof Error ? err.message : "Lá»—i khi táº£i bÃ i viáº¿t.");
+      setPostsError(err instanceof Error ? err.message : "Lỗi khi tải bài viết.");
     } finally {
       setIsLoadingPosts(false);
     }
@@ -360,6 +411,22 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
     filterDebounceRef.current = setTimeout(() => {
       setFilters(f);
       setPage(1);
+      // Phase 6: persist filter state in URL (refresh won't lose filters)
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams();
+        if (f.search) params.set("q", f.search);
+        if (f.intent) params.set("intent", f.intent);
+        if (f.industry) params.set("industry", f.industry);
+        if (f.team) params.set("team", f.team);
+        if (f.sort !== "latest") params.set("sort", f.sort);
+        if (f.dateRange) params.set("date", f.dateRange);
+        if (f.seeding_status && f.seeding_status !== "all")
+          params.set("seeding", f.seeding_status);
+        const newUrl = params.toString()
+          ? `${window.location.pathname}?${params.toString()}`
+          : window.location.pathname;
+        window.history.replaceState(null, "", newUrl);
+      }
     }, 300);
   }, []);
 
@@ -367,6 +434,24 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
     return () => {
       if (filterDebounceRef.current) clearTimeout(filterDebounceRef.current);
     };
+  }, []);
+
+  // Phase 6: restore filter state from URL on mount (F5 won't lose filters)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const hasParams = Array.from(params.keys()).length > 0;
+    if (!hasParams) return;
+    setFilters((prev) => ({
+      ...prev,
+      search: params.get("q") || "",
+      intent: params.get("intent") || "",
+      industry: params.get("industry") || "",
+      team: params.get("team") || "",
+      sort: (params.get("sort") as typeof prev.sort) || "latest",
+      dateRange: params.get("date") || "",
+      seeding_status: (params.get("seeding") as typeof prev.seeding_status) || "all",
+    }));
   }, []);
 
   const intents = categories.filter((c) => c.category_type === "intent");
@@ -417,20 +502,6 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
                 </button>
               ))}
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                if (feedPlatform === "linkedin") {
-                  setShowCrawlPopup(true);
-                } else {
-                  setShowFacebookCrawlPopup(true);
-                }
-              }}
-              className="flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-[#DC2626] px-4 py-2 text-xs font-bold text-white transition-all hover:bg-[#B91C1C] active:scale-[0.98] cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[18px]">download</span>
-              Cào dữ liệu
-            </button>
           </div>
         </div>
       )}
@@ -475,13 +546,19 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
         </div>
       </div>
 
-      {/* â”€â”€ KPI Progress Cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-      {CURRENT_USER_EMAIL && (
-        <div className="mb-6 space-y-6">
-          <KpiProgressCard
-            email={CURRENT_USER_EMAIL}
-            type="comment"
-          />
+      {/* Phase 6: KPI personal progress — hiển thị cho cả member VÀ leader */}
+      {CURRENT_USER_EMAIL && (user?.role === "member" || user?.role === "leader") && (
+        <KpiProgressCard
+          email={CURRENT_USER_EMAIL}
+          type="comment"
+        />
+      )}
+      {/* Phase 6: "Da seeding ai" - panel cho admin/leader.
+          Dat sau KpiProgressCard, truoc FilterBar de leader/admin
+          thay ngay tong quan seeding ma khong can mo tung PostCard. */}
+      {(user?.role === "admin" || user?.role === "leader") && (
+        <>
+          <SeedingActivityPanel email={CURRENT_USER_EMAIL} />
           {feedPlatform === "facebook" && (
             <>
               <ApiExtensionLauncher
@@ -523,7 +600,7 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
               />
             </>
           )}
-        </div>
+        </>
       )}
 
       <FilterBar
@@ -539,7 +616,7 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
       />
 
       {isLoadingPosts ? (
-        <div className="py-12 text-center text-slate-400">Đang tải bài viết...</div>
+        <PostFeedSkeleton />
       ) : postsError ? (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {postsError}
@@ -593,27 +670,6 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
           )}
         </>
       )}
-
-      <CrawlLinkedInPopup
-        open={showCrawlPopup}
-        onClose={() => setShowCrawlPopup(false)}
-        onSuccess={() => {
-          setShowCrawlPopup(false);
-          fetchPosts();
-          fetchStats();
-        }}
-      />
-      <CrawlFacebookPopup
-        open={showFacebookCrawlPopup}
-        onClose={() => setShowFacebookCrawlPopup(false)}
-        onSuccess={() => {
-          setShowFacebookCrawlPopup(false);
-          fetchPosts();
-          fetchStats();
-        }}
-      />
-      
-
 
       <PostDetailModal
         post={detailModalPost}
