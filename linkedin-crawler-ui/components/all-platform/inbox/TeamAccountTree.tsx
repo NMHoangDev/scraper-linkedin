@@ -213,7 +213,7 @@ export default function TeamAccountTree({ sessions, ownerNames, teams, selectedA
         <select
           value={activeTeam?.id || ""}
           onChange={e => selectTeam(e.target.value)}
-          className="h-9 w-full rounded-lg border border-[#E5E5E5] bg-white px-3 text-sm font-semibold text-[#1A1A1A] outline-none focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20"
+          className="h-9 w-full rounded-lg border border-outline-variant bg-surface px-3 text-sm font-semibold text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
         >
           {teamOptions.map(option => (
             <option key={option.id} value={option.id}>
@@ -226,33 +226,33 @@ export default function TeamAccountTree({ sessions, ownerNames, teams, selectedA
           <button
             type="button"
             onClick={() => setAccountOpen(v => !v)}
-            className="flex h-9 w-full items-center justify-between gap-2 rounded-lg border border-[#E5E5E5] bg-white px-3 text-left text-sm outline-none transition hover:border-[#E3000F]/60 focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20"
+            className="flex h-9 w-full items-center justify-between gap-2 rounded-lg border border-outline-variant bg-surface px-3 text-left text-sm outline-none transition hover:border-primary/60 focus:border-primary focus:ring-2 focus:ring-primary/15"
           >
             {selected ? (
               <span className="flex min-w-0 items-center gap-2">
-                <span className={`h-2 w-2 shrink-0 rounded-full ${isOnline(selected) ? "bg-green-500" : isPaused(selected) ? "bg-amber-400" : "bg-gray-300"}`} />
+                <span className={`h-2 w-2 shrink-0 rounded-full ${isOnline(selected) ? "bg-green-500" : isPaused(selected) ? "bg-amber-400" : "bg-surface-container-highest"}`} />
                 <span className="min-w-0">
-                  <span className="block truncate font-semibold text-[#1A1A1A]">{accountLabel(selected)}</span>
-                  <span className="block truncate text-[11px] text-[#A0A0A0]">{accountSubLabel(selected)}</span>
+                  <span className="block truncate font-semibold text-on-surface">{accountLabel(selected)}</span>
+                  <span className="block truncate text-[11px] text-on-surface-variant">{accountSubLabel(selected)}</span>
                 </span>
               </span>
             ) : (
-              <span className="text-[#A0A0A0]">Chọn tài khoản</span>
+              <span className="text-on-surface-variant">Chọn tài khoản</span>
             )}
             <span className="material-symbols-outlined text-[20px] text-[#777777]">arrow_drop_down</span>
           </button>
 
           {accountOpen && (
-            <div className="absolute z-40 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-[#E5E5E5] bg-white p-1 shadow-lg">
+            <div className="absolute z-40 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-outline-variant bg-surface p-1 shadow-lg">
               {visibleAccounts.length === 0 ? (
-                <div className="px-3 py-3 text-center text-xs text-[#A0A0A0]">Không có tài khoản phù hợp</div>
+                <div className="px-3 py-3 text-center text-xs text-on-surface-variant">Không có tài khoản phù hợp</div>
               ) : visibleGroups.map(group => (
                 <div key={group.ownerId || "__no_owner__"} className="py-1">
-                  <div className="px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-[#A0A0A0]">
+                  <div className="px-2 py-1 text-[11px] font-bold uppercase text-on-surface-variant">
                     {group.name} - {group.roleLabel}
                   </div>
                   {group.accounts.length === 0 ? (
-                    <div className="px-3 py-2 text-xs text-[#A0A0A0]">Chưa có tài khoản Facebook</div>
+                    <div className="px-3 py-2 text-xs text-on-surface-variant">Chưa có tài khoản Facebook</div>
                   ) : group.accounts.map(session => {
                     const active = session.user_id === selectedAcc;
                     return (
@@ -264,13 +264,13 @@ export default function TeamAccountTree({ sessions, ownerNames, teams, selectedA
                           setAccountOpen(false);
                         }}
                         className={`flex w-full items-center gap-2 rounded-md px-2 py-2 text-left transition ${
-                          active ? "bg-[#FFF5F5] text-[#C40009]" : "hover:bg-[#F5F5F5] text-[#1A1A1A]"
+                          active ? "bg-primary/5 text-on-primary-fixed-variant" : "hover:bg-surface-container-low text-on-surface"
                         }`}
                       >
-                        <span className={`h-2 w-2 shrink-0 rounded-full ${isOnline(session) ? "bg-green-500" : isPaused(session) ? "bg-amber-400" : "bg-gray-300"}`} />
+                        <span className={`h-2 w-2 shrink-0 rounded-full ${isOnline(session) ? "bg-green-500" : isPaused(session) ? "bg-amber-400" : "bg-surface-container-highest"}`} />
                         <span className="min-w-0">
                           <span className="block truncate text-sm font-semibold">{accountLabel(session)}</span>
-                          <span className="block truncate text-[11px] text-[#A0A0A0]">{accountSubLabel(session)}</span>
+                          <span className="block truncate text-[11px] text-on-surface-variant">{accountSubLabel(session)}</span>
                         </span>
                       </button>
                     );
@@ -285,10 +285,10 @@ export default function TeamAccountTree({ sessions, ownerNames, teams, selectedA
           value={q}
           onChange={e => setQ(e.target.value)}
           placeholder="Tìm user / acc..."
-          className="h-9 w-full rounded-lg border border-[#E5E5E5] bg-white px-3 text-sm text-[#1A1A1A] outline-none focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20"
+          className="h-9 w-full rounded-lg border border-outline-variant bg-surface px-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
         />
 
-        <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-[#666666] xl:justify-end">
+        <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-on-surface-variant xl:justify-end">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-1 text-green-700">
             <span className="h-2 w-2 rounded-full bg-green-500" />{onlineCount}
           </span>
@@ -297,24 +297,24 @@ export default function TeamAccountTree({ sessions, ownerNames, teams, selectedA
               <span className="h-2 w-2 rounded-full bg-amber-400" />{pausedCount}
             </span>
           )}
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F5F5F5] px-2.5 py-1 text-[#777777]">
-            <span className="h-2 w-2 rounded-full bg-gray-300" />{offlineCount}
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-container-low px-2.5 py-1 text-[#777777]">
+            <span className="h-2 w-2 rounded-full bg-surface-container-highest" />{offlineCount}
           </span>
         </div>
       </div>
 
       {activeTeam && (
         <div className="flex min-h-6 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#777777]">
-          <span className="font-semibold text-[#1A1A1A]">{activeTeam.name}</span>
-          <span>Leader: <b className="text-[#666666]">{activeTeam.leaderName}</b></span>
+          <span className="font-semibold text-on-surface">{activeTeam.name}</span>
+          <span>Leader: <b className="text-on-surface-variant">{activeTeam.leaderName}</b></span>
           {selected && (
             <>
               <span className="text-[#D6D6D6]">|</span>
-              <span className="font-bold text-[#C40009]">Đang chọn</span>
-              <span className={`h-2 w-2 rounded-full ${isOnline(selected) ? "bg-green-500" : isPaused(selected) ? "bg-amber-400" : "bg-gray-300"}`} />
-              <span className="font-semibold text-[#1A1A1A]">{accountLabel(selected)}</span>
+              <span className="font-bold text-on-primary-fixed-variant">Đang chọn</span>
+              <span className={`h-2 w-2 rounded-full ${isOnline(selected) ? "bg-green-500" : isPaused(selected) ? "bg-amber-400" : "bg-surface-container-highest"}`} />
+              <span className="font-semibold text-on-surface">{accountLabel(selected)}</span>
               <span>của</span>
-              <span className="font-semibold text-[#666666]">{selectedOwnerName}</span>
+              <span className="font-semibold text-on-surface-variant">{selectedOwnerName}</span>
             </>
           )}
         </div>

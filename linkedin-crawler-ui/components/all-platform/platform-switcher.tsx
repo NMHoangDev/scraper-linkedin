@@ -34,8 +34,8 @@ export function PlatformSwitcher({ value, onChange }: PlatformSwitcherProps) {
           className={cn(
             "flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors cursor-pointer",
             value === p.value
-              ? "border-[#E3000F] bg-[#E3000F] text-white"
-              : "border-[#E5E5E5] bg-white text-[#666666] hover:bg-[#F5F5F5] hover:text-[#1A1A1A]",
+              ? "border-primary bg-primary text-white"
+              : "border-outline-variant bg-surface text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface",
           )}
         >
           {p.icon}

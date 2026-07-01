@@ -107,7 +107,7 @@ export function CrawlerConfigCard() {
           <div className="flex flex-col gap-base">
             <label
               htmlFor={d.emailId}
-              className="text-label-md text-on-surface-variant font-semibold tracking-wide uppercase"
+              className="text-label-md text-on-surface-variant font-semibold uppercase"
             >
               Email (LinkedIn)
             </label>
@@ -125,7 +125,7 @@ export function CrawlerConfigCard() {
           <div className="flex flex-col gap-base">
             <label
               htmlFor={d.passwordId}
-              className="text-label-md text-on-surface-variant font-semibold tracking-wide uppercase"
+              className="text-label-md text-on-surface-variant font-semibold uppercase"
             >
               Mật khẩu
             </label>
@@ -144,7 +144,7 @@ export function CrawlerConfigCard() {
             <div className="flex flex-col gap-base">
               <label
                 htmlFor={d.maxPostsId}
-                className="text-label-md text-on-surface-variant font-semibold tracking-wide uppercase"
+                className="text-label-md text-on-surface-variant font-semibold uppercase"
               >
                 Tối đa bài viết
               </label>
@@ -163,7 +163,7 @@ export function CrawlerConfigCard() {
             <div className="flex flex-col gap-base">
               <label
                 htmlFor={d.targetDateId}
-                className="text-label-md text-on-surface-variant font-semibold tracking-wide uppercase"
+                className="text-label-md text-on-surface-variant font-semibold uppercase"
               >
                 Ngày mục tiêu
               </label>
@@ -181,7 +181,7 @@ export function CrawlerConfigCard() {
             <div className="flex flex-col gap-base">
               <label
                 htmlFor={d.modeId}
-                className="text-label-md text-on-surface-variant font-semibold tracking-wide uppercase"
+                className="text-label-md text-on-surface-variant font-semibold uppercase"
               >
                 Chế độ
               </label>
@@ -201,7 +201,7 @@ export function CrawlerConfigCard() {
             <div className="flex flex-col gap-base">
               <label
                 htmlFor={d.delayId}
-                className="text-label-md text-on-surface-variant font-semibold tracking-wide uppercase"
+                className="text-label-md text-on-surface-variant font-semibold uppercase"
               >
                 Độ trễ (giây)
               </label>
@@ -221,7 +221,7 @@ export function CrawlerConfigCard() {
           <div className="flex flex-col gap-base">
             <label
               htmlFor={d.urlsId}
-              className="text-label-md text-on-surface-variant font-semibold tracking-wide uppercase"
+              className="text-label-md text-on-surface-variant font-semibold uppercase"
             >
               URL nhóm LinkedIn
             </label>
@@ -286,7 +286,7 @@ export function CrawlerConfigCard() {
         </div>
         <button
           type="button"
-          className="text-on-surface-variant hover:text-on-surface text-label-md py-xs w-full text-center font-semibold tracking-wide uppercase transition-colors"
+          className="text-on-surface-variant hover:text-on-surface text-label-md py-xs w-full text-center font-semibold uppercase transition-colors"
           onClick={d.handleResetForm}
           disabled={d.isCrawling}
         >
@@ -317,7 +317,7 @@ export function CrawlerConfigCard() {
             >
              Lựa chọn nhóm cào
             </h3>
-        
+
             <div className="mt-sm">
               <button
                 type="button"

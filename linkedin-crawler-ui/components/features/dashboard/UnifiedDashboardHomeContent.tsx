@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
+import { CrawlLinkedInPopup } from "@/components/all-platform/crawl-linkedin-popup";
+import { CrawlFacebookPopup } from "@/components/all-platform/crawl-facebook-popup";
 import { ApiExtensionLauncher } from "@/components/all-platform/components/api-extension-launcher";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { FilterBar, type FilterState } from "@/components/all-platform/components/filter-bar";
@@ -10,9 +11,7 @@ import { PostCard } from "@/components/all-platform/components/post-card";
 import { PostDetailModal } from "@/components/all-platform/components/post-detail-modal";
 import { VerifyAccountModal } from "@/components/all-platform/components/verify-account-modal";
 import { KpiProgressCard } from "@/components/all-platform/components/kpi-progress-card";
-import { BulkCommentLauncher } from "@/components/all-platform/components/bulk-comment-launcher";
-import { SeedingActivityPanel } from "@/components/all-platform/feed/SeedingActivityPanel";
-import { PostFeedSkeleton } from "@/components/all-platform/feed/PostFeedSkeleton";
+import { BulkCommentModal } from "@/components/all-platform/components/bulk-comment-modal";
 import { allPlatformPostsService, allPlatformCategoriesService, teamsService } from "@/services/all-platform.service";
 import type { UnifiedPost, UnifiedStats, Category, FeedPlatform } from "@/types/unified.types";
 
@@ -118,31 +117,31 @@ function StatCard({
         transition: "transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)",
       };
 
-  let iconCls = "bg-slate-50 text-slate-500";
-  let barColor = "bg-slate-400";
+  let iconCls = "bg-surface-container-low text-on-surface-variant";
+  let barColor = "bg-primary";
 
   if (accent === "blue") {
-    iconCls = "bg-blue-50/80 text-blue-500 dark:bg-blue-950/20 dark:text-blue-400";
+    iconCls = "bg-blue-50/80 text-blue-600";
     barColor = "bg-blue-500";
   } else if (accent === "green") {
-    iconCls = "bg-emerald-50/80 text-emerald-500 dark:bg-emerald-950/20 dark:text-emerald-400";
+    iconCls = "bg-emerald-50/80 text-emerald-600";
     barColor = "bg-emerald-500";
   } else if (accent === "amber") {
-    iconCls = "bg-amber-50/80 text-amber-500 dark:bg-amber-950/20 dark:text-amber-400";
+    iconCls = "bg-amber-50/80 text-amber-600";
     barColor = "bg-amber-500";
   } else if (accent === "indigo") {
-    iconCls = "bg-indigo-50/80 text-indigo-500 dark:bg-indigo-950/20 dark:text-indigo-400";
+    iconCls = "bg-indigo-50/80 text-indigo-600";
     barColor = "bg-indigo-500";
   }
 
   return (
     <div
-      className="bg-white border border-slate-100 p-4 rounded-xl shadow-none flex flex-col justify-between relative overflow-hidden group select-none"
+      className="bg-surface border border-outline-variant p-md rounded-xl shadow-sm flex flex-col justify-between relative overflow-hidden group select-none"
     >
       <div className="flex justify-between items-start">
         <div className="space-y-1">
-          <p className="text-[10px] font-bold text-slate-500 capitalize">{label}</p>
-          <h3 className="text-xl font-bold text-slate-800 tracking-tight mt-1">
+          <p className="text-body-sm font-semibold text-on-surface-variant">{label}</p>
+          <h3 className="text-h2 text-on-surface mt-1">
             {typeof value === "number" ? value.toLocaleString("vi-VN") : value}
           </h3>
         </div>
@@ -156,7 +155,7 @@ function StatCard({
         </div>
       </div>
 
-      <div className="mt-4 pt-3 border-t border-slate-50 flex items-center justify-between">
+      <div className="mt-md pt-sm border-t border-outline-variant flex items-center justify-between">
         {trend ? (
           <span
             className={cn(
@@ -171,18 +170,18 @@ function StatCard({
           </span>
         ) : progress ? (
           <div className="flex-1 max-w-[140px]">
-            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+            <div className="w-full bg-surface-container-low h-1.5 rounded-full overflow-hidden">
               <div
                 className={cn("h-full rounded-full transition-all duration-500", barColor)}
                 style={{ width: `${progress.value}%` }}
               />
             </div>
-            <span className="text-[9px] font-semibold text-slate-400 mt-1 block leading-none">
+            <span className="text-[10px] font-semibold text-on-surface-variant mt-1 block leading-none">
               {progress.label}
             </span>
           </div>
         ) : sub ? (
-          <span className="text-[10px] text-slate-400 font-medium leading-none">{sub}</span>
+          <span className="text-[10px] text-on-surface-variant font-medium leading-none">{sub}</span>
         ) : null}
       </div>
     </div>
@@ -195,16 +194,12 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
   const CURRENT_USER_EMAIL = user?.email || "";
 
   const [feedPlatform, setFeedPlatform] = useState<FeedPlatform>("facebook");
+  const [showCrawlPopup, setShowCrawlPopup] = useState(false);
+  const [showFacebookCrawlPopup, setShowFacebookCrawlPopup] = useState(false);
   const [showBulkCommentModal, setShowBulkCommentModal] = useState(false);
 
   const [detailModalPost, setDetailModalPost] = useState<UnifiedPost | null>(null);
   const [verifyModalPost, setVerifyModalPost] = useState<UnifiedPost | null>(null);
-
-  // Result Modals
-  const [showCrawlResultModal, setShowCrawlResultModal] = useState(false);
-  const [crawlResultsSummary, setCrawlResultsSummary] = useState<{ totalPosts: number, groups: { groupUrl: string, count: number }[], launchedGroups: string[], crawledPostUrls: string[] }>({ totalPosts: 0, groups: [], launchedGroups: [], crawledPostUrls: [] });
-  const [showSeedingResultModal, setShowSeedingResultModal] = useState(false);
-  const [recentlySeededUrls, setRecentlySeededUrls] = useState<string[]>([]);
 
   // States
   const [posts, setPosts] = useState<UnifiedPost[]>([]);
@@ -239,7 +234,6 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
     member: "",
     sort: "latest",
     dateRange: "",
-    seeding_status: "all",
   });
   const filterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -265,7 +259,7 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
     } catch {}
   }, []);
 
-  // Fetch Posts (Phase 6: dùng luôn quick_stats từ response, tiết kiệm 1 round-trip)
+  // Fetch Posts
   const fetchPosts = useCallback(async () => {
     if (!CURRENT_USER_EMAIL) return;
     setIsLoadingPosts(true);
@@ -312,66 +306,14 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
       );
 
       if (res.success && res.data) {
-        let posts = res.data.posts || [];
-
-        // Phase 6: FE-side seeding filter + sort
-        // Backend trả đủ posts với all_seedings → FE filter/sort không cần refetch
-        if (filters.seeding_status && filters.seeding_status !== "all") {
-          posts = posts.filter((p) => {
-            const seedings = p.all_seedings ?? [];
-            if (filters.seeding_status === "seeded") {
-              return seedings.length > 0;
-            }
-            if (filters.seeding_status === "verified") {
-              return seedings.some(
-                (s) => s.verify_status === "yes" && !s.link_comment?.startsWith("Bị từ chối"),
-              );
-            }
-            if (filters.seeding_status === "pending") {
-              return seedings.some(
-                (s) => s.verify_status !== "yes" && !s.link_comment?.startsWith("Bị từ chối"),
-              );
-            }
-            if (filters.seeding_status === "rejected") {
-              return seedings.some(
-                (s) => s.link_comment?.startsWith("Bị từ chối") || s.verify_status === "no",
-              );
-            }
-            return true;
-          });
-        }
-
-        // FE-side sort by seeding (backend chưa hỗ trợ sort=most_seeded/verified_first)
-        if (filters.sort === "most_seeded") {
-          posts = [...posts].sort(
-            (a, b) => (b.all_seedings?.length ?? 0) - (a.all_seedings?.length ?? 0),
-          );
-        } else if (filters.sort === "verified_first") {
-          posts = [...posts].sort((a, b) => {
-            const verCount = (p: typeof posts[0]) =>
-              (p.all_seedings ?? []).filter(
-                (s) => s.verify_status === "yes" && !s.link_comment?.startsWith("Bị từ chối"),
-              ).length;
-            return verCount(b) - verCount(a);
-          });
-        }
-
-        setPosts(posts);
+        setPosts(res.data.posts || []);
         setTotalCount(res.data.total || 0);
-        // Khi filter seeding: totalPages = 1 vì FE-side filter không có pagination thực
-        setTotalPages(filters.seeding_status && filters.seeding_status !== "all" ? 1 : res.data.total_pages || 1);
-        // Phase 6: ưu tiên quick_stats từ response (1 round-trip), fallback /stats nếu thiếu
-        if (res.data.quick_stats) {
-          setStats(res.data.quick_stats as UnifiedStats);
-        } else {
-          // Backend cũ chưa trả quick_stats → gọi /unified/stats riêng
-          fetchStats();
-        }
+        setTotalPages(res.data.total_pages || 1);
       } else {
-        setPostsError(res.message || "Không thể tải bài viết.");
+        setPostsError(res.message || "KhÃ´ng thá»ƒ táº£i bÃ i viáº¿t.");
       }
     } catch (err) {
-      setPostsError(err instanceof Error ? err.message : "Lỗi khi tải bài viết.");
+      setPostsError(err instanceof Error ? err.message : "Lá»—i khi táº£i bÃ i viáº¿t.");
     } finally {
       setIsLoadingPosts(false);
     }
@@ -411,22 +353,6 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
     filterDebounceRef.current = setTimeout(() => {
       setFilters(f);
       setPage(1);
-      // Phase 6: persist filter state in URL (refresh won't lose filters)
-      if (typeof window !== "undefined") {
-        const params = new URLSearchParams();
-        if (f.search) params.set("q", f.search);
-        if (f.intent) params.set("intent", f.intent);
-        if (f.industry) params.set("industry", f.industry);
-        if (f.team) params.set("team", f.team);
-        if (f.sort !== "latest") params.set("sort", f.sort);
-        if (f.dateRange) params.set("date", f.dateRange);
-        if (f.seeding_status && f.seeding_status !== "all")
-          params.set("seeding", f.seeding_status);
-        const newUrl = params.toString()
-          ? `${window.location.pathname}?${params.toString()}`
-          : window.location.pathname;
-        window.history.replaceState(null, "", newUrl);
-      }
     }, 300);
   }, []);
 
@@ -434,24 +360,6 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
     return () => {
       if (filterDebounceRef.current) clearTimeout(filterDebounceRef.current);
     };
-  }, []);
-
-  // Phase 6: restore filter state from URL on mount (F5 won't lose filters)
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const hasParams = Array.from(params.keys()).length > 0;
-    if (!hasParams) return;
-    setFilters((prev) => ({
-      ...prev,
-      search: params.get("q") || "",
-      intent: params.get("intent") || "",
-      industry: params.get("industry") || "",
-      team: params.get("team") || "",
-      sort: (params.get("sort") as typeof prev.sort) || "latest",
-      dateRange: params.get("date") || "",
-      seeding_status: (params.get("seeding") as typeof prev.seeding_status) || "all",
-    }));
   }, []);
 
   const intents = categories.filter((c) => c.category_type === "intent");
@@ -471,18 +379,18 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
   const fbDiff = stats.totalPostsToday - stats.postsYesterday;
 
   return (
-    <div className="w-full space-y-6">
+    <div className="w-full space-y-lg">
       {!hideHeader && (
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex flex-col gap-md md:flex-row md:items-center md:justify-between">
           <div className="space-y-1">
-            <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Unified Post Feed</h1>
-            <p className="text-sm text-slate-500">
+            <h1 className="text-h1 text-on-surface">Unified Post Feed</h1>
+            <p className="text-body-md text-on-surface-variant">
               Quản lý và theo dõi bài viết đa nền tảng với trí tuệ nhân tạo.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 shrink-0">
-            <div className="bg-slate-100/80 p-0.5 rounded-lg flex gap-0.5">
+            <div className="flex gap-0.5 rounded-lg border border-outline-variant bg-surface-container-low p-1">
               {([
                 { key: "facebook", label: "Facebook" },
                 { key: "linkedin", label: "LinkedIn" },
@@ -492,22 +400,36 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
                   type="button"
                   onClick={() => { setFeedPlatform(t.key); setPage(1); }}
                   className={cn(
-                    "px-4 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer",
+                    "rounded-md px-md py-xs text-body-sm font-semibold transition cursor-pointer",
                     feedPlatform === t.key
-                      ? "bg-white text-slate-900 shadow-sm"
-                      : "text-slate-500 hover:text-slate-800 hover:bg-slate-200/40",
+                      ? "bg-surface text-on-surface shadow-sm"
+                      : "text-on-surface-variant hover:bg-surface hover:text-on-surface",
                   )}
                 >
                   {t.label}
                 </button>
               ))}
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (feedPlatform === "linkedin") {
+                  setShowCrawlPopup(true);
+                } else {
+                  setShowFacebookCrawlPopup(true);
+                }
+              }}
+              className="flex items-center gap-xs whitespace-nowrap rounded-lg bg-primary px-md py-sm text-body-sm font-semibold text-on-primary shadow-sm transition hover:bg-on-primary-fixed-variant active:scale-[0.98] cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[18px]">download</span>
+              Cào dữ liệu
+            </button>
           </div>
         </div>
       )}
 
-      <div className="bg-white border border-slate-100 rounded-2xl p-5 mb-4">
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="mb-md rounded-xl border border-outline-variant bg-surface p-md shadow-sm">
+        <div className="grid grid-cols-2 gap-md lg:grid-cols-4">
           <StatCard
             icon="description"
             label="Tổng bài hôm nay"
@@ -546,61 +468,22 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
         </div>
       </div>
 
-      {/* Phase 6: KPI personal progress — hiển thị cho cả member VÀ leader */}
-      {CURRENT_USER_EMAIL && (user?.role === "member" || user?.role === "leader") && (
-        <KpiProgressCard
-          email={CURRENT_USER_EMAIL}
-          type="comment"
-        />
-      )}
-      {/* Phase 6: "Da seeding ai" - panel cho admin/leader.
-          Dat sau KpiProgressCard, truoc FilterBar de leader/admin
-          thay ngay tong quan seeding ma khong can mo tung PostCard. */}
-      {(user?.role === "admin" || user?.role === "leader") && (
-        <>
-          <SeedingActivityPanel email={CURRENT_USER_EMAIL} />
+      {/* â”€â”€ KPI Progress Cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {CURRENT_USER_EMAIL && (
+        <div className="mb-lg space-y-lg">
+          <KpiProgressCard
+            email={CURRENT_USER_EMAIL}
+            type="comment"
+          />
           {feedPlatform === "facebook" && (
-            <>
-              <ApiExtensionLauncher
-                onComplete={(totalPosts, launchedGroups) => {
-                  fetchPosts();
-                  fetchStats();
-                  setCrawlResultsSummary(prev => {
-                    const realTotal = prev.groups.reduce((sum, g) => sum + g.count, 0);
-                    const launchedUrls = launchedGroups ? launchedGroups.map(g => g.url) : [];
-                    return { ...prev, totalPosts: realTotal > 0 ? realTotal : (totalPosts || 0), launchedGroups: launchedUrls };
-                  });
-                  setShowCrawlResultModal(true);
-                }}
-                onCrawlSaved={(data) => {
-                  setCrawlResultsSummary(prev => {
-                    const exists = prev.groups.find(g => g.groupUrl === data.groupUrl);
-                    let newGroups = prev.groups;
-                    if (exists) {
-                      newGroups = prev.groups.map(g => g.groupUrl === data.groupUrl ? { ...g, count: g.count + data.count } : g);
-                    } else {
-                      newGroups = [...prev.groups, { groupUrl: data.groupUrl, count: data.count }];
-                    }
-                    return {
-                      ...prev,
-                      groups: newGroups,
-                      crawledPostUrls: [...prev.crawledPostUrls, ...(data.postUrls || [])]
-                    };
-                  });
-                }}
-              />
-              <BulkCommentLauncher 
-                posts={posts} 
-                onComplete={(seededUrls) => {
-                  fetchPosts();
-                  fetchStats();
-                  if (seededUrls) setRecentlySeededUrls(seededUrls);
-                  setShowSeedingResultModal(true);
-                }}
-              />
-            </>
+            <ApiExtensionLauncher
+              onComplete={() => {
+                fetchPosts();
+                fetchStats();
+              }}
+            />
           )}
-        </>
+        </div>
       )}
 
       <FilterBar
@@ -616,7 +499,7 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
       />
 
       {isLoadingPosts ? (
-        <PostFeedSkeleton />
+        <div className="py-xl text-center text-on-surface-variant">Đang tải bài viết...</div>
       ) : postsError ? (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {postsError}
@@ -625,12 +508,12 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
           </button>
         </div>
       ) : posts.length === 0 ? (
-        <div className="py-12 text-center text-slate-400">
+        <div className="py-xl text-center text-on-surface-variant">
           Không có bài viết nào phù hợp với bộ lọc.
         </div>
       ) : (
         <>
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-md">
             {posts.map((post) => (
               <PostCard
                 key={post.id || post.post_url}
@@ -646,23 +529,23 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
           </div>
 
           {totalPages > 1 && (
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-center">
+            <div className="mt-lg flex flex-wrap items-center justify-center gap-sm text-center">
               <button
                 type="button"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm disabled:opacity-50 cursor-pointer whitespace-nowrap"
+                className="rounded-lg border border-outline-variant bg-surface px-sm py-xs text-body-md text-on-surface transition hover:border-primary hover:text-primary disabled:opacity-50 cursor-pointer whitespace-nowrap"
               >
                 ‹ Trước
               </button>
-              <span className="w-full whitespace-nowrap text-sm text-slate-600 sm:w-auto">
+              <span className="w-full whitespace-nowrap text-body-md text-on-surface-variant sm:w-auto">
                 Trang {page} / {totalPages} ({totalCount} bài)
               </span>
               <button
                 type="button"
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm disabled:opacity-50 cursor-pointer whitespace-nowrap"
+                className="rounded-lg border border-outline-variant bg-surface px-sm py-xs text-body-md text-on-surface transition hover:border-primary hover:text-primary disabled:opacity-50 cursor-pointer whitespace-nowrap"
               >
                 Sau ›
               </button>
@@ -670,6 +553,31 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
           )}
         </>
       )}
+
+      <CrawlLinkedInPopup
+        open={showCrawlPopup}
+        onClose={() => setShowCrawlPopup(false)}
+        onSuccess={() => {
+          setShowCrawlPopup(false);
+          fetchPosts();
+          fetchStats();
+        }}
+      />
+      <CrawlFacebookPopup
+        open={showFacebookCrawlPopup}
+        onClose={() => setShowFacebookCrawlPopup(false)}
+        onSuccess={() => {
+          setShowFacebookCrawlPopup(false);
+          fetchPosts();
+          fetchStats();
+        }}
+      />
+
+      <BulkCommentModal
+        open={showBulkCommentModal}
+        onClose={() => setShowBulkCommentModal(false)}
+        posts={posts}
+      />
 
       <PostDetailModal
         post={detailModalPost}
@@ -690,56 +598,6 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
           platform={verifyModalPost.platform}
           memberEmail={CURRENT_USER_EMAIL}
         />
-      )}
-
-      {/* MODAL KẾT QUẢ CÀO */}
-      {showCrawlResultModal && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-[400px] max-w-[90vw] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-6 text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="material-symbols-outlined text-green-600 text-3xl">check_circle</span>
-              </div>
-              <h3 className="text-xl font-black text-slate-800 mb-2">Hoàn tất cào dữ liệu!</h3>
-              <p className="text-sm text-slate-500 mb-6">
-                Đã cào thành công tổng cộng <strong className="text-green-600">{crawlResultsSummary.totalPosts}</strong> bài viết mới.
-              </p>
-
-              <button
-                onClick={() => window.location.reload()}
-                className="w-full py-3 bg-[#DC2626] hover:bg-[#B91C1C] text-white rounded-xl font-bold shadow-md transition-all active:scale-95"
-              >
-                Đồng ý & Tải lại trang
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* MODAL KẾT QUẢ SEEDING */}
-      {showSeedingResultModal && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-[400px] max-w-[90vw] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-6 text-center">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="material-symbols-outlined text-blue-600 text-3xl">task_alt</span>
-              </div>
-              <h3 className="text-xl font-black text-slate-800 mb-2">Hoàn tất Seeding!</h3>
-              <p className="text-sm text-slate-500 mb-6">
-                Tiến trình seeding comment ngầm đã kết thúc. Các bài viết đã được cập nhật trạng thái mới nhất.
-              </p>
-              
-              <button
-                onClick={() => window.location.reload()}
-                className="w-full py-3 bg-[#DC2626] hover:bg-[#B91C1C] text-white rounded-xl font-bold shadow-md transition-all active:scale-95"
-              >
-                Đồng ý & Tải lại trang
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
       )}
     </div>
   );

@@ -175,18 +175,18 @@ export default function TaiKhoanFbPage() {
   return (
     <div className="p-6 w-full">
       <div className="flex items-center gap-2 mb-1">
-        <MaterialIcon name="account_circle" className="text-[#E3000F]" />
-        <h1 className="text-xl font-black text-[#1A1A1A]">Tài khoản Facebook</h1>
+        <MaterialIcon name="account_circle" className="text-primary" />
+        <h1 className="text-xl font-black text-on-surface">Tài khoản Facebook</h1>
       </div>
-      <p className="text-sm text-[#666666] mb-6">Mỗi tài khoản chỉ cần đăng nhập 1 lần. Tài khoản đã thêm dùng chung cho Đăng bài, Inbox và Cào dữ liệu.</p>
+      <p className="text-sm text-on-surface-variant mb-6">Mỗi tài khoản chỉ cần đăng nhập 1 lần. Tài khoản đã thêm dùng chung cho Đăng bài, Inbox và Cào dữ liệu.</p>
 
       {connErr && <div className="mb-4 rounded-lg bg-amber-50 border border-amber-300 px-4 py-3 text-sm text-amber-700">⚠️ Không kết nối được Facebook automation service. Kiểm tra backend product và Markee service.</div>}
 
-      <div className="bg-white rounded-lg border border-[#E5E5E5] p-5 mb-6">
+      <div className="bg-surface rounded-lg border border-outline-variant p-5 mb-6">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <div className="text-base font-bold text-[#1A1A1A]">Thêm tài khoản mới</div>
-            <div className="text-xs text-[#666666] mt-0.5">Bấm nút bên phải, đăng nhập Facebook như bình thường — hệ thống tự ghi nhớ.</div>
+            <div className="text-base font-bold text-on-surface">Thêm tài khoản mới</div>
+            <div className="text-xs text-on-surface-variant mt-0.5">Bấm nút bên phải, đăng nhập Facebook như bình thường — hệ thống tự ghi nhớ.</div>
           </div>
           <a href="/markee-extension.zip" download
             className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold transition">
@@ -194,12 +194,12 @@ export default function TaiKhoanFbPage() {
             Tải extension
           </a>
           <button onClick={() => addAccount(false)} disabled={adding}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#E3000F] text-white font-bold hover:bg-[#C40009] transition disabled:opacity-50">
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-white font-bold hover:bg-on-primary-fixed-variant transition disabled:opacity-50">
             <MaterialIcon name="person_add" className="text-[18px]" />
             {adding ? "Đang chờ đăng nhập..." : "Thêm tài khoản FB"}
           </button>
         </div>
-        {status && <div className="mt-3 text-sm text-[#666666] bg-[#F5F5F5] rounded-lg px-3 py-2">{status}</div>}
+        {status && <div className="mt-3 text-sm text-on-surface-variant bg-surface-container-low rounded-lg px-3 py-2">{status}</div>}
         {extInstalled === false && (
           <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
             <div className="text-xs text-amber-700">
@@ -214,56 +214,56 @@ export default function TaiKhoanFbPage() {
           </div>
         )}
 
-        <div className="mt-4 pt-4 border-t border-[#E5E5E5]">
+        <div className="mt-4 pt-4 border-t border-outline-variant">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
-              <div className="text-sm font-bold text-[#1A1A1A]">Thêm tài khoản ở máy / trình duyệt khác?</div>
-              <div className="text-xs text-[#666666] mt-0.5">Tạo mã kết nối, mở extension ở máy đó → dán mã vào ô &quot;① Dán mã kết nối&quot; → tài khoản tự gắn về bạn.</div>
+              <div className="text-sm font-bold text-on-surface">Thêm tài khoản ở máy / trình duyệt khác?</div>
+              <div className="text-xs text-on-surface-variant mt-0.5">Tạo mã kết nối, mở extension ở máy đó → dán mã vào ô &quot;① Dán mã kết nối&quot; → tài khoản tự gắn về bạn.</div>
             </div>
-            <button onClick={genPairCode} className="text-xs px-3 py-2 rounded-lg border border-[#E5E5E5] hover:border-[#E3000F] text-[#1A1A1A] font-semibold transition">Tạo mã kết nối</button>
+            <button onClick={genPairCode} className="text-xs px-3 py-2 rounded-lg border border-outline-variant hover:border-primary text-on-surface font-semibold transition">Tạo mã kết nối</button>
           </div>
           {pairCode && (
             <div className="mt-3 flex gap-2">
               <input readOnly value={pairCode} onFocus={e => e.currentTarget.select()}
-                className="flex-1 border border-[#E5E5E5] rounded-lg px-3 py-2 text-xs font-mono text-[#1A1A1A] bg-[#F5F5F5]" />
-              <button onClick={copyPairCode} className="text-xs px-4 py-2 rounded-lg bg-[#E3000F] text-white font-bold hover:bg-[#C40009] transition">Copy</button>
+                className="flex-1 border border-outline-variant rounded-lg px-3 py-2 text-xs font-mono text-on-surface bg-surface-container-low" />
+              <button onClick={copyPairCode} className="text-xs px-4 py-2 rounded-lg bg-primary text-white font-bold hover:bg-on-primary-fixed-variant transition">Copy</button>
             </div>
           )}
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-[#E5E5E5] p-5">
-        <h2 className="text-base font-bold text-[#1A1A1A] mb-4">Tài khoản đã thêm ({sessions.length})</h2>
+      <div className="bg-surface rounded-lg border border-outline-variant p-5">
+        <h2 className="text-base font-bold text-on-surface mb-4">Tài khoản đã thêm ({sessions.length})</h2>
         {sessions.length === 0 ? (
-          <div className="text-center text-[#A0A0A0] py-10 text-sm">Chưa có tài khoản nào. Bấm &quot;Thêm tài khoản FB&quot; để bắt đầu.</div>
+          <div className="text-center text-on-surface-variant py-10 text-sm">Chưa có tài khoản nào. Bấm &quot;Thêm tài khoản FB&quot; để bắt đầu.</div>
         ) : (
           <div className="space-y-2">
             {sessions.map(s => {
               const ready = !s.expired && !s.needs_relogin;
               return (
-                <div key={s.user_id} className="flex items-center justify-between gap-3 border border-[#E5E5E5] rounded-lg px-4 py-3">
+                <div key={s.user_id} className="flex items-center justify-between gap-3 border border-outline-variant rounded-lg px-4 py-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <span className={`inline-block w-2.5 h-2.5 rounded-full shrink-0 ${ready ? "bg-green-500" : "bg-red-500"}`} />
                     <div className="min-w-0">
-                      <div className="font-semibold text-[#1A1A1A] truncate">{accLabel(s)}
-                        <button onClick={() => rename(s.user_id, accLabel(s))} title="Đổi tên" className="ml-1.5 text-[11px] text-[#A0A0A0] hover:text-[#E3000F]">✎</button>
+                      <div className="font-semibold text-on-surface truncate">{accLabel(s)}
+                        <button onClick={() => rename(s.user_id, accLabel(s))} title="Đổi tên" className="ml-1.5 text-[11px] text-on-surface-variant hover:text-primary">✎</button>
                       </div>
-                      <div className="mt-0.5 truncate font-mono text-[11px] text-[#A0A0A0]" title={s.user_id}>{accMeta(s)}</div>
-                      <div className="text-xs text-[#A0A0A0]">
+                      <div className="mt-0.5 truncate font-mono text-[11px] text-on-surface-variant" title={s.user_id}>{accMeta(s)}</div>
+                      <div className="text-xs text-on-surface-variant">
                         {ready ? <span className="text-green-600 font-semibold">🟢 Sẵn sàng</span> : <span className="text-red-500 font-semibold">🔴 Cần đăng nhập lại</span>}
                         {s.online && ready ? " · đang online" : ""}
                         {typeof s.days_left === "number" && ready ? ` · còn ${Math.round(s.days_left)} ngày` : ""}
                       </div>
-                      <div className="text-xs text-[#A0A0A0] truncate mt-0.5">
+                      <div className="text-xs text-on-surface-variant truncate mt-0.5">
                         {s.email ? <span title="Email/SĐT đăng nhập">✉ {s.email}</span> : <span className="italic">chưa có email gợi nhắc</span>}
                         {s.note ? <span> · {s.note}</span> : ""}
-                        <button onClick={() => editMeta(s)} title="Sửa email/ghi chú" className="ml-1.5 text-[#A0A0A0] hover:text-[#E3000F]">✎</button>
+                        <button onClick={() => editMeta(s)} title="Sửa email/ghi chú" className="ml-1.5 text-on-surface-variant hover:text-primary">✎</button>
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {!ready && <button onClick={() => addAccount(true)} disabled={adding}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-[#E3000F] text-white font-bold hover:bg-[#C40009] transition disabled:opacity-50">Đăng nhập lại</button>}
+                      className="text-xs px-3 py-1.5 rounded-lg bg-primary text-white font-bold hover:bg-on-primary-fixed-variant transition disabled:opacity-50">Đăng nhập lại</button>}
                     <button onClick={() => removeSession(s.user_id, accLabel(s))}
                       className="text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 font-semibold transition">Xóa</button>
                   </div>

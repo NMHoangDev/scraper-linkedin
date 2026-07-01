@@ -42,33 +42,6 @@ interface KpiPost {
   posted_at: string;
 }
 
-interface PostJobStatus {
-  job_id?: string;
-  status?: string;
-  message?: string;
-  error?: string;
-  post_url?: string;
-  result?: {
-    error_message?: string;
-    post_url?: string;
-  };
-}
-
-interface PostSubmitResult {
-  uid: string;
-  group: string;
-  ok: boolean;
-  detail?: string;
-  jobId?: string;
-  postUrl?: string;
-  timedOut?: boolean;
-}
-
-const POST_RESULT_TIMEOUT_MS = 90000;
-const POST_RESULT_POLL_MS = 2500;
-const POST_SUCCESS_STATUSES = new Set(["success", "completed", "complete", "done", "succeeded"]);
-const POST_FAILED_STATUSES = new Set(["failed", "failure", "error", "cancelled", "canceled"]);
-
 function accountGroupTargetId(group: AccountGroup) {
   return (group.url || group.group_id || "").trim();
 }
@@ -82,17 +55,21 @@ function accountGroupSelectionKey(uid: string, group: AccountGroup) {
   return key ? `${uid}::${key}` : "";
 }
 
-function sleep(ms: number) {
-  return new Promise(resolve => window.setTimeout(resolve, ms));
-}
-
-function postJobStatusText(status: unknown) {
-  return String(status || "").trim().toLowerCase();
-}
-
-function postJobErrorMessage(job: PostJobStatus) {
-  return job.error || job.result?.error_message || job.message || "Extension báo đăng thất bại";
-}
+const DS = {
+  page: "w-full bg-background p-lg space-y-lg text-on-surface",
+  card: "bg-surface border border-outline-variant rounded-xl shadow-sm overflow-hidden",
+  cardHeader: "px-lg py-md border-b border-outline-variant bg-surface-container-low",
+  sectionTitle: "text-h3 text-on-surface flex items-center gap-sm",
+  muted: "text-body-sm text-on-surface-variant",
+  label: "text-label-md uppercase text-on-surface-variant",
+  primaryButton: "inline-flex items-center justify-center gap-xs rounded-lg bg-primary px-md py-sm text-body-sm font-semibold text-on-primary shadow-sm transition hover:bg-on-primary-fixed-variant active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50",
+  secondaryButton: "inline-flex items-center justify-center gap-xs rounded-lg border border-outline-variant bg-surface px-sm py-xs text-body-sm font-semibold text-on-surface transition hover:border-primary hover:text-primary active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50",
+  iconButton: "inline-flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant transition hover:bg-surface-container-low hover:text-primary disabled:cursor-not-allowed disabled:opacity-50",
+  field: "w-full rounded-lg border border-outline-variant bg-surface px-md py-sm text-body-md text-on-surface outline-none transition placeholder:text-on-surface-variant focus:border-primary focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-surface-container-low",
+  chip: "inline-flex items-center gap-xs rounded-full border px-sm py-xs text-body-sm font-semibold transition",
+  selectedChip: "border-primary bg-primary/10 text-primary shadow-sm",
+  subtleChip: "border-outline-variant bg-surface text-on-surface hover:border-primary hover:text-primary",
+};
 
 export default function DangBaiPage() {
   const { user } = useAppAuth();
@@ -116,7 +93,6 @@ export default function DangBaiPage() {
   const [deletingAccountGroupKeys, setDeletingAccountGroupKeys] = useState<Set<string>>(new Set());
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
-  const [sendStatusText, setSendStatusText] = useState("");
   const [connErr, setConnErr] = useState(false);
   const [extInstalled, setExtInstalled] = useState<boolean | null>(null);
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
@@ -150,7 +126,7 @@ export default function DangBaiPage() {
 
       const sessionMap = new Map<string, FbSession>((s.sessions || []).map((item: FbSession) => [item.user_id, item]));
       setExts((e.extensions || []).map((ext: Ext) => ({ ...(sessionMap.get(ext.user_id) || {}), ...ext })));
-      
+
       setGroups(((g.data || []) as FacebookGroup[])
         .filter(group => group.group_url)
         .map(group => ({
@@ -195,29 +171,9 @@ export default function DangBaiPage() {
   const selectedIdsKey = useMemo(() => selectedIds.join(","), [selectedIds]);
   const selectedOnlineIds = useMemo(() => new Set(selectedOnline.map(e => e.user_id)), [selectedOnline]);
   const hasAccountGroupsFeature = useCallback((e: Ext) => (e.features || []).includes("account_groups"), []);
-  const hasKnownPostFeature = useCallback((e: Ext) => {
-    const features = e.features || [];
-    return features.length > 0 && features.includes("post");
-  }, []);
-  const hasKnownUnsupportedPostFeature = useCallback((e: Ext) => {
-    const features = e.features || [];
-    return features.length > 0 && !features.includes("post");
-  }, []);
-  const isUnknownExtensionBuild = useCallback((e: Ext) => {
-    const features = e.features || [];
-    return !e.version && features.length === 0;
-  }, []);
   const selectedWithoutGroupScan = useMemo(
     () => selectedOnline.filter(e => !hasAccountGroupsFeature(e)),
     [selectedOnline, hasAccountGroupsFeature]
-  );
-  const selectedWithoutPostSupport = useMemo(
-    () => selectedOnline.filter(hasKnownUnsupportedPostFeature),
-    [selectedOnline, hasKnownUnsupportedPostFeature]
-  );
-  const selectedUnknownPostSupport = useMemo(
-    () => selectedOnline.filter(e => !hasKnownPostFeature(e) && isUnknownExtensionBuild(e)),
-    [selectedOnline, hasKnownPostFeature, isUnknownExtensionBuild]
   );
   const accountLabelMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -356,7 +312,7 @@ export default function DangBaiPage() {
   };
 
   const clearAllAccountGroups = () => setSelectedAccountGroupKeys(new Set());
-  
+
   const toggle = (uid: string) => {
     const next = new Set(selected);
     if (next.has(uid)) next.delete(uid);
@@ -466,49 +422,9 @@ export default function DangBaiPage() {
     } catch { toast.error("Lỗi đổi tên"); }
   }
 
-  async function waitForPostJob(jobId: string): Promise<{ ok: boolean; detail?: string; postUrl?: string; timedOut?: boolean }> {
-    const deadline = Date.now() + POST_RESULT_TIMEOUT_MS;
-    let lastJob: PostJobStatus | null = null;
-
-    while (Date.now() < deadline) {
-      await sleep(POST_RESULT_POLL_MS);
-      const r = await fbFetch(`/jobs/${encodeURIComponent(jobId)}`);
-      const job = await r.json().catch(() => ({})) as PostJobStatus;
-      if (!r.ok) {
-        return { ok: false, detail: job.message || job.error || "Không kiểm tra được trạng thái job" };
-      }
-      lastJob = job;
-      const status = postJobStatusText(job.status);
-      if (POST_SUCCESS_STATUSES.has(status)) {
-        return { ok: true, detail: job.message, postUrl: job.post_url || job.result?.post_url };
-      }
-      if (POST_FAILED_STATUSES.has(status)) {
-        return { ok: false, detail: postJobErrorMessage(job) };
-      }
-    }
-
-    return {
-      ok: false,
-      detail: lastJob?.message
-        ? `Extension chưa trả kết quả sau ${Math.round(POST_RESULT_TIMEOUT_MS / 1000)}s (${lastJob.message})`
-        : `Extension chưa trả kết quả sau ${Math.round(POST_RESULT_TIMEOUT_MS / 1000)}s`,
-      timedOut: true,
-    };
-  }
-
   async function submit() {
     if (selectedOnline.length === 0) return toast.error("Chưa chọn tài khoản online nào");
     if (!content.trim() && mediaUrls.length === 0) return toast.error("Chưa nhập nội dung hoặc ảnh");
-    if (selectedWithoutPostSupport.length > 0) {
-      const names = selectedWithoutPostSupport.map(labelOf).slice(0, 3).join(", ");
-      const more = selectedWithoutPostSupport.length > 3 ? ` +${selectedWithoutPostSupport.length - 3}` : "";
-      return toast.error(`Có ${selectedWithoutPostSupport.length} tài khoản không hỗ trợ đăng bài: ${names}${more}. Hãy cập nhật extension Seeding Markee.`);
-    }
-    if (selectedUnknownPostSupport.length > 0) {
-      const names = selectedUnknownPostSupport.map(labelOf).slice(0, 3).join(", ");
-      const more = selectedUnknownPostSupport.length > 3 ? ` +${selectedUnknownPostSupport.length - 3}` : "";
-      toast.warning(`Có ${selectedUnknownPostSupport.length} tài khoản dùng extension cũ/không rõ version: ${names}${more}. Nếu bị treo hãy reload hoặc cập nhật extension.`);
-    }
     const jobs = targetType === "group"
       ? groupPostTargets.map(t => ({ user_id: t.user_id, target_type: "group" as const, target_id: t.target_id, group_name: t.group_name }))
       : selectedOnline.map(e => ({ user_id: e.user_id, target_type: "profile" as const, target_id: null as string | null, group_name: "" }));
@@ -516,75 +432,40 @@ export default function DangBaiPage() {
       if (selectedAccountGroupKeys.size === 0) return toast.error("Chưa chọn group");
       if (jobs.length === 0) return toast.error("Các group đã chọn chưa có tài khoản online nào phù hợp");
     }
-    
+
     setSending(true);
-    setSendStatusText(`Đang gửi ${jobs.length} lệnh xuống extension...`);
-    try {
-      const acceptedToast = window.setTimeout(() => {
-        toast.info("Đã gửi lệnh, đang chờ extension xác nhận đăng thật...");
-      }, 1200);
+    const results = await Promise.all(jobs.map(async job => {
+      try {
+        const r = await fbFetch("/post", {
+          method: "POST", headers: fbHeaders(),
+          body: JSON.stringify({
+            user_id: job.user_id,
+            content,
+            media_urls: mediaUrls,
+            target_type: job.target_type,
+            target_id: job.target_id,
+          }),
+        });
+        const d = await r.json().catch(() => ({}));
+        return { uid: job.user_id, group: job.group_name, ok: r.ok, detail: d.detail };
+      } catch { return { uid: job.user_id, group: job.group_name, ok: false, detail: "không kết nối được" }; }
+    }));
 
-      const results: PostSubmitResult[] = await Promise.all(jobs.map(async job => {
-        try {
-          const r = await fbFetch("/post", {
-            method: "POST", headers: fbHeaders(),
-            body: JSON.stringify({
-              user_id: job.user_id,
-              content,
-              media_urls: mediaUrls,
-              target_type: job.target_type,
-              target_id: job.target_id,
-            }),
-          });
-          const d = await r.json().catch(() => ({}));
-          if (!r.ok) {
-            return { uid: job.user_id, group: job.group_name, ok: false, detail: d.detail || "Không gửi được lệnh đăng" };
-          }
-          const jobId = String(d.job_id || "");
-          if (!jobId) {
-            return { uid: job.user_id, group: job.group_name, ok: false, detail: "Service không trả job_id để kiểm tra kết quả" };
-          }
+    const ok = results.filter(x => x.ok).length;
+    const fail = results.filter(x => !x.ok);
 
-          setSendStatusText("Đã gửi lệnh, đang chờ extension xác nhận...");
-          const final = await waitForPostJob(jobId);
-          return {
-            uid: job.user_id,
-            group: job.group_name,
-            ok: final.ok,
-            detail: final.detail,
-            jobId,
-            postUrl: final.postUrl,
-            timedOut: final.timedOut,
-          };
-        } catch {
-          return { uid: job.user_id, group: job.group_name, ok: false, detail: "không kết nối được" };
-        }
-      }));
-      window.clearTimeout(acceptedToast);
-
-      const ok = results.filter(x => x.ok).length;
-      const fail = results.filter(x => !x.ok);
-
-      if (fail.length === 0) {
-        toast.success(`Đăng thành công ${ok}/${jobs.length} tài khoản`);
-        setContent("");
-        setMediaUrls([]);
-        setSelectedAccountGroupKeys(new Set());
-        setIsPostModalOpen(false);
-      } else {
-        const detail = fail
-          .map(f => `${accountLabelMap.get(f.uid) || shortFbId(f.uid)}${f.group ? ` → ${f.group}` : ""}: ${f.detail || "lỗi không rõ"}`)
-          .slice(0, 3)
-          .join("; ");
-        const more = fail.length > 3 ? `; +${fail.length - 3} tài khoản khác` : "";
-        if (ok > 0) toast.error(`Đăng thành công ${ok}, lỗi ${fail.length}: ${detail}${more}`);
-        else toast.error(detail || "Không đăng được");
-      }
-    } finally {
-      setSending(false);
-      setSendStatusText("");
-      setTimeout(refresh, 800);
+    if (fail.length === 0) {
+      toast.success(`Đã gửi ${ok}/${jobs.length} lệnh đăng!`);
+      setContent("");
+      setMediaUrls([]);
+      setSelectedAccountGroupKeys(new Set());
+      setIsPostModalOpen(false);
     }
+    else if (ok > 0) toast.error(`Gửi OK ${ok}, lỗi ${fail.length}: ${fail.map(f => f.uid).join(", ")}`);
+    else toast.error(fail[0].detail || "Không gửi được");
+
+    setSending(false);
+    setTimeout(refresh, 800);
   }
 
   async function upload(files: FileList | null) {
@@ -601,29 +482,29 @@ export default function DangBaiPage() {
   }
 
   return (
-    <div className="p-6 w-full max-w-7xl mx-auto space-y-6">
+    <div className={DS.page}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800/80 shadow-sm">
+      <div className={`${DS.card} p-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-md`}>
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <div className="h-9 w-9 rounded-lg bg-red-50 dark:bg-red-950/20 flex items-center justify-center">
-              <MaterialIcon name="send" className="text-[#E3000F] text-xl" />
+          <div className="flex items-center gap-sm mb-xs">
+            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+              <MaterialIcon name="send" className="text-primary text-xl" />
             </div>
-            <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Đăng bài Facebook (Seeding)</h1>
+            <h1 className="text-h2 text-on-surface">Đăng bài Facebook (Seeding)</h1>
           </div>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Soạn và đăng bài tự động tới profile cá nhân hoặc các nhóm Facebook.</p>
+          <p className={DS.muted}>Soạn và đăng bài tự động tới profile cá nhân hoặc các nhóm Facebook.</p>
         </div>
         <button
           onClick={() => setIsPostModalOpen(true)}
-          className="bg-[#E3000F] hover:bg-red-750 text-white px-5 py-2.5 rounded-xl flex items-center gap-2 font-semibold text-sm transition-all shadow-md shadow-red-500/10 hover:shadow-red-500/20 active:scale-[0.98]"
+          className={DS.primaryButton}
         >
           <MaterialIcon name="add" className="text-[20px]" /> Đăng bài mới
         </button>
       </div>
 
       {connErr && (
-        <div className="rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 px-5 py-4 text-sm text-amber-800 dark:text-amber-300 flex items-start gap-2.5 shadow-sm">
-          <MaterialIcon name="warning" className="text-amber-600 dark:text-amber-400 shrink-0 text-[18px]" />
+        <div className="rounded-xl bg-amber-50 border border-amber-200 px-lg py-md text-body-md text-amber-800 flex items-start gap-sm shadow-sm">
+          <MaterialIcon name="warning" className="text-amber-600 shrink-0 text-[18px]" />
           <div>
             <strong>Lỗi kết nối:</strong> Không kết nối được Facebook automation service. Vui lòng kiểm tra backend và extension.
           </div>
@@ -636,70 +517,70 @@ export default function DangBaiPage() {
       )}
 
       {/* Lịch sử gần đây */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800/80 shadow-sm overflow-hidden">
-        <div className="p-5 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
-          <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-            <MaterialIcon name="history" className="text-slate-400 dark:text-slate-500" />
+      <div className={DS.card}>
+        <div className={`${DS.cardHeader} flex items-center justify-between`}>
+          <h2 className={DS.sectionTitle}>
+            <MaterialIcon name="history" className="text-on-surface-variant" />
             Lịch sử đăng bài gần đây
           </h2>
-          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Chỉ hiển thị bài đăng của bạn</span>
+          <span className={`${DS.muted} font-medium`}>Chỉ hiển thị bài đăng của bạn</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20">
-                <th className="py-3.5 px-6">Thời gian</th>
-                <th className="py-3.5 px-6">Tài khoản</th>
-                <th className="py-3.5 px-6">Nơi đăng</th>
-                <th className="py-3.5 px-6">Nội dung</th>
-                <th className="py-3.5 px-6 text-right">Trạng thái</th>
+              <tr className="bg-surface-container-low border-b border-outline-variant text-left text-table-header text-on-surface">
+                <th className="py-sm px-lg">Thời gian</th>
+                <th className="py-sm px-lg">Tài khoản</th>
+                <th className="py-sm px-lg">Nơi đăng</th>
+                <th className="py-sm px-lg">Nội dung</th>
+                <th className="py-sm px-lg text-right">Trạng thái</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-850">
+            <tbody className="divide-y divide-outline-variant">
               {kpiPosts.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="text-center text-slate-400 dark:text-slate-500 py-12">
-                    <MaterialIcon name="article" className="text-4xl text-slate-300 dark:text-slate-600 mb-2 block mx-auto" />
+                  <td colSpan={5} className="text-center text-on-surface-variant py-xl">
+                    <MaterialIcon name="article" className="text-4xl text-outline mb-sm block mx-auto" />
                     Chưa có bài đăng KPI nào trong tuần này
                   </td>
                 </tr>
               ) : (
                 kpiPosts.map((j) => (
-                  <tr key={j.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors align-top">
-                    <td className="py-4 px-6 whitespace-nowrap text-slate-500 dark:text-slate-400 text-xs">
+                  <tr key={j.id} className="hover:bg-surface-container-low transition-colors align-top">
+                    <td className="py-md px-lg whitespace-nowrap text-on-surface-variant text-body-sm">
                       {j.posted_at ? new Date(j.posted_at).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" }) : "-"}
                     </td>
-                    <td className="py-4 px-6 font-semibold text-slate-800 dark:text-slate-200">
+                    <td className="py-md px-lg font-semibold text-on-surface">
                       {(() => {
                         const ext = exts.find(e => e.user_id === j.user_id);
                         return ext ? labelOf(ext) : shortFbId(j.user_id || "");
                       })()}
                     </td>
-                    <td className="py-4 px-6 whitespace-nowrap">
+                    <td className="py-md px-lg whitespace-nowrap">
                       {j.target_type === "group" ? (
-                        <span className="inline-flex items-center gap-1 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/20 px-2 py-0.5 rounded text-xs font-medium border border-purple-100 dark:border-purple-900/30">
+                        <span className="inline-flex items-center gap-xs text-purple-700 bg-purple-50 px-sm py-xs rounded-lg text-body-sm font-medium border border-purple-100">
                           <MaterialIcon name="groups" className="text-[14px]" /> Group
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/20 px-2 py-0.5 rounded text-xs font-medium border border-blue-100 dark:border-blue-900/30">
+                        <span className="inline-flex items-center gap-xs text-blue-700 bg-blue-50 px-sm py-xs rounded-lg text-body-sm font-medium border border-blue-100">
                           <MaterialIcon name="person" className="text-[14px]" /> Cá nhân
                         </span>
                       )}
                     </td>
-                    <td className="py-4 px-6 max-w-sm truncate text-slate-700 dark:text-slate-350" title={j.content}>
-                      {j.content || <span className="text-slate-400 italic text-xs">Không có nội dung</span>}
+                    <td className="py-md px-lg max-w-sm truncate text-on-surface" title={j.content}>
+                      {j.content || <span className="text-on-surface-variant italic text-body-sm">Không có nội dung</span>}
                     </td>
-                    <td className="py-4 px-6 text-right whitespace-nowrap">
+                    <td className="py-md px-lg text-right whitespace-nowrap">
                       <div className="flex flex-col items-end gap-1.5">
-                        <span className="inline-flex items-center gap-1 text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/20 px-2.5 py-1 rounded-full text-xs font-bold border border-green-150 dark:border-green-900/30">
+                        <span className="inline-flex items-center gap-xs text-green-700 bg-green-50 px-sm py-xs rounded-full text-body-sm font-bold border border-green-100">
                            Thành công
                         </span>
                         {j.post_url && (
-                          <a 
-                            href={j.post_url} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="text-xs text-[#E3000F] font-bold hover:underline inline-flex items-center gap-0.5 transition"
+                          <a
+                            href={j.post_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-body-sm text-primary font-bold hover:underline inline-flex items-center gap-0.5 transition"
                           >
                             <MaterialIcon name="open_in_new" className="text-[13px]" /> Xem bài viết
                           </a>
@@ -716,80 +597,70 @@ export default function DangBaiPage() {
 
       {/* Modal Đăng Bài Seeding Mới */}
       {isPostModalOpen && (
-        <div 
-          className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 transition-all"
+        <div
+          className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center p-md transition-all"
           onClick={() => setIsPostModalOpen(false)}
         >
-          <div 
-            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl w-[95vw] md:w-[760px] max-w-[48rem] flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+          <div
+            className="bg-surface border border-outline-variant rounded-xl shadow-2xl w-[95vw] md:w-[820px] max-w-[52rem] flex flex-col max-h-[92vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/40 dark:bg-slate-800/40">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-red-50 dark:bg-red-950/30 flex items-center justify-center">
-                  <MaterialIcon name="send" className="text-[#E3000F] text-base" />
+            <div className={`${DS.cardHeader} flex justify-between items-center`}>
+              <div className="flex items-center gap-sm">
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <MaterialIcon name="send" className="text-primary text-base" />
                 </div>
-                <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">Đăng bài Facebook Seeding mới</h3>
+                <h3 className="text-h3 text-on-surface">Đăng bài Facebook Seeding mới</h3>
               </div>
-              <button 
-                onClick={() => setIsPostModalOpen(false)} 
-                className="text-slate-400 hover:text-slate-650 dark:hover:text-slate-200 p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+              <button
+                onClick={() => setIsPostModalOpen(false)}
+                className={DS.iconButton}
               >
                 <MaterialIcon name="close" className="text-[20px]" />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 space-y-5 overflow-y-auto flex-1 text-slate-800 dark:text-slate-200">
+            <div className="p-lg space-y-md overflow-y-auto flex-1 text-on-surface">
               {/* Step 1: Chọn tài khoản */}
-              <div className="space-y-2">
+              <div className="space-y-sm">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tài khoản đăng (đang online: {online.length})</label>
+                  <label className={DS.label}>Tài khoản đăng (đang online: {online.length})</label>
                   {online.length > 0 && (
-                    <button 
-                      className="text-xs font-semibold text-[#E3000F] hover:underline transition" 
+                    <button
+                      className="text-body-sm font-semibold text-primary hover:underline transition"
                       onClick={() => setSelected(new Set(online.map(e => e.user_id)))}
                     >
                       Chọn tất cả
                     </button>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-2 max-h-[140px] overflow-y-auto p-1.5 border border-slate-100 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-800/10">
+                <div className="flex flex-wrap gap-xs max-h-[140px] overflow-y-auto p-xs border border-outline-variant rounded-lg bg-surface-container-low">
                   {online.length === 0 ? (
-                    <span className="text-xs text-slate-400 italic p-1">Chưa có tài khoản Facebook nào đang online.</span>
+                    <span className="text-body-sm text-on-surface-variant italic p-xs">Chưa có tài khoản Facebook nào đang online.</span>
                   ) : (
                     online.map(e => {
                       const isSel = selected.has(e.user_id);
-                      const unknownPost = isUnknownExtensionBuild(e);
-                      const unsupportedPost = hasKnownUnsupportedPostFeature(e);
                       return (
-                        <div 
+                        <div
                           key={e.user_id}
-                          className={`inline-flex items-center gap-1.5 pl-3 pr-2 py-1.5 rounded-full text-xs font-semibold border cursor-pointer select-none transition-all duration-150 ${
-                            isSel 
-                              ? "bg-[#E3000F]/10 text-[#E3000F] border-[#E3000F] shadow-sm shadow-red-500/5" 
-                              : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-350 hover:border-red-400/50 bg-white dark:bg-slate-800"
+                          className={`${DS.chip} pl-sm pr-xs cursor-pointer select-none ${
+                            isSel
+                              ? DS.selectedChip
+                              : DS.subtleChip
                           }`}
                           onClick={() => toggle(e.user_id)}
                         >
                           <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
                           <span className="max-w-[140px] truncate leading-tight">{labelOf(e)}</span>
-                          {(unknownPost || unsupportedPost) && (
-                            <span title={unsupportedPost ? "Extension không khai báo hỗ trợ đăng bài" : "Extension cũ/không rõ version, có thể cần reload hoặc cập nhật"}>
-                              <MaterialIcon
-                                name="warning"
-                                className={`text-[13px] ${unsupportedPost ? "text-amber-600" : "text-slate-400"}`}
-                              />
-                            </span>
-                          )}
-                          <button 
+                          <button
                             onClick={(ev) => {
                               ev.stopPropagation();
                               renameAcc(e.user_id, labelOf(e));
-                            }} 
+                            }}
                             title="Đổi tên hiển thị"
-                            className={`hover:text-[#E3000F] transition p-0.5 rounded ${isSel ? "text-[#E3000F]/60" : "text-slate-400"}`}
+                            className={`hover:text-primary transition p-0.5 rounded ${isSel ? "text-primary/70" : "text-on-surface-variant"}`}
                           >
                             <MaterialIcon name="edit" className="text-[13px]" />
                           </button>
@@ -799,23 +670,23 @@ export default function DangBaiPage() {
                   )}
                 </div>
                 {extInstalled === false && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 px-3 py-2 rounded-lg border border-amber-200/50 dark:border-amber-900/30">
+                  <p className="text-body-sm text-amber-700 bg-amber-50 px-sm py-xs rounded-lg border border-amber-200">
                     ⚠️ Chưa phát hiện extension trên trình duyệt này. Vui lòng cài và mở extension để các tài khoản Facebook online hiển thị.
                   </p>
                 )}
               </div>
 
               {/* Step 2: Chọn nơi đăng */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Chọn nơi đăng bài</label>
-                <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
+              <div className="space-y-sm">
+                <label className={`${DS.label} block`}>Chọn nơi đăng bài</label>
+                <div className="grid grid-cols-2 gap-xs p-xs bg-surface-container-low border border-outline-variant rounded-lg">
                   <button
                     type="button"
                     onClick={() => setTargetType("profile")}
-                    className={`py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
-                      targetType === "profile" 
-                        ? "bg-white dark:bg-slate-700 text-[#E3000F] shadow-sm font-semibold" 
-                        : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                    className={`py-sm text-body-sm font-bold rounded-lg flex items-center justify-center gap-xs transition-all ${
+                      targetType === "profile"
+                        ? "bg-surface text-primary shadow-sm"
+                        : "text-on-surface-variant hover:text-on-surface"
                     }`}
                   >
                     <MaterialIcon name="person" className="text-[16px]" /> Trang cá nhân
@@ -823,10 +694,10 @@ export default function DangBaiPage() {
                   <button
                     type="button"
                     onClick={() => setTargetType("group")}
-                    className={`py-2 text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
-                      targetType === "group" 
-                        ? "bg-white dark:bg-slate-700 text-[#E3000F] shadow-sm font-semibold" 
-                        : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                    className={`py-sm text-body-sm font-bold rounded-lg flex items-center justify-center gap-xs transition-all ${
+                      targetType === "group"
+                        ? "bg-surface text-primary shadow-sm"
+                        : "text-on-surface-variant hover:text-on-surface"
                     }`}
                   >
                     <MaterialIcon name="groups" className="text-[16px]" /> Nhóm (Group)
@@ -836,18 +707,18 @@ export default function DangBaiPage() {
 
               {/* Nếu chọn đăng Group thì render danh sách group theo từng acc đã quét */}
               {targetType === "group" && (
-                <div className="space-y-3 animate-in slide-in-from-top-1 duration-150">
+                <div className="space-y-sm">
                   <div className="flex items-center justify-between gap-3">
-                    <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Chọn group theo từng tài khoản</label>
+                    <label className={`${DS.label} block`}>Chọn group theo từng tài khoản</label>
                     <div className="flex items-center gap-2">
-                      <span className="hidden sm:inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-1 text-[10px] font-bold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                      <span className="hidden sm:inline-flex items-center rounded-full bg-surface-container-low px-sm py-xs text-[10px] font-bold text-on-surface-variant border border-outline-variant">
                         Tối đa 1 group/acc
                       </span>
                       {selectedAccountGroupCount > 0 && (
                         <button
                           type="button"
                           onClick={clearAllAccountGroups}
-                          className="text-xs font-bold text-[#E3000F] hover:underline"
+                          className="text-body-sm font-bold text-primary hover:underline"
                         >
                           Bỏ chọn group
                         </button>
@@ -857,7 +728,7 @@ export default function DangBaiPage() {
                         onClick={scanGroupsForSelected}
                         disabled={scanningGroups.size > 0 || selectedOnline.length === 0 || selectedWithoutGroupScan.length === selectedOnline.length}
                         title={selectedWithoutGroupScan.length > 0 ? "Một số tài khoản cần cập nhật extension Seeding Markee mới để quét group" : undefined}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:border-[#E3000F]/40 hover:text-[#E3000F] disabled:opacity-50 disabled:hover:text-slate-700 transition"
+                        className={DS.secondaryButton}
                       >
                         {scanningGroups.size > 0 ? (
                           <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -869,14 +740,14 @@ export default function DangBaiPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400">
+                  <div className="flex items-center justify-between gap-sm rounded-lg bg-surface-container-low border border-outline-variant px-sm py-xs text-body-sm text-on-surface-variant">
                     <span>{selectedOnline.length} acc online đã chọn</span>
-                    <span className="font-bold text-slate-700 dark:text-slate-200">{groupPostTargets.length}/{selectedOnline.length} acc có group · {groupPostTargets.length} lệnh đăng</span>
+                    <span className="font-bold text-on-surface">{groupPostTargets.length}/{selectedOnline.length} acc có group · {groupPostTargets.length} lệnh đăng</span>
                   </div>
 
-                  <div className="max-h-[430px] overflow-y-auto space-y-2 pr-1">
+                  <div className="max-h-[430px] overflow-y-auto space-y-sm pr-1">
                     {selectedIds.length === 0 ? (
-                      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 text-xs text-slate-400">Chọn tài khoản trước.</div>
+                      <div className="rounded-lg border border-outline-variant bg-surface p-md text-body-sm text-on-surface-variant">Chọn tài khoản trước.</div>
                     ) : (
                       selectedOnline.map(e => {
                         const list = accountGroupsByAccount.get(e.user_id) || [];
@@ -890,15 +761,15 @@ export default function DangBaiPage() {
                           ? list.filter(g => (g.name || "").toLowerCase().includes(q) || (g.url || "").toLowerCase().includes(q) || (g.group_id || "").toLowerCase().includes(q))
                           : list;
                         return (
-                          <div key={e.user_id} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/30">
+                          <div key={e.user_id} className="rounded-xl border border-outline-variant bg-surface overflow-hidden">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-sm px-sm py-sm border-b border-outline-variant bg-surface-container-low">
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2 min-w-0">
                                   <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                                  <span className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{labelOf(e)}</span>
-                                  <span className="text-[10px] text-slate-400 shrink-0">{shortFbId(e.user_id)}</span>
+                                  <span className="text-body-md font-bold text-on-surface truncate">{labelOf(e)}</span>
+                                  <span className="text-[10px] text-on-surface-variant shrink-0">{shortFbId(e.user_id)}</span>
                                 </div>
-                                <div className="mt-0.5 text-[10px] text-slate-400">
+                                <div className="mt-0.5 text-[10px] text-on-surface-variant">
                                   {canScanGroups
                                     ? groupLastScan[e.user_id] ? `Quét gần nhất ${new Date(groupLastScan[e.user_id] as string).toLocaleDateString("vi-VN")}` : "Chưa quét group"
                                     : `Cần cập nhật extension${e.version ? ` (${e.version})` : ""}`}
@@ -910,7 +781,7 @@ export default function DangBaiPage() {
                                   <button
                                     type="button"
                                     onClick={() => clearGroupsForAccount(e.user_id)}
-                                    className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 hover:border-[#E3000F]/40 hover:text-[#E3000F]"
+                                    className={DS.secondaryButton}
                                   >
                                     Bỏ chọn
                                   </button>
@@ -919,7 +790,7 @@ export default function DangBaiPage() {
                                   type="button"
                                   onClick={() => setGroupPickerAccountId(prev => prev === e.user_id ? null : e.user_id)}
                                   disabled={!canScanGroups || list.length === 0}
-                                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#E3000F] text-white text-xs font-bold hover:bg-red-700 disabled:opacity-50 disabled:hover:bg-[#E3000F] transition"
+                                  className={DS.primaryButton}
                                 >
                                   <MaterialIcon name={isPickerOpen ? "arrow_drop_down" : selectedGroup ? "edit" : "search"} className="text-[14px]" />
                                   {isPickerOpen ? "Đóng" : selectedGroup ? "Đổi group" : "Chọn group"}
@@ -928,7 +799,7 @@ export default function DangBaiPage() {
                                   type="button"
                                   onClick={() => scanGroupsForAccounts([e])}
                                   disabled={!canScanGroups || isScanning}
-                                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 hover:border-[#E3000F]/40 hover:text-[#E3000F] disabled:opacity-50 transition"
+                                  className={DS.secondaryButton}
                                 >
                                   {isScanning ? (
                                     <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -941,42 +812,42 @@ export default function DangBaiPage() {
                             </div>
 
                             {!canScanGroups ? (
-                              <div className="p-3 text-xs text-amber-700 dark:text-amber-300 bg-amber-50/70 dark:bg-amber-950/10">
+                              <div className="p-sm text-body-sm text-amber-700 bg-amber-50">
                                 Tài khoản này đang dùng extension cũ nên chưa quét được group.
                               </div>
                             ) : list.length === 0 ? (
-                              <div className="p-3 text-xs text-slate-400">
+                              <div className="p-sm text-body-sm text-on-surface-variant">
                                 Chưa có group trong cache. Bấm Quét để cập nhật group của tài khoản này.
                               </div>
                             ) : (
-                              <div className="p-3 space-y-2">
+                              <div className="p-sm space-y-sm">
                                 {selectedGroup ? (
-                                  <div className="flex items-start gap-2 rounded-xl border border-emerald-100 dark:border-emerald-900/30 bg-emerald-50/70 dark:bg-emerald-950/10 px-3 py-2">
-                                    <MaterialIcon name="check_circle" className="text-[18px] text-emerald-600 dark:text-emerald-300 shrink-0 mt-0.5" />
+                                  <div className="flex items-start gap-sm rounded-lg border border-emerald-100 bg-emerald-50 px-sm py-xs">
+                                    <MaterialIcon name="check_circle" className="text-[18px] text-emerald-600 shrink-0 mt-0.5" />
                                     <div className="min-w-0 flex-1">
-                                      <div className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{selectedGroup.name}</div>
-                                      <div className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400 truncate">{selectedGroup.url || selectedGroup.group_id}</div>
+                                      <div className="text-body-md font-bold text-on-surface truncate">{selectedGroup.name}</div>
+                                      <div className="mt-0.5 text-[10px] text-on-surface-variant truncate">{selectedGroup.url || selectedGroup.group_id}</div>
                                     </div>
                                   </div>
                                 ) : (
-                                  <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 px-3 py-2 text-xs text-slate-400">
+                                  <div className="rounded-lg border border-dashed border-outline-variant px-sm py-xs text-body-sm text-on-surface-variant">
                                     Chưa chọn group cho tài khoản này.
                                   </div>
                                 )}
 
                                 {isPickerOpen && (
-                                  <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-                                    <div className="p-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/30">
+                                  <div className="rounded-lg border border-outline-variant overflow-hidden">
+                                    <div className="p-xs border-b border-outline-variant bg-surface-container-low">
                                       <input
                                         value={search}
                                         onChange={ev => setGroupSearchByAccount(prev => ({ ...prev, [e.user_id]: ev.target.value }))}
                                         placeholder="Tìm group của tài khoản này..."
-                                        className="w-full border border-slate-200 dark:border-slate-750 rounded-lg px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 transition"
+                                        className={DS.field}
                                       />
                                     </div>
-                                    <div className="max-h-[220px] overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                                    <div className="max-h-[220px] overflow-y-auto divide-y divide-outline-variant bg-surface">
                                       {filteredList.length === 0 ? (
-                                        <div className="p-3 text-xs text-slate-400">Không có group khớp bộ lọc.</div>
+                                        <div className="p-sm text-body-sm text-on-surface-variant">Không có group khớp bộ lọc.</div>
                                       ) : filteredList.map(g => {
                                         const selectionKey = accountGroupSelectionKey(e.user_id, g);
                                         const checked = selectedAccountGroupKeys.has(selectionKey);
@@ -984,8 +855,8 @@ export default function DangBaiPage() {
                                         return (
                                           <div
                                             key={selectionKey}
-                                            className={`flex items-start gap-2 px-3 py-2.5 transition ${
-                                              checked ? "bg-red-50/70 dark:bg-red-950/10" : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                                            className={`flex items-start gap-sm px-sm py-sm transition ${
+                                              checked ? "bg-primary/5" : "hover:bg-surface-container-low"
                                             }`}
                                           >
                                             <label className="flex items-start gap-3 min-w-0 flex-1 cursor-pointer">
@@ -997,11 +868,11 @@ export default function DangBaiPage() {
                                                   toggleAccountGroup(e.user_id, g);
                                                   setGroupPickerAccountId(null);
                                                 }}
-                                                className="mt-0.5 h-4 w-4 accent-[#E3000F] shrink-0"
+                                                className="mt-0.5 h-4 w-4 accent-primary shrink-0"
                                               />
                                               <div className="min-w-0 flex-1">
-                                                <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{g.name}</div>
-                                                <div className="mt-0.5 text-[10px] text-slate-400 truncate">{g.url || g.group_id}</div>
+                                                <div className="text-body-md font-semibold text-on-surface truncate">{g.name}</div>
+                                                <div className="mt-0.5 text-[10px] text-on-surface-variant truncate">{g.url || g.group_id}</div>
                                               </div>
                                             </label>
                                             <button
@@ -1009,7 +880,7 @@ export default function DangBaiPage() {
                                               onClick={() => deleteAccountGroup(e.user_id, g)}
                                               disabled={deleting}
                                               title="Xóa group khỏi cache tài khoản này"
-                                              className="h-7 w-7 rounded-lg inline-flex items-center justify-center text-slate-400 hover:text-[#E3000F] hover:bg-red-50 dark:hover:bg-red-950/20 disabled:opacity-50 shrink-0"
+                                              className={`${DS.iconButton} shrink-0`}
                                             >
                                               {deleting ? (
                                                 <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -1031,9 +902,9 @@ export default function DangBaiPage() {
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between gap-3 text-[10px] text-slate-400">
+                  <div className="flex items-center justify-between gap-sm text-[10px] text-on-surface-variant">
                     <span>{groups.length > 0 ? `Thư viện đối chiếu: ${groups.length} group.` : "Cache group lấy từ extension."}</span>
-                    <span className="shrink-0 font-bold text-slate-600 dark:text-slate-300">
+                    <span className="shrink-0 font-bold text-on-surface">
                       {targetType === "group" ? `${groupPostTargets.length} lệnh đăng` : ""}
                     </span>
                   </div>
@@ -1042,30 +913,30 @@ export default function DangBaiPage() {
 
               {/* Step 3: Nội dung */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Nội dung bài viết seeding</label>
-                <textarea 
-                  value={content} 
-                  onChange={ev => setContent(ev.target.value)} 
-                  placeholder="Nhập nội dung bài viết muốn đăng..." 
-                  className="w-full min-h-[120px] border border-slate-200 dark:border-slate-750 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#E3000F]/20 focus:border-[#E3000F] text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 resize-y transition" 
+                <label className={DS.label}>Nội dung bài viết seeding</label>
+                <textarea
+                  value={content}
+                  onChange={ev => setContent(ev.target.value)}
+                  placeholder="Nhập nội dung bài viết muốn đăng..."
+                  className={`${DS.field} min-h-[128px] resize-y`}
                 />
               </div>
 
               {/* Step 4: Hình ảnh */}
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Hình ảnh kèm theo (tùy chọn)</label>
+                <label className={DS.label}>Hình ảnh kèm theo (tùy chọn)</label>
                 <div className="flex items-center justify-center w-full">
-                  <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-slate-200 dark:border-slate-700/60 rounded-xl cursor-pointer bg-slate-50/50 dark:bg-slate-800/20 hover:bg-slate-100 dark:hover:bg-slate-800/40 hover:border-red-400/50 transition">
+                  <label className="flex h-24 w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-outline-variant bg-surface-container-low transition hover:border-primary hover:bg-primary/5">
                     <div className="flex flex-col items-center justify-center pt-3 pb-3">
-                      <MaterialIcon name="image" className="text-slate-400 dark:text-slate-500 text-2xl mb-1" />
-                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Click để chọn tải ảnh từ máy tính</p>
+                      <MaterialIcon name="image" className="mb-1 text-2xl text-on-surface-variant" />
+                      <p className="text-body-sm font-medium text-on-surface-variant">Click để chọn tải ảnh từ máy tính</p>
                     </div>
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      multiple 
-                      onChange={ev => upload(ev.target.files)} 
-                      className="hidden" 
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={ev => upload(ev.target.files)}
+                      className="hidden"
                     />
                   </label>
                 </div>
@@ -1073,10 +944,10 @@ export default function DangBaiPage() {
                 {mediaUrls.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-2">
                     {mediaUrls.map((u, i) => (
-                      <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 group shadow-sm bg-slate-100">
+                      <div key={i} className="relative h-16 w-16 overflow-hidden rounded-lg border border-outline-variant bg-surface-container-low shadow-sm group">
                         <img src={u} className="w-full h-full object-cover" alt="uploaded-preview" />
-                        <button 
-                          onClick={() => setMediaUrls(prev => prev.filter((_, j) => j !== i))} 
+                        <button
+                          onClick={() => setMediaUrls(prev => prev.filter((_, j) => j !== i))}
                           className="absolute top-1 right-1 bg-black/60 hover:bg-black text-white rounded-full w-4.5 h-4.5 flex items-center justify-center text-[10px] leading-none transition"
                         >
                           &times;
@@ -1089,22 +960,22 @@ export default function DangBaiPage() {
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 bg-slate-50/40 dark:bg-slate-800/40">
-              <button 
+            <div className="flex justify-end gap-sm border-t border-outline-variant bg-surface-container-low px-lg py-md">
+              <button
                 onClick={() => setIsPostModalOpen(false)}
-                className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-350 rounded-xl hover:bg-slate-150 dark:hover:bg-slate-800 font-semibold text-xs transition"
+                className={DS.secondaryButton}
               >
                 Hủy
               </button>
-              <button 
-                onClick={submit} 
-                disabled={sending} 
-                className="px-6 py-2.5 bg-[#E3000F] hover:bg-red-750 text-white rounded-xl font-bold text-xs flex items-center gap-2 transition disabled:opacity-50 shadow-sm shadow-red-500/10 hover:shadow-red-500/20 active:scale-[0.98]"
+              <button
+                onClick={submit}
+                disabled={sending}
+                className={DS.primaryButton}
               >
                 {sending ? (
                   <>
                     <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    {sendStatusText || `Đang gửi (${targetType === "group" ? groupPostTargets.length : selectedOnline.length})...`}
+                    Đang gửi ({targetType === "group" ? groupPostTargets.length : selectedOnline.length})...
                   </>
                 ) : (
                   <>

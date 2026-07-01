@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { 
-  allPlatformCategoriesService, 
-  teamsService, 
+import {
+  allPlatformCategoriesService,
+  teamsService,
   usersService,
   type AppUserProfile,
-  type TeamRow 
+  type TeamRow
 } from "@/services/all-platform.service";
 import type { Category, CategoryType } from "@/types/unified.types";
 import { cn } from "@/lib/utils";
@@ -76,13 +76,13 @@ function CategoryModal({ isOpen, onClose, onSave, editing, categoryType }: any) 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-[448px] rounded-2xl bg-[#FFFFFF] p-6 shadow-xl border border-[#E5E5E5] max-h-[90vh] overflow-y-auto">
-        <h2 className="mb-4 text-lg font-bold text-[#1A1A1A]">
+      <div className="w-full max-w-[448px] rounded-xl bg-surface p-6 shadow-xl border border-outline-variant max-h-[90vh] overflow-y-auto">
+        <h2 className="mb-4 text-lg font-bold text-on-surface">
           {editing ? "Sửa" : "Thêm"} danh mục
         </h2>
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-semibold text-[#A0A0A0]">
+            <label className="mb-1 block text-xs font-semibold text-on-surface-variant">
               Code {editing ? "(không đổi)" : "*"}
             </label>
             <input
@@ -91,37 +91,37 @@ function CategoryModal({ isOpen, onClose, onSave, editing, categoryType }: any) 
               onChange={(e) => setCode(e.target.value)}
               disabled={!!editing}
               placeholder="Ví dụ: tech, finance..."
-              className="w-full rounded-lg border border-[#333333] px-3 py-2 text-sm focus:border-[#E3000F] focus:outline-none disabled:bg-[#F5F5F5]"
+              className="w-full rounded-lg border border-[#333333] px-3 py-2 text-sm focus:border-primary focus:outline-none disabled:bg-surface-container-low"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold text-[#A0A0A0]">Tên</label>
+            <label className="mb-1 block text-xs font-semibold text-on-surface-variant">Tên</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Tên hiển thị"
-              className="w-full rounded-lg border border-[#333333] px-3 py-2 text-sm focus:border-[#E3000F] focus:outline-none"
+              className="w-full rounded-lg border border-[#333333] px-3 py-2 text-sm focus:border-primary focus:outline-none"
             />
           </div>
           {(categoryType === "industry" || categoryType === "tier") && (
             <div>
-              <label className="mb-1 block text-xs font-semibold text-[#A0A0A0]">Mô tả</label>
+              <label className="mb-1 block text-xs font-semibold text-on-surface-variant">Mô tả</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={2}
-                className="w-full rounded-lg border border-[#333333] px-3 py-2 text-sm focus:border-[#E3000F] focus:outline-none"
+                className="w-full rounded-lg border border-[#333333] px-3 py-2 text-sm focus:border-primary focus:outline-none"
               />
             </div>
           )}
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-[#A0A0A0]">Platform</label>
+            <label className="mb-1 block text-xs font-semibold text-on-surface-variant">Platform</label>
             <select
               value={platform}
               onChange={(e) => setPlatform(e.target.value)}
-              className="w-full rounded-lg border border-[#333333] px-3 py-2 text-sm focus:border-[#E3000F] focus:outline-none bg-white"
+              className="w-full rounded-lg border border-[#333333] px-3 py-2 text-sm focus:border-primary focus:outline-none bg-surface"
             >
               <option value="general">Tổng hợp (General)</option>
               <option value="facebook">Facebook</option>
@@ -130,10 +130,10 @@ function CategoryModal({ isOpen, onClose, onSave, editing, categoryType }: any) 
           </div>
         </div>
         <div className="mt-6 flex justify-end gap-3">
-          <button onClick={onClose} className="rounded-lg border px-4 py-2 text-sm text-[#666666] hover:bg-[#F5F5F5] cursor-pointer">
+          <button onClick={onClose} className="rounded-lg border px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low cursor-pointer">
             Hủy
           </button>
-          <button onClick={handleSubmit} disabled={isSubmitting || !code.trim()} className="rounded-lg bg-[#E3000F] px-4 py-2 text-sm text-white hover:bg-[#C40009] cursor-pointer disabled:opacity-50">
+          <button onClick={handleSubmit} disabled={isSubmitting || !code.trim()} className="rounded-lg bg-primary px-4 py-2 text-sm text-white hover:bg-on-primary-fixed-variant cursor-pointer disabled:opacity-50">
             {isSubmitting ? "Đang lưu..." : editing ? "Cập nhật" : "Thêm mới"}
           </button>
         </div>
@@ -147,7 +147,7 @@ function TeamModal({ isOpen, onClose, onSave, editing }: any) {
   const [nameTeam, setNameTeam] = useState("");
   const [leaderId, setLeaderId] = useState("");
   const [memberIds, setMemberIds] = useState<string[]>([]);
-  
+
   const [leaders, setLeaders] = useState<AppUserProfile[]>([]);
   const [allUsers, setAllUsers] = useState<AppUserProfile[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -190,20 +190,20 @@ function TeamModal({ isOpen, onClose, onSave, editing }: any) {
   };
 
   const toggleMember = (id: string) => {
-    setMemberIds(prev => 
+    setMemberIds(prev =>
       prev.includes(id) ? prev.filter(e => e !== id) : [...prev, id]
     );
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-[448px] rounded-2xl bg-[#FFFFFF] p-6 shadow-xl border border-[#E5E5E5] max-h-[90vh] flex flex-col">
-        <h2 className="mb-4 text-lg font-bold text-[#1A1A1A] shrink-0">
+      <div className="w-full max-w-[448px] rounded-xl bg-surface p-6 shadow-xl border border-outline-variant max-h-[90vh] flex flex-col">
+        <h2 className="mb-4 text-lg font-bold text-on-surface shrink-0">
           {editing ? "Sửa" : "Thêm"} Team
         </h2>
         <div className="space-y-4 overflow-y-auto pr-2 flex-1">
           <div>
-            <label className="mb-1 block text-xs font-semibold text-[#A0A0A0]">
+            <label className="mb-1 block text-xs font-semibold text-on-surface-variant">
               Tên Team {editing ? "(không đổi)" : "*"}
             </label>
             <input
@@ -212,18 +212,18 @@ function TeamModal({ isOpen, onClose, onSave, editing }: any) {
               onChange={(e) => setNameTeam(e.target.value)}
               disabled={!!editing}
               placeholder="Ví dụ: Team Alpha"
-              className="w-full rounded-lg border border-[#333333] px-3 py-2 text-sm focus:border-[#E3000F] focus:outline-none disabled:bg-[#F5F5F5]"
+              className="w-full rounded-lg border border-[#333333] px-3 py-2 text-sm focus:border-primary focus:outline-none disabled:bg-surface-container-low"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold text-[#A0A0A0]">
+            <label className="mb-1 block text-xs font-semibold text-on-surface-variant">
               Leader {editing ? "(không đổi)" : "*"}
             </label>
             <select
               value={leaderId}
               onChange={(e) => setLeaderId(e.target.value)}
               disabled={!!editing}
-              className="w-full rounded-lg border border-[#333333] px-3 py-2 text-sm focus:border-[#E3000F] focus:outline-none bg-white disabled:bg-[#F5F5F5]"
+              className="w-full rounded-lg border border-[#333333] px-3 py-2 text-sm focus:border-primary focus:outline-none bg-surface disabled:bg-surface-container-low"
             >
               <option value="">-- Chọn Leader --</option>
               {leaders.map(l => (
@@ -234,40 +234,40 @@ function TeamModal({ isOpen, onClose, onSave, editing }: any) {
               )}
             </select>
           </div>
-          
+
           <div>
-            <label className="mb-1 block text-xs font-semibold text-[#A0A0A0]">Members</label>
-            <div className="border border-[#E5E5E5] rounded-lg max-h-48 overflow-y-auto bg-slate-50 p-2 space-y-1">
+            <label className="mb-1 block text-xs font-semibold text-on-surface-variant">Members</label>
+            <div className="border border-outline-variant rounded-lg max-h-48 overflow-y-auto bg-surface-container-low p-2 space-y-1">
               {allUsers.length === 0 ? (
-                <div className="text-xs text-center p-2 text-gray-500">Đang tải user...</div>
+                <div className="text-xs text-center p-2 text-on-surface-variant">Đang tải user...</div>
               ) : (
                 allUsers.map(u => {
                   const uid = String(u.id);
                   const selected = memberIds.includes(uid);
                   return (
-                    <div 
-                      key={uid} 
+                    <div
+                      key={uid}
                       onClick={() => toggleMember(uid)}
-                      className={cn("flex items-center gap-2 p-2 rounded-md cursor-pointer text-xs transition border", selected ? "bg-[#E3000F]/10 border-[#E3000F]/30" : "bg-white border-transparent hover:border-gray-200")}
+                      className={cn("flex items-center gap-2 p-2 rounded-md cursor-pointer text-xs transition border", selected ? "bg-primary/10 border-primary/30" : "bg-surface border-transparent hover:border-outline-variant")}
                     >
-                      <input type="checkbox" checked={selected} readOnly className="cursor-pointer accent-[#E3000F]" />
+                      <input type="checkbox" checked={selected} readOnly className="cursor-pointer accent-primary" />
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-gray-900 truncate">{u.name || u.email.split("@")[0]}</div>
-                        <div className="text-gray-500 text-[10px] truncate">{u.email}</div>
+                        <div className="font-semibold text-on-surface truncate">{u.name || u.email.split("@")[0]}</div>
+                        <div className="text-on-surface-variant text-[10px] truncate">{u.email}</div>
                       </div>
                     </div>
                   )
                 })
               )}
             </div>
-            <div className="text-[10px] text-gray-500 mt-1 text-right">Đã chọn: {memberIds.length} member</div>
+            <div className="text-[10px] text-on-surface-variant mt-1 text-right">Đã chọn: {memberIds.length} member</div>
           </div>
         </div>
         <div className="mt-6 flex justify-end gap-3 shrink-0 pt-4 border-t">
-          <button onClick={onClose} className="rounded-lg border px-4 py-2 text-sm text-[#666666] hover:bg-[#F5F5F5] cursor-pointer">
+          <button onClick={onClose} className="rounded-lg border px-4 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low cursor-pointer">
             Hủy
           </button>
-          <button onClick={handleSubmit} disabled={isSubmitting || !nameTeam.trim() || !leaderId} className="rounded-lg bg-[#E3000F] px-4 py-2 text-sm text-white hover:bg-[#C40009] cursor-pointer disabled:opacity-50">
+          <button onClick={handleSubmit} disabled={isSubmitting || !nameTeam.trim() || !leaderId} className="rounded-lg bg-primary px-4 py-2 text-sm text-white hover:bg-on-primary-fixed-variant cursor-pointer disabled:opacity-50">
             {isSubmitting ? "Đang lưu..." : "Cập nhật"}
           </button>
         </div>
@@ -279,17 +279,17 @@ function TeamModal({ isOpen, onClose, onSave, editing }: any) {
 // ── MAIN COMPONENT ────────────────────────────────────────────────────────────
 export function CategoryManagement() {
   const [activeTab, setActiveTab] = useState<CategoryType>("intent");
-  
+
   // States for Categories (intent, industry, tier, icp)
   const [categories, setCategories] = useState<Category[]>([]);
   const [editingCategory, setEditingCategory] = useState<Category | undefined>();
   const [catModalOpen, setCatModalOpen] = useState(false);
-  
+
   // States for Teams
   const [teams, setTeams] = useState<TeamRow[]>([]);
   const [editingTeam, setEditingTeam] = useState<any>();
   const [teamModalOpen, setTeamModalOpen] = useState(false);
-  
+
   const [isLoading, setIsLoading] = useState(false);
   const [search, setSearch] = useState("");
 
@@ -352,9 +352,9 @@ export function CategoryManagement() {
       const leaderId = String((t as any).id_leader || "");
       const key = `${t.name_team}_${leaderId}`;
       if (!map.has(key)) {
-        map.set(key, { 
-          name_team: t.name_team, 
-          id_leader: leaderId, 
+        map.set(key, {
+          name_team: t.name_team,
+          id_leader: leaderId,
           member_ids: [],
         });
       }
@@ -384,10 +384,10 @@ export function CategoryManagement() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-bold text-[#1A1A1A]">Quản lý danh mục</h2>
+      <h2 className="text-lg font-bold text-on-surface">Quản lý danh mục</h2>
 
       {/* Tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-[#E5E5E5] pb-2">
+      <div className="flex flex-wrap gap-2 border-b border-outline-variant pb-2">
         {CATEGORY_TABS.map((tab) => (
           <button
             key={tab.type}
@@ -399,8 +399,8 @@ export function CategoryManagement() {
             className={cn(
               "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer",
               activeTab === tab.type
-                ? "bg-[#E3000F] text-white shadow-sm"
-                : "bg-[#F5F5F5] text-[#666666] hover:bg-[#E5E5E5] hover:text-[#1A1A1A]",
+                ? "bg-primary text-white shadow-sm"
+                : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container-highest hover:text-on-surface",
             )}
           >
             <span>{tab.icon}</span>
@@ -416,20 +416,20 @@ export function CategoryManagement() {
           placeholder="Tìm kiếm..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 rounded-lg border border-[#E5E5E5] px-4 py-2.5 text-sm focus:border-[#E3000F] focus:outline-none focus:ring-2 focus:ring-[#E3000F]/20"
+          className="flex-1 rounded-lg border border-outline-variant px-4 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
         />
         <button
           type="button"
-          onClick={() => { 
+          onClick={() => {
             if (activeTab === "team") {
-              setEditingTeam(undefined); 
-              setTeamModalOpen(true); 
+              setEditingTeam(undefined);
+              setTeamModalOpen(true);
             } else {
-              setEditingCategory(undefined); 
-              setCatModalOpen(true); 
+              setEditingCategory(undefined);
+              setCatModalOpen(true);
             }
           }}
-          className="rounded-lg bg-[#E3000F] px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-[#C40009] cursor-pointer flex items-center gap-2"
+          className="rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-on-primary-fixed-variant cursor-pointer flex items-center gap-2"
         >
           <MaterialIcon name="add" className="text-lg" />
           Thêm mới
@@ -437,47 +437,47 @@ export function CategoryManagement() {
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-xl border border-[#E5E5E5] shadow-sm">
+      <div className="overflow-x-auto rounded-xl border border-outline-variant shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-[#F5F5F5] border-b border-[#E5E5E5]">
+          <thead className="bg-surface-container-low border-b border-outline-variant">
             <tr>
               {cols.map((col) => (
-                <th key={col} className="px-4 py-3.5 text-left font-bold text-[#A0A0A0] uppercase tracking-wider text-xs">
+                <th key={col} className="px-4 py-3.5 text-left font-bold text-on-surface-variant uppercase text-xs">
                   {col.replace(/_/g, " ")}
                 </th>
               ))}
-              <th className="px-4 py-3.5 text-right font-bold text-[#A0A0A0] uppercase tracking-wider text-xs">Hành động</th>
+              <th className="px-4 py-3.5 text-right font-bold text-on-surface-variant uppercase text-xs">Hành động</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#E5E5E5] bg-white">
+          <tbody className="divide-y divide-outline-variant bg-surface">
             {isLoading ? (
               <tr>
-                <td colSpan={cols.length + 1} className="px-4 py-12 text-center text-[#A0A0A0]">
-                  <div className="w-6 h-6 border-2 border-[#E5E5E5] border-t-[#E3000F] rounded-full animate-spin mx-auto mb-2" />
+                <td colSpan={cols.length + 1} className="px-4 py-12 text-center text-on-surface-variant">
+                  <div className="w-6 h-6 border-2 border-outline-variant border-t-primary rounded-full animate-spin mx-auto mb-2" />
                   Đang tải dữ liệu...
                 </td>
               </tr>
             ) : activeTab === "team" ? (
               filteredTeams.length === 0 ? (
-                <tr><td colSpan={cols.length + 1} className="px-4 py-8 text-center text-[#A0A0A0]">Không có dữ liệu</td></tr>
+                <tr><td colSpan={cols.length + 1} className="px-4 py-8 text-center text-on-surface-variant">Không có dữ liệu</td></tr>
               ) : (
                 filteredTeams.map((t) => (
-                  <tr key={`${t.name_team}_${t.leader_email}`} className="hover:bg-[#F5F5F5]/50">
-                    <td className="px-4 py-3 font-semibold text-[#1A1A1A]">{t.name_team}</td>
-                    <td className="px-4 py-3 text-[#666666]">{t.leader_email}</td>
-                    <td className="px-4 py-3 text-[#1A1A1A] font-bold">{t.number_of_member} <span className="font-normal text-gray-500 text-xs">members</span></td>
+                  <tr key={`${t.name_team}_${t.leader_email}`} className="hover:bg-surface-container-low">
+                    <td className="px-4 py-3 font-semibold text-on-surface">{t.name_team}</td>
+                    <td className="px-4 py-3 text-on-surface-variant">{t.leader_email}</td>
+                    <td className="px-4 py-3 text-on-surface font-bold">{t.number_of_member} <span className="font-normal text-on-surface-variant text-xs">members</span></td>
                     <td className="px-4 py-3 text-right">
                       <button
                         type="button"
                         onClick={() => { setEditingTeam(t); setTeamModalOpen(true); }}
-                        className="mr-3 text-xs font-bold text-[#E3000F] hover:text-[#C40009] hover:underline cursor-pointer"
+                        className="mr-3 text-xs font-bold text-primary hover:text-on-primary-fixed-variant hover:underline cursor-pointer"
                       >
                         Sửa
                       </button>
                       <button
                         type="button"
                         onClick={() => handleDeleteTeam(t.name_team, t.leader_email)}
-                        className="text-xs font-bold text-[#A0A0A0] hover:text-[#E3000F] hover:underline cursor-pointer"
+                        className="text-xs font-bold text-on-surface-variant hover:text-primary hover:underline cursor-pointer"
                       >
                         Xóa
                       </button>
@@ -487,12 +487,12 @@ export function CategoryManagement() {
               )
             ) : (
               filteredCategories.length === 0 ? (
-                <tr><td colSpan={cols.length + 1} className="px-4 py-8 text-center text-[#A0A0A0]">Không có dữ liệu</td></tr>
+                <tr><td colSpan={cols.length + 1} className="px-4 py-8 text-center text-on-surface-variant">Không có dữ liệu</td></tr>
               ) : (
                 filteredCategories.map((cat) => (
-                  <tr key={cat.id} className="hover:bg-[#F5F5F5]/50">
+                  <tr key={cat.id} className="hover:bg-surface-container-low">
                     {cols.map((col) => (
-                      <td key={col} className={cn("px-4 py-3 text-[#1A1A1A]", col === "code" && "font-semibold")}>
+                      <td key={col} className={cn("px-4 py-3 text-on-surface", col === "code" && "font-semibold")}>
                         {(cat as any)[col] || "-"}
                       </td>
                     ))}
@@ -500,14 +500,14 @@ export function CategoryManagement() {
                       <button
                         type="button"
                         onClick={() => { setEditingCategory(cat); setCatModalOpen(true); }}
-                        className="mr-3 text-xs font-bold text-[#E3000F] hover:text-[#C40009] hover:underline cursor-pointer"
+                        className="mr-3 text-xs font-bold text-primary hover:text-on-primary-fixed-variant hover:underline cursor-pointer"
                       >
                         Sửa
                       </button>
                       <button
                         type="button"
                         onClick={() => handleDeleteCategory(cat.id)}
-                        className="text-xs font-bold text-[#A0A0A0] hover:text-[#E3000F] hover:underline cursor-pointer"
+                        className="text-xs font-bold text-on-surface-variant hover:text-primary hover:underline cursor-pointer"
                       >
                         Xóa
                       </button>
@@ -528,7 +528,7 @@ export function CategoryManagement() {
         categoryType={activeTab}
       />
 
-      <TeamModal 
+      <TeamModal
         isOpen={teamModalOpen}
         onClose={() => setTeamModalOpen(false)}
         onSave={handleSaveTeam}

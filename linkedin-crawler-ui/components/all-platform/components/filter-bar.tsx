@@ -5,9 +5,7 @@ import { FaSearch } from "react-icons/fa";
 import { cn } from "@/lib/utils";
 import type { Category } from "@/types/unified.types";
 
-export type SortOption = "latest" | "score_high" | "score_low" | "comments_high" | "crawler" | "most_seeded" | "verified_first";
-
-export type SeedingStatusFilter = "all" | "seeded" | "verified" | "pending" | "rejected";
+export type SortOption = "latest" | "score_high" | "score_low" | "comments_high" | "crawler";
 
 interface FilterBarProps {
   intents: Category[];
@@ -34,8 +32,6 @@ export interface FilterState {
   member: string;
   sort: SortOption;
   dateRange: string;
-  /** Phase 6: filter posts by seeding status (admin/leader) */
-  seeding_status: SeedingStatusFilter;
 }
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
@@ -44,9 +40,6 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "score_low", label: "Score thấp nhất" },
   { value: "comments_high", label: "Bình luận nhiều nhất" },
   { value: "crawler", label: "Theo người cào (Team & Tên)" },
-  // Phase 6: sort by seeding
-  { value: "most_seeded", label: "Nhiều seeding nhất" },
-  { value: "verified_first", label: "Verified nhiều nhất" },
 ];
 
 const DATE_OPTIONS = [
@@ -57,13 +50,9 @@ const DATE_OPTIONS = [
   { value: "30days", label: "30 ngày" },
 ];
 
-const SEEDING_STATUS_OPTIONS: { value: SeedingStatusFilter; label: string; color: string }[] = [
-  { value: "all", label: "Tất cả", color: "slate" },
-  { value: "seeded", label: "Đã seeding", color: "emerald" },
-  { value: "verified", label: "Đã verify", color: "green" },
-  { value: "pending", label: "Chờ verify", color: "amber" },
-  { value: "rejected", label: "Bị từ chối", color: "red" },
-];
+const fieldClass =
+  "border border-outline-variant bg-surface hover:bg-surface-container-low focus:border-primary focus:ring-2 focus:ring-primary/15 rounded-lg px-sm py-xs text-body-sm font-semibold text-on-surface outline-none transition cursor-pointer shadow-sm";
+const selectClass = `${fieldClass} min-w-[120px]`;
 
 export function FilterBar({ intents, industries, teams, tiers, icps, contentTypes = [], productSeedings = [], members = [], onFilter, isLoading }: FilterBarProps) {
   const [search, setSearch] = useState("");
@@ -77,8 +66,6 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
   const [member, setMember] = useState("");
   const [sort, setSort] = useState<SortOption>("latest");
   const [dateRange, setDateRange] = useState("");
-  // Phase 6: seeding status filter (admin/leader)
-  const [seedingStatus, setSeedingStatus] = useState<SeedingStatusFilter>("all");
 
   const handleChange = (updates: Partial<FilterState>) => {
     const s = updates.search !== undefined ? updates.search : search;
@@ -92,7 +79,6 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
     const m = updates.member !== undefined ? updates.member : member;
     const so = updates.sort !== undefined ? updates.sort : sort;
     const dr = updates.dateRange !== undefined ? updates.dateRange : dateRange;
-    const ss = updates.seeding_status !== undefined ? updates.seeding_status : seedingStatus;
 
     onFilter({
       search: s,
@@ -121,7 +107,6 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
     setMember("");
     setSort("latest");
     setDateRange("");
-    setSeedingStatus("all");
     onFilter({
       search: "",
       intent: "",
@@ -134,14 +119,13 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
       member: "",
       sort: "latest",
       dateRange: "",
-      seeding_status: "all",
     });
   };
 
   return (
-    <div className="bg-[#F5F5F5]/50 flex flex-wrap items-center gap-3 rounded-2xl border border-[#E5E5E5] p-4 shadow-[0_4px_20px_rgba(0,0,0,0.015)]">
+    <div className="flex flex-wrap items-center gap-sm rounded-xl border border-outline-variant bg-surface p-md shadow-sm">
       <div className="relative min-w-[200px] flex-1">
-        <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0A0A0] text-sm" />
+        <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm" />
         <input
           type="text"
           placeholder="Tìm kiếm nội dung, tên nhóm..."
@@ -150,7 +134,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
             setSearch(e.target.value);
             handleChange({ search: e.target.value });
           }}
-          className="w-full border border-[#333333] bg-[#FFFFFF] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl pl-9 pr-4 py-2 text-xs font-semibold text-[#1A1A1A] outline-none transition shadow-sm"
+          className="w-full rounded-lg border border-outline-variant bg-surface py-xs pl-9 pr-sm text-body-sm font-semibold text-on-surface shadow-sm outline-none transition placeholder:text-on-surface-variant focus:border-primary focus:ring-2 focus:ring-primary/15"
         />
       </div>
 
@@ -160,7 +144,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
           setDateRange(e.target.value);
           handleChange({ dateRange: e.target.value });
         }}
-        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[110px]"
+        className={`${fieldClass} min-w-[110px]`}
       >
         {DATE_OPTIONS.map((o) => (
           <option key={o.value} value={o.value}>
@@ -175,27 +159,9 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
           setSort(e.target.value as SortOption);
           handleChange({ sort: e.target.value as SortOption });
         }}
-        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
+        className={`${fieldClass} min-w-[130px]`}
       >
         {SORT_OPTIONS.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-
-      {/* Phase 6: seeding status filter */}
-      <select
-        value={seedingStatus}
-        onChange={(e) => {
-          const val = e.target.value as SeedingStatusFilter;
-          setSeedingStatus(val);
-          handleChange({ seeding_status: val });
-        }}
-        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
-        title="Lọc theo trạng thái seeding"
-      >
-        {SEEDING_STATUS_OPTIONS.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}
           </option>
@@ -208,7 +174,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
           setIntent(e.target.value);
           handleChange({ intent: e.target.value });
         }}
-        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[120px]"
+        className={selectClass}
       >
         <option value="">Tất cả Lĩnh vực</option>
         {intents.map((i) => (
@@ -224,7 +190,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
           setIndustry(e.target.value);
           handleChange({ industry: e.target.value });
         }}
-        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[120px]"
+        className={selectClass}
       >
         <option value="">Tất cả Ngành</option>
         {industries.map((i) => (
@@ -240,7 +206,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
           setTeam(e.target.value);
           handleChange({ team: e.target.value });
         }}
-        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[120px]"
+        className={selectClass}
       >
         <option value="">Tất cả Team</option>
         {teams.map((t) => (
@@ -256,7 +222,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
           setTier(e.target.value);
           handleChange({ tier: e.target.value });
         }}
-        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[110px]"
+        className={`${fieldClass} min-w-[110px]`}
       >
         <option value="">Tất cả Tier</option>
         {tiers.map((t) => (
@@ -273,7 +239,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
             setIcp(e.target.value);
             handleChange({ icp: e.target.value });
           }}
-          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[110px]"
+          className={`${fieldClass} min-w-[110px]`}
         >
           <option value="">Tất cả ICP</option>
           {icps.map((c) => (
@@ -291,7 +257,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
             setContentType(e.target.value);
             handleChange({ content_type: e.target.value });
           }}
-          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[120px]"
+          className={selectClass}
         >
           <option value="">Loại nội dung</option>
           {contentTypes.map((c) => (
@@ -309,7 +275,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
             setProductSeeding(e.target.value);
             handleChange({ product_seeding: e.target.value });
           }}
-          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
+          className={`${fieldClass} min-w-[130px]`}
         >
           <option value="">Sản phẩm Seeding</option>
           {productSeedings.map((c) => (
@@ -327,7 +293,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
             setMember(e.target.value);
             handleChange({ member: e.target.value });
           }}
-          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
+          className={`${fieldClass} min-w-[130px]`}
         >
           <option value="">Tất cả Thành viên</option>
           {members.map((m) => (
@@ -343,7 +309,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
         type="button"
         onClick={clearFilters}
         disabled={isLoading}
-        className="ml-auto rounded-xl bg-white border border-[#E5E5E5] px-4 py-2 text-xs font-bold text-[#E3000F] hover:bg-[#E3000F]/5 hover:border-[#E3000F]/30 transition shadow-sm cursor-pointer disabled:opacity-50"
+        className="ml-auto rounded-lg border border-outline-variant bg-surface px-md py-xs text-body-sm font-semibold text-primary shadow-sm transition hover:border-primary hover:bg-primary/5 cursor-pointer disabled:opacity-50"
       >
         Xóa lọc
       </button>

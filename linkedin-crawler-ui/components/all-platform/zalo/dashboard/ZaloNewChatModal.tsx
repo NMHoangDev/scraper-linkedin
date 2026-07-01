@@ -125,40 +125,40 @@ export function ZaloNewChatModal({
       aria-labelledby="zalo-new-chat-title"
     >
       <div
-        className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-[440px] shadow-2xl border border-slate-200 dark:border-slate-800"
+        className="bg-surface rounded-xl w-full max-w-[440px] shadow-2xl border border-outline-variant"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-outline-variant">
           <div>
             <h2
               id="zalo-new-chat-title"
-              className="text-[15px] font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2"
+              className="text-[15px] font-semibold text-on-surface flex items-center gap-2"
             >
-              <MaterialIcon name="person_add" className="text-[#E3000F] text-base" />
+              <MaterialIcon name="person_add" className="text-primary text-base" />
               Nhắn tin cho người lạ
             </h2>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+            <p className="text-[11px] text-on-surface-variant mt-0.5">
               Tìm Zalo theo SĐT rồi gửi tin nhắn nếu user cho phép nhận.
             </p>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition shrink-0"
+            className="p-1.5 hover:bg-surface-container-low rounded-lg transition shrink-0"
             title="Đóng"
             aria-label="Đóng"
           >
-            <MaterialIcon name="close" className="text-base text-slate-500" />
+            <MaterialIcon name="close" className="text-base text-on-surface-variant" />
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-100 dark:border-slate-800 px-5">
+        <div className="flex border-b border-outline-variant px-5">
           <button
             onClick={() => switchMode("phone")}
             className={`flex-1 py-2.5 text-[12px] font-medium transition ${
               mode === "phone"
-                ? "text-[#E3000F] border-b-2 border-[#E3000F]"
-                : "text-slate-400 hover:text-slate-600"
+                ? "text-primary border-b-2 border-primary"
+                : "text-on-surface-variant hover:text-on-surface-variant"
             }`}
           >
             Số điện thoại
@@ -167,8 +167,8 @@ export function ZaloNewChatModal({
             onClick={() => switchMode("username")}
             className={`flex-1 py-2.5 text-[12px] font-medium transition ${
               mode === "username"
-                ? "text-[#E3000F] border-b-2 border-[#E3000F]"
-                : "text-slate-400 hover:text-slate-600"
+                ? "text-primary border-b-2 border-primary"
+                : "text-on-surface-variant hover:text-on-surface-variant"
             }`}
           >
             Username Zalo
@@ -177,7 +177,7 @@ export function ZaloNewChatModal({
 
         <div className="px-5 py-4 space-y-3">
           <div>
-            <label className="text-[11px] text-slate-500 dark:text-slate-400 mb-1 block">
+            <label className="text-[11px] text-on-surface-variant mb-1 block">
               {mode === "phone" ? "Số điện thoại Việt Nam" : "Username Zalo"}
             </label>
             <div className="flex gap-2">
@@ -194,16 +194,16 @@ export function ZaloNewChatModal({
                     ? "0839108906, +84939108906, ..."
                     : "vd: nguyen.van.a"
                 }
-                className="flex-1 px-3 py-2 text-[13px] border border-slate-200 dark:border-slate-700
-                           bg-white dark:bg-slate-800 rounded-lg
-                           focus:outline-none focus:ring-2 focus:ring-[#E3000F]/40 focus:border-[#E3000F]"
+                className="flex-1 px-3 py-2 text-[13px] border border-outline-variant
+                           bg-surface rounded-lg
+                           focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 autoComplete="off"
                 inputMode={mode === "phone" ? "tel" : "text"}
               />
               <button
                 onClick={handleSearch}
                 disabled={!canSearch || searching}
-                className="px-4 py-2 bg-[#E3000F] text-white text-[12px] font-medium rounded-lg
+                className="px-4 py-2 bg-primary text-white text-[12px] font-medium rounded-lg
                            hover:opacity-90 disabled:opacity-40 transition shrink-0 min-w-[72px]
                            flex items-center justify-center gap-1.5"
               >
@@ -221,18 +221,18 @@ export function ZaloNewChatModal({
               </button>
             </div>
             {mode === "phone" ? (
-              <p className="text-[10.5px] text-slate-400 mt-1.5">
+              <p className="text-[10.5px] text-on-surface-variant mt-1.5">
                 Hỗ trợ nhiều định dạng: {PHONE_EXAMPLES.join(" · ")}
               </p>
             ) : (
-              <p className="text-[10.5px] text-slate-400 mt-1.5">
+              <p className="text-[10.5px] text-on-surface-variant mt-1.5">
                 Nhập chính xác username Zalo (không có @).
               </p>
             )}
           </div>
 
           {error && (
-            <div className="text-[12px] text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/40 rounded-lg p-3 leading-relaxed">
+            <div className="text-[12px] text-red-700 bg-red-50 border border-red-100 rounded-lg p-3 leading-relaxed">
               <div className="flex items-start gap-2">
                 <MaterialIcon name="error" className="text-base shrink-0 mt-0.5" />
                 <span>{error}</span>
@@ -241,7 +241,7 @@ export function ZaloNewChatModal({
           )}
 
           {found && (
-            <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-3.5 flex items-center gap-3 bg-slate-50/60 dark:bg-slate-800/40">
+            <div className="border border-outline-variant rounded-xl p-3.5 flex items-center gap-3 bg-surface-container-low">
               {found.avatar_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -255,15 +255,15 @@ export function ZaloNewChatModal({
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <div className="font-semibold text-[13px] text-slate-800 dark:text-slate-100 truncate">
+                <div className="font-semibold text-[13px] text-on-surface truncate">
                   {found.display_name}
                 </div>
                 {found.zalo_name && (
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                  <div className="text-[11px] text-on-surface-variant truncate">
                     @{found.zalo_name}
                   </div>
                 )}
-                <div className="text-[10.5px] text-emerald-600 dark:text-emerald-400 mt-0.5 flex items-center gap-1">
+                <div className="text-[10.5px] text-emerald-600 mt-0.5 flex items-center gap-1">
                   <MaterialIcon name="check_circle" className="text-[12px]" />
                   Có thể nhận tin nhắn
                 </div>
@@ -292,7 +292,7 @@ export function ZaloNewChatModal({
         </div>
 
         <div className="px-5 pb-4">
-          <p className="text-[10.5px] text-slate-400 dark:text-slate-500 leading-relaxed">
+          <p className="text-[10.5px] text-on-surface-variant leading-relaxed">
             ⚠️ Tính năng này chỉ dùng cho khách hàng thân thiết. Nếu user đã tắt
             "Nhận tin nhắn từ người lạ" trong cài đặt Zalo, bạn sẽ nhận thông báo
             lỗi và không thể gửi.

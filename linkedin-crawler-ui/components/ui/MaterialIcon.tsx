@@ -4,6 +4,7 @@ export type MaterialSymbolName =
   | "search"
   | "notifications"
   | "settings"
+  | "menu"
   | "radar"
   | "download"
   | "group"
@@ -111,15 +112,8 @@ export type MaterialSymbolName =
   | "content_copy"
   | "cookie"
   | "warning_amber"
-  | "expand_more"
-  | "expand_less"
   | "navigate_next"
-  | "navigate_before"
-  | "keyboard_arrow_down"
-  | "keyboard_arrow_right"
-  | "person_off"
-  | "circle"
-  | "hourglass_empty";
+  | "keyboard_arrow_down";
 
 export interface MaterialIconProps {
   name: MaterialSymbolName;

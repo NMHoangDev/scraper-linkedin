@@ -72,7 +72,7 @@ export function DashboardAuthGate({
   return (
     <div className="min-h-screen bg-background text-on-background">
       <div className="mx-auto flex min-h-screen w-full max-w-[1024px] flex-col items-stretch justify-center px-lg py-xl">
-        <div className="border-outline-variant bg-surface-container-lowest mx-auto w-full max-w-[640px] rounded-2xl border p-xl shadow-lg">
+        <div className="border-outline-variant bg-surface-container-lowest mx-auto w-full max-w-[640px] rounded-xl border p-xl shadow-lg">
           <div className="mb-lg flex items-center gap-3">
             <div className="bg-primary/10 text-primary flex h-12 w-12 items-center justify-center rounded-full">
               <MaterialIcon name="lock" className="text-2xl" />
@@ -90,7 +90,7 @@ export function DashboardAuthGate({
 
           <form className="flex flex-col gap-md" onSubmit={handleSubmit}>
             <div className="flex flex-col gap-base">
-              <label className="text-label-md text-on-surface-variant font-semibold tracking-wide uppercase">
+              <label className="text-label-md text-on-surface-variant font-semibold uppercase">
                 Email LinkedIn
               </label>
               <input
@@ -103,7 +103,7 @@ export function DashboardAuthGate({
               />
             </div>
             <div className="flex flex-col gap-base">
-              <label className="text-label-md text-on-surface-variant font-semibold tracking-wide uppercase">
+              <label className="text-label-md text-on-surface-variant font-semibold uppercase">
                 Mật khẩu
               </label>
               <input

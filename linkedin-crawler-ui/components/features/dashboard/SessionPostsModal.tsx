@@ -290,7 +290,7 @@ export function SessionPostsModal({
                                 rowNum,
                               })
                             }
-                            className="border-primary text-primary hover:bg-primary/5 inline-flex shrink-0 items-center gap-1 rounded-lg border bg-transparent px-sm py-1.5 text-[11px] font-bold uppercase tracking-wide"
+                            className="border-primary text-primary hover:bg-primary/5 inline-flex shrink-0 items-center gap-1 rounded-lg border bg-transparent px-sm py-1.5 text-[11px] font-bold uppercase"
                           >
                             <MaterialIcon
                               name="visibility"

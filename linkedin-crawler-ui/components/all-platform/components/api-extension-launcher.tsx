@@ -8,7 +8,6 @@ declare global {
 declare const chrome: any;
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { allPlatformGroupsService, authService } from "@/services/all-platform.service";
 import { API_BASE_URL } from "@/lib/env";
@@ -21,12 +20,11 @@ interface ExtensionGroup {
 
 interface ExtensionLauncherProps {
   className?: string;
-  onComplete?: (postsCount: number, launchedGroups?: any[]) => void;
-  onCrawlSaved?: (data: { count: number; groupId: string; groupUrl: string; postUrls: string[] }) => void;
+  onComplete?: (postsCount: number) => void;
+  onCrawlSaved?: (data: { count: number; groupId: string; groupUrl: string }) => void;
 }
 
 export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: ExtensionLauncherProps) {
-  const groupsToCrawlRef = useRef<any[]>([]);
   const [isLaunching, setIsLaunching] = useState(false);
   const [isDone, setIsDone] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -111,7 +109,7 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
           ...prev,
           `🎉 Hoàn tất! ${msg.totalPosts ?? 0} bài viết từ ${msg.totalGroups ?? 0} groups`,
         ]);
-        onCompleteRef.current?.(msg.totalPosts ?? 0, groupsToCrawlRef.current);
+        onCompleteRef.current?.(msg.totalPosts ?? 0);
       } else if (msg.type === 'API_LAUNCH_FROM_APP_RESULT') {
         if (msg.success) {
           setLaunchLog((prev) => [
@@ -144,8 +142,7 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
         onCrawlSavedRef.current?.({
           count: savedData.count ?? 0,
           groupId: savedData.group_id ?? '',
-          groupUrl: savedData.group_url ?? '',
-          postUrls: savedData.post_urls ?? []
+          groupUrl: savedData.group_url ?? ''
         });
       }
     };
@@ -164,14 +161,13 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
         onCrawlSavedRef.current?.({
           count: savedData.count ?? 0,
           groupId: savedData.group_id ?? '',
-          groupUrl: savedData.group_url ?? '',
-          postUrls: savedData.post_urls ?? []
+          groupUrl: savedData.group_url ?? ''
         });
       }
     };
 
     window.addEventListener('message', handler);
-    
+
     if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage?.addListener) {
       chrome.runtime.onMessage.addListener(handleRuntimeMessage);
     }
@@ -245,8 +241,7 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
               onCrawlSavedRef.current?.({
                 count: saved,
                 groupId: savedData.group_id ?? '',
-                groupUrl: savedData.group_url ?? '',
-                postUrls: savedData.post_urls ?? []
+                groupUrl: savedData.group_url ?? ''
               });
             }
           } catch (e) {
@@ -309,7 +304,7 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
     try {
       const meRes = await authService.me();
       const idMember = meRes?.data?.id || (meRes?.data as any)?.user?.id || '';
-      
+
       if (!idMember) {
         setLaunchLog((prev) => [
           ...prev,
@@ -339,17 +334,15 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
         name: g.group_name || 'Group',
         url: g.group_url,
       }));
-      
-      groupsToCrawlRef.current = extensionGroups;
 
       window.postMessage(
         {
           type: 'API_LAUNCH_FROM_APP',
           data: {
             groups: extensionGroups,
-            config: { 
-              maxPosts: 100, 
-              scrollDelay: 2000, 
+            config: {
+              maxPosts: 100,
+              scrollDelay: 2000,
               autoNextGroup: true,
               idMember: idMember
             },
@@ -385,27 +378,27 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
 
   // ── Render button + dialog ────────────────────────────────────────────────
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden flex flex-col transition-all duration-300 w-full mb-6 relative z-10">
+    <div className="bg-surface rounded-xl border border-outline-variant shadow-sm overflow-hidden flex flex-col transition-all duration-300 w-full mb-6 relative z-10">
       {/* Header / Launcher */}
-      <div className="flex items-center justify-between p-4 bg-slate-50/50">
+      <div className="flex items-center justify-between p-4 bg-surface-container-low">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center shrink-0 border border-red-100">
-            <span className="material-symbols-outlined text-red-600 text-[22px]">auto_awesome</span>
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-100 to-purple-100 flex items-center justify-center shrink-0 border border-violet-200/50">
+            <span className="material-symbols-outlined text-violet-600 text-[22px]">auto_awesome</span>
           </div>
           <div>
-            <h3 className="font-bold text-slate-800 text-sm leading-tight">Siêu Tốc Cào Dữ Liệu (API Extension)</h3>
-            <p className="text-xs text-slate-500 leading-tight mt-0.5">
+            <h3 className="font-bold text-on-surface text-sm leading-tight">Siêu Tốc Cào Dữ Liệu (API Extension)</h3>
+            <p className="text-xs text-on-surface-variant leading-tight mt-0.5">
               {isLaunching
                 ? `Đang xử lý ${crawlProgress.totalGroups} groups...`
                 : "Nhấn bắt đầu để tự động gọi GraphQL API."}
             </p>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <a href="https://drive.google.com/uc?export=download&id=1wuUVMipbWMTW726F9_XfgGrC3k-gbeRD"
             target="_blank" rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold transition cursor-pointer">
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-violet-200 bg-violet-50 hover:bg-violet-100 text-violet-700 text-xs font-bold transition cursor-pointer">
             <span className="material-symbols-outlined text-[16px]">download</span>
             Tải Extension
           </a>
@@ -426,21 +419,21 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
                   onCompleteRef.current?.(0);
                   handleLaunch();
                 }}
-                className="px-4 py-2 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold transition-all shadow-sm hover:shadow active:scale-[0.98] flex items-center gap-1.5 cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700 text-xs font-bold transition-all shadow-sm hover:shadow active:scale-[0.98] flex items-center gap-1.5 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px]">refresh</span>
                 Cào lại
               </button>
               <button
                 type="button"
-                onClick={() => { 
-                  setIsDone(false); 
-                  setIsLaunching(false); 
-                  setLaunchLog([]); 
-                  setScrapedGroups([]); 
+                onClick={() => {
+                  setIsDone(false);
+                  setIsLaunching(false);
+                  setLaunchLog([]);
+                  setScrapedGroups([]);
                   onCompleteRef.current?.(0);
                 }}
-                className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container-highest text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px]">close</span>
                 Đóng
@@ -450,55 +443,55 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
             <button
               type="button"
               onClick={() => setShowModal(true)}
-              className="px-4 py-2 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold transition-all shadow-sm hover:shadow active:scale-[0.98] flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700 text-xs font-bold transition-all shadow-sm hover:shadow active:scale-[0.98] flex items-center gap-1.5 cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px]">play_circle</span>
-              Siêu Tốc Cào Dữ Liệu
+              Nút: Siêu Tốc Cào Dữ Liệu
             </button>
           )}
         </div>
       </div>
 
       {/* Select Groups Modal */}
-      {showModal && typeof document !== "undefined" && createPortal(
+      {showModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
-            <div className="flex items-center justify-between p-4 border-b border-slate-100">
+          <div className="bg-surface rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between p-4 border-b border-outline-variant">
               <div>
-                <h3 className="font-bold text-slate-800 text-lg">Chọn nhóm cần cào</h3>
-                <p className="text-sm text-slate-500 mt-1">
+                <h3 className="font-bold text-on-surface text-lg">Chọn nhóm cần cào</h3>
+                <p className="text-sm text-on-surface-variant mt-1">
                   Đã chọn {selectedGroupIds.length}/{availableGroups.length} nhóm
                 </p>
               </div>
-              <button 
+              <button
                 onClick={() => setShowModal(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors"
+                className="w-8 h-8 rounded-full bg-surface-container-low hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant transition-colors"
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
-            
-            <div className="p-4 flex-1 overflow-y-auto bg-slate-50/50">
+
+            <div className="p-4 flex-1 overflow-y-auto bg-surface-container-low">
               <div className="flex gap-2 mb-4">
-                <button 
+                <button
                   onClick={() => setSelectedGroupIds(availableGroups.map(g => g.id))}
                   className="text-sm font-medium text-violet-600 bg-violet-100 hover:bg-violet-200 px-3 py-1.5 rounded-lg transition"
                 >
                   Chọn tất cả
                 </button>
-                <button 
+                <button
                   onClick={() => setSelectedGroupIds([])}
-                  className="text-sm font-medium text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 px-3 py-1.5 rounded-lg transition"
+                  className="text-sm font-medium text-on-surface-variant bg-surface border border-outline-variant hover:bg-surface-container-low px-3 py-1.5 rounded-lg transition"
                 >
                   Bỏ chọn tất cả
                 </button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {availableGroups.map((group) => (
-                  <label key={group.id} className="flex items-start gap-3 p-3 bg-white rounded-xl border border-slate-200 hover:border-violet-300 hover:shadow-sm cursor-pointer transition">
-                    <input 
-                      type="checkbox" 
-                      className="mt-1 w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                  <label key={group.id} className="flex items-start gap-3 p-3 bg-surface rounded-xl border border-outline-variant hover:border-violet-300 hover:shadow-sm cursor-pointer transition">
+                    <input
+                      type="checkbox"
+                      className="mt-1 w-4 h-4 rounded border-outline-variant text-violet-600 focus:ring-violet-500"
                       checked={selectedGroupIds.includes(group.id)}
                       onChange={(e) => {
                         if (e.target.checked) {
@@ -509,14 +502,14 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
                       }}
                     />
                     <div className="flex flex-col overflow-hidden">
-                      <span className="text-sm font-bold text-slate-700 line-clamp-1" title={group.group_name || group.group_url}>
+                      <span className="text-sm font-bold text-on-surface line-clamp-1" title={group.group_name || group.group_url}>
                         {group.group_name || group.group_url}
                       </span>
-                      <a 
-                        href={group.group_url} 
-                        target="_blank" 
-                        rel="noreferrer" 
-                        className="text-[10px] text-slate-400 hover:text-indigo-500 hover:underline line-clamp-1 mt-0.5 inline-block w-fit"
+                      <a
+                        href={group.group_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] text-on-surface-variant hover:text-indigo-500 hover:underline line-clamp-1 mt-0.5 inline-block w-fit"
                         onClick={(e) => e.stopPropagation()}
                       >
                         {group.group_url}
@@ -526,31 +519,30 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
                 ))}
               </div>
             </div>
-            
-            <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-white">
-              <button 
+
+            <div className="p-4 border-t border-outline-variant flex justify-end gap-3 bg-surface">
+              <button
                 onClick={() => setShowModal(false)}
-                className="px-5 py-2.5 rounded-xl font-bold text-sm text-slate-600 hover:bg-slate-100 transition"
+                className="px-5 py-2.5 rounded-xl font-bold text-sm text-on-surface-variant hover:bg-surface-container-low transition"
               >
                 Hủy
               </button>
-              <button 
+              <button
                 onClick={handleLaunch}
                 disabled={selectedGroupIds.length === 0}
-                className="px-5 py-2.5 rounded-xl font-bold text-sm text-white bg-[#DC2626] hover:bg-[#B91C1C] transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-5 py-2.5 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 <span className="material-symbols-outlined text-[20px]">play_arrow</span>
                 Bắt đầu cào ({selectedGroupIds.length} nhóm)
               </button>
             </div>
           </div>
-        </div>,
-        document.body
+        </div>
       )}
 
       {/* Progress & Content (Expanded when launching or has data) */}
       {(isLaunching || isDone || scrapedGroups.length > 0 || launchLog.length > 0) && (
-        <div className="border-t border-slate-100 bg-white p-4">
+        <div className="border-t border-outline-variant bg-surface p-4">
           {(isLaunching || isDone) && (
             <div className="grid grid-cols-3 gap-3 mb-4">
               <div className="bg-violet-50/50 rounded-xl p-3 text-center border border-violet-100/50">
@@ -574,7 +566,7 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
 
           {isLaunching && crawlProgress.totalGroups > 0 && (
             <div className="mb-5">
-              <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-surface-container-low rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full transition-all duration-300"
                   style={{
@@ -589,8 +581,8 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
           {scrapedGroups.length > 0 ? (
             <div className="space-y-4 max-h-[360px] overflow-y-auto custom-scrollbar pr-2">
               {scrapedGroups.map((group, gIdx) => (
-                <div key={gIdx} className="bg-slate-50/50 rounded-xl border border-slate-200/50 p-3">
-                  <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+                <div key={gIdx} className="bg-surface-container-low rounded-xl border border-outline-variant p-3">
+                  <div className="flex items-center justify-between mb-3 border-b border-outline-variant pb-2">
                     <a href={group.groupUrl} target="_blank" rel="noreferrer" className="text-xs font-bold text-indigo-600 hover:underline line-clamp-1 max-w-[80%]">
                       {group.groupName !== 'Group' ? group.groupName : group.groupUrl}
                     </a>
@@ -598,18 +590,18 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
                       {group.posts.length} bài mới
                     </span>
                   </div>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {group.posts.map((post, pIdx) => (
-                      <div key={pIdx} className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:shadow transition-shadow">
+                      <div key={pIdx} className="bg-surface p-3 rounded-lg border border-outline-variant shadow-sm hover:shadow transition-shadow">
                         <div className="flex justify-between items-start mb-1.5">
-                          <span className="font-bold text-slate-800 text-xs line-clamp-1">{post.author_name || 'Người dùng ẩn danh'}</span>
-                          <span className="text-[10px] text-slate-400 shrink-0 ml-2">{post.timestamp_raw}</span>
+                          <span className="font-bold text-on-surface text-xs line-clamp-1">{post.author_name || 'Người dùng ẩn danh'}</span>
+                          <span className="text-[10px] text-on-surface-variant shrink-0 ml-2">{post.timestamp_raw}</span>
                         </div>
-                        <p className="text-[11px] text-slate-600 line-clamp-3 mb-2 italic">
+                        <p className="text-[11px] text-on-surface-variant line-clamp-3 mb-2 italic">
                           "{post.content || post.content_preview || 'Không có nội dung text'}"
                         </p>
-                        <div className="flex items-center gap-2 pt-1.5 border-t border-slate-50">
+                        <div className="flex items-center gap-2 pt-1.5 border-t border-outline-variant">
                           <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">👍 {post.reactions || 0}</span>
                           <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">💬 {post.comments || 0}</span>
                           {post.post_url && (
@@ -626,7 +618,7 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
             </div>
           ) : (
              launchLog.length > 0 && (
-               <div className="bg-slate-900 rounded-xl p-3 font-mono text-[10px] text-slate-300 max-h-[160px] overflow-y-auto">
+               <div className="bg-slate-900 rounded-xl p-3 font-mono text-[10px] text-outline max-h-[160px] overflow-y-auto">
                  {launchLog.slice(-10).map((line, i) => (
                    <div key={i}>{line}</div>
                  ))}

@@ -29,7 +29,7 @@ export function CustomerLeadModal({
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sdrs, setSdrs] = useState<any[]>([]);
-  
+
   const [formData, setFormData] = useState<Partial<CustomerLead>>({
     customer_name: "",
     company_name: "",
@@ -61,7 +61,7 @@ export function CustomerLeadModal({
           sdr_id: "",
         });
       }
-      
+
       // Fetch SDRs if Admin/Leader
       if (currentUserRole === "admin" || currentUserRole === "leader") {
         customerLeadService.getSdrs().then((sdrs) => {
@@ -104,15 +104,15 @@ export function CustomerLeadModal({
 
   const modalContent = (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
-      <div className="bg-white rounded-2xl shadow-xl w-[95vw] md:w-[500px] min-w-[300px] sm:min-w-[500px] max-w-[100vw] overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-          <h2 className="text-lg font-bold text-slate-800">
+      <div className="bg-surface rounded-xl shadow-xl w-[95vw] md:w-[500px] min-w-[300px] sm:min-w-[500px] max-w-[100vw] overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="p-4 border-b border-outline-variant flex items-center justify-between bg-surface-container-low">
+          <h2 className="text-lg font-bold text-on-surface">
             {lead ? "Chỉnh sửa Lead" : "Lưu Khách Hàng (Lead)"}
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 transition-colors"
+            className="text-on-surface-variant hover:text-on-surface-variant transition-colors"
           >
             <span className="material-symbols-outlined">close</span>
           </button>
@@ -121,35 +121,35 @@ export function CustomerLeadModal({
         <div className="p-6 overflow-y-auto">
           <form id="leadForm" onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Tên khách hàng</label>
+              <label className="block text-sm font-medium text-on-surface mb-1">Tên khách hàng</label>
               <input
                 type="text"
                 required
                 value={formData.customer_name || ""}
                 onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-outline-variant rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Nguyễn Văn A"
               />
             </div>
-            
+
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Tên công ty / Dự án</label>
+              <label className="block text-sm font-medium text-on-surface mb-1">Tên công ty / Dự án</label>
               <input
                 type="text"
                 value={formData.company_name || ""}
                 onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-outline-variant rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Công ty TNHH ABC..."
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Trạng thái</label>
+                <label className="block text-sm font-medium text-on-surface mb-1">Trạng thái</label>
                 <select
                   value={formData.status || "pending"}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="w-full px-3 py-2 border border-outline-variant rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface"
                 >
                   <option value="pending">Đang chờ</option>
                   <option value="closed">Đã chốt (Win)</option>
@@ -159,11 +159,11 @@ export function CustomerLeadModal({
 
               {(currentUserRole === "admin" || currentUserRole === "leader") && (
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Giao cho (SDR)</label>
+                  <label className="block text-sm font-medium text-on-surface mb-1">Giao cho (SDR)</label>
                   <select
                     value={formData.sdr_id || ""}
                     onChange={(e) => setFormData({ ...formData, sdr_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    className="w-full px-3 py-2 border border-outline-variant rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface"
                   >
                     <option value="">-- Không giao --</option>
                     {sdrs.map((s) => (
@@ -178,34 +178,34 @@ export function CustomerLeadModal({
 
             {formData.status === "rejected" && (
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Lý do từ chối</label>
+                <label className="block text-sm font-medium text-on-surface mb-1">Lý do từ chối</label>
                 <input
                   type="text"
                   value={formData.reject_reason || ""}
                   onChange={(e) => setFormData({ ...formData, reject_reason: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border border-outline-variant rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                   placeholder="Khách chê đắt..."
                 />
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Ghi chú</label>
+              <label className="block text-sm font-medium text-on-surface mb-1">Ghi chú</label>
               <textarea
                 value={formData.note || ""}
                 onChange={(e) => setFormData({ ...formData, note: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
+                className="w-full px-3 py-2 border border-outline-variant rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
                 placeholder="Yêu cầu cụ thể..."
               />
             </div>
           </form>
         </div>
 
-        <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50">
+        <div className="p-4 border-t border-outline-variant flex justify-end gap-3 bg-surface-container-low">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 font-medium transition-colors"
+            className="px-4 py-2 text-on-surface-variant bg-surface border border-outline-variant rounded-lg hover:bg-surface-container-low font-medium transition-colors"
           >
             Hủy
           </button>
@@ -223,6 +223,6 @@ export function CustomerLeadModal({
   );
 
   if (!mounted) return null;
-  
+
   return createPortal(modalContent, document.body);
 }

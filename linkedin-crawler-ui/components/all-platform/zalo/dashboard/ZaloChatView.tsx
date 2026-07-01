@@ -264,7 +264,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
     { value: "new", label: "Mới", bg: "bg-emerald-50 text-emerald-700 border-emerald-200" },
     { value: "chatting", label: "Đang chat", bg: "bg-blue-50 text-blue-700 border-blue-200" },
     { value: "followup", label: "Follow-up", bg: "bg-amber-50 text-amber-700 border-amber-200" },
-    { value: "inactive", label: "Không HĐ", bg: "bg-slate-50 text-slate-600 border-slate-200" },
+    { value: "inactive", label: "Không HĐ", bg: "bg-surface-container-low text-on-surface-variant border-outline-variant" },
   ], []);
 
   useEffect(() => {
@@ -289,7 +289,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
       return next;
     });
   }, []);
-  
+
   // Auto send / Broadcast states
   const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([]);
   const [autoSendTargetIds, setAutoSendTargetIds] = useState<string[]>([]);
@@ -298,7 +298,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
   const [autoSendSuccess, setAutoSendSuccess] = useState<string | null>(null);
   const [autoSendError, setAutoSendError] = useState<string | null>(null);
   const [isAutoSendOpen, setIsAutoSendOpen] = useState(false);
-  
+
   // Custom states matching mockup redesign
   const [manualRecipients, setManualRecipients] = useState("");
   const [campaignMode, setCampaignMode] = useState<"both" | "text" | "image">("both");
@@ -545,25 +545,25 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
 
   const filteredConversations = useMemo(() => {
     let filtered = conversations;
-    
+
     // Hide hidden chats
     filtered = filtered.filter(c => !hiddenConversations[c.conversation_id]);
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(c => 
-        (c.conversation_name || "").toLowerCase().includes(q) || 
+      filtered = filtered.filter(c =>
+        (c.conversation_name || "").toLowerCase().includes(q) ||
         (c.latest_content || "").toLowerCase().includes(q)
       );
     }
-    
+
     if (activeTab === "unread") {
-      filtered = filtered.filter(c => 
+      filtered = filtered.filter(c =>
         (c.unread_count !== undefined && c.unread_count > 0) ||
         (c.unread_count === undefined && c.message_count > 0 && c.latest_sender_name !== "Bạn")
       );
     } else if (activeTab === "inactive") {
-      filtered = filtered.filter(c => 
+      filtered = filtered.filter(c =>
         c.message_count === 0 || c.has_messages === false || c.sync_status === "known_empty"
       );
     }
@@ -1058,8 +1058,8 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
   }, [flow.userId, flow.isLoggedIn, flow.sessionExpired, flow.email]);
 
   const handleToggleSelectMessage = (messageId: string) => {
-    setSelectedMessageIds(prev => 
-      prev.includes(messageId) 
+    setSelectedMessageIds(prev =>
+      prev.includes(messageId)
         ? prev.filter(id => id !== messageId)
         : [...prev, messageId]
     );
@@ -1084,7 +1084,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
 
   const handleAutoSend = async () => {
     if (!flow.userId || selectedMessageIds.length === 0) return;
-    
+
     const manualLines = manualRecipients
       .split("\n")
       .map(line => line.trim())
@@ -1140,10 +1140,10 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
         } else {
           const target = targets[currentIdx];
           setCampaignLogs(prev => [...prev, { name: target.group_name, status: "sending" }]);
-          
+
           setTimeout(() => {
-            setCampaignLogs(prev => 
-              prev.map((log, idx) => 
+            setCampaignLogs(prev =>
+              prev.map((log, idx) =>
                 idx === currentIdx ? { ...log, status: "success" as const } : log
               )
             );
@@ -1326,28 +1326,28 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
 
   return (
     <div
-      className="flex-1 h-full w-full bg-white overflow-hidden min-h-0 flex flex-col"
+      className="flex-1 h-full w-full bg-surface overflow-hidden min-h-0 flex flex-col"
     >
       {/* [P2] STATS BAR (Horizontal row at the top) */}
       {flow.isLoggedIn && (
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-2.5 px-4 py-1.5 border-b border-slate-200 bg-white shrink-0 shadow-sm">
+        <section className="grid grid-cols-2 md:grid-cols-4 gap-2.5 px-4 py-1.5 border-b border-outline-variant bg-surface shrink-0 shadow-sm">
           {/* Card 1: Zalo Conversations */}
-          <div className="bg-white rounded-lg py-1 px-2.5 border border-slate-200 flex items-center justify-between relative overflow-hidden transition-all hover:shadow-md">
+          <div className="bg-surface rounded-lg py-1 px-2.5 border border-outline-variant flex items-center justify-between relative overflow-hidden transition-all hover:shadow-md">
             <div className="absolute top-0 left-0 w-[3px] h-full bg-slate-400"></div>
             <div className="pl-1.5">
-              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Zalo Hội thoại</span>
-              <span className="text-lg font-extrabold leading-none text-slate-800">{totalChatsCount}</span>
+              <span className="text-[9px] font-bold text-on-surface-variant uppercase block">Zalo Hội thoại</span>
+              <span className="text-lg font-extrabold leading-none text-on-surface">{totalChatsCount}</span>
             </div>
-            <div className="bg-slate-100 text-slate-700 text-[9px] font-bold px-1.5 py-0.5 rounded border border-slate-200 uppercase">
+            <div className="bg-surface-container-low text-on-surface text-[9px] font-bold px-1.5 py-0.5 rounded border border-outline-variant uppercase">
               Tổng nhóm
             </div>
           </div>
 
           {/* Card 2: Awaiting Reply */}
-          <div className="bg-white rounded-lg py-1 px-2.5 border border-slate-200 flex items-center justify-between relative overflow-hidden transition-all hover:shadow-md">
+          <div className="bg-surface rounded-lg py-1 px-2.5 border border-outline-variant flex items-center justify-between relative overflow-hidden transition-all hover:shadow-md">
             <div className="absolute top-0 left-0 w-[3px] h-full bg-red-500"></div>
             <div className="pl-1.5">
-              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Chờ phản hồi</span>
+              <span className="text-[9px] font-bold text-on-surface-variant uppercase block">Chờ phản hồi</span>
               <span className="text-lg font-extrabold leading-none text-red-650">{waitingChatsCount}</span>
             </div>
             <div className="bg-red-50 text-red-650 text-[9px] font-bold px-1.5 py-0.5 rounded border border-red-100 uppercase animate-pulse">
@@ -1356,28 +1356,28 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
           </div>
 
           {/* Card 3: FB + Zalo combined total */}
-          <div className="bg-white rounded-lg py-1 px-2.5 border border-slate-200 flex items-center justify-between relative overflow-hidden transition-all hover:shadow-md">
+          <div className="bg-surface rounded-lg py-1 px-2.5 border border-outline-variant flex items-center justify-between relative overflow-hidden transition-all hover:shadow-md">
             <div className="absolute top-0 left-0 w-[3px] h-full bg-slate-400"></div>
             <div className="pl-1.5">
-              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">FB + Zalo Tổng</span>
-              <span className="text-lg font-extrabold leading-none text-slate-700">{combinedChatsCount}</span>
+              <span className="text-[9px] font-bold text-on-surface-variant uppercase block">FB + Zalo Tổng</span>
+              <span className="text-lg font-extrabold leading-none text-on-surface">{combinedChatsCount}</span>
             </div>
-            <div className="bg-slate-100 text-slate-700 text-[9px] font-bold px-1.5 py-0.5 rounded border border-slate-200 uppercase">
+            <div className="bg-surface-container-low text-on-surface text-[9px] font-bold px-1.5 py-0.5 rounded border border-outline-variant uppercase">
               Đa nền tảng
             </div>
           </div>
 
           {/* Card 4: Bridge Status */}
-          <div className="bg-white rounded-lg py-1 px-2.5 border border-slate-200 flex items-center justify-between relative overflow-hidden transition-all hover:shadow-md">
+          <div className="bg-surface rounded-lg py-1 px-2.5 border border-outline-variant flex items-center justify-between relative overflow-hidden transition-all hover:shadow-md">
             <div className="absolute top-0 left-0 w-[3px] h-full bg-slate-400"></div>
             <div className="pl-1.5">
-              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Bridge Status</span>
-              <span className="text-xs font-extrabold leading-tight text-slate-700 uppercase flex items-center gap-1">
-                <MaterialIcon name="check_circle" className="text-[11px] text-slate-500 animate-pulse" />
+              <span className="text-[9px] font-bold text-on-surface-variant uppercase block">Bridge Status</span>
+              <span className="text-xs font-extrabold leading-tight text-on-surface uppercase flex items-center gap-1">
+                <MaterialIcon name="check_circle" className="text-[11px] text-on-surface-variant animate-pulse" />
                 Sync OK
               </span>
             </div>
-            <div className="bg-slate-100 text-slate-700 text-[9px] font-bold px-1.5 py-0.5 rounded border border-slate-200 truncate max-w-[100px]">
+            <div className="bg-surface-container-low text-on-surface text-[9px] font-bold px-1.5 py-0.5 rounded border border-outline-variant truncate max-w-[100px]">
               {selectedAccount?.label || "Zalo PC"}
             </div>
           </div>
@@ -1385,12 +1385,12 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
       )}
 
       {/* CORE INBOX LAYOUT (Conversations, Chat Area, Campaign Sidebar) */}
-      <div className="flex-1 flex min-h-0 overflow-hidden relative bg-slate-50">
-        
+      <div className="flex-1 flex min-h-0 overflow-hidden relative bg-surface-container-low">
+
         {/* Left Column: Conversations */}
         <section
           ref={sidebarRef}
-          className="zalo-chat-list-panel relative border-r border-slate-200 flex flex-col bg-white overflow-hidden h-full min-h-0 shrink-0"
+          className="zalo-chat-list-panel relative border-r border-outline-variant flex flex-col bg-surface overflow-hidden h-full min-h-0 shrink-0"
           style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px` }}
         >
           {flow.sessionExpired && (
@@ -1408,63 +1408,31 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
               </button>
             </div>
           )}
-          <div className="px-3 py-2.5 border-b border-slate-200 flex flex-col gap-2 bg-slate-50/50">
+          <div className="px-3 py-2.5 border-b border-outline-variant flex flex-col gap-2 bg-surface-container-low">
             <div className="flex items-center space-x-2">
               <button
                 onClick={onBackToDashboard}
-                className="text-slate-400 hover:text-slate-600 transition shrink-0"
+                className="text-on-surface-variant hover:text-on-surface-variant transition shrink-0"
                 title="Quay lại"
               >
                 <MaterialIcon name="arrow_back" className="text-base" />
               </button>
               <div className="min-w-0 flex-1">
-                {flow.accounts.length > 1 ? (
-                  <select
-                    value={flow.userId || ""}
-                    onChange={(e) => flow.switchAccount(e.target.value)}
-                    className="font-bold text-[13px] text-slate-800 bg-transparent outline-none max-w-full cursor-pointer pr-4 border border-slate-200 rounded px-1 py-0.5"
-                  >
-                    {flow.accounts.map((acc) => (
-                      <option key={acc.account_id} value={acc.account_id}>
-                        {acc.label || acc.phone || acc.account_id}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <h2 className="font-bold text-[14px] text-slate-900 leading-tight truncate" title={selectedAccount?.label || "Đang chat"}>
-                    {selectedAccount?.label || "Đang chat"}
-                  </h2>
-                )}
-                <p className="text-[10px] text-slate-400 truncate">UID: {shortId(flow.userId || "")}</p>
+                <h2 className="font-bold text-[14px] text-on-surface leading-tight truncate" title={selectedAccount?.label || "Đang chat"}>{selectedAccount?.label || "Đang chat"}</h2>
+                <p className="text-[10px] text-on-surface-variant truncate">UID: {shortId(flow.userId || "")}</p>
               </div>
               {flow.isLoggedIn && flow.userId && flow.userId !== "default" && (
                 <ZaloKpiPanel accountId={flow.userId} />
               )}
               {flow.isLoggedIn && (
-                <div className="flex items-center gap-0.5">
-                  <button
-                    onClick={() => {
-                      const label = prompt("Nhập tên nhãn gợi nhớ cho tài khoản Zalo mới (ví dụ: Zalo Seeding 05):");
-                      if (label && label.trim()) {
-                        const phone = prompt("Nhập số điện thoại đăng nhập Zalo (Tùy chọn):");
-                        void flow.createAccount(label.trim(), phone?.trim() || undefined);
-                      }
-                    }}
-                    className="p-1 hover:bg-slate-100 rounded transition text-emerald-600 shrink-0"
-                    title="Thêm tài khoản Zalo mới"
-                    aria-label="Thêm tài khoản Zalo"
-                  >
-                    <MaterialIcon name={"add_circle" as MaterialSymbolName} className="text-base" />
-                  </button>
-                  <button
-                    onClick={() => setNewChatModalOpen(true)}
-                    className="p-1 hover:bg-slate-100 rounded transition text-[#E3000F] shrink-0"
-                    title="Nhắn tin cho người lạ (SĐT hoặc username Zalo)"
-                    aria-label="Nhắn tin cho người lạ"
-                  >
-                    <MaterialIcon name="person_add" className="text-base" />
-                  </button>
-                </div>
+                <button
+                  onClick={() => setNewChatModalOpen(true)}
+                  className="p-1 hover:bg-surface-container-low rounded transition text-primary shrink-0"
+                  title="Nhắn tin cho người lạ (SĐT hoặc username Zalo)"
+                  aria-label="Nhắn tin cho người lạ"
+                >
+                  <MaterialIcon name="person_add" className="text-base" />
+                </button>
               )}
               {flow.isLoggedIn && (
                 <button
@@ -1476,10 +1444,10 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                 </button>
               )}
             </div>
-            
+
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
-                <span className="absolute inset-y-0 left-2.5 flex items-center text-slate-400">
+                <span className="absolute inset-y-0 left-2.5 flex items-center text-on-surface-variant">
                   <MaterialIcon name="search" className="text-xs" />
                 </span>
                 <input
@@ -1487,14 +1455,14 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                   placeholder="Tìm kiếm..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 text-[12px] bg-white border border-slate-200 rounded-lg focus:ring-red-500/20 focus:border-red-500 focus:outline-none transition-all"
+                  className="w-full pl-8 pr-3 py-1.5 text-[12px] bg-surface border border-outline-variant rounded-lg focus:ring-red-500/20 focus:border-red-500 focus:outline-none transition-all"
                 />
               </div>
               <div className="relative w-[115px] shrink-0">
                 <select
                   value={filterTag || "all"}
                   onChange={(e) => setFilterTag(e.target.value === "all" ? null : e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-lg pl-2 pr-6 py-1.5 text-[11px] outline-none cursor-pointer focus:border-[#E3000F] appearance-none font-semibold text-slate-650 truncate"
+                  className="w-full bg-surface border border-outline-variant rounded-lg pl-2 pr-6 py-1.5 text-[11px] outline-none cursor-pointer focus:border-primary appearance-none font-semibold text-on-surface truncate"
                 >
                   <option value="all">📁 Tất cả tag</option>
                   <option value="new">🟢 Mới</option>
@@ -1502,21 +1470,21 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                   <option value="followup">🟡 Follow-up</option>
                   <option value="inactive">⚪ Không HĐ</option>
                 </select>
-                <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">
                   <MaterialIcon name="arrow_drop_down" className="text-sm" />
                 </span>
               </div>
             </div>
 
             {/* [P3.2] Segmented Pill Button Tabs for Filter */}
-            <div className="flex p-0.5 bg-slate-100 rounded-lg text-[11px] font-semibold text-slate-500">
+            <div className="flex p-0.5 bg-surface-container-low rounded-lg text-[11px] font-semibold text-on-surface-variant">
               <button
                 type="button"
                 onClick={() => setActiveTab('all')}
                 className={`flex-1 py-1 rounded-md transition-all ${
                   activeTab === 'all'
-                    ? 'bg-white text-[#E3000F] font-bold shadow-sm'
-                    : 'hover:bg-white/50 text-slate-500'
+                    ? 'bg-surface text-primary font-bold shadow-sm'
+                    : 'hover:bg-surface/50 text-on-surface-variant'
                 }`}
               >
                 Tất cả
@@ -1526,8 +1494,8 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                 onClick={() => setActiveTab('unread')}
                 className={`flex-1 py-1 rounded-md transition-all flex items-center justify-center gap-1 ${
                   activeTab === 'unread'
-                    ? 'bg-white text-[#E3000F] font-bold shadow-sm'
-                    : 'hover:bg-white/50 text-slate-500'
+                    ? 'bg-surface text-primary font-bold shadow-sm'
+                    : 'hover:bg-surface/50 text-on-surface-variant'
                 }`}
               >
                 Chưa đọc
@@ -1538,8 +1506,8 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                 onClick={() => setActiveTab('inactive')}
                 className={`flex-1 py-1 rounded-md transition-all ${
                   activeTab === 'inactive'
-                    ? 'bg-white text-[#E3000F] font-bold shadow-sm'
-                    : 'hover:bg-white/50 text-slate-500'
+                    ? 'bg-surface text-primary font-bold shadow-sm'
+                    : 'hover:bg-surface/50 text-on-surface-variant'
                 }`}
               >
                 Chưa HD
@@ -1569,12 +1537,12 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
               {conversationError}
             </div>
           )}
-          
-          <div className="p-2.5 border-t border-slate-200">
+
+          <div className="p-2.5 border-t border-outline-variant">
              <button
                onClick={() => void syncRecentConversations()}
                disabled={isSyncingRecent}
-               className="w-full flex items-center justify-center space-x-1.5 text-[#E3000F] font-semibold text-[12px] py-1.5 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+               className="w-full flex items-center justify-center space-x-1.5 text-primary font-semibold text-[12px] py-1.5 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
              >
                <MaterialIcon name="sync" className={`text-sm ${isSyncingRecent ? "animate-spin" : ""}`} />
                <span>Đồng bộ tin nhắn mới</span>
@@ -1585,7 +1553,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                </div>
              )}
              {!syncError && syncSummary && (
-               <div className="mt-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] text-slate-500">
+               <div className="mt-1.5 rounded-lg border border-outline-variant bg-surface-container-low px-2 py-1 text-[10px] text-on-surface-variant">
                  Đã quét {syncSummary.scanned} nhóm · lưu {syncSummary.messages_saved} tin · {syncSummary.groups_with_messages} nhóm có tin mới
                </div>
              )}
@@ -1593,11 +1561,11 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
         </section>
 
         {/* Middle Column: Chat Workspace */}
-        <section className="flex-1 flex flex-col h-full bg-slate-50 min-w-0 relative border-r border-slate-200">
+        <section className="flex-1 flex flex-col h-full bg-surface-container-low min-w-0 relative border-r border-outline-variant">
           {selectedConversationView ? (
             <>
               {/* [P4.1] Chat Header with Sync status sublabel */}
-              <header className={`flex items-center justify-between border-b border-slate-200 bg-white ${
+              <header className={`flex items-center justify-between border-b border-outline-variant bg-surface ${
                 fullScreen ? "px-5 h-16" : "px-3 h-12"
               } shadow-sm z-10 shrink-0`}>
                 <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -1608,23 +1576,23 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                       onError={() => setAvatarErrors(prev => ({ ...prev, [`header-${selectedConversationView.conversation_id}`]: true }))}
                       className={`${
                         fullScreen ? "h-11 w-11" : "h-8 w-8"
-                      } shrink-0 rounded-full object-cover border border-slate-200 bg-white`}
+                      } shrink-0 rounded-full object-cover border border-outline-variant bg-surface`}
                     />
                   ) : (
                     <div className={`flex ${
                       fullScreen ? "h-11 w-11 text-[13px]" : "h-8 w-8 text-[11px]"
-                    } shrink-0 items-center justify-center rounded-full bg-[#E3000F] text-white hover:bg-red-700 font-semibold`}>
+                    } shrink-0 items-center justify-center rounded-full bg-primary text-white hover:bg-red-700 font-semibold`}>
                       {initials(selectedConversationView.conversation_name)}
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
                     <h3 className={`font-semibold ${
                       fullScreen ? "text-[16px]" : "text-[13px]"
-                    } text-slate-800 truncate leading-tight`}>{selectedConversationView.conversation_name}</h3>
+                    } text-on-surface truncate leading-tight`}>{selectedConversationView.conversation_name}</h3>
                     {/* Sync status sublabel */}
-                    <div className="text-[10px] text-slate-400 font-semibold flex items-center gap-1.5">
+                    <div className="text-[10px] text-on-surface-variant font-semibold flex items-center gap-1.5">
                       {selectedConversation?.conversation_id?.startsWith("fb_") ? (
-                        <span className="text-slate-500 font-bold">Facebook</span>
+                        <span className="text-on-surface-variant font-bold">Facebook</span>
                       ) : (
                         <span className="text-[#0068ff] font-bold">Zalo</span>
                       )}
@@ -1643,20 +1611,20 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                     onClick={() => setIsAutoSendOpen(prev => !prev)}
                     className={`h-7 w-7 flex items-center justify-center rounded-full transition ${
                       isAutoSendOpen
-                        ? "bg-[#E3000F]/10 text-[#E3000F] border border-[#E3000F]/20"
-                        : "hover:bg-slate-100 text-slate-500"
+                        ? "bg-primary/10 text-primary border border-primary/20"
+                        : "hover:bg-surface-container-low text-on-surface-variant"
                     }`}
                     title={isAutoSendOpen ? "Đóng Auto Send" : "Mở Auto Send"}
                   >
                     <MaterialIcon name="campaign" className="text-sm" />
                   </button>
-                  <button className="h-7 w-7 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 transition" title="Tìm trong hội thoại">
+                  <button className="h-7 w-7 flex items-center justify-center rounded-full hover:bg-surface-container-low text-on-surface-variant transition" title="Tìm trong hội thoại">
                     <MaterialIcon name="search" className="text-sm" />
                   </button>
-                  <button className="h-7 w-7 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 transition" title="Gọi thoại">
+                  <button className="h-7 w-7 flex items-center justify-center rounded-full hover:bg-surface-container-low text-on-surface-variant transition" title="Gọi thoại">
                     <MaterialIcon name="call" className="text-sm" />
                   </button>
-                  <button className="h-7 w-7 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 transition" title="Video call">
+                  <button className="h-7 w-7 flex items-center justify-center rounded-full hover:bg-surface-container-low text-on-surface-variant transition" title="Video call">
                     <MaterialIcon name="videocam" className="text-sm" />
                   </button>
                 </div>
@@ -1668,7 +1636,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                     <MaterialIcon name="warning" className="text-amber-500 text-sm shrink-0" />
                     <span className="truncate">Zalo chưa kết nối. Đang hiển thị lịch sử offline.</span>
                   </div>
-                  <button 
+                  <button
                     onClick={handleOpenZaloWeb}
                     className="text-amber-700 hover:text-amber-900 font-bold transition shrink-0 text-[10px] underline"
                   >
@@ -1700,15 +1668,15 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                     const isSentByMe = message.is_sent;
                     const msgId = messageKey(message);
                     const isSelected = selectedMessageIds.includes(msgId);
-                    
+
                     let roleLabel = "Khách hàng";
                     let roleColorClass = "bg-red-50 text-red-650 border border-red-200/50";
                     if (message.role === "leader") {
                       roleLabel = "Leader";
-                      roleColorClass = "bg-slate-100 text-slate-700 border border-slate-200/60";
+                      roleColorClass = "bg-surface-container-low text-on-surface border border-outline-variant";
                     } else if (message.role === "staff" || isSentByMe) {
                       roleLabel = "Staff (Seeder)";
-                      roleColorClass = "bg-slate-50 text-slate-600 border border-slate-200/50";
+                      roleColorClass = "bg-surface-container-low text-on-surface-variant border border-outline-variant";
                     }
 
                     return (
@@ -1716,8 +1684,8 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                         {/* Checkbox for Auto Send Selection - visible on hover or if selected */}
                         {!isSentByMe && (
                            <div className={`mr-1.5 pt-4 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                             <input 
-                               type="checkbox" 
+                             <input
+                               type="checkbox"
                                className="w-3.5 h-3.5 cursor-pointer"
                                checked={isSelected}
                                onChange={() => handleToggleSelectMessage(msgId)}
@@ -1727,26 +1695,26 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
 
                         <div className={fullScreen ? "max-w-[80%]" : "max-w-[70%]"}>
                           {/* [P4.2] Role tag and sender name above bubble */}
-                          <div className={`flex items-center gap-1.5 mb-1 px-1 text-[11px] font-semibold text-slate-500 ${isSentByMe ? 'justify-end' : 'justify-start'}`}>
-                            <span className="text-slate-700 font-bold">{sender}</span>
-                            <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-extrabold tracking-wide uppercase ${roleColorClass}`}>{roleLabel}</span>
+                          <div className={`flex items-center gap-1.5 mb-1 px-1 text-[11px] font-semibold text-on-surface-variant ${isSentByMe ? 'justify-end' : 'justify-start'}`}>
+                            <span className="text-on-surface font-bold">{sender}</span>
+                            <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase ${roleColorClass}`}>{roleLabel}</span>
                           </div>
 
                           {/* Bubble box */}
-                          <div className={`rounded-2xl ${
+                          <div className={`rounded-xl ${
                             fullScreen ? "px-4 py-2.5 text-[15px]" : "px-3 py-1.5"
                           } relative transition-all duration-200 ${
                             isSentByMe
                               ? 'bg-[#0068FF] text-white rounded-tr-none shadow-sm shadow-blue-500/10'
-                              : 'bg-white text-slate-800 rounded-tl-none shadow-sm border border-slate-100'
+                              : 'bg-surface text-on-surface rounded-tl-none shadow-sm border border-outline-variant'
                           } ${isSelected ? 'ring-2 ring-red-500 ring-offset-2' : ''}`}>
-                            
+
                             {message.content && (
-                              <p className={`whitespace-pre-wrap break-words text-[13px] leading-relaxed ${isSentByMe ? 'text-white/95' : 'text-slate-700'}`}>
+                              <p className={`whitespace-pre-wrap break-words text-[13px] leading-relaxed ${isSentByMe ? 'text-white/95' : 'text-on-surface'}`}>
                                 {message.content}
                               </p>
                             )}
-                            
+
                             {assets.length > 0 && (
                               <div className="mt-1 grid gap-1 sm:grid-cols-2">
                                 {assets.map((asset) => (
@@ -1763,7 +1731,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                               </div>
                             )}
 
-                            <div className={`text-[10px] mt-0.5 text-right font-medium ${isSentByMe ? 'text-blue-100' : 'text-slate-400'}`}>
+                            <div className={`text-[10px] mt-0.5 text-right font-medium ${isSentByMe ? 'text-blue-100' : 'text-on-surface-variant'}`}>
                               {formatTime(message.timestamp_text || message.time_text)}
                             </div>
                           </div>
@@ -1771,8 +1739,8 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
 
                         {isSentByMe && (
                            <div className={`ml-1.5 pt-4 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                             <input 
-                               type="checkbox" 
+                             <input
+                               type="checkbox"
                                className="w-3.5 h-3.5 cursor-pointer"
                                checked={isSelected}
                                onChange={() => handleToggleSelectMessage(msgId)}
@@ -1787,7 +1755,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                     <div className="sticky bottom-2 flex justify-center z-10">
                       <button
                         onClick={scrollToLatest}
-                        className="bg-[#E3000F] text-white hover:bg-red-700 rounded-full px-3 py-1 text-[11px] font-semibold shadow-md flex items-center gap-1 transition"
+                        className="bg-primary text-white hover:bg-red-700 rounded-full px-3 py-1 text-[11px] font-semibold shadow-md flex items-center gap-1 transition"
                       >
                         <MaterialIcon name="arrow_downward" className="text-[11px]" />
                         Có {newMessageCount} tin mới
@@ -1798,8 +1766,8 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
               )}
 
               {/* [P5] QUICK REPLY PILLS ROW (Above input area, horizontally scrollable) */}
-              <div className="bg-white border-t border-slate-200 px-4 pt-2 pb-2 flex items-center gap-2 overflow-x-auto whitespace-nowrap shrink-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1 shrink-0">Trả lời nhanh:</span>
+              <div className="bg-surface border-t border-outline-variant px-4 pt-2 pb-2 flex items-center gap-2 overflow-x-auto whitespace-nowrap shrink-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                <span className="text-[10px] font-bold text-on-surface-variant uppercase mr-1 shrink-0">Trả lời nhanh:</span>
                 {QUICK_REPLIES.map((reply, idx) => {
                   let emoji = "👋";
                   if (idx === 1) emoji = "💰";
@@ -1815,7 +1783,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                         setInputText(reply.text);
                         textareaRef.current?.focus();
                       }}
-                      className="px-3 py-1 border border-red-200 bg-red-50/50 hover:bg-red-50 text-[#E3000F] rounded-full text-[11px] font-semibold transition-all shrink-0 cursor-pointer"
+                      className="px-3 py-1 border border-red-200 bg-red-50/50 hover:bg-red-50 text-primary rounded-full text-[11px] font-semibold transition-all shrink-0 cursor-pointer"
                     >
                       {emoji} {reply.label}
                     </button>
@@ -1824,7 +1792,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
               </div>
 
               {/* Chat Input */}
-              <div className="bg-white px-3 py-2 border-t border-slate-200 relative">
+              <div className="bg-surface px-3 py-2 border-t border-outline-variant relative">
                 {/* Invisible Inputs */}
                 <input
                   type="file"
@@ -1846,9 +1814,9 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                 {/* Slash Command Autocomplete Popover */}
                 {showSlashMenu && filteredSlashReplies.length > 0 && (
                   <div
-                    className="absolute bottom-full mb-3 left-4 right-4 z-50 max-h-56 bg-white border border-slate-200 rounded-xl shadow-xl flex flex-col overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-150 divide-y divide-slate-100"
+                    className="absolute bottom-full mb-3 left-4 right-4 z-50 max-h-56 bg-surface border border-outline-variant rounded-xl shadow-xl flex flex-col overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-150 divide-y divide-outline-variant"
                   >
-                    <div className="px-3 py-1.5 bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider sticky top-0">
+                    <div className="px-3 py-1.5 bg-surface-container-low text-[10px] font-bold text-on-surface-variant uppercase sticky top-0">
                       Mẫu trả lời nhanh (Gõ để tìm kiếm, ↑↓ để di chuyển, Enter để chọn)
                     </div>
                     {filteredSlashReplies.map((reply, index) => (
@@ -1863,14 +1831,14 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                         className={`w-full text-left px-3 py-2 text-[12px] transition flex flex-col gap-0.5 ${
                           index === slashSelectedIndex
                             ? "bg-blue-50 text-blue-700 font-medium"
-                            : "text-slate-700 hover:bg-slate-50"
+                            : "text-on-surface hover:bg-surface-container-low"
                         }`}
                       >
                         <div className="flex justify-between items-center w-full">
                           <span className="font-bold text-blue-600">{reply.shortcut}</span>
-                          <span className="text-[10px] text-slate-400">{reply.label}</span>
+                          <span className="text-[10px] text-on-surface-variant">{reply.label}</span>
                         </div>
-                        <p className="text-[11px] text-slate-500 truncate w-full font-medium">{reply.text}</p>
+                        <p className="text-[11px] text-on-surface-variant truncate w-full font-medium">{reply.text}</p>
                       </button>
                     ))}
                   </div>
@@ -1880,11 +1848,11 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                 {showEmojiPicker && (
                   <div
                     ref={emojiPickerRef}
-                    className="absolute bottom-full mb-3 left-4 z-50 w-72 h-80 bg-white border border-slate-200 rounded-2xl shadow-xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200"
+                    className="absolute bottom-full mb-3 left-4 z-50 w-72 h-80 bg-surface border border-outline-variant rounded-xl shadow-xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200"
                     style={{ maxHeight: '320px' }}
                   >
                     {/* Category selector */}
-                    <div className="flex border-b border-slate-200 bg-slate-50 px-2 py-1">
+                    <div className="flex border-b border-outline-variant bg-surface-container-low px-2 py-1">
                       {EMOJI_CATEGORIES.map((cat, i) => (
                         <button
                           key={i}
@@ -1892,8 +1860,8 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                           onClick={() => setActiveEmojiTab(i)}
                           className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition ${
                             activeEmojiTab === i
-                              ? "bg-white text-[#E3000F] shadow-sm"
-                              : "text-slate-500 hover:text-slate-700"
+                              ? "bg-surface text-primary shadow-sm"
+                              : "text-on-surface-variant hover:text-on-surface"
                           }`}
                         >
                           {cat.name}
@@ -1902,13 +1870,13 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                     </div>
 
                     {/* Emoji grid */}
-                    <div className="flex-1 overflow-y-auto p-2 grid grid-cols-6 gap-1 content-start bg-white">
+                    <div className="flex-1 overflow-y-auto p-2 grid grid-cols-6 gap-1 content-start bg-surface">
                       {EMOJI_CATEGORIES[activeEmojiTab].emojis.map((emoji, idx) => (
                         <button
                           key={idx}
                           type="button"
                           onClick={() => handleEmojiClick(emoji)}
-                          className="h-9 w-9 flex items-center justify-center text-xl rounded-lg hover:bg-slate-100 active:scale-95 transition cursor-pointer"
+                          className="h-9 w-9 flex items-center justify-center text-xl rounded-lg hover:bg-surface-container-low active:scale-95 transition cursor-pointer"
                         >
                           {emoji}
                         </button>
@@ -1921,15 +1889,15 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                 {showQuickReplies && (
                   <div
                     ref={quickRepliesRef}
-                    className="absolute bottom-full mb-3 left-14 z-50 w-80 max-h-80 bg-white border border-slate-200 rounded-2xl shadow-xl flex flex-col overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-200"
+                    className="absolute bottom-full mb-3 left-14 z-50 w-80 max-h-80 bg-surface border border-outline-variant rounded-xl shadow-xl flex flex-col overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-200"
                   >
-                    <div className="px-3 py-2 border-b border-slate-200 bg-slate-50 sticky top-0 z-10 flex justify-between items-center">
-                      <span className="text-xs font-bold text-slate-700">Mẫu câu trả lời nhanh</span>
-                      <button onClick={() => setShowQuickReplies(false)} className="text-slate-400 hover:text-red-500 cursor-pointer">
+                    <div className="px-3 py-2 border-b border-outline-variant bg-surface-container-low sticky top-0 z-10 flex justify-between items-center">
+                      <span className="text-xs font-bold text-on-surface">Mẫu câu trả lời nhanh</span>
+                      <button onClick={() => setShowQuickReplies(false)} className="text-on-surface-variant hover:text-red-500 cursor-pointer">
                         <MaterialIcon name="close" className="text-[14px]" />
                       </button>
                     </div>
-                    <div className="flex flex-col p-1.5 gap-1 bg-white">
+                    <div className="flex flex-col p-1.5 gap-1 bg-surface">
                       {QUICK_REPLIES.map((reply, idx) => (
                         <button
                           key={idx}
@@ -1938,7 +1906,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                             setShowQuickReplies(false);
                           }}
                           disabled={isSendingDirect}
-                          className="text-left px-3 py-2 text-[12px] hover:bg-red-50 hover:text-[#E3000F] text-slate-700 rounded-lg transition-all border border-transparent hover:border-red-200 disabled:opacity-50 cursor-pointer"
+                          className="text-left px-3 py-2 text-[12px] hover:bg-red-50 hover:text-primary text-on-surface rounded-lg transition-all border border-transparent hover:border-red-200 disabled:opacity-50 cursor-pointer"
                         >
                           {reply.text}
                         </button>
@@ -1956,13 +1924,13 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
 
                 {/* Selected Media Previews */}
                 {selectedMedia.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 p-1.5 mb-2 rounded-lg border border-slate-200 bg-slate-50 max-h-24 overflow-y-auto">
+                  <div className="flex flex-wrap gap-1.5 p-1.5 mb-2 rounded-lg border border-outline-variant bg-surface-container-low max-h-24 overflow-y-auto">
                     {selectedMedia.map((item, index) => {
                       const isImage = !!item.previewUrl;
                       return (
                         <div
                           key={index}
-                          className="relative group w-10 h-10 rounded border border-slate-200 bg-white overflow-hidden flex items-center justify-center shadow-sm hover:border-[#E3000F]/50 transition"
+                          className="relative group w-10 h-10 rounded border border-outline-variant bg-surface overflow-hidden flex items-center justify-center shadow-sm hover:border-primary/50 transition"
                         >
                           {isImage ? (
                             <img
@@ -1972,8 +1940,8 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                             />
                           ) : (
                             <div className="flex flex-col items-center justify-center p-0.5 text-center w-full h-full">
-                              <MaterialIcon name="description" className="text-base text-[#E3000F]" />
-                              <span className="text-[8px] truncate w-full px-0.5 text-slate-500 font-medium">
+                              <MaterialIcon name="description" className="text-base text-primary" />
+                              <span className="text-[8px] truncate w-full px-0.5 text-on-surface-variant font-medium">
                                 {item.file.name}
                               </span>
                             </div>
@@ -1997,8 +1965,8 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                     type="button"
                     onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                     disabled={!flow.isLoggedIn}
-                    className={`text-slate-400 hover:text-[#E3000F] p-1.5 rounded-full hover:bg-red-50 transition disabled:opacity-40 disabled:hover:bg-transparent cursor-pointer ${
-                      showEmojiPicker ? "text-[#E3000F] bg-red-50" : ""
+                    className={`text-on-surface-variant hover:text-primary p-1.5 rounded-full hover:bg-red-50 transition disabled:opacity-40 disabled:hover:bg-transparent cursor-pointer ${
+                      showEmojiPicker ? "text-primary bg-red-50" : ""
                     }`}
                     title="Biểu cảm"
                   >
@@ -2008,8 +1976,8 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                     type="button"
                     onClick={() => setShowQuickReplies(!showQuickReplies)}
                     disabled={!flow.isLoggedIn}
-                    className={`text-slate-400 hover:text-[#E3000F] p-1.5 rounded-full hover:bg-red-50 transition disabled:opacity-40 disabled:hover:bg-transparent cursor-pointer ${
-                      showQuickReplies ? "text-[#E3000F] bg-red-50" : ""
+                    className={`text-on-surface-variant hover:text-primary p-1.5 rounded-full hover:bg-red-50 transition disabled:opacity-40 disabled:hover:bg-transparent cursor-pointer ${
+                      showQuickReplies ? "text-primary bg-red-50" : ""
                     }`}
                     title="Mẫu câu nhanh"
                   >
@@ -2019,7 +1987,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                     type="button"
                     onClick={() => imageInputRef.current?.click()}
                     disabled={!flow.isLoggedIn}
-                    className="text-slate-400 hover:text-[#E3000F] p-1.5 rounded-full hover:bg-red-50 transition disabled:opacity-40 disabled:hover:bg-transparent cursor-pointer"
+                    className="text-on-surface-variant hover:text-primary p-1.5 rounded-full hover:bg-red-50 transition disabled:opacity-40 disabled:hover:bg-transparent cursor-pointer"
                     title="Gửi hình ảnh"
                   >
                     <MaterialIcon name="image" className="text-[18px]" />
@@ -2028,12 +1996,12 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={!flow.isLoggedIn}
-                    className="text-slate-400 hover:text-[#E3000F] p-1.5 rounded-full hover:bg-red-50 transition disabled:opacity-40 disabled:hover:bg-transparent cursor-pointer"
+                    className="text-on-surface-variant hover:text-primary p-1.5 rounded-full hover:bg-red-50 transition disabled:opacity-40 disabled:hover:bg-transparent cursor-pointer"
                     title="Gửi file tài liệu"
                   >
                     <MaterialIcon name="attach_file" className="text-[18px]" />
                   </button>
-   
+
                   <textarea
                     ref={textareaRef}
                     rows={1}
@@ -2047,11 +2015,11 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                           : "Nhập tin nhắn, Enter để gửi..."
                     }
                     disabled={isSendingDirect || !flow.isLoggedIn}
-                    className={`flex-1 bg-slate-100/80 rounded-2xl ${
+                    className={`flex-1 bg-surface-container-low rounded-xl ${
                       fullScreen
                         ? "px-5 py-2.5 text-[15px]"
                         : "px-3.5 py-2 text-[13px]"
-                    } text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:bg-white border border-transparent focus:border-red-500/30 transition-all disabled:opacity-60 resize-none min-h-[38px] max-h-[120px] overflow-y-auto`}
+                    } text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:bg-surface border border-transparent focus:border-red-500/30 transition-all disabled:opacity-60 resize-none min-h-[38px] max-h-[120px] overflow-y-auto`}
                     onKeyDown={(e) => {
                       if (showSlashMenu && filteredSlashReplies.length > 0) {
                         if (e.key === "ArrowDown") {
@@ -2090,7 +2058,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                   <button
                     onClick={() => void handleSingleSend()}
                     disabled={isSendingDirect || !flow.isLoggedIn || (!inputText.trim() && selectedMedia.length === 0)}
-                    className={`bg-[#E3000F] text-white hover:bg-red-700 ${
+                    className={`bg-primary text-white hover:bg-red-700 ${
                       fullScreen ? "h-11 w-11" : "h-9 w-9"
                     } rounded-full flex items-center justify-center transition-all shadow-sm shadow-red-500/20 disabled:opacity-50 disabled:shadow-none cursor-pointer`}
                   >
@@ -2104,25 +2072,25 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
               </div>
             </>
           ) : !flow.isLoggedIn ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-6 bg-slate-50/50 w-full overflow-y-auto">
+            <div className="flex-1 flex flex-col items-center justify-center p-6 bg-surface-container-low w-full overflow-y-auto">
               {/* QR Code Display - 3 states: has QR, generating QR, no QR */}
               {flow.qrBase64 ? (
                 <>
-                  <div className="bg-white p-4 rounded-2xl shadow-lg mb-4 border border-slate-100 relative">
+                  <div className="bg-surface p-4 rounded-xl shadow-lg mb-4 border border-outline-variant relative">
                     <img
                       src={flow.qrBase64.startsWith("data:") ? flow.qrBase64 : `data:image/png;base64,${flow.qrBase64}`}
                       alt="Zalo QR"
                       className="w-48 h-48 object-fill"
                     />
                     {flow.authStatus === "waiting_scan" && (
-                      <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-[#E3000F] text-white hover:bg-red-700 px-3 py-1 rounded-full text-[10px] font-bold shadow-md animate-pulse whitespace-nowrap">
+                      <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-primary text-white hover:bg-red-700 px-3 py-1 rounded-full text-[10px] font-bold shadow-md animate-pulse whitespace-nowrap">
                         Đang chờ quét mã...
                       </div>
                     )}
                   </div>
-                  <h3 className="text-base font-bold text-slate-800 mb-1.5 mt-2 text-center">Quét mã QR bằng Zalo</h3>
-                  <div 
-                    className="text-slate-500 text-[11px] text-center mb-4 leading-relaxed" 
+                  <h3 className="text-base font-bold text-on-surface mb-1.5 mt-2 text-center">Quét mã QR bằng Zalo</h3>
+                  <div
+                    className="text-on-surface-variant text-[11px] text-center mb-4 leading-relaxed"
                     style={{ minWidth: "240px", maxWidth: "100%", width: "100%" }}
                   >
                     <p>Mở ứng dụng Zalo trên điện thoại → Quét QR → Xác nhận đăng nhập</p>
@@ -2131,7 +2099,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                     <button
                       onClick={() => void flow.startSession()}
                       disabled={flow.isStartingSession}
-                      className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-[12px] font-semibold hover:bg-slate-50 transition shadow-sm disabled:opacity-50"
+                      className="bg-surface border border-outline-variant text-on-surface px-4 py-2 rounded-lg text-[12px] font-semibold hover:bg-surface-container-low transition shadow-sm disabled:opacity-50"
                     >
                       {flow.isStartingSession ? "Đang tạo..." : "Làm mới QR"}
                     </button>
@@ -2139,14 +2107,14 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                 </>
               ) : flow.isStartingSession ? (
                 <>
-                  <div className="w-48 h-48 bg-white rounded-2xl mb-6 flex items-center justify-center border-2 border-dashed border-slate-200 shadow-sm">
-                    <div className="flex flex-col items-center gap-2 text-slate-400">
-                      <MaterialIcon name="qr_code_scanner" className="text-3xl animate-pulse text-[#E3000F]" />
+                  <div className="w-48 h-48 bg-surface rounded-xl mb-6 flex items-center justify-center border-2 border-dashed border-outline-variant shadow-sm">
+                    <div className="flex flex-col items-center gap-2 text-on-surface-variant">
+                      <MaterialIcon name="qr_code_scanner" className="text-3xl animate-pulse text-primary" />
                       <span className="text-[12px] font-semibold">Đang tạo mã QR...</span>
                     </div>
                   </div>
-                  <div 
-                    className="text-slate-500 text-[11px] text-center leading-relaxed"
+                  <div
+                    className="text-on-surface-variant text-[11px] text-center leading-relaxed"
                     style={{ minWidth: "240px", maxWidth: "100%", width: "100%" }}
                   >
                     <p>Hệ thống đang khởi tạo phiên Zalo và tạo mã QR. Quá trình này có thể mất vài giây.</p>
@@ -2154,19 +2122,19 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                 </>
               ) : (
                 <>
-                  <div className="text-[#E3000F] text-4xl mb-4">
+                  <div className="text-primary text-4xl mb-4">
                     <MaterialIcon name="login" className="text-inherit" />
                   </div>
-                  <h3 className="text-base font-bold text-slate-800 mb-2.5 text-center">Tài khoản chưa đăng nhập</h3>
-                  <div 
-                    className="text-slate-500 text-[11px] text-center leading-relaxed mb-5"
+                  <h3 className="text-base font-bold text-on-surface mb-2.5 text-center">Tài khoản chưa đăng nhập</h3>
+                  <div
+                    className="text-on-surface-variant text-[11px] text-center leading-relaxed mb-5"
                     style={{ minWidth: "280px", maxWidth: "100%", width: "100%" }}
                   >
                     <p>Bấm vào nút bên dưới để mở Zalo Web và đăng nhập. Sau khi đăng nhập xong, hệ thống sẽ tự động đồng bộ tài khoản của bạn.</p>
                   </div>
                   <button
                     onClick={handleOpenZaloWeb}
-                    className="bg-[#E3000F] hover:bg-red-600 text-white px-5 py-2 rounded-lg text-[12px] font-bold transition-all shadow-md shadow-red-100 active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                    className="bg-primary hover:bg-red-600 text-white px-5 py-2 rounded-lg text-[12px] font-bold transition-all shadow-md shadow-red-100 active:scale-95 flex items-center gap-1.5 cursor-pointer"
                   >
                     <MaterialIcon name="open_in_new" className="text-sm" />
                     Tiến hành đăng nhập
@@ -2193,30 +2161,30 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
           {flow.isLoggedIn && selectedConversationView && (
             <button
               onClick={() => setIsAutoSendOpen(!isAutoSendOpen)}
-              className="absolute right-0 top-1/3 z-50 w-9 h-12 bg-gradient-to-l from-[#E3000F] to-red-650 hover:from-red-600 hover:to-red-700 text-white rounded-l-xl shadow-lg flex flex-col items-center justify-center border-l border-y border-white/20 transition-all cursor-pointer"
+              className="absolute right-0 top-1/3 z-50 w-9 h-12 bg-gradient-to-l from-primary to-red-650 hover:from-red-600 hover:to-red-700 text-white rounded-l-xl shadow-lg flex flex-col items-center justify-center border-l border-y border-white/20 transition-all cursor-pointer"
               title={isAutoSendOpen ? "Đóng chiến dịch gửi hàng loạt" : "Mở chiến dịch gửi hàng loạt"}
             >
               <MaterialIcon name={(isAutoSendOpen ? "arrow_forward" : "campaign") as MaterialSymbolName} className="text-lg text-white" />
-              <span className="text-[8px] font-extrabold uppercase scale-90 -mt-1 tracking-tighter">Auto</span>
+              <span className="text-[8px] font-extrabold uppercase scale-90 -mt-1er">Auto</span>
             </button>
           )}
         </section>
 
         {/* [P1] AUTO SEND DRAWER (Slide-out absolute sidebar) */}
         {flow.isLoggedIn && selectedConversationView && (
-          <section className={`absolute right-0 top-0 h-full w-[450px] max-w-[90vw] border-l border-slate-200 flex flex-col bg-white overflow-hidden shadow-2xl z-40 transition-transform duration-300 ease-in-out ${isAutoSendOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+          <section className={`absolute right-0 top-0 h-full w-[450px] max-w-[90vw] border-l border-outline-variant flex flex-col bg-surface overflow-hidden shadow-2xl z-40 transition-transform duration-300 ease-in-out ${isAutoSendOpen ? 'translate-x-0' : 'translate-x-full'}`}>
             {/* Drawer Header */}
-            <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50 shrink-0">
+            <div className="p-4 border-b border-outline-variant flex items-center justify-between bg-surface-container-low shrink-0">
               <div className="flex items-center gap-2">
-                <MaterialIcon name="campaign" className="text-[#E3000F] animate-pulse text-lg" />
+                <MaterialIcon name="campaign" className="text-primary animate-pulse text-lg" />
                 <div>
-                  <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Bảng chiến dịch gửi hàng loạt (Auto)</h2>
-                  <p className="text-[10px] text-slate-400">Chọn tin mẫu đã lưu, người nhận để gửi nhanh</p>
+                  <h2 className="text-xs font-bold text-on-surface uppercase">Bảng chiến dịch gửi hàng loạt (Auto)</h2>
+                  <p className="text-[10px] text-on-surface-variant">Chọn tin mẫu đã lưu, người nhận để gửi nhanh</p>
                 </div>
               </div>
               <button
                 onClick={() => setIsAutoSendOpen(false)}
-                className="w-8 h-8 rounded-lg hover:bg-slate-200 border border-slate-200 flex items-center justify-center text-slate-500 transition-colors"
+                className="w-8 h-8 rounded-lg hover:bg-surface-container-highest border border-outline-variant flex items-center justify-center text-on-surface-variant transition-colors"
                 title="Đóng Auto Send"
               >
                 <MaterialIcon name="close" className="text-base" />
@@ -2237,16 +2205,16 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
               )}
 
               {/* Section 1: Content Mode Selection */}
-              <div className="border border-slate-200 rounded-xl p-3 bg-white space-y-2 shadow-sm">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Chế độ nội dung</label>
+              <div className="border border-outline-variant rounded-xl p-3 bg-surface space-y-2 shadow-sm">
+                <label className="text-[10px] font-bold text-on-surface-variant uppercase block">Chế độ nội dung</label>
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => setCampaignMode("both")}
                     className={`py-1.5 rounded-lg border text-xs font-semibold transition-all ${
                       campaignMode === "both"
-                        ? "border-red-500 bg-red-50 text-[#E3000F] font-bold"
-                        : "border-slate-200 text-slate-600 hover:border-red-500"
+                        ? "border-red-500 bg-red-50 text-primary font-bold"
+                        : "border-outline-variant text-on-surface-variant hover:border-red-500"
                     }`}
                   >
                     Text + Ảnh
@@ -2256,8 +2224,8 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                     onClick={() => setCampaignMode("text")}
                     className={`py-1.5 rounded-lg border text-xs font-semibold transition-all ${
                       campaignMode === "text"
-                        ? "border-red-500 bg-red-50 text-[#E3000F] font-bold"
-                        : "border-slate-200 text-slate-600 hover:border-red-500"
+                        ? "border-red-500 bg-red-50 text-primary font-bold"
+                        : "border-outline-variant text-on-surface-variant hover:border-red-500"
                     }`}
                   >
                     Chỉ Text
@@ -2267,41 +2235,41 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                     onClick={() => setCampaignMode("image")}
                     className={`py-1.5 rounded-lg border text-xs font-semibold transition-all ${
                       campaignMode === "image"
-                        ? "border-red-500 bg-red-50 text-[#E3000F] font-bold"
-                        : "border-slate-200 text-slate-600 hover:border-red-500"
+                        ? "border-red-500 bg-red-50 text-primary font-bold"
+                        : "border-outline-variant text-on-surface-variant hover:border-red-500"
                     }`}
                   >
                     Chỉ Ảnh
                   </button>
                 </div>
-                <p className="text-[10px] text-slate-400 font-medium mt-1">
+                <p className="text-[10px] text-on-surface-variant font-medium mt-1">
                   Đã chọn {selectedMessageIds.length} tin nhắn trực quan từ chat.
                 </p>
               </div>
 
               {/* Section 2: Recipients input */}
-              <div className="border border-slate-200 rounded-xl p-3 bg-white space-y-3 shadow-sm">
+              <div className="border border-outline-variant rounded-xl p-3 bg-surface space-y-3 shadow-sm">
                 <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Nhập người nhận thủ công</label>
-                  <span className="text-[9px] text-slate-400">Mỗi dòng một tên/ID</span>
+                  <label className="text-[10px] font-bold text-on-surface-variant uppercase block">Nhập người nhận thủ công</label>
+                  <span className="text-[9px] text-on-surface-variant">Mỗi dòng một tên/ID</span>
                 </div>
                 <textarea
                   value={manualRecipients}
                   onChange={(e) => setManualRecipients(e.target.value)}
                   rows={3}
                   placeholder="Nhập tên group hoặc cá nhân..."
-                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-red-500 resize-none transition-all"
+                  className="w-full border border-outline-variant rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-red-500 resize-none transition-all"
                 />
 
-                <hr className="border-slate-100" />
+                <hr className="border-outline-variant" />
 
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Chọn người nhận từ hệ thống</span>
+                  <span className="text-[10px] font-bold text-on-surface-variant uppercase">Chọn người nhận từ hệ thống</span>
                   <button
                     type="button"
                     onClick={handleLoadTargets}
                     disabled={isLoadingTargets}
-                    className="bg-[#E3000F] hover:bg-red-700 text-white text-[10px] font-bold px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 shrink-0 cursor-pointer"
+                    className="bg-primary hover:bg-red-700 text-white text-[10px] font-bold px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 shrink-0 cursor-pointer"
                   >
                     <MaterialIcon name="refresh" className={`text-xs ${isLoadingTargets ? "animate-spin" : ""}`} />
                     <span>Tải danh sách</span>
@@ -2312,18 +2280,18 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                   <>
                     {/* Search recipient lists */}
                     <div className="relative flex items-center">
-                      <MaterialIcon name="search" className="absolute left-2.5 text-slate-400 text-xs" />
+                      <MaterialIcon name="search" className="absolute left-2.5 text-on-surface-variant text-xs" />
                       <input
                         type="text"
                         placeholder="Lọc danh sách nhận..."
                         value={autoSendSearchQuery}
                         onChange={(e) => setAutoSendSearchQuery(e.target.value)}
-                        className="w-full pl-8 pr-3 py-1 border border-slate-200 rounded-lg text-[11px] outline-none focus:border-red-500 bg-white"
+                        className="w-full pl-8 pr-3 py-1 border border-outline-variant rounded-lg text-[11px] outline-none focus:border-red-500 bg-surface"
                       />
                     </div>
 
                     {/* List of groups fetched */}
-                    <div className="max-h-40 overflow-y-auto border border-slate-100 rounded-lg p-2 space-y-1.5 bg-slate-50 divide-y divide-slate-100">
+                    <div className="max-h-40 overflow-y-auto border border-outline-variant rounded-lg p-2 space-y-1.5 bg-surface-container-low divide-y divide-outline-variant">
                       {autoSendFilteredConversations.length > 0 ? (
                         autoSendFilteredConversations.map((conv) => {
                           const title = conversationTitle(conv);
@@ -2331,22 +2299,22 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                           return (
                             <label
                               key={conv.conversation_id}
-                              className={`flex items-center gap-2 p-1.5 rounded-lg border text-xs cursor-pointer select-none transition-all hover:bg-slate-100 ${
-                                checked ? 'bg-red-50/50 border-red-500/30 text-[#E3000F] font-semibold' : 'bg-white border-slate-200'
+                              className={`flex items-center gap-2 p-1.5 rounded-lg border text-xs cursor-pointer select-none transition-all hover:bg-surface-container-low ${
+                                checked ? 'bg-red-50/50 border-red-500/30 text-primary font-semibold' : 'bg-surface border-outline-variant'
                               }`}
                             >
                               <input
                                 type="checkbox"
                                 checked={checked}
                                 onChange={() => handleToggleAutoSendTarget(conv.conversation_id)}
-                                className="rounded text-[#E3000F] border-slate-300 w-3.5 h-3.5 focus:ring-0 cursor-pointer"
+                                className="rounded text-primary border-outline-variant w-3.5 h-3.5 focus:ring-0 cursor-pointer"
                               />
-                              <span className="font-semibold text-slate-700 truncate flex-1">{title}</span>
+                              <span className="font-semibold text-on-surface truncate flex-1">{title}</span>
                             </label>
                           );
                         })
                       ) : (
-                        <div className="text-[10px] text-slate-400 text-center italic py-2">
+                        <div className="text-[10px] text-on-surface-variant text-center italic py-2">
                           Không tìm thấy người nhận nào
                         </div>
                       )}
@@ -2356,11 +2324,11 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
               </div>
 
               {/* Section 3: Preview Box */}
-              <div className="border border-slate-200 rounded-xl p-3 bg-white space-y-2 shadow-sm">
+              <div className="border border-outline-variant rounded-xl p-3 bg-surface space-y-2 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Bản xem trước chiến dịch</span>
-                    <span className="text-[10px] text-slate-400 font-semibold">
+                    <span className="text-[10px] font-bold text-on-surface-variant uppercase block">Bản xem trước chiến dịch</span>
+                    <span className="text-[10px] text-on-surface-variant font-semibold">
                       {autoSendTargetIds.length + manualRecipients.split("\n").filter(Boolean).length > 0
                         ? `${autoSendTargetIds.length + manualRecipients.split("\n").filter(Boolean).length} người nhận sẽ được gửi (Gặp ${autoSendTargetIds.length} nhóm hệ thống, ${manualRecipients.split("\n").filter(Boolean).length} thủ công).`
                         : "Chưa cấu hình người nhận"}
@@ -2369,7 +2337,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                   <button
                     type="button"
                     onClick={() => setShowPreview(!showPreview)}
-                    className="border border-slate-200 hover:border-red-500 text-slate-700 hover:text-red-600 text-xs font-bold px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+                    className="border border-outline-variant hover:border-red-500 text-on-surface hover:text-red-600 text-xs font-bold px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer"
                   >
                     <MaterialIcon name="visibility" className="text-xs" />
                     <span>Preview</span>
@@ -2378,15 +2346,15 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
 
                 {/* Preview Area Container */}
                 {showPreview && (
-                  <div className="bg-slate-50 border border-dashed border-slate-200 rounded-lg p-3 text-xs text-slate-700 whitespace-pre-wrap text-left shadow-inner">
+                  <div className="bg-surface-container-low border border-dashed border-outline-variant rounded-lg p-3 text-xs text-on-surface whitespace-pre-wrap text-left shadow-inner">
                     {selectedMessageIds.length > 0 ? (
                       <div>
                         {messages.filter(m => selectedMessageIds.includes(messageKey(m))).map((m, idx) => (
                           <div key={idx} className="mb-2 last:mb-0">
                             {(campaignMode === "both" || campaignMode === "text") && m.content && (
                               <div>
-                                <div className="font-bold text-[#E3000F] mb-0.5">Text sẽ gửi:</div>
-                                <div className="bg-white border border-slate-200 rounded-lg p-2 mb-2 italic">
+                                <div className="font-bold text-primary mb-0.5">Text sẽ gửi:</div>
+                                <div className="bg-surface border border-outline-variant rounded-lg p-2 mb-2 italic">
                                   &quot;{m.content}&quot;
                                 </div>
                               </div>
@@ -2398,7 +2366,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                                   {messageAssets(m).map((asset, aIdx) => (
                                     <div
                                       key={aIdx}
-                                      className="w-full aspect-video bg-slate-200 border rounded flex items-center justify-center text-[9px] text-slate-500 font-bold overflow-hidden"
+                                      className="w-full aspect-video bg-surface-container-highest border rounded flex items-center justify-center text-[9px] text-on-surface-variant font-bold overflow-hidden"
                                     >
                                       <img src={asset.storage_url || ""} alt="Preview" className="w-full h-full object-cover" />
                                     </div>
@@ -2410,7 +2378,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                         ))}
                       </div>
                     ) : (
-                      <div className="text-slate-400 text-center italic">
+                      <div className="text-on-surface-variant text-center italic">
                         Chưa có nội dung gửi. Hãy chọn tin nhắn từ khung chat để làm mẫu.
                       </div>
                     )}
@@ -2424,7 +2392,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                   type="button"
                   onClick={() => void handleAutoSend()}
                   disabled={isSending || selectedMessageIds.length === 0 || (autoSendTargetIds.length === 0 && manualRecipients.split("\n").filter(Boolean).length === 0)}
-                  className="w-full bg-[#E3000F] hover:bg-red-700 text-white text-xs font-bold py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                  className="w-full bg-primary hover:bg-red-700 text-white text-xs font-bold py-2.5 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
                   <MaterialIcon name="send" className="text-base" />
                   <span>{isSending ? "Đang gửi chiến dịch..." : "Bắt đầu gửi hàng loạt"}</span>
@@ -2433,9 +2401,9 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
 
               {/* Campaign Status Logs */}
               {campaignStatus && (
-                <div className="border border-slate-200 rounded-xl p-3 bg-white space-y-2 shadow-sm animate-in fade-in duration-300">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                <div className="border border-outline-variant rounded-xl p-3 bg-surface space-y-2 shadow-sm animate-in fade-in duration-300">
+                  <div className="flex items-center justify-between border-b border-outline-variant pb-1.5">
+                    <span className="text-[10px] font-bold text-on-surface-variant uppercase">
                       Chiến dịch: Camp_{flow.userId?.slice(-5) || "981a2"}
                     </span>
                     <span className={`text-[10px] font-bold uppercase ${
@@ -2444,13 +2412,13 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                       {campaignStatus === "sending" ? "Đang chạy" : campaignStatus === "success" ? "Hoàn thành" : "Thất bại"}
                     </span>
                   </div>
-                  <div className="max-h-40 overflow-y-auto space-y-1 text-[11px] font-semibold text-slate-500">
+                  <div className="max-h-40 overflow-y-auto space-y-1 text-[11px] font-semibold text-on-surface-variant">
                     {campaignLogs.map((log, idx) => (
-                      <div key={idx} className="flex items-center gap-1.5 py-0.5 border-b border-slate-50 last:border-0">
+                      <div key={idx} className="flex items-center gap-1.5 py-0.5 border-b border-outline-variant last:border-0">
                         <span className={`w-1.5 h-1.5 rounded-full ${
                           log.status === "sending" ? "bg-blue-500 animate-pulse" : log.status === "success" ? "bg-emerald-500" : "bg-red-500"
                         }`} />
-                        <span className="font-bold text-slate-600 truncate flex-1">Gửi tới: {log.name}</span>
+                        <span className="font-bold text-on-surface-variant truncate flex-1">Gửi tới: {log.name}</span>
                         <span className={`text-[9px] uppercase shrink-0 font-bold ${
                           log.status === "sending" ? "text-blue-500" : log.status === "success" ? "text-emerald-600" : "text-red-600"
                         }`}>
@@ -2487,7 +2455,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
       {newChatToast && (
         <div
           role="status"
-          className="fixed top-4 right-4 z-[70] max-w-[360px] px-4 py-2.5 bg-slate-900 text-white text-[12.5px] rounded-lg shadow-2xl border border-slate-700/50 animate-in fade-in slide-in-from-top-2"
+          className="fixed top-4 right-4 z-[70] max-w-[360px] px-4 py-2.5 bg-slate-900 text-white text-[12.5px] rounded-lg shadow-2xl border border-outline-variant animate-in fade-in slide-in-from-top-2"
         >
           <div className="flex items-center gap-2">
             <MaterialIcon name="info" className="text-base shrink-0" />
