@@ -194,7 +194,7 @@ async def handle_cors_middleware(request: Request, call_next):
         else:
             response.headers["Access-Control-Allow-Origin"] = origin or "*"
         response.headers["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS, PUT, DELETE, PATCH"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, x-api-key, Authorization, X-User-ID, X-Session-ID, X-Zalo-Worker-ID"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, x-api-key, Authorization, X-User-ID, X-Session-ID, X-Zalo-Worker-ID, X-Caller-Email"
         return response
 
     response = await call_next(request)
