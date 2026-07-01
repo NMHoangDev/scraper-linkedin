@@ -1418,21 +1418,53 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                 <MaterialIcon name="arrow_back" className="text-base" />
               </button>
               <div className="min-w-0 flex-1">
-                <h2 className="font-bold text-[14px] text-slate-900 leading-tight truncate" title={selectedAccount?.label || "Đang chat"}>{selectedAccount?.label || "Đang chat"}</h2>
+                {flow.accounts.length > 1 ? (
+                  <select
+                    value={flow.userId || ""}
+                    onChange={(e) => flow.switchAccount(e.target.value)}
+                    className="font-bold text-[13px] text-slate-800 bg-transparent outline-none max-w-full cursor-pointer pr-4 border border-slate-200 rounded px-1 py-0.5"
+                  >
+                    {flow.accounts.map((acc) => (
+                      <option key={acc.account_id} value={acc.account_id}>
+                        {acc.label || acc.phone || acc.account_id}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <h2 className="font-bold text-[14px] text-slate-900 leading-tight truncate" title={selectedAccount?.label || "Đang chat"}>
+                    {selectedAccount?.label || "Đang chat"}
+                  </h2>
+                )}
                 <p className="text-[10px] text-slate-400 truncate">UID: {shortId(flow.userId || "")}</p>
               </div>
               {flow.isLoggedIn && flow.userId && flow.userId !== "default" && (
                 <ZaloKpiPanel accountId={flow.userId} />
               )}
               {flow.isLoggedIn && (
-                <button
-                  onClick={() => setNewChatModalOpen(true)}
-                  className="p-1 hover:bg-slate-100 rounded transition text-[#E3000F] shrink-0"
-                  title="Nhắn tin cho người lạ (SĐT hoặc username Zalo)"
-                  aria-label="Nhắn tin cho người lạ"
-                >
-                  <MaterialIcon name="person_add" className="text-base" />
-                </button>
+                <div className="flex items-center gap-0.5">
+                  <button
+                    onClick={() => {
+                      const label = prompt("Nhập tên nhãn gợi nhớ cho tài khoản Zalo mới (ví dụ: Zalo Seeding 05):");
+                      if (label && label.trim()) {
+                        const phone = prompt("Nhập số điện thoại đăng nhập Zalo (Tùy chọn):");
+                        void flow.createAccount(label.trim(), phone?.trim() || undefined);
+                      }
+                    }}
+                    className="p-1 hover:bg-slate-100 rounded transition text-emerald-600 shrink-0"
+                    title="Thêm tài khoản Zalo mới"
+                    aria-label="Thêm tài khoản Zalo"
+                  >
+                    <MaterialIcon name={"add_circle" as MaterialSymbolName} className="text-base" />
+                  </button>
+                  <button
+                    onClick={() => setNewChatModalOpen(true)}
+                    className="p-1 hover:bg-slate-100 rounded transition text-[#E3000F] shrink-0"
+                    title="Nhắn tin cho người lạ (SĐT hoặc username Zalo)"
+                    aria-label="Nhắn tin cho người lạ"
+                  >
+                    <MaterialIcon name="person_add" className="text-base" />
+                  </button>
+                </div>
               )}
               {flow.isLoggedIn && (
                 <button

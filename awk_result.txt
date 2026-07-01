@@ -1,2 +1,0 @@
-async def save_listener_messages(
-        saved = await save_listener_messages(user_id, g_id, g_name, g_messages)

@@ -117,7 +117,7 @@ async def _get_confirmed_session_for_user(user_id: str, session_id: Optional[str
     if not session:
         session = await get_latest_session_for_user(user_id, preferred_statuses={"confirmed"})
     if not session:
-        raise HTTPException(status_code=401, detail="No confirmed session found, please login first")
+        raise HTTPException(status_code=401, detail="Chưa đăng nhập lại Zalo. Vui lòng đăng nhập lại tài khoản Zalo trước khi tiếp tục.")
     if session.user_id != user_id:
         raise HTTPException(status_code=403, detail="Session does not belong to current user")
 
@@ -140,7 +140,7 @@ async def list_groups(
     if not session:
         session = await get_latest_session_for_user(user_id, preferred_statuses={"confirmed"})
     if not session:
-        raise HTTPException(status_code=401, detail="No confirmed session found, please login first")
+        raise HTTPException(status_code=401, detail="Chưa đăng nhập lại Zalo. Vui lòng đăng nhập lại tài khoản Zalo trước khi tải danh sách.")
     if session.user_id != user_id:
         raise HTTPException(status_code=403, detail="Session does not belong to current user")
 

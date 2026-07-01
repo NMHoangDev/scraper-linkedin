@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Markee Zalo Login Extension",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Capture Zalo Web cookies and sync visible Zalo Web messages to Markee.",
   "permissions": [
     "activeTab",

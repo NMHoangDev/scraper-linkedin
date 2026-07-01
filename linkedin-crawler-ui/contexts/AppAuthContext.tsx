@@ -121,6 +121,14 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  useEffect(() => {
+    if (user?.email) {
+      window.localStorage?.setItem("app_user_email", user.email);
+    } else {
+      window.localStorage?.removeItem("app_user_email");
+    }
+  }, [user]);
+
   return (
     <AppAuthContext.Provider
       value={{

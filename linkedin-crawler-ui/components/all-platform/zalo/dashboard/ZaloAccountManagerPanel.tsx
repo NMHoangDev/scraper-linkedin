@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useRouter } from "next/navigation";
 import { MaterialIcon } from "@/components/ui";
+import { useAppAuth } from "@/contexts/AppAuthContext";
 import type { ZaloCrawlerFlowValue } from "@/hooks/useZaloCrawlerFlow";
 import { getZaloInboxReport } from "@/services/zaloCrawlerService";
 import type { ZaloInboxReportResponse } from "@/types/zalo-api";
@@ -30,6 +31,7 @@ function formatTime(value?: string | null) {
 
 export function ZaloAccountManagerPanel({ flow }: ZaloAccountManagerPanelProps) {
   const router = useRouter();
+  const { user } = useAppAuth();
   const [label, setLabel] = useState("");
   const [phone, setPhone] = useState("");
   const [report, setReport] = useState<ZaloInboxReportResponse | null>(null);
@@ -172,15 +174,18 @@ export function ZaloAccountManagerPanel({ flow }: ZaloAccountManagerPanelProps) 
                   <button
                     type="button"
                     onClick={() => {
-                      // Chọn account trước rồi navigate tới trang chat full-screen
                       if (account.account_id !== flow.userId) {
                         flow.switchAccount(account.account_id);
                       }
-                      router.push("/zalo-chat");
+                      if (user?.role === "leader" || user?.role === "admin") {
+                        router.push(`/all-platform/zalo-inbox`);
+                      } else {
+                        router.push("/zalo-chat");
+                      }
                     }}
                     disabled={!account.has_auth}
                     className="flex-1 bg-[#E3000F] hover:bg-[#C40009] disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl px-4 py-2.5 text-sm font-bold transition-all shadow-sm active:scale-95 flex items-center justify-center gap-1.5"
-                    title={account.has_auth ? "Mở Zalo Chat ở trang full-screen" : "Cần đăng nhập tài khoản trước"}
+                    title={account.has_auth ? "Mở Zalo Chat" : "Cần đăng nhập tài khoản trước"}
                   >
                     <MaterialIcon name="open_in_new" className="text-[18px]" />
                     Mở chat

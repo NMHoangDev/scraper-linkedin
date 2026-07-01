@@ -91,6 +91,13 @@ function buildWorkspaceEntries(dashboardHref: string, teamHref: string): Sidebar
         },
         {
           type: "item",
+          href: "/all-platform/zalo-inbox",
+          icon: "chat",
+          label: "Zalo Inbox Admin",
+          matchStartsWith: ["/all-platform/zalo-inbox"],
+        },
+        {
+          type: "item",
           href: "/all-platform/customers",
           icon: "group",
           label: "Khách hàng",
@@ -100,12 +107,6 @@ function buildWorkspaceEntries(dashboardHref: string, teamHref: string): Sidebar
           href: "/all-platform/quan-ly-tai-khoan",
           icon: "manage_accounts",
           label: "Quản lý tài khoản",
-        },
-        {
-          type: "item",
-          href: "/all-platform/tai-khoan",
-          icon: "account_circle",
-          label: "Quản lý TK Zalo",
         },
       ],
     },
@@ -161,6 +162,12 @@ const personalEntries: SidebarEntry[] = [
     icon: "inbox",
     label: "Inbox",
     badge: 3,
+  },
+  {
+    type: "item",
+    href: "/all-platform/tai-khoan",
+    icon: "chat",
+    label: "Inbox Zalo",
   },
   {
     type: "item",
@@ -224,6 +231,12 @@ const memberEntries: SidebarEntry[] = [
     href: "/all-platform/inbox",
     icon: "inbox",
     label: "Inbox FB",
+  },
+  {
+    type: "item",
+    href: "/all-platform/tai-khoan",
+    icon: "chat",
+    label: "Inbox Zalo",
   },
   {
     type: "item",

@@ -363,7 +363,7 @@ async def start_crawl(
     user_id = _normalize_user_id(x_user_id)
     session = await _get_confirmed_or_zca_session(user_id, x_session_id)
     if not session:
-        raise HTTPException(status_code=401, detail="No confirmed session found, please login first")
+        raise HTTPException(status_code=401, detail="Chưa đăng nhập lại Zalo. Vui lòng đăng nhập lại tài khoản Zalo trước khi bắt đầu cào.")
     if session.user_id != user_id:
         raise HTTPException(status_code=403, detail="Session does not belong to current user")
 

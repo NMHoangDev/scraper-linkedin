@@ -67,6 +67,82 @@ def _normalize_user_id(value: Optional[str]) -> str:
     return raw or "default"
 
 
+async def check_caller_conversation_access(
+    account_id: str,
+    caller_email: Optional[str],
+) -> Optional[set[str]]:
+    """Kiểm tra quyền truy cập của người gọi đối với tài khoản zalo account_id.
+    
+    Trả về:
+        - None: Nếu người gọi là chủ sở hữu tài khoản (full quyền).
+        - set[str]: Danh sách conversation_id được phép truy cập (được share).
+        - Ném HTTPException(403) nếu không có quyền.
+    """
+    if not caller_email:
+        # Nếu không có caller_email, cho phép truy cập full để tương thích ngược
+        return None
+
+    # 1. Tìm thông tin app_user của người gọi
+    caller_email_clean = caller_email.strip().lower()
+    user_rows = await _rest(
+        "GET",
+        "app_users",
+        params={
+            "select": "id,role",
+            "email": f"eq.{caller_email_clean}",
+            "limit": "1",
+        },
+    )
+    if not user_rows:
+        raise HTTPException(status_code=403, detail="Không tìm thấy thông tin tài khoản người gọi.")
+        
+    caller_user = user_rows[0]
+    caller_user_id = str(caller_user.get("id"))
+    caller_role = str(caller_user.get("role") or "").strip().lower()
+
+    # 2. Tìm chủ sở hữu của tài khoản Zalo (owner_id trong zalo_accounts)
+    account_rows = await _rest(
+        "GET",
+        "zalo_accounts",
+        params={
+            "select": "owner_id",
+            "account_id": f"eq.{account_id}",
+            "limit": "1",
+        },
+    )
+    owner_user_id = None
+    if account_rows:
+        owner_user_id = str(account_rows[0].get("owner_id") or "")
+
+    # 3. Nếu là chủ sở hữu, cho phép xem toàn bộ
+    if owner_user_id and caller_user_id == owner_user_id:
+        return None
+
+    # 4. Nếu không phải chủ sở hữu, chỉ admin và leader được xem (nhưng bị giới hạn bởi các chat được share)
+    if caller_role not in ["admin", "superadmin", "leader"]:
+        raise HTTPException(status_code=403, detail="Bạn không có quyền truy cập dữ liệu của tài khoản này.")
+
+    # 5. Truy vấn danh sách cuộc hội thoại được share
+    perm_params = {
+        "select": "conversation_id,id_leader",
+        "account_id": f"eq.{account_id}",
+        "is_active": "eq.true",
+        "limit": "5000",
+    }
+    if caller_role == "leader":
+        # Leader chỉ được xem nếu id_leader khớp hoặc là NULL (share chung)
+        perm_params["or"] = f"(id_leader.eq.{caller_user_id},id_leader.is.null)"
+
+    perm_rows = await _rest(
+        "GET",
+        "zalo_conversation_permissions",
+        params=perm_params,
+    ) or []
+
+    allowed_ids = {str(row.get("conversation_id") or "").strip() for row in perm_rows if row.get("conversation_id")}
+    return allowed_ids
+
+
 class SyncRecentRequest(BaseModel):
     account_id: Optional[str] = None
     limit: int = Field(default=50, ge=1, le=100)
@@ -128,11 +204,18 @@ class SyncDomResponse(BaseModel):
 async def get_conversations(
     account_id: Optional[str] = Query(None),
     x_user_id: str = Header("default", alias="X-User-ID"),
+    x_caller_email: Optional[str] = Header(None, alias="X-Caller-Email"),
     limit: int = Query(500, ge=1, le=2000),
 ):
     user_id = _normalize_user_id(account_id or x_user_id)
+    # Check access permission
+    allowed_conv_ids = await check_caller_conversation_access(user_id, x_caller_email)
+    
     try:
         rows = await list_conversations(user_id, limit=limit)
+        if allowed_conv_ids is not None:
+            # Lọc chỉ giữ lại các hội thoại đã được share
+            rows = [r for r in rows if str(r.get("group_id") or "").strip() in allowed_conv_ids]
         return {
             "account_id": user_id,
             "conversations": [ZaloConversationSummary(**row) for row in rows],
@@ -409,6 +492,7 @@ async def sync_dom_messages(
                     group_name=group_name,
                     avatar_url=conversation.avatar_url,
                     unread_count=conversation.unread_count,
+                    is_friend=conversation.is_friend,
                 )
             total_saved += saved
             if saved > 0:
@@ -506,10 +590,18 @@ async def get_conversation_messages(
     background_tasks: BackgroundTasks,
     account_id: Optional[str] = Query(None),
     x_user_id: str = Header("default", alias="X-User-ID"),
+    x_caller_email: Optional[str] = Header(None, alias="X-Caller-Email"),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
 ):
     user_id = _normalize_user_id(account_id or x_user_id)
+    # Check access permission
+    allowed_conv_ids = await check_caller_conversation_access(user_id, x_caller_email)
+    if allowed_conv_ids is not None and conversation_id.strip() not in allowed_conv_ids:
+        raise HTTPException(
+            status_code=403,
+            detail="Cuộc trò chuyện này ở chế độ riêng tư và chưa được chia sẻ với bạn."
+        )
     
     # User requested to NOT auto-sync old messages on load. 
     # They will click the sync button manually if needed.
@@ -557,6 +649,7 @@ async def send_message_to_conversation(
     body: SendMessageRequest,
     account_id: Optional[str] = Query(None),
     x_user_id: str = Header("default", alias="X-User-ID"),
+    x_caller_email: Optional[str] = Header(None, alias="X-Caller-Email"),
 ):
     """Gửi tin nhắn văn bản trực tiếp vào một hội thoại Zalo qua ZCA API.
 
@@ -618,9 +711,18 @@ async def send_media_to_conversation(
     files: List[UploadFile] = File(...),
     account_id: Optional[str] = Query(None),
     x_user_id: str = Header("default", alias="X-User-ID"),
+    x_caller_email: Optional[str] = Header(None, alias="X-Caller-Email"),
 ):
     """Gửi hình ảnh hoặc tài liệu kèm chữ vào một hội thoại Zalo qua ZCA API."""
     user_id = _normalize_user_id(account_id or x_user_id)
+    # Check access permission
+    allowed_conv_ids = await check_caller_conversation_access(user_id, x_caller_email)
+    if allowed_conv_ids is not None and conversation_id.strip() not in allowed_conv_ids:
+        raise HTTPException(
+            status_code=403,
+            detail="Cuộc trò chuyện này ở chế độ riêng tư và chưa được chia sẻ với bạn."
+        )
+
     auth = await load_zca_auth(user_id)
     if not auth:
         raise HTTPException(
@@ -735,9 +837,17 @@ async def mark_conversation_read(
     background_tasks: BackgroundTasks,
     account_id: Optional[str] = Query(None),
     x_user_id: str = Header("default", alias="X-User-ID"),
+    x_caller_email: Optional[str] = Header(None, alias="X-Caller-Email"),
 ):
     """Đánh dấu hội thoại là đã đọc. Cập nhật trong Supabase và thông báo ZCA (nếu đăng nhập)."""
     user_id = _normalize_user_id(account_id or x_user_id)
+    # Check access permission
+    allowed_conv_ids = await check_caller_conversation_access(user_id, x_caller_email)
+    if allowed_conv_ids is not None and conversation_id.strip() not in allowed_conv_ids:
+        raise HTTPException(
+            status_code=403,
+            detail="Cuộc trò chuyện này ở chế độ riêng tư và chưa được chia sẻ với bạn."
+        )
     
     # 1. Update in Supabase
     try:
@@ -1014,6 +1124,7 @@ async def create_user_thread(
             group_id=target_user_id,
             group_name=body.display_name.strip() or f"User {target_user_id}",
             avatar_url=body.avatar_url,
+            is_friend=True,
         )
     except Exception as exc:
         raise HTTPException(

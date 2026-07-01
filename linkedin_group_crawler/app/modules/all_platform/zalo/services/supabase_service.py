@@ -84,7 +84,6 @@ async def resolve_thread_type(account_id: str, conversation_id: str) -> int:
     """Tra cứu zalo_groups để xác định thread_type.
 
     - Nếu group có is_friend=true → type 0 (cá nhân).
-    - Nếu group_name trùng group_id hoặc là tên người → type 0.
     - Mặc định type 1 (nhóm) nếu không xác định được.
     """
     try:
@@ -92,20 +91,18 @@ async def resolve_thread_type(account_id: str, conversation_id: str) -> int:
             "GET",
             "zalo_groups",
             params={
-                "select": "group_name",
+                "select": "is_friend",
                 "user_id": f"eq.{account_id}",
                 "group_id": f"eq.{conversation_id}",
                 "limit": "1",
             },
         ) or []
-        if rows:
-            row = rows[0]
-            name = str(row.get("group_name") or "").strip()
-            if name == conversation_id or name.startswith("Conversation "):
-                return 1
+        if rows and rows[0].get("is_friend"):
+            return 0  # Cá nhân (friend/stranger chat)
     except Exception:
         pass
-    return 1
+    return 1  # Nhóm chat
+
 
 
 async def _rest_with_count(
@@ -329,6 +326,7 @@ async def upsert_group(
     last_sender_id: Optional[str] = None,
     last_sender_name: Optional[str] = None,
     last_message_type: Optional[str] = None,
+    is_friend: Optional[bool] = None,
 ) -> None:
     resolved_name = group_name
     if group_name and (group_name.startswith("Conversation ") or group_name.isdigit() or group_name == group_id):
@@ -371,6 +369,8 @@ async def upsert_group(
         payload["last_sender_name"] = last_sender_name
     if last_message_type is not None:
         payload["last_message_type"] = last_message_type
+    if is_friend is not None:
+        payload["is_friend"] = is_friend
 
     await _rest(
         "POST",
@@ -403,7 +403,7 @@ async def upsert_groups(user_id: str, groups: Iterable[Dict[str, Any]]) -> int:
             "GET",
             "zalo_groups",
             params={
-                "select": "group_id,group_name,avatar_url,unread_count,last_message_at,last_message_content,last_sender_id,last_sender_name,last_message_type",
+                "select": "group_id,group_name,avatar_url,unread_count,last_message_at,last_message_content,last_sender_id,last_sender_name,last_message_type,is_friend",
                 "user_id": f"eq.{user_id}",
                 "limit": "5000",
             },
@@ -436,6 +436,7 @@ async def upsert_groups(user_id: str, groups: Iterable[Dict[str, Any]]) -> int:
             "last_sender_name": group.get("last_sender_name") or existing.get("last_sender_name"),
             "last_message_type": group.get("last_message_type") or existing.get("last_message_type"),
             "is_pinned": bool(group.get("is_pinned")),
+            "is_friend": bool(group.get("is_friend") or existing.get("is_friend") or False),
             "updated_at": now,
         }
         rows.append(row)
@@ -787,13 +788,13 @@ async def set_conversation_share(
 async def list_shared_conversation_ids(
     account_id: str,
     shared_role: Optional[str] = None,
-) -> Set[str]:
+) -> set[str]:
     """Trả về set ``conversation_id`` đang được share (is_active=true) cho account.
 
     Nếu ``shared_role=None`` trả về tất cả role. Hàm fail-soft trả về set rỗng
     nếu bảng chưa tồn tại.
     """
-    empty: Set[str] = set()
+    empty: set[str] = set()
     if not is_supabase_configured():
         return empty
     account_id = (account_id or "").strip()
@@ -815,7 +816,7 @@ async def list_shared_conversation_ids(
             return empty
         raise
 
-    result: Set[str] = set()
+    result: set[str] = set()
     for row in rows:
         if not isinstance(row, dict):
             continue
@@ -1883,11 +1884,26 @@ async def fetch_messages_by_ids(
 ) -> List[Dict[str, Any]]:
     if not message_ids:
         return []
-    quoted_ids = ",".join(message_ids)
+    
+    import re
+    # UUID pattern: 8-4-4-4-12 hex chars
+    uuid_pattern = re.compile(r"^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$", re.I)
+    uuid_ids = [mid for mid in message_ids if uuid_pattern.match(mid)]
+    source_ids = [mid for mid in message_ids if not uuid_pattern.match(mid)]
+    
+    or_filters = []
+    if uuid_ids:
+        or_filters.append(f"id.in.({','.join(uuid_ids)})")
+    if source_ids:
+        or_filters.append(f"source_message_id.in.({','.join(source_ids)})")
+        
+    if not or_filters:
+        return []
+
     params = {
         "select": "*,assets:zalo_message_assets(*)",
         "user_id": f"eq.{user_id}",
-        "id": f"in.({quoted_ids})",
+        "or": f"({','.join(or_filters)})",
     }
     if not include_deleted:
         params["is_deleted"] = "eq.false"
@@ -1924,10 +1940,15 @@ async def update_library_message(user_id: str, message_id: str, payload: Dict[st
     payload = {key: value for key, value in payload.items() if value is not None}
     payload["updated_at"] = datetime.utcnow().isoformat()
     include_deleted = payload.get("is_deleted") is True
+    
+    import re
+    uuid_pattern = re.compile(r"^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$", re.I)
+    id_field = "id" if uuid_pattern.match(message_id) else "source_message_id"
+    
     rows = await _rest(
         "PATCH",
         "zalo_messages",
-        params={"id": f"eq.{message_id}", "user_id": f"eq.{user_id}"},
+        params={id_field: f"eq.{message_id}", "user_id": f"eq.{user_id}"},
         json=payload,
         prefer="return=representation",
     )

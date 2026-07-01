@@ -136,6 +136,32 @@ export function ZaloInboxAdminShell() {
   const [campaignError, setCampaignError] = useState<string | null>(null);
   const [campaignLogs, setCampaignLogs] = useState<{ name: string; status: "sending" | "success" | "failed" }[]>([]);
   const [editedMessagesText, setEditedMessagesText] = useState<Record<string, string>>({});
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    setSelectedFiles((prev) => [...prev, ...files]);
+    e.target.value = "";
+  };
+
+  const handleSendReply = async () => {
+    const text = inbox.reply.trim();
+    if (!text && selectedFiles.length === 0) return;
+
+    inbox.setReply("");
+    setSelectedFiles([]);
+
+    try {
+      await inbox.sendMessage(text, selectedFiles.length > 0 ? selectedFiles : undefined);
+    } catch (e) {
+      console.error("Failed to send message via ZCA", e);
+    }
+  };
+
+  const appendEmoji = (emoji: string) => {
+    inbox.setReply((prev) => prev + emoji);
+  };
 
   const handleAutoSend = async () => {
     if (!inbox.selectedAccountId || selectedMessageIds.length === 0) return;
@@ -188,6 +214,16 @@ export function ZaloInboxAdminShell() {
     setCampaignLogs([]);
 
     try {
+      // Save all edited messages to the database before creating the campaign
+      const editPromises = Object.entries(editedMessagesText).map(([msgId, text]) => {
+        const originalMsg = inbox.messages.find(m => (m.source_message_id || m.id) === msgId);
+        if (originalMsg && originalMsg.content !== text) {
+          return updateZaloLibraryMessage(inbox.selectedAccountId, msgId, { content: text });
+        }
+        return Promise.resolve();
+      });
+      await Promise.all(editPromises);
+
       await createZaloBroadcast(inbox.selectedAccountId, {
         user_id: inbox.selectedAccountId,
         message_ids: selectedMessageIds,
@@ -550,12 +586,21 @@ export function ZaloInboxAdminShell() {
         <section className="min-w-0 overflow-hidden rounded-xl border border-[#E5E5E5] bg-white shadow-sm flex flex-col">
           <div className="border-b border-[#E5E5E5] p-3 flex-shrink-0">
             <div className="mb-2.5 flex items-center justify-between gap-3">
-              <div>
+              <div className="flex items-center gap-2 min-w-0">
                 <h2 className="text-sm font-bold">Hộp thư</h2>
-                <p className="text-[11px] text-[#A0A0A0]">
-                  {inbox.loadingConvs ? "Đang cập nhật..." : `${inbox.filtered.length} hội thoại`}
-                </p>
+                <button
+                  onClick={() => void inbox.scan()}
+                  disabled={inbox.scanning || !inbox.selectedAccountId}
+                  title="Đồng bộ lại tin nhắn"
+                  className="inline-flex items-center gap-1 rounded-md border border-[#E5E5E5] bg-white px-1.5 py-0.5 text-[10px] font-semibold text-[#666666] transition hover:border-[#E3000F] hover:text-[#E3000F] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <MaterialIcon name={inbox.scanning ? "sync" : "refresh"} className={cn("text-[12px]", inbox.scanning && "animate-spin")} />
+                  {inbox.scanning ? "Đang đồng bộ..." : "Đồng bộ"}
+                </button>
               </div>
+              <p className="text-[11px] text-[#A0A0A0] shrink-0">
+                {inbox.loadingConvs ? "Đang cập nhật..." : `${inbox.filtered.length} hội thoại`}
+              </p>
               <select
                 value={inbox.filter}
                 onChange={(e) => inbox.setFilter(e.target.value as any)}
@@ -785,21 +830,54 @@ export function ZaloInboxAdminShell() {
                             {!isSent && msg.sender_name && (
                               <div className="text-[10px] text-[#A0A0A0] mb-0.5 px-1">{msg.sender_name}</div>
                             )}
-                            <div
-                              className={cn(
-                                "whitespace-pre-wrap rounded-xl px-3 py-2 text-xs leading-relaxed break-words transition-all duration-200",
-                                isSent
-                                  ? "bg-[#E3000F] text-white rounded-br-sm"
-                                  : "bg-white text-slate-800 shadow-sm ring-1 ring-slate-150 rounded-bl-sm",
-                                isSelected && (
+                            {msg.content && (
+                              <div
+                                className={cn(
+                                  "whitespace-pre-wrap rounded-xl px-3 py-2 text-xs leading-relaxed break-words transition-all duration-200",
                                   isSent
-                                    ? "ring-2 ring-[#E3000F] ring-offset-2"
-                                    : "ring-2 ring-[#E3000F]/60 bg-red-50/30"
-                                )
-                              )}
-                            >
-                              {msg.content}
-                            </div>
+                                    ? "bg-[#E3000F] text-white rounded-br-sm"
+                                    : "bg-white text-slate-800 shadow-sm ring-1 ring-slate-150 rounded-bl-sm",
+                                  isSelected && (
+                                    isSent
+                                      ? "ring-2 ring-[#E3000F] ring-offset-2"
+                                      : "ring-2 ring-[#E3000F]/60 bg-red-50/30"
+                                  )
+                                )}
+                              >
+                                {msg.content}
+                              </div>
+                            )}
+                            {(msg.assets ?? [])
+                              .filter((asset) => asset.storage_url)
+                              .map((asset, ai) => (
+                                <div
+                                  key={ai}
+                                  className={cn(
+                                    "rounded-xl overflow-hidden border border-slate-200 max-w-[200px] mt-1 shadow-sm",
+                                    isSent ? "ml-auto" : "mr-auto"
+                                  )}
+                                >
+                                  {asset.storage_url?.match(/\.(jpg|jpeg|png|gif|webp)/i) ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      src={asset.storage_url!}
+                                      alt="media"
+                                      className="w-full h-auto"
+                                      loading="lazy"
+                                    />
+                                  ) : (
+                                    <a
+                                      href={asset.storage_url!}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex items-center gap-1.5 p-2 text-[11px] text-blue-600 hover:underline bg-white"
+                                    >
+                                      <MaterialIcon name="attach_file" className="text-[14px]" />
+                                      File đính kèm
+                                    </a>
+                                  )}
+                                </div>
+                              ))}
                             {time && <div className="mt-0.5 px-1 text-[9px] text-[#A0A0A0]">{time}</div>}
                           </div>
 
@@ -816,26 +894,75 @@ export function ZaloInboxAdminShell() {
 
           {/* Quick template shortcuts & send button */}
           <div className="border-t border-[#E5E5E5] bg-white p-3 flex-shrink-0">
-            <div className="mb-2 flex flex-wrap gap-1.5">
-              {activeTemplateGroup.items.slice(0, 3).map((item) => (
-                <button
-                  key={item}
-                  onClick={() => appendTemplate(item)}
-                  disabled={!inbox.openConv || inbox.archiveReading}
-                  className="rounded-full bg-[#F4F6FF] px-2.5 py-1 text-[11px] font-bold text-[#4F46E5] transition hover:bg-[#E9ECFF] disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {item.length > 34 ? `${item.slice(0, 34)}...` : item}
-                </button>
-              ))}
+            <div className="mb-2 flex flex-wrap gap-1.5 justify-between items-center">
+              <div className="flex flex-wrap gap-1.5">
+                {activeTemplateGroup.items.slice(0, 3).map((item) => (
+                  <button
+                    key={item}
+                    onClick={() => appendTemplate(item)}
+                    disabled={!inbox.openConv || inbox.archiveReading}
+                    className="rounded-full bg-[#F4F6FF] px-2.5 py-1 text-[11px] font-bold text-[#4F46E5] transition hover:bg-[#E9ECFF] disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {item.length > 34 ? `${item.slice(0, 34)}...` : item}
+                  </button>
+                ))}
+              </div>
+              {/* Quick Emojis */}
+              <div className="flex gap-1">
+                {["👍", "❤️", "😂", "😮", "🙏", "🌹", "✔️"].map((emoji) => (
+                  <button
+                    key={emoji}
+                    onClick={() => appendEmoji(emoji)}
+                    disabled={!inbox.openConv || inbox.archiveReading}
+                    className="hover:scale-125 transition text-sm px-1 disabled:opacity-30"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="flex gap-2">
+
+            {/* Selected files preview */}
+            {selectedFiles.length > 0 && (
+              <div className="mb-2 flex gap-2 flex-wrap bg-slate-50 p-2 border border-slate-100 rounded-xl">
+                {selectedFiles.map((f, i) => (
+                  <div key={i} className="flex items-center gap-1 bg-slate-200/60 rounded-lg px-2 py-0.5 text-[10px]">
+                    <MaterialIcon name="attach_file" className="text-[12px] text-slate-500" />
+                    <span className="text-slate-700 max-w-[120px] truncate">{f.name}</span>
+                    <button
+                      onClick={() => setSelectedFiles((prev) => prev.filter((_, j) => j !== i))}
+                      className="text-slate-400 hover:text-[#E3000F] transition"
+                    >
+                      <MaterialIcon name="close" className="text-[11px]" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-2 items-end">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition flex-shrink-0"
+                title="Đính kèm file"
+                disabled={!inbox.openConv || inbox.archiveReading}
+              >
+                <MaterialIcon name="attach_file" className="text-slate-500 text-[18px]" />
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={handleFileChange}
+              />
               <textarea
                 value={inbox.reply}
                 onChange={(e) => inbox.setReply(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
-                    void inbox.sendReply();
+                    void handleSendReply();
                   }
                 }}
                 disabled={!inbox.openConv || inbox.archiveReading}
@@ -845,16 +972,25 @@ export function ZaloInboxAdminShell() {
                     ? "Đang xem lưu trữ..."
                     : !inbox.selectedAccountId
                     ? "Chưa chọn tài khoản..."
-                    : "Nhập câu trả lời..."
+                    : "Nhập câu trả lời... (Enter để gửi)"
                 }
                 className="min-h-[44px] flex-1 resize-none rounded-lg border border-[#E5E5E5] px-3 py-2 text-xs outline-none transition focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 disabled:cursor-not-allowed disabled:bg-[#F5F5F5]"
               />
               <button
-                onClick={() => void inbox.sendReply()}
-                disabled={!inbox.openConv || inbox.archiveReading || !inbox.reply.trim() || inbox.isSending}
-                className="shrink-0 rounded-lg bg-[#E3000F] px-4 text-xs font-black text-white transition hover:bg-[#C40009] disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center"
+                onClick={() => void handleSendReply()}
+                disabled={
+                  !inbox.openConv ||
+                  inbox.archiveReading ||
+                  (!inbox.reply.trim() && selectedFiles.length === 0) ||
+                  inbox.isSending
+                }
+                className="shrink-0 h-11 rounded-lg bg-[#E3000F] px-4 text-xs font-black text-white transition hover:bg-[#C40009] disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-1"
               >
-                Gửi
+                {inbox.isSending ? (
+                  <MaterialIcon name="pending" className="text-[14px] animate-spin" />
+                ) : (
+                  <span>Gửi</span>
+                )}
               </button>
             </div>
           </div>
@@ -945,6 +1081,28 @@ export function ZaloInboxAdminShell() {
                                 className="w-full bg-white border border-slate-250 rounded p-1 text-[11px] outline-none text-slate-700 resize-none font-sans"
                                 rows={2.5}
                               />
+                              {(m.assets ?? [])
+                                .filter((asset) => asset.storage_url)
+                                .map((asset, ai) => (
+                                  <div
+                                    key={ai}
+                                    className="rounded-lg overflow-hidden border border-slate-200 max-w-[120px] mt-1 bg-white"
+                                  >
+                                    {asset.storage_url?.match(/\.(jpg|jpeg|png|gif|webp)/i) ? (
+                                      // eslint-disable-next-line @next/next/no-img-element
+                                      <img
+                                        src={asset.storage_url!}
+                                        alt="media preview"
+                                        className="w-full h-auto object-cover max-h-[80px]"
+                                      />
+                                    ) : (
+                                      <div className="flex items-center gap-1 p-1.5 text-[9px] text-blue-600">
+                                        <MaterialIcon name="attach_file" className="text-[12px]" />
+                                        <span className="truncate">File đính kèm</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
                             </div>
                           );
                         })}

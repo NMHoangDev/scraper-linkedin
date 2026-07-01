@@ -146,7 +146,7 @@ async def create_broadcast(
 
     session = await get_latest_session_for_user(user_id, preferred_statuses={"confirmed"})
     if not session:
-        raise HTTPException(status_code=401, detail="No confirmed Zalo session found, please login first")
+        raise HTTPException(status_code=401, detail="Chưa đăng nhập lại Zalo. Vui lòng đăng nhập lại tài khoản Zalo trước khi bắt đầu chiến dịch.")
     zca_auth = await ensure_session_zca_auth(session)
     if not zca_auth:
         live_status = await ensure_session_browser_ready(session)
@@ -161,10 +161,24 @@ async def create_broadcast(
         if preview.warnings:
             raise HTTPException(status_code=400, detail="; ".join(preview.warnings))
 
+        # Map source/raw message_ids to their database UUID primary keys for zalo_broadcast_items
+        resolved_db_ids = []
+        id_map = {}
+        for m in messages:
+            db_uuid = m.get("id")
+            src_id = m.get("source_message_id")
+            if db_uuid:
+                id_map[db_uuid] = db_uuid
+                if src_id:
+                    id_map[src_id] = db_uuid
+        
+        for mid in body.message_ids:
+            resolved_db_ids.append(id_map.get(mid, mid))
+
         campaign_id = await create_broadcast_campaign(
             user_id,
             body.content_mode,
-            body.message_ids,
+            resolved_db_ids,
             [target.model_dump() for target in body.targets],
         )
         asyncio.create_task(
