@@ -5,8 +5,9 @@ services:
       context: ./linkedin-crawler-ui
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_LINKEDIN_CRAWLER_API_URL: https://seeding.markeeai.com
-        NEXT_PUBLIC_API_FACEBOOK_BASE_URL: https://seeding.markeeai.com
+        NEXT_PUBLIC_LINKEDIN_CRAWLER_API_URL: http://localhost:8082
+        NEXT_PUBLIC_API_FACEBOOK_BASE_URL: http://localhost:8082
+        NEXT_PUBLIC_LINKEDIN_CRAWLER_API_KEY: secret_api_key
     image: scraper-linkedin-frontend:latest
     container_name: seeding-frontend
     restart: unless-stopped
@@ -49,7 +50,7 @@ services:
       - frontend
       - backend
     ports:
-      - "8080:8080"
+      - "8082:8080"
     volumes:
       - ./nginx-router/nginx.conf:/etc/nginx/nginx.conf:ro
     networks:

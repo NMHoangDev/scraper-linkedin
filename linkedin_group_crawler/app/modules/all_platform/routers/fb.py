@@ -365,6 +365,15 @@ async def fb_jobs(request: Request, authorization: str | None = Header(None)) ->
     return _json_response(status, payload)
 
 
+@router.get("/jobs/{job_id}")
+async def fb_job_status(job_id: str, request: Request, authorization: str | None = Header(None)) -> JSONResponse:
+    user = _current_user(request, authorization)
+    status, payload = await _markee_json("GET", f"/jobs/{job_id}")
+    if status < 400 and isinstance(payload, dict):
+        await _require_fb_account_scope(user, str(payload.get("user_id") or ""))
+    return _json_response(status, payload)
+
+
 @router.post("/upload")
 async def fb_upload(request: Request, authorization: str | None = Header(None)) -> Response:
     _current_user(request, authorization)

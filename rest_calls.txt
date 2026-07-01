@@ -1,4 +1,0 @@
-853:    rows = await _rest("GET", "zalo_messages", params=params) or []
-1180:    rows, total = await _rest_with_count("zalo_messages", params=params)
-1201:            rows, total = await _rest_with_count("zalo_messages", params=fallback_params)
-1562:    rows, total = await _rest_with_count("zalo_messages", params=query_params)

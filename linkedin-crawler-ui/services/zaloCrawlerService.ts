@@ -189,13 +189,16 @@ export function syncZaloRecentConversations(
 }
 
 function buildHeaders(extra?: HeadersInit, isFormData = false): HeadersInit {
+  const callerEmail = typeof window !== "undefined" ? window.localStorage?.getItem("app_user_email") : null;
   const baseHeaders: HeadersInit = API_KEY
     ? {
         ...(isFormData ? {} : JSON_HEADERS),
         "x-api-key": API_KEY,
+        ...(callerEmail ? { "X-Caller-Email": callerEmail } : {}),
       }
     : {
         ...(isFormData ? {} : JSON_HEADERS),
+        ...(callerEmail ? { "X-Caller-Email": callerEmail } : {}),
       };
 
   return {

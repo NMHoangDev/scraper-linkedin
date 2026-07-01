@@ -173,7 +173,7 @@ function collectUrls(value, out = []) {
   }
   if (typeof value === "object") {
     let found = false;
-    for (const key of ["hdUrl", "normalUrl", "url", "imageUrl", "photoUrl", "src", "fileUrl", "href"]) {
+    for (const key of ["hdUrl", "normalUrl", "url", "imageUrl", "photoUrl", "src", "fileUrl", "href", "stickerUrl", "stickerWebpUrl"]) {
       if (value[key] && typeof value[key] === "string" && isLikelyImageUrl(value[key])) {
         out.push(value[key]);
         found = true;

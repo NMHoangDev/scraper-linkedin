@@ -1,5 +1,0 @@
-a1fff90 Deduplicate inbox reply echoes
-22a5eab Fix inbox layout overflow
-6d8f1c3 fix(zalo): role-based access control for zalo_accounts
-75f597e Allow extension provisioning on dev hosts
-97d4bc7 Redesign Facebook inbox workspace

@@ -1,5 +1,5 @@
 const REQUIRED_COOKIE_KEYS = ["zppsid", "zppwsid", "zpsid", "zphpsid"];
-const DEFAULT_BACKEND_URL = "http://localhost:8000";
+const DEFAULT_BACKEND_URL = "http://localhost:8082";
 const ZALO_URL = "https://chat.zalo.me/";
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -148,9 +148,13 @@ function waitForTabComplete(tabId, timeoutMs = 30000) {
 }
 
 async function findZaloTab() {
-  const tabs = await queryTabs({ url: "https://chat.zalo.me/*" });
-  const complete = tabs.find((tab) => tab.status === "complete");
-  return complete || tabs[0] || null;
+  const tabs = await queryTabs({});
+  const zaloTabs = tabs.filter((tab) => {
+    const url = String(tab.url || "").toLowerCase();
+    return url.includes("zalo.me") || url.includes("chat.zalo") || url.includes("id.zalo");
+  });
+  const complete = zaloTabs.find((tab) => tab.status === "complete");
+  return complete || zaloTabs[0] || null;
 }
 
 async function getOrOpenZaloTab({ active = false } = {}) {
@@ -170,10 +174,14 @@ async function ensureZaloContentScript(tabId) {
     await sendMessageToTab(tabId, { action: "PING_ZALO_CONTENT" });
     return;
   } catch (_error) {
-    await executeContentFile(tabId, "zalo-content.js");
-    await wait(250);
+    try {
+      await executeContentFile(tabId, "zalo-content.js");
+      await wait(250);
+      await sendMessageToTab(tabId, { action: "PING_ZALO_CONTENT" });
+    } catch (e) {
+      console.warn("[zalo-extension] failed to ensure Zalo content script:", e);
+    }
   }
-  await sendMessageToTab(tabId, { action: "PING_ZALO_CONTENT" });
 }
 
 async function getZaloPageContext(tabId) {
@@ -267,10 +275,14 @@ function missingRequiredKeys(keys) {
 
 async function getZaloCookiesPayload(options = {}) {
   let tab = null;
-  if (options.openTab) {
-    tab = await getOrOpenZaloTab({ active: !!options.active });
-  } else {
-    tab = await findZaloTab();
+  try {
+    if (options.openTab) {
+      tab = await getOrOpenZaloTab({ active: !!options.active });
+    } else {
+      tab = await findZaloTab();
+    }
+  } catch (e) {
+    console.warn("[zalo-extension] failed to get or open Zalo tab:", e);
   }
 
   const context = tab?.id ? await getZaloPageContext(tab.id) : {};
@@ -298,9 +310,16 @@ async function checkZaloLogin() {
   };
 }
 
+let lastZaloTabId = null;
+
 async function waitForLoginCookies(timeoutMs = 35000) {
   const startedAt = Date.now();
   let payload = await getZaloCookiesPayload({ openTab: true, active: true });
+
+  const tab = await findZaloTab();
+  if (tab?.id) {
+    lastZaloTabId = tab.id;
+  }
 
   while (!payload.is_logged_in && Date.now() - startedAt < timeoutMs) {
     await wait(1500);
@@ -360,6 +379,18 @@ async function importZaloSession(data) {
       `Zalo Web is not logged in or required cookies are missing: ${payload.missing.join(", ")}. Open Zalo Web, finish login, then retry.`,
     );
   }
+
+  // Auto-close Zalo Web tab immediately after successful login detection to avoid session/reload conflicts
+  const tabIdToClose = lastZaloTabId || (await findZaloTab())?.id;
+  if (tabIdToClose) {
+    try {
+      await chrome.tabs.remove(tabIdToClose);
+      console.log("[zalo-extension] auto-closed Zalo Web tab BEFORE backend sync:", tabIdToClose);
+    } catch (e) {
+      console.warn("[zalo-extension] failed to close tab before sync:", e);
+    }
+  }
+  lastZaloTabId = null;
 
   const body = {
     account_id: accountId,

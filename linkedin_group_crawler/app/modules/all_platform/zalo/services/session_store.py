@@ -153,7 +153,27 @@ async def get_latest_session_for_user(
         and (preferred_statuses is None or session.status in preferred_statuses)
     ]
     if not candidates:
+        # Check if we have persistent ZCA credentials for this user
+        from app.modules.all_platform.zalo.services.zca_auth_store import load_zca_auth
+        import uuid as _uuid
+        auth_data = await load_zca_auth(user_id)
+        if auth_data:
+            logger.info(f"Reconstructing session for user={user_id} from persistent ZCA auth")
+            session_id = f"recovered-{user_id}-{_uuid.uuid4().hex[:8]}"
+            session = SessionData(
+                session_id=session_id,
+                user_id=user_id,
+                browser=None,
+                context=None,
+                page=None,
+                status="confirmed",
+                zca_auth=auth_data,
+            )
+            session_store[session_id] = session
+            session_locks.setdefault(session_id, asyncio.Lock())
+            return session
         return None
+
     def _session_priority(session: SessionData) -> int:
         if session.status == "confirmed" and getattr(session, "zca_auth", None):
             return 3

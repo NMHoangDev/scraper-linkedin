@@ -35,9 +35,12 @@ from app.modules.all_platform.zalo.services.session_store import (
 )
 from app.modules.all_platform.zalo.services.supabase_service import (
     get_zalo_account_by_id,
+    save_listener_messages,
+    upsert_groups,
     upsert_zalo_account,
     upsert_zalo_user,
 )
+from app.modules.all_platform.zalo.schemas.message import Message
 from app.modules.all_platform.zalo.services.zca_auth_store import (
     delete_zca_auth,
     ensure_session_zca_auth,
@@ -192,6 +195,67 @@ async def _remember_zalo_user(
         )
     except Exception as exc:
         logger.warning(f"Could not upsert Zalo account metadata for account={user_id}: {exc}")
+
+
+async def _persist_first_time_sync_result(user_id: str, result: Dict[str, Any]) -> None:
+    """Lưu groups + friends + messages trả về từ first_time_sync vào Supabase.
+
+    Được gọi bởi cả QR login và extension import flows.
+    """
+    try:
+        # 1. Upsert groups + friends vào zalo_groups
+        all_chats = list(result.get("groups") or []) + list(result.get("friends") or [])
+        if all_chats:
+            await upsert_groups(user_id, all_chats)
+            logger.info(
+                f"Persisted {len(all_chats)} groups/friends for user={user_id}"
+            )
+    except Exception as exc:
+        logger.warning(f"Could not persist groups/friends for user={user_id}: {exc}")
+
+    try:
+        # 2. Save messages vào zalo_messages, grouped by thread_id
+        raw_messages = result.get("messages") or []
+        if raw_messages:
+            # Group messages by thread_id (= group_id / friend_id)
+            threads: Dict[str, list] = {}
+            for m in raw_messages:
+                tid = str(m.get("thread_id") or m.get("group_id") or "").strip()
+                if tid:
+                    threads.setdefault(tid, []).append(m)
+
+            total_saved = 0
+            for thread_id, msgs in threads.items():
+                messages = [
+                    Message(
+                        message_id=str(m.get("message_id") or ""),
+                        sender_id=m.get("sender_id"),
+                        sender_name=m.get("sender_name"),
+                        timestamp=m.get("timestamp"),
+                        time_text=m.get("time_text"),
+                        type=str(m.get("type") or "text"),
+                        content=m.get("content"),
+                        image_urls=[str(u) for u in (m.get("image_urls") or []) if u],
+                        reply_to_id=m.get("reply_to_id"),
+                        is_deleted=bool(m.get("is_deleted")),
+                        is_sent=bool(m.get("is_sent")),
+                        group_id=thread_id,
+                    )
+                    for m in msgs
+                    if m.get("message_id")
+                ]
+                if messages:
+                    saved = await save_listener_messages(
+                        user_id, thread_id, thread_id, messages,
+                        increment_unread=False,
+                    )
+                    total_saved += saved
+            logger.info(
+                f"Persisted {total_saved} messages across {len(threads)} threads "
+                f"for user={user_id}"
+            )
+    except Exception as exc:
+        logger.warning(f"Could not persist first-time-sync messages for user={user_id}: {exc}")
 
 
 def _serialize_login_state(request: Request, user_id: str, session: Optional[SessionData], status: str) -> dict:
@@ -428,10 +492,6 @@ async def _handle_zca_qr_events(session_id: str) -> None:
             session.last_used = datetime.utcnow()
             await save_session(session)
             await save_zca_auth(session.user_id, auth)
-            try:
-                await start_listener(session.user_id, auth, force_restart=True)
-            except Exception as exc:
-                logger.warning(f"Could not start ZCA persistent listener for user={session.user_id}: {exc}")
             
             # Construct cookie string for DB backward compatibility
             cookies = auth.get("cookies")
@@ -440,6 +500,50 @@ async def _handle_zca_qr_events(session_id: str) -> None:
                 cookie_str = "; ".join(f"{c.get('key')}={c.get('value')}" for c in cookies if c.get("key") and c.get("value") is not None)
                 
             await _remember_zalo_user(session.user_id, "confirmed", cookie=cookie_str)
+
+            # ── Background: first-time sync (groups + friends + messages) then start listener ───
+            async def _background_qr_sync(uid: str, uauth: dict):
+                import time as _time
+                t0 = _time.time()
+                try:
+                    logger.info(f"QR login: [1/2] starting first-time sync for user={uid}...")
+                    from app.modules.all_platform.zalo.services.zca_api_bridge import first_time_sync
+                    result = await first_time_sync(
+                        auth=uauth,
+                        zalo_account_id=uid,
+                        messages_per_chat=50,
+                        group_limit=25,
+                        include_friends=True,
+                    )
+                    dt = _time.time() - t0
+                    logger.info(
+                        f"QR login: [1/2] first-time sync done for {uid} in {dt:.1f}s"
+                    )
+                    # ── Persist groups + friends + messages to Supabase ──
+                    await _persist_first_time_sync_result(uid, result)
+                except Exception as sync_exc:
+                    dt = _time.time() - t0
+                    logger.warning(
+                        f"QR login: [1/2] first-time sync FAILED for {uid} after {dt:.1f}s: {sync_exc}. "
+                        f"Listener vẫn chạy — user có thể retry."
+                    )
+                finally:
+                    t1 = _time.time()
+                    try:
+                        logger.info(f"QR login: [2/2] starting persistent listener for user={uid}...")
+                        await start_listener(uid, uauth, force_restart=True)
+                        dt = _time.time() - t1
+                        logger.info(
+                            f"QR login: [2/2] persistent listener started for user={uid} in {dt:.1f}s. "
+                            f"Total time: {_time.time() - t0:.1f}s."
+                        )
+                    except Exception as start_exc:
+                        dt = _time.time() - t1
+                        logger.warning(
+                            f"QR login: [2/2] could not start listener for user={uid} after {dt:.1f}s: {start_exc}"
+                        )
+
+            asyncio.create_task(_background_qr_sync(session.user_id, auth))
             logger.info(f"ZCA QR login success for session {session_id}")
             return
 
@@ -1359,11 +1463,6 @@ async def import_session_from_extension(
     await save_session(session)
     await save_zca_auth(user_id, auth)
     
-    try:
-        await start_listener(user_id, auth, force_restart=True)
-    except Exception as exc:
-        logger.warning(f"Could not start ZCA persistent listener for user={user_id} after extension import: {exc}")
-
     cookie_str = "; ".join(f"{c.get('key')}={c.get('value')}" for c in parsed_cookies if c.get("key") and c.get("value") is not None)
     await _remember_zalo_user(
         user_id,
@@ -1400,8 +1499,10 @@ async def import_session_from_extension(
             )
             dt = _time.time() - t0
             logger.info(
-                f"Extension import: [1/2] first-time sync done for {uid} in {dt:.1f}s: {result}"
+                f"Extension import: [1/2] first-time sync done for {uid} in {dt:.1f}s"
             )
+            # ── Persist groups + friends + messages to Supabase ──
+            await _persist_first_time_sync_result(uid, result)
         except Exception as sync_exc:
             dt = _time.time() - t0
             logger.warning(

@@ -110,7 +110,16 @@ export type MaterialSymbolName =
   | "mail"
   | "content_copy"
   | "cookie"
-  | "warning_amber";
+  | "warning_amber"
+  | "expand_more"
+  | "expand_less"
+  | "navigate_next"
+  | "navigate_before"
+  | "keyboard_arrow_down"
+  | "keyboard_arrow_right"
+  | "person_off"
+  | "circle"
+  | "hourglass_empty";
 
 export interface MaterialIconProps {
   name: MaterialSymbolName;

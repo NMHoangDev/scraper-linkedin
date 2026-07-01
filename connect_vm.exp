@@ -1,6 +1,0 @@
-#!/usr/bin/env expect
-set pass "Poptech@123!"
-spawn ssh vmadmin@10.30.50.29 "cd /opt/apps/seeding_markeeai/scraper-linkedin && git status --short | head -20"
-expect "password:"
-send "$pass\r"
-expect eof
