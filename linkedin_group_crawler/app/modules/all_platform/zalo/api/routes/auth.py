@@ -1359,11 +1359,6 @@ async def import_session_from_extension(
     await save_session(session)
     await save_zca_auth(user_id, auth)
     
-    try:
-        await start_listener(user_id, auth, force_restart=True)
-    except Exception as exc:
-        logger.warning(f"Could not start ZCA persistent listener for user={user_id} after extension import: {exc}")
-
     cookie_str = "; ".join(f"{c.get('key')}={c.get('value')}" for c in parsed_cookies if c.get("key") and c.get("value") is not None)
     await _remember_zalo_user(
         user_id,

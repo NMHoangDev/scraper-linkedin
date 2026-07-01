@@ -148,9 +148,13 @@ function waitForTabComplete(tabId, timeoutMs = 30000) {
 }
 
 async function findZaloTab() {
-  const tabs = await queryTabs({ url: "https://chat.zalo.me/*" });
-  const complete = tabs.find((tab) => tab.status === "complete");
-  return complete || tabs[0] || null;
+  const tabs = await queryTabs({});
+  const zaloTabs = tabs.filter((tab) => {
+    const url = String(tab.url || "").toLowerCase();
+    return url.includes("zalo.me") || url.includes("chat.zalo") || url.includes("id.zalo");
+  });
+  const complete = zaloTabs.find((tab) => tab.status === "complete");
+  return complete || zaloTabs[0] || null;
 }
 
 async function getOrOpenZaloTab({ active = false } = {}) {
@@ -298,9 +302,16 @@ async function checkZaloLogin() {
   };
 }
 
+let lastZaloTabId = null;
+
 async function waitForLoginCookies(timeoutMs = 35000) {
   const startedAt = Date.now();
   let payload = await getZaloCookiesPayload({ openTab: true, active: true });
+
+  const tab = await findZaloTab();
+  if (tab?.id) {
+    lastZaloTabId = tab.id;
+  }
 
   while (!payload.is_logged_in && Date.now() - startedAt < timeoutMs) {
     await wait(1500);
@@ -360,6 +371,18 @@ async function importZaloSession(data) {
       `Zalo Web is not logged in or required cookies are missing: ${payload.missing.join(", ")}. Open Zalo Web, finish login, then retry.`,
     );
   }
+
+  // Auto-close Zalo Web tab immediately after successful login detection to avoid session/reload conflicts
+  const tabIdToClose = lastZaloTabId || (await findZaloTab())?.id;
+  if (tabIdToClose) {
+    try {
+      chrome.tabs.remove(tabIdToClose);
+      console.log("[zalo-extension] auto-closed Zalo Web tab BEFORE backend sync:", tabIdToClose);
+    } catch (e) {
+      console.warn("[zalo-extension] failed to close tab before sync:", e);
+    }
+  }
+  lastZaloTabId = null;
 
   const body = {
     account_id: accountId,

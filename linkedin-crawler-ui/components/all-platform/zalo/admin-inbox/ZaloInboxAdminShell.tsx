@@ -1,0 +1,1471 @@
+"use client";
+
+import { useMemo, useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
+import { useZaloAdminInbox, type ZaloConv } from "@/hooks/useZaloAdminInbox";
+import ZaloTeamAccountTree from "./ZaloTeamAccountTree";
+import ZaloAccountAuthView from "./ZaloAccountAuthView";
+import { KpiProgressCard } from "@/components/all-platform/components/kpi-progress-card";
+import { MaterialIcon } from "@/components/ui";
+import { cn } from "@/lib/utils";
+import type { ZaloConversationSummary, ZaloLibraryMessage } from "@/types/zalo-api";
+import {
+  restartZaloAccountListener,
+  updateZaloAccount,
+  deleteZaloAccount,
+  deleteZaloAccountFull,
+  createZaloAccount,
+  createZaloBroadcast,
+  updateZaloLibraryMessage,
+} from "@/services/zaloCrawlerService";
+import type { ZaloBroadcastTarget } from "@/types/zalo-api";
+
+// ─── Constants & Templates ──────────────────────────────────────────────────
+
+const QUICK_REPLY_GROUPS = [
+  {
+    id: "greeting",
+    label: "Chào hỏi",
+    items: [
+      "Chào bạn, bên mình có thể hỗ trợ bạn phần nào ạ?",
+      "Dạ mình đang xem thông tin, bạn cho mình xin thêm nhu cầu cụ thể nhé.",
+      "Cảm ơn bạn đã nhắn tin. Mình hỗ trợ bạn ngay đây ạ.",
+    ],
+  },
+  {
+    id: "quote",
+    label: "Báo giá",
+    items: [
+      "Dạ để báo giá chính xác, bạn cho mình xin số lượng và khu vực cần triển khai nhé.",
+      "Mình gửi bạn gói phù hợp trước, nếu cần mình sẽ tư vấn thêm để tối ưu chi phí ạ.",
+      "Bên mình có thể làm theo ngân sách của bạn, bạn dự kiến khoảng bao nhiêu để mình tư vấn đúng hơn?",
+    ],
+  },
+  {
+    id: "followup",
+    label: "Follow-up",
+    items: [
+      "Bạn cần mình hỗ trợ thêm thông tin nào trước khi chốt không ạ?",
+      "Mình nhắc nhẹ để bạn khỏi trôi tin, phần này bên mình vẫn đang giữ slot hỗ trợ nhé.",
+      "Nếu tiện, mình có thể gọi nhanh 3-5 phút để nắm nhu cầu và tư vấn sát hơn ạ.",
+    ],
+  },
+  {
+    id: "handoff",
+    label: "Chuyển lead",
+    items: [
+      "Mình đã ghi nhận nhu cầu của bạn, bên mình sẽ liên hệ lại để tư vấn chi tiết hơn nhé.",
+      "Bạn cho mình xin số điện thoại/Zalo để team tư vấn gửi thông tin nhanh hơn ạ.",
+      "Dạ mình chuyển thông tin qua bộ phận phụ trách, bạn để ý tin nhắn giúp mình nhé.",
+    ],
+  },
+];
+
+type PanelTab = "templates" | "customer" | "kpi" | "account" | "campaign";
+
+function formatTime(value: string | null | undefined): string {
+  if (!value) return "";
+  const trimmed = String(value).trim();
+  const num = Number(trimmed);
+  const ms = !Number.isNaN(num) && /^\d+$/.test(trimmed)
+    ? (num < 1e11 ? num * 1000 : num)
+    : Date.parse(trimmed);
+
+  if (!ms || Number.isNaN(ms)) return trimmed;
+  return new Date(ms).toLocaleTimeString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Ho_Chi_Minh",
+  });
+}
+
+function formatDate(value: string | null | undefined): string {
+  if (!value) return "";
+  const trimmed = String(value).trim();
+  const num = Number(trimmed);
+  const ms = !Number.isNaN(num) && /^\d+$/.test(trimmed)
+    ? (num < 1e11 ? num * 1000 : num)
+    : Date.parse(trimmed);
+
+  if (!ms || Number.isNaN(ms)) return "";
+  return new Date(ms).toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "Asia/Ho_Chi_Minh",
+  });
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+export function ZaloInboxAdminShell() {
+  const inbox = useZaloAdminInbox();
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const [panelTab, setPanelTab] = useState<PanelTab>("templates");
+  const [templateGroupId, setTemplateGroupId] = useState(QUICK_REPLY_GROUPS[0].id);
+  const [noteDraftState, setNoteDraftState] = useState({ convId: "", value: "" });
+  const panelScrollRef = useRef<HTMLDivElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+
+  // States for account edit
+  const [editLabel, setEditLabel] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [isSavingAccount, setIsSavingAccount] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+
+  // States for creating new account
+  const [isCreatingAccount, setIsCreatingAccount] = useState(true);
+  const [newLabel, setNewLabel] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [newOwnerId, setNewOwnerId] = useState("");
+
+  // States for campaign / multi-message forwarding
+  const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([]);
+  const [autoSendTargetIds, setAutoSendTargetIds] = useState<string[]>([]);
+  const [autoSendSearchQuery, setAutoSendSearchQuery] = useState("");
+  const [manualRecipients, setManualRecipients] = useState("");
+  const [campaignMode, setCampaignMode] = useState<"both" | "text" | "image">("both");
+  const [isSendingCampaign, setIsSendingCampaign] = useState(false);
+  const [campaignSuccess, setCampaignSuccess] = useState<string | null>(null);
+  const [campaignError, setCampaignError] = useState<string | null>(null);
+  const [campaignLogs, setCampaignLogs] = useState<{ name: string; status: "sending" | "success" | "failed" }[]>([]);
+  const [editedMessagesText, setEditedMessagesText] = useState<Record<string, string>>({});
+
+  const handleAutoSend = async () => {
+    if (!inbox.selectedAccountId || selectedMessageIds.length === 0) return;
+
+    setIsSendingCampaign(true);
+    setCampaignError(null);
+    setCampaignSuccess(null);
+    setCampaignLogs([]);
+
+    // Save edited message texts to DB first
+    for (const msgId of selectedMessageIds) {
+      const editedText = editedMessagesText[msgId];
+      if (editedText !== undefined) {
+        try {
+          await updateZaloLibraryMessage(inbox.selectedAccountId, msgId, { content: editedText });
+        } catch (e) {
+          console.error("Failed to update message content for broadcast", e);
+        }
+      }
+    }
+    
+    const manualLines = manualRecipients
+      .split("\n")
+      .map(line => line.trim())
+      .filter(Boolean);
+
+    const targets: ZaloBroadcastTarget[] = [];
+
+    // System targets
+    autoSendTargetIds.forEach(id => {
+      const conv = inbox.filtered.find(c => c.conv_id === id);
+      if (conv) {
+        targets.push({ group_id: conv.conv_id, group_name: conv.name || conv.conv_id });
+      }
+    });
+
+    // Manual targets
+    manualLines.forEach(line => {
+      targets.push({ group_id: line, group_name: line });
+    });
+
+    if (targets.length === 0) {
+      setCampaignError("Không tìm thấy người nhận hợp lệ.");
+      return;
+    }
+
+    setIsSendingCampaign(true);
+    setCampaignError(null);
+    setCampaignSuccess(null);
+    setCampaignLogs([]);
+
+    try {
+      await createZaloBroadcast(inbox.selectedAccountId, {
+        user_id: inbox.selectedAccountId,
+        message_ids: selectedMessageIds,
+        targets,
+        content_mode: campaignMode,
+      });
+
+      // Simulate log stream for interactive view
+      let currentIdx = 0;
+      const logNext = () => {
+        if (currentIdx >= targets.length) {
+          setCampaignSuccess(`Đã gửi thành công đến ${targets.length} người nhận!`);
+          setIsSendingCampaign(false);
+          setAutoSendTargetIds([]);
+          setSelectedMessageIds([]);
+          setManualRecipients("");
+        } else {
+          const target = targets[currentIdx];
+          setCampaignLogs(prev => [...prev, { name: target.group_name, status: "success" }]);
+          currentIdx++;
+          setTimeout(logNext, 300);
+        }
+      };
+      logNext();
+    } catch (e) {
+      setCampaignError(e instanceof Error ? e.message : String(e));
+      setIsSendingCampaign(false);
+    }
+  };
+
+  // Sync edit account values & switch forms automatically
+  useEffect(() => {
+    if (inbox.selectedAccountId) {
+      setIsCreatingAccount(false);
+    } else {
+      setIsCreatingAccount(true);
+    }
+  }, [inbox.selectedAccountId]);
+
+  // Selected conversation objects mapped
+  const selectedConv = useMemo<ZaloConv | null>(
+    () => inbox.filtered.find((c) => c.conv_id === inbox.openConv) ?? null,
+    [inbox.filtered, inbox.openConv]
+  );
+  const selectedArchive = useMemo(() => {
+    return inbox.archives.find((a) => a.conv_id === inbox.openConv) ?? null;
+  }, [inbox.archives, inbox.openConv]);
+
+  const selectedName = inbox.archiveReading ? selectedArchive?.name : selectedConv?.name;
+  const selectedPreview = inbox.archiveReading ? selectedArchive?.preview : selectedConv?.preview;
+  const selectedNote = inbox.openConv ? (inbox.customerNotes[inbox.openConv] ?? selectedArchive?.note ?? "") : "";
+
+  const activeTemplateGroup = QUICK_REPLY_GROUPS.find((g) => g.id === templateGroupId) || QUICK_REPLY_GROUPS[0];
+  const noteDraft = noteDraftState.convId === inbox.openConv ? noteDraftState.value : selectedNote;
+  const setNoteDraft = (value: string) => setNoteDraftState({ convId: inbox.openConv, value });
+  const noteChanged = noteDraft.trim() !== selectedNote.trim();
+
+  // Scroll to bottom on chat loading
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [inbox.messages]);
+
+  // Current owner/account labels for display
+  const ownerName = inbox.selectedOwnerInfo?.ownerName ?? inbox.ownerNames[inbox.selectedOwnerId] ?? "";
+  const ownerEmail = inbox.selectedOwnerInfo?.ownerEmail ?? inbox.ownerEmails[inbox.selectedOwnerId] ?? "";
+  const accountLabel = inbox.selectedAccountInfo
+    ? inbox.selectedAccountInfo.label ?? inbox.selectedAccountInfo.phone ?? inbox.selectedAccountId
+    : "";
+  const accountStatus = inbox.selectedAccountId ? inbox.getAccountStatus(inbox.selectedAccountId) : "offline";
+
+  // Sync edit account values
+  useEffect(() => {
+    if (inbox.selectedAccountInfo) {
+      setEditLabel(inbox.selectedAccountInfo.label || "");
+      setEditPhone(inbox.selectedAccountInfo.phone || "");
+    }
+  }, [inbox.selectedAccountId, inbox.selectedAccountInfo]);
+
+  // Stats calculation
+  const stats = useMemo(() => {
+    const activeList = inbox.activeConvs.filter((c) => !c.archived);
+    return {
+      total: activeList.length,
+      unread: activeList.filter((c) => c.unread).length,
+      needReply: activeList.filter((c) => c.unread || c.preview !== "").length,
+      customers: activeList.filter((c) => c.is_customer).length,
+      pushed: activeList.filter((c) => c.is_customer).length,
+    };
+  }, [inbox.activeConvs]);
+
+  const appendTemplate = (text: string) => {
+    inbox.setReply((prev) => (prev.trim() ? `${prev.trim()}\n${text}` : text));
+  };
+
+  const handleSuggestKpi = async () => {
+    if (!inbox.selectedAccountId || !ownerEmail) return;
+    const pendingConvs = inbox.activeConvs
+      .filter((c) => !inbox.verifiedConvIds.has(c.conv_id) && !inbox.suggestedConvIds.has(c.conv_id))
+      .map((c) => c.conv_id);
+
+    if (pendingConvs.length === 0) {
+      inbox.showToast("Không có hội thoại nào cần đề xuất tính KPI", false);
+      return;
+    }
+    await inbox.onSuggestKpi({
+      member_email: ownerEmail,
+      conv_ids: pendingConvs,
+      user_id: inbox.selectedAccountId,
+    });
+  };
+
+  const handleVerifyKpi = async () => {
+    if (!inbox.openConv) return;
+    await inbox.onBulkVerifyKpi({
+      leader_email: inbox.leaderEmail,
+      target_date: inbox.targetDate,
+    });
+  };
+
+  // Zalo Account Actions
+  const handleUpdateAccount = async () => {
+    if (!inbox.selectedAccountId) return;
+    setIsSavingAccount(true);
+    try {
+      await updateZaloAccount(inbox.selectedAccountId, {
+        label: editLabel,
+        phone: editPhone,
+      });
+      inbox.showToast("Cập nhật thông tin tài khoản thành công!", true);
+      void inbox.refreshAccounts();
+    } catch (e) {
+      inbox.showToast(e instanceof Error ? e.message : "Cập nhật thất bại", false);
+    } finally {
+      setIsSavingAccount(false);
+    }
+  };
+
+  const allMembers = useMemo(() => {
+    return inbox.teams.flatMap((t) => t.members ?? []);
+  }, [inbox.teams]);
+
+  const handleCreateAccount = async () => {
+    const cleanLabel = newLabel.trim();
+    if (!cleanLabel) {
+      inbox.showToast("Nhập tên nhãn hiển thị trước.", false);
+      return;
+    }
+    if (!newOwnerId) {
+      inbox.showToast("Chọn nhân sự quản lý tài khoản.", false);
+      return;
+    }
+    setIsSavingAccount(true);
+    try {
+      const rawId = newPhone.trim() || cleanLabel;
+      const accountId = rawId.toLowerCase().replace(/[^a-z0-9]/g, "");
+      await createZaloAccount({
+        account_id: accountId,
+        owner_id: newOwnerId,
+        id_member: newOwnerId,
+        label: cleanLabel,
+        phone: newPhone.trim() || undefined,
+      });
+      inbox.showToast("Đã thêm tài khoản Zalo mới thành công!", true);
+      setNewLabel("");
+      setNewPhone("");
+      setIsCreatingAccount(false);
+      void inbox.refreshAccounts();
+    } catch (error) {
+      inbox.showToast(error instanceof Error ? error.message : "Không thể tạo tài khoản Zalo.", false);
+    } finally {
+      setIsSavingAccount(false);
+    }
+  };
+
+  const handleRestartListener = async () => {
+    if (!inbox.selectedAccountId) return;
+    inbox.showToast("Đang khởi động lại listener...", true);
+    try {
+      await restartZaloAccountListener(inbox.selectedAccountId);
+      inbox.showToast("Listener đã được khởi động lại thành công!", true);
+      void inbox.refreshAccounts();
+    } catch (e) {
+      inbox.showToast(e instanceof Error ? e.message : "Lỗi khởi động", false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!inbox.selectedAccountId) return;
+    if (window.confirm("Bạn có chắc chắn muốn ẩn tài khoản Zalo này khỏi Inbox?")) {
+      try {
+        await deleteZaloAccount(inbox.selectedAccountId, false);
+        inbox.showToast("Đã ẩn tài khoản Zalo", true);
+        inbox.onSelectAccount("");
+        void inbox.refreshAccounts();
+      } catch (e) {
+        inbox.showToast("Lỗi khi ẩn tài khoản", false);
+      }
+    }
+  };
+
+  const handleDeleteFull = async () => {
+    if (!inbox.selectedAccountId) return;
+    if (
+      window.confirm(
+        "CẢNH BÁO: Hành động này sẽ xoá hoàn toàn file session đăng nhập Zalo trên VPS và dữ liệu chat trong DB. Bạn có chắc chắn?"
+      )
+    ) {
+      try {
+        await deleteZaloAccountFull(inbox.selectedAccountId, inbox.selectedOwnerId);
+        inbox.showToast("Đã xoá hoàn toàn tài khoản Zalo", true);
+        inbox.onSelectAccount("");
+        void inbox.refreshAccounts();
+      } catch (e) {
+        inbox.showToast("Lỗi khi xoá hoàn toàn tài khoản", false);
+      }
+    }
+  };
+
+  // Group messages by date
+  const groupedMessages = (() => {
+    const groups: { date: string; msgs: ZaloLibraryMessage[] }[] = [];
+    for (const msg of inbox.messages) {
+      const date = formatDate(msg.timestamp_text ?? msg.time_text);
+      const last = groups[groups.length - 1];
+      if (!last || last.date !== date) {
+        groups.push({ date, msgs: [msg] });
+      } else {
+        last.msgs.push(msg);
+      }
+    }
+    return groups;
+  })();
+
+  const panelH = "h-[620px]";
+
+  return (
+    <div className="w-full max-w-full text-[#1A1A1A] flex flex-col bg-slate-50 pb-8">
+      {/* ── Header ── */}
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3 flex-shrink-0">
+        <div>
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-[#E3000F] to-red-700 flex items-center justify-center shadow-sm">
+              <MaterialIcon name="chat" className="text-white text-[18px]" />
+            </div>
+            <h1 className="text-xl font-black">Inbox Zalo Admin</h1>
+          </div>
+          <p className="mt-1 text-sm text-[#666666]">
+            Quản lý hội thoại Zalo của tất cả nhân sự, theo dõi online/offline và tính KPI inbox.
+          </p>
+        </div>
+        <button
+          onClick={inbox.scan}
+          disabled={inbox.scanning || !inbox.selectedAccountId || accountStatus !== "online"}
+          className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#E3000F] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#C40009] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <MaterialIcon
+            name={inbox.scanning ? "sync" : "refresh"}
+            className={cn("text-base", inbox.scanning && "animate-spin")}
+          />
+          {inbox.scanning ? "Đang quét" : "Quét ngay"}
+        </button>
+      </div>
+
+      {/* Toast Alert */}
+      {inbox.toast && (
+        <div
+          className={cn(
+            "mb-3 rounded-lg border px-4 py-3 text-sm font-semibold transition-all shadow-sm flex-shrink-0",
+            inbox.toast.ok ? "border-green-200 bg-green-50 text-green-800" : "border-red-200 bg-red-50 text-red-800"
+          )}
+        >
+          {inbox.toast.msg}
+        </div>
+      )}
+
+      {/* ── Stats Row ── */}
+      <div className="mb-4 grid min-w-0 grid-cols-2 gap-3 xl:grid-cols-4 flex-shrink-0">
+        {[
+          ["Hội thoại", stats.total, stats.unread],
+          ["Cần trả lời", stats.needReply, null],
+          ["Lead đã lưu", stats.customers, stats.pushed],
+          ["Online", inbox.sessions.filter((s) => s.listener?.connected).length, inbox.sessions.length],
+        ].map(([label, val, sub], i) => (
+          <div key={label} className="rounded-xl border border-[#E5E5E5] bg-white px-4 py-3 shadow-sm">
+            <div className="text-[11px] font-bold uppercase text-[#A0A0A0]">{String(label)}</div>
+            <div className="mt-1 text-2xl font-black" style={i === 1 ? { color: "#E3000F" } : {}}>
+              {val}
+            </div>
+            {sub !== null && (
+              <div className="text-xs text-[#A0A0A0]">
+                {sub} {i === 0 ? "chưa đọc" : i === 2 ? "chưa tính KPI" : "tài khoản"}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* ── KPI Progress Cards ── */}
+      {ownerEmail && (
+        <div className="mb-4 grid grid-cols-1 xl:grid-cols-2 gap-4 flex-shrink-0">
+          <KpiProgressCard email={ownerEmail} type="inbox" />
+          <KpiProgressCard email={ownerEmail} type="lead" />
+        </div>
+      )}
+
+      {/* ── Employee Accounts selection panel ── */}
+      <div className="mb-4 min-w-0 rounded-xl border border-[#E5E5E5] bg-white p-3 shadow-sm flex-shrink-0">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="text-xs font-bold uppercase text-[#A0A0A0]">Tài khoản nhân viên</div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            {inbox.role === "admin" || inbox.role === "leader" ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={inbox.targetDate}
+                  onChange={(e) => inbox.setTargetDate(e.target.value)}
+                  className="rounded border border-[#E5E5E5] px-2 py-1 text-xs outline-none focus:border-[#E3000F]"
+                />
+                <button
+                  onClick={() =>
+                    inbox.onBulkVerifyKpi({ leader_email: inbox.leaderEmail, target_date: inbox.targetDate })
+                  }
+                  disabled={inbox.isBulkVerifying}
+                  className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {inbox.isBulkVerifying ? "ĐANG TÍNH..." : "TÍNH KPI HÀNG LOẠT"}
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleSuggestKpi}
+                disabled={inbox.isBulkSuggesting || !inbox.selectedAccountId}
+                className="rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-blue-700 disabled:opacity-50"
+              >
+                {inbox.isBulkSuggesting ? "ĐANG ĐỀ XUẤT..." : "ĐỀ XUẤT TÍNH KPI HÀNG LOẠT"}
+              </button>
+            )}
+            <div className="text-xs text-[#A0A0A0] hidden md:block">Realtime cập nhật, offline chỉ xem dữ liệu.</div>
+          </div>
+        </div>
+
+        <ZaloTeamAccountTree
+          sessions={inbox.sessions}
+          ownerNames={inbox.ownerNames}
+          teams={inbox.teams}
+          selectedAcc={inbox.selectedAccountId}
+          onSelect={inbox.onSelectAccount}
+          role={inbox.role}
+          owner={inbox.leaderEmail}
+        />
+      </div>
+
+      {/* ── 3-Pane Layout ── */}
+      <div className="grid min-w-0 grid-cols-[280px_1fr_260px] gap-4">
+        {/* Pane 1: Conversations list */}
+        <section className="min-w-0 overflow-hidden rounded-xl border border-[#E5E5E5] bg-white shadow-sm flex flex-col">
+          <div className="border-b border-[#E5E5E5] p-3 flex-shrink-0">
+            <div className="mb-2.5 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-bold">Hộp thư</h2>
+                <p className="text-[11px] text-[#A0A0A0]">
+                  {inbox.loadingConvs ? "Đang cập nhật..." : `${inbox.filtered.length} hội thoại`}
+                </p>
+              </div>
+              <select
+                value={inbox.filter}
+                onChange={(e) => inbox.setFilter(e.target.value as any)}
+                className="h-8 rounded-lg border border-[#E5E5E5] bg-white px-2 text-xs font-semibold outline-none focus:border-[#E3000F]"
+              >
+                <option value="all">Tất cả</option>
+                <option value="need_reply">Cần trả lời</option>
+                <option value="unread">Chưa đọc</option>
+                <option value="customer">Khách hàng</option>
+                <option value="need_verify">Chưa tính KPI</option>
+              </select>
+            </div>
+            <div className="inline-flex rounded-lg border border-[#E5E5E5] bg-[#F8F8F8] p-0.5 w-full">
+              <button
+                onClick={() => inbox.setArchiveReading(false)}
+                className={cn(
+                  "flex-1 rounded-md py-1 text-xs font-bold transition",
+                  !inbox.archiveReading ? "bg-white text-[#E3000F] shadow-sm" : "text-[#666666]"
+                )}
+              >
+                Hộp thư
+              </button>
+              <button
+                onClick={() => inbox.setArchiveReading(true)}
+                className={cn(
+                  "flex-1 rounded-md py-1 text-xs font-bold transition",
+                  inbox.archiveReading ? "bg-white text-[#E3000F] shadow-sm" : "text-[#666666]"
+                )}
+              >
+                Lưu trữ
+              </button>
+            </div>
+          </div>
+
+          <div className="h-[600px] overflow-y-auto p-2 space-y-1.5">
+            {inbox.archiveReading ? (
+              inbox.archives.length === 0 ? (
+                <div className="py-12 text-center text-xs text-[#A0A0A0]">Chưa có hội thoại lưu trữ.</div>
+              ) : (
+                inbox.archives.map((item) => (
+                  <button
+                    key={item.conv_id}
+                    onClick={() => inbox.openArchive(item.conv_id)}
+                    className={cn(
+                      "w-full rounded-lg border p-2.5 text-left transition text-xs",
+                      inbox.openConv === item.conv_id && inbox.archiveReading
+                        ? "border-[#E3000F] bg-[#FFF5F5]"
+                        : "border-[#E5E5E5] bg-white hover:border-[#E3000F]/60"
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-bold text-slate-800">{item.name}</div>
+                        <div className="mt-0.5 truncate text-[11px] text-[#A0A0A0]">{item.preview || "—"}</div>
+                      </div>
+                    </div>
+                  </button>
+                ))
+              )
+            ) : inbox.loadingConvs && inbox.filtered.length === 0 ? (
+              <div className="py-12 text-center text-xs text-[#A0A0A0]">Đang tải hộp thư...</div>
+            ) : inbox.filtered.length === 0 ? (
+              <div className="py-12 text-center text-xs text-[#A0A0A0]">Chưa có hội thoại.</div>
+            ) : (
+              inbox.filtered.map((conv) => (
+                <button
+                  key={conv.conv_id}
+                  onClick={() => inbox.openChat(conv.conv_id)}
+                  className={cn(
+                    "w-full rounded-lg border p-2.5 text-left transition text-xs",
+                    inbox.openConv === conv.conv_id && !inbox.archiveReading
+                      ? "border-[#E3000F] bg-[#FFF5F5]"
+                      : "border-[#E5E5E5] bg-white hover:border-[#E3000F]/60"
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-1.5">
+                    <div className="min-w-0 flex-1">
+                      <div className={cn("truncate font-bold text-slate-800", conv.unread && "font-black text-black")}>
+                        {conv.name}
+                      </div>
+                      <div className="mt-0.5 truncate text-[11px] text-[#A0A0A0]">{conv.preview || "—"}</div>
+                    </div>
+                    <span className="whitespace-nowrap text-[10px] text-[#A0A0A0]">{conv.time}</span>
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {conv.unread && (
+                      <span className="rounded-full bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">
+                        chưa đọc
+                      </span>
+                    )}
+                    {conv.is_customer && (
+                      <span className="rounded-full bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">
+                        khách
+                      </span>
+                    )}
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </section>
+
+        {/* Pane 2: Chat panel (middle) */}
+        <section className="flex h-[700px] min-w-0 flex-col overflow-hidden rounded-xl border border-[#E5E5E5] bg-white shadow-sm">
+          {inbox.selectedAccountId && (accountStatus === "expired" || accountStatus === "offline") && (
+            <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center justify-between text-xs text-amber-800 flex-shrink-0 animate-fade-in">
+              <span className="flex items-center gap-1.5 font-semibold">
+                <MaterialIcon name="warning" className="text-amber-500 text-base" />
+                {ownerEmail && inbox.leaderEmail && ownerEmail.toLowerCase() === inbox.leaderEmail.toLowerCase()
+                  ? "Tài khoản của bạn đang offline / hết phiên. Vui lòng đăng nhập lại."
+                  : "Tài khoản của nhân viên đang offline / hết phiên. Bạn đang xem dữ liệu lịch sử."}
+              </span>
+              {ownerEmail && inbox.leaderEmail && ownerEmail.toLowerCase() === inbox.leaderEmail.toLowerCase() && (
+                <button
+                  onClick={() => setShowAuthModal(true)}
+                  className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-2 py-1 rounded text-[10px] transition shadow-sm"
+                >
+                  Đăng nhập lại
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-3 border-b border-[#E5E5E5] px-4 py-2.5 bg-[#FAFAFA] flex-shrink-0">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <h2 className="truncate text-sm font-bold text-slate-800">{selectedName || "Hội thoại"}</h2>
+                {selectedMessageIds.length > 0 && (
+                  <span className="bg-red-105 text-[#E3000F] text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse border border-red-200">
+                    Đã chọn {selectedMessageIds.length} tin
+                  </span>
+                )}
+              </div>
+              <p className="truncate text-[11px] text-[#A0A0A0]">
+                {selectedPreview || (inbox.openConv ? "Đang xem nội dung" : "Chọn hội thoại để bắt đầu")}
+              </p>
+            </div>
+            {selectedConv && !inbox.archiveReading && (
+              <div className="flex gap-1.5 items-center">
+                <button
+                  onClick={() => {
+                    setPanelTab("campaign");
+                    panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className={cn(
+                    "rounded-lg border px-2 py-1 text-xs font-bold transition flex items-center gap-0.5 shadow-sm",
+                    selectedMessageIds.length > 0
+                      ? "border-red-200 bg-red-50 text-[#E3000F] hover:bg-red-100"
+                      : "border-[#E5E5E5] bg-white text-slate-500 hover:bg-slate-50"
+                  )}
+                  title="Mở chiến dịch gửi tin hàng loạt (Auto)"
+                >
+                  <MaterialIcon name="campaign" className="text-base" />
+                  <span>Auto Send</span>
+                </button>
+                <button
+                  onClick={() => inbox.mark(selectedConv.conv_id, "is_customer", !selectedConv.is_customer)}
+                  className="rounded-lg border border-[#E5E5E5] bg-white px-2 py-1 text-xs font-bold hover:border-[#E3000F] text-slate-700"
+                >
+                  {selectedConv.is_customer ? "Bỏ khách" : "Là khách"}
+                </button>
+                <button
+                  onClick={() => inbox.saveArchive(selectedConv.conv_id, false)}
+                  className="rounded-lg border border-[#E5E5E5] bg-white px-2 py-1 text-xs font-bold hover:border-[#E3000F] text-slate-700"
+                >
+                  Lưu
+                </button>
+                <button
+                  onClick={() => inbox.saveArchive(selectedConv.conv_id, true)}
+                  className="rounded-lg border border-red-200 bg-white px-2 py-1 text-xs font-bold text-red-500 hover:bg-red-50"
+                >
+                  Ẩn
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Messages scroll box */}
+          <div ref={chatScrollRef} className="flex-1 overflow-y-auto bg-[#FCFCFC] px-4 py-4 space-y-3">
+            {!inbox.openConv ? (
+              <div className="flex h-full items-center justify-center text-xs text-[#A0A0A0]">
+                Chọn một hội thoại để xem tin nhắn.
+              </div>
+            ) : inbox.loadingChat && inbox.messages.length === 0 ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+                Đang tải hội thoại Zalo...
+              </div>
+            ) : inbox.messages.length === 0 ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+                Chưa có nội dung hội thoại.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {groupedMessages.map((group, gi) => (
+                  <div key={gi} className="space-y-2">
+                    <div className="flex items-center gap-2 my-2.5">
+                      <div className="flex-1 h-px bg-slate-200" />
+                      <span className="text-[9px] text-slate-400 px-1.5 font-medium">{group.date}</span>
+                      <div className="flex-1 h-px bg-slate-200" />
+                    </div>
+                    {group.msgs.map((msg, index) => {
+                      const isSent = msg.is_sent;
+                      const time = formatTime(msg.timestamp_text ?? msg.time_text);
+                      const isSelected = selectedMessageIds.includes(msg.source_message_id || msg.id || "");
+                      
+                      const checkboxEl = (
+                        <input
+                          type="checkbox"
+                          className="w-3.5 h-3.5 cursor-pointer opacity-0 group-hover:opacity-100 checked:opacity-100 transition-opacity shrink-0"
+                          checked={isSelected}
+                          onChange={() => {
+                            const msgId = msg.source_message_id || msg.id || "";
+                            if (!msgId) return;
+                            setSelectedMessageIds(prev =>
+                              prev.includes(msgId) ? prev.filter(x => x !== msgId) : [...prev, msgId]
+                            );
+                          }}
+                        />
+                      );
+
+                      return (
+                        <div key={index} className={cn("flex items-center gap-2 group", isSent ? "justify-end" : "justify-start")}>
+                          {/* Checkbox on left for received messages */}
+                          {!isSent && checkboxEl}
+
+                          <div className={cn("max-w-[75%]", isSent ? "text-right" : "text-left")}>
+                            {!isSent && msg.sender_name && (
+                              <div className="text-[10px] text-[#A0A0A0] mb-0.5 px-1">{msg.sender_name}</div>
+                            )}
+                            <div
+                              className={cn(
+                                "whitespace-pre-wrap rounded-xl px-3 py-2 text-xs leading-relaxed break-words transition-all duration-200",
+                                isSent
+                                  ? "bg-[#E3000F] text-white rounded-br-sm"
+                                  : "bg-white text-slate-800 shadow-sm ring-1 ring-slate-150 rounded-bl-sm",
+                                isSelected && (
+                                  isSent
+                                    ? "ring-2 ring-[#E3000F] ring-offset-2"
+                                    : "ring-2 ring-[#E3000F]/60 bg-red-50/30"
+                                )
+                              )}
+                            >
+                              {msg.content}
+                            </div>
+                            {time && <div className="mt-0.5 px-1 text-[9px] text-[#A0A0A0]">{time}</div>}
+                          </div>
+
+                          {/* Checkbox on right for sent messages */}
+                          {isSent && checkboxEl}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Quick template shortcuts & send button */}
+          <div className="border-t border-[#E5E5E5] bg-white p-3 flex-shrink-0">
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {activeTemplateGroup.items.slice(0, 3).map((item) => (
+                <button
+                  key={item}
+                  onClick={() => appendTemplate(item)}
+                  disabled={!inbox.openConv || inbox.archiveReading}
+                  className="rounded-full bg-[#F4F6FF] px-2.5 py-1 text-[11px] font-bold text-[#4F46E5] transition hover:bg-[#E9ECFF] disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {item.length > 34 ? `${item.slice(0, 34)}...` : item}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <textarea
+                value={inbox.reply}
+                onChange={(e) => inbox.setReply(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    void inbox.sendReply();
+                  }
+                }}
+                disabled={!inbox.openConv || inbox.archiveReading}
+                rows={2}
+                placeholder={
+                  inbox.archiveReading
+                    ? "Đang xem lưu trữ..."
+                    : !inbox.selectedAccountId
+                    ? "Chưa chọn tài khoản..."
+                    : "Nhập câu trả lời..."
+                }
+                className="min-h-[44px] flex-1 resize-none rounded-lg border border-[#E5E5E5] px-3 py-2 text-xs outline-none transition focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 disabled:cursor-not-allowed disabled:bg-[#F5F5F5]"
+              />
+              <button
+                onClick={() => void inbox.sendReply()}
+                disabled={!inbox.openConv || inbox.archiveReading || !inbox.reply.trim() || inbox.isSending}
+                className="shrink-0 rounded-lg bg-[#E3000F] px-4 text-xs font-black text-white transition hover:bg-[#C40009] disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center"
+              >
+                Gửi
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Pane 3: Tabs sidebar (Templates / Customer / KPI / Account Management) */}
+        <aside className="min-w-0 overflow-hidden rounded-xl border border-[#E5E5E5] bg-white shadow-sm flex flex-col h-[700px]">
+          <div className="grid border-b border-[#E5E5E5] bg-[#FAFAFA] text-[11px] font-black shrink-0 grid-cols-5">
+            <button
+              onClick={() => {
+                setPanelTab("templates");
+                panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className={cn("py-3 truncate px-0.5 text-center", panelTab === "templates" ? "bg-white text-[#E3000F]" : "text-[#666666]")}
+            >
+              Mẫu
+            </button>
+            <button
+              onClick={() => {
+                setPanelTab("customer");
+                panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className={cn("py-3 truncate px-0.5 text-center", panelTab === "customer" ? "bg-white text-[#E3000F]" : "text-[#666666]")}
+            >
+              Khách
+            </button>
+            <button
+              onClick={() => {
+                setPanelTab("kpi");
+                panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className={cn("py-3 truncate px-0.5 text-center", panelTab === "kpi" ? "bg-white text-[#E3000F]" : "text-[#666666]")}
+            >
+              KPI
+            </button>
+            <button
+              onClick={() => {
+                setPanelTab("campaign");
+                panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className={cn("py-3 truncate px-0.5 text-center flex items-center justify-center gap-0.5", panelTab === "campaign" ? "bg-white text-[#E3000F]" : "text-[#666666]")}
+            >
+              <MaterialIcon name="campaign" className="text-[13px] shrink-0" />
+              <span>Auto</span>
+            </button>
+            <button
+              onClick={() => {
+                setPanelTab("account");
+                panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className={cn("py-3 truncate px-0.5 text-center", panelTab === "account" ? "bg-white text-[#E3000F]" : "text-[#666666]")}
+            >
+              Quản lý
+            </button>
+          </div>
+
+          <div ref={panelScrollRef} className={cn("overflow-y-auto p-3", panelH)}>
+            {/* ── Campaign / Broadcast Tab ── */}
+            {panelTab === "campaign" && (
+              <div className="space-y-3 text-xs text-slate-700">
+                <div className="border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-2">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex justify-between">
+                    <span>Tin nhắn đã chọn ({selectedMessageIds.length})</span>
+                    <span className="text-[9px] text-[#E3000F] font-black">Có thể chỉnh sửa</span>
+                  </div>
+                  {selectedMessageIds.length === 0 ? (
+                    <p className="text-slate-500 text-[11px]">Tích chọn tin nhắn ở cột chat giữa để bắt đầu chiến dịch.</p>
+                  ) : (
+                    <div className="max-h-[160px] overflow-y-auto space-y-2 pr-1 border border-slate-200/60 rounded bg-white p-2">
+                      {inbox.messages
+                        .filter(m => selectedMessageIds.includes(m.source_message_id || m.id || ""))
+                        .map((m, idx) => {
+                          const msgId = m.source_message_id || m.id || "";
+                          const currentText = editedMessagesText[msgId] ?? m.content ?? "";
+                          return (
+                            <div key={idx} className="bg-slate-50 border border-slate-200/55 p-1.5 rounded space-y-1">
+                              <div className="flex justify-between items-center text-[9px] text-slate-400 font-bold">
+                                <span>Tin #{idx + 1}</span>
+                              </div>
+                              <textarea
+                                value={currentText}
+                                onChange={(e) => {
+                                  setEditedMessagesText(prev => ({
+                                    ...prev,
+                                    [msgId]: e.target.value
+                                  }));
+                                }}
+                                className="w-full bg-white border border-slate-250 rounded p-1 text-[11px] outline-none text-slate-700 resize-none font-sans"
+                                rows={2.5}
+                              />
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-slate-500 font-bold block mb-1">Phương thức nội dung</label>
+                  <select
+                    value={campaignMode}
+                    onChange={(e) => setCampaignMode(e.target.value as any)}
+                    className="w-full border border-slate-200 rounded px-2 py-1 outline-none focus:border-[#E3000F] text-xs bg-white"
+                  >
+                    <option value="both">Gửi cả chữ & ảnh</option>
+                    <option value="text">Chỉ gửi chữ</option>
+                    <option value="image">Chỉ gửi ảnh</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-slate-500 font-bold block mb-1">
+                    Người nhận từ danh sách hội thoại ({autoSendTargetIds.length})
+                  </label>
+                  <div className="relative mb-2">
+                    <MaterialIcon name="search" className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs" />
+                    <input
+                      type="text"
+                      placeholder="Lọc danh sách..."
+                      value={autoSendSearchQuery}
+                      onChange={(e) => setAutoSendSearchQuery(e.target.value)}
+                      className="w-full pl-6 pr-2 py-1 text-xs border border-slate-200 rounded outline-none"
+                    />
+                  </div>
+                  <div className="h-[120px] overflow-y-auto border border-slate-200 rounded p-1.5 space-y-1 bg-white">
+                    {inbox.filtered
+                      .filter(c => (c.name || "").toLowerCase().includes(autoSendSearchQuery.toLowerCase()))
+                      .map((c) => (
+                        <label key={c.conv_id} className="flex items-center gap-1.5 p-1 rounded hover:bg-slate-50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="w-3 h-3"
+                            checked={autoSendTargetIds.includes(c.conv_id)}
+                            onChange={() => {
+                              const id = c.conv_id;
+                              setAutoSendTargetIds(prev =>
+                                prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+                              );
+                            }}
+                          />
+                          <span className="truncate text-[11px] font-semibold text-slate-700">{c.name}</span>
+                        </label>
+                      ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-slate-500 font-bold block mb-1">
+                    Hoặc nhập số điện thoại thủ công (Mỗi số 1 dòng)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={manualRecipients}
+                    onChange={(e) => setManualRecipients(e.target.value)}
+                    placeholder="0912345678&#10;0976543210"
+                    className="w-full border border-slate-200 rounded px-2.5 py-1 outline-none focus:border-[#E3000F] text-xs resize-none"
+                  />
+                </div>
+
+                {campaignError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 text-[11px] p-2 rounded-lg">
+                    {campaignError}
+                  </div>
+                )}
+                {campaignSuccess && (
+                  <div className="bg-green-50 border border-green-200 text-green-700 text-[11px] p-2 rounded-lg">
+                    {campaignSuccess}
+                  </div>
+                )}
+
+                {campaignLogs.length > 0 && (
+                  <div className="border border-slate-200 rounded bg-slate-50 p-2 text-[10px] max-h-[80px] overflow-y-auto space-y-1">
+                    {campaignLogs.map((log, i) => (
+                      <div key={i} className="flex justify-between items-center text-slate-600">
+                        <span className="truncate">{log.name}</span>
+                        <span className="text-green-600 font-bold">✓ Đã gửi</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <button
+                  onClick={handleAutoSend}
+                  disabled={isSendingCampaign || selectedMessageIds.length === 0 || (autoSendTargetIds.length === 0 && !manualRecipients.trim())}
+                  className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-[#E3000F] hover:bg-[#C40009] text-white font-bold py-2 text-xs transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <MaterialIcon name="campaign" className="text-base" />
+                  {isSendingCampaign ? "Đang gửi..." : "Bắt đầu chiến dịch"}
+                </button>
+              </div>
+            )}
+
+            {/* ── Templates Tab ── */}
+            {panelTab === "templates" && (
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-1">
+                  {QUICK_REPLY_GROUPS.map((group) => (
+                    <button
+                      key={group.id}
+                      onClick={() => setTemplateGroupId(group.id)}
+                      className={cn(
+                        "rounded-full px-2.5 py-1 text-[10px] font-bold transition",
+                        templateGroupId === group.id
+                          ? "bg-[#E3000F] text-white"
+                          : "bg-[#F5F5F5] text-[#666666] hover:text-[#1A1A1A]"
+                      )}
+                    >
+                      {group.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="space-y-2">
+                  {activeTemplateGroup.items.map((item) => (
+                    <button
+                      key={item}
+                      onClick={() => appendTemplate(item)}
+                      disabled={!inbox.openConv || inbox.archiveReading}
+                      className="block w-full rounded-lg border border-[#E5E5E5] bg-white p-2.5 text-left text-xs leading-relaxed transition hover:border-[#E3000F]/60 hover:bg-[#FFF8F8] disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── Customer Tab ── */}
+            {panelTab === "customer" && (
+              <div>
+                {!inbox.openConv ? (
+                  <div className="rounded-lg border border-dashed border-[#E5E5E5] bg-[#FAFAFA] p-3 text-xs text-[#A0A0A0]">
+                    Chọn hội thoại để xem thông tin.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="rounded-lg border border-[#E5E5E5] p-3">
+                      <div className="text-[10px] font-bold uppercase text-[#A0A0A0]">Tên</div>
+                      <div className="mt-1 text-sm font-black">{selectedName || inbox.openConv}</div>
+                      <div className="mt-1 text-xs text-[#A0A0A0]">{selectedPreview || "—"}</div>
+                    </div>
+                    <div className="rounded-lg border border-[#E5E5E5] bg-[#FFFDF7] p-3">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <div>
+                          <div className="text-[10px] font-bold uppercase text-[#A0A0A0]">Ghi chú nhu cầu</div>
+                          <div className="text-[9px] text-[#A0A0A0]">Lưu thông tin cần nhớ về khách.</div>
+                        </div>
+                        {selectedNote && !noteChanged && (
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-bold text-emerald-700">
+                            đã lưu
+                          </span>
+                        )}
+                      </div>
+                      <textarea
+                        value={noteDraft}
+                        onChange={(e) => setNoteDraft(e.target.value)}
+                        rows={4}
+                        maxLength={1000}
+                        placeholder="VD: Khách cần tư vấn phần mềm..."
+                        className="w-full resize-none rounded-lg border border-[#E5E5E5] bg-white px-2 py-1.5 text-xs leading-relaxed outline-none transition focus:border-[#E3000F] disabled:bg-[#F5F5F5]"
+                      />
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <span className="text-[10px] text-[#A0A0A0]">{noteDraft.trim().length}/1000</span>
+                        <button
+                          onClick={() => void inbox.saveCustomerNote(inbox.openConv, noteDraft)}
+                          disabled={!inbox.openConv || inbox.savingNoteConv === inbox.openConv || !noteChanged}
+                          className="rounded bg-[#E3000F] px-2.5 py-1 text-xs font-black text-white hover:bg-[#C40009] disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Lưu
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── KPI Tab ── */}
+            {panelTab === "kpi" && (
+              <div>
+                {inbox.role === "admin" || inbox.role === "leader" ? (
+                  <div
+                    className={cn(
+                      "rounded-xl border p-3.5 shadow-sm transition-colors",
+                      inbox.verifiedConvIds.has(inbox.openConv) ? "border-emerald-250 bg-emerald-50" : "border-[#E3000F]/20 bg-white"
+                    )}
+                  >
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <div
+                        className={cn(
+                          "text-xs font-black uppercase tracking-wider",
+                          inbox.verifiedConvIds.has(inbox.openConv) ? "text-emerald-700" : "text-[#1A1A1A]"
+                        )}
+                      >
+                        {inbox.verifiedConvIds.has(inbox.openConv) ? "Đã xác nhận KPI" : "Xác nhận KPI"}
+                      </div>
+                      {inbox.verifiedConvIds.has(inbox.openConv) && (
+                        <MaterialIcon name="check_circle" className="text-emerald-500 text-base" />
+                      )}
+                    </div>
+                    {!inbox.verifiedConvIds.has(inbox.openConv) && (
+                      <p className="text-[10px] text-slate-500 mb-3">
+                        Chọn hội thoại rồi bấm Xác nhận bên dưới để chấm KPI inbox cho nhân sự.
+                      </p>
+                    )}
+                    {inbox.openConv && selectedConv && (
+                      <div className="mb-3 rounded-lg border border-[#E5E5E5] bg-white p-2.5">
+                        <div className="truncate text-xs font-bold text-[#1A1A1A]">{selectedName}</div>
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {inbox.suggestedConvIds.has(inbox.openConv) && (
+                            <span className="rounded-full bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-[9px] font-bold text-blue-700">
+                              đã đề xuất
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {inbox.openConv && (
+                      <button
+                        onClick={handleVerifyKpi}
+                        className={cn(
+                          "w-full rounded-lg py-2 text-xs font-bold text-white transition",
+                          inbox.verifiedConvIds.has(inbox.openConv)
+                            ? "bg-slate-300 cursor-not-allowed opacity-50"
+                            : "bg-[#E3000F] hover:bg-[#C40009] shadow-sm shadow-red-500/10"
+                        )}
+                        disabled={inbox.verifiedConvIds.has(inbox.openConv)}
+                      >
+                        {inbox.verifiedConvIds.has(inbox.openConv) ? "Đã tính" : "XÁC NHẬN KPI"}
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border p-3 bg-white">
+                    <div className="text-xs font-bold uppercase text-slate-700 mb-2">Trạng thái đề xuất</div>
+                    {inbox.openConv ? (
+                      <div>
+                        {inbox.verifiedConvIds.has(inbox.openConv) ? (
+                          <div className="p-2.5 rounded-lg bg-green-50 border border-green-200 text-[11px] text-green-700 font-semibold flex items-center gap-1.5">
+                            <MaterialIcon name="check_circle" className="text-green-500 text-[16px]" />
+                            Leader đã duyệt tính KPI
+                          </div>
+                        ) : inbox.suggestedConvIds.has(inbox.openConv) ? (
+                          <div className="p-2.5 rounded-lg bg-blue-50 border border-blue-200 text-[11px] text-blue-700 font-semibold flex items-center gap-1.5">
+                            <MaterialIcon name="pending" className="text-blue-500 text-[16px]" />
+                            Đã đề xuất, chờ leader duyệt
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() =>
+                              void inbox.onSuggestKpi({
+                                member_email: ownerEmail,
+                                conv_ids: [inbox.openConv],
+                                user_id: inbox.selectedAccountId,
+                              })
+                            }
+                            className="w-full rounded bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 text-xs transition"
+                          >
+                            ĐỀ XUẤT TÍNH KPI HỘI THOẠI NÀY
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-slate-400 italic">Chọn hội thoại để xem KPI</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Zalo Account Technical Management Tab ── */}
+            {panelTab === "account" && (
+              <div className="space-y-3">
+                {isCreatingAccount ? (
+                  <div className="border border-slate-200 rounded-xl p-3.5 bg-white space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        Thêm tài khoản Zalo mới
+                      </div>
+                      {inbox.selectedAccountId && (
+                        <button
+                          onClick={() => setIsCreatingAccount(false)}
+                          className="text-[10px] font-bold text-[#E3000F] hover:underline"
+                        >
+                          Quay lại
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="space-y-2.5 text-xs text-slate-700">
+                      <div>
+                        <label className="text-[10px] text-slate-500 font-bold block mb-1">
+                          Nhân sự quản lý tài khoản
+                        </label>
+                        <select
+                          value={newOwnerId}
+                          onChange={(e) => setNewOwnerId(e.target.value)}
+                          className="w-full border border-slate-200 rounded px-2.5 py-1.5 outline-none focus:border-[#E3000F] text-xs bg-white"
+                        >
+                          <option value="">-- Chọn nhân viên --</option>
+                          {allMembers.map((member) => (
+                            <option key={member.id || member.email} value={member.id || member.email || ""}>
+                              {member.name} ({member.email})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] text-slate-500 font-bold block mb-1">
+                          Tên nhãn hiển thị
+                        </label>
+                        <input
+                          type="text"
+                          value={newLabel}
+                          onChange={(e) => setNewLabel(e.target.value)}
+                          placeholder="MKT Zalo 01, CSKH 02..."
+                          className="w-full border border-slate-200 rounded px-2.5 py-1.5 outline-none focus:border-[#E3000F] text-xs"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] text-slate-500 font-bold block mb-1">
+                          Số điện thoại (Tuỳ chọn)
+                        </label>
+                        <input
+                          type="text"
+                          value={newPhone}
+                          onChange={(e) => setNewPhone(e.target.value)}
+                          placeholder="Số điện thoại đăng nhập Zalo..."
+                          className="w-full border border-slate-200 rounded px-2.5 py-1.5 outline-none focus:border-[#E3000F] text-xs"
+                        />
+                      </div>
+
+                      <button
+                        onClick={handleCreateAccount}
+                        disabled={isSavingAccount || !newLabel.trim() || !newOwnerId}
+                        className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-[#E3000F] hover:bg-[#C40009] text-white font-bold py-2.5 text-xs transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed mt-2"
+                      >
+                        <MaterialIcon name="person_add" className="text-[16px]" />
+                        {isSavingAccount ? "Đang tạo..." : "Thêm account"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3.5 text-xs text-slate-700">
+                    <div className="flex justify-end">
+                      <button
+                        onClick={() => {
+                          setNewLabel("");
+                          setNewPhone("");
+                          setNewOwnerId(inbox.selectedOwnerId || "");
+                          setIsCreatingAccount(true);
+                        }}
+                        className="text-[10px] font-bold text-[#E3000F] hover:underline flex items-center gap-0.5"
+                      >
+                        <MaterialIcon name="add" className="text-[12px]" />
+                        Thêm tài khoản mới
+                      </button>
+                    </div>
+
+                    {/* Status Info Card */}
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+                      <div>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mã Zalo ID</div>
+                        <div className="font-mono text-slate-800 font-bold truncate">
+                          {inbox.selectedAccountId}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Trạng thái Auth</div>
+                          <div className="font-semibold flex items-center gap-1 mt-0.5">
+                            <span
+                              className={cn(
+                                "h-2 w-2 rounded-full",
+                                inbox.selectedAccountInfo?.has_auth ? "bg-green-500" : "bg-slate-400"
+                              )}
+                            />
+                            {inbox.selectedAccountInfo?.has_auth ? "Đã login" : "Chưa login"}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Listener</div>
+                          <div className="font-semibold flex items-center gap-1 mt-0.5">
+                            <span
+                              className={cn(
+                                "h-2 w-2 rounded-full",
+                                accountStatus === "online"
+                                  ? "bg-green-500"
+                                  : accountStatus === "connecting"
+                                  ? "bg-amber-400 animate-pulse"
+                                  : "bg-slate-400"
+                              )}
+                            />
+                            {accountStatus === "online"
+                              ? "Online"
+                              : accountStatus === "connecting"
+                              ? "Kết nối..."
+                              : "Tắt (Offline)"}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="border-t border-slate-200 pt-2 flex justify-between text-[11px]">
+                        <span>Tin nhắn đã quét:</span>
+                        <span className="font-bold text-slate-800">
+                          {inbox.selectedAccountInfo?.listener?.messages_seen ?? 0}
+                        </span>
+                      </div>
+                      {inbox.selectedAccountInfo?.listener?.pid && (
+                        <div className="flex justify-between text-[10px] text-slate-400">
+                          <span>Listener PID:</span>
+                          <span className="font-mono">{inbox.selectedAccountInfo.listener.pid}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Edit Info Form */}
+                    <div className="border border-slate-250 rounded-xl p-3 bg-white space-y-2">
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        Thông tin tài khoản
+                      </div>
+                      <div className="space-y-2">
+                        <div>
+                          <label className="text-[10px] text-slate-500">Tên nhãn hiển thị</label>
+                          <input
+                            type="text"
+                            value={editLabel}
+                            onChange={(e) => setEditLabel(e.target.value)}
+                            placeholder="MKT 01, CSKH 02..."
+                            className="w-full mt-1 border border-slate-200 rounded px-2 py-1 outline-none focus:border-[#E3000F] text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-slate-500">Số điện thoại</label>
+                          <input
+                            type="text"
+                            value={editPhone}
+                            onChange={(e) => setEditPhone(e.target.value)}
+                            placeholder="09xxx..."
+                            className="w-full mt-1 border border-slate-200 rounded px-2 py-1 outline-none focus:border-[#E3000F] text-xs"
+                          />
+                        </div>
+                        <button
+                          onClick={handleUpdateAccount}
+                          disabled={isSavingAccount || !editLabel.trim()}
+                          className="w-full rounded bg-slate-800 hover:bg-slate-900 text-white font-bold py-1.5 text-xs transition disabled:opacity-40"
+                        >
+                          {isSavingAccount ? "Đang lưu..." : "Lưu thay đổi"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Technical Actions Card */}
+                    <div className="border border-slate-200 rounded-xl p-3 bg-white space-y-2.5">
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Thao tác kỹ thuật</div>
+                      <div className="space-y-2">
+                        <button
+                          onClick={handleRestartListener}
+                          className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 hover:border-[#E3000F] hover:text-[#E3000F] py-2 font-bold transition bg-white"
+                        >
+                          <MaterialIcon name="refresh" className="text-[16px]" />
+                          Khởi động lại Listener
+                        </button>
+
+                        <button
+                          onClick={handleDeleteAccount}
+                          className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-red-100 hover:bg-red-50 text-red-600 py-2 font-bold transition bg-white"
+                        >
+                          <MaterialIcon name="visibility_off" className="text-[16px]" />
+                          Ẩn tài khoản khỏi Inbox
+                        </button>
+
+                        <button
+                          onClick={handleDeleteFull}
+                          className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white py-2 font-bold transition shadow-sm"
+                        >
+                          <MaterialIcon name="delete" className="text-[16px]" />
+                          Xoá hoàn toàn dữ liệu Zalo
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </aside>
+      </div>
+
+      {mounted && showAuthModal && inbox.selectedAccountId && createPortal(
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50 p-4 font-sans text-slate-800 backdrop-blur-sm">
+          <div className="relative w-full max-w-[448px] min-w-[320px] bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <button
+              onClick={() => setShowAuthModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition z-10 cursor-pointer"
+            >
+              <MaterialIcon name="close" className="text-xl" />
+            </button>
+            <ZaloAccountAuthView
+              accountId={inbox.selectedAccountId}
+              ownerName={ownerName}
+              autoTrigger={true}
+              onSuccess={() => {
+                setShowAuthModal(false);
+                void inbox.refreshAccounts();
+              }}
+            />
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}

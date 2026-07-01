@@ -26,7 +26,7 @@ try:
     print(f"\nVM HEAD: {chan2[1].read().decode('utf-8', errors='replace').strip()}")
 
     # Check local head
-    result = subprocess.run(["git", "log", "-1", "--format=%H %h %s"], capture_output=True, text=True, cwd=r"D:\CrawlDataLinkedin")
+    result = subprocess.run(["git", "log", "-1", "--format=%H %h %s"], capture_output=True, text=True, cwd=".")
     print(f"Local HEAD: {result.stdout.strip()}")
 
     # Step 3: Rebuild frontend
