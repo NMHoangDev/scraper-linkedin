@@ -3,9 +3,8 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { customerLeadService } from "@/services/customer-lead.service";
-import type { CustomerLead } from "@/services/customer-lead.service";
+import type { Customer as CustomerLead } from "@/services/customer-lead.service";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 
 interface CustomerLeadModalProps {
   isOpen: boolean;

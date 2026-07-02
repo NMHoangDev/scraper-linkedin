@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { customerLeadService, CustomerLead, SDRUser } from "@/services/customer-lead.service";
+import { customerLeadService, Customer as CustomerLead, SDRUser } from "@/services/customer-lead.service";
 import { MaterialIcon } from "@/components/ui";
 import { toast } from "sonner";
 
@@ -28,8 +28,9 @@ export default function CustomerLeadsPage() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
+      const listResp = await customerLeadService.getAll();
       const [leadsData, sdrsData] = await Promise.all([
-        customerLeadService.getAll(),
+        Promise.resolve(listResp.items),
         customerLeadService.getSdrs()
       ]);
       setLeads(leadsData);

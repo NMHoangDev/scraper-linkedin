@@ -7,7 +7,7 @@ import { zaloInboxShareService } from "@/services/all-platform.service";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { API_KEY } from "@/lib/env";
 import { sendZaloMessage, sendZaloMessageWithFiles } from "@/services/zaloCrawlerService";
-import { CustomerLeadModal } from "@/components/all-platform/components/customer-lead-modal";
+import { CrmCustomerModal } from "@/components/all-platform/components/CrmCustomerModal";
 
 interface SelectedMedia {
   file: File;
@@ -948,12 +948,12 @@ export function LeaderInboxView({
           </div>
         </div>
       </div>
-      <CustomerLeadModal
+      <CrmCustomerModal
         isOpen={showLeadModal}
         onClose={() => setShowLeadModal(false)}
         defaultConvId={activeConversationId || undefined}
         defaultCustomerName={sharedList.find((r) => r.conversation_id === activeConversationId)?.group_name || undefined}
-        currentUserRole={appUser?.role}
+        defaultSourcePlatform="Zalo"
       />
     </div>
   );
