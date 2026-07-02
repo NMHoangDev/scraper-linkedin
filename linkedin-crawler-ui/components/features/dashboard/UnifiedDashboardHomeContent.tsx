@@ -557,49 +557,50 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
           Dat sau KpiProgressCard, truoc FilterBar de leader/admin
           thay ngay tong quan seeding ma khong can mo tung PostCard. */}
       {(user?.role === "admin" || user?.role === "leader") && (
+        <SeedingActivityPanel email={CURRENT_USER_EMAIL} />
+      )}
+      {/* Phase 6: Siêu Tốc Cào Dữ Liệu + Bulk Comment — hiển thị cho cả 3 role
+          (admin/leader/member) khi đang ở tab Facebook. SeedingActivityPanel
+          vẫn chỉ admin/leader vì là panel tổng quan nhóm. */}
+      {CURRENT_USER_EMAIL && feedPlatform === "facebook" && (
         <>
-          <SeedingActivityPanel email={CURRENT_USER_EMAIL} />
-          {feedPlatform === "facebook" && (
-            <>
-              <ApiExtensionLauncher
-                onComplete={(totalPosts, launchedGroups) => {
-                  fetchPosts();
-                  fetchStats();
-                  setCrawlResultsSummary(prev => {
-                    const realTotal = prev.groups.reduce((sum, g) => sum + g.count, 0);
-                    const launchedUrls = launchedGroups ? launchedGroups.map(g => g.url) : [];
-                    return { ...prev, totalPosts: realTotal > 0 ? realTotal : (totalPosts || 0), launchedGroups: launchedUrls };
-                  });
-                  setShowCrawlResultModal(true);
-                }}
-                onCrawlSaved={(data) => {
-                  setCrawlResultsSummary(prev => {
-                    const exists = prev.groups.find(g => g.groupUrl === data.groupUrl);
-                    let newGroups = prev.groups;
-                    if (exists) {
-                      newGroups = prev.groups.map(g => g.groupUrl === data.groupUrl ? { ...g, count: g.count + data.count } : g);
-                    } else {
-                      newGroups = [...prev.groups, { groupUrl: data.groupUrl, count: data.count }];
-                    }
-                    return {
-                      ...prev,
-                      groups: newGroups,
-                      crawledPostUrls: [...prev.crawledPostUrls, ...(data.postUrls || [])]
-                    };
-                  });
-                }}
-              />
-              <BulkCommentLauncher 
-                posts={posts} 
-                onComplete={(seededUrls) => {
-                  fetchPosts();
-                  fetchStats();
-                  if (seededUrls) setRecentlySeededUrls(seededUrls);
-                  setShowSeedingResultModal(true);
-                }}
-              />
-            </>
-          )}
+          <ApiExtensionLauncher
+            onComplete={(totalPosts, launchedGroups) => {
+              fetchPosts();
+              fetchStats();
+              setCrawlResultsSummary(prev => {
+                const realTotal = prev.groups.reduce((sum, g) => sum + g.count, 0);
+                const launchedUrls = launchedGroups ? launchedGroups.map(g => g.url) : [];
+                return { ...prev, totalPosts: realTotal > 0 ? realTotal : (totalPosts || 0), launchedGroups: launchedUrls };
+              });
+              setShowCrawlResultModal(true);
+            }}
+            onCrawlSaved={(data) => {
+              setCrawlResultsSummary(prev => {
+                const exists = prev.groups.find(g => g.groupUrl === data.groupUrl);
+                let newGroups = prev.groups;
+                if (exists) {
+                  newGroups = prev.groups.map(g => g.groupUrl === data.groupUrl ? { ...g, count: g.count + data.count } : g);
+                } else {
+                  newGroups = [...prev.groups, { groupUrl: data.groupUrl, count: data.count }];
+                }
+                return {
+                  ...prev,
+                  groups: newGroups,
+                  crawledPostUrls: [...prev.crawledPostUrls, ...(data.postUrls || [])]
+                };
+              });
+            }}
+          />
+          <BulkCommentLauncher
+            posts={posts}
+            onComplete={(seededUrls) => {
+              fetchPosts();
+              fetchStats();
+              if (seededUrls) setRecentlySeededUrls(seededUrls);
+              setShowSeedingResultModal(true);
+            }}
+          />
         </>
       )}
 

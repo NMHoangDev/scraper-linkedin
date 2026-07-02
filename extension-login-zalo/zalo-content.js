@@ -557,6 +557,24 @@
           url: location.href,
         };
       }
+      if (action === "GET_DOCUMENT_COOKIES") {
+        // Đọc cookies từ document.cookie — có thể thấy cookies mà chrome.cookies.getAll
+        // không trả về (session cookies, httpOnly được set bởi JS thay vì server header).
+        const raw = String(document.cookie || "");
+        const cookies = raw
+          .split(";")
+          .map((part) => part.trim())
+          .filter(Boolean)
+          .map((pair) => {
+            const eq = pair.indexOf("=");
+            return eq >= 0
+              ? { name: pair.slice(0, eq).trim(), value: pair.slice(eq + 1).trim() }
+              : null;
+          })
+          .filter(Boolean)
+          .filter((c) => /zalo|zppsid|zppwsid|zpsid|zphpsid/i.test(c.name));
+        return { cookies: raw ? cookies : [], raw: raw };
+      }
       if (action === "SCRAPE_ZALO_DOM_MESSAGES") return await scrapeDomMessages(data);
       throw new Error(`Unknown Zalo content action: ${action}`);
     })()

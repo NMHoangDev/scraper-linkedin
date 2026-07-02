@@ -1317,7 +1317,7 @@ async def import_session_from_extension(
         }
 
     Validation:
-        * Phải có đủ 5 key cookies bắt buộc: zppsid, zppwsid, zpsid, zphpsid, _ga
+        * Cookies: lấy được bao nhiêu dùng bấy nhiêu, không yêu cầu specific keys
         * Mỗi cookie phải có key + value
         * user_agent bắt buộc (Chrome thật), không chấp nhận default
     """
@@ -1441,22 +1441,9 @@ async def import_session_from_extension(
             detail="Could not parse any cookies. Expected Chrome-cookie array (key/value/domain) or 'k=v; k=v' string.",
         )
 
-    # ── Validate required keys ─────────────────────────────────────────
-    # ZCA-JS hiện đại yêu cầu cookies mới zppsid/zppwsid/zphpsid
-    # (Zalo API session mới), không chỉ cookies web cũ (zpsid/zpw_sek).
-    # Extension phải lấy được bộ cookies này từ Zalo web sau khi QR login.
-    REQUIRED_KEYS = ["zppsid", "zppwsid", "zpsid", "zphpsid"]
-    cookie_keys = {c.get("key", "").strip().lower() for c in parsed_cookies}
-    missing = [k for k in REQUIRED_KEYS if k not in cookie_keys]
-    if missing:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Thiếu cookies bắt buộc: {', '.join(missing)}. "
-                f"Đã có: {sorted(cookie_keys)}. "
-                "Hãy đăng nhập lại bằng QR trong extension để lấy cookies đầy đủ."
-            ),
-        )
+    # ── Cookie validation: bypassed ─────────────────────────────────────
+    # Lấy được bao nhiêu dùng bấy nhiêu, không yêu cầu specific keys.
+    # ZCA-JS chỉ cần imei + cookies + userAgent, không check tên cookie cụ thể.
 
     # ── Validate user_agent (phải là Chrome thật, không dùng default) ─
     user_agent = (body.get("user_agent") or "").strip()
@@ -1515,7 +1502,7 @@ async def import_session_from_extension(
         id_member=id_member,
     )
 
-    cookie_keys_str = ", ".join(sorted(cookie_keys))
+    cookie_keys_str = ", ".join(sorted({c.get("key", "").strip().lower() for c in parsed_cookies})) or "(none)"
     logger.info(
         f"Imported extension session for user={user_id}, "
         f"session={session_id}, cookies={len(parsed_cookies)} keys=[{cookie_keys_str}]"
@@ -1577,7 +1564,7 @@ async def import_session_from_extension(
             "status": "confirmed",
             "source": "extension",
             "cookies_count": len(parsed_cookies),
-            "cookies_keys": sorted(cookie_keys),
+            "cookies_keys": sorted({c.get("key", "").strip().lower() for c in parsed_cookies}),
             "imei": bool(body.get("imei")),
             "message": f"Imported {len(parsed_cookies)} cookies, keys=[{cookie_keys_str}]. Listener sẽ khởi động nền.",
         },

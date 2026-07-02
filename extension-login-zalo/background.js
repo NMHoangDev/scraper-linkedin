@@ -1,6 +1,43 @@
-const REQUIRED_COOKIE_KEYS = ["zppsid", "zppwsid", "zpsid", "zphpsid"];
+const REQUIRED_COOKIE_KEYS = [];
 const DEFAULT_BACKEND_URL = "http://localhost:8082";
 const ZALO_URL = "https://chat.zalo.me/";
+
+// ──────────────────────────────────────────────────────────────────────
+// Debug logger: log ra console + broadcast step events về tất cả tab
+// matching host_permissions để UI hiển thị progress real-time.
+// ──────────────────────────────────────────────────────────────────────
+const DEBUG_TAG = "[zalo-extension]";
+
+function logStep(step, details = {}) {
+  const payload = { step, ts: Date.now(), ...details };
+  // 1) Console (xem được trong chrome://extensions → Service worker → Inspect)
+  console.log(DEBUG_TAG, step, payload);
+  // 2) Broadcast về UI qua tất cả tab zalo + dashboard tabs
+  broadcastStep(payload).catch(() => undefined);
+}
+
+async function broadcastStep(payload) {
+  try {
+    const tabs = await new Promise((resolve) => {
+      chrome.tabs.query({}, (t) => resolve(t || []));
+    });
+    const ALLOWED_URL_RE =
+      /(chat\.zalo\.me|id\.zalo\.me|zalo\.me|localhost|127\.0\.0\.1|zenithglobal\.dev|markeeai\.com)/i;
+    const message = { __zaloExt: true, type: "STEP", data: payload };
+    for (const tab of tabs) {
+      if (!tab?.id) continue;
+      const url = String(tab.url || "");
+      if (!ALLOWED_URL_RE.test(url)) continue;
+      try {
+        await chrome.tabs.sendMessage(tab.id, message);
+      } catch (_) {
+        // Tab chưa load page-bridge hoặc không quan tâm — bỏ qua
+      }
+    }
+  } catch (_) {
+    // Service worker bị unload giữa chừng — bỏ qua broadcast
+  }
+}
 
 // Origins được phép gửi messages tới background (từ manifest content_scripts matches).
 // Bao gồm cả extension origin để popup/offscreen page hoạt động.
@@ -45,11 +82,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   const action = message?.action || message?.type;
   const data = message?.data || {};
+  const senderUrl = sender.tab?.url || "(extension)";
+  logStep("action.received", { action, senderUrl });
 
   handleAction(action, data)
-    .then((result) => sendResponse({ success: true, data: result }))
+    .then((result) => {
+      logStep("action.success", { action });
+      sendResponse({ success: true, data: result });
+    })
     .catch((error) => {
       console.error("[zalo-extension] action failed", action, error);
+      logStep("action.error", { action, error: error?.message || String(error) });
       sendResponse({
         success: false,
         error: error?.message || String(error || "Unknown extension error"),
@@ -60,6 +103,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 async function handleAction(action, data) {
+  logStep("action.start", { action });
+
+  // Mutex: chỉ cho phép 1 action IMPORT_ZALO_SESSION chạy tại một thời điểm
+  // để tránh 2 request cùng lúc đóng tab chồng lên nhau
+  if (action === "IMPORT_ZALO_SESSION") {
+    if (_importInProgress) {
+      const msg = "Another IMPORT_ZALO_SESSION is already in progress. Please wait for it to finish.";
+      logStep("action.rejected_concurrent", { action, reason: msg });
+      throw new Error(msg);
+    }
+    _importInProgress = true;
+    try {
+      const result = await importZaloSession(data);
+      return result;
+    } finally {
+      _importInProgress = false;
+    }
+  }
+
   switch (action) {
     case "PING":
       return { installed: true };
@@ -149,6 +211,7 @@ function waitForTabComplete(tabId, timeoutMs = 30000) {
       try {
         const tab = await getTab(tabId);
         if (tab.status === "complete") {
+          logStep("tab.loaded", { tabId, url: tab.url });
           cleanup();
           resolve(tab);
           return true;
@@ -168,6 +231,7 @@ function waitForTabComplete(tabId, timeoutMs = 30000) {
 
     const listener = (updatedTabId, changeInfo, tab) => {
       if (updatedTabId === tabId && changeInfo.status === "complete") {
+        logStep("tab.onUpdated.complete", { tabId, url: tab?.url });
         cleanup();
         resolve(tab);
       }
@@ -175,6 +239,7 @@ function waitForTabComplete(tabId, timeoutMs = 30000) {
 
     const timer = setInterval(async () => {
       if (Date.now() - startedAt > timeoutMs) {
+        logStep("tab.load.timeout", { tabId, timeoutMs });
         cleanup();
         reject(new Error("Timeout waiting for Zalo tab to load"));
         return;
@@ -194,13 +259,16 @@ async function findZaloTab() {
     return url.includes("zalo.me") || url.includes("chat.zalo") || url.includes("id.zalo");
   });
   const complete = zaloTabs.find((tab) => tab.status === "complete");
-  return complete || zaloTabs[0] || null;
+  const found = complete || zaloTabs[0] || null;
+  logStep("findZaloTab", { totalTabs: tabs.length, zaloTabs: zaloTabs.length, foundUrl: found?.url || null, foundStatus: found?.status });
+  return found;
 }
 
 let openTabPromise = null;
 
 async function getOrOpenZaloTab({ active = false } = {}) {
   if (openTabPromise) {
+    logStep("getOrOpenZaloTab.reuse_promise", { active });
     return await openTabPromise;
   }
 
@@ -208,11 +276,14 @@ async function getOrOpenZaloTab({ active = false } = {}) {
     try {
       const existing = await findZaloTab();
       if (existing?.id) {
+        logStep("getOrOpenZaloTab.existing", { tabId: existing.id, status: existing.status, url: existing.url });
         if (existing.status !== "complete") await waitForTabComplete(existing.id, 30000);
         return await getTab(existing.id);
       }
+      logStep("getOrOpenZaloTab.creating", { url: ZALO_URL, active });
       const tab = await createTab(ZALO_URL, active);
       if (!tab?.id) throw new Error("Cannot open Zalo Web tab");
+      logStep("getOrOpenZaloTab.created", { tabId: tab.id });
       await waitForTabComplete(tab.id, 30000);
       return await getTab(tab.id);
     } finally {
@@ -226,13 +297,17 @@ async function getOrOpenZaloTab({ active = false } = {}) {
 async function ensureZaloContentScript(tabId) {
   try {
     await sendMessageToTab(tabId, { action: "PING_ZALO_CONTENT" });
+    logStep("content.ready", { tabId });
     return;
-  } catch (_error) {
+  } catch (pingError) {
+    logStep("content.ping_failed_reinject", { tabId, error: pingError?.message });
     try {
       await executeContentFile(tabId, "zalo-content.js");
       await wait(250);
       await sendMessageToTab(tabId, { action: "PING_ZALO_CONTENT" });
+      logStep("content.reinjected", { tabId });
     } catch (e) {
+      logStep("content.reinject_failed", { tabId, error: e?.message });
       console.warn("[zalo-extension] failed to ensure Zalo content script:", e);
     }
   }
@@ -241,8 +316,11 @@ async function ensureZaloContentScript(tabId) {
 async function getZaloPageContext(tabId) {
   try {
     await ensureZaloContentScript(tabId);
-    return await sendMessageToTab(tabId, { action: "GET_ZALO_CONTEXT" });
+    const ctx = await sendMessageToTab(tabId, { action: "GET_ZALO_CONTEXT" });
+    logStep("page.context", { tabId, url: ctx?.url, hasUA: !!ctx?.user_agent, hasImei: !!ctx?.imei });
+    return ctx;
   } catch (error) {
+    logStep("page.context.failed", { tabId, error: error?.message });
     console.warn("[zalo-extension] cannot read Zalo page context", error);
     return {
       user_agent: typeof navigator !== "undefined" ? navigator.userAgent : "",
@@ -265,20 +343,69 @@ function getAllCookies(details) {
   });
 }
 
+// Query cookies cho một URL từ TẤT CẢ cookie stores (default, session, profile...).
+// Zalo đôi khi lưu session cookies vào store khác, không phải default store.
+function getAllStoresCookies(url) {
+  return new Promise((resolve) => {
+    chrome.cookies.getAllCookieStores((stores) => {
+      if (chromeLastError()) {
+        // fallback: getAll không có store filter
+        resolve(getAllCookies({ url }));
+        return;
+      }
+      const storeIds = (stores || []).map((s) => s.id);
+      Promise.all(storeIds.map((storeId) => getAllCookies({ url, storeId })))
+        .then((batches) => resolve(batches.flat()))
+        .catch(() => resolve(getAllCookies({ url })));
+    });
+  });
+}
+
 async function readZaloCookies() {
-  const queries = [
-    { url: "https://chat.zalo.me/" },
-    { url: "https://id.zalo.me/" },
-    { url: "https://zalo.me/" },
-    { domain: "zalo.me" },
-    { domain: ".zalo.me" },
-    { domain: "chat.zalo.me" },
-    { domain: ".chat.zalo.me" },
+  // Các URL cần query — dùng getAllStoresCookies để đọc TẤT CẢ cookie stores
+  const urls = [
+    "https://chat.zalo.me/",
+    "https://id.zalo.me/",
+    "https://zalo.me/",
+    "https://www.zalo.me/",
+  ];
+
+  // Các domain query bổ sung (chỉ dùng default store — domain query trả tất cả stores)
+  const domains = [
+    "zalo.me",
+    ".zalo.me",
+    "chat.zalo.me",
+    ".chat.zalo.me",
+    "id.zalo.me",
+    ".id.zalo.me",
+    "www.zalo.me",
+    ".www.zalo.me",
+    "zaloapp.com",
+    ".zaloapp.com",
   ];
 
   const all = [];
-  for (const query of queries) {
-    all.push(...(await getAllCookies(query)));
+  for (const url of urls) {
+    const cookies = await getAllStoresCookies(url);
+    all.push(...cookies);
+  }
+  for (const domain of domains) {
+    all.push(...(await getAllCookies({ domain })));
+  }
+
+  // Log toàn bộ cookies gốc (chưa dedup) — debug: xem tất cả cookie Zalo trên browser
+  // Throttle: chỉ log mỗi 10s để tránh spam console khi poll nhanh
+  const rawCookieList = all
+    .filter((c) => c?.name && String(c.domain || "").includes("zalo.me"))
+    .map((c) => ({ name: c.name, domain: c.domain, storeId: c.storeId, path: c.path || "/" }))
+    .sort((a, b) => (a.domain + a.name).localeCompare(b.domain + b.name));
+  const now = Date.now();
+  if (!_lastRawCookieLogAt || now - _lastRawCookieLogAt > 10000) {
+    _lastRawCookieLogAt = now;
+    console.log(
+      "[zalo-extension] ALL raw zalo cookies (" + rawCookieList.length + "):",
+      rawCookieList,
+    );
   }
 
   const byKey = new Map();
@@ -288,7 +415,34 @@ async function readZaloCookies() {
     byKey.set(key, cookie);
   }
 
-  return [...byKey.values()].map(toBackendCookie);
+  const result = [...byKey.values()].map(toBackendCookie);
+  const names = result.map((c) => c.name).sort();
+  const missing = missingRequiredKeys(names);
+
+  // Log ra console với tên cookies đầy đủ (không bị truncate như logStep object)
+  // Throttle: mỗi 10s hoặc khi missing changes
+  const missingStr = missing.join(",");
+  if (!_lastCookieReadLogAt || now - _lastCookieReadLogAt > 10000 || missingStr !== _lastMissingStr) {
+    _lastCookieReadLogAt = now;
+    _lastMissingStr = missingStr;
+    console.log(
+      "[zalo-extension] cookies.read",
+      `\n  raw=${all.length}  dedup=${result.length}  found=[${names.join(", ")}]`,
+      `\n  required=[${REQUIRED_COOKIE_KEYS.join(", ")}]`,
+      `\n  missing=[${missing.join(", ")}]  is_logged_in=${missing.length === 0}`,
+    );
+  }
+
+  logStep("cookies.read", {
+    rawCount: all.length,
+    dedupCount: result.length,
+    foundCookies: names,
+    required: REQUIRED_COOKIE_KEYS,
+    missingCookies: missing,
+    is_logged_in: missing.length === 0,
+  });
+
+  return result;
 }
 
 function toBackendCookie(cookie) {
@@ -328,6 +482,7 @@ function missingRequiredKeys(keys) {
 }
 
 async function getZaloCookiesPayload(options = {}) {
+  logStep("getZaloCookies.start", { options });
   let tab = null;
   try {
     if (options.openTab) {
@@ -337,15 +492,54 @@ async function getZaloCookiesPayload(options = {}) {
     }
   } catch (e) {
     console.warn("[zalo-extension] failed to get or open Zalo tab:", e);
+    logStep("getZaloCookies.tab_error", { error: e?.message });
   }
 
   const context = tab?.id ? await getZaloPageContext(tab.id) : {};
   const cookies = await readZaloCookies();
-  const keys = cookieKeys(cookies);
+
+  // Bổ sung: content script đọc document.cookie (có thể thấy httpOnly JS-set cookies)
+  let docCookies = [];
+  if (tab?.id) {
+    try {
+      const result = await sendMessageToTab(tab.id, { action: "GET_DOCUMENT_COOKIES" });
+      if (result?.cookies?.length) {
+        console.log("[zalo-extension] document.cookie bonus cookies:", result.cookies);
+        docCookies = result.cookies.map((c) => ({
+          name: c.name,
+          value: c.value,
+          domain: "chat.zalo.me", // document.cookie luôn dùng domain hiện tại
+          path: "/",
+          httpOnly: false,
+          secure: false,
+        }));
+      }
+    } catch (e) {
+      console.warn("[zalo-extension] GET_DOCUMENT_COOKIES failed:", e?.message);
+    }
+  }
+
+  // Merge docCookies vào cookies, tránh trùng tên
+  const nameSet = new Set(cookies.map((c) => c.name));
+  const newCookies = docCookies.filter((c) => !nameSet.has(c.name));
+  const allCookies = [...cookies, ...newCookies];
+
+  const keys = cookieKeys(allCookies);
   const missing = missingRequiredKeys(keys);
 
+  logStep("getZaloCookies.done", {
+    tabId: tab?.id || null,
+    tabUrl: tab?.url || null,
+    cookieCount: allCookies.length,
+    chromeApiCookies: cookies.length,
+    docCookies: newCookies.length,
+    keysFound: keys,
+    missing,
+    is_logged_in: missing.length === 0,
+  });
+
   return {
-    cookies,
+    cookies: allCookies,
     keys,
     user_agent: context.user_agent || (typeof navigator !== "undefined" ? navigator.userAgent : ""),
     imei: context.imei || "",
@@ -365,9 +559,16 @@ async function checkZaloLogin() {
 }
 
 let lastZaloTabId = null;
+let _importInProgress = false;
+let _lastRawCookieLogAt = 0;
+let _lastCookieReadLogAt = 0;
+let _lastMissingStr = "";
 
 async function waitForLoginCookies(timeoutMs = 35000) {
+  logStep("waitLogin.start", { timeoutMs });
   const startedAt = Date.now();
+
+  // Lần đầu: mở tab mới (openTab: true)
   let payload = await getZaloCookiesPayload({ openTab: true, active: true });
 
   const tab = await findZaloTab();
@@ -375,13 +576,40 @@ async function waitForLoginCookies(timeoutMs = 35000) {
     lastZaloTabId = tab.id;
   }
 
+  let attempt = 0;
+  let lastLogAt = 0;
+
   while (!payload.is_logged_in && Date.now() - startedAt < timeoutMs) {
-    await wait(1500);
+    attempt++;
+    const elapsed = Date.now() - startedAt;
+    // Throttle log: mỗi 10s hoặc attempt đầu tiên
+    if (attempt === 1 || Date.now() - lastLogAt >= 10000) {
+      lastLogAt = Date.now();
+      logStep("waitLogin.poll", {
+        attempt,
+        elapsed,
+        remaining: timeoutMs - elapsed,
+        foundCookies: payload.keys,
+        missingCookies: payload.missing,
+      });
+    }
+    await wait(2000);
+    // Chỉ poll, không log — tiết kiệm log noise
     payload = await getZaloCookiesPayload({ openTab: false });
   }
 
+  logStep("waitLogin.done", {
+    is_logged_in: payload.is_logged_in,
+    totalAttempts: attempt,
+    totalMs: Date.now() - startedAt,
+    foundCookies: payload.keys,
+    missingCookies: payload.missing,
+  });
+
   return payload;
 }
+
+const DEFAULT_LOGIN_TIMEOUT_MS = 90000;
 
 function makeEndpoint(baseUrl, path) {
   const base = String(baseUrl || DEFAULT_BACKEND_URL).replace(/\/+$/, "");
@@ -427,21 +655,27 @@ async function importZaloSession(data) {
   const backendUrl = data.backend_url || DEFAULT_BACKEND_URL;
   const apiKey = data.api_key || "";
 
-  const payload = await waitForLoginCookies(Number(data.login_timeout_ms || 35000));
+  logStep("import.start", { accountId, backendUrl, loginTimeout: data.login_timeout_ms || DEFAULT_LOGIN_TIMEOUT_MS });
+
+  const payload = await waitForLoginCookies(Number(data.login_timeout_ms || DEFAULT_LOGIN_TIMEOUT_MS));
+
   if (!payload.is_logged_in) {
+    logStep("import.login_failed", { missing: payload.missing });
     throw new Error(
       `Zalo Web is not logged in or required cookies are missing: ${payload.missing.join(", ")}. Open Zalo Web, finish login, then retry.`,
     );
   }
+
+  logStep("import.cookies_ok", { cookiesCount: payload.cookies.length, keys: payload.keys });
 
   // Auto-close Zalo Web tab immediately after successful login detection to avoid session/reload conflicts
   const tabIdToClose = lastZaloTabId || (await findZaloTab())?.id;
   if (tabIdToClose) {
     try {
       await chrome.tabs.remove(tabIdToClose);
-      console.log("[zalo-extension] auto-closed Zalo Web tab BEFORE backend sync:", tabIdToClose);
+      logStep("import.tab_closed", { tabId: tabIdToClose });
     } catch (e) {
-      console.warn("[zalo-extension] failed to close tab before sync:", e);
+      logStep("import.tab_close_failed", { tabId: tabIdToClose, error: e?.message });
     }
   }
   lastZaloTabId = null;
@@ -456,12 +690,16 @@ async function importZaloSession(data) {
   if (payload.imei) body.imei = payload.imei;
 
   const endpoint = makeEndpoint(backendUrl, "/api/all-platform/zalo/auth/import-session");
+  logStep("import.posting_to_backend", { endpoint, cookiesCount: payload.cookies.length });
+
   const result = await postJson(endpoint, body, apiKey, accountId);
 
   if (!result.ok) {
+    logStep("import.backend_failed", { status: result.status, error: backendError(result, "unknown") });
     throw new Error(`Backend import-session failed (${result.status}): ${backendError(result, "unknown error")}`);
   }
 
+  logStep("import.success", { status: result.status, cookiesCount: payload.cookies.length });
   return {
     status: result.status,
     backend: result.data,
@@ -475,10 +713,15 @@ async function syncZaloDomMessages(data) {
   const backendUrl = data.backend_url || DEFAULT_BACKEND_URL;
   const apiKey = data.api_key || "";
 
+  logStep("syncDom.start", { accountId, conversationId: data.conversation_id || null });
+
   const tab = await getOrOpenZaloTab({ active: false });
   if (!tab?.id) throw new Error("Cannot find or open Zalo Web tab");
+  logStep("syncDom.tab_ready", { tabId: tab.id, url: tab.url });
+
   await ensureZaloContentScript(tab.id);
 
+  logStep("syncDom.scraping", { tabId: tab.id });
   const scraped = await sendMessageToTab(tab.id, {
     action: "SCRAPE_ZALO_DOM_MESSAGES",
     data: {
@@ -489,11 +732,21 @@ async function syncZaloDomMessages(data) {
   });
 
   const conversations = Array.isArray(scraped?.conversations) ? scraped.conversations : [];
+  logStep("syncDom.scraped", {
+    tabId: tab.id,
+    conversationsCount: conversations.length,
+    activeGroupId: scraped?.active_group_id,
+    messagesPerConv: conversations.map((c) => c.messages?.length || 0),
+  });
+
   if (conversations.length === 0) {
+    logStep("syncDom.no_conversations", { tabId: tab.id });
     throw new Error("No Zalo conversations/messages were found in the current Zalo Web DOM.");
   }
 
   const endpoint = makeEndpoint(backendUrl, "/api/all-platform/zalo/conversations/sync-dom");
+  logStep("syncDom.posting_to_backend", { endpoint, conversationsCount: conversations.length });
+
   const result = await postJson(
     endpoint,
     {
@@ -503,6 +756,13 @@ async function syncZaloDomMessages(data) {
     apiKey,
     accountId,
   );
+
+  logStep("syncDom.done", {
+    status: result.status,
+    ok: result.ok,
+    conversationsCount: conversations.length,
+    totalMessages: conversations.reduce((sum, item) => sum + (item.messages?.length || 0), 0),
+  });
 
   return {
     status: result.status,
