@@ -185,22 +185,6 @@ function buildEntries(isAdmin: boolean, isLeader: boolean): SidebarEntry[] {
   return [
     {
       type: "item",
-      id: "campaigns",
-      href: "/all-platform/post-feed",
-      icon: "folder",
-      label: "Chiến dịch của tôi",
-      matchStartsWith: ["/all-platform/post-feed"],
-    },
-    {
-      type: "item",
-      id: "reports",
-      href: dashboardHref,
-      icon: "monitoring",
-      label: "Báo cáo & Tiến trình",
-      matchStartsWith: [dashboardHref],
-    },
-    {
-      type: "item",
       id: "home",
       href: dashboardHref,
       icon: "dashboard",
