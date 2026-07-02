@@ -30,8 +30,7 @@ export function GlobalCrawlNotification() {
 
           if (!isIncluded && !isAdmin) {
             console.log("WebSocket message ignored because user is not involved.");
-            // Tạm thời comment dòng return này để test hiển thị thông báo cho tất cả
-            // return; // Bỏ qua nếu không liên quan
+            return; // Bỏ qua nếu không liên quan
           }
         }
 
