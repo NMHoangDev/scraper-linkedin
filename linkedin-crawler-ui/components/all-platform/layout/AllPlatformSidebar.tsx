@@ -133,14 +133,6 @@ function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: "person
       label: "Đăng bài FB",
       matchStartsWith: ["/all-platform/dang-bai"],
     },
-    {
-      type: "item",
-      id: "zalo-crawl",
-      href: "/all-platform/zalo-crawl",
-      icon: "travel_explore",
-      label: "Cào Zalo",
-      matchStartsWith: ["/all-platform/zalo-crawl"],
-    },
   ];
 
   const channelItems: NavLeafItem[] = [
@@ -155,11 +147,11 @@ function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: "person
     },
     {
       type: "item",
-      id: "customers",
-      href: "/all-platform/customers",
-      icon: "group",
-      label: "Khách hàng",
-      matchStartsWith: ["/all-platform/customers"],
+      id: "zalo-crawl",
+      href: "/all-platform/zalo-crawl",
+      icon: "travel_explore",
+      label: "Cào Zalo",
+      matchStartsWith: ["/all-platform/zalo-crawl"],
     },
     {
       type: "item",
@@ -168,6 +160,14 @@ function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: "person
       icon: "chat",
       label: "Tài khoản Zalo",
       matchStartsWith: ["/all-platform/tai-khoan"],
+    },
+    {
+      type: "item",
+      id: "customers",
+      href: "/all-platform/customers",
+      icon: "group",
+      label: "Khách hàng",
+      matchStartsWith: ["/all-platform/customers"],
     },
   ];
 
