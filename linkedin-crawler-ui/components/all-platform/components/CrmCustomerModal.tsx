@@ -636,7 +636,7 @@ export function CrmCustomerModal({
             type="submit"
             form="crmForm"
             disabled={loading}
-            className="px-5 py-2 text-sm text-white bg-[#E3000F] rounded-lg hover:bg-red-700 font-medium transition-colors disabled:opacity-50 shadow-sm shadow-red-500/20 flex items-center gap-1"
+            className="px-5 py-2 text-sm text-white bg-primary rounded-lg hover:opacity-90 font-medium transition-colors disabled:opacity-50 shadow-sm shadow-red-500/20 flex items-center gap-1"
           >
             {loading ? "Đang lưu..." : "Lưu khách hàng"}
           </button>

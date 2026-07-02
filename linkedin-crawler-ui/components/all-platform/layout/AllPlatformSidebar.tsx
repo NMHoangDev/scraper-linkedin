@@ -32,7 +32,7 @@ type SidebarEntry = NavLeafItem | NavGroupItem;
 const navBaseClass =
   "flex min-h-[36px] items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-sm font-medium leading-relaxed transition-colors";
 const navActiveClass = "rounded-md bg-[var(--color-markee-primary)] text-white font-semibold";
-const navIdleClass = "text-[#171717] hover:bg-[#f5f5f5]";
+const navIdleClass = "text-on-surface hover:bg-surface-container-low";
 const iconClass = "shrink-0 text-[18px]";
 
 function isLeafActive(pathname: string, item: NavLeafItem) {
@@ -287,7 +287,7 @@ function SidebarLink({
         navBaseClass,
         active ? navActiveClass : navIdleClass,
         collapsed && "justify-center px-2",
-        indented && !collapsed && "ml-6 rounded-none border-l border-[#e5e5e5] pl-5",
+        indented && !collapsed && "ml-6 rounded-none border-l border-outline-variant pl-5",
       )}
       aria-current={active ? "page" : undefined}
       onClick={onNavigate}
@@ -298,7 +298,7 @@ function SidebarLink({
         <span
           className={cn(
             "ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-bold",
-            active ? "bg-white/20 text-white" : "bg-[#fce8ee] text-[var(--color-markee-primary)]",
+            active ? "bg-white/20 text-white" : "bg-primary/10 text-[var(--color-markee-primary)]",
           )}
         >
           {item.badge}
@@ -351,7 +351,7 @@ function SidebarGroup({
         className={cn(
           navBaseClass,
           "w-full justify-between",
-          hasActiveChild ? "bg-[#fce8ee] text-[var(--color-markee-primary)]" : navIdleClass,
+          hasActiveChild ? "bg-primary/10 text-[var(--color-markee-primary)]" : navIdleClass,
         )}
       >
         <span className="flex min-w-0 items-center gap-2.5">
@@ -390,7 +390,7 @@ function SectionLabel({ children, collapsed }: { children: React.ReactNode; coll
   if (collapsed) return null;
   return (
     <div className="flex items-center justify-between px-2 pt-2">
-      <h3 className="text-sm font-semibold tracking-wider text-[#737373]">{children}</h3>
+      <h3 className="text-sm font-semibold tracking-wider text-on-surface-variant">{children}</h3>
     </div>
   );
 }
@@ -435,7 +435,7 @@ export function AllPlatformSidebar({
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-[#e5e5e5] bg-white text-[#171717] shadow-xl transition-all duration-300 lg:translate-x-0 lg:shadow-none",
+          "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-outline-variant bg-white text-on-surface shadow-xl transition-all duration-300 lg:translate-x-0 lg:shadow-none",
           isCollapsed ? "w-[70px]" : "w-[280px]",
           isOpen ? "translate-x-0" : "-translate-x-full",
         )}
@@ -444,19 +444,19 @@ export function AllPlatformSidebar({
           <button
             type="button"
             onClick={onClose}
-            className="absolute right-3 top-3 rounded-lg p-2 text-[#737373] transition hover:bg-[#f5f5f5] hover:text-[var(--color-markee-primary)] lg:hidden"
+            className="absolute right-3 top-3 rounded-lg p-2 text-on-surface-variant transition hover:bg-surface-container-low hover:text-[var(--color-markee-primary)] lg:hidden"
             aria-label="Đóng menu"
           >
             <MaterialIcon name="close" />
           </button>
         ) : null}
 
-        <div className="border-b border-[#e5e5e5] px-2 py-2">
+        <div className="border-b border-outline-variant px-2 py-2">
           <Link
             href="/all-platform/post-feed"
             onClick={onClose}
             className={cn(
-              "flex items-center gap-3 rounded-lg p-1 transition hover:bg-[#f5f5f5] active:scale-[0.98]",
+              "flex items-center gap-3 rounded-lg p-1 transition hover:bg-surface-container-low active:scale-[0.98]",
               isCollapsed && "justify-center",
             )}
           >
@@ -480,7 +480,7 @@ export function AllPlatformSidebar({
 
         {!isCollapsed ? (
           <div className="px-3 py-2">
-            <div className="grid grid-cols-2 rounded-xl bg-[#f5f5f5] p-1">
+            <div className="grid grid-cols-2 rounded-xl bg-surface-container-low p-1">
               <button
                 type="button"
                 onClick={() => setWorkspaceTab("personal")}
@@ -488,7 +488,7 @@ export function AllPlatformSidebar({
                   "rounded-lg px-3 py-1.5 text-sm font-semibold transition",
                   workspaceTab === "personal"
                     ? "bg-[var(--color-markee-primary)] text-white shadow-sm"
-                    : "text-[#737373] hover:bg-white hover:text-[#171717]",
+                    : "text-on-surface-variant hover:bg-white hover:text-on-surface",
                 )}
               >
                 Cá nhân
@@ -500,7 +500,7 @@ export function AllPlatformSidebar({
                   "rounded-lg px-3 py-1.5 text-sm font-semibold transition",
                   workspaceTab === "team"
                     ? "bg-[var(--color-markee-primary)] text-white shadow-sm"
-                    : "text-[#737373] hover:bg-white hover:text-[#171717]",
+                    : "text-on-surface-variant hover:bg-white hover:text-on-surface",
                 )}
               >
                 Nhóm
@@ -535,9 +535,9 @@ export function AllPlatformSidebar({
 
           {!isCollapsed ? (
             <>
-              <div className="border-t border-[#e5e5e5] pt-2">
+              <div className="border-t border-outline-variant pt-2">
                 <div className="flex items-center justify-between px-2">
-                  <h3 className="text-sm font-semibold tracking-wider text-[#737373]">Dự án</h3>
+                  <h3 className="text-sm font-semibold tracking-wider text-on-surface-variant">Dự án</h3>
                   <button
                     type="button"
                     className="flex items-center gap-0.5 text-sm font-semibold text-[var(--color-markee-primary)] transition hover:scale-105 active:scale-95"
@@ -555,9 +555,9 @@ export function AllPlatformSidebar({
                 </Link>
               </div>
 
-              <div className="border-t border-[#e5e5e5] pt-2">
+              <div className="border-t border-outline-variant pt-2">
                 <div className="flex items-center justify-between px-2">
-                  <h3 className="text-sm font-semibold tracking-wider text-[#737373]">
+                  <h3 className="text-sm font-semibold tracking-wider text-on-surface-variant">
                     Lịch sử trò chuyện
                   </h3>
                   <Link
@@ -573,7 +573,7 @@ export function AllPlatformSidebar({
                     <li key={`${chat}-${index}`}>
                       <Link
                         href="/all-platform/post-feed"
-                        className="block rounded-lg px-8 py-1.5 text-sm text-[#3d3d3d] transition hover:bg-[#f5f5f5]"
+                        className="block rounded-lg px-8 py-1.5 text-sm text-on-surface transition hover:bg-surface-container-low"
                         onClick={onClose}
                       >
                         <span className="block truncate">{chat}</span>
@@ -590,15 +590,15 @@ export function AllPlatformSidebar({
           {!isCollapsed ? (
             <button
               type="button"
-              className="flex w-full items-center justify-between rounded-xl border border-[#e5e5e5] bg-white px-3 py-3 text-left shadow-sm transition hover:bg-[#f8f8f8] active:scale-[0.98]"
+              className="flex w-full items-center justify-between rounded-xl border border-outline-variant bg-white px-3 py-3 text-left shadow-sm transition hover:bg-surface-container-low active:scale-[0.98]"
             >
               <span>
-                <span className="block text-sm font-bold text-[#171717]">Chia sẻ Markee</span>
-                <span className="mt-0.5 block text-xs leading-4 text-[#737373]">
+                <span className="block text-sm font-bold text-on-surface">Chia sẻ Markee</span>
+                <span className="mt-0.5 block text-xs leading-4 text-on-surface-variant">
                   Giới thiệu bạn bè của bạn về ứng dụng để nhận credits
                 </span>
               </span>
-              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#e5e5e5] text-[var(--color-markee-primary)]">
+              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-outline-variant text-[var(--color-markee-primary)]">
                 <MaterialIcon name="share" className="text-[18px]" />
               </span>
             </button>
@@ -606,7 +606,7 @@ export function AllPlatformSidebar({
 
           <div
             className={cn(
-              "flex items-center rounded-lg p-2 transition hover:bg-[#f5f5f5] active:scale-[0.98]",
+              "flex items-center rounded-lg p-2 transition hover:bg-surface-container-low active:scale-[0.98]",
               isCollapsed ? "justify-center" : "gap-2.5",
             )}
           >
@@ -616,15 +616,15 @@ export function AllPlatformSidebar({
               title={isCollapsed ? user?.name || user?.email || "Người dùng" : undefined}
               onClick={onClose}
             >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fce8ee] text-sm font-bold text-[var(--color-markee-primary)]">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-[var(--color-markee-primary)]">
                 {getInitials(user?.name || user?.email)}
               </span>
               {!isCollapsed ? (
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-[#171717]">
+                  <span className="block truncate text-sm font-semibold text-on-surface">
                     {user?.name || "Người dùng"}
                   </span>
-                  <span className="block truncate text-xs text-[#737373]">
+                  <span className="block truncate text-xs text-on-surface-variant">
                     {user?.email || "Chưa đăng nhập"}
                   </span>
                 </span>
@@ -634,7 +634,7 @@ export function AllPlatformSidebar({
               <button
                 type="button"
                 onClick={() => void handleLogout()}
-                className="relative rounded-lg p-1.5 text-[#737373] transition hover:bg-white hover:text-[var(--color-markee-primary)]"
+                className="relative rounded-lg p-1.5 text-on-surface-variant transition hover:bg-white hover:text-[var(--color-markee-primary)]"
                 title="Đăng xuất"
               >
                 <MaterialIcon name="logout" className="text-[18px]" />
@@ -645,7 +645,7 @@ export function AllPlatformSidebar({
           <button
             type="button"
             onClick={() => onCollapsedChange?.(!isCollapsed)}
-            className="hidden w-full items-center justify-center rounded-lg py-1 text-sm font-medium text-[#3d3d3d] transition hover:bg-[#f5f5f5] md:flex"
+            className="hidden w-full items-center justify-center rounded-lg py-1 text-sm font-medium text-on-surface transition hover:bg-surface-container-low md:flex"
             aria-label={isCollapsed ? "Mở rộng sidebar" : "Thu gọn sidebar"}
           >
             <MaterialIcon

@@ -235,7 +235,7 @@ export default function CrmCustomersPage() {
         </div>
         <button
           onClick={() => { setEditingCustomer(null); setModalOpen(true); }}
-          className="px-4 py-2.5 bg-[#E3000F] hover:bg-red-700 text-white rounded-lg font-semibold text-sm
+          className="px-4 py-2.5 bg-primary hover:opacity-90 text-white rounded-lg font-semibold text-sm
                      flex items-center gap-2 transition-colors shadow-sm shadow-red-500/20"
         >
           <span className="text-lg leading-none">+</span> Thêm khách hàng
@@ -268,7 +268,7 @@ export default function CrmCustomersPage() {
                 <tr>
                   <td colSpan={8} className="px-4 py-12 text-center">
                     <div className="flex justify-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E3000F]" />
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
                     </div>
                   </td>
                 </tr>
@@ -412,7 +412,7 @@ export default function CrmCustomersPage() {
                     onClick={() => setPage(p)}
                     className={`px-3 py-1.5 text-sm border rounded transition-colors ${
                       p === page
-                        ? "bg-[#E3000F] text-white border-[#E3000F]"
+                        ? "bg-primary text-white border-primary"
                         : "border-slate-300 hover:bg-slate-100"
                     }`}
                   >
