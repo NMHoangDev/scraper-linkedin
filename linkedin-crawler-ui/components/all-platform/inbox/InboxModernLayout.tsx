@@ -47,6 +47,8 @@ interface Props {
   activeConvs: Conv[];
   filtered: Conv[];
   allConvs?: Conv[];
+  loadingAllConvs?: boolean;
+  onRequestAllConvs?: () => void;
   archives: ArchiveConv[];
   openConv: string;
   msgs: Msg[];
@@ -154,7 +156,7 @@ export default function InboxModernLayout(props: Props) {
     role, owner, sessions, rawSessions = [], allowedOwnerIds = null, extraAccountIds = new Set<string>(), toggleExtraAccount,
     ownerNames, teams, acc, accOnline, accPaused,
     needRelogin, connErr, extInstalled, scanning, loadingConvs, loadingArchives,
-    loadingChat, loadingFresh, archiveReading, viewMode, filter, activeConvs, filtered, allConvs = [],
+    loadingChat, loadingFresh, archiveReading, viewMode, filter, activeConvs, filtered, allConvs = [], loadingAllConvs = false, onRequestAllConvs,
     archives, openConv, msgs, reply, customerNotes, savingNoteConv, toast,
     chatScrollRef, selectAcc, scan, setViewMode, setArchiveReading, setFilter,
     setReply, openChat, hoverConv, openArchive, mark, saveArchive, saveCustomerNote, sendReply,
@@ -439,7 +441,13 @@ export default function InboxModernLayout(props: Props) {
               </div>
               <button
                 type="button"
-                onClick={() => setTrackSearchOpen(v => !v)}
+                onClick={() => {
+                  setTrackSearchOpen(v => {
+                    const next = !v;
+                    if (next) onRequestAllConvs?.();
+                    return next;
+                  });
+                }}
                 title="Tìm 1 người cũ (không nhắn gần đây) để luôn hiện trong Hộp thư"
                 className="rounded-lg border border-outline-variant px-2.5 py-1.5 text-xs font-bold text-on-surface-variant transition hover:border-primary hover:text-primary"
               >
@@ -452,7 +460,7 @@ export default function InboxModernLayout(props: Props) {
                   autoFocus
                   value={trackSearchQuery}
                   onChange={e => setTrackSearchQuery(e.target.value)}
-                  placeholder="Gõ tên khách cần tìm (kể cả hội thoại cũ đã ẩn)..."
+                  placeholder={loadingAllConvs ? "Đang tải toàn bộ hội thoại..." : "Gõ tên khách cần tìm (kể cả hội thoại cũ đã ẩn)..."}
                   className="w-full rounded-lg border border-outline-variant bg-surface px-3 py-1.5 text-sm outline-none focus:border-primary"
                 />
                 {trackSearchQuery.trim() && (

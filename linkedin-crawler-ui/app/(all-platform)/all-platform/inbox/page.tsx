@@ -216,6 +216,11 @@ function InboxPageContent() {
   const [teams, setTeams] = useState<TeamRow[]>([]);
   const [extInstalled, setExtInstalled] = useState<boolean | null>(null);
   const [convs, setConvs] = useState<Conv[]>([]);
+  // Danh sach hoi thoai DAY DU (khong loc 7 ngay) - chi tai khi can (mo "Theo doi nguoi cu"),
+  // tranh tai toan bo lich su moi lan doi acc (co the rat nang ve sau vi da tat auto-delete).
+  const [allConvsFull, setAllConvsFull] = useState<Conv[]>([]);
+  const [loadingAllConvs, setLoadingAllConvs] = useState(false);
+  const allConvsFullAccRef = useRef<string>("");
   const [archives, setArchives] = useState<ArchiveConv[]>([]);
   const [customerNotes, setCustomerNotes] = useState<Record<string, string>>({});
   const [savingNoteConv, setSavingNoteConv] = useState("");
@@ -264,7 +269,27 @@ function InboxPageContent() {
 
   const showToast = (msg: string, ok: boolean) => { setToast({ msg, ok }); setTimeout(() => setToast(null), 3500); };
 
+  const loadAllConvsFull = useCallback(async () => {
+    if (!acc || loadingAllConvs) return;
+    if (allConvsFullAccRef.current === acc && allConvsFull.length > 0) return;
+    setLoadingAllConvs(true);
+    try {
+      const r = await fbFetch(`/inbox/conversations?user_id=${encodeURIComponent(acc)}&all=1`);
+      const d = await r.json();
+      if (r.ok) {
+        allConvsFullAccRef.current = acc;
+        setAllConvsFull(d.conversations || []);
+      }
+    } catch {
+      // im lang: "Theo doi nguoi cu" se chi tim duoc trong danh sach da tai
+    } finally {
+      setLoadingAllConvs(false);
+    }
+  }, [acc, loadingAllConvs, allConvsFull.length]);
+
   const resetAccountView = (uid: string) => {
+    allConvsFullAccRef.current = "";
+    setAllConvsFull([]);
     convsAbortRef.current?.abort();
     convsInFlightRef.current = false;
     convsErrorStreakRef.current = 0;
@@ -1291,7 +1316,9 @@ function InboxPageContent() {
         filter={filter}
         activeConvs={activeConvs}
         filtered={filtered}
-        allConvs={convs}
+        allConvs={allConvsFull}
+        loadingAllConvs={loadingAllConvs}
+        onRequestAllConvs={loadAllConvsFull}
         archives={archives}
         openConv={openConv}
         msgs={msgs}
