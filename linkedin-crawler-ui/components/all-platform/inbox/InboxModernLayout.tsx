@@ -46,6 +46,7 @@ interface Props {
   filter: InboxFilter;
   activeConvs: Conv[];
   filtered: Conv[];
+  allConvs?: Conv[];
   archives: ArchiveConv[];
   openConv: string;
   msgs: Msg[];
@@ -153,7 +154,7 @@ export default function InboxModernLayout(props: Props) {
     role, owner, sessions, rawSessions = [], allowedOwnerIds = null, extraAccountIds = new Set<string>(), toggleExtraAccount,
     ownerNames, teams, acc, accOnline, accPaused,
     needRelogin, connErr, extInstalled, scanning, loadingConvs, loadingArchives,
-    loadingChat, loadingFresh, archiveReading, viewMode, filter, activeConvs, filtered,
+    loadingChat, loadingFresh, archiveReading, viewMode, filter, activeConvs, filtered, allConvs = [],
     archives, openConv, msgs, reply, customerNotes, savingNoteConv, toast,
     chatScrollRef, selectAcc, scan, setViewMode, setArchiveReading, setFilter,
     setReply, openChat, hoverConv, openArchive, mark, saveArchive, saveCustomerNote, sendReply,
@@ -171,6 +172,8 @@ export default function InboxModernLayout(props: Props) {
   const [isBulkVerifying, setIsBulkVerifying] = useState(false);
   const [showLeadModal, setShowLeadModal] = useState(false);
   const [showAddAccountPicker, setShowAddAccountPicker] = useState(false);
+  const [trackSearchOpen, setTrackSearchOpen] = useState(false);
+  const [trackSearchQuery, setTrackSearchQuery] = useState("");
   const { user } = useAppAuth();
 
   const selectedSession = sessions.find(s => s.user_id === acc);
@@ -190,6 +193,16 @@ export default function InboxModernLayout(props: Props) {
     customers: activeConvs.filter(c => c.is_customer).length,
     pushed: activeConvs.filter(c => c.pushed_to_zalo).length,
   }), [activeConvs, needsReply]);
+
+  // Tim + "theo doi" hoi thoai CU (khong con trong active window ~7 ngay) de luon hien trong Hop thu ve sau.
+  const trackSearchResults = useMemo(() => {
+    const q = trackSearchQuery.trim().toLowerCase();
+    if (!q) return [];
+    const activeIds = new Set(activeConvs.map(c => c.conv_id));
+    return allConvs
+      .filter(c => !c.deleted && !activeIds.has(c.conv_id) && (c.name || "").toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [trackSearchQuery, allConvs, activeConvs]);
 
   const canSend = !!openConv && !archiveReading && accOnline && !accPaused && !needRelogin;
   const appendTemplate = (text: string) => setReply(reply.trim() ? `${reply.trim()}\n${text}` : text);
@@ -375,7 +388,7 @@ export default function InboxModernLayout(props: Props) {
           </div>
         </div>
         {sessions.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-outline-variant bg-[#FAFAFA] px-3 py-4 text-sm text-on-surface-variant">
+          <div className="rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 py-4 text-sm text-on-surface-variant">
             {extInstalled === false ? "Chưa thấy extension. Hãy cài và mở extension." : "Chưa có tài khoản Facebook nào."}
           </div>
         ) : (role === "admin" || role === "leader") ? (
@@ -419,10 +432,54 @@ export default function InboxModernLayout(props: Props) {
                 <option value="need_verify">Chưa tính KPI</option>
               </select>
             </div>
-            <div className="inline-flex rounded-lg border border-outline-variant bg-[#F8F8F8] p-0.5">
-              <button onClick={switchInbox} className={`rounded-md px-3 py-1.5 text-xs font-bold transition ${viewMode === "inbox" ? "bg-surface text-primary shadow-sm" : "text-on-surface-variant"}`}>Hộp thư</button>
-              <button onClick={() => setViewMode("archive")} className={`rounded-md px-3 py-1.5 text-xs font-bold transition ${viewMode === "archive" ? "bg-surface text-primary shadow-sm" : "text-on-surface-variant"}`}>Lưu trữ</button>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="inline-flex rounded-lg border border-outline-variant bg-surface-container-low p-0.5">
+                <button onClick={switchInbox} className={`rounded-md px-3 py-1.5 text-xs font-bold transition ${viewMode === "inbox" ? "bg-surface text-primary shadow-sm" : "text-on-surface-variant"}`}>Hộp thư</button>
+                <button onClick={() => setViewMode("archive")} className={`rounded-md px-3 py-1.5 text-xs font-bold transition ${viewMode === "archive" ? "bg-surface text-primary shadow-sm" : "text-on-surface-variant"}`}>Lưu trữ</button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTrackSearchOpen(v => !v)}
+                title="Tìm 1 người cũ (không nhắn gần đây) để luôn hiện trong Hộp thư"
+                className="rounded-lg border border-outline-variant px-2.5 py-1.5 text-xs font-bold text-on-surface-variant transition hover:border-primary hover:text-primary"
+              >
+                🔎 Theo dõi người cũ
+              </button>
             </div>
+            {trackSearchOpen && (
+              <div className="mb-2 rounded-lg border border-outline-variant bg-surface-container-low p-2">
+                <input
+                  autoFocus
+                  value={trackSearchQuery}
+                  onChange={e => setTrackSearchQuery(e.target.value)}
+                  placeholder="Gõ tên khách cần tìm (kể cả hội thoại cũ đã ẩn)..."
+                  className="w-full rounded-lg border border-outline-variant bg-surface px-3 py-1.5 text-sm outline-none focus:border-primary"
+                />
+                {trackSearchQuery.trim() && (
+                  <div className="mt-2 max-h-48 space-y-1 overflow-auto">
+                    {trackSearchResults.length === 0 ? (
+                      <div className="px-1 py-2 text-xs text-on-surface-variant">Không tìm thấy hội thoại nào khớp (chỉ tìm được trong dữ liệu đã quét trước đó).</div>
+                    ) : (
+                      trackSearchResults.map(c => (
+                        <div key={c.conv_id} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-surface">
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-semibold text-on-surface">{c.name || c.conv_id}</div>
+                            <div className="truncate text-xs text-on-surface-variant">{c.preview || "(không có preview)"} · {c.time}</div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => { mark(c.conv_id, "is_customer", true); setTrackSearchQuery(""); setTrackSearchOpen(false); }}
+                            className="shrink-0 rounded-lg bg-primary px-2.5 py-1 text-xs font-bold text-white transition hover:opacity-90"
+                          >
+                            Theo dõi
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="h-[560px] overflow-auto p-3 xl:h-[620px]">
@@ -435,7 +492,7 @@ export default function InboxModernLayout(props: Props) {
                 <button
                   key={item.conv_id}
                   onClick={() => openArchive(item.conv_id)}
-                  className={`mb-2 block w-full rounded-lg border p-3 text-left transition hover:border-primary ${openConv === item.conv_id && archiveReading ? "border-primary bg-[#FFF5F5]" : "border-outline-variant bg-surface"}`}
+                  className={`mb-2 block w-full rounded-lg border p-3 text-left transition hover:border-primary ${openConv === item.conv_id && archiveReading ? "border-primary bg-primary/5" : "border-outline-variant bg-surface"}`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -459,7 +516,7 @@ export default function InboxModernLayout(props: Props) {
                 key={conv.conv_id}
                 onClick={() => openChat(conv.conv_id)}
                 onMouseEnter={() => hoverConv?.(conv.conv_id)}
-                className={`mb-2 block w-full rounded-lg border p-3 text-left transition hover:border-primary ${openConv === conv.conv_id && !archiveReading ? "border-primary bg-[#FFF5F5]" : "border-outline-variant bg-surface"}`}
+                className={`mb-2 block w-full rounded-lg border p-3 text-left transition hover:border-primary ${openConv === conv.conv_id && !archiveReading ? "border-primary bg-primary/5" : "border-outline-variant bg-surface"}`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -481,7 +538,7 @@ export default function InboxModernLayout(props: Props) {
 
         {/* Pane 2: Chat */}
         <section className="flex h-[656px] min-w-0 flex-col overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm xl:h-[716px]">
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-outline-variant px-4 py-3 bg-[#FAFAFA]">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-outline-variant px-4 py-3 bg-surface-container-low">
             <div className="min-w-0">
               <h2 className="truncate text-base font-black">{selectedName || "Hội thoại"}</h2>
               <p className="truncate text-xs text-on-surface-variant">{selectedPreview || (openConv ? "Đang xem nội dung" : "Chọn hội thoại để bắt đầu")}</p>
@@ -505,7 +562,7 @@ export default function InboxModernLayout(props: Props) {
             )}
           </div>
 
-          <div ref={chatScrollRef} className="flex-1 overflow-auto bg-[#FCFCFC] px-4 py-4">
+          <div ref={chatScrollRef} className="flex-1 overflow-auto bg-surface-container-low px-4 py-4">
             {!openConv ? (
               <div className="flex h-full items-center justify-center text-sm text-on-surface-variant">Chọn một hội thoại để xem tin nhắn.</div>
             ) : loadingChat && msgs.length === 0 ? (
@@ -542,7 +599,7 @@ export default function InboxModernLayout(props: Props) {
             <div className="mb-2 flex flex-wrap gap-2">
               {activeTemplateGroup.items.slice(0, 3).map(item => (
                 <button key={item} onClick={() => appendTemplate(item)} disabled={!openConv || archiveReading}
-                  className="rounded-full bg-[#F4F6FF] px-3 py-1 text-xs font-bold text-[#4F46E5] transition hover:bg-[#E9ECFF] disabled:opacity-40 disabled:cursor-not-allowed">
+                  className="rounded-full bg-secondary-container px-3 py-1 text-xs font-bold text-on-secondary-container transition hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed">
                   {item.length > 34 ? `${item.slice(0, 34)}...` : item}
                 </button>
               ))}
@@ -567,7 +624,7 @@ export default function InboxModernLayout(props: Props) {
 
         {/* Pane 3: Panel (Templates / Customer / KPI) */}
         <aside className="min-w-0 overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm flex flex-col">
-          <div className="grid grid-cols-3 border-b border-outline-variant bg-[#FAFAFA] text-xs font-black shrink-0">
+          <div className="grid grid-cols-3 border-b border-outline-variant bg-surface-container-low text-xs font-black shrink-0">
             <button onClick={() => { setPanelTab("templates"); panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" }); }}
               className={`py-3 ${panelTab === "templates" ? "bg-surface text-primary" : "text-on-surface-variant"}`}>Mẫu</button>
             <button onClick={() => { setPanelTab("customer"); panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" }); }}
@@ -591,7 +648,7 @@ export default function InboxModernLayout(props: Props) {
                 <div className="space-y-2">
                   {activeTemplateGroup.items.map(item => (
                     <button key={item} onClick={() => appendTemplate(item)} disabled={!openConv || archiveReading}
-                      className="block w-full rounded-lg border border-outline-variant bg-surface p-3 text-left text-sm leading-relaxed transition hover:border-primary hover:bg-[#FFF8F8] disabled:opacity-40 disabled:cursor-not-allowed">
+                      className="block w-full rounded-lg border border-outline-variant bg-surface p-3 text-left text-sm leading-relaxed transition hover:border-primary hover:bg-primary/5 disabled:opacity-40 disabled:cursor-not-allowed">
                       {item}
                     </button>
                   ))}
@@ -603,7 +660,7 @@ export default function InboxModernLayout(props: Props) {
             {panelTab === "customer" && (
               <div>
                 {!openConv ? (
-                  <div className="rounded-lg border border-dashed border-outline-variant bg-[#FAFAFA] p-4 text-sm text-on-surface-variant">Chọn hội thoại để xem thông tin.</div>
+                  <div className="rounded-lg border border-dashed border-outline-variant bg-surface-container-low p-4 text-sm text-on-surface-variant">Chọn hội thoại để xem thông tin.</div>
                 ) : (
                   <div className="space-y-3">
                     <div className="rounded-lg border border-outline-variant p-3">
@@ -611,7 +668,7 @@ export default function InboxModernLayout(props: Props) {
                       <div className="mt-1 text-sm font-black">{selectedName || openConv}</div>
                       <div className="mt-1 text-xs text-on-surface-variant">{selectedPreview || "—"}</div>
                     </div>
-                    <div className="rounded-lg border border-outline-variant bg-[#FFFDF7] p-3">
+                    <div className="rounded-lg border border-outline-variant bg-surface-container-low p-3">
                       <div className="mb-2 flex items-center justify-between gap-2">
                         <div>
                           <div className="text-xs font-bold uppercase text-on-surface-variant">Ghi chú nhu cầu</div>
@@ -691,7 +748,7 @@ export default function InboxModernLayout(props: Props) {
                         </div>
                       </div>
                     ) : (
-                      <div className="mb-4 rounded-xl border border-dashed border-outline-variant bg-[#FAFAFA] p-4 text-center text-xs text-on-surface-variant">
+                      <div className="mb-4 rounded-xl border border-dashed border-outline-variant bg-surface-container-low p-4 text-center text-xs text-on-surface-variant">
                         Chưa chọn hội thoại
                       </div>
                     )}
@@ -763,7 +820,7 @@ export default function InboxModernLayout(props: Props) {
                         <span>{String(label)}</span>
                         <span>{Number(value)}</span>
                       </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-[#F0F0F0]">
+                      <div className="h-2 overflow-hidden rounded-full bg-surface-container-highest">
                         <div className={`h-full ${color}`} style={{ width: `${pct}%` }} />
                       </div>
                     </div>

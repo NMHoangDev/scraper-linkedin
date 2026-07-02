@@ -1291,6 +1291,7 @@ function InboxPageContent() {
         filter={filter}
         activeConvs={activeConvs}
         filtered={filtered}
+        allConvs={convs}
         archives={archives}
         openConv={openConv}
         msgs={msgs}
