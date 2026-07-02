@@ -36,10 +36,18 @@ const navActiveIndentedClass = "border-l-2 border-[var(--color-markee-primary)] 
 const navIdleClass = "text-on-surface hover:bg-surface-container-low";
 const iconClass = "shrink-0 text-[18px]";
 
+// So khop theo TUNG DOAN duong dan (path segment), khong phai chuoi con tho -
+// tranh truong hop "/all-platform/tai-khoan" (Zalo) tinh nham la tien to cua
+// "/all-platform/tai-khoan-fb" (Facebook) roi ca 2 cung sang active.
+function pathMatchesPrefix(pathname: string, prefix: string): boolean {
+  if (pathname === prefix) return true;
+  return pathname.startsWith(prefix.endsWith("/") ? prefix : `${prefix}/`);
+}
+
 function isLeafActive(pathname: string, item: NavLeafItem) {
   if (pathname === item.href) return true;
-  if (item.matchStartsWith?.some((prefix) => pathname.startsWith(prefix))) return true;
-  return pathname.startsWith(item.href) && item.href !== "/all-platform/post-feed";
+  if (item.matchStartsWith?.some((prefix) => pathMatchesPrefix(pathname, prefix))) return true;
+  return pathMatchesPrefix(pathname, item.href) && item.href !== "/all-platform/post-feed";
 }
 
 function getInitials(name?: string) {
