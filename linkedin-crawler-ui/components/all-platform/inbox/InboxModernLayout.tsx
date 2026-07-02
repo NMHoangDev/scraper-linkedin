@@ -34,6 +34,8 @@ interface Props {
   accOnline: boolean;
   accPaused: boolean;
   needRelogin: boolean;
+  needsPin?: boolean;
+  needsPinMessage?: string;
   connErr: boolean;
   extInstalled: boolean | null;
   scanning: boolean;
@@ -155,7 +157,7 @@ export default function InboxModernLayout(props: Props) {
   const {
     role, owner, sessions, rawSessions = [], allowedOwnerIds = null, extraAccountIds = new Set<string>(), toggleExtraAccount,
     ownerNames, teams, acc, accOnline, accPaused,
-    needRelogin, connErr, extInstalled, scanning, loadingConvs, loadingArchives,
+    needRelogin, needsPin = false, needsPinMessage = "", connErr, extInstalled, scanning, loadingConvs, loadingArchives,
     loadingChat, loadingFresh, archiveReading, viewMode, filter, activeConvs, filtered, allConvs = [], loadingAllConvs = false, onRequestAllConvs,
     archives, openConv, msgs, reply, customerNotes, savingNoteConv, toast,
     chatScrollRef, selectAcc, scan, setViewMode, setArchiveReading, setFilter,
@@ -267,6 +269,12 @@ export default function InboxModernLayout(props: Props) {
     <div className="w-full max-w-full overflow-x-hidden text-on-surface">
       {connErr && <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">Không kết nối được service. Kiểm tra backend.</div>}
       {needRelogin && <div className="mb-3 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">Cookie hết hạn. Vào Quản lý tài khoản &gt; Tài khoản FB &amp; KPI để đăng nhập lại.</div>}
+      {needsPin && (
+        <div className="mb-3 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+          <MaterialIcon name="lock" className="text-[18px] shrink-0 mt-0.5" />
+          <span>{needsPinMessage || "Facebook yêu cầu nhập mã PIN thủ công để khôi phục 1 đoạn chat. Vào Messenger trên máy nhân viên, mở hội thoại, nhập mã PIN 1 lần rồi thử lại."}</span>
+        </div>
+      )}
       {role === "member" && extInstalled !== null && !sessions.some(s => s.owner === owner) && (
         <div className="mb-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
           {extInstalled === false ? "Chưa cài hoặc chưa mở extension Markee." : "Extension sẵn sàng nhưng tài khoản FB chưa kết nối."}

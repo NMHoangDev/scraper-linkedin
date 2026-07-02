@@ -239,6 +239,8 @@ function InboxPageContent() {
   const [loadingChat, setLoadingChat] = useState(false);
   const [loadingFresh, setLoadingFresh] = useState(false);
   const [needRelogin, setNeedRelogin] = useState(false);
+  const [needsPin, setNeedsPin] = useState(false);
+  const [needsPinMessage, setNeedsPinMessage] = useState("");
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [connErr, setConnErr] = useState(false);
   const openConvRef = useRef("");
@@ -545,6 +547,8 @@ function InboxPageContent() {
       const list: Conv[] = d.conversations || [];
       setConvs(list);
       setNeedRelogin(!!d.needs_relogin);
+      setNeedsPin(!!d.needs_pin);
+      setNeedsPinMessage(d.needs_pin_message || "");
       convsErrorStreakRef.current = 0;
       void idbSetConvs(requestAcc, list);
 
@@ -1304,6 +1308,8 @@ function InboxPageContent() {
         accOnline={!!accOnline}
         accPaused={!!accPaused}
         needRelogin={needRelogin}
+        needsPin={needsPin}
+        needsPinMessage={needsPinMessage}
         connErr={connErr}
         extInstalled={extInstalled}
         scanning={scanning}
