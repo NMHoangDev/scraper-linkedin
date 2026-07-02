@@ -157,16 +157,30 @@ async function findZaloTab() {
   return complete || zaloTabs[0] || null;
 }
 
+let openTabPromise = null;
+
 async function getOrOpenZaloTab({ active = false } = {}) {
-  const existing = await findZaloTab();
-  if (existing?.id) {
-    if (existing.status !== "complete") await waitForTabComplete(existing.id, 30000);
-    return await getTab(existing.id);
+  if (openTabPromise) {
+    return await openTabPromise;
   }
-  const tab = await createTab(ZALO_URL, active);
-  if (!tab?.id) throw new Error("Cannot open Zalo Web tab");
-  await waitForTabComplete(tab.id, 30000);
-  return await getTab(tab.id);
+
+  openTabPromise = (async () => {
+    try {
+      const existing = await findZaloTab();
+      if (existing?.id) {
+        if (existing.status !== "complete") await waitForTabComplete(existing.id, 30000);
+        return await getTab(existing.id);
+      }
+      const tab = await createTab(ZALO_URL, active);
+      if (!tab?.id) throw new Error("Cannot open Zalo Web tab");
+      await waitForTabComplete(tab.id, 30000);
+      return await getTab(tab.id);
+    } finally {
+      openTabPromise = null;
+    }
+  })();
+
+  return await openTabPromise;
 }
 
 async function ensureZaloContentScript(tabId) {

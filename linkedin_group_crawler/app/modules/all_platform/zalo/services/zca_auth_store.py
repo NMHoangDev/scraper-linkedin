@@ -15,6 +15,7 @@ from app.modules.all_platform.zalo.services.session_store import save_session
 
 
 _STORE_LOCKS: Dict[str, asyncio.Lock] = {}
+_ZCA_AUTH_CACHE: Dict[str, Optional[Dict[str, Any]]] = {}
 
 
 def _normalize_user_id(user_id: str) -> str:
@@ -41,6 +42,7 @@ async def save_zca_auth(user_id: str, auth: Dict[str, Any]) -> None:
     if not isinstance(auth, dict) or not auth:
         return
 
+    safe_user_id = _normalize_user_id(user_id)
     path = _store_path(user_id)
     async with _lock_for(user_id):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -51,21 +53,32 @@ async def save_zca_auth(user_id: str, auth: Dict[str, Any]) -> None:
         except Exception:
             pass
         tmp_path.replace(path)
-    logger.info(f"Saved ZCA auth for user={_normalize_user_id(user_id)} to {path}")
+        _ZCA_AUTH_CACHE[safe_user_id] = auth
+    logger.info(f"Saved ZCA auth for user={safe_user_id} to {path}")
 
 
 async def load_zca_auth(user_id: str) -> Optional[Dict[str, Any]]:
+    safe_user_id = _normalize_user_id(user_id)
+    if safe_user_id in _ZCA_AUTH_CACHE:
+        return _ZCA_AUTH_CACHE[safe_user_id]
+
     path = _store_path(user_id)
     async with _lock_for(user_id):
+        if safe_user_id in _ZCA_AUTH_CACHE:
+            return _ZCA_AUTH_CACHE[safe_user_id]
         if not path.exists():
+            _ZCA_AUTH_CACHE[safe_user_id] = None
             return None
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except Exception as exc:
-            logger.warning(f"Could not read ZCA auth for user={_normalize_user_id(user_id)}: {exc}")
+            logger.warning(f"Could not read ZCA auth for user={safe_user_id}: {exc}")
+            _ZCA_AUTH_CACHE[safe_user_id] = None
             return None
         if not isinstance(data, dict) or not data:
+            _ZCA_AUTH_CACHE[safe_user_id] = None
             return None
+        _ZCA_AUTH_CACHE[safe_user_id] = data
         return data
 
 
@@ -83,18 +96,20 @@ async def list_zca_auth_users() -> List[str]:
 
 
 async def delete_zca_auth(user_id: str) -> bool:
+    safe_user_id = _normalize_user_id(user_id)
     path = _store_path(user_id)
     async with _lock_for(user_id):
+        _ZCA_AUTH_CACHE[safe_user_id] = None
         if not path.exists():
             return False
         try:
             path.unlink()
-            logger.info(f"Deleted ZCA auth for user={_normalize_user_id(user_id)}")
+            logger.info(f"Deleted ZCA auth for user={safe_user_id}")
             return True
         except FileNotFoundError:
             return False
         except Exception as exc:
-            logger.warning(f"Could not delete ZCA auth for user={_normalize_user_id(user_id)}: {exc}")
+            logger.warning(f"Could not delete ZCA auth for user={safe_user_id}: {exc}")
             return False
 
 

@@ -1336,6 +1336,34 @@ async def import_session_from_extension(
     owner_id = _normalize_user_id(body.get("owner_id") or x_user_id)
     id_member = _normalize_user_id(body.get("id_member") or owner_id)
 
+    # Nếu user_id không bắt đầu bằng "zl_" (ví dụ là email), tự động tìm kiếm zalo_account tương ứng
+    if not user_id.startswith("zl_"):
+        try:
+            from app.modules.all_platform.zalo.services.supabase_service import _rest
+            db_accounts = await _rest(
+                "GET",
+                "zalo_accounts",
+                params={
+                    "select": "account_id,phone,status",
+                    "or": f"owner_id.eq.{user_id},id_member.eq.{user_id}",
+                    "order": "created_at.desc",
+                }
+            ) or []
+            zl_accounts = [a for a in db_accounts if a.get("account_id", "").startswith("zl_")]
+            if zl_accounts:
+                target_account = None
+                for a in zl_accounts:
+                    if a.get("status") == "not_logged_in":
+                        target_account = a
+                        break
+                if not target_account:
+                    target_account = zl_accounts[0]
+                
+                logger.info(f"Auto-resolved email user_id={user_id} to Zalo account_id={target_account['account_id']}")
+                user_id = target_account["account_id"]
+        except Exception as resolve_exc:
+            logger.warning(f"Could not auto-resolve email user_id={user_id} to account_id: {resolve_exc}")
+
     # ── Parse cookies: accept 4 formats ────────────────────────────────
     #   1. List of {key, value, domain, ...}  (Chrome extension native format)
     #   2. JSON string of list  (e.g. '[{"key":"...","value":"..."}]')

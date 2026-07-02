@@ -11,6 +11,7 @@ import {
   buildZaloRealtimeStreamUrl,
   markZaloConversationAsRead,
   syncZaloRecentConversations,
+  syncZaloConversationMessages,
   type BuildZaloRealtimeStreamOptions,
 } from "@/services/zaloCrawlerService";
 import { allPlatformKpiService, zaloInboxShareService } from "@/services/all-platform.service";
@@ -118,6 +119,7 @@ export function useZaloAdminInbox() {
 
   // ── Share & KPI metadata from zaloInboxShareService ──────────────────────────
   const [verifiedConvIds, setVerifiedConvIds] = useState<Set<string>>(new Set());
+  const [isSyncingMessages, setIsSyncingMessages] = useState<Record<string, boolean>>({});
   const [suggestedConvIds, setSuggestedConvIds] = useState<Set<string>>(new Set());
   const [customerNotes, setCustomerNotes] = useState<Record<string, string>>({});
   const [isCustomerSet, setIsCustomerSet] = useState<Set<string>>(new Set());
@@ -661,6 +663,79 @@ export function useZaloAdminInbox() {
     }
   }, [fetchShareStatus, showToast]);
 
+  const toggleShare = useCallback(async (convId: string) => {
+    if (!selectedAccountId) return;
+    const ownerEmail = ownerEmails[selectedOwnerId] || user?.email || "";
+    if (!ownerEmail) return;
+
+    const currentlyShared = suggestedConvIds.has(convId) || verifiedConvIds.has(convId);
+    const newActiveState = !currentlyShared;
+
+    try {
+      const res = await zaloInboxShareService.toggle({
+        account_id: selectedAccountId,
+        conversation_id: convId,
+        member_email: ownerEmail,
+        is_active: newActiveState,
+      });
+
+      if (res.success) {
+        showToast(newActiveState ? "Đã chia sẻ hội thoại với leader/admin" : "Đã hủy chia sẻ hội thoại", true);
+        await fetchShareStatus();
+      } else {
+        showToast(res.message || "Lỗi khi cập nhật quyền chia sẻ", false);
+      }
+    } catch (e) {
+      showToast("Lỗi kết nối máy chủ", false);
+    }
+  }, [selectedAccountId, selectedOwnerId, ownerEmails, user?.email, suggestedConvIds, verifiedConvIds, fetchShareStatus, showToast]);
+
+  const revokeAllShares = useCallback(async () => {
+    if (!selectedAccountId) return;
+    const ownerEmail = ownerEmails[selectedOwnerId] || user?.email || "";
+    if (!ownerEmail) return;
+
+    if (!window.confirm("Bạn có chắc chắn muốn HỦY CHIA SẺ tất cả các hội thoại chưa được duyệt KPI của tài khoản này?")) {
+      return;
+    }
+
+    try {
+      const res = await zaloInboxShareService.revokeAll({
+        account_id: selectedAccountId,
+        member_email: ownerEmail,
+      });
+
+      if (res.success) {
+        showToast(`Đã thu hồi chia sẻ thành công cho ${res.data?.count ?? 0} hội thoại`, true);
+        await fetchShareStatus();
+      } else {
+        showToast(res.message || "Lỗi khi hủy chia sẻ tất cả", false);
+      }
+    } catch (e) {
+      showToast("Lỗi kết nối máy chủ", false);
+    }
+  }, [selectedAccountId, selectedOwnerId, ownerEmails, user?.email, fetchShareStatus, showToast]);
+
+  const syncConversationMessages = useCallback(async (convId: string) => {
+    if (!selectedAccountId || !convId) return;
+    setIsSyncingMessages(prev => ({ ...prev, [convId]: true }));
+    try {
+      const res = await syncZaloConversationMessages(selectedAccountId, convId);
+      if (res?.ok) {
+        showToast("Đã bắt đầu đồng bộ tin nhắn cũ. Lịch sử sẽ cập nhật sau giây lát.", true);
+        await loadMessages(selectedAccountId, convId);
+      } else {
+        showToast(res?.message || "Lỗi đồng bộ lịch sử tin nhắn", false);
+      }
+    } catch (e) {
+      showToast("Lỗi đồng bộ lịch sử tin nhắn", false);
+    } finally {
+      setIsSyncingMessages(prev => ({ ...prev, [convId]: false }));
+    }
+  }, [selectedAccountId, loadMessages, showToast]);
+
+
+
   const verifyKpi = useCallback(async (payload: { leader_email: string; conv_ids: string[] }) => {
     try {
       await Promise.all(
@@ -910,6 +985,10 @@ export function useZaloAdminInbox() {
     saveArchive,
     saveCustomerNote,
     onSuggestKpi: suggestKpi,
+    onToggleShare: toggleShare,
+    onRevokeAllShares: revokeAllShares,
+    onSyncConversationMessages: syncConversationMessages,
+    isSyncingMessages,
     onBulkVerifyKpi: bulkVerifyKpi,
     bulkSuggestKpi,
     sendMessage,

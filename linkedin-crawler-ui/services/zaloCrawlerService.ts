@@ -170,6 +170,22 @@ export function getZaloConversationMessages(
   );
 }
 
+export function syncZaloConversationMessages(
+  accountId: string,
+  conversationId: string,
+): Promise<{ ok: boolean; message: string }> {
+  const params = new URLSearchParams({ account_id: accountId });
+  return requestJson<{ ok: boolean; message: string }>(
+    `/api/all-platform/zalo/conversations/${encodeURIComponent(conversationId)}/sync?${params.toString()}`,
+    {
+      method: "POST",
+      headers: {
+        "X-User-ID": accountId,
+      },
+    },
+  );
+}
+
 export function syncZaloRecentConversations(
   accountId: string,
   limit = 50,

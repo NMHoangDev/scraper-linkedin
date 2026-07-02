@@ -348,6 +348,7 @@ export interface ZaloBroadcastRequest {
   message_ids: string[];
   targets: ZaloBroadcastTarget[];
   content_mode: ZaloBroadcastContentMode;
+  text_overrides?: Record<string, string>;
 }
 
 export interface ZaloBroadcastPreviewItem {

@@ -200,6 +200,53 @@ class SyncDomResponse(BaseModel):
     results: List[SyncRecentGroupResult] = Field(default_factory=list)
 
 
+async def list_conversations_for_caller(
+    user_id: str,
+    caller_email: Optional[str],
+    limit: int = 500,
+) -> List[Dict[str, Any]]:
+    try:
+        rows = await _rest(
+            "POST",
+            "rpc/fn_get_zalo_conversations",
+            json={
+                "p_account_id": user_id,
+                "p_caller_email": caller_email or "",
+                "p_limit": limit,
+            }
+        ) or []
+        
+        results = []
+        for r in rows:
+            last_msg_at = r.get("last_message_at")
+            latest_message_at = str(last_msg_at) if last_msg_at else None
+            results.append({
+                "conversation_id": r.get("conversation_id"),
+                "conversation_name": r.get("conversation_name") or r.get("conversation_id"),
+                "account_id": user_id,
+                "message_count": 0,
+                "image_count": 0,
+                "sent_count": 0,
+                "received_count": 0,
+                "latest_message_at": latest_message_at,
+                "latest_content": r.get("last_message_content"),
+                "latest_sender_name": r.get("last_sender_name"),
+                "has_messages": bool(latest_message_at),
+                "sync_status": "has_messages" if latest_message_at else "no_messages",
+                "avatar_url": r.get("avatar_url"),
+                "unread_count": int(r.get("unread_count") or 0),
+                "is_pinned": bool(r.get("is_pinned")),
+            })
+        return results
+    except Exception as exc:
+        logger.info(f"fn_get_zalo_conversations RPC failed: {exc}. Falling back to manual queries...")
+        allowed_conv_ids = await check_caller_conversation_access(user_id, caller_email)
+        rows = await list_conversations(user_id, limit=limit)
+        if allowed_conv_ids is not None:
+            rows = [r for r in rows if str(r.get("group_id") or "").strip() in allowed_conv_ids]
+        return rows
+
+
 @router.get("", response_model=ZaloConversationListResponse)
 async def get_conversations(
     account_id: Optional[str] = Query(None),
@@ -208,14 +255,8 @@ async def get_conversations(
     limit: int = Query(500, ge=1, le=2000),
 ):
     user_id = _normalize_user_id(account_id or x_user_id)
-    # Check access permission
-    allowed_conv_ids = await check_caller_conversation_access(user_id, x_caller_email)
-    
     try:
-        rows = await list_conversations(user_id, limit=limit)
-        if allowed_conv_ids is not None:
-            # Lọc chỉ giữ lại các hội thoại đã được share
-            rows = [r for r in rows if str(r.get("group_id") or "").strip() in allowed_conv_ids]
+        rows = await list_conversations_for_caller(user_id, x_caller_email, limit=limit)
         return {
             "account_id": user_id,
             "conversations": [ZaloConversationSummary(**row) for row in rows],
@@ -627,6 +668,29 @@ async def get_conversation_messages(
         raise HTTPException(status_code=503, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Không thể tải tin nhắn hội thoại Zalo: {exc}")
+
+
+@router.post("/{conversation_id}/sync")
+async def sync_conversation_messages_manually(
+    conversation_id: str,
+    background_tasks: BackgroundTasks,
+    account_id: Optional[str] = Query(None),
+    x_user_id: str = Header("default", alias="X-User-ID"),
+    x_caller_email: Optional[str] = Header(None, alias="X-Caller-Email"),
+):
+    """Đồng bộ bù tin nhắn thủ công cho một cuộc hội thoại từ Zalo."""
+    user_id = _normalize_user_id(account_id or x_user_id)
+    # Check access permission
+    allowed_conv_ids = await check_caller_conversation_access(user_id, x_caller_email)
+    if allowed_conv_ids is not None and conversation_id.strip() not in allowed_conv_ids:
+        raise HTTPException(
+            status_code=403,
+            detail="Cuộc trò chuyện này ở chế độ riêng tư và chưa được chia sẻ với bạn."
+        )
+
+    # Thêm background task để chạy đồng bộ tin nhắn
+    background_tasks.add_task(_background_sync_conversation_messages, user_id, conversation_id)
+    return {"ok": True, "message": "Đã thêm tác vụ đồng bộ lịch sử tin nhắn vào nền"}
 
 
 class SendMessageRequest(BaseModel):

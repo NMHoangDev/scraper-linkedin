@@ -170,18 +170,6 @@ export function ZaloInboxAdminShell() {
     setCampaignError(null);
     setCampaignSuccess(null);
     setCampaignLogs([]);
-
-    // Save edited message texts to DB first
-    for (const msgId of selectedMessageIds) {
-      const editedText = editedMessagesText[msgId];
-      if (editedText !== undefined) {
-        try {
-          await updateZaloLibraryMessage(inbox.selectedAccountId, msgId, { content: editedText });
-        } catch (e) {
-          console.error("Failed to update message content for broadcast", e);
-        }
-      }
-    }
     
     const manualLines = manualRecipients
       .split("\n")
@@ -205,6 +193,7 @@ export function ZaloInboxAdminShell() {
 
     if (targets.length === 0) {
       setCampaignError("Không tìm thấy người nhận hợp lệ.");
+      setIsSendingCampaign(false);
       return;
     }
 
@@ -213,22 +202,22 @@ export function ZaloInboxAdminShell() {
     setCampaignSuccess(null);
     setCampaignLogs([]);
 
-    try {
-      // Save all edited messages to the database before creating the campaign
-      const editPromises = Object.entries(editedMessagesText).map(([msgId, text]) => {
-        const originalMsg = inbox.messages.find(m => (m.source_message_id || m.id) === msgId);
-        if (originalMsg && originalMsg.content !== text) {
-          return updateZaloLibraryMessage(inbox.selectedAccountId, msgId, { content: text });
-        }
-        return Promise.resolve();
-      });
-      await Promise.all(editPromises);
+    // Build text overrides
+    const textOverrides: Record<string, string> = {};
+    selectedMessageIds.forEach(msgId => {
+      const text = editedMessagesText[msgId];
+      if (text !== undefined) {
+        textOverrides[msgId] = text;
+      }
+    });
 
+    try {
       await createZaloBroadcast(inbox.selectedAccountId, {
         user_id: inbox.selectedAccountId,
         message_ids: selectedMessageIds,
         targets,
         content_mode: campaignMode,
+        text_overrides: textOverrides,
       });
 
       // Simulate log stream for interactive view
@@ -584,9 +573,9 @@ export function ZaloInboxAdminShell() {
       <div className="grid min-w-0 grid-cols-[280px_1fr_260px] gap-4">
         {/* Pane 1: Conversations list */}
         <section className="min-w-0 overflow-hidden rounded-xl border border-[#E5E5E5] bg-white shadow-sm flex flex-col">
-          <div className="border-b border-[#E5E5E5] p-3 flex-shrink-0">
-            <div className="mb-2.5 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 min-w-0">
+          <div className="border-b border-[#E5E5E5] p-3 flex-shrink-0 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 min-w-0">
                 <h2 className="text-sm font-bold">Hộp thư</h2>
                 <button
                   onClick={() => void inbox.scan()}
@@ -595,22 +584,34 @@ export function ZaloInboxAdminShell() {
                   className="inline-flex items-center gap-1 rounded-md border border-[#E5E5E5] bg-white px-1.5 py-0.5 text-[10px] font-semibold text-[#666666] transition hover:border-[#E3000F] hover:text-[#E3000F] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <MaterialIcon name={inbox.scanning ? "sync" : "refresh"} className={cn("text-[12px]", inbox.scanning && "animate-spin")} />
-                  {inbox.scanning ? "Đang đồng bộ..." : "Đồng bộ"}
+                  {inbox.scanning ? "Đồng bộ" : "Đồng bộ"}
                 </button>
+                {inbox.role === "member" && inbox.suggestedConvIds.size > 0 && (
+                  <button
+                    onClick={() => void inbox.onRevokeAllShares()}
+                    title="Hủy chia sẻ toàn bộ các hội thoại chưa được duyệt KPI"
+                    className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 transition hover:border-red-400 hover:text-red-600 hover:bg-red-50 shrink-0"
+                  >
+                    <MaterialIcon name="lock" className="text-[11px]" />
+                    <span>Hủy share tất cả</span>
+                  </button>
+                )}
               </div>
               <p className="text-[11px] text-[#A0A0A0] shrink-0">
                 {inbox.loadingConvs ? "Đang cập nhật..." : `${inbox.filtered.length} hội thoại`}
               </p>
+            </div>
+            <div>
               <select
                 value={inbox.filter}
                 onChange={(e) => inbox.setFilter(e.target.value as any)}
-                className="h-8 rounded-lg border border-[#E5E5E5] bg-white px-2 text-xs font-semibold outline-none focus:border-[#E3000F]"
+                className="h-8 w-full rounded-lg border border-[#E5E5E5] bg-white px-2 text-xs font-semibold outline-none focus:border-[#E3000F]"
               >
-                <option value="all">Tất cả</option>
+                <option value="all">Tất cả (Lọc)</option>
                 <option value="need_reply">Cần trả lời</option>
                 <option value="unread">Chưa đọc</option>
                 <option value="customer">Khách hàng</option>
-                <option value="need_verify">Chưa tính KPI</option>
+                <option value="need_verify">Chưa tính KPI (Đã share)</option>
               </select>
             </div>
             <div className="inline-flex rounded-lg border border-[#E5E5E5] bg-[#F8F8F8] p-0.5 w-full">
@@ -683,7 +684,18 @@ export function ZaloInboxAdminShell() {
                       </div>
                       <div className="mt-0.5 truncate text-[11px] text-[#A0A0A0]">{conv.preview || "—"}</div>
                     </div>
-                    <span className="whitespace-nowrap text-[10px] text-[#A0A0A0]">{conv.time}</span>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <span className="whitespace-nowrap text-[10px] text-[#A0A0A0]">{conv.time}</span>
+                      <div className="flex items-center gap-1">
+                        {inbox.verifiedConvIds.has(conv.conv_id) ? (
+                          <span title="Đã duyệt KPI"><MaterialIcon name="verified" className="text-green-600 text-[13px]" /></span>
+                        ) : inbox.suggestedConvIds.has(conv.conv_id) ? (
+                          <span title="Đã chia sẻ với leader"><MaterialIcon name="share" className="text-blue-600 text-[13px]" /></span>
+                        ) : (
+                          <span title="Riêng tư (Chỉ mình tôi)"><MaterialIcon name="lock" className="text-slate-400 text-[13px]" /></span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                   <div className="mt-1.5 flex flex-wrap gap-1">
                     {conv.unread && (
@@ -728,6 +740,23 @@ export function ZaloInboxAdminShell() {
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <h2 className="truncate text-sm font-bold text-slate-800">{selectedName || "Hội thoại"}</h2>
+                {inbox.openConv && (
+                  <button
+                    onClick={() => void inbox.onSyncConversationMessages(inbox.openConv)}
+                    disabled={inbox.isSyncingMessages[inbox.openConv]}
+                    title="Đồng bộ tin nhắn mới nhất từ Zalo"
+                    className="inline-flex items-center gap-0.5 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[9px] font-bold text-slate-500 hover:border-[#E3000F] hover:text-[#E3000F] transition disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                  >
+                    <MaterialIcon
+                      name="sync"
+                      className={cn(
+                        "text-[11px]",
+                        inbox.isSyncingMessages[inbox.openConv] && "animate-spin"
+                      )}
+                    />
+                    <span>{inbox.isSyncingMessages[inbox.openConv] ? "Đồng bộ" : "Đồng bộ"}</span>
+                  </button>
+                )}
                 {selectedMessageIds.length > 0 && (
                   <span className="bg-red-105 text-[#E3000F] text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse border border-red-200">
                     Đã chọn {selectedMessageIds.length} tin
@@ -740,6 +769,43 @@ export function ZaloInboxAdminShell() {
             </div>
             {selectedConv && !inbox.archiveReading && (
               <div className="flex gap-1.5 items-center">
+                <button
+                  onClick={() => void inbox.onToggleShare(selectedConv.conv_id)}
+                  disabled={inbox.verifiedConvIds.has(selectedConv.conv_id)}
+                  className={cn(
+                    "rounded-lg border px-2 py-1 text-xs font-bold transition flex items-center gap-1 shadow-sm",
+                    inbox.verifiedConvIds.has(selectedConv.conv_id)
+                      ? "border-green-200 bg-green-50 text-green-700 hover:bg-green-100 cursor-not-allowed"
+                      : inbox.suggestedConvIds.has(selectedConv.conv_id)
+                      ? "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                      : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                  )}
+                  title={
+                    inbox.verifiedConvIds.has(selectedConv.conv_id)
+                      ? "Leader đã duyệt KPI, không thể hủy chia sẻ"
+                      : inbox.suggestedConvIds.has(selectedConv.conv_id)
+                      ? "Nhấn để hủy chia sẻ với leader/admin"
+                      : "Nhấn để chia sẻ hội thoại này với leader/admin"
+                  }
+                >
+                  <MaterialIcon
+                    name={
+                      inbox.verifiedConvIds.has(selectedConv.conv_id)
+                        ? "verified"
+                        : inbox.suggestedConvIds.has(selectedConv.conv_id)
+                        ? "share"
+                        : "lock"
+                    }
+                    className="text-base"
+                  />
+                  <span>
+                    {inbox.verifiedConvIds.has(selectedConv.conv_id)
+                      ? "Đã Duyệt KPI"
+                      : inbox.suggestedConvIds.has(selectedConv.conv_id)
+                      ? "Hủy Chia Sẻ"
+                      : "Chia Sẻ"}
+                  </span>
+                </button>
                 <button
                   onClick={() => {
                     setPanelTab("campaign");
@@ -998,387 +1064,380 @@ export function ZaloInboxAdminShell() {
 
         {/* Pane 3: Tabs sidebar (Templates / Customer / KPI / Account Management) */}
         <aside className="min-w-0 overflow-hidden rounded-xl border border-[#E5E5E5] bg-white shadow-sm flex flex-col h-[700px]">
-          <div className="grid border-b border-[#E5E5E5] bg-[#FAFAFA] text-[11px] font-black shrink-0 grid-cols-5">
+          <div className="grid border-b border-[#E5E5E5] bg-[#FAFAFA] text-[11px] font-black shrink-0 grid-cols-3">
             <button
               onClick={() => {
                 setPanelTab("templates");
                 panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
               }}
-              className={cn("py-3 truncate px-0.5 text-center", panelTab === "templates" ? "bg-white text-[#E3000F]" : "text-[#666666]")}
+              className={cn(
+                "py-3 truncate px-0.5 text-center transition flex items-center justify-center gap-0.5",
+                (panelTab === "templates" || panelTab === "campaign") ? "bg-white text-[#E3000F]" : "text-[#666666] hover:bg-slate-50"
+              )}
             >
-              Mẫu
+              <MaterialIcon name="chat" className="text-[12px] shrink-0" />
+              <span>Tương tác</span>
             </button>
             <button
               onClick={() => {
                 setPanelTab("customer");
                 panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
               }}
-              className={cn("py-3 truncate px-0.5 text-center", panelTab === "customer" ? "bg-white text-[#E3000F]" : "text-[#666666]")}
+              className={cn(
+                "py-3 truncate px-0.5 text-center transition flex items-center justify-center gap-0.5",
+                (panelTab === "customer" || panelTab === "kpi") ? "bg-white text-[#E3000F]" : "text-[#666666] hover:bg-slate-50"
+              )}
             >
-              Khách
-            </button>
-            <button
-              onClick={() => {
-                setPanelTab("kpi");
-                panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              className={cn("py-3 truncate px-0.5 text-center", panelTab === "kpi" ? "bg-white text-[#E3000F]" : "text-[#666666]")}
-            >
-              KPI
-            </button>
-            <button
-              onClick={() => {
-                setPanelTab("campaign");
-                panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              className={cn("py-3 truncate px-0.5 text-center flex items-center justify-center gap-0.5", panelTab === "campaign" ? "bg-white text-[#E3000F]" : "text-[#666666]")}
-            >
-              <MaterialIcon name="campaign" className="text-[13px] shrink-0" />
-              <span>Auto</span>
+              <MaterialIcon name="info" className="text-[12px] shrink-0" />
+              <span>Thông tin</span>
             </button>
             <button
               onClick={() => {
                 setPanelTab("account");
                 panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
               }}
-              className={cn("py-3 truncate px-0.5 text-center", panelTab === "account" ? "bg-white text-[#E3000F]" : "text-[#666666]")}
+              className={cn(
+                "py-3 truncate px-0.5 text-center transition flex items-center justify-center gap-0.5",
+                panelTab === "account" ? "bg-white text-[#E3000F]" : "text-[#666666] hover:bg-slate-50"
+              )}
             >
-              Quản lý
+              <MaterialIcon name="settings" className="text-[12px] shrink-0" />
+              <span>Cài đặt</span>
             </button>
           </div>
 
           <div ref={panelScrollRef} className={cn("overflow-y-auto p-3", panelH)}>
-            {/* ── Campaign / Broadcast Tab ── */}
-            {panelTab === "campaign" && (
-              <div className="space-y-3 text-xs text-slate-700">
-                <div className="border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-2">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex justify-between">
-                    <span>Tin nhắn đã chọn ({selectedMessageIds.length})</span>
-                    <span className="text-[9px] text-[#E3000F] font-black">Có thể chỉnh sửa</span>
+            {/* ── Interact Tab (Templates / Campaign) ── */}
+            {(panelTab === "templates" || panelTab === "campaign") && (
+              <div className="space-y-3">
+                <div className="inline-flex rounded-lg border border-[#E5E5E5] bg-[#F8F8F8] p-0.5 w-full mb-1">
+                  <button
+                    onClick={() => setPanelTab("templates")}
+                    className={cn(
+                      "flex-1 rounded-md py-1 text-center text-[10px] font-bold transition",
+                      panelTab === "templates" ? "bg-white text-[#E3000F] shadow-sm" : "text-[#666666] hover:text-[#1A1A1A]"
+                    )}
+                  >
+                    Mẫu nhanh
+                  </button>
+                  <button
+                    onClick={() => setPanelTab("campaign")}
+                    className={cn(
+                      "flex-1 rounded-md py-1 text-center text-[10px] font-bold transition flex items-center justify-center gap-0.5",
+                      panelTab === "campaign" ? "bg-white text-[#E3000F] shadow-sm" : "text-[#666666] hover:text-[#1A1A1A]"
+                    )}
+                  >
+                    <MaterialIcon name="campaign" className="text-[12px]" />
+                    <span>Gửi Auto</span>
+                  </button>
+                </div>
+
+                {panelTab === "templates" && (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap gap-1">
+                      {QUICK_REPLY_GROUPS.map((group) => (
+                        <button
+                          key={group.id}
+                          onClick={() => setTemplateGroupId(group.id)}
+                          className={cn(
+                            "rounded-full px-2.5 py-1 text-[10px] font-bold transition",
+                            templateGroupId === group.id
+                              ? "bg-[#E3000F] text-white"
+                              : "bg-[#F5F5F5] text-[#666666] hover:text-[#1A1A1A]"
+                          )}
+                        >
+                          {group.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="space-y-2">
+                      {activeTemplateGroup.items.map((item) => (
+                        <button
+                          key={item}
+                          onClick={() => appendTemplate(item)}
+                          disabled={!inbox.openConv || inbox.archiveReading}
+                          className="block w-full rounded-lg border border-[#E5E5E5] bg-white p-2.5 text-left text-xs leading-relaxed transition hover:border-[#E3000F]/60 hover:bg-[#FFF8F8] disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {item}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  {selectedMessageIds.length === 0 ? (
-                    <p className="text-slate-500 text-[11px]">Tích chọn tin nhắn ở cột chat giữa để bắt đầu chiến dịch.</p>
-                  ) : (
-                    <div className="max-h-[160px] overflow-y-auto space-y-2 pr-1 border border-slate-200/60 rounded bg-white p-2">
-                      {inbox.messages
-                        .filter(m => selectedMessageIds.includes(m.source_message_id || m.id || ""))
-                        .map((m, idx) => {
-                          const msgId = m.source_message_id || m.id || "";
-                          const currentText = editedMessagesText[msgId] ?? m.content ?? "";
-                          return (
-                            <div key={idx} className="bg-slate-50 border border-slate-200/55 p-1.5 rounded space-y-1">
-                              <div className="flex justify-between items-center text-[9px] text-slate-400 font-bold">
-                                <span>Tin #{idx + 1}</span>
-                              </div>
-                              <textarea
-                                value={currentText}
-                                onChange={(e) => {
-                                  setEditedMessagesText(prev => ({
-                                    ...prev,
-                                    [msgId]: e.target.value
-                                  }));
-                                }}
-                                className="w-full bg-white border border-slate-250 rounded p-1 text-[11px] outline-none text-slate-700 resize-none font-sans"
-                                rows={2.5}
-                              />
-                              {(m.assets ?? [])
-                                .filter((asset) => asset.storage_url)
-                                .map((asset, ai) => (
-                                  <div
-                                    key={ai}
-                                    className="rounded-lg overflow-hidden border border-slate-200 max-w-[120px] mt-1 bg-white"
-                                  >
-                                    {asset.storage_url?.match(/\.(jpg|jpeg|png|gif|webp)/i) ? (
-                                      // eslint-disable-next-line @next/next/no-img-element
-                                      <img
-                                        src={asset.storage_url!}
-                                        alt="media preview"
-                                        className="w-full h-auto object-cover max-h-[80px]"
-                                      />
-                                    ) : (
-                                      <div className="flex items-center gap-1 p-1.5 text-[9px] text-blue-600">
-                                        <MaterialIcon name="attach_file" className="text-[12px]" />
-                                        <span className="truncate">File đính kèm</span>
-                                      </div>
-                                    )}
+                )}
+
+                {panelTab === "campaign" && (
+                  <div className="space-y-3 text-xs text-slate-700">
+                    <div className="border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-2">
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex justify-between">
+                        <span>Tin nhắn đã chọn ({selectedMessageIds.length})</span>
+                        <span className="text-[9px] text-[#E3000F] font-black">Có thể chỉnh sửa</span>
+                      </div>
+                      {selectedMessageIds.length === 0 ? (
+                        <p className="text-slate-500 text-[11px]">Tích chọn tin nhắn ở cột chat giữa để bắt đầu chiến dịch.</p>
+                      ) : (
+                        <div className="max-h-[160px] overflow-y-auto space-y-2 pr-1 border border-slate-200/60 rounded bg-white p-2">
+                          {inbox.messages
+                            .filter(m => selectedMessageIds.includes(m.source_message_id || m.id || ""))
+                            .map((m, idx) => {
+                              const msgId = m.source_message_id || m.id || "";
+                              const currentText = editedMessagesText[msgId] ?? m.content ?? "";
+                              return (
+                                <div key={idx} className="bg-slate-50 border border-slate-200/55 p-1.5 rounded space-y-1">
+                                  <div className="flex justify-between items-center text-[9px] text-slate-400 font-bold">
+                                    <span>Tin #{idx + 1}</span>
                                   </div>
-                                ))}
-                            </div>
-                          );
-                        })}
+                                  <textarea
+                                    value={currentText}
+                                    onChange={(e) => {
+                                      setEditedMessagesText(prev => ({
+                                        ...prev,
+                                        [msgId]: e.target.value
+                                      }));
+                                    }}
+                                    className="w-full bg-white border border-slate-250 rounded p-1 text-[11px] outline-none text-slate-700 resize-none font-sans"
+                                    rows={2.5}
+                                  />
+                                  {(m.assets ?? [])
+                                    .filter((asset) => asset.storage_url)
+                                    .map((asset, ai) => (
+                                      <div
+                                        key={ai}
+                                        className="rounded-lg overflow-hidden border border-slate-200 max-w-[120px] mt-1 bg-white"
+                                      >
+                                        {asset.storage_url?.match(/\.(jpg|jpeg|png|gif|webp)/i) ? (
+                                          // eslint-disable-next-line @next/next/no-img-element
+                                          <img
+                                            src={asset.storage_url!}
+                                            alt="media preview"
+                                            className="w-full h-auto object-cover max-h-[80px]"
+                                          />
+                                        ) : (
+                                          <div className="flex items-center gap-1 p-1.5 text-[9px] text-blue-600">
+                                            <MaterialIcon name="attach_file" className="text-[12px]" />
+                                            <span className="truncate">File đính kèm</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                </div>
+                              );
+                            })}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-slate-500 font-bold block mb-1">Phương thức nội dung</label>
+                      <select
+                        value={campaignMode}
+                        onChange={(e) => setCampaignMode(e.target.value as any)}
+                        className="w-full border border-slate-200 rounded px-2 py-1 outline-none focus:border-[#E3000F] text-xs bg-white"
+                      >
+                        <option value="both">Gửi cả chữ & ảnh</option>
+                        <option value="text">Chỉ gửi chữ</option>
+                        <option value="image">Chỉ gửi ảnh</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-slate-500 font-bold block mb-1">
+                        Người nhận từ danh sách hội thoại ({autoSendTargetIds.length})
+                      </label>
+                      <div className="relative mb-2">
+                        <MaterialIcon name="search" className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs" />
+                        <input
+                          type="text"
+                          placeholder="Lọc danh sách..."
+                          value={autoSendSearchQuery}
+                          onChange={(e) => setAutoSendSearchQuery(e.target.value)}
+                          className="w-full pl-6 pr-2 py-1 text-xs border border-slate-200 rounded outline-none"
+                        />
+                      </div>
+                      <div className="h-[120px] overflow-y-auto border border-slate-200 rounded p-1.5 space-y-1 bg-white">
+                        {inbox.filtered
+                          .filter(c => (c.name || "").toLowerCase().includes(autoSendSearchQuery.toLowerCase()))
+                          .map((c) => (
+                            <label key={c.conv_id} className="flex items-center gap-1.5 p-1 rounded hover:bg-slate-50 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                className="w-3 h-3"
+                                checked={autoSendTargetIds.includes(c.conv_id)}
+                                onChange={() => {
+                                  const id = c.conv_id;
+                                  setAutoSendTargetIds(prev =>
+                                    prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+                                  );
+                                }}
+                              />
+                              <span className="truncate text-[11px] font-semibold text-slate-700">{c.name}</span>
+                            </label>
+                          ))}
+                      </div>
+                    </div>
+
+                    {campaignError && (
+                      <div className="bg-red-50 border border-red-200 text-red-700 text-[11px] p-2 rounded-lg">
+                        {campaignError}
+                      </div>
+                    )}
+                    {campaignSuccess && (
+                      <div className="bg-green-50 border border-green-200 text-green-700 text-[11px] p-2 rounded-lg">
+                        {campaignSuccess}
+                      </div>
+                    )}
+
+                    {campaignLogs.length > 0 && (
+                      <div className="border border-slate-200 rounded bg-slate-50 p-2 text-[10px] max-h-[80px] overflow-y-auto space-y-1">
+                        {campaignLogs.map((log, i) => (
+                          <div key={i} className="flex justify-between items-center text-slate-600">
+                            <span className="truncate">{log.name}</span>
+                            <span className="text-green-600 font-bold">✓ Đã gửi</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <button
+                      onClick={handleAutoSend}
+                      disabled={isSendingCampaign || selectedMessageIds.length === 0 || (autoSendTargetIds.length === 0 && !manualRecipients.trim())}
+                      className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-[#E3000F] hover:bg-[#C40009] text-white font-bold py-2 text-xs transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <MaterialIcon name="campaign" className="text-base" />
+                      {isSendingCampaign ? "Đang gửi..." : "Bắt đầu chiến dịch"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Info Tab (Customer notes + KPI share/verify) ── */}
+            {(panelTab === "customer" || panelTab === "kpi") && (
+              <div className="space-y-4">
+                {/* 1. Customer Note Section */}
+                <div>
+                  {!inbox.openConv ? (
+                    <div className="rounded-lg border border-dashed border-[#E5E5E5] bg-[#FAFAFA] p-3 text-xs text-[#A0A0A0]">
+                      Chọn hội thoại để xem thông tin khách hàng.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="rounded-lg border border-[#E5E5E5] p-2.5 bg-white">
+                        <div className="text-[10px] font-bold uppercase text-[#A0A0A0]">Khách hàng</div>
+                        <div className="mt-1 text-xs font-black truncate">{selectedName || inbox.openConv}</div>
+                        <div className="mt-1 text-[11px] text-[#A0A0A0] truncate">{selectedPreview || "—"}</div>
+                      </div>
+                      <div className="rounded-lg border border-[#E5E5E5] bg-[#FFFDF7] p-2.5">
+                        <div className="mb-1.5 flex items-center justify-between gap-2">
+                          <div className="text-[10px] font-bold uppercase text-[#A0A0A0]">Ghi chú nhu cầu</div>
+                          {selectedNote && !noteChanged && (
+                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-bold text-emerald-700">
+                              đã lưu
+                            </span>
+                          )}
+                        </div>
+                        <textarea
+                          value={noteDraft}
+                          onChange={(e) => setNoteDraft(e.target.value)}
+                          rows={3}
+                          maxLength={1000}
+                          placeholder="VD: Khách cần tư vấn..."
+                          className="w-full resize-none rounded-lg border border-[#E5E5E5] bg-white px-2 py-1.5 text-xs leading-relaxed outline-none transition focus:border-[#E3000F] disabled:bg-[#F5F5F5]"
+                        />
+                        <div className="mt-1.5 flex items-center justify-between gap-2">
+                          <span className="text-[10px] text-[#A0A0A0]">{noteDraft.trim().length}/1000</span>
+                          <button
+                            onClick={() => void inbox.saveCustomerNote(inbox.openConv, noteDraft)}
+                            disabled={!inbox.openConv || inbox.savingNoteConv === inbox.openConv || !noteChanged}
+                            className="rounded bg-[#E3000F] px-2.5 py-1 text-xs font-black text-white hover:bg-[#C40009] disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            Lưu ghi chú
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
 
-                <div>
-                  <label className="text-[10px] text-slate-500 font-bold block mb-1">Phương thức nội dung</label>
-                  <select
-                    value={campaignMode}
-                    onChange={(e) => setCampaignMode(e.target.value as any)}
-                    className="w-full border border-slate-200 rounded px-2 py-1 outline-none focus:border-[#E3000F] text-xs bg-white"
-                  >
-                    <option value="both">Gửi cả chữ & ảnh</option>
-                    <option value="text">Chỉ gửi chữ</option>
-                    <option value="image">Chỉ gửi ảnh</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[10px] text-slate-500 font-bold block mb-1">
-                    Người nhận từ danh sách hội thoại ({autoSendTargetIds.length})
-                  </label>
-                  <div className="relative mb-2">
-                    <MaterialIcon name="search" className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs" />
-                    <input
-                      type="text"
-                      placeholder="Lọc danh sách..."
-                      value={autoSendSearchQuery}
-                      onChange={(e) => setAutoSendSearchQuery(e.target.value)}
-                      className="w-full pl-6 pr-2 py-1 text-xs border border-slate-200 rounded outline-none"
-                    />
-                  </div>
-                  <div className="h-[120px] overflow-y-auto border border-slate-200 rounded p-1.5 space-y-1 bg-white">
-                    {inbox.filtered
-                      .filter(c => (c.name || "").toLowerCase().includes(autoSendSearchQuery.toLowerCase()))
-                      .map((c) => (
-                        <label key={c.conv_id} className="flex items-center gap-1.5 p-1 rounded hover:bg-slate-50 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            className="w-3 h-3"
-                            checked={autoSendTargetIds.includes(c.conv_id)}
-                            onChange={() => {
-                              const id = c.conv_id;
-                              setAutoSendTargetIds(prev =>
-                                prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-                              );
-                            }}
-                          />
-                          <span className="truncate text-[11px] font-semibold text-slate-700">{c.name}</span>
-                        </label>
-                      ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[10px] text-slate-500 font-bold block mb-1">
-                    Hoặc nhập số điện thoại thủ công (Mỗi số 1 dòng)
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={manualRecipients}
-                    onChange={(e) => setManualRecipients(e.target.value)}
-                    placeholder="0912345678&#10;0976543210"
-                    className="w-full border border-slate-200 rounded px-2.5 py-1 outline-none focus:border-[#E3000F] text-xs resize-none"
-                  />
-                </div>
-
-                {campaignError && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 text-[11px] p-2 rounded-lg">
-                    {campaignError}
-                  </div>
-                )}
-                {campaignSuccess && (
-                  <div className="bg-green-50 border border-green-200 text-green-700 text-[11px] p-2 rounded-lg">
-                    {campaignSuccess}
-                  </div>
-                )}
-
-                {campaignLogs.length > 0 && (
-                  <div className="border border-slate-200 rounded bg-slate-50 p-2 text-[10px] max-h-[80px] overflow-y-auto space-y-1">
-                    {campaignLogs.map((log, i) => (
-                      <div key={i} className="flex justify-between items-center text-slate-600">
-                        <span className="truncate">{log.name}</span>
-                        <span className="text-green-600 font-bold">✓ Đã gửi</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <button
-                  onClick={handleAutoSend}
-                  disabled={isSendingCampaign || selectedMessageIds.length === 0 || (autoSendTargetIds.length === 0 && !manualRecipients.trim())}
-                  className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-[#E3000F] hover:bg-[#C40009] text-white font-bold py-2 text-xs transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <MaterialIcon name="campaign" className="text-base" />
-                  {isSendingCampaign ? "Đang gửi..." : "Bắt đầu chiến dịch"}
-                </button>
-              </div>
-            )}
-
-            {/* ── Templates Tab ── */}
-            {panelTab === "templates" && (
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-1">
-                  {QUICK_REPLY_GROUPS.map((group) => (
-                    <button
-                      key={group.id}
-                      onClick={() => setTemplateGroupId(group.id)}
+                {/* 2. KPI / Share Section */}
+                <div className="pt-2 border-t border-slate-100">
+                  {inbox.role === "admin" || inbox.role === "leader" ? (
+                    <div
                       className={cn(
-                        "rounded-full px-2.5 py-1 text-[10px] font-bold transition",
-                        templateGroupId === group.id
-                          ? "bg-[#E3000F] text-white"
-                          : "bg-[#F5F5F5] text-[#666666] hover:text-[#1A1A1A]"
+                        "rounded-xl border p-3.5 shadow-sm transition-colors",
+                        inbox.verifiedConvIds.has(inbox.openConv) ? "border-emerald-250 bg-emerald-50" : "border-[#E5E5E5] bg-white"
                       )}
                     >
-                      {group.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="space-y-2">
-                  {activeTemplateGroup.items.map((item) => (
-                    <button
-                      key={item}
-                      onClick={() => appendTemplate(item)}
-                      disabled={!inbox.openConv || inbox.archiveReading}
-                      className="block w-full rounded-lg border border-[#E5E5E5] bg-white p-2.5 text-left text-xs leading-relaxed transition hover:border-[#E3000F]/60 hover:bg-[#FFF8F8] disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* ── Customer Tab ── */}
-            {panelTab === "customer" && (
-              <div>
-                {!inbox.openConv ? (
-                  <div className="rounded-lg border border-dashed border-[#E5E5E5] bg-[#FAFAFA] p-3 text-xs text-[#A0A0A0]">
-                    Chọn hội thoại để xem thông tin.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="rounded-lg border border-[#E5E5E5] p-3">
-                      <div className="text-[10px] font-bold uppercase text-[#A0A0A0]">Tên</div>
-                      <div className="mt-1 text-sm font-black">{selectedName || inbox.openConv}</div>
-                      <div className="mt-1 text-xs text-[#A0A0A0]">{selectedPreview || "—"}</div>
-                    </div>
-                    <div className="rounded-lg border border-[#E5E5E5] bg-[#FFFDF7] p-3">
-                      <div className="mb-2 flex items-center justify-between gap-2">
-                        <div>
-                          <div className="text-[10px] font-bold uppercase text-[#A0A0A0]">Ghi chú nhu cầu</div>
-                          <div className="text-[9px] text-[#A0A0A0]">Lưu thông tin cần nhớ về khách.</div>
-                        </div>
-                        {selectedNote && !noteChanged && (
-                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-bold text-emerald-700">
-                            đã lưu
-                          </span>
-                        )}
-                      </div>
-                      <textarea
-                        value={noteDraft}
-                        onChange={(e) => setNoteDraft(e.target.value)}
-                        rows={4}
-                        maxLength={1000}
-                        placeholder="VD: Khách cần tư vấn phần mềm..."
-                        className="w-full resize-none rounded-lg border border-[#E5E5E5] bg-white px-2 py-1.5 text-xs leading-relaxed outline-none transition focus:border-[#E3000F] disabled:bg-[#F5F5F5]"
-                      />
-                      <div className="mt-2 flex items-center justify-between gap-2">
-                        <span className="text-[10px] text-[#A0A0A0]">{noteDraft.trim().length}/1000</span>
-                        <button
-                          onClick={() => void inbox.saveCustomerNote(inbox.openConv, noteDraft)}
-                          disabled={!inbox.openConv || inbox.savingNoteConv === inbox.openConv || !noteChanged}
-                          className="rounded bg-[#E3000F] px-2.5 py-1 text-xs font-black text-white hover:bg-[#C40009] disabled:opacity-40 disabled:cursor-not-allowed"
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <div
+                          className={cn(
+                            "text-xs font-black uppercase tracking-wider",
+                            inbox.verifiedConvIds.has(inbox.openConv) ? "text-emerald-700" : "text-[#1A1A1A]"
+                          )}
                         >
-                          Lưu
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ── KPI Tab ── */}
-            {panelTab === "kpi" && (
-              <div>
-                {inbox.role === "admin" || inbox.role === "leader" ? (
-                  <div
-                    className={cn(
-                      "rounded-xl border p-3.5 shadow-sm transition-colors",
-                      inbox.verifiedConvIds.has(inbox.openConv) ? "border-emerald-250 bg-emerald-50" : "border-[#E3000F]/20 bg-white"
-                    )}
-                  >
-                    <div className="mb-1.5 flex items-center justify-between">
-                      <div
-                        className={cn(
-                          "text-xs font-black uppercase tracking-wider",
-                          inbox.verifiedConvIds.has(inbox.openConv) ? "text-emerald-700" : "text-[#1A1A1A]"
+                          {inbox.verifiedConvIds.has(inbox.openConv) ? "Đã duyệt KPI" : "Duyệt KPI"}
+                        </div>
+                        {inbox.verifiedConvIds.has(inbox.openConv) && (
+                          <MaterialIcon name="check_circle" className="text-emerald-500 text-base" />
                         )}
-                      >
-                        {inbox.verifiedConvIds.has(inbox.openConv) ? "Đã xác nhận KPI" : "Xác nhận KPI"}
                       </div>
-                      {inbox.verifiedConvIds.has(inbox.openConv) && (
-                        <MaterialIcon name="check_circle" className="text-emerald-500 text-base" />
+                      {!inbox.verifiedConvIds.has(inbox.openConv) && (
+                        <p className="text-[10px] text-slate-500 mb-2.5">
+                          Bấm nút bên dưới để xác nhận tính KPI cho nhân viên.
+                        </p>
+                      )}
+                      {inbox.openConv && (
+                        <button
+                          onClick={handleVerifyKpi}
+                          className={cn(
+                            "w-full rounded-lg py-1.5 text-xs font-bold text-white transition",
+                            inbox.verifiedConvIds.has(inbox.openConv)
+                              ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                              : "bg-[#E3000F] hover:bg-[#C40009] shadow-sm"
+                          )}
+                          disabled={inbox.verifiedConvIds.has(inbox.openConv)}
+                        >
+                          {inbox.verifiedConvIds.has(inbox.openConv) ? "Đã duyệt" : "XÁC NHẬN KPI"}
+                        </button>
                       )}
                     </div>
-                    {!inbox.verifiedConvIds.has(inbox.openConv) && (
-                      <p className="text-[10px] text-slate-500 mb-3">
-                        Chọn hội thoại rồi bấm Xác nhận bên dưới để chấm KPI inbox cho nhân sự.
-                      </p>
-                    )}
-                    {inbox.openConv && selectedConv && (
-                      <div className="mb-3 rounded-lg border border-[#E5E5E5] bg-white p-2.5">
-                        <div className="truncate text-xs font-bold text-[#1A1A1A]">{selectedName}</div>
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          {inbox.suggestedConvIds.has(inbox.openConv) && (
-                            <span className="rounded-full bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-[9px] font-bold text-blue-700">
-                              đã đề xuất
-                            </span>
+                  ) : (
+                    <div className="rounded-xl border border-[#E5E5E5] p-3 bg-white space-y-2">
+                      <div className="text-[10px] font-bold uppercase text-[#A0A0A0]">KPI &amp; Chia sẻ</div>
+                      {inbox.openConv ? (
+                        <div>
+                          {inbox.verifiedConvIds.has(inbox.openConv) ? (
+                            <div className="p-2.5 rounded-lg bg-green-50 border border-green-200 text-[11px] text-green-700 font-semibold flex items-center gap-1.5">
+                              <MaterialIcon name="check_circle" className="text-green-500 text-[16px]" />
+                              Đã duyệt tính KPI (Đã khóa)
+                            </div>
+                          ) : inbox.suggestedConvIds.has(inbox.openConv) ? (
+                            <div className="space-y-2">
+                              <div className="p-2.5 rounded-lg bg-blue-50 border border-blue-200 text-[11px] text-blue-700 font-semibold flex items-center gap-1.5">
+                                <MaterialIcon name="pending" className="text-blue-500 text-[16px]" />
+                                Đang chia sẻ, chờ duyệt KPI
+                              </div>
+                              <button
+                                onClick={() => void inbox.onToggleShare(inbox.openConv)}
+                                className="w-full rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-1.5 text-xs transition border border-slate-200"
+                              >
+                                HỦY CHIA SẺ (THU HỒI)
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => void inbox.onToggleShare(inbox.openConv)}
+                              className="w-full rounded bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 text-xs transition shadow-sm"
+                            >
+                              CHIA SẺ HỘI THOẠI
+                            </button>
                           )}
                         </div>
-                      </div>
-                    )}
-                    {inbox.openConv && (
-                      <button
-                        onClick={handleVerifyKpi}
-                        className={cn(
-                          "w-full rounded-lg py-2 text-xs font-bold text-white transition",
-                          inbox.verifiedConvIds.has(inbox.openConv)
-                            ? "bg-slate-300 cursor-not-allowed opacity-50"
-                            : "bg-[#E3000F] hover:bg-[#C40009] shadow-sm shadow-red-500/10"
-                        )}
-                        disabled={inbox.verifiedConvIds.has(inbox.openConv)}
-                      >
-                        {inbox.verifiedConvIds.has(inbox.openConv) ? "Đã tính" : "XÁC NHẬN KPI"}
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="rounded-xl border p-3 bg-white">
-                    <div className="text-xs font-bold uppercase text-slate-700 mb-2">Trạng thái đề xuất</div>
-                    {inbox.openConv ? (
-                      <div>
-                        {inbox.verifiedConvIds.has(inbox.openConv) ? (
-                          <div className="p-2.5 rounded-lg bg-green-50 border border-green-200 text-[11px] text-green-700 font-semibold flex items-center gap-1.5">
-                            <MaterialIcon name="check_circle" className="text-green-500 text-[16px]" />
-                            Leader đã duyệt tính KPI
-                          </div>
-                        ) : inbox.suggestedConvIds.has(inbox.openConv) ? (
-                          <div className="p-2.5 rounded-lg bg-blue-50 border border-blue-200 text-[11px] text-blue-700 font-semibold flex items-center gap-1.5">
-                            <MaterialIcon name="pending" className="text-blue-500 text-[16px]" />
-                            Đã đề xuất, chờ leader duyệt
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() =>
-                              void inbox.onSuggestKpi({
-                                member_email: ownerEmail,
-                                conv_ids: [inbox.openConv],
-                                user_id: inbox.selectedAccountId,
-                              })
-                            }
-                            className="w-full rounded bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 text-xs transition"
-                          >
-                            ĐỀ XUẤT TÍNH KPI HỘI THOẠI NÀY
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-xs text-slate-400 italic">Chọn hội thoại để xem KPI</div>
-                    )}
-                  </div>
-                )}
+                      ) : (
+                        <div className="text-xs text-slate-400 italic">Chọn hội thoại để chia sẻ</div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
