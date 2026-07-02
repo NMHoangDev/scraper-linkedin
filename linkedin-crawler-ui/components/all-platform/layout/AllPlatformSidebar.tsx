@@ -513,16 +513,16 @@ export function AllPlatformSidebar({
         </div>
 
         {!isCollapsed ? (
-          <div className="px-3 pt-2">
-            <div className="flex items-center gap-4 border-b border-outline-variant">
+          <div className="px-3 py-2">
+            <div className="flex items-center gap-1 rounded-full bg-surface-container-low p-1">
               <button
                 type="button"
                 onClick={() => setWorkspaceTab("personal")}
                 className={cn(
-                  "-mb-px border-b-2 px-1 pb-2 text-sm font-semibold transition",
+                  "flex-1 rounded-full px-3 py-1.5 text-sm font-semibold transition",
                   workspaceTab === "personal"
-                    ? "border-[var(--color-markee-primary)] text-[var(--color-markee-primary)]"
-                    : "border-transparent text-on-surface-variant hover:text-on-surface",
+                    ? "bg-[var(--color-markee-primary)] text-white shadow-sm"
+                    : "text-on-surface-variant hover:text-on-surface",
                 )}
               >
                 Cá nhân
@@ -531,10 +531,10 @@ export function AllPlatformSidebar({
                 type="button"
                 onClick={() => setWorkspaceTab("team")}
                 className={cn(
-                  "-mb-px border-b-2 px-1 pb-2 text-sm font-semibold transition",
+                  "flex-1 rounded-full px-3 py-1.5 text-sm font-semibold transition",
                   workspaceTab === "team"
-                    ? "border-[var(--color-markee-primary)] text-[var(--color-markee-primary)]"
-                    : "border-transparent text-on-surface-variant hover:text-on-surface",
+                    ? "bg-[var(--color-markee-primary)] text-white shadow-sm"
+                    : "text-on-surface-variant hover:text-on-surface",
                 )}
               >
                 Nhóm
