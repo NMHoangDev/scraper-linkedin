@@ -170,7 +170,7 @@ export default function CrawlFB_Form() {
                                 />
                             </div>
                             <div className="mb-2">
-                            <a href="/minhhoang-scraper/loginFb"
+                            <a href="/loginFb"
                                 className="border border-violet-300 text-violet-600 px-5 py-3 rounded-xl font-semibold hover:bg-violet-50 transition"
                             >
                                 Xác nhận tài khoản FB
