@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useZaloAdminInbox, type ZaloConv } from "@/hooks/useZaloAdminInbox";
 import ZaloTeamAccountTree from "./ZaloTeamAccountTree";
 import ZaloAccountAuthView from "./ZaloAccountAuthView";
+import { CrmCustomerModal } from "@/components/all-platform/components/CrmCustomerModal";
 import { KpiProgressCard } from "@/components/all-platform/components/kpi-progress-card";
 import { MaterialIcon } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -136,6 +137,7 @@ export function ZaloInboxAdminShell() {
   const [campaignError, setCampaignError] = useState<string | null>(null);
   const [campaignLogs, setCampaignLogs] = useState<{ name: string; status: "sending" | "success" | "failed" }[]>([]);
   const [editedMessagesText, setEditedMessagesText] = useState<Record<string, string>>({});
+  const [showCrmModal, setShowCrmModal] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1360,6 +1362,14 @@ export function ZaloInboxAdminShell() {
                           >
                             Lưu ghi chú
                           </button>
+                          <button
+                            onClick={() => setShowCrmModal(true)}
+                            disabled={!inbox.openConv}
+                            className="rounded border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-700 hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            title="Lưu khách hàng vào CRM"
+                          >
+                            Lưu vào CRM
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -1691,6 +1701,14 @@ export function ZaloInboxAdminShell() {
         </div>,
         document.body
       )}
+
+      <CrmCustomerModal
+        isOpen={showCrmModal}
+        onClose={() => setShowCrmModal(false)}
+        defaultConvId={inbox.openConv || undefined}
+        defaultCustomerName={selectedName || undefined}
+        defaultSourcePlatform="Zalo"
+      />
     </div>
   );
 }

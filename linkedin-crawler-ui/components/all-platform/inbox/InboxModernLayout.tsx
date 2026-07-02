@@ -6,7 +6,7 @@ import { MaterialIcon } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import TeamAccountTree from "@/components/all-platform/inbox/TeamAccountTree";
 import { KpiProgressCard } from "@/components/all-platform/components/kpi-progress-card";
-import { CustomerLeadModal } from "@/components/all-platform/components/customer-lead-modal";
+import { CrmCustomerModal } from "@/components/all-platform/components/CrmCustomerModal";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 
 interface Session { user_id: string; fb_user_id?: string; label?: string; owner?: string; online?: boolean; inbox_enabled?: boolean; status?: string; }
@@ -740,12 +740,12 @@ export default function InboxModernLayout(props: Props) {
       {toast && <div className={`fixed bottom-6 right-6 z-50 rounded-lg px-5 py-3.5 font-semibold text-white shadow-lg ${toast.ok ? "bg-green-600" : "bg-red-600"}`}>{toast.msg}</div>}
       {kpiToast && <div className={`fixed bottom-6 right-6 z-50 rounded-lg px-5 py-3.5 font-semibold text-white shadow-lg ${kpiToast.ok ? "bg-green-600" : "bg-red-600"}`}>{kpiToast.msg}</div>}
 
-      <CustomerLeadModal
+      <CrmCustomerModal
         isOpen={showLeadModal}
         onClose={() => setShowLeadModal(false)}
         defaultConvId={openConv || undefined}
         defaultCustomerName={selectedName || undefined}
-        currentUserRole={user?.role}
+        defaultSourcePlatform="FB_Inbox"
       />
     </div>
   );
