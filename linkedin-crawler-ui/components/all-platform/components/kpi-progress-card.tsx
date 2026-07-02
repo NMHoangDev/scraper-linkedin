@@ -133,7 +133,7 @@ function KpiProgressSkeleton() {
           <div className="w-64 h-4 rounded bg-surface-container-highest" />
           <div className="w-96 h-3 rounded bg-surface-container-low mt-2" />
         </div>
-        <div className="w-32 h-8 rounded-lg bg-surface-container-low" />
+        <div className="w-32 h-8 rounded-xl bg-surface-container-low" />
       </div>
       <div className="w-full h-2.5 rounded-full bg-surface-container-low" />
     </div>
@@ -225,7 +225,7 @@ export function KpiProgressCard({
             </p>
           )}
         </div>
-        <div className={cn("px-3 py-1.5 rounded-lg flex items-baseline gap-1.5 shrink-0 whitespace-nowrap self-start xl:self-center", colors.bg)}>
+        <div className={cn("px-3 py-1.5 rounded-xl flex items-baseline gap-1.5 shrink-0 whitespace-nowrap self-start xl:self-center", colors.bg)}>
           <span className={cn("text-lg font-black", colors.text)}>
             {snap.current.toLocaleString("vi-VN")}
           </span>

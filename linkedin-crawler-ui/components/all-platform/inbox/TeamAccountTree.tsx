@@ -213,7 +213,7 @@ export default function TeamAccountTree({ sessions, ownerNames, teams, selectedA
         <select
           value={activeTeam?.id || ""}
           onChange={e => selectTeam(e.target.value)}
-          className="h-9 w-full rounded-lg border border-outline-variant bg-surface px-3 text-sm font-semibold text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+          className="h-9 w-full rounded-xl border border-outline-variant bg-surface px-3 text-sm font-semibold text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
         >
           {teamOptions.map(option => (
             <option key={option.id} value={option.id}>
@@ -226,7 +226,7 @@ export default function TeamAccountTree({ sessions, ownerNames, teams, selectedA
           <button
             type="button"
             onClick={() => setAccountOpen(v => !v)}
-            className="flex h-9 w-full items-center justify-between gap-2 rounded-lg border border-outline-variant bg-surface px-3 text-left text-sm outline-none transition hover:border-primary/60 focus:border-primary focus:ring-2 focus:ring-primary/15"
+            className="flex h-9 w-full items-center justify-between gap-2 rounded-xl border border-outline-variant bg-surface px-3 text-left text-sm outline-none transition hover:border-primary/60 focus:border-primary focus:ring-2 focus:ring-primary/15"
           >
             {selected ? (
               <span className="flex min-w-0 items-center gap-2">
@@ -243,7 +243,7 @@ export default function TeamAccountTree({ sessions, ownerNames, teams, selectedA
           </button>
 
           {accountOpen && (
-            <div className="absolute z-40 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-outline-variant bg-surface p-1 shadow-lg">
+            <div className="absolute z-40 mt-1 max-h-72 w-full overflow-auto rounded-xl border border-outline-variant bg-surface p-1 shadow-lg">
               {visibleAccounts.length === 0 ? (
                 <div className="px-3 py-3 text-center text-xs text-on-surface-variant">Không có tài khoản phù hợp</div>
               ) : visibleGroups.map(group => (
@@ -263,7 +263,7 @@ export default function TeamAccountTree({ sessions, ownerNames, teams, selectedA
                           onSelect(session.user_id);
                           setAccountOpen(false);
                         }}
-                        className={`flex w-full items-center gap-2 rounded-md px-2 py-2 text-left transition ${
+                        className={`flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left transition ${
                           active ? "bg-primary/5 text-on-primary-fixed-variant" : "hover:bg-surface-container-low text-on-surface"
                         }`}
                       >
@@ -285,7 +285,7 @@ export default function TeamAccountTree({ sessions, ownerNames, teams, selectedA
           value={q}
           onChange={e => setQ(e.target.value)}
           placeholder="Tìm user / acc..."
-          className="h-9 w-full rounded-lg border border-outline-variant bg-surface px-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+          className="h-9 w-full rounded-xl border border-outline-variant bg-surface px-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
         />
 
         <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-on-surface-variant xl:justify-end">

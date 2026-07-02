@@ -192,7 +192,7 @@ export function CrmCustomerModal({
                     type="text" required
                     value={formData.customer_name ?? ""}
                     onChange={(e) => set("customer_name", e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
                     placeholder="Nguyễn Văn A"
                   />
                 </div>
@@ -206,7 +206,7 @@ export function CrmCustomerModal({
                     type="text"
                     value={formData.company_name ?? ""}
                     onChange={(e) => set("company_name", e.target.value || null)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
                     placeholder="Công ty TNHH ABC..."
                   />
                 </div>
@@ -218,7 +218,7 @@ export function CrmCustomerModal({
                     type="text"
                     value={formData.phone ?? ""}
                     onChange={(e) => set("phone", e.target.value || null)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
                     placeholder="0912 345 678"
                   />
                 </div>
@@ -230,7 +230,7 @@ export function CrmCustomerModal({
                     type="email"
                     value={formData.email ?? ""}
                     onChange={(e) => set("email", e.target.value || null)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
                     placeholder="khach@email.com"
                   />
                 </div>
@@ -242,7 +242,7 @@ export function CrmCustomerModal({
                     type="text"
                     value={formData.website ?? ""}
                     onChange={(e) => set("website", e.target.value || null)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
                     placeholder="https://..."
                   />
                 </div>
@@ -254,7 +254,7 @@ export function CrmCustomerModal({
                     type="text"
                     value={formData.tax_code ?? ""}
                     onChange={(e) => set("tax_code", e.target.value || null)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
                     placeholder="0123456789"
                   />
                 </div>
@@ -273,7 +273,7 @@ export function CrmCustomerModal({
                   <select
                     value={formData.city ?? ""}
                     onChange={(e) => set("city", e.target.value || null)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
                   >
                     <option value="">-- Chọn thành phố --</option>
                     {CITY_OPTIONS.map((c) => (
@@ -288,7 +288,7 @@ export function CrmCustomerModal({
                   <select
                     value={formData.industry ?? ""}
                     onChange={(e) => set("industry", e.target.value || null)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
                   >
                     <option value="">-- Chọn lĩnh vực --</option>
                     {INDUSTRY_OPTIONS.map((ind) => (
@@ -304,7 +304,7 @@ export function CrmCustomerModal({
                     type="text"
                     value={formData.address ?? ""}
                     onChange={(e) => set("address", e.target.value || null)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
                     placeholder="123 Đường ABC, Quận 1, TP.HCM"
                   />
                 </div>
@@ -323,7 +323,7 @@ export function CrmCustomerModal({
                   <select
                     value={formData.source_platform ?? "FB_Inbox"}
                     onChange={(e) => set("source_platform", e.target.value as SourcePlatform)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
                   >
                     {SOURCE_PLATFORM_OPTIONS.map((o) => (
                       <option key={o.value} value={o.value}>{o.label}</option>
@@ -337,7 +337,7 @@ export function CrmCustomerModal({
                   <select
                     value={String(formData.has_budget ?? false)}
                     onChange={(e) => set("has_budget", e.target.value === "true")}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
                   >
                     {HAS_BUDGET_OPTIONS.map((o) => (
                       <option key={String(o.value)} value={String(o.value)}>{o.label}</option>
@@ -359,7 +359,7 @@ export function CrmCustomerModal({
                   <select
                     value={formData.status ?? "pending"}
                     onChange={(e) => set("status", e.target.value as any)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
                   >
                     <option value="pending">Đang chờ</option>
                     <option value="closed">Đã chốt</option>
@@ -373,7 +373,7 @@ export function CrmCustomerModal({
                   <select
                     value={formData.activity_status ?? "active"}
                     onChange={(e) => set("activity_status", e.target.value as any)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
                   >
                     <option value="active">Active</option>
                     <option value="paused">Tạm ngưng</option>
@@ -387,7 +387,7 @@ export function CrmCustomerModal({
                   <select
                     value={formData.review_result ?? "Chua_xem_xet"}
                     onChange={(e) => set("review_result", e.target.value as ReviewResult)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
                   >
                     {REVIEW_RESULT_OPTIONS.map((o) => (
                       <option key={o.value} value={o.value}>{o.label}</option>
@@ -408,7 +408,7 @@ export function CrmCustomerModal({
                   <select
                     value={formData.reject_reason_type ?? ""}
                     onChange={(e) => set("reject_reason_type", e.target.value as RejectReasonType || null)}
-                    className="w-full px-3 py-2 border border-red-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
+                    className="w-full px-3 py-2 border border-red-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
                   >
                     <option value="">-- Chọn lý do --</option>
                     {REJECT_REASON_TYPE_OPTIONS.map((o) => (
@@ -422,7 +422,7 @@ export function CrmCustomerModal({
                     type="text"
                     value={formData.reject_reason ?? ""}
                     onChange={(e) => set("reject_reason", e.target.value || null)}
-                    className="w-full px-3 py-2 border border-red-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
+                    className="w-full px-3 py-2 border border-red-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
                     placeholder="Ghi chú thêm..."
                   />
                 </div>
@@ -441,7 +441,7 @@ export function CrmCustomerModal({
                     type="text"
                     value={formData.service_package ?? ""}
                     onChange={(e) => set("service_package", e.target.value || null)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
                     placeholder="Gói Nâng cao 2tr/tháng"
                   />
                 </div>
@@ -452,7 +452,7 @@ export function CrmCustomerModal({
                     min="0"
                     value={formData.lifetime_value ?? ""}
                     onChange={(e) => set("lifetime_value", e.target.value ? Number(e.target.value) : null)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
                     placeholder="2,000,000"
                   />
                 </div>
@@ -462,7 +462,7 @@ export function CrmCustomerModal({
                     type="date"
                     value={formData.contract_signed_at ? String(formData.contract_signed_at).split("T")[0] : ""}
                     onChange={(e) => set("contract_signed_at", e.target.value ? `${e.target.value}T00:00:00Z` : null)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
                   />
                 </div>
                 <div>
@@ -470,7 +470,7 @@ export function CrmCustomerModal({
                   <select
                     value={formData.contract_status ?? "active"}
                     onChange={(e) => set("contract_status", e.target.value as any)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
                   >
                     <option value="active">Đang triển khai</option>
                     <option value="completed">Đã hoàn thành</option>
@@ -483,7 +483,7 @@ export function CrmCustomerModal({
                     type="date"
                     value={formData.warranty_expires_at ? String(formData.warranty_expires_at).split("T")[0] : ""}
                     onChange={(e) => set("warranty_expires_at", e.target.value ? `${e.target.value}T00:00:00Z` : null)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
                   />
                 </div>
                 <div>
@@ -492,7 +492,7 @@ export function CrmCustomerModal({
                     type="date"
                     value={formData.customer_since ? String(formData.customer_since).split("T")[0] : ""}
                     onChange={(e) => set("customer_since", e.target.value ? `${e.target.value}T00:00:00Z` : null)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
                   />
                 </div>
               </div>
@@ -516,7 +516,7 @@ export function CrmCustomerModal({
                     }
                     e.target.value = "";
                   }}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white mb-2"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white mb-2"
                 >
                   <option value="">+ Thêm nhanh ghi chú liên lạc...</option>
                   {CARE_NOTE_OPTIONS.map((o) => (
@@ -526,7 +526,7 @@ export function CrmCustomerModal({
                 <textarea
                   value={formData.note ?? ""}
                   onChange={(e) => set("note", e.target.value || null)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm min-h-[80px]"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm min-h-[80px]"
                   placeholder="Yêu cầu cụ thể, ghi chú liên lạc..."
                 />
               </div>
@@ -543,7 +543,7 @@ export function CrmCustomerModal({
                   <textarea
                     value={formData.care_note ?? ""}
                     onChange={(e) => set("care_note", e.target.value || null)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm min-h-[60px]"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm min-h-[60px]"
                     placeholder="Nhắc nhở: gọi lại sau 1 tuần, upsell gói B..."
                   />
                 </div>
@@ -603,7 +603,7 @@ export function CrmCustomerModal({
                   <select
                     value={formData.sdr_id ?? ""}
                     onChange={(e) => set("sdr_id", e.target.value || null)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
                   >
                     <option value="">-- Không giao --</option>
                     {sdrs.map((s) => (
@@ -628,7 +628,7 @@ export function CrmCustomerModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2 text-sm text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 font-medium transition-colors"
+            className="px-5 py-2 text-sm text-slate-600 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 font-medium transition-colors"
           >
             Hủy
           </button>
@@ -636,7 +636,7 @@ export function CrmCustomerModal({
             type="submit"
             form="crmForm"
             disabled={loading}
-            className="px-5 py-2 text-sm text-white bg-primary rounded-lg hover:opacity-90 font-medium transition-colors disabled:opacity-50 shadow-sm shadow-red-500/20 flex items-center gap-1"
+            className="px-5 py-2 text-sm text-white bg-primary rounded-xl hover:opacity-90 font-medium transition-colors disabled:opacity-50 shadow-sm shadow-red-500/20 flex items-center gap-1"
           >
             {loading ? "Đang lưu..." : "Lưu khách hàng"}
           </button>
