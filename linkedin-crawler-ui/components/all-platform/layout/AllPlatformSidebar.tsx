@@ -32,6 +32,7 @@ type SidebarEntry = NavLeafItem | NavGroupItem;
 const navBaseClass =
   "flex min-h-[36px] items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-sm font-medium leading-relaxed transition-colors";
 const navActiveClass = "rounded-md bg-[var(--color-markee-primary)] text-white font-semibold";
+const navActiveIndentedClass = "border-l-2 border-[var(--color-markee-primary)] text-[var(--color-markee-primary)] font-semibold";
 const navIdleClass = "text-on-surface hover:bg-surface-container-low";
 const iconClass = "shrink-0 text-[18px]";
 
@@ -236,13 +237,6 @@ function buildEntries(isAdmin: boolean, isLeader: boolean): SidebarEntry[] {
     },
     {
       type: "item",
-      id: "library",
-      href: "/all-platform/tai-khoan-fb",
-      icon: "folder",
-      label: "Thư viện",
-    },
-    {
-      type: "item",
       id: "settings",
       href: "/all-platform/profile",
       icon: "settings",
@@ -271,9 +265,10 @@ function SidebarLink({
       title={collapsed ? item.label : undefined}
       className={cn(
         navBaseClass,
-        active ? navActiveClass : navIdleClass,
+        active ? (indented ? navActiveIndentedClass : navActiveClass) : navIdleClass,
         collapsed && "justify-center px-2",
-        indented && !collapsed && "ml-6 rounded-none border-l border-outline-variant pl-5",
+        indented && !collapsed && "ml-6 rounded-none border-l pl-5",
+        indented && !collapsed && !active && "border-outline-variant",
       )}
       aria-current={active ? "page" : undefined}
       onClick={onNavigate}
@@ -337,7 +332,7 @@ function SidebarGroup({
         className={cn(
           navBaseClass,
           "w-full justify-between",
-          hasActiveChild ? "bg-primary/10 text-[var(--color-markee-primary)]" : navIdleClass,
+          hasActiveChild ? "bg-[var(--color-markee-primary)] text-white font-semibold shadow-sm" : navIdleClass,
         )}
       >
         <span className="flex min-w-0 items-center gap-2.5">
