@@ -30,7 +30,7 @@ interface NavGroupItem {
 type SidebarEntry = NavLeafItem | NavGroupItem;
 
 const navBaseClass =
-  "flex min-h-[36px] items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-sm font-medium leading-relaxed transition-colors";
+  "flex min-h-[36px] items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-sm font-medium leading-relaxed transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-markee-primary)]/40";
 const navActiveClass = "rounded-md bg-[var(--color-markee-primary)] text-white font-semibold";
 const navActiveIndentedClass = "border-l-2 border-[var(--color-markee-primary)] text-[var(--color-markee-primary)] font-semibold";
 const navIdleClass = "text-on-surface hover:bg-surface-container-low";
@@ -55,7 +55,7 @@ function getInitials(name?: string) {
   return parts[0]?.[0]?.toUpperCase() || "U";
 }
 
-function buildEntries(isAdmin: boolean, isLeader: boolean): SidebarEntry[] {
+function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: "personal" | "team"): SidebarEntry[] {
   const dashboardHref = isAdmin
     ? "/all-platform/admin/dashboard"
     : isLeader
@@ -182,15 +182,57 @@ function buildEntries(isAdmin: boolean, isLeader: boolean): SidebarEntry[] {
     },
   ];
 
+  const homeEntry: SidebarEntry = {
+    type: "item",
+    id: "home",
+    href: dashboardHref,
+    icon: "dashboard",
+    label: "Trang chủ",
+    matchStartsWith: [dashboardHref],
+  };
+  const contentGroup: SidebarEntry = {
+    type: "group",
+    id: "content",
+    icon: "article",
+    label: "Sản xuất nội dung",
+    items: contentItems,
+  };
+  const channelGroup: SidebarEntry = {
+    type: "group",
+    id: "channel",
+    icon: "support_agent",
+    label: "Quản lý kênh & CSKH",
+    items: channelItems,
+  };
+
+  // Ca nhan: chi viec hang ngay cua tung nguoi (dang bai, inbox, acc FB cua minh).
+  // Nhom: full bo cong cu quan ly - Teams, thu vien nhom, KPI acc seeding, ha tang VPS.
+  if (workspaceTab === "personal") {
+    return [
+      homeEntry,
+      contentGroup,
+      channelGroup,
+      {
+        type: "item",
+        id: "fb-accounts-personal",
+        href: "/all-platform/tai-khoan-fb",
+        icon: "account_circle",
+        label: "Tài khoản FB",
+        matchStartsWith: ["/all-platform/tai-khoan-fb"],
+      },
+      {
+        type: "item",
+        id: "settings",
+        href: "/all-platform/profile",
+        icon: "settings",
+        label: "Cài đặt kết nối",
+        matchStartsWith: ["/all-platform/profile"],
+      },
+    ];
+  }
+
   return [
-    {
-      type: "item",
-      id: "home",
-      href: dashboardHref,
-      icon: "dashboard",
-      label: "Trang chủ",
-      matchStartsWith: [dashboardHref],
-    },
+    homeEntry,
     {
       type: "group",
       id: "management",
@@ -198,20 +240,8 @@ function buildEntries(isAdmin: boolean, isLeader: boolean): SidebarEntry[] {
       label: "Quản lý",
       items: managementItems,
     },
-    {
-      type: "group",
-      id: "content",
-      icon: "article",
-      label: "Sản xuất nội dung",
-      items: contentItems,
-    },
-    {
-      type: "group",
-      id: "channel",
-      icon: "support_agent",
-      label: "Quản lý kênh & CSKH",
-      items: channelItems,
-    },
+    contentGroup,
+    channelGroup,
     {
       type: "group",
       id: "resources",
@@ -257,7 +287,7 @@ function SidebarLink({
       aria-current={active ? "page" : undefined}
       onClick={onNavigate}
     >
-      <MaterialIcon name={item.icon} className={cn(iconClass, active && "text-white")} />
+      <MaterialIcon name={item.icon} className={cn(iconClass, active && (indented ? "text-[var(--color-markee-primary)]" : "text-white"))} />
       {!collapsed ? <span className="min-w-0 truncate">{item.label}</span> : null}
       {!collapsed && item.badge !== undefined ? (
         <span
@@ -379,7 +409,7 @@ export function AllPlatformSidebar({
 
   const isAdmin = user?.role === "admin";
   const isLeader = user?.role === "leader";
-  const entries = useMemo(() => buildEntries(isAdmin, isLeader), [isAdmin, isLeader]);
+  const entries = useMemo(() => buildEntries(isAdmin, isLeader, workspaceTab), [isAdmin, isLeader, workspaceTab]);
 
   const handleLogout = async () => {
     await logout();
