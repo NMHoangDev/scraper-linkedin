@@ -30,11 +30,11 @@ interface NavGroupItem {
 type SidebarEntry = NavLeafItem | NavGroupItem;
 
 const navBaseClass =
-  "flex min-h-[36px] items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-sm font-medium leading-relaxed transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-markee-primary)]/40";
+  "group relative flex min-h-[36px] items-center gap-2.5 overflow-hidden rounded-xl px-2.5 py-1.5 text-sm font-medium leading-relaxed transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-markee-primary)]/40";
 const navActiveClass = "rounded-md bg-[var(--color-markee-primary)] text-white font-semibold";
-const navActiveIndentedClass = "text-[var(--color-markee-primary)] font-semibold";
+const navActiveIndentedClass = "-ml-3 rounded-none border-l-2 border-[var(--color-markee-primary)] pl-5 text-[var(--color-markee-primary)] font-semibold";
 const navIdleClass = "text-on-surface hover:bg-surface-container-low";
-const iconClass = "shrink-0 text-[18px]";
+const iconClass = "shrink-0 text-[18px] transition-transform duration-200 group-hover:scale-105";
 
 // So khop theo TUNG DOAN duong dan (path segment), khong phai chuoi con tho -
 // tranh truong hop "/all-platform/tai-khoan" (Zalo) tinh nham la tien to cua
@@ -289,8 +289,6 @@ function SidebarLink({
         navBaseClass,
         active ? (indented ? navActiveIndentedClass : navActiveClass) : navIdleClass,
         collapsed && "justify-center px-2",
-        indented && !collapsed && "ml-6 rounded-none border-l-2 pl-5",
-        indented && !collapsed && (active ? "border-[var(--color-markee-primary)]" : "border-transparent"),
       )}
       aria-current={active ? "page" : undefined}
       onClick={onNavigate}
@@ -373,7 +371,7 @@ function SidebarGroup({
           isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
         )}
       >
-        <div className="min-h-0 space-y-1">
+        <div className="ml-5 min-h-0 space-y-1 border-l border-outline-variant pl-3">
           {entry.items.map((item) => (
             <SidebarLink
               key={item.id}
@@ -432,7 +430,7 @@ export function AllPlatformSidebar({
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-outline-variant bg-surface-container-low text-on-surface shadow-xl transition-all duration-300 lg:translate-x-0 lg:shadow-none",
+          "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-outline-variant bg-[#fafafa] text-on-surface shadow-xl transition-all duration-300 lg:translate-x-0 lg:shadow-none",
           isCollapsed ? "w-[70px]" : "w-[280px]",
           isOpen ? "translate-x-0" : "-translate-x-full",
         )}
