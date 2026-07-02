@@ -441,40 +441,68 @@ export function AllPlatformSidebar({
         ) : null}
 
         <div className="border-b border-outline-variant px-2 py-2">
-          <div className={cn("flex items-center", isCollapsed ? "flex-col gap-1" : "justify-between gap-2")}>
-            <Link
-              href="/all-platform/post-feed"
-              onClick={onClose}
-              className={cn(
-                "flex min-w-0 items-center gap-3 rounded-lg p-1 transition hover:bg-surface-container-low active:scale-[0.98]",
-                isCollapsed && "justify-center",
-              )}
-            >
-              <Image
-                src="/markeeai_logo.svg"
-                alt="Marketing Agents"
-                width={40}
-                height={40}
-                className="h-10 w-10 shrink-0 rounded-xl object-contain"
-                priority
-              />
-              {!isCollapsed ? (
+          <div className={cn("flex items-center", isCollapsed ? "justify-center" : "justify-between gap-2")}>
+            {isCollapsed ? (
+              <button
+                type="button"
+                onClick={() => onCollapsedChange?.(!isCollapsed)}
+                className="group/logo relative hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl outline-none md:flex focus-visible:ring-2 focus-visible:ring-[var(--color-markee-primary)]/40"
+                aria-label="Mở rộng sidebar"
+                title="Mở rộng"
+              >
+                <Image
+                  src="/markeeai_logo.svg"
+                  alt="Marketing Agents"
+                  width={40}
+                  height={40}
+                  className="h-10 w-10 rounded-xl object-contain transition-opacity duration-200 group-hover/logo:opacity-0"
+                  priority
+                />
+                <span className="absolute inset-0 flex items-center justify-center rounded-xl bg-surface-container-low opacity-0 transition-opacity duration-200 group-hover/logo:opacity-100">
+                  <MaterialIcon name="chevron_right" className="text-[20px] text-[var(--color-markee-primary)]" />
+                </span>
+              </button>
+            ) : null}
+            {isCollapsed ? (
+              <Link
+                href="/all-platform/post-feed"
+                onClick={onClose}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl md:hidden"
+              >
+                <Image src="/markeeai_logo.svg" alt="Marketing Agents" width={40} height={40} className="h-10 w-10 rounded-xl object-contain" priority />
+              </Link>
+            ) : (
+              <Link
+                href="/all-platform/post-feed"
+                onClick={onClose}
+                className="flex min-w-0 items-center gap-3 rounded-lg p-1 transition hover:bg-surface-container-low active:scale-[0.98]"
+              >
+                <Image
+                  src="/markeeai_logo.svg"
+                  alt="Marketing Agents"
+                  width={40}
+                  height={40}
+                  className="h-10 w-10 shrink-0 rounded-xl object-contain"
+                  priority
+                />
                 <span className="text-left text-lg font-semibold leading-5 tracking-tight text-[var(--color-markee-primary)]">
                   Marketing
                   <br />
                   Agents
                 </span>
-              ) : null}
-            </Link>
-            <button
-              type="button"
-              onClick={() => onCollapsedChange?.(!isCollapsed)}
-              className="hidden shrink-0 rounded-lg p-1.5 text-on-surface-variant transition hover:bg-surface-container-low hover:text-[var(--color-markee-primary)] md:flex"
-              aria-label={isCollapsed ? "Mở rộng sidebar" : "Thu gọn sidebar"}
-              title={isCollapsed ? "Mở rộng" : "Thu gọn"}
-            >
-              <MaterialIcon name={isCollapsed ? "chevron_right" : "chevron_left"} className="text-[20px]" />
-            </button>
+              </Link>
+            )}
+            {!isCollapsed ? (
+              <button
+                type="button"
+                onClick={() => onCollapsedChange?.(!isCollapsed)}
+                className="hidden shrink-0 rounded-lg p-1.5 text-on-surface-variant outline-none transition hover:bg-surface-container-low hover:text-[var(--color-markee-primary)] md:flex focus-visible:ring-2 focus-visible:ring-[var(--color-markee-primary)]/40"
+                aria-label="Thu gọn sidebar"
+                title="Thu gọn"
+              >
+                <MaterialIcon name="chevron_left" className="text-[20px]" />
+              </button>
+            ) : null}
           </div>
         </div>
 
