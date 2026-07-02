@@ -285,10 +285,12 @@ export default function InboxModernLayout(props: Props) {
             ["Lead đã lưu", stats.customers, stats.pushed],
             ["Online", sessions.filter(s => s.status === "online").length, sessions.length],
           ].map(([label, val, sub], i) => (
-            <div key={label} className="px-5 py-3">
-              <div className="text-[11px] font-bold uppercase text-on-surface-variant">{String(label)}</div>
-              <div className="mt-1 text-2xl font-black" style={i === 1 ? { color: "var(--color-primary)" } : {}}>{val}</div>
-              {sub !== null && <div className="text-xs text-on-surface-variant">{sub} {i === 0 ? "chưa đọc" : i === 2 ? "đẩy Zalo" : "tài khoản"}</div>}
+            <div key={label} className="px-5 py-2.5">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-lg font-black leading-none" style={i === 1 ? { color: "var(--color-primary)" } : {}}>{val}</span>
+                <span className="text-[11px] font-bold uppercase text-on-surface-variant">{String(label)}</span>
+              </div>
+              {sub !== null && <div className="mt-0.5 text-[11px] text-on-surface-variant">{sub} {i === 0 ? "chưa đọc" : i === 2 ? "đẩy Zalo" : "tài khoản"}</div>}
             </div>
           ))}
         </div>
@@ -601,7 +603,7 @@ export default function InboxModernLayout(props: Props) {
             <div className="mb-2 flex flex-wrap gap-2">
               {activeTemplateGroup.items.slice(0, 3).map(item => (
                 <button key={item} onClick={() => appendTemplate(item)} disabled={!openConv || archiveReading}
-                  className="rounded-full bg-secondary-container px-3 py-1 text-xs font-bold text-on-secondary-container transition hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed">
+                  className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary transition hover:bg-primary/20 disabled:opacity-40 disabled:cursor-not-allowed">
                   {item.length > 34 ? `${item.slice(0, 34)}...` : item}
                 </button>
               ))}
@@ -626,13 +628,19 @@ export default function InboxModernLayout(props: Props) {
 
         {/* Pane 3: Panel (Templates / Customer / KPI) */}
         <aside className="min-w-0 overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm flex flex-col">
-          <div className="grid grid-cols-3 border-b border-outline-variant bg-surface-container-low text-xs font-black shrink-0">
+          <div className="grid grid-cols-3 border-b border-outline-variant bg-surface-container-low text-sm font-black shrink-0">
             <button onClick={() => { setPanelTab("templates"); panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" }); }}
-              className={`py-3 ${panelTab === "templates" ? "bg-surface text-primary" : "text-on-surface-variant"}`}>Mẫu</button>
+              className={`flex items-center justify-center gap-1.5 border-b-2 py-3.5 transition ${panelTab === "templates" ? "border-primary bg-surface text-primary" : "border-transparent text-on-surface-variant hover:text-on-surface"}`}>
+              <MaterialIcon name="chat_bubble" className="text-[16px]" />Mẫu
+            </button>
             <button onClick={() => { setPanelTab("customer"); panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" }); }}
-              className={`py-3 ${panelTab === "customer" ? "bg-surface text-primary" : "text-on-surface-variant"}`}>Khách</button>
+              className={`flex items-center justify-center gap-1.5 border-b-2 py-3.5 transition ${panelTab === "customer" ? "border-primary bg-surface text-primary" : "border-transparent text-on-surface-variant hover:text-on-surface"}`}>
+              <MaterialIcon name="person" className="text-[16px]" />Khách
+            </button>
             <button onClick={() => { setPanelTab("kpi"); panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" }); }}
-              className={`py-3 ${panelTab === "kpi" ? "bg-surface text-primary" : "text-on-surface-variant"}`}>KPI</button>
+              className={`flex items-center justify-center gap-1.5 border-b-2 py-3.5 transition ${panelTab === "kpi" ? "border-primary bg-surface text-primary" : "border-transparent text-on-surface-variant hover:text-on-surface"}`}>
+              <MaterialIcon name="analytics" className="text-[16px]" />KPI
+            </button>
           </div>
 
           <div ref={panelScrollRef} className={`overflow-auto p-4 ${panelH}`}>
