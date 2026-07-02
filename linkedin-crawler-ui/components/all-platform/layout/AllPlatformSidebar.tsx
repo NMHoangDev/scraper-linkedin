@@ -406,13 +406,6 @@ export function AllPlatformSidebar({
     router.push("/auth/login");
   };
 
-  const recentChats = [
-    "tạo cho tôi 1 bài tâm s...",
-    "Nghiên cứu từ khóa c...",
-    "tạo bài viết giới thiệu ...",
-    "tạo bài viết giới thiệu ...",
-  ];
-
   return (
     <>
       {isOpen ? (
@@ -519,77 +512,9 @@ export function AllPlatformSidebar({
             ))}
           </ul>
 
-          {!isCollapsed ? (
-            <>
-              <div className="border-t border-outline-variant pt-2">
-                <div className="flex items-center justify-between px-2">
-                  <h3 className="text-sm font-semibold tracking-wider text-on-surface-variant">Dự án</h3>
-                  <button
-                    type="button"
-                    className="flex items-center gap-0.5 text-sm font-semibold text-[var(--color-markee-primary)] transition hover:scale-105 active:scale-95"
-                  >
-                    <MaterialIcon name="add" className="text-[18px]" />
-                  </button>
-                </div>
-                <Link
-                  href="/all-platform/post-feed"
-                  className={cn(navBaseClass, navIdleClass, "mx-0 mt-1")}
-                  onClick={onClose}
-                >
-                  <MaterialIcon name="folder" className={iconClass} />
-                  <span className="truncate">Dự án</span>
-                </Link>
-              </div>
-
-              <div className="border-t border-outline-variant pt-2">
-                <div className="flex items-center justify-between px-2">
-                  <h3 className="text-sm font-semibold tracking-wider text-on-surface-variant">
-                    Lịch sử trò chuyện
-                  </h3>
-                  <Link
-                    href="/all-platform/post-feed"
-                    className="flex items-center gap-0.5 text-sm font-semibold text-[var(--color-markee-primary)] transition hover:scale-105 active:scale-95"
-                    onClick={onClose}
-                  >
-                    Xem tất cả
-                  </Link>
-                </div>
-                <ul className="space-y-1 py-2">
-                  {recentChats.map((chat, index) => (
-                    <li key={`${chat}-${index}`}>
-                      <Link
-                        href="/all-platform/post-feed"
-                        className="block rounded-lg px-8 py-1.5 text-sm text-on-surface transition hover:bg-surface-container-low"
-                        onClick={onClose}
-                      >
-                        <span className="block truncate">{chat}</span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </>
-          ) : null}
         </nav>
 
         <div className={cn("mt-auto space-y-2 px-2 py-3", isCollapsed && "px-1")}>
-          {!isCollapsed ? (
-            <button
-              type="button"
-              className="flex w-full items-center justify-between rounded-xl border border-outline-variant bg-white px-3 py-3 text-left shadow-sm transition hover:bg-surface-container-low active:scale-[0.98]"
-            >
-              <span>
-                <span className="block text-sm font-bold text-on-surface">Chia sẻ Markee</span>
-                <span className="mt-0.5 block text-xs leading-4 text-on-surface-variant">
-                  Giới thiệu bạn bè của bạn về ứng dụng để nhận credits
-                </span>
-              </span>
-              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-outline-variant text-[var(--color-markee-primary)]">
-                <MaterialIcon name="share" className="text-[18px]" />
-              </span>
-            </button>
-          ) : null}
-
           <div
             className={cn(
               "flex items-center rounded-lg p-2 transition hover:bg-surface-container-low active:scale-[0.98]",
