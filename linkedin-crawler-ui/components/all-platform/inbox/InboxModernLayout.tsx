@@ -302,21 +302,8 @@ export default function InboxModernLayout(props: Props) {
         </div>
       )}
 
-      {/* KPI Progress Cards */}
-      {userEmail && (
-        <div className="mb-4 grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <KpiProgressCard
-            email={userEmail}
-            type="inbox"
-          />
-          <KpiProgressCard
-            email={userEmail}
-            type="lead"
-          />
-        </div>
-      )}
-
-      <div className="mb-4 min-w-0 rounded-xl border border-outline-variant bg-surface p-3 shadow-sm">
+      <div className="mb-4 min-w-0 overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm">
+        <div className="p-4">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div>
             <div className="text-xs font-bold uppercase text-on-surface-variant">Tài khoản nhân viên</div>
@@ -406,6 +393,14 @@ export default function InboxModernLayout(props: Props) {
                 <span className="text-[10px] opacity-70">{statusLabel(session.status)}</span>
               </button>
             ))}
+          </div>
+        )}
+        </div>
+
+        {userEmail && (
+          <div className="grid grid-cols-1 gap-4 border-t border-outline-variant p-4 xl:grid-cols-2">
+            <KpiProgressCard email={userEmail} type="inbox" />
+            <KpiProgressCard email={userEmail} type="lead" />
           </div>
         )}
       </div>
