@@ -176,6 +176,7 @@ export default function InboxModernLayout(props: Props) {
   const [showAddAccountPicker, setShowAddAccountPicker] = useState(false);
   const [trackSearchOpen, setTrackSearchOpen] = useState(false);
   const [trackSearchQuery, setTrackSearchQuery] = useState("");
+  const [trackSelectedIds, setTrackSelectedIds] = useState<Set<string>>(new Set());
   const { user } = useAppAuth();
 
   const selectedSession = sessions.find(s => s.user_id === acc);
@@ -196,15 +197,18 @@ export default function InboxModernLayout(props: Props) {
     pushed: activeConvs.filter(c => c.pushed_to_zalo).length,
   }), [activeConvs, needsReply]);
 
-  // Tim + "theo doi" hoi thoai CU (khong con trong active window ~7 ngay) de luon hien trong Hop thu ve sau.
+  // Quet TOAN BO hoi thoai cu (khong con trong active window ~7 ngay) de chon nhieu + danh dau khach 1 lan,
+  // phong khi nhan vien quen bam "La khach" luc nhan tin.
+  const TRACK_SEARCH_LIMIT = 200;
+  const trackSearchPool = useMemo(() => {
+    const activeIds = new Set(activeConvs.map(c => c.conv_id));
+    return allConvs.filter(c => !c.deleted && !activeIds.has(c.conv_id));
+  }, [allConvs, activeConvs]);
   const trackSearchResults = useMemo(() => {
     const q = trackSearchQuery.trim().toLowerCase();
-    if (!q) return [];
-    const activeIds = new Set(activeConvs.map(c => c.conv_id));
-    return allConvs
-      .filter(c => !c.deleted && !activeIds.has(c.conv_id) && (c.name || "").toLowerCase().includes(q))
-      .slice(0, 8);
-  }, [trackSearchQuery, allConvs, activeConvs]);
+    const filtered = q ? trackSearchPool.filter(c => (c.name || "").toLowerCase().includes(q)) : trackSearchPool;
+    return filtered.slice(0, TRACK_SEARCH_LIMIT);
+  }, [trackSearchQuery, trackSearchPool]);
 
   const canSend = !!openConv && !archiveReading && accOnline && !accPaused && !needRelogin;
   const appendTemplate = (text: string) => setReply(reply.trim() ? `${reply.trim()}\n${text}` : text);
@@ -261,7 +265,15 @@ export default function InboxModernLayout(props: Props) {
 
   return (
     <div className="w-full max-w-full overflow-x-hidden text-on-surface">
-      {/* Header + thống kê nhanh — gộp chung 1 khối thay vì nhiều box rời rạc */}
+      {connErr && <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">Không kết nối được service. Kiểm tra backend.</div>}
+      {needRelogin && <div className="mb-3 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">Cookie hết hạn. Vào Quản lý tài khoản &gt; Tài khoản FB &amp; KPI để đăng nhập lại.</div>}
+      {role === "member" && extInstalled !== null && !sessions.some(s => s.owner === owner) && (
+        <div className="mb-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          {extInstalled === false ? "Chưa cài hoặc chưa mở extension Markee." : "Extension sẵn sàng nhưng tài khoản FB chưa kết nối."}
+        </div>
+      )}
+
+      {/* Toàn bộ header + thống kê + chọn tài khoản + KPI gộp chung 1 khối duy nhất, không tách nhiều box rời rạc */}
       <div className="mb-4 overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
           <div className="flex items-center gap-2">
@@ -294,18 +306,8 @@ export default function InboxModernLayout(props: Props) {
             </div>
           ))}
         </div>
-      </div>
 
-      {connErr && <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">Không kết nối được service. Kiểm tra backend.</div>}
-      {needRelogin && <div className="mb-3 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">Cookie hết hạn. Vào Quản lý tài khoản &gt; Tài khoản FB &amp; KPI để đăng nhập lại.</div>}
-      {role === "member" && extInstalled !== null && !sessions.some(s => s.owner === owner) && (
-        <div className="mb-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-          {extInstalled === false ? "Chưa cài hoặc chưa mở extension Markee." : "Extension sẵn sàng nhưng tài khoản FB chưa kết nối."}
-        </div>
-      )}
-
-      <div className="mb-4 min-w-0 overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm">
-        <div className="p-4">
+        <div className="border-t border-outline-variant p-4">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div>
             <div className="text-xs font-bold uppercase text-on-surface-variant">Tài khoản nhân viên</div>
@@ -408,7 +410,7 @@ export default function InboxModernLayout(props: Props) {
       </div>
 
       {/* 3-Pane layout — always visible */}
-      <div className="grid min-w-0 grid-cols-[280px_1fr_260px] gap-4">
+      <div className="grid min-w-0 grid-cols-[280px_1fr_300px] gap-4">
         {/* Pane 1: Conversation list */}
         <section className="min-w-0 overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm">
           <div className="border-b border-outline-variant p-4">
@@ -440,14 +442,15 @@ export default function InboxModernLayout(props: Props) {
                   setTrackSearchOpen(v => {
                     const next = !v;
                     if (next) onRequestAllConvs?.();
+                    else setTrackSelectedIds(new Set());
                     return next;
                   });
                 }}
-                title="Tìm 1 người cũ (không nhắn gần đây) để luôn hiện trong Hộp thư"
+                title="Quét toàn bộ hội thoại cũ, chọn nhiều rồi đánh dấu là khách 1 lần (phòng khi quên bấm lúc nhắn)"
                 className="inline-flex items-center gap-1 rounded-xl border border-outline-variant px-2.5 py-1.5 text-xs font-bold text-on-surface-variant transition hover:border-primary hover:text-primary"
               >
                 <MaterialIcon name="person_search" className="text-[14px]" />
-                Theo dõi người cũ
+                Quét & đánh dấu khách
               </button>
             </div>
             {trackSearchOpen && (
@@ -456,32 +459,77 @@ export default function InboxModernLayout(props: Props) {
                   autoFocus
                   value={trackSearchQuery}
                   onChange={e => setTrackSearchQuery(e.target.value)}
-                  placeholder={loadingAllConvs ? "Đang tải toàn bộ hội thoại..." : "Gõ tên khách cần tìm (kể cả hội thoại cũ đã ẩn)..."}
+                  placeholder={loadingAllConvs ? "Đang tải toàn bộ hội thoại..." : "Lọc theo tên (để trống = xem hết hội thoại cũ)..."}
                   className="w-full rounded-xl border border-outline-variant bg-surface px-3 py-1.5 text-sm outline-none focus:border-primary"
                 />
-                {trackSearchQuery.trim() && (
-                  <div className="mt-2 max-h-48 space-y-1 overflow-auto">
-                    {trackSearchResults.length === 0 ? (
-                      <div className="px-1 py-2 text-xs text-on-surface-variant">Không tìm thấy hội thoại nào khớp (chỉ tìm được trong dữ liệu đã quét trước đó).</div>
-                    ) : (
-                      trackSearchResults.map(c => (
-                        <div key={c.conv_id} className="flex items-center justify-between gap-2 rounded-xl px-2 py-1.5 hover:bg-surface">
-                          <div className="min-w-0">
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    disabled={trackSearchResults.length === 0}
+                    onClick={() => setTrackSelectedIds(prev =>
+                      prev.size === trackSearchResults.length
+                        ? new Set()
+                        : new Set(trackSearchResults.map(c => c.conv_id))
+                    )}
+                    className="text-xs font-bold text-primary transition hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {trackSelectedIds.size > 0 && trackSelectedIds.size === trackSearchResults.length
+                      ? "Bỏ chọn tất cả"
+                      : `Chọn tất cả (${trackSearchResults.length})`}
+                  </button>
+                  {trackSelectedIds.size > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        trackSelectedIds.forEach(id => mark(id, "is_customer", true));
+                        setTrackSelectedIds(new Set());
+                        setTrackSearchQuery("");
+                        setTrackSearchOpen(false);
+                      }}
+                      className="rounded-xl bg-primary px-2.5 py-1 text-xs font-bold text-white transition hover:opacity-90"
+                    >
+                      Đánh dấu {trackSelectedIds.size} mục là khách
+                    </button>
+                  )}
+                </div>
+                <div className="mt-2 max-h-64 space-y-1 overflow-auto">
+                  {loadingAllConvs ? (
+                    <div className="px-1 py-2 text-xs text-on-surface-variant">Đang tải toàn bộ hội thoại...</div>
+                  ) : trackSearchResults.length === 0 ? (
+                    <div className="px-1 py-2 text-xs text-on-surface-variant">Không có hội thoại nào khớp (chỉ tìm được trong dữ liệu đã quét trước đó).</div>
+                  ) : (
+                    trackSearchResults.map(c => {
+                      const checked = trackSelectedIds.has(c.conv_id);
+                      return (
+                        <label key={c.conv_id} className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-1.5 hover:bg-surface">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => setTrackSelectedIds(prev => {
+                              const next = new Set(prev);
+                              if (next.has(c.conv_id)) next.delete(c.conv_id); else next.add(c.conv_id);
+                              return next;
+                            })}
+                          />
+                          <div className="min-w-0 flex-1">
                             <div className="truncate text-sm font-semibold text-on-surface">{c.name || c.conv_id}</div>
                             <div className="truncate text-xs text-on-surface-variant">{c.preview || "(không có preview)"} · {c.time}</div>
                           </div>
                           <button
                             type="button"
-                            onClick={() => { mark(c.conv_id, "is_customer", true); setTrackSearchQuery(""); setTrackSearchOpen(false); }}
-                            className="shrink-0 rounded-xl bg-primary px-2.5 py-1 text-xs font-bold text-white transition hover:opacity-90"
+                            onClick={() => mark(c.conv_id, "is_customer", true)}
+                            className="shrink-0 rounded-xl border border-primary/30 px-2 py-1 text-[11px] font-bold text-primary transition hover:bg-primary/10"
                           >
-                            Theo dõi
+                            Đánh dấu
                           </button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
+                        </label>
+                      );
+                    })
+                  )}
+                  {trackSearchPool.length > TRACK_SEARCH_LIMIT && (
+                    <div className="px-1 pt-1 text-[10px] text-on-surface-variant">Chỉ hiện {TRACK_SEARCH_LIMIT}/{trackSearchPool.length} — gõ tên để lọc bớt.</div>
+                  )}
+                </div>
               </div>
             )}
           </div>
