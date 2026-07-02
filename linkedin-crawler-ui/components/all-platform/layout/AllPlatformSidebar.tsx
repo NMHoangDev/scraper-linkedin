@@ -539,7 +539,12 @@ export function AllPlatformSidebar({
           {showProfileMenu ? (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
-              <div className="absolute bottom-full left-2 right-2 z-50 mb-2 overflow-hidden rounded-xl border border-outline-variant bg-white shadow-lg">
+              <div
+                className={cn(
+                  "absolute z-50 w-60 overflow-hidden rounded-xl border border-outline-variant bg-white shadow-lg",
+                  isCollapsed ? "bottom-0 left-full ml-2" : "bottom-full left-2 right-2 mb-2",
+                )}
+              >
                 <Link
                   href="/all-platform/profile"
                   onClick={() => { setShowProfileMenu(false); onClose?.(); }}
@@ -569,7 +574,7 @@ export function AllPlatformSidebar({
             <button
               type="button"
               onClick={() => setShowProfileMenu((v) => !v)}
-              className="flex min-w-0 flex-1 items-center gap-2.5 text-left active:scale-[0.98]"
+              className="flex min-w-0 flex-1 items-center gap-2.5 text-left outline-none active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-[var(--color-markee-primary)]/40 rounded-lg"
               title={isCollapsed ? user?.name || user?.email || "Người dùng" : undefined}
             >
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-[var(--color-markee-primary)]">
@@ -590,7 +595,7 @@ export function AllPlatformSidebar({
               <button
                 type="button"
                 title="Thông báo (sắp có)"
-                className="relative rounded-lg p-1.5 text-on-surface-variant transition hover:bg-white hover:text-[var(--color-markee-primary)]"
+                className="relative rounded-lg p-1.5 text-on-surface-variant outline-none transition hover:bg-white hover:text-[var(--color-markee-primary)] focus-visible:ring-2 focus-visible:ring-[var(--color-markee-primary)]/40"
               >
                 <MaterialIcon name="notifications" className="text-[18px]" />
               </button>
