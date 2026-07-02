@@ -449,9 +449,10 @@ export default function InboxModernLayout(props: Props) {
                   });
                 }}
                 title="Tìm 1 người cũ (không nhắn gần đây) để luôn hiện trong Hộp thư"
-                className="rounded-lg border border-outline-variant px-2.5 py-1.5 text-xs font-bold text-on-surface-variant transition hover:border-primary hover:text-primary"
+                className="inline-flex items-center gap-1 rounded-lg border border-outline-variant px-2.5 py-1.5 text-xs font-bold text-on-surface-variant transition hover:border-primary hover:text-primary"
               >
-                🔎 Theo dõi người cũ
+                <MaterialIcon name="person_search" className="text-[14px]" />
+                Theo dõi người cũ
               </button>
             </div>
             {trackSearchOpen && (

@@ -1187,12 +1187,12 @@ function InboxPageContent() {
     try {
       const r = await fbFetch("/inbox/reply", { method: "POST", headers: fbHeaders(), body: JSON.stringify({ user_id: acc, conv_id: convIdForSend, text }) });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) { showToast(d.detail || "Lỗi gửi", false); setStatus("✗ Gửi lỗi"); replyInFlightRef.current = false; return; }
+      if (!r.ok) { showToast(d.detail || "Lỗi gửi", false); setStatus("Gửi lỗi"); replyInFlightRef.current = false; return; }
       const cmd = d.command_id;
       if (!cmd) { setStatus("Đã gửi (đang xác nhận)"); replyInFlightRef.current = false; return; }
       pollReplyStatus(cmd, setStatus, 12, acc, convIdForSend, text, () => { replyInFlightRef.current = false; });
     } catch {
-      showToast("Không kết nối được", false); setStatus("✗ Gửi lỗi");
+      showToast("Không kết nối được", false); setStatus("Gửi lỗi");
       replyInFlightRef.current = false;
     }
   }
@@ -1203,7 +1203,7 @@ function InboxPageContent() {
       const d = await r.json();
       if (d.done) {
         if (d.sent) {
-          setStatus("Đã gửi ✓");
+          setStatus("Đã gửi");
           setConvs(prev => {
             const next = prev.map(c => c.conv_id === convId ? { ...c, preview: sentText, unread: false, time: "Vừa xong" } : c);
             const sentConv = next.find(c => c.conv_id === convId);
@@ -1217,7 +1217,7 @@ function InboxPageContent() {
           }
           showToast("Đã gửi tin thành công", true);
         }
-        else { setStatus("✗ Gửi thất bại"); showToast("FB chưa gửi được — thử lại", false); }
+        else { setStatus("Gửi thất bại"); showToast("FB chưa gửi được — thử lại", false); }
         finish();
         return;
       }
@@ -1361,14 +1361,27 @@ function InboxPageContent() {
       </div>
       <p className="text-sm text-on-surface-variant mb-6">Tin nhắn Messenger tự cập nhật gần như tức thời khi extension đang mở (đọc ngay trên trình duyệt seeder, giải được mã hóa đầu cuối). Đánh dấu khách và trả lời, ưu tiên đẩy khách sang Zalo.</p>
 
-      {connErr && <div className="mb-4 rounded-lg bg-amber-50 border border-amber-300 px-4 py-3 text-sm text-amber-700">⚠️ Không kết nối được Facebook automation service. Kiểm tra backend product và Markee service.</div>}
-      {needRelogin && <div className="mb-4 rounded-lg bg-red-50 border border-red-300 px-4 py-3 text-sm text-red-700">🔑 Cookie tài khoản này đã hết hạn — vào tab Tài khoản đăng nhập lại.</div>}
+      {connErr && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-300 px-4 py-3 text-sm text-amber-700">
+          <MaterialIcon name="warning" className="text-[18px] shrink-0" />
+          <span>Không kết nối được Facebook automation service. Kiểm tra backend product và Markee service.</span>
+        </div>
+      )}
+      {needRelogin && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg bg-red-50 border border-red-300 px-4 py-3 text-sm text-red-700">
+          <MaterialIcon name="lock" className="text-[18px] shrink-0" />
+          <span>Cookie tài khoản này đã hết hạn — vào tab Tài khoản đăng nhập lại.</span>
+        </div>
+      )}
 
       {role === "member" && extInstalled !== null && !sessions.some(s => s.owner === owner) && (
-        <div className="mb-4 rounded-lg bg-blue-50 border border-blue-300 px-4 py-3 text-sm text-blue-800">
-          {extInstalled === false
-            ? "📌 Bạn chưa cài (hoặc chưa mở) extension Markee trên trình duyệt này. Cài + mở extension rồi đăng nhập Facebook — tài khoản của bạn sẽ tự kết nối về đây, không cần thao tác gì thêm."
-            : "📌 Extension đã sẵn sàng nhưng tài khoản Facebook của bạn chưa kết nối. Mở extension (biểu tượng góc phải trình duyệt) và đăng nhập Facebook để kết nối. Giữ 1 tab Messenger mở trong giờ làm để tin nhắn tự về."}
+        <div className="mb-4 flex items-start gap-2 rounded-lg bg-blue-50 border border-blue-300 px-4 py-3 text-sm text-blue-800">
+          <MaterialIcon name="info" className="text-[18px] shrink-0 mt-0.5" />
+          <span>
+            {extInstalled === false
+              ? "Bạn chưa cài (hoặc chưa mở) extension Markee trên trình duyệt này. Cài + mở extension rồi đăng nhập Facebook — tài khoản của bạn sẽ tự kết nối về đây, không cần thao tác gì thêm."
+              : "Extension đã sẵn sàng nhưng tài khoản Facebook của bạn chưa kết nối. Mở extension (biểu tượng góc phải trình duyệt) và đăng nhập Facebook để kết nối. Giữ 1 tab Messenger mở trong giờ làm để tin nhắn tự về."}
+          </span>
         </div>
       )}
 
@@ -1526,14 +1539,14 @@ function InboxPageContent() {
                         {archiveReading
                           ? <div>Bản lưu này chưa có nội dung tin nhắn. Hãy mở hội thoại live một lần để tải thread rồi lưu lại.</div>
                           : needRelogin
-                          ? <div>🔑 Cookie tài khoản đã hết hạn — vào tab <b>Tài khoản</b> đăng nhập lại rồi mở lại hội thoại.</div>
+                          ? <div className="flex items-start gap-1.5"><MaterialIcon name="lock" className="text-[16px] shrink-0 mt-0.5" /><span>Cookie tài khoản đã hết hạn — vào tab <b>Tài khoản</b> đăng nhập lại rồi mở lại hội thoại.</span></div>
                           : accPaused
-                            ? <div>⏸️ Inbox realtime đang <b>tạm dừng</b> trong extension của nhân viên. Bật lại công tắc Inbox realtime trong popup extension để lấy tin mới.</div>
+                            ? <div className="flex items-start gap-1.5"><MaterialIcon name="pause_circle" className="text-[16px] shrink-0 mt-0.5" /><span>Inbox realtime đang <b>tạm dừng</b> trong extension của nhân viên. Bật lại công tắc Inbox realtime trong popup extension để lấy tin mới.</span></div>
                           : !accOnline
-                            ? <div>💤 Tài khoản đang <b>offline</b> — nhân viên cần mở máy + extension và giữ 1 tab Messenger để lấy được tin.</div>
+                            ? <div className="flex items-start gap-1.5"><MaterialIcon name="bedtime" className="text-[16px] shrink-0 mt-0.5" /><span>Tài khoản đang <b>offline</b> — nhân viên cần mở máy + extension và giữ 1 tab Messenger để lấy được tin.</span></div>
                             : <div>Chưa lấy được tin nhắn. Đảm bảo extension đang bật và mở 1 tab <b>Messenger</b> trên máy nhân viên, rồi bấm <b>Quét lại</b>.</div>}
                         {!archiveReading && accOnline && !needRelogin && (
-                          <button onClick={() => openChat(openConv)} className="text-xs px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold transition">↻ Quét lại hội thoại</button>
+                          <button onClick={() => openChat(openConv)} className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold transition"><MaterialIcon name="refresh" className="text-[14px]" />Quét lại hội thoại</button>
                         )}
                       </div>
                     : msgs.map((m, i) => {
