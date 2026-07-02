@@ -261,23 +261,37 @@ export default function InboxModernLayout(props: Props) {
 
   return (
     <div className="w-full max-w-full overflow-x-hidden text-on-surface">
-      {/* Header */}
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
+      {/* Header + thống kê nhanh — gộp chung 1 khối thay vì nhiều box rời rạc */}
+      <div className="mb-4 overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
           <div className="flex items-center gap-2">
             <MaterialIcon name="inbox" className="text-primary" />
-            <h1 className="text-xl font-black">Inbox Facebook</h1>
+            <h1 className="text-base font-black">Inbox Facebook</h1>
           </div>
-          <p className="mt-1 text-sm text-on-surface-variant">Quản lý hội thoại Messenger, lọc lead và trả lời nhanh bằng mẫu có sẵn.</p>
+          <button
+            onClick={scan}
+            disabled={scanning || !acc || !accOnline || needRelogin}
+            className="inline-flex h-9 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-white shadow-sm transition hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <MaterialIcon name={scanning ? "sync" : "travel_explore"} className={`text-base ${scanning ? "animate-spin" : ""}`} />
+            {scanning ? "Đang quét" : "Quét ngay"}
+          </button>
         </div>
-        <button
-          onClick={scan}
-          disabled={scanning || !acc || !accOnline || needRelogin}
-          className="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-white shadow-sm transition hover:bg-on-primary-fixed-variant disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <MaterialIcon name={scanning ? "sync" : "travel_explore"} className={`text-base ${scanning ? "animate-spin" : ""}`} />
-          {scanning ? "Đang quét" : "Quét ngay"}
-        </button>
+
+        <div className="grid grid-cols-2 divide-x divide-y divide-outline-variant border-t border-outline-variant xl:grid-cols-4 xl:divide-y-0">
+          {[
+            ["Hội thoại", activeConvs.length, stats.unread],
+            ["Cần trả lời", stats.need, null],
+            ["Lead đã lưu", stats.customers, stats.pushed],
+            ["Online", sessions.filter(s => s.status === "online").length, sessions.length],
+          ].map(([label, val, sub], i) => (
+            <div key={label} className="px-5 py-3">
+              <div className="text-[11px] font-bold uppercase text-on-surface-variant">{String(label)}</div>
+              <div className="mt-1 text-2xl font-black" style={i === 1 ? { color: "var(--color-primary)" } : {}}>{val}</div>
+              {sub !== null && <div className="text-xs text-on-surface-variant">{sub} {i === 0 ? "chưa đọc" : i === 2 ? "đẩy Zalo" : "tài khoản"}</div>}
+            </div>
+          ))}
+        </div>
       </div>
 
       {connErr && <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">Không kết nối được service. Kiểm tra backend.</div>}
@@ -287,22 +301,6 @@ export default function InboxModernLayout(props: Props) {
           {extInstalled === false ? "Chưa cài hoặc chưa mở extension Markee." : "Extension sẵn sàng nhưng tài khoản FB chưa kết nối."}
         </div>
       )}
-
-      {/* Stats row */}
-      <div className="mb-4 grid min-w-0 grid-cols-2 gap-3 xl:grid-cols-4">
-        {[
-          ["Hội thoại", activeConvs.length, stats.unread],
-          ["Cần trả lời", stats.need, null],
-          ["Lead đã lưu", stats.customers, stats.pushed],
-          ["Online", sessions.filter(s => s.status === "online").length, sessions.length],
-        ].map(([label, val, sub], i) => (
-          <div key={label} className="rounded-xl border border-outline-variant bg-surface px-4 py-3">
-            <div className="text-[11px] font-bold uppercase text-on-surface-variant">{String(label)}</div>
-            <div className="mt-1 text-2xl font-black" style={i === 1 ? { color: "var(--color-primary)" } : {}}>{val}</div>
-            {sub !== null && <div className="text-xs text-on-surface-variant">{sub} {i === 0 ? "chưa đọc" : i === 2 ? "đẩy Zalo" : "tài khoản"}</div>}
-          </div>
-        ))}
-      </div>
 
       {/* KPI Progress Cards */}
       {userEmail && (
