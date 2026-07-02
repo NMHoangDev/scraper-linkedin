@@ -97,6 +97,12 @@ async def _resolve_accounts_for_caller(
     # Luu y: dung id_member thay vi owner_id vi owner_id la UUID column,
     # va gia tri can query la app_users.id (UUID) - tuong thich voi id_member.
     member_uuid = caller_user_id
+    if member_uuid and member_uuid.startswith("zl_"):
+        from app.modules.all_platform.zalo.services.supabase_service import get_zalo_account_by_id
+        acc = await get_zalo_account_by_id(member_uuid)
+        if acc:
+            return [acc]
+
     if caller_email:
         resolved = await get_app_user_id_by_email(caller_email)
         if resolved:
