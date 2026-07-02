@@ -540,60 +540,87 @@ export default function InboxModernLayout(props: Props) {
                 <div className="py-12 text-center text-sm text-on-surface-variant">Đang tải lưu trữ...</div>
               ) : archives.length === 0 ? (
                 <div className="py-12 text-center text-sm text-on-surface-variant">Chưa có hội thoại lưu trữ.</div>
-              ) : archives.map(item => (
+              ) : archives.map(item => {
+                const initial = (item.name || "?").trim().charAt(0).toUpperCase() || "?";
+                const active = openConv === item.conv_id && archiveReading;
+                return (
                 <button
                   key={item.conv_id}
                   onClick={() => openArchive(item.conv_id)}
-                  className={`mb-2 block w-full rounded-xl border p-3 text-left transition hover:border-primary ${openConv === item.conv_id && archiveReading ? "border-primary bg-primary/5" : "border-outline-variant bg-surface"}`}
+                  className={`mb-0.5 flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left transition ${active ? "bg-primary/10" : "hover:bg-surface-container-low"}`}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-black">{item.name || item.conv_id}</div>
-                      <div className="mt-1 truncate text-xs text-on-surface-variant">{item.preview || "—"}</div>
-                    </div>
-                    <span className="whitespace-nowrap text-xs text-on-surface-variant">{item.messages_count || 0} tin</span>
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-outline-variant/40 text-base font-black text-on-surface-variant">
+                    {initial}
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {item.is_customer && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">khách</span>}
-                    {item.pushed_to_zalo && <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">Zalo</span>}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <div className="truncate text-sm font-semibold text-on-surface">{item.name || item.conv_id}</div>
+                      <span className="shrink-0 text-[11px] text-on-surface-variant">{item.messages_count || 0} tin</span>
+                    </div>
+                    <div className="truncate text-xs text-on-surface-variant">{item.preview || "—"}</div>
+                    {(item.is_customer || item.pushed_to_zalo) && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {item.is_customer && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">khách</span>}
+                        {item.pushed_to_zalo && <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[9px] font-bold text-blue-700">Zalo</span>}
+                      </div>
+                    )}
                   </div>
                 </button>
-              ))
+                );
+              })
             ) : loadingConvs && filtered.length === 0 ? (
               <div className="py-12 text-center text-sm text-on-surface-variant">Đang tải hộp thư...</div>
             ) : filtered.length === 0 ? (
               <div className="py-12 text-center text-sm text-on-surface-variant">Chưa có hội thoại.</div>
-            ) : filtered.map(conv => (
+            ) : filtered.map(conv => {
+              const initial = (conv.name || "?").trim().charAt(0).toUpperCase() || "?";
+              const active = openConv === conv.conv_id && !archiveReading;
+              return (
               <button
                 key={conv.conv_id}
                 onClick={() => openChat(conv.conv_id)}
                 onMouseEnter={() => hoverConv?.(conv.conv_id)}
-                className={`mb-2 block w-full rounded-xl border p-3 text-left transition hover:border-primary ${openConv === conv.conv_id && !archiveReading ? "border-primary bg-primary/5" : "border-outline-variant bg-surface"}`}
+                className={`mb-0.5 flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left transition ${active ? "bg-primary/10" : "hover:bg-surface-container-low"}`}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className={`truncate text-sm ${conv.unread ? "font-black" : "font-bold"}`}>{conv.name || "Người dùng"}</div>
-                    <div className="mt-1 truncate text-xs text-on-surface-variant">{conv.preview || "—"}</div>
+                <div className="relative shrink-0">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-base font-black text-primary">
+                    {initial}
                   </div>
-                  <span className="whitespace-nowrap text-xs text-on-surface-variant">{conv.time}</span>
+                  {conv.unread && <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-surface bg-primary" />}
                 </div>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {needsReply(conv) && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">cần trả lời</span>}
-                  {conv.unread && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">chưa đọc</span>}
-                  {conv.is_customer && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">khách</span>}
-                  {conv.pushed_to_zalo && <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">Zalo</span>}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div className={`truncate text-sm ${conv.unread ? "font-black text-on-surface" : "font-semibold text-on-surface"}`}>{conv.name || "Người dùng"}</div>
+                    <span className="shrink-0 text-[11px] text-on-surface-variant">{conv.time}</span>
+                  </div>
+                  <div className={`truncate text-xs ${conv.unread ? "font-semibold text-on-surface" : "text-on-surface-variant"}`}>{conv.preview || "—"}</div>
+                  {(needsReply(conv) || conv.is_customer || conv.pushed_to_zalo) && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {needsReply(conv) && <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[9px] font-bold text-red-700">cần trả lời</span>}
+                      {conv.is_customer && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">khách</span>}
+                      {conv.pushed_to_zalo && <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[9px] font-bold text-blue-700">Zalo</span>}
+                    </div>
+                  )}
                 </div>
               </button>
-            ))}
+              );
+            })}
           </div>
         </section>
 
         {/* Pane 2: Chat */}
         <section className="flex h-[656px] min-w-0 flex-col overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm xl:h-[716px]">
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-outline-variant px-4 py-3 bg-surface-container-low">
-            <div className="min-w-0">
-              <h2 className="truncate text-base font-black">{selectedName || "Hội thoại"}</h2>
-              <p className="truncate text-xs text-on-surface-variant">{selectedPreview || (openConv ? "Đang xem nội dung" : "Chọn hội thoại để bắt đầu")}</p>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant px-4 py-3 bg-surface">
+            <div className="flex min-w-0 items-center gap-3">
+              {openConv && (
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-black text-primary">
+                  {(selectedName || "?").trim().charAt(0).toUpperCase() || "?"}
+                </div>
+              )}
+              <div className="min-w-0">
+                <h2 className="truncate text-base font-black">{selectedName || "Hội thoại"}</h2>
+                <p className="truncate text-xs text-on-surface-variant">{selectedPreview || (openConv ? "Đang xem nội dung" : "Chọn hội thoại để bắt đầu")}</p>
+              </div>
             </div>
             {selectedConv && !archiveReading && (
               <div className="flex flex-wrap gap-2">
@@ -634,7 +661,7 @@ export default function InboxModernLayout(props: Props) {
                   return (
                     <div key={`${index}-${message.clientId || time}`} className={`flex ${message.from === "me" ? "justify-end" : "justify-start"}`}>
                       <div className={`max-w-[78%] ${message.from === "me" ? "text-right" : "text-left"}`}>
-                        <div className={`whitespace-pre-wrap rounded-xl px-3 py-2 text-sm leading-relaxed ${message.from === "me" ? "bg-primary text-white" : "bg-surface text-on-surface shadow-sm ring-1 ring-outline-variant"}`}>
+                        <div className={`whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${message.from === "me" ? "bg-primary text-white" : "bg-surface-container-low text-on-surface"}`}>
                           {content}
                         </div>
                         {time && <div className="mt-1 px-1 text-[10px] text-on-surface-variant">{time}</div>}
