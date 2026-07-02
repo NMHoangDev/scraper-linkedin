@@ -24,6 +24,10 @@ interface Props {
   role: string;
   owner: string;
   sessions: Session[];
+  rawSessions?: Session[];
+  allowedOwnerIds?: Set<string> | null;
+  extraAccountIds?: Set<string>;
+  toggleExtraAccount?: (userId: string) => void;
   ownerNames: Record<string, string>;
   teams: TeamRow[];
   acc: string;
@@ -146,7 +150,8 @@ function statusLabel(status?: string): string {
 
 export default function InboxModernLayout(props: Props) {
   const {
-    role, owner, sessions, ownerNames, teams, acc, accOnline, accPaused,
+    role, owner, sessions, rawSessions = [], allowedOwnerIds = null, extraAccountIds = new Set<string>(), toggleExtraAccount,
+    ownerNames, teams, acc, accOnline, accPaused,
     needRelogin, connErr, extInstalled, scanning, loadingConvs, loadingArchives,
     loadingChat, loadingFresh, archiveReading, viewMode, filter, activeConvs, filtered,
     archives, openConv, msgs, reply, customerNotes, savingNoteConv, toast,
@@ -165,6 +170,7 @@ export default function InboxModernLayout(props: Props) {
   const [isBulkSuggesting, setIsBulkSuggesting] = useState(false);
   const [isBulkVerifying, setIsBulkVerifying] = useState(false);
   const [showLeadModal, setShowLeadModal] = useState(false);
+  const [showAddAccountPicker, setShowAddAccountPicker] = useState(false);
   const { user } = useAppAuth();
 
   const selectedSession = sessions.find(s => s.user_id === acc);
@@ -332,6 +338,38 @@ export default function InboxModernLayout(props: Props) {
               >
                 {isBulkSuggesting ? "ĐANG ĐỀ XUẤT..." : "ĐỀ XUẤT TÍNH KPI HÀNG LOẠT"}
               </button>
+            )}
+            {(role === "admin" || role === "leader") && typeof toggleExtraAccount === "function" && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowAddAccountPicker(v => !v)}
+                  className="rounded-lg border border-outline-variant px-3 py-1.5 text-xs font-bold text-on-surface-variant transition hover:border-primary hover:text-primary"
+                >
+                  + Thêm tài khoản khác
+                </button>
+                {showAddAccountPicker && (
+                  <div className="absolute right-0 z-20 mt-1 w-72 max-h-80 overflow-auto rounded-lg border border-outline-variant bg-surface p-2 shadow-lg">
+                    <div className="px-1 pb-1.5 text-[11px] text-on-surface-variant">Chọn thêm acc ngoài phạm vi mặc định (team/của bạn) để hiện trong Inbox — chỉ lưu trên trình duyệt này.</div>
+                    {rawSessions.length === 0 ? (
+                      <div className="px-1 py-2 text-xs text-on-surface-variant">Chưa có acc nào.</div>
+                    ) : (
+                      rawSessions.map(s => {
+                        const inDefaultScope = allowedOwnerIds === null || (!!s.owner && allowedOwnerIds.has(String(s.owner)));
+                        const checked = extraAccountIds.has(s.user_id);
+                        return (
+                          <label key={s.user_id} className={`flex items-center gap-2 rounded px-1.5 py-1 text-xs cursor-pointer hover:bg-surface-container-low ${inDefaultScope ? "opacity-50" : ""}`}>
+                            <input type="checkbox" checked={checked || inDefaultScope} disabled={inDefaultScope} onChange={() => toggleExtraAccount(s.user_id)} />
+                            <span className={`inline-block h-1.5 w-1.5 rounded-full ${statusClasses(s.status)}`} />
+                            <span className="truncate">{accLabel(s)}</span>
+                            {inDefaultScope && <span className="ml-auto shrink-0 text-[10px] text-on-surface-variant">(mặc định)</span>}
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
             )}
             <div className="text-xs text-on-surface-variant hidden md:block">Online realtime, offline chỉ xem dữ liệu.</div>
           </div>

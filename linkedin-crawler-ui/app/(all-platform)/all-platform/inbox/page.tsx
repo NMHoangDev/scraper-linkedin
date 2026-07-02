@@ -1269,6 +1269,10 @@ function InboxPageContent() {
         role={role}
         owner={owner}
         sessions={sessions}
+        rawSessions={rawSessions}
+        allowedOwnerIds={allowedOwnerIds}
+        extraAccountIds={extraAccountIds}
+        toggleExtraAccount={toggleExtraAccount}
         ownerNames={ownerNames}
         teams={teams}
         acc={acc}
