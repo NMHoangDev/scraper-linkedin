@@ -383,7 +383,7 @@ export default function DangBaiPage() {
     const groupKey = accountGroupIdentity(group);
     const selectionKey = accountGroupSelectionKey(uid, group);
     if (!groupKey || !selectionKey) return;
-    const ok = window.confirm(`Xóa group "${group.name || group.url || group.group_id}" khỏi cache của ${accountLabelMap.get(uid) || shortFbId(uid)}?`);
+    const ok = window.confirm(`Xóa "${group.name || group.url || group.group_id}" khỏi cache của ${accountLabelMap.get(uid) || shortFbId(uid)}?\n\nLƯU Ý: group này sẽ bị loại trừ VĨNH VIỄN, không tự hiện lại dù quét lại nhiều lần (chỉ dùng để lọc group rác). Không phải để "làm sạch rồi quét lại" — nếu lỡ xoá nhầm, có nút "Khôi phục group đã ẩn" khi danh sách group trống.`);
     if (!ok) return;
 
     setDeletingAccountGroupKeys(prev => new Set([...prev, selectionKey]));
@@ -407,6 +407,21 @@ export default function DangBaiPage() {
         next.delete(selectionKey);
         return next;
       });
+    }
+  }
+
+  async function restoreExcludedGroups(uid: string) {
+    const ok = window.confirm(`Khôi phục toàn bộ group đã bị ẩn/xoá trước đó cho ${accountLabelMap.get(uid) || shortFbId(uid)}? Sau khi khôi phục, bấm "Quét" lại để cập nhật danh sách.`);
+    if (!ok) return;
+    try {
+      const r = await fbFetch("/account-groups/reset-excluded", {
+        method: "POST", headers: fbHeaders(), body: JSON.stringify({ user_id: uid }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || "Không khôi phục được");
+      toast.success(`Đã khôi phục ${d.restored || 0} group bị ẩn — bấm "Quét" lại để cập nhật danh sách.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không khôi phục được");
     }
   }
 
@@ -816,8 +831,14 @@ export default function DangBaiPage() {
                                 Tài khoản này đang dùng extension cũ nên chưa quét được group.
                               </div>
                             ) : list.length === 0 ? (
-                              <div className="p-sm text-body-sm text-on-surface-variant">
-                                Chưa có group trong cache. Bấm Quét để cập nhật group của tài khoản này.
+                              <div className="p-sm text-body-sm text-on-surface-variant space-y-xs">
+                                <div>Chưa có group trong cache. Bấm Quét để cập nhật group của tài khoản này.</div>
+                                <div>
+                                  Nếu trước đó đã lỡ xoá hết group (xoá = loại trừ vĩnh viễn khỏi lần quét sau), bấm{" "}
+                                  <button type="button" onClick={() => restoreExcludedGroups(e.user_id)} className="font-bold text-primary hover:underline">
+                                    khôi phục group đã ẩn
+                                  </button>{" "}rồi quét lại.
+                                </div>
                               </div>
                             ) : (
                               <div className="p-sm space-y-sm">
