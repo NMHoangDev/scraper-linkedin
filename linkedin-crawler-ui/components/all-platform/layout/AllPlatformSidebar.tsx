@@ -32,7 +32,7 @@ type SidebarEntry = NavLeafItem | NavGroupItem;
 const navBaseClass =
   "flex min-h-[36px] items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-sm font-medium leading-relaxed transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-markee-primary)]/40";
 const navActiveClass = "rounded-md bg-[var(--color-markee-primary)] text-white font-semibold";
-const navActiveIndentedClass = "border-l-2 border-[var(--color-markee-primary)] text-[var(--color-markee-primary)] font-semibold";
+const navActiveIndentedClass = "text-[var(--color-markee-primary)] font-semibold";
 const navIdleClass = "text-on-surface hover:bg-surface-container-low";
 const iconClass = "shrink-0 text-[18px]";
 
@@ -289,8 +289,8 @@ function SidebarLink({
         navBaseClass,
         active ? (indented ? navActiveIndentedClass : navActiveClass) : navIdleClass,
         collapsed && "justify-center px-2",
-        indented && !collapsed && "ml-6 rounded-none border-l pl-5",
-        indented && !collapsed && !active && "border-outline-variant",
+        indented && !collapsed && "ml-6 rounded-none border-l-2 pl-5",
+        indented && !collapsed && (active ? "border-[var(--color-markee-primary)]" : "border-transparent"),
       )}
       aria-current={active ? "page" : undefined}
       onClick={onNavigate}
@@ -432,7 +432,7 @@ export function AllPlatformSidebar({
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-outline-variant bg-white text-on-surface shadow-xl transition-all duration-300 lg:translate-x-0 lg:shadow-none",
+          "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-outline-variant bg-surface-container-low text-on-surface shadow-xl transition-all duration-300 lg:translate-x-0 lg:shadow-none",
           isCollapsed ? "w-[70px]" : "w-[280px]",
           isOpen ? "translate-x-0" : "-translate-x-full",
         )}
@@ -515,16 +515,16 @@ export function AllPlatformSidebar({
         </div>
 
         {!isCollapsed ? (
-          <div className="px-3 py-2">
-            <div className="grid grid-cols-2 rounded-xl bg-surface-container-low p-1">
+          <div className="px-3 pt-2">
+            <div className="flex items-center gap-4 border-b border-outline-variant">
               <button
                 type="button"
                 onClick={() => setWorkspaceTab("personal")}
                 className={cn(
-                  "rounded-lg px-3 py-1.5 text-sm font-semibold transition",
+                  "-mb-px border-b-2 px-1 pb-2 text-sm font-semibold transition",
                   workspaceTab === "personal"
-                    ? "bg-[var(--color-markee-primary)] text-white shadow-sm"
-                    : "text-on-surface-variant hover:bg-white hover:text-on-surface",
+                    ? "border-[var(--color-markee-primary)] text-[var(--color-markee-primary)]"
+                    : "border-transparent text-on-surface-variant hover:text-on-surface",
                 )}
               >
                 Cá nhân
@@ -533,10 +533,10 @@ export function AllPlatformSidebar({
                 type="button"
                 onClick={() => setWorkspaceTab("team")}
                 className={cn(
-                  "rounded-lg px-3 py-1.5 text-sm font-semibold transition",
+                  "-mb-px border-b-2 px-1 pb-2 text-sm font-semibold transition",
                   workspaceTab === "team"
-                    ? "bg-[var(--color-markee-primary)] text-white shadow-sm"
-                    : "text-on-surface-variant hover:bg-white hover:text-on-surface",
+                    ? "border-[var(--color-markee-primary)] text-[var(--color-markee-primary)]"
+                    : "border-transparent text-on-surface-variant hover:text-on-surface",
                 )}
               >
                 Nhóm
