@@ -12,7 +12,7 @@ export default function TeamManagementPage() {
 
   useEffect(() => {
     if (isLoading) return;
-    if (user?.role === "leader") {
+    if (user?.role === "leader" || user?.role === "admin") {
       setAuthorized(true);
     } else {
       // Member hoặc chưa đăng nhập → redirect

@@ -17,8 +17,8 @@ export default function ZaloChatFullScreenPage() {
   // Chỉ member/staff mới vào được (leader đã có flow riêng)
   useEffect(() => {
     if (isLoading || !user) return;
-    if (user.role === "leader" || user.role === "admin") {
-      // Leader thì dùng flow team-management (đã có nút "Xem Inbox")
+    if (user.role === "leader") {
+      // Leader thì dùng flow team-management (đã có nút "Xem Inbox"). Admin xem chat trực tiếp như member.
       router.replace("/all-platform/leader/team");
     }
   }, [user, isLoading, router]);
@@ -27,7 +27,7 @@ export default function ZaloChatFullScreenPage() {
     router.push("/all-platform/tai-khoan");
   }
 
-  if (isLoading || !user || user.role === "leader" || user.role === "admin") {
+  if (isLoading || !user || user.role === "leader") {
     return (
       <div className="h-screen flex items-center justify-center bg-slate-50">
         <div className="w-10 h-10 border-4 border-outline-variant border-t-primary rounded-full animate-spin" />
