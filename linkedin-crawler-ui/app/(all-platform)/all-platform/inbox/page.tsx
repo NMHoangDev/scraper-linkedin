@@ -1044,11 +1044,9 @@ function InboxPageContent() {
       prevLoadedAt = d0.loaded_at || null;
       loadedAtRef.current.set(conv_id, prevLoadedAt);
       if (d0.messages?.length) {
-        if (d0.messages.length >= msgsRef.current.length) {
-          const merged = mergeThreadMessages(msgsRef.current, d0.messages);
-          setMsgs(merged); msgsRef.current = merged;
-          saveThreadCache(conv_id, merged, prevLoadedAt);
-        }
+        const merged = mergeThreadMessages(msgsRef.current, d0.messages);
+        setMsgs(merged); msgsRef.current = merged;
+        saveThreadCache(conv_id, merged, prevLoadedAt);
         setLoadingChat(false);
       }
     } catch { /* ignore */ }
@@ -1082,7 +1080,9 @@ function InboxPageContent() {
       const d = await r.json();
       if (selectedAccRef.current !== accountId || openConvRef.current !== conv_id) return;
       const fetched: Msg[] = d.messages || [];
-      if (fetched.length >= msgsRef.current.length) {
+      // Luon merge (khong con dieu kien "fetched dai hon moi merge") - mergeThreadMessages da
+      // tu dedup/union an toan, gate cu co the bo sot tin da gui khi ban scan tra ve it hon tam thoi.
+      if (fetched.length) {
         const merged = mergeThreadMessages(msgsRef.current, fetched);
         setMsgs(merged); msgsRef.current = merged;
         saveThreadCache(conv_id, merged, d.loaded_at ?? undefined);

@@ -263,7 +263,7 @@ export default function InboxModernLayout(props: Props) {
     }
   };
 
-  const panelH = "h-[590px] xl:h-[676px]";
+  const panelH = "flex-1 min-h-0";
 
   return (
     <div className="w-full max-w-full overflow-x-hidden text-on-surface">
@@ -418,10 +418,10 @@ export default function InboxModernLayout(props: Props) {
       </div>
 
       {/* 3-Pane layout — always visible */}
-      <div className="grid min-w-0 grid-cols-[280px_1fr_300px] gap-4">
+      <div className="grid min-w-0 grid-cols-[280px_1fr_340px] gap-4">
         {/* Pane 1: Conversation list */}
-        <section className="min-w-0 overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm">
-          <div className="border-b border-outline-variant p-4">
+        <section className="flex h-[656px] min-w-0 flex-col overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm xl:h-[716px]">
+          <div className="shrink-0 border-b border-outline-variant p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-base font-black">Hộp thư</h2>
@@ -542,7 +542,7 @@ export default function InboxModernLayout(props: Props) {
             )}
           </div>
 
-          <div className="h-[560px] overflow-auto p-3 xl:h-[620px]">
+          <div className="flex-1 min-h-0 overflow-auto p-3">
             {viewMode === "archive" ? (
               loadingArchives && archives.length === 0 ? (
                 <div className="py-12 text-center text-sm text-on-surface-variant">Đang tải lưu trữ...</div>
@@ -669,7 +669,7 @@ export default function InboxModernLayout(props: Props) {
                   return (
                     <div key={`${index}-${message.clientId || time}`} className={`flex ${message.from === "me" ? "justify-end" : "justify-start"}`}>
                       <div className={`max-w-[78%] ${message.from === "me" ? "text-right" : "text-left"}`}>
-                        <div className={`whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${message.from === "me" ? "bg-primary text-white" : "bg-surface-container-low text-on-surface"}`}>
+                        <div className={`whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${message.from === "me" ? "bg-primary text-white" : "bg-surface text-on-surface shadow-sm"}`}>
                           {content}
                         </div>
                         {time && <div className="mt-1 px-1 text-[10px] text-on-surface-variant">{time}</div>}
@@ -710,7 +710,7 @@ export default function InboxModernLayout(props: Props) {
         </section>
 
         {/* Pane 3: Panel (Templates / Customer / KPI) */}
-        <aside className="min-w-0 overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm flex flex-col">
+        <aside className="flex h-[656px] min-w-0 flex-col overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm xl:h-[716px]">
           <div className="grid grid-cols-3 border-b border-outline-variant bg-surface-container-low text-sm font-black shrink-0">
             <button onClick={() => { setPanelTab("templates"); panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" }); }}
               className={`flex items-center justify-center gap-1.5 border-b-2 py-3.5 transition ${panelTab === "templates" ? "border-primary bg-surface text-primary" : "border-transparent text-on-surface-variant hover:text-on-surface"}`}>
