@@ -252,6 +252,13 @@ export function ZaloInboxAdminShell() {
     }
   }, [inbox.selectedAccountId]);
 
+  // Reset selected campaign messages and target recipients when conversation or account changes
+  useEffect(() => {
+    setSelectedMessageIds([]);
+    setEditedMessagesText({});
+    setAutoSendTargetIds([]);
+  }, [inbox.openConv, inbox.selectedAccountId]);
+
   // Selected conversation objects mapped
   const selectedConv = useMemo<ZaloConv | null>(
     () => inbox.filtered.find((c) => c.conv_id === inbox.openConv) ?? null,
@@ -1255,6 +1262,7 @@ export function ZaloInboxAdminShell() {
                       </div>
                       <div className="h-[120px] overflow-y-auto border border-slate-200 rounded p-1.5 space-y-1 bg-white">
                         {inbox.filtered
+                          .filter(c => c.conv_id !== inbox.openConv)
                           .filter(c => (c.name || "").toLowerCase().includes(autoSendSearchQuery.toLowerCase()))
                           .map((c) => (
                             <label key={c.conv_id} className="flex items-center gap-1.5 p-1 rounded hover:bg-slate-50 cursor-pointer">

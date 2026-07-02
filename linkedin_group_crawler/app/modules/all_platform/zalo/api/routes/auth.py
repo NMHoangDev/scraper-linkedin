@@ -51,6 +51,7 @@ from app.modules.all_platform.zalo.services.zca_persistent_listener import (
     get_listener_status,
     start_listener,
     stop_listener,
+    reset_listener_auth_expired,
 )
 from app.modules.all_platform.zalo.services.zca_qr_bridge import (
     import_zca_auth_to_context,
@@ -500,6 +501,7 @@ async def _handle_zca_qr_events(session_id: str) -> None:
                 cookie_str = "; ".join(f"{c.get('key')}={c.get('value')}" for c in cookies if c.get("key") and c.get("value") is not None)
                 
             await _remember_zalo_user(session.user_id, "confirmed", cookie=cookie_str)
+            reset_listener_auth_expired(session.user_id)
 
             # ── Background: first-time sync (groups + friends + messages) then start listener ───
             async def _background_qr_sync(uid: str, uauth: dict):
@@ -1068,7 +1070,7 @@ async def auth_status_events(
 ):
     from app.modules.all_platform.zalo.services.message_events import (
         publish_auth_expired,
-        wait_for_auth_expired,
+        wait_for_auth_expired_user,
     )
 
     normalized_user_id = _normalize_user_id(user_id)
@@ -1088,8 +1090,10 @@ async def auth_status_events(
                 break
 
             # 1. Kiểm tra auth_expired event từ ZCA listener (chờ tối đa _POLL_INTERVAL giây).
-            expired_event = await wait_for_auth_expired(timeout=_POLL_INTERVAL)
-            if expired_event is not None and expired_event[0] == normalized_user_id:
+            # Dùng per-user queue để tránh race condition khi nhiều user cùng online:
+            # wait_for_auth_expired_user chỉ đọc queue của normalized_user_id này.
+            expired_event = await wait_for_auth_expired_user(normalized_user_id, timeout=_POLL_INTERVAL)
+            if expired_event is not None:
                 # Dọn dẹp auth và build payload "session_expired" để push ngay về FE.
                 try:
                     from app.modules.all_platform.zalo.services.zca_auth_store import delete_zca_auth
@@ -1133,7 +1137,7 @@ async def auth_status_events(
                         yield "event: close\ndata: {}\n\n"
                         return
                 else:
-                    yield "event: heartbeat\ndata: {}\n\n"
+                    yield f"event: heartbeat\ndata: {{\"ts\":{int(time.time())}}}\n\n"
             except Exception as exc:
                 logger.warning(f"SSE auth status stream error for user={normalized_user_id}: {exc}")
                 yield "event: error\ndata: {\"message\":\"status_stream_error\"}\n\n"
@@ -1409,7 +1413,15 @@ async def import_session_from_extension(
             except Exception as exc:
                 logger.warning(f"Failed to parse cookies JSON object: {exc}")
         else:
-            # Plain "k=v; k=v" format
+            # Plain "k=v; k=v" format — LEGACY, không được khuyến nghị.
+            # Format này không cung cấp httpOnly/secure/domain → không đủ thông tin
+            # để import cookie an toàn. Cảnh báo để caller chuyển sang structured format.
+            # Vẫn hỗ trợ để không break backward compatibility nhưng log warning rõ ràng.
+            logger.warning(
+                f"import-session: received legacy 'k=v; k=v' cookie string format for user={user_id}. "
+                "This format is deprecated and lacks httpOnly/secure/domain metadata. "
+                "Please upgrade to structured Chrome-cookie array format."
+            )
             for part in stripped.split(";"):
                 part = part.strip()
                 if "=" in part:
@@ -1417,8 +1429,10 @@ async def import_session_from_extension(
                     parsed_cookies.append({
                         "key": k.strip(),
                         "value": v.strip(),
-                        "domain": "chat.zalo.me",
+                        "domain": ".zalo.me",  # Dùng .zalo.me thay vì chat.zalo.me để rộng hơn
                         "path": "/",
+                        "httpOnly": True,
+                        "secure": True,
                     })
 
     if not parsed_cookies:
@@ -1506,6 +1520,7 @@ async def import_session_from_extension(
         f"Imported extension session for user={user_id}, "
         f"session={session_id}, cookies={len(parsed_cookies)} keys=[{cookie_keys_str}]"
     )
+    reset_listener_auth_expired(user_id)
 
     # ── Background: first-time sync then start persistent listener ───
     async def _background_extension_sync(uid: str, uauth: dict):

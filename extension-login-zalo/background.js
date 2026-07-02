@@ -2,7 +2,47 @@ const REQUIRED_COOKIE_KEYS = ["zppsid", "zppwsid", "zpsid", "zphpsid"];
 const DEFAULT_BACKEND_URL = "http://localhost:8082";
 const ZALO_URL = "https://chat.zalo.me/";
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+// Origins được phép gửi messages tới background (từ manifest content_scripts matches).
+// Bao gồm cả extension origin để popup/offscreen page hoạt động.
+const ALLOWED_SENDER_ORIGINS = new Set([
+  "http://localhost",
+  "http://127.0.0.1",
+  "https://localhost",
+  "https://127.0.0.1",
+  "https://auto-fb.zenithglobal.dev",
+  "https://seeding.zenithglobal.dev",
+  "https://seeding.markeeai.com",
+]);
+
+function isTrustedSender(sender) {
+  // Messages từ extension popup hoặc offscreen document luôn tin cậy
+  if (!sender.tab) return true; // không có tab = từ extension context
+
+  const tabUrl = sender.tab?.url || "";
+  if (!tabUrl) return false;
+
+  try {
+    const origin = new URL(tabUrl).origin;
+    if (ALLOWED_SENDER_ORIGINS.has(origin)) return true;
+
+    // Fallback: cho phép localhost với bất kỳ port nào
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
+  } catch (_) {
+    // URL parse failed
+  }
+  return false;
+}
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // B22: Validate sender origin — chặn messages từ tabs không được phép
+  // (ví dụ: nếu extension bị inject vào trang ngoài whitelist)
+  if (!isTrustedSender(sender)) {
+    const senderUrl = sender.tab?.url || "(no tab)";
+    console.warn("[zalo-extension] blocked message from untrusted sender:", senderUrl, message?.action);
+    sendResponse({ success: false, error: "Sender origin not trusted" });
+    return true;
+  }
+
   const action = message?.action || message?.type;
   const data = message?.data || {};
 

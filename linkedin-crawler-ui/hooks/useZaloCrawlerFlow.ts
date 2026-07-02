@@ -505,6 +505,12 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
   }, [userId]);
 
   useEffect(() => {
+    if (appUser?.email) {
+      setEmail(appUser.email);
+    }
+  }, [appUser?.email]);
+
+  useEffect(() => {
     sessionIdRef.current = sessionId;
   }, [sessionId]);
 

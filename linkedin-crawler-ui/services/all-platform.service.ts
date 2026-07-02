@@ -678,6 +678,14 @@ export const zaloInboxShareService = {
       body: JSON.stringify({ member_email, start_date, end_date }),
     });
   },
+
+  /** Hủy chia sẻ tất cả các cuộc hội thoại chưa được duyệt KPI. */
+  revokeAll: (payload: { account_id: string; member_email: string }): Promise<ApiResponse<{ count: number }>> => {
+    return requestJson(`${BASE}/zalo/inbox-share/revoke-all`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
 };
 
 // ── UNIFIED POSTS (Tong-hop — no cache, all server-side) ─────────────────────

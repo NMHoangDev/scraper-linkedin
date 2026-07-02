@@ -37,13 +37,19 @@
         "https://seeding.zenithglobal.dev/*",
         "https://seeding.markeeai.com/*"
       ],
-      "js": ["page-bridge.js"],
+      "js": [
+        "page-bridge.js"
+      ],
       "run_at": "document_start",
       "all_frames": false
     },
     {
-      "matches": ["https://chat.zalo.me/*"],
-      "js": ["zalo-content.js"],
+      "matches": [
+        "https://chat.zalo.me/*"
+      ],
+      "js": [
+        "zalo-content.js"
+      ],
       "run_at": "document_idle",
       "all_frames": false
     }
