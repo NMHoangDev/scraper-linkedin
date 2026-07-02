@@ -206,6 +206,9 @@ function InboxPageContent() {
   const role = user?.role || "member";
 
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [rawSessions, setRawSessions] = useState<Session[]>([]); // TOÀN BỘ acc (chưa lọc theo scope) — dùng cho picker "thêm tài khoản khác"
+  const [extraAccountIds, setExtraAccountIds] = useState<Set<string>>(new Set()); // acc admin/leader tự chọn thêm ngoài scope mặc định
+  const [showAddAccountPicker, setShowAddAccountPicker] = useState(false);
   const [acc, setAcc] = useState("");
   const [scopeReady, setScopeReady] = useState(false);
   const [allowedOwnerIds, setAllowedOwnerIds] = useState<Set<string> | null>(new Set());
@@ -422,9 +425,32 @@ function InboxPageContent() {
 
   const sessionInScope = useCallback((session: Session) => {
     if (!scopeReady) return false;
+    if (extraAccountIds.has(session.user_id)) return true; // admin/leader tự thêm ngoài scope
     if (allowedOwnerIds === null) return true;
     return !!session.owner && allowedOwnerIds.has(String(session.owner));
-  }, [allowedOwnerIds, scopeReady]);
+  }, [allowedOwnerIds, scopeReady, extraAccountIds]);
+
+  // Nạp danh sách acc admin/leader tự chọn thêm (lưu theo trình duyệt, key theo owner hiện tại)
+  useEffect(() => {
+    if (!owner) return;
+    try {
+      const raw = localStorage.getItem(`markee_inbox_extra_accounts_${owner}`);
+      setExtraAccountIds(raw ? new Set(JSON.parse(raw)) : new Set());
+    } catch {
+      setExtraAccountIds(new Set());
+    }
+  }, [owner]);
+
+  const toggleExtraAccount = useCallback((userId: string) => {
+    setExtraAccountIds(prev => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId); else next.add(userId);
+      if (owner) {
+        try { localStorage.setItem(`markee_inbox_extra_accounts_${owner}`, JSON.stringify(Array.from(next))); } catch {}
+      }
+      return next;
+    });
+  }, [owner]);
 
   const loadSessions = useCallback(async () => {
     if (!scopeReady) return;
@@ -435,10 +461,12 @@ function InboxPageContent() {
       const r = await fbFetch("/sessions");
       const d = await r.json();
       if (!r.ok) throw new Error(d?.detail || "sessions failed");
-      const list: Session[] = (d.sessions || []).map((s: Session) => ({
+      const mapped: Session[] = (d.sessions || []).map((s: Session) => ({
         ...s,
         status: s.online ? (s.inbox_enabled === false ? "paused" : "online") : "offline",
-      })).filter(sessionInScope);
+      }));
+      setRawSessions(mapped);
+      const list: Session[] = mapped.filter(sessionInScope);
       setSessions(list);
       setConnErr(false);
       sessionsErrorStreakRef.current = 0;
@@ -1313,11 +1341,41 @@ function InboxPageContent() {
       )}
 
       <div className="bg-surface rounded-lg border border-outline-variant p-3 mb-4">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-2 gap-2">
           <label className="text-xs font-bold text-on-surface-variant">Tài khoản nhân viên</label>
-          <button onClick={scan} disabled={scanning || !acc || !accOnline || needRelogin} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-on-primary-fixed-variant transition disabled:opacity-50">
-            {scanning ? "Đang quét..." : "Quét ngay"}
-          </button>
+          <div className="flex items-center gap-2">
+            {(role === "admin" || role === "leader") && (
+              <div className="relative">
+                <button onClick={() => setShowAddAccountPicker(v => !v)} className="text-xs font-bold px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary transition">
+                  + Thêm tài khoản khác
+                </button>
+                {showAddAccountPicker && (
+                  <div className="absolute right-0 mt-1 w-72 max-h-80 overflow-auto bg-surface border border-outline-variant rounded-lg shadow-lg z-20 p-2">
+                    <div className="text-[11px] text-on-surface-variant px-1 pb-1.5">Chọn thêm acc ngoài phạm vi mặc định (team/của bạn) để hiện trong Inbox — chỉ lưu trên trình duyệt này.</div>
+                    {rawSessions.length === 0 ? (
+                      <div className="text-xs text-on-surface-variant px-1 py-2">Chưa có acc nào.</div>
+                    ) : (
+                      rawSessions.map(s => {
+                        const inDefaultScope = allowedOwnerIds === null || (!!s.owner && allowedOwnerIds!.has(String(s.owner)));
+                        const checked = extraAccountIds.has(s.user_id);
+                        return (
+                          <label key={s.user_id} className={`flex items-center gap-2 px-1.5 py-1 rounded text-xs cursor-pointer hover:bg-surface-container-low ${inDefaultScope ? "opacity-50" : ""}`}>
+                            <input type="checkbox" checked={checked || inDefaultScope} disabled={inDefaultScope} onChange={() => toggleExtraAccount(s.user_id)} />
+                            <span className={`inline-block w-1.5 h-1.5 rounded-full ${s.status === "online" ? "bg-green-500" : "bg-surface-container-highest"}`} />
+                            <span className="truncate">{accLabel(s)}</span>
+                            {inDefaultScope && <span className="text-[10px] text-on-surface-variant ml-auto shrink-0">(mặc định)</span>}
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            <button onClick={scan} disabled={scanning || !acc || !accOnline || needRelogin} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-on-primary-fixed-variant transition disabled:opacity-50">
+              {scanning ? "Đang quét..." : "Quét ngay"}
+            </button>
+          </div>
         </div>
         {sessions.length === 0 ? (
           <span className="text-sm text-on-surface-variant">{extInstalled === false ? 'Chưa thấy extension. Hãy cài + mở extension trên trình duyệt này.' : 'Chưa có tài khoản nào. Nhân viên cài extension + đăng nhập Facebook để tài khoản hiện ra.'}</span>
