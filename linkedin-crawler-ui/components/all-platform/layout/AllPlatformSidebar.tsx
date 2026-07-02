@@ -228,20 +228,6 @@ function buildEntries(isAdmin: boolean, isLeader: boolean): SidebarEntry[] {
       items: channelItems,
     },
     {
-      type: "item",
-      id: "ads",
-      href: "/all-platform/post-feed",
-      icon: "campaign",
-      label: "Quảng cáo",
-    },
-    {
-      type: "item",
-      id: "design",
-      href: "/all-platform/post-feed",
-      icon: "image",
-      label: "Thiết kế",
-    },
-    {
       type: "group",
       id: "resources",
       icon: "database",
