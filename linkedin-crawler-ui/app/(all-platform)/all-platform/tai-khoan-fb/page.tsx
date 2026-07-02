@@ -10,7 +10,7 @@
  *   - Acc đã thêm DÙNG CHUNG cho Đăng bài + Inbox + Cào.
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { MaterialIcon } from "@/components/ui";
 import { provisionExtension, pingExtension, addAccountViaExtension } from "@/lib/markee-ext-provision";
@@ -172,11 +172,57 @@ export default function TaiKhoanFbPage() {
     catch { showToast("Không copy được, hãy bôi đen + Ctrl C", false); }
   }
 
+  // Gom theo chủ tài khoản (owner) — nếu admin/leader xem nhiều người thì tách nhóm rõ ràng (kiểu "Nhóm"),
+  // còn 1 người thì hiện phẳng như trước (kiểu "Cá nhân") — không cần thêm tab riêng.
+  const groupedSessions = useMemo(() => {
+    const groups = new Map<string, Session[]>();
+    for (const s of sessions) {
+      const key = s.owner || "_";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(s);
+    }
+    return groups;
+  }, [sessions]);
+  const isMultiOwner = groupedSessions.size > 1;
+
+  const renderAccountRow = (s: Session) => {
+    const ready = !s.expired && !s.needs_relogin;
+    return (
+      <div key={s.user_id} className="flex items-center justify-between gap-3 border border-outline-variant rounded-lg px-4 py-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className={`inline-block w-2.5 h-2.5 rounded-full shrink-0 ${ready ? "bg-green-500" : "bg-red-500"}`} />
+          <div className="min-w-0">
+            <div className="font-semibold text-on-surface truncate">{accLabel(s)}
+              <button onClick={() => rename(s.user_id, accLabel(s))} title="Đổi tên" className="ml-1.5 text-[11px] text-on-surface-variant hover:text-primary">✎</button>
+            </div>
+            <div className="mt-0.5 truncate font-mono text-[11px] text-on-surface-variant" title={s.user_id}>{accMeta(s)}</div>
+            <div className="text-xs text-on-surface-variant">
+              {ready ? <span className="text-green-600 font-semibold">🟢 Sẵn sàng</span> : <span className="text-red-500 font-semibold">🔴 Cần đăng nhập lại</span>}
+              {s.online && ready ? " · đang online" : ""}
+              {typeof s.days_left === "number" && ready ? ` · còn ${Math.round(s.days_left)} ngày` : ""}
+            </div>
+            <div className="text-xs text-on-surface-variant truncate mt-0.5">
+              {s.email ? <span title="Email/SĐT đăng nhập">✉ {s.email}</span> : <span className="italic">chưa có email gợi nhắc</span>}
+              {s.note ? <span> · {s.note}</span> : ""}
+              <button onClick={() => editMeta(s)} title="Sửa email/ghi chú" className="ml-1.5 text-on-surface-variant hover:text-primary">✎</button>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {!ready && <button onClick={() => addAccount(true)} disabled={adding}
+            className="text-xs px-3 py-1.5 rounded-lg bg-primary text-white font-bold hover:bg-on-primary-fixed-variant transition disabled:opacity-50">Đăng nhập lại</button>}
+          <button onClick={() => removeSession(s.user_id, accLabel(s))}
+            className="text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 font-semibold transition">Xóa</button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="p-6 w-full">
       <div className="flex items-center gap-2 mb-1">
         <MaterialIcon name="account_circle" className="text-primary" />
-        <h1 className="text-xl font-black text-on-surface">Tài khoản Facebook</h1>
+        <h1 className="text-xl font-bold text-on-surface">Tài khoản Facebook</h1>
       </div>
       <p className="text-sm text-on-surface-variant mb-6">Mỗi tài khoản chỉ cần đăng nhập 1 lần. Tài khoản đã thêm dùng chung cho Đăng bài, Inbox và Cào dữ liệu.</p>
 
@@ -236,41 +282,24 @@ export default function TaiKhoanFbPage() {
         <h2 className="text-base font-bold text-on-surface mb-4">Tài khoản đã thêm ({sessions.length})</h2>
         {sessions.length === 0 ? (
           <div className="text-center text-on-surface-variant py-10 text-sm">Chưa có tài khoản nào. Bấm &quot;Thêm tài khoản FB&quot; để bắt đầu.</div>
-        ) : (
-          <div className="space-y-2">
-            {sessions.map(s => {
-              const ready = !s.expired && !s.needs_relogin;
-              return (
-                <div key={s.user_id} className="flex items-center justify-between gap-3 border border-outline-variant rounded-lg px-4 py-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className={`inline-block w-2.5 h-2.5 rounded-full shrink-0 ${ready ? "bg-green-500" : "bg-red-500"}`} />
-                    <div className="min-w-0">
-                      <div className="font-semibold text-on-surface truncate">{accLabel(s)}
-                        <button onClick={() => rename(s.user_id, accLabel(s))} title="Đổi tên" className="ml-1.5 text-[11px] text-on-surface-variant hover:text-primary">✎</button>
-                      </div>
-                      <div className="mt-0.5 truncate font-mono text-[11px] text-on-surface-variant" title={s.user_id}>{accMeta(s)}</div>
-                      <div className="text-xs text-on-surface-variant">
-                        {ready ? <span className="text-green-600 font-semibold">🟢 Sẵn sàng</span> : <span className="text-red-500 font-semibold">🔴 Cần đăng nhập lại</span>}
-                        {s.online && ready ? " · đang online" : ""}
-                        {typeof s.days_left === "number" && ready ? ` · còn ${Math.round(s.days_left)} ngày` : ""}
-                      </div>
-                      <div className="text-xs text-on-surface-variant truncate mt-0.5">
-                        {s.email ? <span title="Email/SĐT đăng nhập">✉ {s.email}</span> : <span className="italic">chưa có email gợi nhắc</span>}
-                        {s.note ? <span> · {s.note}</span> : ""}
-                        <button onClick={() => editMeta(s)} title="Sửa email/ghi chú" className="ml-1.5 text-on-surface-variant hover:text-primary">✎</button>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {!ready && <button onClick={() => addAccount(true)} disabled={adding}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-primary text-white font-bold hover:bg-on-primary-fixed-variant transition disabled:opacity-50">Đăng nhập lại</button>}
-                    <button onClick={() => removeSession(s.user_id, accLabel(s))}
-                      className="text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 font-semibold transition">Xóa</button>
-                  </div>
+        ) : isMultiOwner ? (
+          <div className="space-y-5">
+            {Array.from(groupedSessions.entries()).map(([ownerId, group]) => (
+              <div key={ownerId}>
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
+                    {(ownerNames[ownerId] || "?").slice(0, 1).toUpperCase()}
+                  </span>
+                  <span className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
+                    {ownerNames[ownerId] || "Không rõ chủ tài khoản"} · {group.length} tài khoản
+                  </span>
                 </div>
-              );
-            })}
+                <div className="space-y-2">{group.map(renderAccountRow)}</div>
+              </div>
+            ))}
           </div>
+        ) : (
+          <div className="space-y-2">{sessions.map(renderAccountRow)}</div>
         )}
       </div>
 

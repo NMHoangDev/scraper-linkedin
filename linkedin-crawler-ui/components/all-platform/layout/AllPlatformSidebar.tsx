@@ -375,6 +375,7 @@ export function AllPlatformSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const [workspaceTab, setWorkspaceTab] = useState<"personal" | "team">("personal");
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const isAdmin = user?.role === "admin";
   const isLeader = user?.role === "leader";
@@ -410,30 +411,41 @@ export function AllPlatformSidebar({
         ) : null}
 
         <div className="border-b border-outline-variant px-2 py-2">
-          <Link
-            href="/all-platform/post-feed"
-            onClick={onClose}
-            className={cn(
-              "flex items-center gap-3 rounded-lg p-1 transition hover:bg-surface-container-low active:scale-[0.98]",
-              isCollapsed && "justify-center",
-            )}
-          >
-            <Image
-              src="/markeeai_logo.svg"
-              alt="Marketing Agents"
-              width={40}
-              height={40}
-              className="h-10 w-10 shrink-0 rounded-xl object-contain"
-              priority
-            />
-            {!isCollapsed ? (
-              <span className="text-left text-lg font-bold leading-5 tracking-tight text-[var(--color-markee-primary)]">
-                Marketing
-                <br />
-                Agents
-              </span>
-            ) : null}
-          </Link>
+          <div className={cn("flex items-center", isCollapsed ? "flex-col gap-1" : "justify-between gap-2")}>
+            <Link
+              href="/all-platform/post-feed"
+              onClick={onClose}
+              className={cn(
+                "flex min-w-0 items-center gap-3 rounded-lg p-1 transition hover:bg-surface-container-low active:scale-[0.98]",
+                isCollapsed && "justify-center",
+              )}
+            >
+              <Image
+                src="/markeeai_logo.svg"
+                alt="Marketing Agents"
+                width={40}
+                height={40}
+                className="h-10 w-10 shrink-0 rounded-xl object-contain"
+                priority
+              />
+              {!isCollapsed ? (
+                <span className="text-left text-lg font-semibold leading-5 tracking-tight text-[var(--color-markee-primary)]">
+                  Marketing
+                  <br />
+                  Agents
+                </span>
+              ) : null}
+            </Link>
+            <button
+              type="button"
+              onClick={() => onCollapsedChange?.(!isCollapsed)}
+              className="hidden shrink-0 rounded-lg p-1.5 text-on-surface-variant transition hover:bg-surface-container-low hover:text-[var(--color-markee-primary)] md:flex"
+              aria-label={isCollapsed ? "Mở rộng sidebar" : "Thu gọn sidebar"}
+              title={isCollapsed ? "Mở rộng" : "Thu gọn"}
+            >
+              <MaterialIcon name={isCollapsed ? "chevron_right" : "chevron_left"} className="text-[20px]" />
+            </button>
+          </div>
         </div>
 
         {!isCollapsed ? (
@@ -493,18 +505,42 @@ export function AllPlatformSidebar({
 
         </nav>
 
-        <div className={cn("mt-auto space-y-2 px-2 py-3", isCollapsed && "px-1")}>
+        <div className={cn("relative mt-auto px-2 py-3", isCollapsed && "px-1")}>
+          {showProfileMenu ? (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
+              <div className="absolute bottom-full left-2 right-2 z-50 mb-2 overflow-hidden rounded-xl border border-outline-variant bg-white shadow-lg">
+                <Link
+                  href="/all-platform/profile"
+                  onClick={() => { setShowProfileMenu(false); onClose?.(); }}
+                  className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-on-surface transition hover:bg-surface-container-low"
+                >
+                  <MaterialIcon name="settings" className="text-[18px]" />
+                  Cài đặt tài khoản
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => void handleLogout()}
+                  className="flex w-full items-center gap-2.5 border-t border-outline-variant px-3 py-2.5 text-left text-sm text-red-600 transition hover:bg-red-50"
+                >
+                  <MaterialIcon name="logout" className="text-[18px]" />
+                  Đăng xuất
+                </button>
+              </div>
+            </>
+          ) : null}
+
           <div
             className={cn(
-              "flex items-center rounded-lg p-2 transition hover:bg-surface-container-low active:scale-[0.98]",
+              "flex items-center rounded-lg p-2 transition hover:bg-surface-container-low",
               isCollapsed ? "justify-center" : "gap-2.5",
             )}
           >
-            <Link
-              href="/all-platform/profile"
-              className="flex min-w-0 flex-1 items-center gap-2.5"
+            <button
+              type="button"
+              onClick={() => setShowProfileMenu((v) => !v)}
+              className="flex min-w-0 flex-1 items-center gap-2.5 text-left active:scale-[0.98]"
               title={isCollapsed ? user?.name || user?.email || "Người dùng" : undefined}
-              onClick={onClose}
             >
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-[var(--color-markee-primary)]">
                 {getInitials(user?.name || user?.email)}
@@ -519,31 +555,17 @@ export function AllPlatformSidebar({
                   </span>
                 </span>
               ) : null}
-            </Link>
+            </button>
             {!isCollapsed ? (
               <button
                 type="button"
-                onClick={() => void handleLogout()}
+                title="Thông báo (sắp có)"
                 className="relative rounded-lg p-1.5 text-on-surface-variant transition hover:bg-white hover:text-[var(--color-markee-primary)]"
-                title="Đăng xuất"
               >
-                <MaterialIcon name="logout" className="text-[18px]" />
+                <MaterialIcon name="notifications" className="text-[18px]" />
               </button>
             ) : null}
           </div>
-
-          <button
-            type="button"
-            onClick={() => onCollapsedChange?.(!isCollapsed)}
-            className="hidden w-full items-center justify-center rounded-lg py-1 text-sm font-medium text-on-surface transition hover:bg-surface-container-low md:flex"
-            aria-label={isCollapsed ? "Mở rộng sidebar" : "Thu gọn sidebar"}
-          >
-            <MaterialIcon
-              name={isCollapsed ? "chevron_right" : "chevron_left"}
-              className="text-[22px]"
-            />
-            {!isCollapsed ? <span className="ml-2">Thu gọn</span> : null}
-          </button>
         </div>
       </aside>
     </>
