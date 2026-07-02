@@ -176,6 +176,7 @@ export default function InboxModernLayout(props: Props) {
   const [isBulkVerifying, setIsBulkVerifying] = useState(false);
   const [showLeadModal, setShowLeadModal] = useState(false);
   const [showAddAccountPicker, setShowAddAccountPicker] = useState(false);
+  const [accountBarOpen, setAccountBarOpen] = useState(true);
   const [trackSearchOpen, setTrackSearchOpen] = useState(false);
   const [trackSearchQuery, setTrackSearchQuery] = useState("");
   const [trackSelectedIds, setTrackSelectedIds] = useState<Set<string>>(new Set());
@@ -326,86 +327,100 @@ export default function InboxModernLayout(props: Props) {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            {(role === "admin" || role === "leader") ? (
-              <div className="flex items-center gap-2">
-                <input
-                  type="date"
-                  value={targetDate}
-                  onChange={e => setTargetDate(e.target.value)}
-                  className="rounded border border-outline-variant px-2 py-1 text-xs outline-none focus:border-primary"
-                />
-                <button
-                  onClick={handleBulkVerify}
-                  disabled={isBulkVerifying}
-                  className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
-                >
-                  {isBulkVerifying ? "ĐANG TÍNH..." : "TÍNH KPI HÀNG LOẠT"}
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={handleBulkSuggest}
-                disabled={isBulkSuggesting || !acc}
-                className="rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-blue-700 disabled:opacity-50"
-              >
-                {isBulkSuggesting ? "ĐANG ĐỀ XUẤT..." : "ĐỀ XUẤT TÍNH KPI HÀNG LOẠT"}
-              </button>
-            )}
-            {(role === "admin" || role === "leader") && typeof toggleExtraAccount === "function" && (
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShowAddAccountPicker(v => !v)}
-                  className="rounded-xl border border-outline-variant px-3 py-1.5 text-xs font-bold text-on-surface-variant transition hover:border-primary hover:text-primary"
-                >
-                  + Thêm tài khoản khác
-                </button>
-                {showAddAccountPicker && (
-                  <div className="absolute right-0 z-20 mt-1 w-72 max-h-80 overflow-auto rounded-xl border border-outline-variant bg-surface p-2 shadow-lg">
-                    <div className="px-1 pb-1.5 text-[11px] text-on-surface-variant">Chọn thêm acc ngoài phạm vi mặc định (team/của bạn) để hiện trong Inbox — chỉ lưu trên trình duyệt này.</div>
-                    {rawSessions.length === 0 ? (
-                      <div className="px-1 py-2 text-xs text-on-surface-variant">Chưa có acc nào.</div>
-                    ) : (
-                      rawSessions.map(s => {
-                        const inDefaultScope = allowedOwnerIds === null || (!!s.owner && allowedOwnerIds.has(String(s.owner)));
-                        const checked = extraAccountIds.has(s.user_id);
-                        return (
-                          <label key={s.user_id} className={`flex items-center gap-2 rounded px-1.5 py-1 text-xs cursor-pointer hover:bg-surface-container-low ${inDefaultScope ? "opacity-50" : ""}`}>
-                            <input type="checkbox" checked={checked || inDefaultScope} disabled={inDefaultScope} onChange={() => toggleExtraAccount(s.user_id)} />
-                            <span className={`inline-block h-1.5 w-1.5 rounded-full ${statusClasses(s.status)}`} />
-                            <span className="truncate">{accLabel(s)}</span>
-                            {inDefaultScope && <span className="ml-auto shrink-0 text-[10px] text-on-surface-variant">(mặc định)</span>}
-                          </label>
-                        );
-                      })
+            {accountBarOpen && (
+              <>
+                {(role === "admin" || role === "leader") ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      value={targetDate}
+                      onChange={e => setTargetDate(e.target.value)}
+                      className="rounded border border-outline-variant px-2 py-1 text-xs outline-none focus:border-primary"
+                    />
+                    <button
+                      onClick={handleBulkVerify}
+                      disabled={isBulkVerifying}
+                      className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      {isBulkVerifying ? "ĐANG TÍNH..." : "TÍNH KPI HÀNG LOẠT"}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleBulkSuggest}
+                    disabled={isBulkSuggesting || !acc}
+                    className="rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {isBulkSuggesting ? "ĐANG ĐỀ XUẤT..." : "ĐỀ XUẤT TÍNH KPI HÀNG LOẠT"}
+                  </button>
+                )}
+                {(role === "admin" || role === "leader") && typeof toggleExtraAccount === "function" && (
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddAccountPicker(v => !v)}
+                      className="rounded-xl border border-outline-variant px-3 py-1.5 text-xs font-bold text-on-surface-variant transition hover:border-primary hover:text-primary"
+                    >
+                      + Thêm tài khoản khác
+                    </button>
+                    {showAddAccountPicker && (
+                      <div className="absolute right-0 z-20 mt-1 w-72 max-h-80 overflow-auto rounded-xl border border-outline-variant bg-surface p-2 shadow-lg">
+                        <div className="px-1 pb-1.5 text-[11px] text-on-surface-variant">Chọn thêm acc ngoài phạm vi mặc định (team/của bạn) để hiện trong Inbox — chỉ lưu trên trình duyệt này.</div>
+                        {rawSessions.length === 0 ? (
+                          <div className="px-1 py-2 text-xs text-on-surface-variant">Chưa có acc nào.</div>
+                        ) : (
+                          rawSessions.map(s => {
+                            const inDefaultScope = allowedOwnerIds === null || (!!s.owner && allowedOwnerIds.has(String(s.owner)));
+                            const checked = extraAccountIds.has(s.user_id);
+                            return (
+                              <label key={s.user_id} className={`flex items-center gap-2 rounded px-1.5 py-1 text-xs cursor-pointer hover:bg-surface-container-low ${inDefaultScope ? "opacity-50" : ""}`}>
+                                <input type="checkbox" checked={checked || inDefaultScope} disabled={inDefaultScope} onChange={() => toggleExtraAccount(s.user_id)} />
+                                <span className={`inline-block h-1.5 w-1.5 rounded-full ${statusClasses(s.status)}`} />
+                                <span className="truncate">{accLabel(s)}</span>
+                                {inDefaultScope && <span className="ml-auto shrink-0 text-[10px] text-on-surface-variant">(mặc định)</span>}
+                              </label>
+                            );
+                          })
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
-              </div>
+                <div className="text-xs text-on-surface-variant hidden md:block">Online realtime, offline chỉ xem dữ liệu.</div>
+              </>
             )}
-            <div className="text-xs text-on-surface-variant hidden md:block">Online realtime, offline chỉ xem dữ liệu.</div>
+            <button
+              type="button"
+              onClick={() => setAccountBarOpen(v => !v)}
+              title={accountBarOpen ? "Thu gọn danh sách tài khoản" : "Hiện danh sách tài khoản"}
+              className="rounded-xl border border-outline-variant p-1.5 text-on-surface-variant transition hover:border-primary hover:text-primary"
+            >
+              <MaterialIcon name="keyboard_arrow_down" className={`text-[16px] transition-transform ${accountBarOpen ? "rotate-180" : ""}`} />
+            </button>
           </div>
         </div>
-        {sessions.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-outline-variant bg-surface-container-low px-3 py-4 text-sm text-on-surface-variant">
-            {extInstalled === false ? "Chưa thấy extension. Hãy cài và mở extension." : "Chưa có tài khoản Facebook nào."}
-          </div>
-        ) : (role === "admin" || role === "leader") ? (
-          <TeamAccountTree sessions={sessions} ownerNames={ownerNames} teams={teams} selectedAcc={acc} role={role} owner={owner} onSelect={selectAcc} />
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {sessions.map(session => (
-              <button
-                key={session.user_id}
-                onClick={() => selectAcc(session.user_id)}
-                className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition ${acc === session.user_id ? "border-primary bg-primary text-white" : "border-outline-variant bg-surface text-on-surface hover:border-primary"}`}
-              >
-                <span className={`h-2 w-2 rounded-full ${statusClasses(session.status)}`} />
-                {accLabel(session)}
-                <span className="text-[10px] opacity-70">{statusLabel(session.status)}</span>
-              </button>
-            ))}
-          </div>
+        {accountBarOpen && (
+          sessions.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-outline-variant bg-surface-container-low px-3 py-4 text-sm text-on-surface-variant">
+              {extInstalled === false ? "Chưa thấy extension. Hãy cài và mở extension." : "Chưa có tài khoản Facebook nào."}
+            </div>
+          ) : (role === "admin" || role === "leader") ? (
+            <TeamAccountTree sessions={sessions} ownerNames={ownerNames} teams={teams} selectedAcc={acc} role={role} owner={owner} onSelect={selectAcc} />
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {sessions.map(session => (
+                <button
+                  key={session.user_id}
+                  onClick={() => selectAcc(session.user_id)}
+                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition ${acc === session.user_id ? "border-primary bg-primary text-white" : "border-outline-variant bg-surface text-on-surface hover:border-primary"}`}
+                >
+                  <span className={`h-2 w-2 rounded-full ${statusClasses(session.status)}`} />
+                  {accLabel(session)}
+                  <span className="text-[10px] opacity-70">{statusLabel(session.status)}</span>
+                </button>
+              ))}
+            </div>
+          )
         )}
         </div>
 
