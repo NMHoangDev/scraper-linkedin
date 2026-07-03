@@ -314,13 +314,15 @@ function SidebarGroup({
   pathname,
   collapsed,
   onNavigate,
+  homeHref,
 }: {
   entry: NavGroupItem;
   pathname: string;
   collapsed?: boolean;
   onNavigate?: () => void;
+  homeHref?: string;
 }) {
-  const hasActiveChild = entry.items.some((item) => isLeafActive(pathname, item));
+  const hasActiveChild = entry.items.some((item) => item.href !== homeHref && isLeafActive(pathname, item));
   const [isOpen, setIsOpen] = useState(hasActiveChild);
 
   useEffect(() => {
@@ -554,6 +556,7 @@ export function AllPlatformSidebar({
                     pathname={pathname}
                     collapsed={isCollapsed}
                     onNavigate={onClose}
+                    homeHref={entries[0]?.type === "item" ? entries[0].href : undefined}
                   />
                 ) : (
                   <SidebarLink
