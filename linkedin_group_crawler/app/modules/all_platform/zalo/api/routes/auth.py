@@ -34,6 +34,7 @@ from app.modules.all_platform.zalo.services.session_store import (
     save_session,
 )
 from app.modules.all_platform.zalo.services.supabase_service import (
+    get_app_user_id_by_email,
     get_zalo_account_by_id,
     save_listener_messages,
     upsert_groups,
@@ -164,28 +165,69 @@ def _build_session_id(user_id: str) -> str:
     return f"{user_id}--{uuid.uuid4().hex}"
 
 
+_UUID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
+)
+
+
+async def _resolve_app_user_uuid(raw: Optional[str]) -> Optional[str]:
+    """Đưa owner_id/id_member về đúng UUID app_users.id trước khi ghi Supabase.
+
+    Extension gửi X-User-ID là EMAIL (đã bị _normalize_user_id đổi '@' thành '-',
+    vd 'ngminhhoang0934-gmail.com') trong khi cột owner_id/id_member là uuid —
+    insert thẳng sẽ 400 (22P02 invalid uuid). Thứ tự xử lý:
+      1. Đã là UUID → dùng luôn.
+      2. Còn '@' (email thô) → tra app_users theo email.
+      3. Dạng đã normalize 'ten-domain.tld' → thử khôi phục '@' ở dấu '-' cuối
+         trước phần domain rồi tra app_users.
+      4. Không ra → None (bỏ qua field, KHÔNG nhét chuỗi email vào cột uuid).
+    """
+    value = (raw or "").strip()
+    if not value or value == "default":
+        return None
+    if _UUID_RE.match(value):
+        return value
+    if "@" in value:
+        try:
+            return await get_app_user_id_by_email(value)
+        except Exception:
+            return None
+    m = re.match(r"^(.+)-([a-z0-9-]+\.[a-z0-9.]+)$", value, re.IGNORECASE)
+    if m:
+        try:
+            return await get_app_user_id_by_email(f"{m.group(1)}@{m.group(2)}")
+        except Exception:
+            return None
+    return None
+
+
 async def _remember_zalo_user(
-    user_id: str, 
-    status: str, 
-    worker_id: Optional[str] = None, 
+    user_id: str,
+    status: str,
+    worker_id: Optional[str] = None,
     cookie: Optional[str] = None,
     owner_id: Optional[str] = None,
     id_member: Optional[str] = None,
 ) -> None:
+    # id_member là cột UUID (app_users.id) ở cả zalo_users lẫn zalo_accounts —
+    # extension gửi email nên phải resolve về UUID thật (hoặc bỏ qua), tránh 22P02.
+    # owner_id của zalo_accounts là cột TEXT (giữ nguyên email normalize để
+    # auto-resolve `or=(owner_id.eq...,id_member.eq...)` tra lại được) — KHÔNG đổi.
+    safe_member_id = await _resolve_app_user_uuid(id_member)
     try:
         await upsert_zalo_user(
             user_id,
             status=status,
             assigned_worker_id=worker_id,
             cookie=cookie,
-            id_member=id_member,
+            id_member=safe_member_id,
         )
     except Exception as exc:
         logger.warning(f"Could not upsert Zalo user metadata for user={user_id}: {exc}")
     try:
         existing = await get_zalo_account_by_id(user_id) or {}
         resolved_owner_id = owner_id or existing.get("owner_id") or user_id
-        resolved_member_id = id_member or existing.get("id_member")
+        resolved_member_id = safe_member_id or existing.get("id_member")
         await upsert_zalo_account(
             account_id=user_id,
             owner_id=resolved_owner_id,
@@ -1349,7 +1391,9 @@ async def import_session_from_extension(
                 "zalo_accounts",
                 params={
                     "select": "account_id,phone,status",
-                    "or": f"owner_id.eq.{user_id},id_member.eq.{user_id}",
+                    # PostgREST bắt buộc bọc điều kiện or trong ngoặc đơn —
+                    # thiếu ngoặc sẽ bị hiểu nhầm thành cột "orowner_id" (400)
+                    "or": f"(owner_id.eq.{user_id},id_member.eq.{user_id})",
                     "order": "created_at.desc",
                 }
             ) or []

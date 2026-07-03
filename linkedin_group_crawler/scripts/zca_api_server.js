@@ -338,7 +338,10 @@ async function cmdListGroups(api, _args) {
 }
 
 async function cmdListFriends(api, _args) {
-  const response = await api.getFriendList();
+  // zca-js khong co api.getFriendList — ten dung la getAllFriends (giong
+  // zca_api_bridge.js). Goi sai ten lam ZCA pool bao loi va roi ve
+  // spawn-per-call (cham) moi lan list-friends.
+  const response = await api.getAllFriends();
   const rawList = Array.isArray(response) ? response : Object.values(response || {});
   const friends = rawList.map(raw => {
     const id = String(raw.userId || raw.uid || raw.id || raw.zaloId || "");
