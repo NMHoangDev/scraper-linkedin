@@ -127,15 +127,15 @@ function getProgressColor(percent: number): { bar: string; text: string; bg: str
 /** ─── Skeleton loading ─────────────────────────────────────────────── */
 function KpiProgressSkeleton() {
   return (
-    <div className="rounded-xl border border-outline-variant bg-surface shadow-[0_2px_10px_rgba(0,0,0,0.02)] p-5 animate-pulse mb-6">
+    <div className="rounded-xl border border-border bg-card shadow-[0_2px_10px_rgba(0,0,0,0.02)] p-5 animate-pulse mb-6">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <div className="w-64 h-4 rounded bg-surface-container-highest" />
-          <div className="w-96 h-3 rounded bg-surface-container-low mt-2" />
+          <div className="w-64 h-4 rounded bg-muted" />
+          <div className="w-96 h-3 rounded bg-muted mt-2" />
         </div>
-        <div className="w-32 h-8 rounded-xl bg-surface-container-low" />
+        <div className="w-32 h-8 rounded-xl bg-muted" />
       </div>
-      <div className="w-full h-2.5 rounded-full bg-surface-container-low" />
+      <div className="w-full h-2.5 rounded-full bg-muted" />
     </div>
   );
 }
@@ -210,17 +210,17 @@ export function KpiProgressCard({
   const colors = getProgressColor(percent);
 
   return (
-    <div className={cn("bg-surface p-5 rounded-xl border border-outline-variant shadow-[0_2px_10px_rgba(0,0,0,0.02)]", className)}>
+    <div className={cn("bg-card p-5 rounded-xl border border-border shadow-[0_2px_10px_rgba(0,0,0,0.02)]", className)}>
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-4">
         <div className="flex-1 min-w-0 pr-0 xl:pr-4">
           <h3 className="text-[13px] font-bold text-[#1E293B] uppercase break-words">
             {displayTitle}
           </h3>
-          <p className="text-[11px] text-on-surface-variant mt-0.5">
+          <p className="text-[11px] text-muted-foreground mt-0.5">
             {cfg.subtitle}
           </p>
           {(snap.startDate || snap.endDate) && (
-            <p className="text-[10px] text-on-surface-variant mt-1 font-medium">
+            <p className="text-[10px] text-muted-foreground mt-1 font-medium">
               Tuần: {snap.startDate} → {snap.endDate}
             </p>
           )}
@@ -229,7 +229,7 @@ export function KpiProgressCard({
           <span className={cn("text-lg font-black", colors.text)}>
             {snap.current.toLocaleString("vi-VN")}
           </span>
-          <span className="text-[11px] text-on-surface-variant font-medium">
+          <span className="text-[11px] text-muted-foreground font-medium">
             / {snap.target} {cfg.unit}
           </span>
           <span className={cn("text-xs font-bold ml-1", colors.text)}>
@@ -238,7 +238,7 @@ export function KpiProgressCard({
         </div>
       </div>
 
-      <div className="w-full h-2.5 rounded-full overflow-hidden bg-surface-container-low">
+      <div className="w-full h-2.5 rounded-full overflow-hidden bg-muted">
         <div
           className={cn(
             "h-full rounded-full transition-all duration-1000 ease-out",
@@ -288,8 +288,8 @@ export function KpiProgressCompact({
   if (snap.loading) {
     return (
       <div className={cn("flex items-center gap-2", className)}>
-        <div className="w-4 h-4 rounded bg-surface-container-highest animate-pulse" />
-        <div className="h-1.5 w-16 rounded-full bg-surface-container-highest animate-pulse" />
+        <div className="w-4 h-4 rounded bg-muted animate-pulse" />
+        <div className="h-1.5 w-16 rounded-full bg-muted animate-pulse" />
       </div>
     );
   }
@@ -306,9 +306,9 @@ export function KpiProgressCompact({
       )}
       <div className="flex items-center gap-1 text-[11px] font-bold">
         <span className={colors.text}>{snap.current}/{snap.target}</span>
-        {label && <span className="text-on-surface-variant font-medium">{label}</span>}
+        {label && <span className="text-muted-foreground font-medium">{label}</span>}
       </div>
-      <div className="relative w-16 h-1.5 bg-surface-container-low rounded-full overflow-hidden">
+      <div className="relative w-16 h-1.5 bg-muted rounded-full overflow-hidden">
         <div
           className={cn("absolute inset-y-0 left-0 rounded-full transition-all", colors.bar)}
           style={{ width: `${percent}%` }}

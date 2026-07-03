@@ -118,8 +118,8 @@ function StatCard({
         transition: "transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)",
       };
 
-  let iconCls = "bg-slate-50 text-slate-500";
-  let barColor = "bg-slate-400";
+  let iconCls = "bg-muted text-muted-foreground";
+  let barColor = "bg-muted-foreground/60";
 
   if (accent === "blue") {
     iconCls = "bg-blue-50/80 text-blue-500 dark:bg-blue-950/20 dark:text-blue-400";
@@ -137,12 +137,12 @@ function StatCard({
 
   return (
     <div
-      className="bg-white border border-slate-100 p-4 rounded-xl shadow-none flex flex-col justify-between relative overflow-hidden group select-none"
+      className="bg-card border border-border p-4 rounded-xl shadow-none flex flex-col justify-between relative overflow-hidden group select-none"
     >
       <div className="flex justify-between items-start">
         <div className="space-y-1">
-          <p className="text-[10px] font-bold text-slate-500 capitalize">{label}</p>
-          <h3 className="text-xl font-bold text-slate-800 tracking-tight mt-1">
+          <p className="text-[10px] font-bold text-muted-foreground capitalize">{label}</p>
+          <h3 className="text-xl font-bold text-foreground tracking-tight mt-1">
             {typeof value === "number" ? value.toLocaleString("vi-VN") : value}
           </h3>
         </div>
@@ -156,7 +156,7 @@ function StatCard({
         </div>
       </div>
 
-      <div className="mt-4 pt-3 border-t border-slate-50 flex items-center justify-between">
+      <div className="mt-4 pt-3 border-t border-border/60 flex items-center justify-between">
         {trend ? (
           <span
             className={cn(
@@ -171,18 +171,18 @@ function StatCard({
           </span>
         ) : progress ? (
           <div className="flex-1 max-w-[140px]">
-            <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+            <div className="w-full bg-muted h-1.5 rounded-full overflow-hidden">
               <div
                 className={cn("h-full rounded-full transition-all duration-500", barColor)}
                 style={{ width: `${progress.value}%` }}
               />
             </div>
-            <span className="text-[9px] font-semibold text-slate-400 mt-1 block leading-none">
+            <span className="text-[9px] font-semibold text-muted-foreground mt-1 block leading-none">
               {progress.label}
             </span>
           </div>
         ) : sub ? (
-          <span className="text-[10px] text-slate-400 font-medium leading-none">{sub}</span>
+          <span className="text-[10px] text-muted-foreground font-medium leading-none">{sub}</span>
         ) : null}
       </div>
     </div>
@@ -475,14 +475,14 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
       {!hideHeader && (
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="space-y-1">
-            <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Unified Post Feed</h1>
-            <p className="text-sm text-slate-500">
+            <h1 className="text-2xl font-bold text-foreground tracking-tight">Unified Post Feed</h1>
+            <p className="text-sm text-muted-foreground">
               Quản lý và theo dõi bài viết đa nền tảng với trí tuệ nhân tạo.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 shrink-0">
-            <div className="bg-slate-100/80 p-0.5 rounded-lg flex gap-0.5">
+            <div className="bg-muted p-0.5 rounded-lg flex gap-0.5">
               {([
                 { key: "facebook", label: "Facebook" },
                 { key: "linkedin", label: "LinkedIn" },
@@ -494,8 +494,8 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
                   className={cn(
                     "px-4 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer",
                     feedPlatform === t.key
-                      ? "bg-white text-slate-900 shadow-sm"
-                      : "text-slate-500 hover:text-slate-800 hover:bg-slate-200/40",
+                      ? "bg-white text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent",
                   )}
                 >
                   {t.label}
@@ -506,7 +506,7 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
         </div>
       )}
 
-      <div className="bg-white border border-slate-100 rounded-2xl p-5 mb-4">
+      <div className="bg-card border border-border rounded-2xl p-5 mb-4">
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard
             icon="description"
@@ -621,7 +621,7 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
           </button>
         </div>
       ) : posts.length === 0 ? (
-        <div className="py-12 text-center text-slate-400">
+        <div className="py-12 text-center text-muted-foreground">
           Không có bài viết nào phù hợp với bộ lọc.
         </div>
       ) : (
@@ -647,18 +647,18 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
                 type="button"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm disabled:opacity-50 cursor-pointer whitespace-nowrap"
+                className="rounded-lg border border-border px-3 py-1.5 text-sm disabled:opacity-50 cursor-pointer whitespace-nowrap"
               >
                 ‹ Trước
               </button>
-              <span className="w-full whitespace-nowrap text-sm text-slate-600 sm:w-auto">
+              <span className="w-full whitespace-nowrap text-sm text-muted-foreground sm:w-auto">
                 Trang {page} / {totalPages} ({totalCount} bài)
               </span>
               <button
                 type="button"
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm disabled:opacity-50 cursor-pointer whitespace-nowrap"
+                className="rounded-lg border border-border px-3 py-1.5 text-sm disabled:opacity-50 cursor-pointer whitespace-nowrap"
               >
                 Sau ›
               </button>
@@ -690,20 +690,20 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
 
       {/* MODAL KẾT QUẢ CÀO */}
       {showCrawlResultModal && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-[400px] max-w-[90vw] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-card rounded-2xl shadow-xl w-[400px] max-w-[90vw] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="p-6 text-center">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="material-symbols-outlined text-green-600 text-3xl">check_circle</span>
               </div>
-              <h3 className="text-xl font-black text-slate-800 mb-2">Hoàn tất cào dữ liệu!</h3>
-              <p className="text-sm text-slate-500 mb-6">
+              <h3 className="text-xl font-black text-foreground mb-2">Hoàn tất cào dữ liệu!</h3>
+              <p className="text-sm text-muted-foreground mb-6">
                 Đã cào thành công tổng cộng <strong className="text-green-600">{crawlResultsSummary.totalPosts}</strong> bài viết mới.
               </p>
 
               <button
                 onClick={() => window.location.reload()}
-                className="w-full py-3 bg-[#DC2626] hover:bg-[#B91C1C] text-white rounded-xl font-bold shadow-md transition-all active:scale-95"
+                className="w-full py-3 bg-primary hover:bg-primary/90 text-white rounded-xl font-bold shadow-md transition-all active:scale-95"
               >
                 Đồng ý & Tải lại trang
               </button>
@@ -715,20 +715,20 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
 
       {/* MODAL KẾT QUẢ SEEDING */}
       {showSeedingResultModal && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-[400px] max-w-[90vw] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-card rounded-2xl shadow-xl w-[400px] max-w-[90vw] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="p-6 text-center">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="material-symbols-outlined text-blue-600 text-3xl">task_alt</span>
               </div>
-              <h3 className="text-xl font-black text-slate-800 mb-2">Hoàn tất Seeding!</h3>
-              <p className="text-sm text-slate-500 mb-6">
+              <h3 className="text-xl font-black text-foreground mb-2">Hoàn tất Seeding!</h3>
+              <p className="text-sm text-muted-foreground mb-6">
                 Tiến trình seeding comment ngầm đã kết thúc. Các bài viết đã được cập nhật trạng thái mới nhất.
               </p>
               
               <button
                 onClick={() => window.location.reload()}
-                className="w-full py-3 bg-[#DC2626] hover:bg-[#B91C1C] text-white rounded-xl font-bold shadow-md transition-all active:scale-95"
+                className="w-full py-3 bg-primary hover:bg-primary/90 text-white rounded-xl font-bold shadow-md transition-all active:scale-95"
               >
                 Đồng ý & Tải lại trang
               </button>

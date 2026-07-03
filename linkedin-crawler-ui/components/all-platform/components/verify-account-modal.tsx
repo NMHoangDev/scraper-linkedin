@@ -84,15 +84,15 @@ export function VerifyAccountModal({
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
-      <div className="w-[400px] max-w-[90vw] rounded-xl bg-surface p-6 shadow-xl">
-        <h2 className="mb-4 text-lg font-bold text-on-surface">
+      <div className="w-[400px] max-w-[90vw] rounded-xl bg-card p-6 shadow-xl">
+        <h2 className="mb-4 text-lg font-bold text-foreground">
           Chọn tài khoản seeding ({platform === "facebook" ? "Facebook" : "LinkedIn"})
         </h2>
 
         {isLoading ? (
-          <div className="py-8 text-center text-sm text-on-surface-variant">Đang tải tài khoản...</div>
+          <div className="py-8 text-center text-sm text-muted-foreground">Đang tải tài khoản...</div>
         ) : accounts.length === 0 ? (
-          <div className="py-6 text-center text-sm text-on-surface-variant">
+          <div className="py-6 text-center text-sm text-muted-foreground">
             Chưa có tài khoản {platform} nào được thêm. Vui lòng thêm tài khoản trước khi xác minh.
           </div>
         ) : (
@@ -104,7 +104,7 @@ export function VerifyAccountModal({
                   "flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition-colors",
                   selectedId === acc.id
                     ? "border-primary bg-primary/5 ring-1 ring-primary"
-                    : "border-outline-variant hover:bg-surface-container-low"
+                    : "border-border hover:bg-muted"
                 )}
               >
                 <input
@@ -116,8 +116,8 @@ export function VerifyAccountModal({
                   className="h-4 w-4 text-primary focus:ring-primary"
                 />
                 <div>
-                  <div className="text-sm font-bold text-on-surface">{acc.account_name}</div>
-                  <div className="text-xs text-on-surface-variant">UID: {acc.account_profile_id}</div>
+                  <div className="text-sm font-bold text-foreground">{acc.account_name}</div>
+                  <div className="text-xs text-muted-foreground">UID: {acc.account_profile_id}</div>
                 </div>
               </label>
             ))}
@@ -127,7 +127,7 @@ export function VerifyAccountModal({
         <div className="flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="rounded-lg border border-outline-variant px-4 py-2 text-sm font-medium text-on-surface-variant transition-colors hover:bg-surface-container-low"
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
           >
             Hủy
           </button>

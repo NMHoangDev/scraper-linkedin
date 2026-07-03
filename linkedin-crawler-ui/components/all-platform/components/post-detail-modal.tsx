@@ -5,6 +5,7 @@ import { FaFacebook, FaLinkedin } from "react-icons/fa";
 import { FiExternalLink } from "react-icons/fi";
 import { cn } from "@/lib/utils";
 import type { UnifiedPost } from "@/types/unified.types";
+import { INBOX_TEMPLATES, composeInboxMessage } from "./inbox-templates";
 
 interface PostDetailModalProps {
   post: UnifiedPost | null;
@@ -28,48 +29,6 @@ export function PostDetailModal({
     return link && link.startsWith("Bị từ chối");
   };
 
-  const INBOX_TEMPLATES = [
-    {
-      category: "Dịch vụ Website",
-      templates: [
-        {
-          title: "Thiết kế Web Doanh Nghiệp",
-          content: "Chào bạn, mình thấy bạn đang có nhu cầu phát triển kinh doanh. Bên mình chuyên thiết kế Website chuyên nghiệp, chuẩn SEO và tối ưu chuyển đổi. Một Website xịn sẽ là 'nhân viên sale' làm việc 24/7 cho bạn. Bạn có muốn mình gửi thêm một số mẫu Web bên mình đã làm để tham khảo không?"
-        },
-        {
-          title: "Tối ưu/Nâng cấp Web hiện tại",
-          content: "Dạ chào anh/chị, em thấy lĩnh vực của mình rất tiềm năng. Không biết hiện tại anh/chị đã có Website riêng để đẩy mạnh thương hiệu chưa ạ? Bên em nhận thiết kế mới và nâng cấp Website với chi phí cực kì hợp lý. Anh/chị check tin nhắn để em tư vấn chi tiết hơn nhé!"
-        }
-      ]
-    },
-    {
-      category: "Chatbot AI & CSKH",
-      templates: [
-        {
-          title: "Chatbot AI Chăm sóc khách hàng",
-          content: "Chào bạn, mình thấy mảng dịch vụ của bạn thường xuyên phải trả lời nhiều câu hỏi từ khách hàng. Bên mình đang cung cấp giải pháp Chatbot AI thông minh có khả năng tự động trả lời, tư vấn và chốt đơn 24/7 như người thật. Mình gửi bạn xem thử bản demo Chatbot AI bên mình nhé?"
-        },
-        {
-          title: "Tích hợp AI tư vấn chuyên sâu",
-          content: "Dạ chào anh/chị, em chuyên triển khai các hệ thống Chatbot AI (Tích hợp ChatGPT/Claude) vào quy trình chăm sóc khách hàng. Chatbot bên em có thể học theo data riêng của doanh nghiệp để tư vấn cá nhân hóa. Anh/chị có hứng thú nâng cấp hệ thống CSKH của mình không ạ?"
-        }
-      ]
-    },
-    {
-      category: "n8n & Tự động hoá",
-      templates: [
-        {
-          title: "Giải pháp Automation (n8n)",
-          content: "Xin chào! Mình thấy quy trình vận hành của bạn đang phải xử lý thủ công khá nhiều bước. Bên mình chuyên thiết kế các luồng tự động hoá bằng n8n, giúp đồng bộ dữ liệu giữa các nền tảng hoàn toàn tự động. Việc này sẽ giúp bạn giảm thiểu sai sót và tối ưu hiệu suất x10 lần. Mình trao đổi thêm nhé?"
-        },
-        {
-          title: "Tối ưu quy trình đa nền tảng",
-          content: "Chào anh/chị, việc lặp đi lặp lại các tác vụ thủ công thường tốn rất nhiều nguồn lực. Bên em cung cấp giải pháp Tự động hoá doanh nghiệp với n8n, giúp tự động kết nối các phần mềm (Lead FB -> Zalo -> CRM). Chi phí triển khai 1 lần, dùng trọn đời. Anh/chị check inbox em gửi demo nhé!"
-        }
-      ]
-    }
-  ];
-
   React.useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (inboxRef.current && !inboxRef.current.contains(event.target as Node)) {
@@ -87,16 +46,16 @@ export function PostDetailModal({
   };
 
   const score = post.score || 0;
-  let scoreBg = "bg-surface-container-low text-on-surface border-outline-variant";
+  let scoreBg = "bg-muted text-foreground border-border";
   if (score >= 85) scoreBg = "bg-red-50 text-primary border-red-100";
   else if (score >= 60) scoreBg = "bg-amber-50 text-amber-600 border-amber-100";
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-3xl rounded-xl bg-surface shadow-xl flex flex-col max-h-[90vh]">
+      <div className="w-full max-w-3xl rounded-xl bg-card shadow-xl flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-outline-variant px-6 py-4">
-          <h2 className="text-lg font-bold text-on-surface flex items-center gap-2">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
+          <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
             {post.platform === "facebook" ? (
               <FaFacebook className="text-blue-600" />
             ) : (
@@ -106,7 +65,7 @@ export function PostDetailModal({
           </h2>
           <button
             onClick={onClose}
-            className="rounded-full p-2 text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface-variant transition"
+            className="rounded-full p-2 text-muted-foreground hover:bg-muted hover:text-muted-foreground transition"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -126,7 +85,7 @@ export function PostDetailModal({
                 href={post.post_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-base font-bold text-on-surface hover:text-indigo-600 hover:underline mb-2 block"
+                className="text-base font-bold text-foreground hover:text-indigo-600 hover:underline mb-2 block"
               >
                 {post.group_name || "Unknown Group"}
               </a>
@@ -137,14 +96,14 @@ export function PostDetailModal({
                 {post.team && <span className="rounded bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-600">{post.team}</span>}
                 {post.tier !== undefined && <span className="rounded bg-orange-50 px-2 py-0.5 text-xs font-bold text-orange-600">Tier {post.tier}</span>}
               </div>
-              <span className="text-xs text-on-surface-variant font-medium block mt-2">
-                Tác giả: <span className="font-bold text-on-surface">{post.author || "Người tham gia ẩn danh"}</span> • Đăng lúc: {post.post_time ? new Date(post.post_time).toLocaleString("vi-VN") : "Không rõ"} • Cào lúc: {post.crawl_date ? new Date(post.crawl_date).toLocaleString("vi-VN") : ""}
+              <span className="text-xs text-muted-foreground font-medium block mt-2">
+                Tác giả: <span className="font-bold text-foreground">{post.author || "Người tham gia ẩn danh"}</span> • Đăng lúc: {post.post_time ? new Date(post.post_time).toLocaleString("vi-VN") : "Không rõ"} • Cào lúc: {post.crawl_date ? new Date(post.crawl_date).toLocaleString("vi-VN") : ""}
               </span>
             </div>
           </div>
 
-          <div className="bg-surface-container-low rounded-xl border border-outline-variant p-4 mb-6">
-            <p className="text-sm text-on-surface whitespace-pre-wrap leading-relaxed">
+          <div className="bg-muted rounded-xl border border-border p-4 mb-6">
+            <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
               {post.content || "Nội dung bài viết rỗng hoặc chứa thuần hình ảnh/video."}
             </p>
           </div>
@@ -153,11 +112,11 @@ export function PostDetailModal({
             <div className="mb-6 grid grid-cols-2 gap-2 rounded-xl overflow-hidden">
               {post.media_url && (
                 <div className="col-span-full">
-                  <video src={post.media_url} controls className="w-full max-h-64 object-contain bg-black/5 rounded-lg border border-outline-variant" />
+                  <video src={post.media_url} controls className="w-full max-h-64 object-contain bg-black/5 rounded-lg border border-border" />
                 </div>
               )}
               {post.image_urls?.map((url, i) => (
-                <img key={i} src={url} alt={`Post media ${i}`} className="w-full h-48 object-cover rounded-lg border border-outline-variant hover:opacity-90 transition-opacity cursor-pointer" onClick={() => window.open(url, '_blank')} />
+                <img key={i} src={url} alt={`Post media ${i}`} className="w-full h-48 object-cover rounded-lg border border-border hover:opacity-90 transition-opacity cursor-pointer" onClick={() => window.open(url, '_blank')} />
               ))}
             </div>
           ) : null}
@@ -166,21 +125,21 @@ export function PostDetailModal({
             <div className="bg-emerald-50/50 rounded-xl border border-emerald-100 p-4 mb-6">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-xs font-bold text-emerald-700 uppercase bg-emerald-100/50 px-2 py-0.5 rounded">Tài khoản Seeding:</span>
-                <span className="text-sm font-bold text-on-surface">{post.seeding_name || "Unknown"}</span>
+                <span className="text-sm font-bold text-foreground">{post.seeding_name || "Unknown"}</span>
               </div>
-              <p className="text-sm text-on-surface whitespace-pre-wrap leading-relaxed italic border-l-4 border-emerald-300 pl-3 py-1">
+              <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed italic border-l-4 border-emerald-300 pl-3 py-1">
                 {post.seeding_content}
               </p>
               {post.link_comment && !isRejected(post.link_comment) && (
                 <div className="mt-3">
-                  <a href={post.link_comment} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline inline-flex items-center gap-1.5 bg-surface px-3 py-1.5 rounded-lg border border-blue-100 shadow-sm transition hover:shadow">
+                  <a href={post.link_comment} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-blue-600 hover:underline inline-flex items-center gap-1.5 bg-card px-3 py-1.5 rounded-lg border border-blue-100 shadow-sm transition hover:shadow">
                     <FiExternalLink className="w-4 h-4" /> Đi tới bình luận trên Facebook
                   </a>
                 </div>
               )}
               {post.link_comment && isRejected(post.link_comment) && (
                 <div className="mt-3">
-                  <span className="text-sm font-medium text-red-600 inline-flex items-center gap-1.5 bg-surface px-3 py-1.5 rounded-lg border border-red-100 shadow-sm">
+                  <span className="text-sm font-medium text-red-600 inline-flex items-center gap-1.5 bg-card px-3 py-1.5 rounded-lg border border-red-100 shadow-sm">
                     <span className="material-symbols-outlined text-[16px]">error</span>
                     Bị từ chối / Lỗi
                   </span>
@@ -193,7 +152,7 @@ export function PostDetailModal({
             <span className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50/60 text-amber-700 rounded-lg text-sm font-bold border border-amber-100/40">
               👍 {post.reactions?.toLocaleString() || 0}
             </span>
-            <span className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-container-low text-on-surface-variant rounded-lg text-sm font-bold border border-outline-variant">
+            <span className="flex items-center gap-1.5 px-3 py-1.5 bg-muted text-muted-foreground rounded-lg text-sm font-bold border border-border">
               💬 {post.comments?.toLocaleString() || 0}
             </span>
             <span className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-sm font-bold border border-blue-100/50">
@@ -203,7 +162,7 @@ export function PostDetailModal({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-outline-variant bg-surface-container-low px-6 py-4 flex items-center justify-between rounded-b-2xl">
+        <div className="border-t border-border bg-muted px-6 py-4 flex items-center justify-between rounded-b-2xl">
           <div>
             {verifyStatus === "yes" && !isRejected(post.link_comment) ? (
               <span className="px-3 py-1.5 rounded-lg text-xs font-bold border bg-green-100 text-green-700 border-green-200">
@@ -218,7 +177,7 @@ export function PostDetailModal({
                 ✓ Đã seeding
               </span>
             ) : (
-              <span className="px-3 py-1.5 rounded-lg text-xs font-bold border bg-surface-container-low text-on-surface-variant border-outline-variant">
+              <span className="px-3 py-1.5 rounded-lg text-xs font-bold border bg-muted text-muted-foreground border-border">
                 Chưa seeding
               </span>
             )}
@@ -226,13 +185,13 @@ export function PostDetailModal({
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 bg-surface border border-outline-variant text-on-surface hover:bg-surface-container-low rounded-xl text-sm font-bold transition shadow-sm"
+              className="px-4 py-2 bg-card border border-border text-foreground hover:bg-muted rounded-xl text-sm font-bold transition shadow-sm"
             >
               Đóng
             </button>
             <button
               onClick={handleView}
-              className="px-4 py-2 bg-surface border border-primary text-primary hover:bg-primary hover:text-white rounded-xl text-sm font-bold transition shadow-sm flex items-center gap-1.5"
+              className="px-4 py-2 bg-card border border-primary text-primary hover:bg-primary hover:text-white rounded-xl text-sm font-bold transition shadow-sm flex items-center gap-1.5"
             >
               <FiExternalLink />
               Xem chi tiết
@@ -255,28 +214,29 @@ export function PostDetailModal({
                 <button
                   type="button"
                   onClick={() => setIsInboxOpen(!isInboxOpen)}
-                  className="px-4 py-2 bg-primary hover:bg-on-primary-fixed-variant text-white rounded-xl text-sm font-bold transition shadow-sm cursor-pointer flex items-center gap-1.5"
+                  className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-xl text-sm font-bold transition shadow-sm cursor-pointer flex items-center gap-1.5"
                 >
                   Inbox ngay <span className="text-[10px]">▼</span>
                 </button>
                 {isInboxOpen && (
-                  <div className="absolute bottom-full mb-2 right-0 w-[340px] bg-surface border border-outline-variant rounded-xl shadow-2xl z-[100] py-1 overflow-hidden">
-                    <div className="px-3 py-2 text-xs font-black text-on-surface border-b border-outline-variant uppercase flex items-center justify-between bg-surface-container-low">
+                  <div className="absolute bottom-full mb-2 right-0 w-[340px] bg-card border border-border rounded-xl shadow-2xl z-[100] py-1 overflow-hidden">
+                    <div className="px-3 py-2 text-xs font-black text-foreground border-b border-border uppercase flex items-center justify-between bg-muted">
                       <span>Chọn mẫu câu</span>
-                      <span className="text-[10px] font-bold text-primary normal-case bg-red-50 border border-red-100 px-2 py-0.5 rounded">Tự động Copy</span>
+                      <span className="text-[10px] font-bold text-primary normal-case bg-red-50 border border-red-100 px-2 py-0.5 rounded">Tự chèn bài khách + Copy</span>
                     </div>
                     <div className="max-h-[320px] overflow-y-auto custom-scrollbar text-left">
                       {INBOX_TEMPLATES.map((group, gIdx) => (
                         <div key={gIdx}>
-                          <div className="px-3 py-1.5 text-[11px] font-bold text-on-surface-variant bg-surface-container-low uppercase sticky top-0 border-b border-outline-variant backdrop-blur-sm z-10 text-left">
+                          <div className="px-3 py-1.5 text-[11px] font-bold text-muted-foreground bg-muted uppercase sticky top-0 border-b border-border backdrop-blur-sm z-10 text-left">
                             {group.category}
                           </div>
                           {group.templates.map((template, tIdx) => (
                             <button
                               key={tIdx}
-                              className="w-full text-left px-3 py-2.5 hover:bg-red-50 group/item transition border-b border-outline-variant last:border-0"
+                              className="w-full text-left px-3 py-2.5 hover:bg-red-50 group/item transition border-b border-border last:border-0"
                               onClick={() => {
-                                navigator.clipboard.writeText(template.content).then(() => {
+                                const message = composeInboxMessage(template, post.content);
+                                navigator.clipboard.writeText(message).then(() => {
                                   setIsInboxOpen(false);
                                   const targetUrl = post.author_url || post.post_url;
                                   window.open(targetUrl, '_blank');
@@ -286,11 +246,11 @@ export function PostDetailModal({
                                 });
                               }}
                             >
-                              <div className="font-bold text-xs text-on-surface group-hover/item:text-primary mb-1 transition-colors leading-tight">
+                              <div className="font-bold text-xs text-foreground group-hover/item:text-primary mb-1 transition-colors leading-tight">
                                 {template.title}
                               </div>
-                              <div className="text-[11px] text-on-surface-variant line-clamp-2 leading-relaxed opacity-90">
-                                {template.content}
+                              <div className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed opacity-90">
+                                {composeInboxMessage(template, post.content)}
                               </div>
                             </button>
                           ))}

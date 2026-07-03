@@ -378,16 +378,16 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
 
   // ── Render button + dialog ────────────────────────────────────────────────
   return (
-    <div className="bg-surface rounded-xl border border-outline-variant shadow-sm overflow-hidden flex flex-col transition-all duration-300 w-full mb-6 relative z-10">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden flex flex-col transition-all duration-300 w-full mb-6 relative z-10">
       {/* Header / Launcher */}
-      <div className="flex items-center justify-between p-4 bg-surface-container-low">
+      <div className="flex items-center justify-between p-4 bg-muted">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-100 to-purple-100 flex items-center justify-center shrink-0 border border-violet-200/50">
             <span className="material-symbols-outlined text-violet-600 text-[22px]">auto_awesome</span>
           </div>
           <div>
-            <h3 className="font-bold text-on-surface text-sm leading-tight">Siêu Tốc Cào Dữ Liệu (API Extension)</h3>
-            <p className="text-xs text-on-surface-variant leading-tight mt-0.5">
+            <h3 className="font-bold text-foreground text-sm leading-tight">Siêu Tốc Cào Dữ Liệu (API Extension)</h3>
+            <p className="text-xs text-muted-foreground leading-tight mt-0.5">
               {isLaunching
                 ? `Đang xử lý ${crawlProgress.totalGroups} groups...`
                 : "Nhấn bắt đầu để tự động gọi GraphQL API."}
@@ -433,7 +433,7 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
                   setScrapedGroups([]);
                   onCompleteRef.current?.(0);
                 }}
-                className="px-4 py-2 rounded-xl bg-surface-container-low text-on-surface hover:bg-surface-container-highest text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-muted text-foreground hover:bg-muted text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px]">close</span>
                 Đóng
@@ -455,23 +455,23 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
       {/* Select Groups Modal */}
       {showModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-          <div className="bg-surface rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
-            <div className="flex items-center justify-between p-4 border-b border-outline-variant">
+          <div className="bg-card rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between p-4 border-b border-border">
               <div>
-                <h3 className="font-bold text-on-surface text-lg">Chọn nhóm cần cào</h3>
-                <p className="text-sm text-on-surface-variant mt-1">
+                <h3 className="font-bold text-foreground text-lg">Chọn nhóm cần cào</h3>
+                <p className="text-sm text-muted-foreground mt-1">
                   Đã chọn {selectedGroupIds.length}/{availableGroups.length} nhóm
                 </p>
               </div>
               <button
                 onClick={() => setShowModal(false)}
-                className="w-8 h-8 rounded-full bg-surface-container-low hover:bg-surface-container-highest flex items-center justify-center text-on-surface-variant transition-colors"
+                className="w-8 h-8 rounded-full bg-muted hover:bg-muted flex items-center justify-center text-muted-foreground transition-colors"
               >
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
 
-            <div className="p-4 flex-1 overflow-y-auto bg-surface-container-low">
+            <div className="p-4 flex-1 overflow-y-auto bg-muted">
               <div className="flex gap-2 mb-4">
                 <button
                   onClick={() => setSelectedGroupIds(availableGroups.map(g => g.id))}
@@ -481,17 +481,17 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
                 </button>
                 <button
                   onClick={() => setSelectedGroupIds([])}
-                  className="text-sm font-medium text-on-surface-variant bg-surface border border-outline-variant hover:bg-surface-container-low px-3 py-1.5 rounded-lg transition"
+                  className="text-sm font-medium text-muted-foreground bg-card border border-border hover:bg-muted px-3 py-1.5 rounded-lg transition"
                 >
                   Bỏ chọn tất cả
                 </button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {availableGroups.map((group) => (
-                  <label key={group.id} className="flex items-start gap-3 p-3 bg-surface rounded-xl border border-outline-variant hover:border-violet-300 hover:shadow-sm cursor-pointer transition">
+                  <label key={group.id} className="flex items-start gap-3 p-3 bg-card rounded-xl border border-border hover:border-violet-300 hover:shadow-sm cursor-pointer transition">
                     <input
                       type="checkbox"
-                      className="mt-1 w-4 h-4 rounded border-outline-variant text-violet-600 focus:ring-violet-500"
+                      className="mt-1 w-4 h-4 rounded border-border text-violet-600 focus:ring-violet-500"
                       checked={selectedGroupIds.includes(group.id)}
                       onChange={(e) => {
                         if (e.target.checked) {
@@ -502,14 +502,14 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
                       }}
                     />
                     <div className="flex flex-col overflow-hidden">
-                      <span className="text-sm font-bold text-on-surface line-clamp-1" title={group.group_name || group.group_url}>
+                      <span className="text-sm font-bold text-foreground line-clamp-1" title={group.group_name || group.group_url}>
                         {group.group_name || group.group_url}
                       </span>
                       <a
                         href={group.group_url}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-[10px] text-on-surface-variant hover:text-indigo-500 hover:underline line-clamp-1 mt-0.5 inline-block w-fit"
+                        className="text-[10px] text-muted-foreground hover:text-indigo-500 hover:underline line-clamp-1 mt-0.5 inline-block w-fit"
                         onClick={(e) => e.stopPropagation()}
                       >
                         {group.group_url}
@@ -520,10 +520,10 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
               </div>
             </div>
 
-            <div className="p-4 border-t border-outline-variant flex justify-end gap-3 bg-surface">
+            <div className="p-4 border-t border-border flex justify-end gap-3 bg-card">
               <button
                 onClick={() => setShowModal(false)}
-                className="px-5 py-2.5 rounded-xl font-bold text-sm text-on-surface-variant hover:bg-surface-container-low transition"
+                className="px-5 py-2.5 rounded-xl font-bold text-sm text-muted-foreground hover:bg-muted transition"
               >
                 Hủy
               </button>
@@ -542,7 +542,7 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
 
       {/* Progress & Content (Expanded when launching or has data) */}
       {(isLaunching || isDone || scrapedGroups.length > 0 || launchLog.length > 0) && (
-        <div className="border-t border-outline-variant bg-surface p-4">
+        <div className="border-t border-border bg-card p-4">
           {(isLaunching || isDone) && (
             <div className="grid grid-cols-3 gap-3 mb-4">
               <div className="bg-violet-50/50 rounded-xl p-3 text-center border border-violet-100/50">
@@ -566,7 +566,7 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
 
           {isLaunching && crawlProgress.totalGroups > 0 && (
             <div className="mb-5">
-              <div className="h-1.5 bg-surface-container-low rounded-full overflow-hidden">
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full transition-all duration-300"
                   style={{
@@ -581,8 +581,8 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
           {scrapedGroups.length > 0 ? (
             <div className="space-y-4 max-h-[360px] overflow-y-auto custom-scrollbar pr-2">
               {scrapedGroups.map((group, gIdx) => (
-                <div key={gIdx} className="bg-surface-container-low rounded-xl border border-outline-variant p-3">
-                  <div className="flex items-center justify-between mb-3 border-b border-outline-variant pb-2">
+                <div key={gIdx} className="bg-muted rounded-xl border border-border p-3">
+                  <div className="flex items-center justify-between mb-3 border-b border-border pb-2">
                     <a href={group.groupUrl} target="_blank" rel="noreferrer" className="text-xs font-bold text-indigo-600 hover:underline line-clamp-1 max-w-[80%]">
                       {group.groupName !== 'Group' ? group.groupName : group.groupUrl}
                     </a>
@@ -593,15 +593,15 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {group.posts.map((post, pIdx) => (
-                      <div key={pIdx} className="bg-surface p-3 rounded-lg border border-outline-variant shadow-sm hover:shadow transition-shadow">
+                      <div key={pIdx} className="bg-card p-3 rounded-lg border border-border shadow-sm hover:shadow transition-shadow">
                         <div className="flex justify-between items-start mb-1.5">
-                          <span className="font-bold text-on-surface text-xs line-clamp-1">{post.author_name || 'Người dùng ẩn danh'}</span>
-                          <span className="text-[10px] text-on-surface-variant shrink-0 ml-2">{post.timestamp_raw}</span>
+                          <span className="font-bold text-foreground text-xs line-clamp-1">{post.author_name || 'Người dùng ẩn danh'}</span>
+                          <span className="text-[10px] text-muted-foreground shrink-0 ml-2">{post.timestamp_raw}</span>
                         </div>
-                        <p className="text-[11px] text-on-surface-variant line-clamp-3 mb-2 italic">
+                        <p className="text-[11px] text-muted-foreground line-clamp-3 mb-2 italic">
                           "{post.content || post.content_preview || 'Không có nội dung text'}"
                         </p>
-                        <div className="flex items-center gap-2 pt-1.5 border-t border-outline-variant">
+                        <div className="flex items-center gap-2 pt-1.5 border-t border-border">
                           <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">👍 {post.reactions || 0}</span>
                           <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">💬 {post.comments || 0}</span>
                           {post.post_url && (
