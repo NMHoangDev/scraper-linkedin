@@ -244,38 +244,69 @@ export default function TeamsManagementPage() {
         />
       </PlatformStatsRow>
 
-      {/* Inbox Comparison Chart */}
+      {/* Tong quan KPI day du theo Team - Post/Comment/Lead/Inbox, khong chi rieng Inbox
+          (rieng Inbox can buoc "Xac nhan Inbox" thu cong nen hay 0% du team van co
+          tien do that o cac chi so khac, de gay hieu nham team khong lam gi). */}
       {!isLoading && teams.length > 0 && (
         <div className="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm">
-          <h3 className="text-sm font-bold text-on-surface mb-4">So sánh tỷ lệ hoàn thành KPI Inbox các Team</h3>
+          <h3 className="text-sm font-bold text-on-surface mb-4">Tổng quan KPI theo Team (Post / Comment / Lead / Inbox)</h3>
           <div className="flex flex-col gap-4">
             {teams.map(team => {
               const teamKpis = kpiResultsData.find(r => r.teamId === team.id)?.members || [];
-              const totalMembers = team.members?.length || 0;
-              let achievedMembers = 0;
+              const totals = { post: 0, postTarget: 0, comment: 0, commentTarget: 0, lead: 0, leadTarget: 0, inbox: 0, inboxTarget: 0 };
 
               team.members?.forEach(member => {
                 const kpiInfo = teamKpis.find((k: any) => k.id === member.id) || {};
-                const seedingStats = kpiInfo.seeding_stats || {};
-                const target = seedingStats.kpi_inbox || 0;
-                const current = seedingStats.kpi_inbox_current || 0;
-                if (target > 0 && current >= target) {
-                  achievedMembers++;
-                }
+                const st = kpiInfo.seeding_stats || {};
+                totals.post += st.kpi_post_current || 0;
+                totals.postTarget += st.kpi_post || 0;
+                totals.comment += st.verified_count || 0;
+                totals.commentTarget += st.kpi_target || 0;
+                totals.lead += st.kpi_lead_current || 0;
+                totals.leadTarget += st.kpi_lead || 0;
+                totals.inbox += st.kpi_inbox_current || 0;
+                totals.inboxTarget += st.kpi_inbox || 0;
               });
 
-              const percentage = totalMembers > 0 ? Math.min(Math.round((achievedMembers / totalMembers) * 100), 100) : 0;
+              const overallTarget = totals.postTarget + totals.commentTarget + totals.leadTarget + totals.inboxTarget;
+              const overallCurrent = totals.post + totals.comment + totals.lead + totals.inbox;
+              const percentage = overallTarget > 0 ? Math.min(Math.round((overallCurrent / overallTarget) * 100), 100) : 0;
               const barColor = percentage >= 100 ? "bg-emerald-500" : percentage >= 50 ? "bg-orange-500" : "bg-red-500";
               const textColor = percentage >= 100 ? "text-emerald-600" : percentage >= 50 ? "text-orange-600" : "text-red-600";
 
+              const metrics = [
+                { label: "Post", current: totals.post, target: totals.postTarget },
+                { label: "Comment", current: totals.comment, target: totals.commentTarget },
+                { label: "Lead", current: totals.lead, target: totals.leadTarget },
+                { label: "Inbox", current: totals.inbox, target: totals.inboxTarget },
+              ];
+
               return (
-                <div key={team.id} className="flex flex-col gap-1.5">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-on-surface">{team.name_team} <span className="text-on-surface-variant font-medium text-[10px] ml-1">({achievedMembers}/{totalMembers} TV hoàn thành)</span></span>
-                    <span className={`font-bold ${textColor}`}>{percentage}%</span>
+                <div key={team.id} className="flex flex-col gap-2.5 rounded-lg border border-outline-variant p-3">
+                  <div className="flex flex-wrap justify-between items-center gap-2">
+                    <div>
+                      <span className="font-bold text-on-surface text-xs">{team.name_team}</span>
+                      <span className="text-on-surface-variant font-medium text-[10px] ml-2">
+                        Leader: {team.leader_name || "Chưa đặt tên"} · {team.number_of_member || 0} TV
+                      </span>
+                    </div>
+                    <span className={`font-bold text-xs ${textColor}`}>{overallTarget > 0 ? `${percentage}%` : "Chưa có chỉ tiêu"}</span>
                   </div>
-                  <div className="h-2 w-full bg-surface-container-low rounded-full overflow-hidden">
+
+                  <div className="h-1.5 w-full bg-surface-container-low rounded-full overflow-hidden">
                     <div className={`h-full ${barColor} transition-all duration-500`} style={{ width: `${percentage}%` }} />
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {metrics.map((m) => (
+                      <div key={m.label} className="rounded-lg bg-surface-container-low px-2.5 py-1.5">
+                        <div className="text-[10px] font-semibold text-on-surface-variant">{m.label}</div>
+                        <div className="text-xs font-bold text-on-surface">
+                          {m.current}
+                          <span className="text-[10px] font-medium text-on-surface-variant"> / {m.target}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               );
