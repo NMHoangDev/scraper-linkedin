@@ -462,12 +462,19 @@ async def _wait_for_stable_qr(page: Page, previous_signature: Optional[str] = No
 
     Zalo can render the QR canvas before the bitmap is fully settled. Returning the
     first canvas snapshot too early can produce a QR that scans but is already stale.
-    Requiring two matching captures reduces those false positives.
+    Requiring two matching captures with the same signature reduces those false positives.
+
+    Tăng số attempts từ 8 lên 14 (~4.5s total) để xử lý môi trường canvas render chậm
+    (máy chủ ít CPU, headless mode, hay mạng chậm khi Zalo web load lâu).
+    Nếu sau toàn bộ vòng lặp mà chưa có 2 consecutive captures, vẫn trả lại
+    last_data_url như là "best effort" thay vì None — caller (navigate_and_get_qr)
+    có 30 attempts x 500ms để thử lại nếu QR chưa stable.
     """
     last_data_url: Optional[str] = None
     last_signature: Optional[str] = None
+    consecutive_count = 0  # Đếm số lần liên tiếp nhận được cùng 1 signature
 
-    for _ in range(8):
+    for attempt in range(14):  # ~4.5s tổng (8 attempts cũ ~2.2s không đủ cho canvas chậm)
         try:
             if await page.evaluate(_JS_QR_EXPIRED):
                 return None
@@ -478,19 +485,26 @@ async def _wait_for_stable_qr(page: Page, previous_signature: Optional[str] = No
         if not data_url:
             last_data_url = None
             last_signature = None
-            await page.wait_for_timeout(250)
+            consecutive_count = 0
+            await page.wait_for_timeout(300)
             continue
 
         current_signature = qr_signature(data_url)
         if previous_signature and current_signature == previous_signature:
+            # QR chưa đổi so với lần trước — tiếp tục chờ
             last_data_url = data_url
             last_signature = current_signature
-            await page.wait_for_timeout(250)
+            await page.wait_for_timeout(300)
             continue
 
-        if last_signature and current_signature == last_signature and last_data_url == data_url:
-            logger.info("QR stabilized across consecutive captures")
-            return data_url
+        if last_signature and current_signature == last_signature:
+            consecutive_count += 1
+            if consecutive_count >= 1:  # 2 captures khớp (lần đầu set last, lần này match)
+                logger.info(f"QR stabilized across consecutive captures (attempt {attempt})")
+                return data_url
+        else:
+            # Signature thay đổi — QR đang render/update, reset counter
+            consecutive_count = 0
 
         last_data_url = data_url
         last_signature = current_signature
@@ -498,6 +512,9 @@ async def _wait_for_stable_qr(page: Page, previous_signature: Optional[str] = No
 
     if previous_signature and last_signature == previous_signature:
         return None
+    # Fallback: trả last_data_url dù chưa có 2 consecutive — caller sẽ retry nếu cần
+    if last_data_url:
+        logger.debug("QR returned without full stabilization (best-effort)")
     return last_data_url
 
 

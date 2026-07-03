@@ -29,6 +29,9 @@ _AUTH_EXPIRED_MARKERS = (
     "401",
 )
 
+# Các lệnh phức tạp cần listener riêng — không dùng được qua persistent server
+_SPAWN_ONLY_COMMANDS = {"sync-old-messages"}
+
 
 def _looks_like_auth_expired(detail_text: str) -> bool:
     lowered = (detail_text or "").lower()
@@ -43,7 +46,35 @@ def zca_api_script_path() -> Path:
     return _backend_root() / "scripts" / "zca_api_bridge.js"
 
 
-async def _run_zca_command(
+# ── Persistent worker pool (ưu tiên) ─────────────────────────────────────────
+
+async def _run_via_pool(
+    command: str,
+    auth: Dict[str, Any],
+    *,
+    args: Optional[Dict[str, Any]] = None,
+    payload: Optional[Dict[str, Any]] = None,
+    timeout_seconds: int = 120,
+) -> Dict[str, Any]:
+    """Chạy command qua persistent Node.js worker pool.
+
+    Raise RuntimeError nếu pool chưa khởi tạo được hoặc server crash.
+    Caller sẽ fallback sang _run_via_spawn nếu cần.
+    """
+    from app.modules.all_platform.zalo.services.zca_worker_pool import get_pool
+    pool = get_pool()
+    return await pool.run_command(
+        command,
+        auth,
+        args=args or {},
+        payload=payload,
+        timeout=float(timeout_seconds),
+    )
+
+
+# ── Spawn-per-call (fallback) ─────────────────────────────────────────────────
+
+async def _run_via_spawn(
     command: str,
     auth: Dict[str, Any],
     *,
@@ -51,6 +82,7 @@ async def _run_zca_command(
     payload: Optional[Dict[str, Any]] = None,
     timeout_seconds: int = 120,
 ) -> Dict[str, Any]:
+    """Mô hình cũ: spawn 1 tiến trình Node.js per lệnh."""
     script = zca_api_script_path()
     if not script.exists():
         raise RuntimeError(f"ZCA API helper not found: {script}")
@@ -76,10 +108,9 @@ async def _run_zca_command(
         )
         def _communicate():
             return proc.communicate(input=input_data)
-        
+
         try:
             stdout, stderr = await asyncio.wait_for(asyncio.to_thread(_communicate), timeout=timeout_seconds)
-            returncode = proc.returncode
         except asyncio.TimeoutError:
             proc.kill()
             raise
@@ -96,7 +127,6 @@ async def _run_zca_command(
             proc.communicate(input_data),
             timeout=timeout_seconds,
         )
-        returncode = proc.returncode
 
     stderr_text = stderr.decode("utf-8", errors="replace").strip()
     if stderr_text:
@@ -126,6 +156,79 @@ async def _run_zca_command(
         raise RuntimeError(detail_text)
 
     return result
+
+
+# ── Dispatcher: pool → fallback spawn ────────────────────────────────────────
+
+async def _run_zca_command(
+    command: str,
+    auth: Dict[str, Any],
+    *,
+    args: Optional[List[str]] = None,
+    payload: Optional[Dict[str, Any]] = None,
+    timeout_seconds: int = 120,
+) -> Dict[str, Any]:
+    """Entry point cho tất cả ZCA API calls.
+
+    Chiến lược:
+        1. Nếu command trong _SPAWN_ONLY_COMMANDS → spawn-per-call ngay (listener/sync).
+        2. Thử chạy qua persistent worker pool (0 spawn overhead).
+        3. Nếu pool lỗi → fallback về spawn-per-call và log warning.
+
+    Args dict (pool) vs list (spawn) được convert tự động.
+    """
+    # Convert args list → dict cho pool (vd: ["--group-id","123"] → {"group-id":"123"})
+    pool_args: Dict[str, Any] = {}
+    if args:
+        it = iter(args)
+        for token in it:
+            if token.startswith("--"):
+                key = token[2:]
+                try:
+                    val = next(it)
+                    if val.startswith("--"):
+                        pool_args[key] = True
+                        pool_args[val[2:]] = True  # next flag
+                    else:
+                        pool_args[key] = val
+                except StopIteration:
+                    pool_args[key] = True
+            else:
+                pool_args[token] = True
+
+    # Lệnh cần listener — luôn dùng spawn
+    if command in _SPAWN_ONLY_COMMANDS:
+        return await _run_via_spawn(
+            command, auth, args=args, payload=payload, timeout_seconds=timeout_seconds
+        )
+
+    # Thử pool trước
+    try:
+        result = await _run_via_pool(
+            command, auth,
+            args=pool_args,
+            payload=payload,
+            timeout_seconds=timeout_seconds,
+        )
+        # Kiểm tra auth expired từ kết quả pool
+        if not result.get("ok"):
+            detail_text = str(result.get("error") or "")
+            if _looks_like_auth_expired(detail_text):
+                raise ZcaAuthExpiredError(detail_text)
+            raise RuntimeError(detail_text)
+        return result
+    except ZcaAuthExpiredError:
+        raise  # propagate auth expired không cần fallback
+    except Exception as pool_exc:
+        logger.warning(
+            f"ZCA pool failed for command={command} ({pool_exc}), "
+            f"falling back to spawn-per-call"
+        )
+
+    # Fallback: spawn-per-call
+    return await _run_via_spawn(
+        command, auth, args=args, payload=payload, timeout_seconds=timeout_seconds
+    )
 
 
 def _to_group(row: Dict[str, Any], *, is_friend: bool = False) -> Group:

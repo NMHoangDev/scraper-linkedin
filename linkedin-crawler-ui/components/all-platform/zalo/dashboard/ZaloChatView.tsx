@@ -834,6 +834,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
       setHasOlderMessages(false);
       setNewMessageCount(0);
       setSelectedMessageIds([]); // Reset selection when switching conversations
+      setAutoSendTargetIds([]); // Reset target list when switching conversations
       lastLoadedConversationIdRef.current = null;
     }
     void loadLatestMessages(selectedConversationId);
@@ -1066,13 +1067,17 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
   };
 
   const autoSendFilteredConversations = useMemo(() => {
-    if (!autoSendSearchQuery) return conversations;
+    let list = conversations;
+    if (selectedConversationId) {
+      list = list.filter(c => c.conversation_id !== selectedConversationId);
+    }
+    if (!autoSendSearchQuery) return list;
     const q = autoSendSearchQuery.toLowerCase();
-    return conversations.filter(c =>
+    return list.filter(c =>
       (c.conversation_name || "").toLowerCase().includes(q) ||
       (c.latest_content || "").toLowerCase().includes(q)
     );
-  }, [conversations, autoSendSearchQuery]);
+  }, [conversations, autoSendSearchQuery, selectedConversationId]);
 
   const handleToggleAutoSendTarget = (conversationId: string) => {
     setAutoSendTargetIds(prev =>

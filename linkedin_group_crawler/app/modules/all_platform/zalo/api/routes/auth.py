@@ -51,6 +51,7 @@ from app.modules.all_platform.zalo.services.zca_persistent_listener import (
     get_listener_status,
     start_listener,
     stop_listener,
+    reset_listener_auth_expired,
 )
 from app.modules.all_platform.zalo.services.zca_qr_bridge import (
     import_zca_auth_to_context,
@@ -500,6 +501,7 @@ async def _handle_zca_qr_events(session_id: str) -> None:
                 cookie_str = "; ".join(f"{c.get('key')}={c.get('value')}" for c in cookies if c.get("key") and c.get("value") is not None)
                 
             await _remember_zalo_user(session.user_id, "confirmed", cookie=cookie_str)
+            reset_listener_auth_expired(session.user_id)
 
             # ── Background: first-time sync (groups + friends + messages) then start listener ───
             async def _background_qr_sync(uid: str, uauth: dict):
@@ -1068,7 +1070,7 @@ async def auth_status_events(
 ):
     from app.modules.all_platform.zalo.services.message_events import (
         publish_auth_expired,
-        wait_for_auth_expired,
+        wait_for_auth_expired_user,
     )
 
     normalized_user_id = _normalize_user_id(user_id)
@@ -1088,8 +1090,10 @@ async def auth_status_events(
                 break
 
             # 1. Kiểm tra auth_expired event từ ZCA listener (chờ tối đa _POLL_INTERVAL giây).
-            expired_event = await wait_for_auth_expired(timeout=_POLL_INTERVAL)
-            if expired_event is not None and expired_event[0] == normalized_user_id:
+            # Dùng per-user queue để tránh race condition khi nhiều user cùng online:
+            # wait_for_auth_expired_user chỉ đọc queue của normalized_user_id này.
+            expired_event = await wait_for_auth_expired_user(normalized_user_id, timeout=_POLL_INTERVAL)
+            if expired_event is not None:
                 # Dọn dẹp auth và build payload "session_expired" để push ngay về FE.
                 try:
                     from app.modules.all_platform.zalo.services.zca_auth_store import delete_zca_auth
@@ -1133,7 +1137,7 @@ async def auth_status_events(
                         yield "event: close\ndata: {}\n\n"
                         return
                 else:
-                    yield "event: heartbeat\ndata: {}\n\n"
+                    yield f"event: heartbeat\ndata: {{\"ts\":{int(time.time())}}}\n\n"
             except Exception as exc:
                 logger.warning(f"SSE auth status stream error for user={normalized_user_id}: {exc}")
                 yield "event: error\ndata: {\"message\":\"status_stream_error\"}\n\n"
@@ -1313,7 +1317,7 @@ async def import_session_from_extension(
         }
 
     Validation:
-        * Phải có đủ 5 key cookies bắt buộc: zppsid, zppwsid, zpsid, zphpsid, _ga
+        * Cookies: lấy được bao nhiêu dùng bấy nhiêu, không yêu cầu specific keys
         * Mỗi cookie phải có key + value
         * user_agent bắt buộc (Chrome thật), không chấp nhận default
     """
@@ -1335,6 +1339,34 @@ async def import_session_from_extension(
     user_id = _normalize_user_id(raw_user_id)
     owner_id = _normalize_user_id(body.get("owner_id") or x_user_id)
     id_member = _normalize_user_id(body.get("id_member") or owner_id)
+
+    # Nếu user_id không bắt đầu bằng "zl_" (ví dụ là email), tự động tìm kiếm zalo_account tương ứng
+    if not user_id.startswith("zl_"):
+        try:
+            from app.modules.all_platform.zalo.services.supabase_service import _rest
+            db_accounts = await _rest(
+                "GET",
+                "zalo_accounts",
+                params={
+                    "select": "account_id,phone,status",
+                    "or": f"owner_id.eq.{user_id},id_member.eq.{user_id}",
+                    "order": "created_at.desc",
+                }
+            ) or []
+            zl_accounts = [a for a in db_accounts if a.get("account_id", "").startswith("zl_")]
+            if zl_accounts:
+                target_account = None
+                for a in zl_accounts:
+                    if a.get("status") == "not_logged_in":
+                        target_account = a
+                        break
+                if not target_account:
+                    target_account = zl_accounts[0]
+                
+                logger.info(f"Auto-resolved email user_id={user_id} to Zalo account_id={target_account['account_id']}")
+                user_id = target_account["account_id"]
+        except Exception as resolve_exc:
+            logger.warning(f"Could not auto-resolve email user_id={user_id} to account_id: {resolve_exc}")
 
     # ── Parse cookies: accept 4 formats ────────────────────────────────
     #   1. List of {key, value, domain, ...}  (Chrome extension native format)
@@ -1381,7 +1413,15 @@ async def import_session_from_extension(
             except Exception as exc:
                 logger.warning(f"Failed to parse cookies JSON object: {exc}")
         else:
-            # Plain "k=v; k=v" format
+            # Plain "k=v; k=v" format — LEGACY, không được khuyến nghị.
+            # Format này không cung cấp httpOnly/secure/domain → không đủ thông tin
+            # để import cookie an toàn. Cảnh báo để caller chuyển sang structured format.
+            # Vẫn hỗ trợ để không break backward compatibility nhưng log warning rõ ràng.
+            logger.warning(
+                f"import-session: received legacy 'k=v; k=v' cookie string format for user={user_id}. "
+                "This format is deprecated and lacks httpOnly/secure/domain metadata. "
+                "Please upgrade to structured Chrome-cookie array format."
+            )
             for part in stripped.split(";"):
                 part = part.strip()
                 if "=" in part:
@@ -1389,8 +1429,10 @@ async def import_session_from_extension(
                     parsed_cookies.append({
                         "key": k.strip(),
                         "value": v.strip(),
-                        "domain": "chat.zalo.me",
+                        "domain": ".zalo.me",  # Dùng .zalo.me thay vì chat.zalo.me để rộng hơn
                         "path": "/",
+                        "httpOnly": True,
+                        "secure": True,
                     })
 
     if not parsed_cookies:
@@ -1399,22 +1441,9 @@ async def import_session_from_extension(
             detail="Could not parse any cookies. Expected Chrome-cookie array (key/value/domain) or 'k=v; k=v' string.",
         )
 
-    # ── Validate required keys ─────────────────────────────────────────
-    # ZCA-JS hiện đại yêu cầu cookies mới zppsid/zppwsid/zphpsid
-    # (Zalo API session mới), không chỉ cookies web cũ (zpsid/zpw_sek).
-    # Extension phải lấy được bộ cookies này từ Zalo web sau khi QR login.
-    REQUIRED_KEYS = ["zppsid", "zppwsid", "zpsid", "zphpsid"]
-    cookie_keys = {c.get("key", "").strip().lower() for c in parsed_cookies}
-    missing = [k for k in REQUIRED_KEYS if k not in cookie_keys]
-    if missing:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Thiếu cookies bắt buộc: {', '.join(missing)}. "
-                f"Đã có: {sorted(cookie_keys)}. "
-                "Hãy đăng nhập lại bằng QR trong extension để lấy cookies đầy đủ."
-            ),
-        )
+    # ── Cookie validation: bypassed ─────────────────────────────────────
+    # Lấy được bao nhiêu dùng bấy nhiêu, không yêu cầu specific keys.
+    # ZCA-JS chỉ cần imei + cookies + userAgent, không check tên cookie cụ thể.
 
     # ── Validate user_agent (phải là Chrome thật, không dùng default) ─
     user_agent = (body.get("user_agent") or "").strip()
@@ -1473,11 +1502,12 @@ async def import_session_from_extension(
         id_member=id_member,
     )
 
-    cookie_keys_str = ", ".join(sorted(cookie_keys))
+    cookie_keys_str = ", ".join(sorted({c.get("key", "").strip().lower() for c in parsed_cookies})) or "(none)"
     logger.info(
         f"Imported extension session for user={user_id}, "
         f"session={session_id}, cookies={len(parsed_cookies)} keys=[{cookie_keys_str}]"
     )
+    reset_listener_auth_expired(user_id)
 
     # ── Background: first-time sync then start persistent listener ───
     async def _background_extension_sync(uid: str, uauth: dict):
@@ -1534,7 +1564,7 @@ async def import_session_from_extension(
             "status": "confirmed",
             "source": "extension",
             "cookies_count": len(parsed_cookies),
-            "cookies_keys": sorted(cookie_keys),
+            "cookies_keys": sorted({c.get("key", "").strip().lower() for c in parsed_cookies}),
             "imei": bool(body.get("imei")),
             "message": f"Imported {len(parsed_cookies)} cookies, keys=[{cookie_keys_str}]. Listener sẽ khởi động nền.",
         },

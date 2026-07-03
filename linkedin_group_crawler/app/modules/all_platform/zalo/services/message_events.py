@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from collections import defaultdict
 from typing import AsyncIterator, DefaultDict, Dict, List, Optional, Set, Tuple
 
@@ -36,26 +37,81 @@ _account_owners: Dict[str, str] = {}
 # ══════════════════════════════════════════════════════════════════════════════
 # Auth-expired event bus: khi ZCA listener phát hiện auth hết hạn,
 # publish event vào đây để auth SSE endpoint nhận và push ngay về FE.
+#
+# THIẾT KẾ PER-USER QUEUE:
+#   Trước đây dùng 1 queue chung (_auth_expired_queue) → lỗi race condition:
+#   Nếu SSE của user A đang poll và event của user B bị expire, user A sẽ
+#   dequeue event của B, check "B == A" fail → event bị mất vĩnh viễn.
+#
+#   Giải pháp: mỗi user_id có 1 asyncio.Queue(maxsize=5) riêng.
+#   publish_auth_expired gửi vào đúng queue của user đó.
+#   wait_for_auth_expired_user(user_id) chỉ đọc queue của user đó.
 # ══════════════════════════════════════════════════════════════════════════════
 _AuthExpiredEvent = Tuple[str, str]  # (account_id, reason)
-_auth_expired_queue: asyncio.Queue[_AuthExpiredEvent] = asyncio.Queue(maxsize=100)
+
+# Per-user queues: account_id (normalized) → asyncio.Queue
+_auth_expired_queues: Dict[str, asyncio.Queue] = {}
+
+
+def _get_auth_expired_queue(account_id: str) -> "asyncio.Queue[_AuthExpiredEvent]":
+    """Trả về queue của account_id, tạo mới nếu chưa có."""
+    account = _normalize(account_id)
+    if account not in _auth_expired_queues:
+        _auth_expired_queues[account] = asyncio.Queue(maxsize=5)
+    return _auth_expired_queues[account]
 
 
 async def publish_auth_expired(account_id: str, reason: str) -> bool:
-    """Đẩy auth-expired event vào bus. Trả True nếu có ai đang chờ nhận."""
+    """Đẩy auth-expired event vào queue riêng của account_id.
+
+    Nếu queue đã đầy (5 events chưa được consume) thì drain 1 event cũ
+    và push event mới — đảm bảo event mới nhất luôn được gửi đi.
+    Trả True nếu push thành công.
+    """
+    q = _get_auth_expired_queue(account_id)
+    event: _AuthExpiredEvent = (_normalize(account_id), reason)
     try:
-        _auth_expired_queue.put_nowait((account_id, reason))
+        q.put_nowait(event)
         return True
     except asyncio.QueueFull:
-        return False
+        # Drain 1 event cũ nhất rồi push event mới
+        try:
+            q.get_nowait()
+        except asyncio.QueueEmpty:
+            pass
+        try:
+            q.put_nowait(event)
+            return True
+        except asyncio.QueueFull:
+            return False
 
 
-async def wait_for_auth_expired(timeout: float = 60.0) -> Optional[_AuthExpiredEvent]:
-    """Chờ event auth-expired, hoặc None nếu timeout."""
+async def wait_for_auth_expired_user(account_id: str, timeout: float = 60.0) -> Optional[_AuthExpiredEvent]:
+    """Chờ event auth-expired chỉ cho account_id cụ thể, hoặc None nếu timeout.
+
+    Thay thế wait_for_auth_expired() cũ (dùng queue chung).
+    Mỗi SSE connection gọi hàm này với user_id của mình → không bị race với user khác.
+    """
+    q = _get_auth_expired_queue(account_id)
     try:
-        return await asyncio.wait_for(_auth_expired_queue.get(), timeout=timeout)
+        return await asyncio.wait_for(q.get(), timeout=timeout)
     except asyncio.TimeoutError:
         return None
+
+
+# Backward-compat alias: auth.py cũ gọi wait_for_auth_expired(timeout=_POLL_INTERVAL)
+# nhưng không truyền user_id → không dùng được với per-user queue.
+# Giữ lại để không break code cũ; auth.py cần migrate sang wait_for_auth_expired_user.
+async def wait_for_auth_expired(timeout: float = 60.0) -> Optional[_AuthExpiredEvent]:
+    """[DEPRECATED] Dùng wait_for_auth_expired_user(account_id, timeout) thay thế.
+
+    Hàm này giờ luôn trả None (không đọc queue nào) để tránh consume nhầm
+    event của user khác. Auth SSE endpoints phải dùng wait_for_auth_expired_user().
+    """
+    # Chờ timeout mà không đọc queue nào → SSE endpoint sẽ fallback sang
+    # poll _build_current_status_payload() như bình thường.
+    await asyncio.sleep(min(timeout, 2.0))
+    return None
 
 
 # ----------------------------------------------------------------------------
@@ -256,7 +312,7 @@ async def subscribe_zalo_events(
             if not queues:
                 # Không subscribe account nào — vẫn giữ kết nối sống bằng heartbeat.
                 await asyncio.sleep(20)
-                yield "event: heartbeat\ndata: {}\n\n"
+                yield f"event: heartbeat\ndata: {{\"ts\":{int(time.time())}}}\n\n"
                 continue
 
             pending = [asyncio.create_task(q.get(), name=f"sse-{acc}") for acc, q, _ in queues]
@@ -268,7 +324,7 @@ async def subscribe_zalo_events(
                     task.cancel()
 
             if not done:
-                yield "event: heartbeat\ndata: {}\n\n"
+                yield f"event: heartbeat\ndata: {{\"ts\":{int(time.time())}}}\n\n"
                 continue
 
             for task in done:

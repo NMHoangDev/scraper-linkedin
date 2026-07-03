@@ -31,8 +31,12 @@
         "https://*.facebook.com/*",
         "https://*.fb.com/*"
       ],
-      "js": ["content-script.js"],
-      "css": ["content-style.css"],
+      "js": [
+        "content-script.js"
+      ],
+      "css": [
+        "content-style.css"
+      ],
       "run_at": "document_idle"
     }
   ],

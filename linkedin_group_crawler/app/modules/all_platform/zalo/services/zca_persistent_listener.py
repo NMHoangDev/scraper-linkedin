@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 import asyncio
@@ -144,7 +144,119 @@ class AdaptiveRateLimiter:
 
 
 # Global rate limiter — shared giữa startup sync và background backfill.
+# ⚠️ LIMITATION (B18): Rate limiter state chỉ tồn tại in-memory per process.
+# Nếu deploy horizontal scaling (nhiều backend instances), mỗi instance có limiter riêng
+# → các instances không coordinate → có thể burst rate limit cùng lúc.
+# TODO: Migrate sang Redis-backed rate limiter (INCR/EXPIRE pattern) khi cần scale.
+# Hiện tại: chạy ổn với 1 process. Với 2+ instances, tăng base_delay lên ~8.0s.
 _RATE_LIMITER = AdaptiveRateLimiter(base_delay=4.0, max_delay=120.0)
+
+# ── CDN image download helper (B13) ─────────────────────────────────────────
+# Zalo CDN URLs expire after the session ends (tied to cookie validity).
+# To prevent broken images in message history, we fetch CDN images using
+# the current Zalo cookies and append them as base64 data URLs alongside the
+# original CDN URLs. Falls back to CDN URL only if download fails.
+#
+# Data URLs ARE large (~4/3× the raw bytes), but this is consistent with what
+# the DOM scraping path already stores (message_parser.py keeps both CDN + data URL).
+# Without this, any ZCA-API-sourced image message shows broken images after re-login.
+
+_IMAGE_FETCH_TIMEOUT_S = 8.0
+_IMAGE_FETCH_MAX_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB — skip very large images
+_IMAGE_FETCH_MAX_PER_MESSAGE = 2               # max CDN URLs to convert per message
+_IMAGE_FETCH_SEMAPHORE = asyncio.Semaphore(2)  # max 2 concurrent image fetches globally
+_ZALO_CDN_DOMAINS = frozenset({"zalo.me", "zadn.vn", "zalostatic.com", "zalostg.vn", "zaloapp.com"})
+
+
+def _is_zalo_cdn_url(url: str) -> bool:
+    """True nếu URL là Zalo CDN (sẽ expire sau khi session kết thúc)."""
+    if not url or not url.startswith("http"):
+        return False
+    try:
+        from urllib.parse import urlparse
+        host = urlparse(url).netloc.lower()
+        return any(d in host for d in _ZALO_CDN_DOMAINS)
+    except Exception:
+        return False
+
+
+def _build_zalo_cookie_header(auth: Dict[str, Any]) -> str:
+    """Build Cookie header string từ auth cookie list."""
+    cookies = auth.get("cookies") or []
+    if isinstance(cookies, str):
+        return cookies  # already a header string
+    parts = []
+    for c in (cookies if isinstance(cookies, list) else []):
+        name = c.get("key") or c.get("name") or ""
+        value = c.get("value") or ""
+        if name and value:
+            parts.append(f"{name}={value}")
+    return "; ".join(parts)
+
+
+async def _try_fetch_image_data_url(url: str, auth: Dict[str, Any]) -> Optional[str]:
+    """Fetch Zalo CDN image và trả về base64 data URL, hoặc None nếu thất bại."""
+    if not _is_zalo_cdn_url(url):
+        return None
+    try:
+        import base64
+        import httpx
+        headers = {
+            "Cookie": _build_zalo_cookie_header(auth),
+            "User-Agent": auth.get("userAgent") or "Mozilla/5.0",
+            "Referer": "https://chat.zalo.me/",
+        }
+        async with _IMAGE_FETCH_SEMAPHORE:
+            async with httpx.AsyncClient(timeout=_IMAGE_FETCH_TIMEOUT_S, follow_redirects=True) as client:
+                response = await client.get(url, headers=headers)
+        if not response.is_success:
+            logger.debug(f"CDN image fetch {response.status_code} for {url[:80]}")
+            return None
+        content_type = response.headers.get("content-type", "").split(";")[0].strip()
+        if not content_type.startswith("image/"):
+            return None
+        content = response.content
+        if len(content) > _IMAGE_FETCH_MAX_SIZE_BYTES:
+            logger.debug(f"CDN image too large ({len(content)} bytes), skipping data URL: {url[:80]}")
+            return None
+        b64 = base64.b64encode(content).decode("ascii")
+        return f"data:{content_type};base64,{b64}"
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        logger.debug(f"Could not fetch CDN image data URL ({url[:80]}): {exc}")
+        return None
+
+
+async def _enrich_image_urls(message: "Message", auth: Dict[str, Any]) -> "Message":
+    """Với image-type message có CDN URLs, thử tải và append data URLs làm backup.
+
+    Nếu session hết hạn sau đó, CDN URL sẽ expire nhưng data URL vẫn hiển thị được.
+    Consistent với DOM scraping (message_parser.py) đã làm tương tự trong browser context.
+    """
+    if message.type != "image" or not message.image_urls:
+        return message
+
+    cdn_urls = [u for u in message.image_urls if _is_zalo_cdn_url(u)][:_IMAGE_FETCH_MAX_PER_MESSAGE]
+    already_has_data = any(u.startswith("data:image/") for u in message.image_urls)
+    if not cdn_urls or already_has_data:
+        return message
+
+    try:
+        data_urls = await asyncio.wait_for(
+            asyncio.gather(*[_try_fetch_image_data_url(u, auth) for u in cdn_urls]),
+            timeout=_IMAGE_FETCH_TIMEOUT_S + 2.0,
+        )
+        new_data_urls = [u for u in data_urls if u]
+        if new_data_urls:
+            return message.model_copy(update={"image_urls": message.image_urls + new_data_urls})
+    except asyncio.TimeoutError:
+        logger.debug(f"CDN image enrichment timed out for message {message.message_id}")
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        logger.debug(f"CDN image enrichment failed for message {message.message_id}: {exc}")
+    return message
 
 # Marker cho biết cookie/session Zalo đã hết hạn — không cố restart vô ích nữa.
 _AUTH_EXPIRED_MARKERS = (
@@ -201,12 +313,26 @@ def _message_timestamp_ms(message: Message) -> int:
     return _timestamp_ms(message.timestamp) or _timestamp_ms(message.time_text)
 
 
+def _message_id_numeric_key(message_id: Any) -> int:
+    """Chuyển message_id sang int để sort đúng thứ tự số.
+
+    Tránh lỗi string sort: "9" > "10" dù 9 < 10.
+    Zalo message IDs thường là số nguyên lớn (e.g. 6723450981234567890).
+    Non-numeric IDs (dom-..., uuid) fallback về 0 và sort theo string tiếp theo.
+    """
+    try:
+        return int(str(message_id or "").strip())
+    except (ValueError, TypeError):
+        return 0
+
+
 def _sort_messages_old_to_new(messages: List[Message]) -> List[Message]:
     return sorted(
         messages,
         key=lambda message: (
             _message_timestamp_ms(message),
-            str(message.message_id or ""),
+            _message_id_numeric_key(message.message_id),
+            str(message.message_id or ""),  # tiebreaker cho non-numeric IDs
         ),
     )
 
@@ -216,6 +342,7 @@ def _sort_messages_new_to_old(messages: List[Message]) -> List[Message]:
         messages,
         key=lambda message: (
             _message_timestamp_ms(message),
+            _message_id_numeric_key(message.message_id),
             str(message.message_id or ""),
         ),
         reverse=True,
@@ -972,6 +1099,13 @@ class ZcaPersistentListenerManager:
             if not message.message_id:
                 continue
 
+            # B13: CDN image URLs expire khi Zalo session hết hạn → broken images.
+            # Tải ảnh ngay bây giờ (trong khi session còn valid) và append data URLs
+            # làm backup. Nếu CDN expire sau đó, data URL vẫn hiển thị được.
+            # Consistent với DOM scraping (message_parser.py) đã làm tương tự.
+            if message.type == "image" and state.auth:
+                message = await _enrich_image_urls(message, state.auth)
+
             cache = self._cache.setdefault((state.user_id, group_id), {})
 
             if message.message_id not in cache:
@@ -1012,12 +1146,25 @@ class ZcaPersistentListenerManager:
             if not group_name:
                 group_name = _supabase_group_name_cache.get((state.user_id, group_id))
             if not group_name:
-                # Personal chat: lấy tên từ sender của message đầu tiên.
-                first_msg = messages[0]
-                if first_msg.sender_name and first_msg.sender_name not in {"__me__", "me", "ban", "bạn"}:
-                    group_name = first_msg.sender_name
-                else:
-                    group_name = f"Conversation {group_id}"
+                # Personal chat (DM): tìm tên từ sender của bất kỳ message nào trong batch.
+                # Không chỉ dùng messages[0] vì message đầu có thể là tin của chính mình
+                # (sender_name = "__me__") — cần tìm tin từ đối phương.
+                _dm_skip = {"__me__", "me", "ban", "bạn", "", None}
+                for _msg in messages:
+                    if _msg.sender_name not in _dm_skip:
+                        group_name = _msg.sender_name
+                        break
+                # Nếu toàn bộ batch là tin của mình (gửi đi), kiểm tra in-memory cache
+                # để xem đối phương có tên trong tin nhắn cũ không.
+                if not group_name:
+                    cached_msgs = list((self._cache.get((state.user_id, group_id)) or {}).values())
+                    for _msg in reversed(cached_msgs):  # tin mới nhất trước
+                        if _msg.sender_name not in _dm_skip:
+                            group_name = _msg.sender_name
+                            break
+                if not group_name:
+                    # Cuối cùng mới dùng group_id — vẫn hiển thị đẹp hơn "Conversation g123"
+                    group_name = f"DM {group_id}"
 
             try:
                 await save_listener_messages(state.user_id, group_id, group_name, messages, increment_unread=increment_unread)
@@ -1093,5 +1240,11 @@ def get_listener_status(user_id: str) -> Dict[str, Any]:
 
 def get_cached_messages(user_id: str, group_id: str, limit: int = 500) -> List[Message]:
     return _MANAGER.get_cached_messages(user_id, group_id, limit)
+
+
+def reset_listener_auth_expired(user_id: str) -> None:
+    state = _MANAGER._states.get(user_id)
+    if state:
+        state.auth_expired = False
 
 

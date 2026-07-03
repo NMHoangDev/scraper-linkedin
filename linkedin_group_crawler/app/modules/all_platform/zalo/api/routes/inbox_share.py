@@ -52,6 +52,7 @@ from app.modules.all_platform.zalo.services.supabase_inbox_share_service import 
     unverify_inbox_share,
     verify_inbox_share,
     toggle_lead_inbox_share,
+    revoke_all_shares,
 )
 
 
@@ -291,3 +292,26 @@ def share_count_verified(payload: CountVerifiedRequest) -> Dict[str, Any]:
         return {"success": result.get("ok", False), **result}
     except Exception as exc:
         return {"success": False, "message": str(exc)}
+
+
+class RevokeAllRequest(BaseModel):
+    account_id: str = Field(..., min_length=1, description="Zalo account_id")
+    member_email: str = Field(..., min_length=3, description="Email member")
+
+
+@router.post("/revoke-all")
+def share_revoke_all(payload: RevokeAllRequest) -> Dict[str, Any]:
+    """Hủy chia sẻ tất cả các cuộc hội thoại chưa được duyệt KPI."""
+    try:
+        result = revoke_all_shares(
+            account_id=payload.account_id,
+            member_email=payload.member_email,
+        )
+        return {
+            "success": result.get("ok", False),
+            "count": result.get("count", 0),
+            "message": result.get("error"),
+        }
+    except Exception as exc:
+        return {"success": False, "message": str(exc)}
+

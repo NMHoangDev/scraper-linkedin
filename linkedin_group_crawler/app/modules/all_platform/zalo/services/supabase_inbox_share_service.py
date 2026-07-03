@@ -564,3 +564,27 @@ def bulk_sync_shares(
             errors.append(result.get("error", "unknown"))
 
     return {"ok": True, "synced": synced, "failed": failed, "errors": errors}
+
+
+def revoke_all_shares(account_id: str, member_email: str) -> Dict[str, Any]:
+    """Hủy chia sẻ tất cả các cuộc hội thoại chưa được duyệt KPI của account_id."""
+    supabase: Client = get_supabase_client()
+    member_id = _resolve_user_id(supabase, member_email)
+    if not member_id:
+        return {"ok": False, "error": f"Không tìm thấy user: {member_email}"}
+
+    try:
+        # Cập nhật is_active = false cho toàn bộ các permission của account_id này mà chưa được verified
+        res = (
+            supabase.table("zalo_conversation_permissions")
+            .update({"is_active": False})
+            .eq("account_id", account_id)
+            .eq("id_member", member_id)
+            .is_("verified_at", "null") # chỉ hủy các hội thoại chưa được duyệt KPI
+            .execute()
+        )
+        return {"ok": True, "count": len(res.data or [])}
+    except Exception as exc:
+        logger.exception("revoke_all_shares failed")
+        return {"ok": False, "error": str(exc)}
+
