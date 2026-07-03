@@ -213,6 +213,78 @@ export function TeamManagement() {
     refreshKpi();
   };
 
+  // Sua KPI truc tiep tai bang (bam vao so muc tieu la hien input, khong can mo modal).
+  const [editingCell, setEditingCell] = useState<{ memberId: string; field: "kpiPostTarget" | "kpiCommentTarget" | "kpiInboxTarget" | "kpiLeadTarget" } | null>(null);
+  const [editingValue, setEditingValue] = useState("");
+
+  const submitInlineKpiEdit = async (member: any) => {
+    if (!editingCell || editingCell.memberId !== member.id) return;
+    const field = editingCell.field;
+    const newVal = Math.max(0, parseInt(editingValue, 10) || 0);
+    setEditingCell(null);
+    if (newVal === member[field]) return;
+    try {
+      const [startDate, endDate] = selectedWeek.split("_");
+      const payload = {
+        leader_role: "leader",
+        role: "member",
+        email: member.email,
+        profile_slug: member.profile_slug || member.email,
+        email_leader: user?.email || "",
+        id_team: selectedTeamId,
+        kpi: [{
+          start_day: startDate,
+          end_day: endDate,
+          kpi_comment: field === "kpiCommentTarget" ? newVal : member.kpiCommentTarget,
+          kpi_post: field === "kpiPostTarget" ? newVal : member.kpiPostTarget,
+          kpi_lead: field === "kpiLeadTarget" ? newVal : member.kpiLeadTarget,
+          kpi_inbox: field === "kpiInboxTarget" ? newVal : member.kpiInboxTarget,
+        }],
+        platform: "All",
+      };
+      const res = await allPlatformKpiService.assign(payload);
+      if (res.success) {
+        toast.success("Đã cập nhật KPI");
+        refreshKpi();
+      } else {
+        toast.error(res.message || "Không thể cập nhật KPI");
+      }
+    } catch {
+      toast.error("Lỗi hệ thống, vui lòng thử lại.");
+    }
+  };
+
+  function InlineKpiTarget({ member, field, value }: { member: any; field: "kpiPostTarget" | "kpiCommentTarget" | "kpiInboxTarget" | "kpiLeadTarget"; value: number }) {
+    const isEditing = editingCell?.memberId === member.id && editingCell?.field === field;
+    if (isEditing) {
+      return (
+        <input
+          type="number"
+          min={0}
+          autoFocus
+          value={editingValue}
+          onChange={(e) => setEditingValue(e.target.value)}
+          onFocus={(e) => e.currentTarget.select()}
+          onBlur={() => void submitInlineKpiEdit(member)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+            if (e.key === "Escape") setEditingCell(null);
+          }}
+          className="w-10 text-center text-[10px] font-bold border border-primary rounded px-0.5 py-0 outline-none focus:ring-2 focus:ring-primary/20"
+        />
+      );
+    }
+    return (
+      <span
+        className="text-[10px] text-slate-400 cursor-pointer hover:underline hover:text-primary transition"
+        title="Bấm để sửa nhanh chỉ tiêu"
+        onClick={() => { setEditingCell({ memberId: member.id, field }); setEditingValue(String(value)); }}
+      >
+        {" "}/ {value}
+      </span>
+    );
+  }
+
   // Listen for KPI refresh events (from bulk verify inbox, bulk assign, etc.)
   useKpiRefresh(refreshKpi);
 
@@ -645,19 +717,19 @@ export function TeamManagement() {
                       </td>
                       <td className="px-1 py-2.5 text-center">
                         <span className={cn("text-[11px] font-bold", member.kpiPostCurrent > 0 ? "text-emerald-600" : "text-slate-800")}>{member.kpiPostCurrent}</span>
-                        <span className="text-[10px] text-slate-400"> / {member.kpiPostTarget}</span>
+                        <InlineKpiTarget member={member} field="kpiPostTarget" value={member.kpiPostTarget} />
                       </td>
                       <td className="px-1 py-2.5 text-center">
                         <span className="text-[11px] font-bold text-slate-800">{member.kpiCommentCurrent}</span>
-                        <span className="text-[10px] text-slate-400"> / {member.kpiCommentTarget}</span>
+                        <InlineKpiTarget member={member} field="kpiCommentTarget" value={member.kpiCommentTarget} />
                       </td>
                       <td className="px-1 py-2.5 text-center">
                         <span className={cn("text-[11px] font-bold", member.kpiInboxCurrent >= member.kpiInboxTarget && member.kpiInboxTarget > 0 ? "text-emerald-600" : "text-slate-800")}>{member.kpiInboxCurrent}</span>
-                        <span className="text-[10px] text-slate-400"> / {member.kpiInboxTarget}</span>
+                        <InlineKpiTarget member={member} field="kpiInboxTarget" value={member.kpiInboxTarget} />
                       </td>
                       <td className="px-1 py-2.5 text-center">
                         <span className="text-[11px] font-bold text-slate-800">{member.kpiLeadCurrent}</span>
-                        <span className="text-[10px] text-slate-400"> / {member.kpiLeadTarget}</span>
+                        <InlineKpiTarget member={member} field="kpiLeadTarget" value={member.kpiLeadTarget} />
                       </td>
                       <td className="px-2 py-2.5">
                         <div className="flex items-center gap-1.5">
