@@ -31,7 +31,7 @@ type SidebarEntry = NavLeafItem | NavGroupItem;
 
 const navBaseClass =
   "group relative flex min-h-[36px] items-center gap-2.5 overflow-hidden rounded-xl px-2.5 py-1.5 text-sm font-medium leading-relaxed transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-markee-primary)]/40";
-const navActiveClass = "rounded-md bg-[var(--color-markee-primary)] text-white font-semibold";
+const navActiveClass = "rounded-md bg-[var(--color-markee-primary)]/10 text-[var(--color-markee-primary)] font-semibold";
 const navActiveIndentedClass = "-ml-3 rounded-none border-l-2 border-[var(--color-markee-primary)] pl-5 text-[var(--color-markee-primary)] font-semibold";
 const navIdleClass = "text-on-surface hover:bg-surface-container-low";
 const iconClass = "shrink-0 text-[18px] transition-transform duration-200 group-hover:scale-105";
@@ -293,13 +293,13 @@ function SidebarLink({
       aria-current={active ? "page" : undefined}
       onClick={onNavigate}
     >
-      <MaterialIcon name={item.icon} className={cn(iconClass, active && (indented ? "text-[var(--color-markee-primary)]" : "text-white"))} />
+      <MaterialIcon name={item.icon} className={cn(iconClass, active && "text-[var(--color-markee-primary)]")} />
       {!collapsed ? <span className="min-w-0 truncate">{item.label}</span> : null}
       {!collapsed && item.badge !== undefined ? (
         <span
           className={cn(
             "ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-bold",
-            active ? "bg-white/20 text-white" : "bg-primary/10 text-[var(--color-markee-primary)]",
+            active ? "bg-[var(--color-markee-primary)]/15 text-[var(--color-markee-primary)]" : "bg-primary/10 text-[var(--color-markee-primary)]",
           )}
         >
           {item.badge}
@@ -354,7 +354,7 @@ function SidebarGroup({
         className={cn(
           navBaseClass,
           "w-full justify-between",
-          hasActiveChild ? "bg-[var(--color-markee-primary)] text-white font-semibold shadow-sm" : navIdleClass,
+          hasActiveChild ? "bg-[var(--color-markee-primary)]/10 text-[var(--color-markee-primary)] font-semibold" : navIdleClass,
         )}
       >
         <span className="flex min-w-0 items-center gap-2.5">

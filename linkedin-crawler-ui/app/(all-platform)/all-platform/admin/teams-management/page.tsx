@@ -178,6 +178,39 @@ export default function TeamsManagementPage() {
     };
   }, [teams, kpiResultsData]);
 
+  // Tong hop KPI (Post/Comment/Lead/Inbox) + % hoan thanh cho tung team - tinh 1 lan,
+  // dung chung cho ca bieu do so sanh va cac card chi tiet ben duoi.
+  const teamKpiSummaries = useMemo(() => {
+    return teams.map(team => {
+      const teamKpis = kpiResultsData.find(r => r.teamId === team.id)?.members || [];
+      const totals = { post: 0, postTarget: 0, comment: 0, commentTarget: 0, lead: 0, leadTarget: 0, inbox: 0, inboxTarget: 0 };
+
+      team.members?.forEach(member => {
+        const kpiInfo = teamKpis.find((k: any) => k.id === member.id) || {};
+        const st = kpiInfo.seeding_stats || {};
+        totals.post += st.kpi_post_current || 0;
+        totals.postTarget += st.kpi_post || 0;
+        totals.comment += st.verified_count || 0;
+        totals.commentTarget += st.kpi_target || 0;
+        totals.lead += st.kpi_lead_current || 0;
+        totals.leadTarget += st.kpi_lead || 0;
+        totals.inbox += st.kpi_inbox_current || 0;
+        totals.inboxTarget += st.kpi_inbox || 0;
+      });
+
+      const overallTarget = totals.postTarget + totals.commentTarget + totals.leadTarget + totals.inboxTarget;
+      const overallCurrent = totals.post + totals.comment + totals.lead + totals.inbox;
+      const percentage = overallTarget > 0 ? Math.min(Math.round((overallCurrent / overallTarget) * 100), 100) : 0;
+
+      return { team, totals, overallTarget, overallCurrent, percentage };
+    });
+  }, [teams, kpiResultsData]);
+
+  const teamKpiSummariesRanked = useMemo(
+    () => [...teamKpiSummaries].sort((a, b) => b.percentage - a.percentage),
+    [teamKpiSummaries],
+  );
+
   const handleDeleteTeam = async (team: TeamRow) => {
     if (!window.confirm(`Bạn có chắc chắn muốn xóa team "${team.name_team}"?`)) {
       return;
@@ -285,6 +318,40 @@ export default function TeamsManagementPage() {
         />
       </div>
 
+      {/* So sanh tien do giua cac Team - xep hang theo % hoan thanh tong (Post+Comment+
+          Lead+Inbox), giup nhin duoc ngay team nao dang lam tot / cham hon nhau
+          thay vi phai doc tung card rieng le. */}
+      {!isLoading && teamKpiSummariesRanked.length > 0 && (
+        <div className="rounded-xl border border-outline-variant bg-surface p-5">
+          <h3 className="text-sm font-bold text-on-surface mb-4 flex items-center gap-2">
+            <LuLayoutGrid size={16} className="text-primary" />
+            So sánh tiến độ giữa các Team
+          </h3>
+          <div className="flex flex-col gap-3">
+            {teamKpiSummariesRanked.map((s, idx) => (
+              <div key={s.team.id} className="flex items-center gap-3">
+                <span className="w-5 shrink-0 text-[11px] font-bold text-on-surface-variant">#{idx + 1}</span>
+                <div className="w-40 shrink-0 truncate text-xs font-bold text-on-surface" title={s.team.name_team}>
+                  {s.team.name_team}
+                </div>
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-container-low">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-all duration-500",
+                      s.percentage >= 100 ? "bg-emerald-500" : s.percentage >= 50 ? "bg-amber-500" : s.overallTarget > 0 ? "bg-primary" : "bg-outline-variant",
+                    )}
+                    style={{ width: `${s.percentage}%` }}
+                  />
+                </div>
+                <span className="w-12 shrink-0 text-right text-xs font-bold text-on-surface tabular-nums">
+                  {s.overallTarget > 0 ? `${s.percentage}%` : "—"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Tong quan KPI day du theo Team - Post/Comment/Lead/Inbox, khong chi rieng Inbox
           (rieng Inbox can buoc "Xac nhan Inbox" thu cong nen hay 0% du team van co
           tien do that o cac chi so khac, de gay hieu nham team khong lam gi).
@@ -294,29 +361,10 @@ export default function TeamsManagementPage() {
         <div>
           <h3 className="text-sm font-bold text-on-surface mb-3 flex items-center gap-2">
             <LuTrendingUp size={16} className="text-primary" />
-            Tổng quan KPI theo Team
+            Chi tiết KPI theo Team
           </h3>
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            {teams.map(team => {
-              const teamKpis = kpiResultsData.find(r => r.teamId === team.id)?.members || [];
-              const totals = { post: 0, postTarget: 0, comment: 0, commentTarget: 0, lead: 0, leadTarget: 0, inbox: 0, inboxTarget: 0 };
-
-              team.members?.forEach(member => {
-                const kpiInfo = teamKpis.find((k: any) => k.id === member.id) || {};
-                const st = kpiInfo.seeding_stats || {};
-                totals.post += st.kpi_post_current || 0;
-                totals.postTarget += st.kpi_post || 0;
-                totals.comment += st.verified_count || 0;
-                totals.commentTarget += st.kpi_target || 0;
-                totals.lead += st.kpi_lead_current || 0;
-                totals.leadTarget += st.kpi_lead || 0;
-                totals.inbox += st.kpi_inbox_current || 0;
-                totals.inboxTarget += st.kpi_inbox || 0;
-              });
-
-              const overallTarget = totals.postTarget + totals.commentTarget + totals.leadTarget + totals.inboxTarget;
-              const overallCurrent = totals.post + totals.comment + totals.lead + totals.inbox;
-              const percentage = overallTarget > 0 ? Math.min(Math.round((overallCurrent / overallTarget) * 100), 100) : 0;
+            {teamKpiSummaries.map(({ team, totals, overallTarget, percentage }) => {
               const barColor = percentage >= 100 ? "bg-[var(--color-success,#22c55e)]" : percentage >= 50 ? "bg-[var(--color-warning,#f59e0b)]" : "bg-primary";
               const badgeCls = percentage >= 100
                 ? "bg-emerald-50 text-emerald-700 border-emerald-200"
