@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { MaterialIcon } from "@/components/ui";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { cn } from "@/lib/utils";
-import { teamsService, allPlatformKpiService } from "@/services/all-platform.service";
+import { teamsService } from "@/services/all-platform.service";
 import type { TeamRow } from "@/services/all-platform.service";
 import { AdminTeamModal } from "@/components/all-platform/admin/AdminTeamModal";
 import { AdminMemberKpiModal } from "@/components/all-platform/admin/AdminMemberKpiModal";
@@ -120,7 +120,11 @@ function getRecentWeeks(numWeeks = 8) {
 export default function TeamsManagementPage() {
   const { user } = useAppAuth();
   const [teams, setTeams] = useState<TeamRow[]>([]);
-  const [kpiResultsData, setKpiResultsData] = useState<any[]>([]);
+  const [kpiRows, setKpiRows] = useState<Array<{
+    team_id: string; member_id: string;
+    kpi_post: number; kpi_lead: number; kpi_inbox: number; kpi_comment: number;
+    verified_count: number; kpi_post_current: number; kpi_lead_current: number; kpi_inbox_current: number;
+  }>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -140,28 +144,19 @@ export default function TeamsManagementPage() {
 
   const isAdmin = (user?.role as string) === "admin" || (user?.role as string) === "superadmin";
 
+  // Dung 1 RPC gop teams+KPI duy nhat (get_admin_teams_kpi_overview qua /teams/with-kpi)
+  // thay cho kieu cu 1 + N request song song (N = so team, moi request lai keo theo ca
+  // lich su seeding_items rat nang) - do la nguyen nhan trang load cham va luc len luc
+  // khong: 1 trong N request cham/loi se bi nuot lang le, team do hien 0 sai lech.
   const fetchTeams = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await teamsService.getAll();
+      const [startDate, endDate] = selectedWeek.split("_");
+      const res = await teamsService.getWithKpi(startDate, endDate);
       if (res.success && res.data) {
-        const teamsData = res.data;
-        setTeams(teamsData);
-
-        // Fetch KPI data for all teams' leaders in parallel
-        const [startDate, endDate] = selectedWeek.split("_");
-        const kpiPromises = teamsData.map(async (t) => {
-          if (!t.leader_email) return { teamId: t.id, members: [] };
-          try {
-            const kpiRes = await allPlatformKpiService.getAll(t.leader_email, undefined, startDate, endDate);
-            return { teamId: t.id, members: kpiRes.success ? (kpiRes.data?.members || []) : [] };
-          } catch {
-            return { teamId: t.id, members: [] };
-          }
-        });
-        const kpiResults = await Promise.all(kpiPromises);
-        setKpiResultsData(kpiResults);
+        setTeams(res.data.teams || []);
+        setKpiRows(res.data.kpi_data || []);
       } else {
         setError(res.message || "Không thể tải danh sách team");
       }
@@ -182,26 +177,23 @@ export default function TeamsManagementPage() {
   // tinh 1 lan, dung chung cho ca bang so sanh, cac card chi tiet va thong ke tong.
   const teamKpiSummaries = useMemo(() => {
     return teams.map(team => {
-      const teamKpis = kpiResultsData.find(r => r.teamId === team.id)?.members || [];
       const totals = { post: 0, postTarget: 0, comment: 0, commentTarget: 0, lead: 0, leadTarget: 0, inbox: 0, inboxTarget: 0 };
 
-      team.members?.forEach(member => {
-        const kpiInfo = teamKpis.find((k: any) => k.id === member.id) || {};
-        const st = kpiInfo.seeding_stats || {};
-        totals.post += st.kpi_post_current || 0;
-        totals.postTarget += st.kpi_post || 0;
-        totals.comment += st.verified_count || 0;
-        totals.commentTarget += st.kpi_target || 0;
-        totals.lead += st.kpi_lead_current || 0;
-        totals.leadTarget += st.kpi_lead || 0;
-        totals.inbox += st.kpi_inbox_current || 0;
-        totals.inboxTarget += st.kpi_inbox || 0;
+      kpiRows.filter(r => r.team_id === team.id).forEach(r => {
+        totals.post += r.kpi_post_current || 0;
+        totals.postTarget += r.kpi_post || 0;
+        totals.comment += r.verified_count || 0;
+        totals.commentTarget += r.kpi_comment || 0;
+        totals.lead += r.kpi_lead_current || 0;
+        totals.leadTarget += r.kpi_lead || 0;
+        totals.inbox += r.kpi_inbox_current || 0;
+        totals.inboxTarget += r.kpi_inbox || 0;
       });
 
       const { percentage, hasTarget } = computeWeightedPercentage(totals);
       return { team, totals, hasTarget, percentage };
     });
-  }, [teams, kpiResultsData]);
+  }, [teams, kpiRows]);
 
   const teamKpiSummariesRanked = useMemo(
     () => [...teamKpiSummaries].sort((a, b) => b.percentage - a.percentage),
