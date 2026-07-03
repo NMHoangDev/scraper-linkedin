@@ -457,7 +457,7 @@ export default function TeamsManagementPage() {
                     <div className="flex gap-2 pt-3 border-t border-[#f0f0f0]">
                       <button
                         onClick={() => handleViewMembers(team)}
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#71717a] px-2 py-2 text-[12.5px] font-semibold text-white shadow-sm transition hover:bg-[#52525b] cursor-pointer"
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#e4e4e7] px-2 py-2 text-[12.5px] font-semibold text-[#3f3f46] transition hover:bg-[#d4d4d8] cursor-pointer"
                       >
                         <LuEye size={13} /> Xem TV
                       </button>
@@ -466,7 +466,7 @@ export default function TeamsManagementPage() {
                           setSelectedLeaderForInbox({ email: team.leader_email, name: team.name_team });
                           setInboxModalOpen(true);
                         }}
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#7a1830] px-2 py-2 text-[12.5px] font-semibold text-white shadow-sm transition hover:bg-[#631427] cursor-pointer"
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#ba244a]/10 px-2 py-2 text-[12.5px] font-semibold text-[#ba244a] transition hover:bg-[#ba244a]/15 cursor-pointer"
                         title="Xem toàn bộ Inbox của Team này"
                       >
                         <LuMessageSquare size={13} /> Inbox
