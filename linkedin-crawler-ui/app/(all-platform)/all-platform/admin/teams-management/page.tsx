@@ -16,12 +16,43 @@ import {
   LuUserPlus,
   LuEye,
   LuMessageSquare,
+  LuFileText,
+  LuInbox,
   LuPencil,
   LuTrash2,
   LuChartBar,
   LuChevronRight,
 } from "react-icons/lu";
 import { LeaderInboxView } from "@/components/all-platform/leader/LeaderInboxView";
+
+// Trong so KPI theo yeu cau nghiep vu: Lead quan trong nhat -> Inbox -> Comment -> Post.
+// % hoan thanh tong cua team = trung binh CO TRONG SO cua ty le hoan thanh tung chi so
+// (chi tinh cac chi so da co chi tieu > 0, ty le moi chi so gioi han toi da 100%).
+const KPI_WEIGHTS = { lead: 0.45, inbox: 0.4, comment: 0.05, post: 0.1 } as const;
+
+function computeWeightedPercentage(t: {
+  post: number; postTarget: number;
+  comment: number; commentTarget: number;
+  lead: number; leadTarget: number;
+  inbox: number; inboxTarget: number;
+}): { percentage: number; hasTarget: boolean } {
+  const parts = [
+    { w: KPI_WEIGHTS.lead, cur: t.lead, tgt: t.leadTarget },
+    { w: KPI_WEIGHTS.inbox, cur: t.inbox, tgt: t.inboxTarget },
+    { w: KPI_WEIGHTS.comment, cur: t.comment, tgt: t.commentTarget },
+    { w: KPI_WEIGHTS.post, cur: t.post, tgt: t.postTarget },
+  ];
+  let weightedSum = 0;
+  let weightTotal = 0;
+  for (const p of parts) {
+    if (p.tgt > 0) {
+      weightedSum += p.w * Math.min(p.cur / p.tgt, 1);
+      weightTotal += p.w;
+    }
+  }
+  const hasTarget = weightTotal > 0;
+  return { percentage: hasTarget ? Math.round((weightedSum / weightTotal) * 100) : 0, hasTarget };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Trang nay dung he mau/thiet ke rieng, lay mau 1:1 tu app.markeeai.com de dong
@@ -147,49 +178,8 @@ export default function TeamsManagementPage() {
     }
   }, [isAdmin, fetchTeams]);
 
-  // Calculate statistics
-  const stats = useMemo(() => {
-    const totalTeams = teams.length;
-    const totalMembers = teams.reduce((acc, t) => acc + (t.number_of_member || 0), 0);
-
-    let totalTarget = 0;
-    let totalCurrent = 0;
-    let achievedTeams = 0;
-
-    teams.forEach(team => {
-      const teamKpis = kpiResultsData.find(r => r.teamId === team.id)?.members || [];
-      let teamTarget = 0;
-      let teamCurrent = 0;
-
-      team.members?.forEach(member => {
-        const kpiInfo = teamKpis.find((k: any) => k.id === member.id) || {};
-        const seedingStats = kpiInfo.seeding_stats || {};
-
-        teamTarget += (seedingStats.kpi_target || 0) + (seedingStats.kpi_post || 0) + (seedingStats.kpi_lead || 0) + (seedingStats.kpi_inbox || 0);
-        teamCurrent += (seedingStats.verified_count || 0) + (seedingStats.kpi_post_current || 0) + (seedingStats.kpi_lead_current || 0) + (seedingStats.kpi_inbox_current || 0);
-      });
-
-      if (teamTarget > 0) {
-        totalTarget += teamTarget;
-        totalCurrent += teamCurrent;
-        if (teamCurrent >= teamTarget) {
-          achievedTeams++;
-        }
-      }
-    });
-
-    const completionRate = totalTarget > 0 ? Math.min(Math.round((totalCurrent / totalTarget) * 100), 100) : 0;
-
-    return {
-      totalTeams,
-      totalMembers,
-      achievedTeams,
-      completionRate,
-    };
-  }, [teams, kpiResultsData]);
-
-  // Tong hop KPI (Post/Comment/Lead/Inbox) + % hoan thanh cho tung team - tinh 1 lan,
-  // dung chung cho ca bang so sanh va cac card chi tiet ben duoi.
+  // Tong hop KPI (Post/Comment/Lead/Inbox) + % hoan thanh CO TRONG SO cho tung team -
+  // tinh 1 lan, dung chung cho ca bang so sanh, cac card chi tiet va thong ke tong.
   const teamKpiSummaries = useMemo(() => {
     return teams.map(team => {
       const teamKpis = kpiResultsData.find(r => r.teamId === team.id)?.members || [];
@@ -208,11 +198,8 @@ export default function TeamsManagementPage() {
         totals.inboxTarget += st.kpi_inbox || 0;
       });
 
-      const overallTarget = totals.postTarget + totals.commentTarget + totals.leadTarget + totals.inboxTarget;
-      const overallCurrent = totals.post + totals.comment + totals.lead + totals.inbox;
-      const percentage = overallTarget > 0 ? Math.min(Math.round((overallCurrent / overallTarget) * 100), 100) : 0;
-
-      return { team, totals, overallTarget, overallCurrent, percentage };
+      const { percentage, hasTarget } = computeWeightedPercentage(totals);
+      return { team, totals, hasTarget, percentage };
     });
   }, [teams, kpiResultsData]);
 
@@ -220,6 +207,18 @@ export default function TeamsManagementPage() {
     () => [...teamKpiSummaries].sort((a, b) => b.percentage - a.percentage),
     [teamKpiSummaries],
   );
+
+  // Thong ke tong - suy ra tu teamKpiSummaries (dung chung cong thuc co trong so).
+  const stats = useMemo(() => {
+    const totalTeams = teams.length;
+    const totalMembers = teams.reduce((acc, t) => acc + (t.number_of_member || 0), 0);
+    const withTarget = teamKpiSummaries.filter(s => s.hasTarget);
+    const achievedTeams = withTarget.filter(s => s.percentage >= 100).length;
+    const completionRate = withTarget.length > 0
+      ? Math.round(withTarget.reduce((acc, s) => acc + s.percentage, 0) / withTarget.length)
+      : 0;
+    return { totalTeams, totalMembers, achievedTeams, completionRate };
+  }, [teams, teamKpiSummaries]);
 
   const handleDeleteTeam = async (team: TeamRow) => {
     if (!window.confirm(`Bạn có chắc chắn muốn xóa team "${team.name_team}"?`)) {
@@ -267,11 +266,13 @@ export default function TeamsManagementPage() {
     );
   }
 
+  // Thu tu hien thi theo do quan trong (trong so): Lead -> Inbox -> Comment -> Post.
+  // Moi chi so co 1 icon mau nhat rieng cho card chi tiet do mat, khong don dieu.
   const metricDefs = [
-    { key: "post" as const, label: "Post" },
-    { key: "comment" as const, label: "Comment" },
-    { key: "lead" as const, label: "Lead" },
-    { key: "inbox" as const, label: "Inbox" },
+    { key: "lead" as const, label: "Lead", weight: "45%", icon: LuUserPlus, tone: "bg-[#f1edfb] text-[#7c5cff]" },
+    { key: "inbox" as const, label: "Inbox", weight: "40%", icon: LuInbox, tone: "bg-[#fdeee5] text-[#ea580c]" },
+    { key: "comment" as const, label: "Comment", weight: "5%", icon: LuMessageSquare, tone: "bg-[#e6f1fb] text-[#2563eb]" },
+    { key: "post" as const, label: "Post", weight: "10%", icon: LuFileText, tone: "bg-[#e6f6ec] text-[#16a34a]" },
   ];
 
   return (
@@ -349,58 +350,43 @@ export default function TeamsManagementPage() {
             <div className="px-5 py-4 border-b border-[#e5e5e5]">
               <div className="flex items-center gap-2">
                 <LuChartBar size={16} className="text-[#6e6e80]" />
-                <span className="text-[14px] font-semibold text-[#0a0a0a]">So sánh chi tiết giữa các Team</span>
+                <span className="text-[14px] font-semibold text-[#0a0a0a]">So sánh & xếp hạng Team</span>
               </div>
-              <p className="text-[12px] text-[#6e6e80] mt-0.5">Xếp hạng theo % hoàn thành KPI tổng (Post + Comment + Lead + Inbox)</p>
+              <p className="text-[12px] text-[#6e6e80] mt-0.5">Xếp theo % hoàn thành KPI có trọng số: Lead 45% · Inbox 40% · Comment 5% · Post 10%</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-[13px]">
                 <thead>
                   <tr className="bg-[#f7f7f8]">
-                    <th className="text-left px-5 py-2.5 text-[11px] font-medium text-[#6e6e80] uppercase">#</th>
+                    <th className="text-left px-5 py-2.5 text-[11px] font-medium text-[#6e6e80] uppercase w-12">#</th>
                     <th className="text-left px-3 py-2.5 text-[11px] font-medium text-[#6e6e80] uppercase">Team</th>
                     <th className="text-left px-3 py-2.5 text-[11px] font-medium text-[#6e6e80] uppercase hidden md:table-cell">Leader</th>
-                    <th className="text-center px-3 py-2.5 text-[11px] font-medium text-[#6e6e80] uppercase">TV</th>
-                    <th className="text-center px-3 py-2.5 text-[11px] font-medium text-[#6e6e80] uppercase">Post</th>
-                    <th className="text-center px-3 py-2.5 text-[11px] font-medium text-[#6e6e80] uppercase">Comment</th>
-                    <th className="text-center px-3 py-2.5 text-[11px] font-medium text-[#6e6e80] uppercase">Lead</th>
-                    <th className="text-center px-3 py-2.5 text-[11px] font-medium text-[#6e6e80] uppercase">Inbox</th>
-                    <th className="text-left px-5 py-2.5 text-[11px] font-medium text-[#6e6e80] uppercase w-[150px]">Tiến độ</th>
+                    <th className="text-center px-3 py-2.5 text-[11px] font-medium text-[#6e6e80] uppercase">Thành viên</th>
+                    <th className="text-left px-5 py-2.5 text-[11px] font-medium text-[#6e6e80] uppercase w-[45%]">Tiến độ hoàn thành</th>
                   </tr>
                 </thead>
                 <tbody>
                   {teamKpiSummariesRanked.map((s, idx) => (
                     <tr key={s.team.id} className="border-t border-[#e5e5e5] hover:bg-[#f7f7f8] transition">
-                      <td className="px-5 py-3 text-[12px] font-medium text-[#a1a1aa]">{idx + 1}</td>
+                      <td className="px-5 py-3">
+                        <span className={cn(
+                          "inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold",
+                          idx === 0 && s.hasTarget ? "bg-[#16a34a]/10 text-[#15803d]" : "bg-[#f0f0f1] text-[#a1a1aa]",
+                        )}>{idx + 1}</span>
+                      </td>
                       <td className="px-3 py-3 font-semibold text-[#0a0a0a] whitespace-nowrap">{s.team.name_team}</td>
                       <td className="px-3 py-3 text-[#6e6e80] hidden md:table-cell whitespace-nowrap">{s.team.leader_name || "Chưa đặt tên"}</td>
                       <td className="px-3 py-3 text-center text-[#6e6e80]">{s.team.number_of_member || 0}</td>
-                      <td className="px-3 py-3 text-center tabular-nums">
-                        <span className="font-semibold text-[#0a0a0a]">{s.totals.post}</span>
-                        <span className="text-[#a1a1aa]"> / {s.totals.postTarget}</span>
-                      </td>
-                      <td className="px-3 py-3 text-center tabular-nums">
-                        <span className="font-semibold text-[#0a0a0a]">{s.totals.comment}</span>
-                        <span className="text-[#a1a1aa]"> / {s.totals.commentTarget}</span>
-                      </td>
-                      <td className="px-3 py-3 text-center tabular-nums">
-                        <span className="font-semibold text-[#0a0a0a]">{s.totals.lead}</span>
-                        <span className="text-[#a1a1aa]"> / {s.totals.leadTarget}</span>
-                      </td>
-                      <td className="px-3 py-3 text-center tabular-nums">
-                        <span className="font-semibold text-[#0a0a0a]">{s.totals.inbox}</span>
-                        <span className="text-[#a1a1aa]"> / {s.totals.inboxTarget}</span>
-                      </td>
                       <td className="px-5 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#f0f0f1]">
+                        <div className="flex items-center gap-3">
+                          <div className="h-2 flex-1 overflow-hidden rounded-full bg-[#f0f0f1]">
                             <div
                               className="h-full rounded-full bg-[#16a34a] transition-all duration-500"
                               style={{ width: `${s.percentage}%` }}
                             />
                           </div>
-                          <span className="w-9 text-right text-[12px] font-semibold text-[#0a0a0a] tabular-nums">
-                            {s.overallTarget > 0 ? `${s.percentage}%` : "—"}
+                          <span className="w-10 text-right text-[13px] font-semibold text-[#0a0a0a] tabular-nums">
+                            {s.hasTarget ? `${s.percentage}%` : "—"}
                           </span>
                         </div>
                       </td>
@@ -420,7 +406,7 @@ export default function TeamsManagementPage() {
               <span className="text-[14px] font-semibold text-[#0a0a0a]">Quản lý từng Team</span>
             </div>
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-              {teamKpiSummaries.map(({ team, totals, overallTarget, percentage }) => {
+              {teamKpiSummaries.map(({ team, totals, hasTarget, percentage }) => {
                 const initial = (team.name_team || "?").trim().charAt(0).toUpperCase();
                 return (
                   <div key={team.id} className="flex flex-col gap-3 rounded-xl border border-[#e5e5e5] bg-white p-4">
@@ -439,12 +425,10 @@ export default function TeamsManagementPage() {
                       <span
                         className={cn(
                           "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold",
-                          overallTarget > 0
-                            ? "bg-[#16a34a]/10 text-[#15803d]"
-                            : "bg-[#f7f7f8] text-[#6e6e80]",
+                          hasTarget ? "bg-[#16a34a]/10 text-[#15803d]" : "bg-[#f7f7f8] text-[#6e6e80]",
                         )}
                       >
-                        {overallTarget > 0 ? `${percentage}%` : "Chưa giao KPI"}
+                        {hasTarget ? `${percentage}%` : "Chưa giao KPI"}
                       </span>
                     </div>
 
@@ -454,9 +438,15 @@ export default function TeamsManagementPage() {
 
                     <div className="grid grid-cols-4 gap-2">
                       {metricDefs.map((m) => (
-                        <div key={m.label} className="rounded-lg border border-[#e5e5e5] px-2.5 py-2 text-center">
-                          <div className="text-[10px] font-medium text-[#6e6e80] uppercase">{m.label}</div>
-                          <div className="text-[14px] font-bold text-[#0a0a0a] tabular-nums leading-none mt-1">
+                        <div key={m.label} className="rounded-lg border border-[#f0f0f0] bg-[#fafafa] px-2.5 py-2.5">
+                          <div className={cn("mb-1.5 inline-flex h-7 w-7 items-center justify-center rounded-lg", m.tone)}>
+                            <m.icon size={14} />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-semibold text-[#6e6e80] uppercase">{m.label}</span>
+                            <span className="text-[9px] font-medium text-[#a1a1aa]">{m.weight}</span>
+                          </div>
+                          <div className="text-[15px] font-bold text-[#0a0a0a] tabular-nums leading-none mt-1">
                             {totals[m.key]}
                             <span className="text-[11px] font-normal text-[#a1a1aa]"> / {totals[`${m.key}Target` as keyof typeof totals]}</span>
                           </div>
