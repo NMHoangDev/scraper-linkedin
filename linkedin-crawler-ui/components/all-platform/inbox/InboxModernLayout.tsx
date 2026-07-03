@@ -282,8 +282,9 @@ export default function InboxModernLayout(props: Props) {
         </div>
       )}
 
-      {/* Toàn bộ header + thống kê + chọn tài khoản + KPI gộp chung 1 khối duy nhất, không tách nhiều box rời rạc */}
-      <div className="mb-4 overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm">
+      {/* Toàn bộ header + thống kê + chọn tài khoản + KPI gộp chung 1 khối duy nhất, không tách nhiều box rời rạc.
+          KHONG dung overflow-hidden o day: se cat mat dropdown chon tai khoan (absolute) khi no xo xuong duoi vien card. */}
+      <div className="mb-4 rounded-xl border border-outline-variant bg-surface shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
           <div className="flex items-center gap-2">
             <MaterialIcon name="inbox" className="text-primary" />
