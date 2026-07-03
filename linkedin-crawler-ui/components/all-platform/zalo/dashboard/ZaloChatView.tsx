@@ -16,6 +16,7 @@ import {
   buildZaloRealtimeStreamUrl,
   getZaloConversationShareStatus,
   setZaloConversationShare,
+  syncZaloRecentConversations,
 } from "@/services/zaloCrawlerService";
 import type {
   ZaloConversationSummary,
@@ -25,7 +26,6 @@ import type {
 } from "@/types/zalo-api";
 import { ZaloChatHeaderSkeleton, ZaloMessageListSkeleton } from "./chat/ZaloChatSkeleton";
 import { ZaloEmptyChat } from "./chat/ZaloEmptyChat";
-import { syncZaloDomMessagesViaExtension } from "@/services/zaloExtension";
 import { ZaloConversationListVirtualized } from "./sidebar/ZaloConversationListVirtualized";
 import { ZaloNewChatModal } from "./ZaloNewChatModal";
 import { ZaloKpiPanel } from "./ZaloKpiPanel";
@@ -768,43 +768,30 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
     setSyncSummary(null);
     setSyncError(null);
     try {
-      const domResponse = await syncZaloDomMessagesViaExtension({
-        account_id: flow.userId,
-        conversation_id: selectedConversationId || undefined,
-        limit: SYNC_MESSAGES_PER_CONVERSATION,
-        conversation_limit: Math.min(SYNC_CONVERSATION_LIMIT, 10),
-      });
-      if (domResponse.status >= 400) {
-        const detail = domResponse.backend?.detail || domResponse.backend?.message || domResponse.backend?.error;
-        throw new Error(typeof detail === "string" ? detail : `Extension DOM sync failed: ${domResponse.status}`);
-      }
-      const backend = domResponse.backend || {};
-      const response: ZaloSyncRecentResponse = {
-        account_id: backend.account_id || flow.userId,
-        scanned: Number(backend.scanned || 0),
-        groups_with_messages: Number(backend.groups_with_messages || 0),
-        messages_saved: Number(backend.messages_saved || 0),
-        errors: Number(backend.errors || 0),
-        results: Array.isArray(backend.results) ? backend.results : [],
-      };
+      const response = await syncZaloRecentConversations(
+        flow.userId,
+        SYNC_CONVERSATION_LIMIT,
+        SYNC_MESSAGES_PER_CONVERSATION,
+      );
       setSyncSummary(response);
       if (response.errors === response.scanned && response.scanned > 0) {
         setSyncError(
           `Đồng bộ thất bại (quét ${response.scanned} nhóm, lỗi toàn bộ). Listener Zalo có thể chưa kết nối.`,
         );
       }
-      try {
-        await loadConversations();
-        if (selectedConversationId) await loadLatestMessages(selectedConversationId, { silent: true });
-      } catch (refreshError) {
-        console.warn("[zalo] DOM sync saved, but refreshing local inbox failed", refreshError);
-      }
+      await loadConversations();
+      if (selectedConversationId) await loadLatestMessages(selectedConversationId, { silent: true });
     } catch (error) {
-      setSyncError(error instanceof Error ? error.message : "Khong the dong bo DOM tin nhan Zalo.");
+      if (isSessionExpiredError(error)) {
+        setSyncError("Phiên đăng nhập Zalo đã hết hạn. Vui lòng đăng nhập lại bằng mã QR.");
+        void flow.refreshLoginStatus();
+      } else {
+        setSyncError(error instanceof Error ? error.message : "Không thể đồng bộ tin nhắn.");
+      }
     } finally {
       setIsSyncingRecent(false);
     }
-  }, [flow.userId, isSyncingRecent, loadConversations, loadLatestMessages, selectedConversationId]);
+  }, [flow, isSyncingRecent, loadConversations, loadLatestMessages, selectedConversationId]);
 
   useEffect(() => {
     const action = pendingScrollRef.current;
