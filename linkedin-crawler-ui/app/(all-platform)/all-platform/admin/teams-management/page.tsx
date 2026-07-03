@@ -444,7 +444,7 @@ export default function TeamsManagementPage() {
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] font-bold text-[#6e6e80] uppercase">{m.label}</span>
-                            <span className="text-[9px] font-medium text-[#a1a1aa]">{m.weight}</span>
+                            <span className="text-[11px] font-bold text-[#71717a]">{m.weight}</span>
                           </div>
                           <div className="text-[16px] font-bold text-[#0a0a0a] tabular-nums leading-none mt-1">
                             {totals[m.key]}
@@ -457,7 +457,7 @@ export default function TeamsManagementPage() {
                     <div className="flex gap-2 pt-3 border-t border-[#f0f0f0]">
                       <button
                         onClick={() => handleViewMembers(team)}
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#0a0a0a] px-2 py-2 text-[12.5px] font-semibold text-white shadow-sm transition hover:bg-[#262626] cursor-pointer"
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#71717a] px-2 py-2 text-[12.5px] font-semibold text-white shadow-sm transition hover:bg-[#52525b] cursor-pointer"
                       >
                         <LuEye size={13} /> Xem TV
                       </button>
@@ -466,14 +466,14 @@ export default function TeamsManagementPage() {
                           setSelectedLeaderForInbox({ email: team.leader_email, name: team.name_team });
                           setInboxModalOpen(true);
                         }}
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#d4d4d8] bg-[#f7f7f8] px-2 py-2 text-[12.5px] font-semibold text-[#0a0a0a] shadow-sm transition hover:bg-[#eeeeef] cursor-pointer"
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#7a1830] px-2 py-2 text-[12.5px] font-semibold text-white shadow-sm transition hover:bg-[#631427] cursor-pointer"
                         title="Xem toàn bộ Inbox của Team này"
                       >
                         <LuMessageSquare size={13} /> Inbox
                       </button>
                       <button
                         onClick={() => handleEditTeam(team)}
-                        className="inline-flex items-center justify-center rounded-lg border border-[#d4d4d8] bg-[#f7f7f8] px-2.5 py-2 text-[#3f3f46] shadow-sm transition hover:bg-[#eeeeef] hover:text-[#0a0a0a] cursor-pointer"
+                        className="inline-flex items-center justify-center rounded-lg bg-[#0a0a0a] px-2.5 py-2 text-white shadow-sm transition hover:bg-[#262626] cursor-pointer"
                         title="Sửa team"
                       >
                         <LuPencil size={13} />
