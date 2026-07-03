@@ -151,7 +151,10 @@ export function CrmCustomerModal({
       style={{ position: "fixed", inset: 0 }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh] my-4">
+      <div
+        className="bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh] my-4"
+        style={{ width: "100%", maxWidth: "672px", minWidth: "300px" }}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50 rounded-t-2xl shrink-0">
           <div>

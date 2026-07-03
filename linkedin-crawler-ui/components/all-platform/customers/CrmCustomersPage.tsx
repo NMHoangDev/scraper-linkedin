@@ -443,7 +443,10 @@ export default function CrmCustomersPage() {
       {/* Delete confirm */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-[99998] flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm">
+          <div
+            className="bg-white rounded-xl shadow-xl p-6"
+            style={{ width: "100%", maxWidth: "384px", minWidth: "280px" }}
+          >
             <h3 className="text-lg font-bold text-slate-800 mb-2">Xác nhận xóa</h3>
             <p className="text-sm text-slate-500 mb-5">
               Bạn có chắc muốn xóa khách hàng này? Hành động này không thể hoàn tác.
