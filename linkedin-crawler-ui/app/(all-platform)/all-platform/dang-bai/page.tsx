@@ -93,23 +93,50 @@ export default function DangBaiPage() {
   const [deletingAccountGroupKeys, setDeletingAccountGroupKeys] = useState<Set<string>>(new Set());
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
-  const [pendingJobs, setPendingJobs] = useState<Array<{ jobId: string; uid: string; group: string; status: "processing" | "success" | "failed"; postUrl?: string; error?: string }>>([]);
+  const [pendingJobs, setPendingJobs] = useState<Array<{ jobId: string; uid: string; group: string; status: "processing" | "success" | "failed"; postUrl?: string; error?: string; createdAt: number }>>([]);
 
-  async function pollJobStatus(jobId: string, attemptsLeft = 30) {
+  // Dung chung GET /jobs (da duoc backend loc dung theo vai tro: member chi thay acc
+  // cua minh, leader thay ca team, admin thay het) thay vi chi luu state rieng tren
+  // trinh duyet nay -> ca team deu thay job dang xu ly cua nhau. Khong con gioi han
+  // "het thoi gian cho" cung 60s nua (ex co the mat vai phut la binh thuong) - luon
+  // phan anh dung trang thai that tu server, khong tu bao that bai.
+  const fetchSharedJobs = useCallback(async () => {
     try {
-      const r = await fbFetch(`/jobs/${encodeURIComponent(jobId)}`);
+      const r = await fbFetch("/jobs");
       const d = await r.json().catch(() => ({}));
-      if (r.ok && (d.status === "success" || d.status === "failed")) {
-        setPendingJobs(prev => prev.map(p => p.jobId === jobId ? { ...p, status: d.status, postUrl: d.post_url, error: d.error } : p));
-        return;
-      }
-    } catch { /* bo qua, thu lai */ }
-    if (attemptsLeft <= 1) {
-      setPendingJobs(prev => prev.map(p => p.jobId === jobId ? { ...p, status: "failed", error: "Hết thời gian chờ xác nhận từ extension" } : p));
-      return;
-    }
-    setTimeout(() => { void pollJobStatus(jobId, attemptsLeft - 1); }, 2000);
-  }
+      if (!r.ok || !Array.isArray(d.jobs)) return;
+      setPendingJobs(prev => {
+        const byId = new Map(prev.map(p => [p.jobId, p]));
+        for (const j of d.jobs as Array<Record<string, unknown>>) {
+          const jobId = j.job_id as string | undefined;
+          if (!jobId) continue;
+          const existing = byId.get(jobId);
+          if (j.status === "processing") {
+            if (!existing) {
+              const targetId = j.target_id as string | undefined;
+              byId.set(jobId, {
+                jobId,
+                uid: (j.user_id as string) || "",
+                group: j.target_type === "group" ? `Nhóm ...${(targetId || "").slice(-6)}` : "",
+                status: "processing",
+                createdAt: Date.parse((j.created_at as string) || "") || Date.now(),
+              });
+            }
+          } else if (existing) {
+            byId.set(jobId, { ...existing, status: j.status as "success" | "failed", postUrl: j.post_url as string | undefined, error: j.error as string | undefined });
+          }
+        }
+        return Array.from(byId.values()).sort((a, b) => b.createdAt - a.createdAt).slice(0, 30);
+      });
+    } catch { /* bo qua, thu lai vong sau */ }
+  }, []);
+
+  useEffect(() => {
+    if (!owner) return;
+    void fetchSharedJobs();
+    const interval = setInterval(() => { void fetchSharedJobs(); }, 5000);
+    return () => clearInterval(interval);
+  }, [owner, fetchSharedJobs]);
   const [connErr, setConnErr] = useState(false);
   const [extInstalled, setExtInstalled] = useState<boolean | null>(null);
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
@@ -488,10 +515,10 @@ export default function DangBaiPage() {
 
     const newPending = results
       .filter(x => x.ok && x.jobId)
-      .map(x => ({ jobId: x.jobId as string, uid: x.uid, group: x.group, status: "processing" as const }));
+      .map(x => ({ jobId: x.jobId as string, uid: x.uid, group: x.group, status: "processing" as const, createdAt: Date.now() }));
     if (newPending.length) {
-      setPendingJobs(prev => [...newPending, ...prev].slice(0, 20));
-      newPending.forEach(p => { void pollJobStatus(p.jobId); });
+      setPendingJobs(prev => [...newPending, ...prev].sort((a, b) => b.createdAt - a.createdAt).slice(0, 30));
+      setTimeout(() => { void fetchSharedJobs(); }, 3000);
     }
 
     if (fail.length === 0) {
