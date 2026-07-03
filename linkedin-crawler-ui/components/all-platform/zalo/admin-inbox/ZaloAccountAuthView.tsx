@@ -242,6 +242,14 @@ export default function ZaloAccountAuthView({ accountId, ownerName, autoTrigger,
               <MaterialIcon name="sync" className="text-[18px]" />
               Đăng nhập qua Extension (Khuyên dùng)
             </button>
+            <a
+              href="/extension-login-zalo.zip"
+              download
+              className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold py-2 text-xs transition"
+            >
+              <MaterialIcon name="download" className="text-[16px]" />
+              Tải extension Zalo (giải nén rồi Load unpacked ở chrome://extensions)
+            </a>
             <button
               onClick={startQrLogin}
               disabled={loading}

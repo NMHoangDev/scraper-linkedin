@@ -1920,12 +1920,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                   </div>
                 )}
 
-                {/* Direct Send Error */}
-                {directSendError && (
-                  <div className="mb-1.5 text-[10px] text-error bg-error-container/40 px-2 py-1 rounded">
-                    {directSendError}
-                  </div>
-                )}
+                {/* Direct Send Error - tam an banner loi ky thuat (yeu cau Thanh, dang test) */}
 
                 {/* Selected Media Previews */}
                 {selectedMedia.length > 0 && (
