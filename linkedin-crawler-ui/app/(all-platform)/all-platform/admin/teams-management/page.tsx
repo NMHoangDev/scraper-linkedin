@@ -8,18 +8,28 @@ import { teamsService, allPlatformKpiService } from "@/services/all-platform.ser
 import type { TeamRow } from "@/services/all-platform.service";
 import { AdminTeamModal } from "@/components/all-platform/admin/AdminTeamModal";
 import { AdminMemberKpiModal } from "@/components/all-platform/admin/AdminMemberKpiModal";
-import { FaTrash, FaEdit, FaEye } from "react-icons/fa";
 import {
   LuLayoutGrid,
   LuUsers,
   LuTarget,
   LuTrendingUp,
-  LuFileText,
-  LuMessageSquare,
   LuUserPlus,
-  LuInbox,
+  LuEye,
+  LuMessageSquare,
+  LuPencil,
+  LuTrash2,
+  LuChartBar,
+  LuChevronRight,
 } from "react-icons/lu";
 import { LeaderInboxView } from "@/components/all-platform/leader/LeaderInboxView";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Trang nay dung he mau/thiet ke rieng, lay mau 1:1 tu app.markeeai.com de dong
+// bo dan voi ben app. Cac gia tri hex hardcode co chu dich (tach biet khoi token
+// Material cua phan con lai trong seeding). He mau toi gian: xam trung tinh +
+// mot mau nhan hieu #ba244a cho hanh dong + mot mau emerald cho tien do. Cac o
+// icon nho tren the thong ke la pastel nhat (giong app), khong dung mau tran lan.
+// ─────────────────────────────────────────────────────────────────────────────
 
 function StatCard({
   icon: Icon,
@@ -35,16 +45,16 @@ function StatCard({
   iconClassName?: string;
 }) {
   return (
-    <div className="flex h-full flex-col gap-3 rounded-xl border border-outline-variant bg-surface p-5">
-      <div className={cn("w-fit rounded-lg p-2", iconClassName)}>
+    <div className="flex h-full flex-col gap-4 rounded-xl border border-[#e5e5e5] bg-white p-5">
+      <div className={cn("w-fit rounded-lg p-2.5", iconClassName)}>
         <Icon size={20} />
       </div>
-      <div className="flex flex-1 flex-col justify-end gap-1">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-on-surface-variant">{label}</p>
-        <span className="text-2xl font-bold tracking-tight text-on-surface tabular-nums">
+      <div className="flex flex-1 flex-col justify-end gap-1.5">
+        <p className="text-[11px] font-medium uppercase tracking-wide text-[#6e6e80]">{label}</p>
+        <span className="text-2xl font-bold tracking-tight text-[#0a0a0a] tabular-nums">
           {typeof value === "number" ? value.toLocaleString("vi-VN") : value}
         </span>
-        {hint ? <p className="text-[11px] text-on-surface-variant">{hint}</p> : null}
+        {hint ? <p className="text-[11px] text-[#6e6e80]">{hint}</p> : null}
       </div>
     </div>
   );
@@ -179,7 +189,7 @@ export default function TeamsManagementPage() {
   }, [teams, kpiResultsData]);
 
   // Tong hop KPI (Post/Comment/Lead/Inbox) + % hoan thanh cho tung team - tinh 1 lan,
-  // dung chung cho ca bieu do so sanh va cac card chi tiet ben duoi.
+  // dung chung cho ca bang so sanh va cac card chi tiet ben duoi.
   const teamKpiSummaries = useMemo(() => {
     return teams.map(team => {
       const teamKpis = kpiResultsData.find(r => r.teamId === team.id)?.members || [];
@@ -249,342 +259,284 @@ export default function TeamsManagementPage() {
 
   if (!isAdmin) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-on-surface-variant space-y-2">
-        <MaterialIcon name="block" className="text-5xl text-primary-container" />
-        <p className="font-bold text-base text-on-surface">Quyền truy cập bị từ chối</p>
+      <div className="flex flex-col items-center justify-center py-20 text-[#6e6e80] space-y-2">
+        <MaterialIcon name="block" className="text-5xl text-[#ba244a]" />
+        <p className="font-semibold text-base text-[#0a0a0a]">Quyền truy cập bị từ chối</p>
         <p className="text-sm">Trang này chỉ khả dụng đối với tài khoản Admin.</p>
       </div>
     );
   }
 
+  const metricDefs = [
+    { key: "post" as const, label: "Post" },
+    { key: "comment" as const, label: "Comment" },
+    { key: "lead" as const, label: "Lead" },
+    { key: "inbox" as const, label: "Inbox" },
+  ];
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-on-surface">Quản lý Teams (Admin)</h2>
-          <p className="text-sm text-on-surface-variant">Quản lý toàn bộ danh sách team, gán leader và theo dõi KPI thành viên</p>
+    <div className="space-y-5 text-[#0a0a0a]">
+      {/* ── Thanh tieu de trang (hien muc dang xem, giong app) ─────────────── */}
+      <div className="rounded-xl border border-[#e5e5e5] bg-white px-5 py-4">
+        <div className="flex items-center gap-1.5 text-[12px] text-[#6e6e80] mb-1.5">
+          <span>Quản lý</span>
+          <LuChevronRight size={13} />
+          <span className="font-medium text-[#ba244a]">Quản lý Teams</span>
         </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <div className="flex items-center gap-2 border border-outline-variant rounded-lg px-3 py-1.5 bg-surface shadow-sm">
-            <label className="text-xs font-bold text-on-surface-variant">Lọc theo Tuần:</label>
-            <select
-              value={selectedWeek}
-              onChange={(e) => setSelectedWeek(e.target.value)}
-              className="text-sm font-semibold text-on-surface outline-none bg-transparent"
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-lg font-bold text-[#0a0a0a] leading-tight">Quản lý Teams</h1>
+            <p className="text-[13px] text-[#6e6e80] mt-0.5">Theo dõi KPI và so sánh hiệu suất giữa các team</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 border border-[#e5e5e5] rounded-[10px] px-3 py-1.5 bg-white">
+              <span className="text-[11px] font-medium text-[#6e6e80]">Tuần</span>
+              <select
+                value={selectedWeek}
+                onChange={(e) => setSelectedWeek(e.target.value)}
+                className="text-[13px] font-medium text-[#0a0a0a] outline-none bg-transparent cursor-pointer"
+              >
+                {recentWeeks.map(w => (
+                  <option key={w.value} value={w.value}>{w.label}</option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={handleCreateTeam}
+              className="flex items-center justify-center gap-1.5 bg-[#ba244a] text-white px-4 py-2 rounded-[10px] text-[13px] font-semibold hover:bg-[#9a1e3e] transition shrink-0 cursor-pointer active:scale-95"
             >
-              {recentWeeks.map(w => (
-                <option key={w.value} value={w.value}>{w.label}</option>
-              ))}
-            </select>
+              <LuUserPlus size={16} />
+              Thêm Team
+            </button>
           </div>
-          <button
-            onClick={handleCreateTeam}
-            className="flex items-center justify-center gap-2 bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-on-primary-fixed-variant transition shrink-0 cursor-pointer shadow-sm active:scale-95"
-          >
-            <LuUserPlus size={16} />
-            Thêm Team Mới
-          </button>
         </div>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          icon={LuLayoutGrid}
-          label="Tổng số Team"
-          value={stats.totalTeams}
-          iconClassName="bg-blue-100 text-blue-600"
-        />
-        <StatCard
-          icon={LuUsers}
-          label="Tổng số Thành viên"
-          value={stats.totalMembers}
-          iconClassName="bg-emerald-100 text-emerald-600"
-        />
-        <StatCard
-          icon={LuTarget}
-          label="Team đạt KPI tuần này"
-          value={`${stats.achievedTeams} / ${stats.totalTeams}`}
-          hint="Các team đạt ≥ 100% KPI chỉ tiêu"
-          iconClassName="bg-purple-100 text-purple-600"
-        />
-        <StatCard
-          icon={LuTrendingUp}
-          label="Tỷ lệ hoàn thành KPI hệ thống"
-          value={`${stats.completionRate}%`}
-          hint="Tiến độ hoàn thành KPI của tất cả team"
-          iconClassName="bg-amber-100 text-amber-600"
-        />
-      </div>
+      <div className="space-y-6">
+        {/* ── The thong ke tong (icon chip pastel nhat, giong MetricCard cua app) ── */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            icon={LuLayoutGrid}
+            label="Tổng số Team"
+            value={stats.totalTeams}
+            iconClassName="bg-[#f1edfb] text-[#7c5cff]"
+          />
+          <StatCard
+            icon={LuUsers}
+            label="Tổng số Thành viên"
+            value={stats.totalMembers}
+            iconClassName="bg-[#e6f6ec] text-[#16a34a]"
+          />
+          <StatCard
+            icon={LuTarget}
+            label="Team đạt KPI tuần này"
+            value={`${stats.achievedTeams} / ${stats.totalTeams}`}
+            hint="Đạt ≥ 100% KPI chỉ tiêu"
+            iconClassName="bg-[#e6f1fb] text-[#2563eb]"
+          />
+          <StatCard
+            icon={LuTrendingUp}
+            label="Hoàn thành KPI hệ thống"
+            value={`${stats.completionRate}%`}
+            hint="Tiến độ của tất cả team"
+            iconClassName="bg-[#fbe8ee] text-[#ba244a]"
+          />
+        </div>
 
-      {/* So sanh tien do giua cac Team - xep hang theo % hoan thanh tong (Post+Comment+
-          Lead+Inbox), giup nhin duoc ngay team nao dang lam tot / cham hon nhau
-          thay vi phai doc tung card rieng le. */}
-      {!isLoading && teamKpiSummariesRanked.length > 0 && (
-        <div className="rounded-xl border border-outline-variant bg-surface p-5">
-          <h3 className="text-sm font-bold text-on-surface mb-4 flex items-center gap-2">
-            <LuLayoutGrid size={16} className="text-primary" />
-            So sánh tiến độ giữa các Team
-          </h3>
-          <div className="flex flex-col gap-3">
-            {teamKpiSummariesRanked.map((s, idx) => (
-              <div key={s.team.id} className="flex items-center gap-3">
-                <span className="w-5 shrink-0 text-[11px] font-bold text-on-surface-variant">#{idx + 1}</span>
-                <div className="w-40 shrink-0 truncate text-xs font-bold text-on-surface" title={s.team.name_team}>
-                  {s.team.name_team}
-                </div>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-container-low">
-                  <div
-                    className={cn(
-                      "h-full rounded-full transition-all duration-500",
-                      s.percentage >= 100 ? "bg-emerald-500" : s.percentage >= 50 ? "bg-amber-500" : s.overallTarget > 0 ? "bg-primary" : "bg-outline-variant",
-                    )}
-                    style={{ width: `${s.percentage}%` }}
-                  />
-                </div>
-                <span className="w-12 shrink-0 text-right text-xs font-bold text-on-surface tabular-nums">
-                  {s.overallTarget > 0 ? `${s.percentage}%` : "—"}
-                </span>
+        {/* ── So sanh chi tiet giua cac team (bang, xep hang theo % hoan thanh) ── */}
+        {!isLoading && teamKpiSummariesRanked.length > 0 && (
+          <div className="rounded-xl border border-[#e5e5e5] bg-white overflow-hidden">
+            <div className="px-5 py-4 border-b border-[#e5e5e5]">
+              <div className="flex items-center gap-2">
+                <LuChartBar size={16} className="text-[#6e6e80]" />
+                <span className="text-[14px] font-semibold text-[#0a0a0a]">So sánh chi tiết giữa các Team</span>
               </div>
-            ))}
+              <p className="text-[12px] text-[#6e6e80] mt-0.5">Xếp hạng theo % hoàn thành KPI tổng (Post + Comment + Lead + Inbox)</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-[13px]">
+                <thead>
+                  <tr className="bg-[#f7f7f8]">
+                    <th className="text-left px-5 py-2.5 text-[11px] font-medium text-[#6e6e80] uppercase">#</th>
+                    <th className="text-left px-3 py-2.5 text-[11px] font-medium text-[#6e6e80] uppercase">Team</th>
+                    <th className="text-left px-3 py-2.5 text-[11px] font-medium text-[#6e6e80] uppercase hidden md:table-cell">Leader</th>
+                    <th className="text-center px-3 py-2.5 text-[11px] font-medium text-[#6e6e80] uppercase">TV</th>
+                    <th className="text-center px-3 py-2.5 text-[11px] font-medium text-[#6e6e80] uppercase">Post</th>
+                    <th className="text-center px-3 py-2.5 text-[11px] font-medium text-[#6e6e80] uppercase">Comment</th>
+                    <th className="text-center px-3 py-2.5 text-[11px] font-medium text-[#6e6e80] uppercase">Lead</th>
+                    <th className="text-center px-3 py-2.5 text-[11px] font-medium text-[#6e6e80] uppercase">Inbox</th>
+                    <th className="text-left px-5 py-2.5 text-[11px] font-medium text-[#6e6e80] uppercase w-[150px]">Tiến độ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {teamKpiSummariesRanked.map((s, idx) => (
+                    <tr key={s.team.id} className="border-t border-[#e5e5e5] hover:bg-[#f7f7f8] transition">
+                      <td className="px-5 py-3 text-[12px] font-medium text-[#a1a1aa]">{idx + 1}</td>
+                      <td className="px-3 py-3 font-semibold text-[#0a0a0a] whitespace-nowrap">{s.team.name_team}</td>
+                      <td className="px-3 py-3 text-[#6e6e80] hidden md:table-cell whitespace-nowrap">{s.team.leader_name || "Chưa đặt tên"}</td>
+                      <td className="px-3 py-3 text-center text-[#6e6e80]">{s.team.number_of_member || 0}</td>
+                      <td className="px-3 py-3 text-center tabular-nums">
+                        <span className="font-semibold text-[#0a0a0a]">{s.totals.post}</span>
+                        <span className="text-[#a1a1aa]"> / {s.totals.postTarget}</span>
+                      </td>
+                      <td className="px-3 py-3 text-center tabular-nums">
+                        <span className="font-semibold text-[#0a0a0a]">{s.totals.comment}</span>
+                        <span className="text-[#a1a1aa]"> / {s.totals.commentTarget}</span>
+                      </td>
+                      <td className="px-3 py-3 text-center tabular-nums">
+                        <span className="font-semibold text-[#0a0a0a]">{s.totals.lead}</span>
+                        <span className="text-[#a1a1aa]"> / {s.totals.leadTarget}</span>
+                      </td>
+                      <td className="px-3 py-3 text-center tabular-nums">
+                        <span className="font-semibold text-[#0a0a0a]">{s.totals.inbox}</span>
+                        <span className="text-[#a1a1aa]"> / {s.totals.inboxTarget}</span>
+                      </td>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#f0f0f1]">
+                            <div
+                              className="h-full rounded-full bg-[#16a34a] transition-all duration-500"
+                              style={{ width: `${s.percentage}%` }}
+                            />
+                          </div>
+                          <span className="w-9 text-right text-[12px] font-semibold text-[#0a0a0a] tabular-nums">
+                            {s.overallTarget > 0 ? `${s.percentage}%` : "—"}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Tong quan KPI day du theo Team - Post/Comment/Lead/Inbox, khong chi rieng Inbox
-          (rieng Inbox can buoc "Xac nhan Inbox" thu cong nen hay 0% du team van co
-          tien do that o cac chi so khac, de gay hieu nham team khong lam gi).
-          Dung lai dung ngon ngu thiet ke (card, icon mau, PlatformStatCard) da co
-          san tren trang nay + AssignKpiModal de dong bo giao dien. */}
-      {!isLoading && teams.length > 0 && (
-        <div>
-          <h3 className="text-sm font-bold text-on-surface mb-3 flex items-center gap-2">
-            <LuTrendingUp size={16} className="text-primary" />
-            Chi tiết KPI theo Team
-          </h3>
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            {teamKpiSummaries.map(({ team, totals, overallTarget, percentage }) => {
-              const barColor = percentage >= 100 ? "bg-[var(--color-success,#22c55e)]" : percentage >= 50 ? "bg-[var(--color-warning,#f59e0b)]" : "bg-primary";
-              const badgeCls = percentage >= 100
-                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                : percentage >= 50
-                  ? "bg-amber-50 text-amber-700 border-amber-200"
-                  : overallTarget > 0
-                    ? "bg-red-50 text-red-600 border-red-200"
-                    : "bg-surface-container-low text-on-surface-variant border-outline-variant";
-
-              const metrics = [
-                { label: "Post", icon: LuFileText, current: totals.post, target: totals.postTarget, tone: "text-emerald-600 bg-emerald-100" },
-                { label: "Comment", icon: LuMessageSquare, current: totals.comment, target: totals.commentTarget, tone: "text-blue-600 bg-blue-100" },
-                { label: "Lead", icon: LuUserPlus, current: totals.lead, target: totals.leadTarget, tone: "text-purple-600 bg-purple-100" },
-                { label: "Inbox", icon: LuInbox, current: totals.inbox, target: totals.inboxTarget, tone: "text-orange-600 bg-orange-100" },
-              ];
-
-              const initial = (team.name_team || "?").trim().charAt(0).toUpperCase();
-
-              return (
-                <div key={team.id} className="flex flex-col gap-3 rounded-xl border border-outline-variant bg-surface p-4 shadow-sm">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-black text-primary">
-                        {initial}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="font-bold text-on-surface text-sm truncate">{team.name_team}</div>
-                        <div className="text-on-surface-variant font-medium text-[11px] truncate">
-                          {team.leader_name || "Chưa đặt tên"} · {team.number_of_member || 0} thành viên
+        {/* ── Quan ly tung team (card + hanh dong) ─────────────────────────── */}
+        {!isLoading && teams.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <LuLayoutGrid size={16} className="text-[#6e6e80]" />
+              <span className="text-[14px] font-semibold text-[#0a0a0a]">Quản lý từng Team</span>
+            </div>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              {teamKpiSummaries.map(({ team, totals, overallTarget, percentage }) => {
+                const initial = (team.name_team || "?").trim().charAt(0).toUpperCase();
+                return (
+                  <div key={team.id} className="flex flex-col gap-3 rounded-xl border border-[#e5e5e5] bg-white p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fbe8ee] text-[13px] font-bold text-[#ba244a]">
+                          {initial}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-semibold text-[#0a0a0a] text-[14px] truncate">{team.name_team}</div>
+                          <div className="text-[#6e6e80] text-[12px] truncate">
+                            {team.leader_name || "Chưa đặt tên"} · {team.number_of_member || 0} thành viên
+                          </div>
                         </div>
                       </div>
+                      <span
+                        className={cn(
+                          "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold",
+                          overallTarget > 0
+                            ? "bg-[#16a34a]/10 text-[#15803d]"
+                            : "bg-[#f7f7f8] text-[#6e6e80]",
+                        )}
+                      >
+                        {overallTarget > 0 ? `${percentage}%` : "Chưa giao KPI"}
+                      </span>
                     </div>
-                    <span className={cn("shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-bold", badgeCls)}>
-                      {overallTarget > 0 ? `${percentage}%` : "Chưa giao KPI"}
-                    </span>
-                  </div>
 
-                  <div className="h-1.5 w-full bg-surface-container-low rounded-full overflow-hidden">
-                    <div className={cn("h-full transition-all duration-500", barColor)} style={{ width: `${percentage}%` }} />
-                  </div>
+                    <div className="h-1.5 w-full bg-[#f0f0f1] rounded-full overflow-hidden">
+                      <div className="h-full bg-[#16a34a] rounded-full transition-all duration-500" style={{ width: `${percentage}%` }} />
+                    </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {metrics.map((m) => (
-                      <div key={m.label} className="rounded-lg border border-outline-variant p-2.5">
-                        <div className={cn("mb-1.5 inline-flex h-7 w-7 items-center justify-center rounded-md", m.tone)}>
-                          <m.icon size={14} />
+                    <div className="grid grid-cols-4 gap-2">
+                      {metricDefs.map((m) => (
+                        <div key={m.label} className="rounded-lg border border-[#e5e5e5] px-2.5 py-2 text-center">
+                          <div className="text-[10px] font-medium text-[#6e6e80] uppercase">{m.label}</div>
+                          <div className="text-[14px] font-bold text-[#0a0a0a] tabular-nums leading-none mt-1">
+                            {totals[m.key]}
+                            <span className="text-[11px] font-normal text-[#a1a1aa]"> / {totals[`${m.key}Target` as keyof typeof totals]}</span>
+                          </div>
                         </div>
-                        <div className="text-[10px] font-bold text-on-surface-variant uppercase">{m.label}</div>
-                        <div className="text-sm font-extrabold text-on-surface tabular-nums leading-none mt-0.5">
-                          {m.current}
-                          <span className="text-[11px] font-medium text-on-surface-variant"> / {m.target}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+                      ))}
+                    </div>
 
-      {/* Message Notifications */}
-      {success && (
-        <div className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-4 py-3 rounded-xl text-xs font-semibold flex items-center gap-2">
-          <MaterialIcon name="check_circle" className="text-[16px] shrink-0 text-emerald-600" />
-          <span>{success}</span>
-        </div>
-      )}
-      {error && (
-        <div className="bg-red-50 text-red-600 border border-red-200 px-4 py-3 rounded-xl text-xs font-semibold flex items-center gap-2">
-          <MaterialIcon name="error" className="text-[16px] shrink-0 text-red-500" />
-          <span>{error}</span>
-        </div>
-      )}
-
-      {/* Teams Table */}
-      {isLoading ? (
-        <div className="text-center py-16 text-on-surface-variant flex flex-col items-center justify-center gap-2 bg-surface rounded-xl border border-outline-variant">
-          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm font-semibold">Đang tải danh sách team...</p>
-        </div>
-      ) : teams.length === 0 ? (
-        <div className="text-center py-16 bg-surface-container-low rounded-xl border border-dashed border-outline-variant flex flex-col items-center justify-center">
-          <MaterialIcon name="groups" className="text-4xl text-on-surface-variant mb-2" />
-          <p className="text-on-surface-variant text-sm font-semibold">Chưa có team nào</p>
-          <button
-            onClick={handleCreateTeam}
-            className="mt-3 text-primary text-sm font-bold hover:underline cursor-pointer"
-          >
-            + Tạo team đầu tiên
-          </button>
-        </div>
-      ) : (
-        <div className="bg-surface rounded-xl border border-outline-variant shadow-sm overflow-hidden">
-          {/* DESKTOP TABLE VIEW */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-sm">
-            <thead className="bg-surface-container-low border-b border-outline-variant text-on-surface">
-              <tr>
-                <th className="text-left px-4 py-3 font-bold text-on-surface-variant text-xs uppercase">
-                  Tên Team
-                </th>
-                <th className="text-left px-4 py-3 font-bold text-on-surface-variant text-xs uppercase">
-                  Leader
-                </th>
-                <th className="text-center px-4 py-3 font-bold text-on-surface-variant text-xs uppercase w-[120px]">
-                  Số thành viên
-                </th>
-                <th className="text-center px-4 py-3 font-bold text-on-surface-variant text-xs uppercase w-[320px]">
-                  Hành động
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-outline-variant text-on-surface">
-              {teams.map((team) => (
-                <tr key={team.id} className="hover:bg-surface-container-low/30 transition">
-                  <td className="px-4 py-3 font-bold text-on-surface align-middle">
-                    {team.name_team}
-                  </td>
-                  <td className="px-4 py-3 align-middle">
-                    <div className="font-bold text-xs text-on-surface">{team.leader_name || "Chưa đặt tên"}</div>
-                    <div className="text-[10px] text-on-surface-variant font-medium">{team.leader_email}</div>
-                  </td>
-                  <td className="px-4 py-3 text-center font-bold text-xs text-on-surface-variant align-middle">
-                    {team.number_of_member || 0}
-                  </td>
-                  <td className="px-4 py-3 align-middle">
-                    <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                    <div className="flex gap-2 pt-3 border-t border-[#f0f0f0]">
                       <button
                         onClick={() => handleViewMembers(team)}
-                        className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-primary/5 text-primary hover:bg-primary/10 transition text-[11px] font-bold cursor-pointer shrink-0"
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#e5e5e5] px-2 py-2 text-[12px] font-medium text-[#0a0a0a] hover:bg-[#f7f7f8] transition cursor-pointer"
                       >
-                        <FaEye size={10} /> Xem TV
+                        <LuEye size={13} /> Xem TV
                       </button>
                       <button
                         onClick={() => {
-                          setSelectedLeaderForInbox({
-                            email: team.leader_email,
-                            name: team.name_team
-                          });
+                          setSelectedLeaderForInbox({ email: team.leader_email, name: team.name_team });
                           setInboxModalOpen(true);
                         }}
-                        className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-orange-50 text-orange-700 hover:bg-orange-100 transition text-[11px] font-bold cursor-pointer shrink-0 border border-orange-100"
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#e5e5e5] px-2 py-2 text-[12px] font-medium text-[#0a0a0a] hover:bg-[#f7f7f8] transition cursor-pointer"
                         title="Xem toàn bộ Inbox của Team này"
                       >
-                        <MaterialIcon name="forum" className="text-[12px]" /> Inbox
+                        <LuMessageSquare size={13} /> Inbox
                       </button>
                       <button
                         onClick={() => handleEditTeam(team)}
-                        className="inline-flex items-center gap-1 px-2 py-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low border border-outline-variant rounded-lg transition text-[11px] font-bold cursor-pointer shrink-0"
+                        className="inline-flex items-center justify-center rounded-lg border border-[#e5e5e5] px-2.5 py-2 text-[#6e6e80] hover:bg-[#f7f7f8] hover:text-[#0a0a0a] transition cursor-pointer"
+                        title="Sửa team"
                       >
-                        <FaEdit size={10} /> Sửa
+                        <LuPencil size={13} />
                       </button>
                       <button
                         onClick={() => handleDeleteTeam(team)}
-                        className="inline-flex items-center gap-1 px-2 py-1.5 text-on-surface-variant hover:text-primary-container hover:bg-primary-container/5 border border-outline-variant hover:border-red-200 rounded-lg transition text-[11px] font-bold cursor-pointer shrink-0"
+                        className="inline-flex items-center justify-center rounded-lg border border-[#e5e5e5] px-2.5 py-2 text-[#6e6e80] hover:bg-[#fbe8ee] hover:text-[#ba244a] hover:border-[#f3c8d3] transition cursor-pointer"
+                        title="Xóa team"
                       >
-                        <FaTrash size={10} /> Xóa
+                        <LuTrash2 size={13} />
                       </button>
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            </table>
-          </div>
-
-          {/* MOBILE CARD VIEW */}
-          <div className="md:hidden flex flex-col divide-y divide-outline-variant">
-            {teams.map((team) => (
-              <div key={team.id} className="p-4 hover:bg-surface-container-low/30 transition flex flex-col gap-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="font-bold text-on-surface text-sm">{team.name_team}</h3>
-                    <div className="text-xs text-on-surface-variant mt-1 flex flex-col gap-0.5">
-                      <span className="font-medium text-on-surface">{team.leader_name || "Chưa đặt tên"}</span>
-                      <span className="text-[10px] text-on-surface-variant">{team.leader_email}</span>
-                    </div>
                   </div>
-                  <div className="bg-surface-container-low px-3 py-1.5 rounded-lg text-center shrink-0 border border-outline-variant shadow-sm">
-                    <div className="text-[9px] text-on-surface-variant uppercase font-bold mb-0.5">Số TV</div>
-                    <div className="text-sm font-black text-on-surface leading-none">{team.number_of_member || 0}</div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 pt-3 border-t border-outline-variant">
-                  <button
-                    onClick={() => handleViewMembers(team)}
-                    className="flex items-center justify-center gap-1.5 p-2 rounded-xl bg-primary/5 text-primary hover:bg-primary/10 transition cursor-pointer shadow-sm active:scale-95"
-                  >
-                    <FaEye size={14} /> <span className="text-[11px] font-bold">Thành viên</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedLeaderForInbox({ email: team.leader_email, name: team.name_team });
-                      setInboxModalOpen(true);
-                    }}
-                    className="flex items-center justify-center gap-1.5 p-2 rounded-xl bg-orange-50 text-orange-700 hover:bg-orange-100 transition cursor-pointer shadow-sm active:scale-95 border border-orange-100"
-                  >
-                    <MaterialIcon name="forum" className="text-[14px]" /> <span className="text-[11px] font-bold">Xem Inbox</span>
-                  </button>
-                  <button
-                    onClick={() => handleEditTeam(team)}
-                    className="flex items-center justify-center gap-1.5 p-2 text-on-surface-variant hover:text-on-surface bg-surface-container-low hover:bg-surface-container-highest border border-outline-variant rounded-xl transition cursor-pointer shadow-sm active:scale-95"
-                  >
-                    <FaEdit size={14} /> <span className="text-[11px] font-bold">Sửa Team</span>
-                  </button>
-                  <button
-                    onClick={() => handleDeleteTeam(team)}
-                    className="flex items-center justify-center gap-1.5 p-2 text-on-surface-variant hover:text-primary-container bg-red-50 hover:bg-red-100 border border-red-100 rounded-xl transition cursor-pointer shadow-sm active:scale-95"
-                  >
-                    <FaTrash size={14} /> <span className="text-[11px] font-bold">Xóa Team</span>
-                  </button>
-                </div>
-              </div>
-            ))}
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* ── Thong bao ──────────────────────────────────────────────────── */}
+        {success && (
+          <div className="bg-[#e6f6ec] text-[#15803d] border border-[#bbf0cc] px-4 py-3 rounded-xl text-[13px] font-medium flex items-center gap-2">
+            <MaterialIcon name="check_circle" className="text-[16px] shrink-0" />
+            <span>{success}</span>
+          </div>
+        )}
+        {error && (
+          <div className="bg-[#fbe8ee] text-[#ba244a] border border-[#f3c8d3] px-4 py-3 rounded-xl text-[13px] font-medium flex items-center gap-2">
+            <MaterialIcon name="error" className="text-[16px] shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {/* ── Trang thai loading / rong ──────────────────────────────────── */}
+        {isLoading && (
+          <div className="text-center py-16 text-[#6e6e80] flex flex-col items-center justify-center gap-2 bg-white rounded-xl border border-[#e5e5e5]">
+            <div className="w-8 h-8 border-4 border-[#ba244a] border-t-transparent rounded-full animate-spin" />
+            <p className="text-[13px] font-medium">Đang tải danh sách team...</p>
+          </div>
+        )}
+        {!isLoading && teams.length === 0 && (
+          <div className="text-center py-16 bg-white rounded-xl border border-dashed border-[#e5e5e5] flex flex-col items-center justify-center">
+            <LuLayoutGrid size={36} className="text-[#c4c4cc] mb-2" />
+            <p className="text-[#6e6e80] text-[13px] font-medium">Chưa có team nào</p>
+            <button
+              onClick={handleCreateTeam}
+              className="mt-3 text-[#ba244a] text-[13px] font-semibold hover:underline cursor-pointer"
+            >
+              + Tạo team đầu tiên
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Admin Team Creation / Edit Modal */}
       <AdminTeamModal
