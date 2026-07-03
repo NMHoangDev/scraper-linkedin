@@ -179,16 +179,24 @@ export default function TeamsManagementPage() {
     return teams.map(team => {
       const totals = { post: 0, postTarget: 0, comment: 0, commentTarget: 0, lead: 0, leadTarget: 0, inbox: 0, inboxTarget: 0 };
 
-      kpiRows.filter(r => r.team_id === team.id).forEach(r => {
-        totals.post += r.kpi_post_current || 0;
-        totals.postTarget += r.kpi_post || 0;
-        totals.comment += r.verified_count || 0;
-        totals.commentTarget += r.kpi_comment || 0;
-        totals.lead += r.kpi_lead_current || 0;
-        totals.leadTarget += r.kpi_lead || 0;
-        totals.inbox += r.kpi_inbox_current || 0;
-        totals.inboxTarget += r.kpi_inbox || 0;
-      });
+      // Phong ve: RPC backend co the tra >1 dong cho cung 1 member (du lieu
+      // kpi_tracker mo coi/trung khoang ngay o phia DB) - dedupe theo member_id
+      // truoc khi cong don, tranh nhan doi target/actual cua thanh vien do.
+      const seenMembers = new Set<string>();
+      kpiRows
+        .filter(r => r.team_id === team.id)
+        .forEach(r => {
+          if (seenMembers.has(r.member_id)) return;
+          seenMembers.add(r.member_id);
+          totals.post += r.kpi_post_current || 0;
+          totals.postTarget += r.kpi_post || 0;
+          totals.comment += r.verified_count || 0;
+          totals.commentTarget += r.kpi_comment || 0;
+          totals.lead += r.kpi_lead_current || 0;
+          totals.leadTarget += r.kpi_lead || 0;
+          totals.inbox += r.kpi_inbox_current || 0;
+          totals.inboxTarget += r.kpi_inbox || 0;
+        });
 
       const { percentage, hasTarget } = computeWeightedPercentage(totals);
       return { team, totals, hasTarget, percentage };
