@@ -825,12 +825,26 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
         const messageEvent = event as MessageEvent;
         const data = JSON.parse(messageEvent.data) as ZaloCurrentStatusResponse;
         applyAuthStatus(data);
+        // Backend chu dong dong stream sau khi xac nhan dang nhap thanh cong (xem
+        // auth.py _event_stream: yield "event: close" roi return). Nhung EventSource
+        // cua trinh duyet TU DONG RECONNECT moi khi server dong ket noi (hanh vi mac
+        // dinh, khong tat duoc qua option) - neu FE khong tu dong luon thi se tao vong
+        // lap vo han: server xac nhan -> dong -> browser tu noi lai -> server xac nhan
+        // lai (van dang login) -> dong -> ... gay nhay lien tuc trang thai moi ~7s.
+        if (data?.is_logged_in) {
+          clearAuthEventStream();
+        }
       } catch {
         // ignore malformed payload
       }
     };
 
+    const onStreamClose = () => {
+      clearAuthEventStream();
+    };
+
     eventSource.addEventListener("auth-status", onAuthStatus);
+    eventSource.addEventListener("close", onStreamClose);
     eventSource.onerror = () => {
       // keep polling fallback active
     };
