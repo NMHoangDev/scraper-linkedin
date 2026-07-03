@@ -565,13 +565,12 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
       {CURRENT_USER_EMAIL && feedPlatform === "facebook" && (
         <>
           <ApiExtensionLauncher
-            onComplete={(totalPosts, launchedGroups) => {
+            onComplete={(totalPosts) => {
               fetchPosts();
               fetchStats();
               setCrawlResultsSummary(prev => {
                 const realTotal = prev.groups.reduce((sum, g) => sum + g.count, 0);
-                const launchedUrls = launchedGroups ? launchedGroups.map(g => g.url) : [];
-                return { ...prev, totalPosts: realTotal > 0 ? realTotal : (totalPosts || 0), launchedGroups: launchedUrls };
+                return { ...prev, totalPosts: realTotal > 0 ? realTotal : (totalPosts || 0) };
               });
               setShowCrawlResultModal(true);
             }}
@@ -584,11 +583,7 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
                 } else {
                   newGroups = [...prev.groups, { groupUrl: data.groupUrl, count: data.count }];
                 }
-                return {
-                  ...prev,
-                  groups: newGroups,
-                  crawledPostUrls: [...prev.crawledPostUrls, ...(data.postUrls || [])]
-                };
+                return { ...prev, groups: newGroups };
               });
             }}
           />
