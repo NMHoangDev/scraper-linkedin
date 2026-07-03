@@ -106,6 +106,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
       member: m,
       sort: so,
       dateRange: dr,
+      seeding_status: ss,
     });
   };
 
