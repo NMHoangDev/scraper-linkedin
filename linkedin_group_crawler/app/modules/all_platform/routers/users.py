@@ -173,16 +173,21 @@ def teams_create(payload: dict) -> BaseResponse:
 
 @teams_router.put("")
 def teams_update(payload: dict) -> BaseResponse:
-    """Update a team (replace members). Accepts leader_id (UUID) or leader_email."""
+    """Update a team (replace members, optionally rename). Accepts leader_id (UUID) or leader_email.
+
+    team_id (optional): khi UI biet ro id cua team dang sua, gui kem de tim theo id thay vi
+    theo name_team - cho phep doi ten team ma khong bi hieu nham thanh "tao team moi".
+    """
     try:
         name_team = payload.get("name_team", "").strip()
+        team_id = (payload.get("team_id") or "").strip() or None
         leader_identifier = (payload.get("leader_id") or payload.get("leader_email") or "").strip()
         member_ids: List[str] = payload.get("member_ids", [])
         member_emails: List[str] = payload.get("member_emails", [])
         all_members: List[str] = list(set((member_ids or []) + (member_emails or [])))
         if not name_team or not leader_identifier:
             return BaseResponse(success=False, message="name_team và leader là bắt buộc")
-        data = update_team(name_team, leader_identifier, all_members)
+        data = update_team(name_team, leader_identifier, all_members, team_id=team_id)
         return BaseResponse(success=True, message="Đã cập nhật team", data=data)
     except Exception as e:
         return BaseResponse(success=False, message=str(e))

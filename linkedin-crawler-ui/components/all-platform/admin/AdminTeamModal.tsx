@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { MaterialIcon } from "@/components/ui";
@@ -133,7 +133,9 @@ export function AdminTeamModal({ isOpen, onClose, team, onSuccess }: AdminTeamMo
       const payload = {
         name_team: nameTeam.trim(),
         leader_id: selectedLeaderId,
-        member_ids: selectedMemberIds
+        member_ids: selectedMemberIds,
+        // team.id giup backend tim dung team theo id thay vi theo ten cu, ho tro doi ten.
+        ...(team ? { team_id: team.id } : {}),
       };
 
       let res;
@@ -231,9 +233,8 @@ export function AdminTeamModal({ isOpen, onClose, team, onSuccess }: AdminTeamMo
               type="text"
               value={nameTeam}
               onChange={(e) => setNameTeam(e.target.value)}
-              disabled={!!team}
               placeholder="VD: Growth Team, Dev Team..."
-              className="w-full bg-surface-container-low border border-outline-variant rounded-xl px-3 py-2 text-sm text-on-surface outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full bg-surface-container-low border border-outline-variant rounded-xl px-3 py-2 text-sm text-on-surface outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition"
               required
             />
           </div>

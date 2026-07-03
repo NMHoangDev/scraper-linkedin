@@ -1383,6 +1383,9 @@ export const teamsService = {
     name_team: string;
     leader_id: string;
     member_ids: string[];
+    // Truyen kem khi sua team da biet id, de backend tim theo id thay vi theo name_team -
+    // cho phep doi ten team an toan (khong bi hieu nham la tao team moi).
+    team_id?: string;
   }): Promise<ApiResponse<TeamRow[]>> => {
     return requestJson(`${BASE}/teams`, {
       method: "PUT",

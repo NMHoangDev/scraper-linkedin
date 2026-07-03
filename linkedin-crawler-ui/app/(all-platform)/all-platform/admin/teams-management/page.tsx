@@ -76,16 +76,16 @@ function StatCard({
   iconClassName?: string;
 }) {
   return (
-    <div className="flex h-full flex-col gap-4 rounded-xl border border-[#e5e5e5] bg-white p-5">
-      <div className={cn("w-fit rounded-lg p-2.5", iconClassName)}>
-        <Icon size={20} />
+    <div className="flex h-full items-center gap-3 rounded-xl border border-[#e5e5e5] bg-white p-4 shadow-sm">
+      <div className={cn("shrink-0 rounded-lg p-2", iconClassName)}>
+        <Icon size={18} />
       </div>
-      <div className="flex flex-1 flex-col justify-end gap-1.5">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-[#6e6e80]">{label}</p>
-        <span className="text-2xl font-bold tracking-tight text-[#0a0a0a] tabular-nums">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[11px] font-medium uppercase tracking-wide text-[#6e6e80]">{label}</p>
+        <span className="text-xl font-bold tracking-tight text-[#0a0a0a] tabular-nums">
           {typeof value === "number" ? value.toLocaleString("vi-VN") : value}
         </span>
-        {hint ? <p className="text-[11px] text-[#6e6e80]">{hint}</p> : null}
+        {hint ? <p className="truncate text-[11px] text-[#6e6e80]">{hint}</p> : null}
       </div>
     </div>
   );
@@ -286,8 +286,8 @@ export default function TeamsManagementPage() {
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-lg font-bold text-[#0a0a0a] leading-tight">Quản lý Teams</h1>
-            <p className="text-[13px] text-[#6e6e80] mt-0.5">Theo dõi KPI và so sánh hiệu suất giữa các team</p>
+            <h1 className="text-xl font-bold text-[#0a0a0a] leading-tight">Quản lý Teams</h1>
+            <p className="text-[13.5px] text-[#6e6e80] mt-0.5">Theo dõi KPI và so sánh hiệu suất giữa các team</p>
           </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 border border-[#e5e5e5] rounded-[10px] px-3 py-1.5 bg-white">
@@ -346,23 +346,23 @@ export default function TeamsManagementPage() {
 
         {/* ── So sanh chi tiet giua cac team (bang, xep hang theo % hoan thanh) ── */}
         {!isLoading && teamKpiSummariesRanked.length > 0 && (
-          <div className="rounded-xl border border-[#e5e5e5] bg-white overflow-hidden">
-            <div className="px-5 py-4 border-b border-[#e5e5e5]">
+          <div className="rounded-xl border border-[#dcdce0] bg-white overflow-hidden shadow-sm">
+            <div className="px-5 py-4 border-b border-[#e5e5e5] bg-[#fafafa]">
               <div className="flex items-center gap-2">
-                <LuChartBar size={16} className="text-[#6e6e80]" />
-                <span className="text-[14px] font-semibold text-[#0a0a0a]">So sánh & xếp hạng Team</span>
+                <LuChartBar size={17} className="text-[#0a0a0a]" />
+                <span className="text-[15px] font-bold text-[#0a0a0a]">So sánh & xếp hạng Team</span>
               </div>
-              <p className="text-[12px] text-[#6e6e80] mt-0.5">Xếp theo % hoàn thành KPI có trọng số: Lead 45% · Inbox 40% · Comment 5% · Post 10%</p>
+              <p className="text-[12.5px] text-[#6e6e80] mt-0.5">Xếp theo % hoàn thành KPI có trọng số: Lead 45% · Inbox 40% · Comment 5% · Post 10%</p>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-[13px]">
+              <table className="w-full border-collapse text-[14px]">
                 <thead>
-                  <tr className="bg-[#f7f7f8]">
-                    <th className="text-left px-5 py-2.5 text-[11px] font-medium text-[#6e6e80] uppercase w-12">#</th>
-                    <th className="text-left px-3 py-2.5 text-[11px] font-medium text-[#6e6e80] uppercase">Team</th>
-                    <th className="text-left px-3 py-2.5 text-[11px] font-medium text-[#6e6e80] uppercase hidden md:table-cell">Leader</th>
-                    <th className="text-center px-3 py-2.5 text-[11px] font-medium text-[#6e6e80] uppercase">Thành viên</th>
-                    <th className="text-left px-5 py-2.5 text-[11px] font-medium text-[#6e6e80] uppercase w-[45%]">Tiến độ hoàn thành</th>
+                  <tr className="bg-[#f0f0f1]">
+                    <th className="text-left px-5 py-2.5 text-[11px] font-bold text-[#52525b] uppercase w-12">#</th>
+                    <th className="text-left px-3 py-2.5 text-[11px] font-bold text-[#52525b] uppercase">Team</th>
+                    <th className="text-left px-3 py-2.5 text-[11px] font-bold text-[#52525b] uppercase hidden md:table-cell">Leader</th>
+                    <th className="text-center px-3 py-2.5 text-[11px] font-bold text-[#52525b] uppercase">Thành viên</th>
+                    <th className="text-left px-5 py-2.5 text-[11px] font-bold text-[#52525b] uppercase w-[45%]">Tiến độ hoàn thành</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -370,22 +370,22 @@ export default function TeamsManagementPage() {
                     <tr key={s.team.id} className="border-t border-[#e5e5e5] hover:bg-[#f7f7f8] transition">
                       <td className="px-5 py-3">
                         <span className={cn(
-                          "inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold",
-                          idx === 0 && s.hasTarget ? "bg-[#16a34a]/10 text-[#15803d]" : "bg-[#f0f0f1] text-[#a1a1aa]",
+                          "inline-flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-bold",
+                          idx === 0 && s.hasTarget ? "bg-[#16a34a] text-white" : "bg-[#e5e5e7] text-[#52525b]",
                         )}>{idx + 1}</span>
                       </td>
-                      <td className="px-3 py-3 font-semibold text-[#0a0a0a] whitespace-nowrap">{s.team.name_team}</td>
-                      <td className="px-3 py-3 text-[#6e6e80] hidden md:table-cell whitespace-nowrap">{s.team.leader_name || "Chưa đặt tên"}</td>
-                      <td className="px-3 py-3 text-center text-[#6e6e80]">{s.team.number_of_member || 0}</td>
+                      <td className="px-3 py-3 font-bold text-[#0a0a0a] whitespace-nowrap">{s.team.name_team}</td>
+                      <td className="px-3 py-3 text-[#52525b] hidden md:table-cell whitespace-nowrap">{s.team.leader_name || "Chưa đặt tên"}</td>
+                      <td className="px-3 py-3 text-center font-semibold text-[#0a0a0a]">{s.team.number_of_member || 0}</td>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-3">
-                          <div className="h-2 flex-1 overflow-hidden rounded-full bg-[#f0f0f1]">
+                          <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-[#e5e5e7]">
                             <div
                               className="h-full rounded-full bg-[#16a34a] transition-all duration-500"
                               style={{ width: `${s.percentage}%` }}
                             />
                           </div>
-                          <span className="w-10 text-right text-[13px] font-semibold text-[#0a0a0a] tabular-nums">
+                          <span className="w-11 text-right text-[15px] font-bold text-[#0a0a0a] tabular-nums">
                             {s.hasTarget ? `${s.percentage}%` : "—"}
                           </span>
                         </div>
@@ -402,51 +402,51 @@ export default function TeamsManagementPage() {
         {!isLoading && teams.length > 0 && (
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <LuLayoutGrid size={16} className="text-[#6e6e80]" />
-              <span className="text-[14px] font-semibold text-[#0a0a0a]">Quản lý từng Team</span>
+              <LuLayoutGrid size={17} className="text-[#0a0a0a]" />
+              <span className="text-[15px] font-bold text-[#0a0a0a]">Quản lý từng Team</span>
             </div>
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
               {teamKpiSummaries.map(({ team, totals, hasTarget, percentage }) => {
                 const initial = (team.name_team || "?").trim().charAt(0).toUpperCase();
                 return (
-                  <div key={team.id} className="flex flex-col gap-3 rounded-xl border border-[#e5e5e5] bg-white p-4">
+                  <div key={team.id} className="flex flex-col gap-3 rounded-xl border border-[#dcdce0] bg-white p-4 shadow-sm">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fbe8ee] text-[13px] font-bold text-[#ba244a]">
                           {initial}
                         </div>
                         <div className="min-w-0">
-                          <div className="font-semibold text-[#0a0a0a] text-[14px] truncate">{team.name_team}</div>
-                          <div className="text-[#6e6e80] text-[12px] truncate">
+                          <div className="font-bold text-[#0a0a0a] text-[15px] truncate">{team.name_team}</div>
+                          <div className="text-[#6e6e80] text-[12.5px] truncate">
                             {team.leader_name || "Chưa đặt tên"} · {team.number_of_member || 0} thành viên
                           </div>
                         </div>
                       </div>
                       <span
                         className={cn(
-                          "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold",
-                          hasTarget ? "bg-[#16a34a]/10 text-[#15803d]" : "bg-[#f7f7f8] text-[#6e6e80]",
+                          "shrink-0 rounded-full px-2.5 py-1 text-[11.5px] font-bold",
+                          hasTarget ? "bg-[#16a34a]/10 text-[#15803d]" : "bg-[#f0f0f1] text-[#6e6e80]",
                         )}
                       >
                         {hasTarget ? `${percentage}%` : "Chưa giao KPI"}
                       </span>
                     </div>
 
-                    <div className="h-1.5 w-full bg-[#f0f0f1] rounded-full overflow-hidden">
+                    <div className="h-1.5 w-full bg-[#e5e5e7] rounded-full overflow-hidden">
                       <div className="h-full bg-[#16a34a] rounded-full transition-all duration-500" style={{ width: `${percentage}%` }} />
                     </div>
 
                     <div className="grid grid-cols-4 gap-2">
                       {metricDefs.map((m) => (
-                        <div key={m.label} className="rounded-lg border border-[#f0f0f0] bg-[#fafafa] px-2.5 py-2.5">
+                        <div key={m.label} className="rounded-lg border border-[#e5e5e7] bg-[#fafafa] px-2.5 py-2.5">
                           <div className={cn("mb-1.5 inline-flex h-7 w-7 items-center justify-center rounded-lg", m.tone)}>
                             <m.icon size={14} />
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-semibold text-[#6e6e80] uppercase">{m.label}</span>
+                            <span className="text-[10px] font-bold text-[#6e6e80] uppercase">{m.label}</span>
                             <span className="text-[9px] font-medium text-[#a1a1aa]">{m.weight}</span>
                           </div>
-                          <div className="text-[15px] font-bold text-[#0a0a0a] tabular-nums leading-none mt-1">
+                          <div className="text-[16px] font-bold text-[#0a0a0a] tabular-nums leading-none mt-1">
                             {totals[m.key]}
                             <span className="text-[11px] font-normal text-[#a1a1aa]"> / {totals[`${m.key}Target` as keyof typeof totals]}</span>
                           </div>
@@ -457,7 +457,7 @@ export default function TeamsManagementPage() {
                     <div className="flex gap-2 pt-3 border-t border-[#f0f0f0]">
                       <button
                         onClick={() => handleViewMembers(team)}
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#e5e5e5] px-2 py-2 text-[12px] font-medium text-[#0a0a0a] hover:bg-[#f7f7f8] transition cursor-pointer"
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#0a0a0a] px-2 py-2 text-[12.5px] font-semibold text-white shadow-sm transition hover:bg-[#262626] cursor-pointer"
                       >
                         <LuEye size={13} /> Xem TV
                       </button>
@@ -466,21 +466,21 @@ export default function TeamsManagementPage() {
                           setSelectedLeaderForInbox({ email: team.leader_email, name: team.name_team });
                           setInboxModalOpen(true);
                         }}
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#e5e5e5] px-2 py-2 text-[12px] font-medium text-[#0a0a0a] hover:bg-[#f7f7f8] transition cursor-pointer"
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#d4d4d8] bg-[#f7f7f8] px-2 py-2 text-[12.5px] font-semibold text-[#0a0a0a] shadow-sm transition hover:bg-[#eeeeef] cursor-pointer"
                         title="Xem toàn bộ Inbox của Team này"
                       >
                         <LuMessageSquare size={13} /> Inbox
                       </button>
                       <button
                         onClick={() => handleEditTeam(team)}
-                        className="inline-flex items-center justify-center rounded-lg border border-[#e5e5e5] px-2.5 py-2 text-[#6e6e80] hover:bg-[#f7f7f8] hover:text-[#0a0a0a] transition cursor-pointer"
+                        className="inline-flex items-center justify-center rounded-lg border border-[#d4d4d8] bg-[#f7f7f8] px-2.5 py-2 text-[#3f3f46] shadow-sm transition hover:bg-[#eeeeef] hover:text-[#0a0a0a] cursor-pointer"
                         title="Sửa team"
                       >
                         <LuPencil size={13} />
                       </button>
                       <button
                         onClick={() => handleDeleteTeam(team)}
-                        className="inline-flex items-center justify-center rounded-lg border border-[#e5e5e5] px-2.5 py-2 text-[#6e6e80] hover:bg-[#fbe8ee] hover:text-[#ba244a] hover:border-[#f3c8d3] transition cursor-pointer"
+                        className="inline-flex items-center justify-center rounded-lg border border-[#f3c8d3] bg-[#fbe8ee] px-2.5 py-2 text-[#ba244a] shadow-sm transition hover:bg-[#f6d2dc] cursor-pointer"
                         title="Xóa team"
                       >
                         <LuTrash2 size={13} />

@@ -457,21 +457,30 @@ def create_team(name_team: str, leader_email_or_id: str, member_emails_or_ids: l
     return [new_team]
 
 
-def update_team(team_name: str, leader_email_or_id: str, member_emails_or_ids: list[str]) -> list[dict]:
-    """Replace members of a team in member_of_teams, and optionally update its leader."""
+def update_team(team_name: str, leader_email_or_id: str, member_emails_or_ids: list[str], team_id: str | None = None) -> list[dict]:
+    """Replace members of a team in member_of_teams, and optionally update its leader/name.
+
+    Neu co team_id (sua tu UI, biet chac team nao) thi tim theo id de ho tro doi ten team
+    an toan. Neu khong co team_id (cac noi goi cu hon) thi fallback ve tim theo name_team
+    nhu truoc, giu tuong thich nguoc.
+    """
     supabase: Client = get_supabase_client()
     leader_id = _resolve_user_id(supabase, leader_email_or_id)
 
-    # 1. Find the team by name_team
-    team_res = supabase.table("teams").select("id").eq("name_team", team_name).execute()
+    # 1. Find the team - uu tien theo id neu co, tranh truong hop doi ten lam mat team cu
+    if team_id:
+        team_res = supabase.table("teams").select("id").eq("id", team_id).execute()
+    else:
+        team_res = supabase.table("teams").select("id").eq("name_team", team_name).execute()
     if not team_res.data:
         # If team doesn't exist, create it
         return create_team(team_name, leader_id, member_emails_or_ids)
-    
-    team_id = team_res.data[0]["id"]
 
-    # 2. Update leader in teams table if changed
-    supabase.table("teams").update({"id_leader": leader_id}).eq("id", team_id).execute()
+    found_team_id = team_res.data[0]["id"]
+
+    # 2. Update leader + name_team (ho tro doi ten team) trong bang teams
+    supabase.table("teams").update({"id_leader": leader_id, "name_team": team_name}).eq("id", found_team_id).execute()
+    team_id = found_team_id
 
     # 3. Remove all existing members from member_of_teams for this team
     supabase.table("member_of_teams").delete().eq("id_teams", team_id).execute()
