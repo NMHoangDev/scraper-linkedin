@@ -1,16 +1,54 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { MaterialIcon, type MaterialSymbolName } from "@/components/ui";
+import { MaterialIcon } from "@/components/ui";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { cn } from "@/lib/utils";
 import { teamsService, allPlatformKpiService } from "@/services/all-platform.service";
 import type { TeamRow } from "@/services/all-platform.service";
 import { AdminTeamModal } from "@/components/all-platform/admin/AdminTeamModal";
 import { AdminMemberKpiModal } from "@/components/all-platform/admin/AdminMemberKpiModal";
-import { PlatformStatsRow, PlatformStatCard } from "@/components/features/shared/PlatformStatCard";
 import { FaTrash, FaEdit, FaEye } from "react-icons/fa";
+import {
+  LuLayoutGrid,
+  LuUsers,
+  LuTarget,
+  LuTrendingUp,
+  LuFileText,
+  LuMessageSquare,
+  LuUserPlus,
+  LuInbox,
+} from "react-icons/lu";
 import { LeaderInboxView } from "@/components/all-platform/leader/LeaderInboxView";
+
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  hint,
+  iconClassName,
+}: {
+  icon: React.ComponentType<{ size?: number }>;
+  label: string;
+  value: string | number;
+  hint?: string;
+  iconClassName?: string;
+}) {
+  return (
+    <div className="flex h-full flex-col gap-3 rounded-xl border border-outline-variant bg-surface p-5">
+      <div className={cn("w-fit rounded-lg p-2", iconClassName)}>
+        <Icon size={20} />
+      </div>
+      <div className="flex flex-1 flex-col justify-end gap-1">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-on-surface-variant">{label}</p>
+        <span className="text-2xl font-bold tracking-tight text-on-surface tabular-nums">
+          {typeof value === "number" ? value.toLocaleString("vi-VN") : value}
+        </span>
+        {hint ? <p className="text-[11px] text-on-surface-variant">{hint}</p> : null}
+      </div>
+    </div>
+  );
+}
 
 function getRecentWeeks(numWeeks = 8) {
   const weeks = [];
@@ -211,39 +249,41 @@ export default function TeamsManagementPage() {
             onClick={handleCreateTeam}
             className="flex items-center justify-center gap-2 bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-on-primary-fixed-variant transition shrink-0 cursor-pointer shadow-sm active:scale-95"
           >
-            <MaterialIcon name="group_add" className="text-base" />
+            <LuUserPlus size={16} />
             Thêm Team Mới
           </button>
         </div>
       </div>
 
       {/* Statistics Cards */}
-      <PlatformStatsRow>
-        <PlatformStatCard
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          icon={LuLayoutGrid}
           label="Tổng số Team"
           value={stats.totalTeams}
-          accent="primary"
+          iconClassName="bg-blue-100 text-blue-600"
         />
-        <PlatformStatCard
+        <StatCard
+          icon={LuUsers}
           label="Tổng số Thành viên"
           value={stats.totalMembers}
-          accent="secondary"
+          iconClassName="bg-emerald-100 text-emerald-600"
         />
-        <PlatformStatCard
+        <StatCard
+          icon={LuTarget}
           label="Team đạt KPI tuần này"
           value={`${stats.achievedTeams} / ${stats.totalTeams}`}
-          accent="success"
-          hint="Các team đạt >= 100% KPI chỉ tiêu"
-          hintTone="up"
+          hint="Các team đạt ≥ 100% KPI chỉ tiêu"
+          iconClassName="bg-purple-100 text-purple-600"
         />
-        <PlatformStatCard
+        <StatCard
+          icon={LuTrendingUp}
           label="Tỷ lệ hoàn thành KPI hệ thống"
           value={`${stats.completionRate}%`}
-          accent="warning"
           hint="Tiến độ hoàn thành KPI của tất cả team"
-          hintTone="neutral"
+          iconClassName="bg-amber-100 text-amber-600"
         />
-      </PlatformStatsRow>
+      </div>
 
       {/* Tong quan KPI day du theo Team - Post/Comment/Lead/Inbox, khong chi rieng Inbox
           (rieng Inbox can buoc "Xac nhan Inbox" thu cong nen hay 0% du team van co
@@ -253,7 +293,7 @@ export default function TeamsManagementPage() {
       {!isLoading && teams.length > 0 && (
         <div>
           <h3 className="text-sm font-bold text-on-surface mb-3 flex items-center gap-2">
-            <MaterialIcon name="analytics" className="text-primary text-base" />
+            <LuTrendingUp size={16} className="text-primary" />
             Tổng quan KPI theo Team
           </h3>
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -287,10 +327,10 @@ export default function TeamsManagementPage() {
                     : "bg-surface-container-low text-on-surface-variant border-outline-variant";
 
               const metrics = [
-                { label: "Post", icon: "article", current: totals.post, target: totals.postTarget, tone: "text-emerald-600 bg-emerald-50" },
-                { label: "Comment", icon: "comment", current: totals.comment, target: totals.commentTarget, tone: "text-blue-600 bg-blue-50" },
-                { label: "Lead", icon: "person_add", current: totals.lead, target: totals.leadTarget, tone: "text-purple-600 bg-purple-50" },
-                { label: "Inbox", icon: "chat", current: totals.inbox, target: totals.inboxTarget, tone: "text-orange-600 bg-orange-50" },
+                { label: "Post", icon: LuFileText, current: totals.post, target: totals.postTarget, tone: "text-emerald-600 bg-emerald-100" },
+                { label: "Comment", icon: LuMessageSquare, current: totals.comment, target: totals.commentTarget, tone: "text-blue-600 bg-blue-100" },
+                { label: "Lead", icon: LuUserPlus, current: totals.lead, target: totals.leadTarget, tone: "text-purple-600 bg-purple-100" },
+                { label: "Inbox", icon: LuInbox, current: totals.inbox, target: totals.inboxTarget, tone: "text-orange-600 bg-orange-100" },
               ];
 
               const initial = (team.name_team || "?").trim().charAt(0).toUpperCase();
@@ -320,9 +360,9 @@ export default function TeamsManagementPage() {
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {metrics.map((m) => (
-                      <div key={m.label} className="rounded-lg border border-outline-variant p-2">
-                        <div className={cn("mb-1 inline-flex h-6 w-6 items-center justify-center rounded-md", m.tone)}>
-                          <MaterialIcon name={m.icon as MaterialSymbolName} className="text-[14px]" />
+                      <div key={m.label} className="rounded-lg border border-outline-variant p-2.5">
+                        <div className={cn("mb-1.5 inline-flex h-7 w-7 items-center justify-center rounded-md", m.tone)}>
+                          <m.icon size={14} />
                         </div>
                         <div className="text-[10px] font-bold text-on-surface-variant uppercase">{m.label}</div>
                         <div className="text-sm font-extrabold text-on-surface tabular-nums leading-none mt-0.5">
