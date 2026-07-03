@@ -466,21 +466,21 @@ export default function TeamsManagementPage() {
                           setSelectedLeaderForInbox({ email: team.leader_email, name: team.name_team });
                           setInboxModalOpen(true);
                         }}
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#ba244a]/10 px-2 py-2 text-[12.5px] font-semibold text-[#ba244a] transition hover:bg-[#ba244a]/15 cursor-pointer"
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#e4e4e7] px-2 py-2 text-[12.5px] font-semibold text-[#3f3f46] transition hover:bg-[#d4d4d8] cursor-pointer"
                         title="Xem toàn bộ Inbox của Team này"
                       >
                         <LuMessageSquare size={13} /> Inbox
                       </button>
                       <button
                         onClick={() => handleEditTeam(team)}
-                        className="inline-flex items-center justify-center rounded-lg bg-[#0a0a0a] px-2.5 py-2 text-white shadow-sm transition hover:bg-[#262626] cursor-pointer"
+                        className="inline-flex items-center justify-center rounded-lg bg-[#0a0a0a] px-2.5 py-2 text-white transition hover:bg-[#262626] cursor-pointer"
                         title="Sửa team"
                       >
                         <LuPencil size={13} />
                       </button>
                       <button
                         onClick={() => handleDeleteTeam(team)}
-                        className="inline-flex items-center justify-center rounded-lg border border-[#f3c8d3] bg-[#fbe8ee] px-2.5 py-2 text-[#ba244a] shadow-sm transition hover:bg-[#f6d2dc] cursor-pointer"
+                        className="inline-flex items-center justify-center rounded-lg bg-[#fbe8ee] px-2.5 py-2 text-[#ba244a] transition hover:bg-[#f6d2dc] cursor-pointer"
                         title="Xóa team"
                       >
                         <LuTrash2 size={13} />
