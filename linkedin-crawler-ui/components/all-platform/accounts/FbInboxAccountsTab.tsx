@@ -157,6 +157,20 @@ export function FbInboxAccountsTab({ onChange }: FbInboxAccountsTabProps) {
     } catch { showToast("Lỗi xóa", false); }
   }
 
+  async function removeAccountFull(uid: string, label: string) {
+    if (!window.confirm(`CẢNH BÁO: Xóa HOÀN TOÀN tài khoản "${label}" - sẽ xóa file cookie phiên đăng nhập trên server VÀ toàn bộ dữ liệu KPI/đăng ký inbox liên quan trong database. Không thể khôi phục. Bạn có chắc chắn?`)) return;
+    try {
+      const r = await fbFetch(`/accounts/${encodeURIComponent(uid)}/full`, { method: "DELETE" });
+      if (r.ok) {
+        showToast("Đã xóa hoàn toàn tài khoản", true);
+        loadAll();
+        onChange?.();
+      } else {
+        showToast("Lỗi xóa hoàn toàn", false);
+      }
+    } catch { showToast("Lỗi xóa hoàn toàn", false); }
+  }
+
   async function editMeta(s: Session) {
     const email = window.prompt("Email/SĐT đăng nhập của tài khoản này (để gợi nhắc khi cần đăng nhập lại):", s.email || "");
     if (email === null) return;
@@ -423,6 +437,11 @@ export function FbInboxAccountsTab({ onChange }: FbInboxAccountsTabProps) {
                           Xóa Ext
                         </button>
                       )}
+                      <button onClick={() => removeAccountFull(acc.user_id, acc.label)}
+                        title="Xóa hoàn toàn: file cookie + toàn bộ dữ liệu KPI/đăng ký trong database"
+                        className="px-2 py-1 bg-red-600 text-white hover:bg-red-700 border border-red-700 rounded-lg text-[10px] font-bold transition cursor-pointer">
+                        Xóa hoàn toàn
+                      </button>
                     </div>
                   </td>
                 </tr>

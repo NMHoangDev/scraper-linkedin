@@ -18,6 +18,7 @@ from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 
 from app.modules.all_platform.services import decode_token, get_team_members, get_user_by_id
+from app.core.supabase_client import get_supabase_client
 
 
 router = APIRouter()
@@ -416,6 +417,35 @@ async def fb_delete_session(user_id: str, request: Request, authorization: str |
     status, payload = await _markee_json("DELETE", f"/session/cookie/{user_id}")
     _clear_markee_cache("/sessions", "/extensions", "/inbox/conversations", "/inbox/thread")
     return _json_response(status, payload)
+
+
+@router.delete("/accounts/{user_id}/full")
+async def fb_delete_account_full(user_id: str, request: Request, authorization: str | None = Header(None)) -> JSONResponse:
+    """Xoá HOÀN TOÀN 1 tài khoản FB: file cookie session trên VPS service +
+    toàn bộ dòng liên quan trong Supabase (fb_inbox_accounts, fb_post_kpi,
+    fb_inbox_kpi) - tránh tình trạng chỉ xoá cookie mà dữ liệu KPI/đăng ký
+    account vẫn còn rác trong DB (hoặc ngược lại)."""
+    user = _current_user(request, authorization)
+    await _require_fb_account_scope(user, user_id)
+
+    result: dict[str, object] = {"user_id": user_id, "cookie_deleted": False, "db": {}}
+
+    try:
+        status, _payload = await _markee_json("DELETE", f"/session/cookie/{user_id}")
+        result["cookie_deleted"] = status < 400
+    except Exception as exc:
+        result["cookie_error"] = str(exc)
+
+    supabase = get_supabase_client()
+    for table in ("fb_inbox_accounts", "fb_post_kpi", "fb_inbox_kpi"):
+        try:
+            res = supabase.table(table).delete().eq("user_id", user_id).execute()
+            result["db"][table] = len(res.data or [])
+        except Exception as exc:
+            result["db"][f"{table}_error"] = str(exc)
+
+    _clear_markee_cache("/sessions", "/extensions", "/inbox/conversations", "/inbox/thread")
+    return _json_response(200, result)
 
 
 @router.post("/session/meta")
