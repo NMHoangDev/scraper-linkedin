@@ -3,29 +3,37 @@
 import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAppAuth } from "@/contexts/AppAuthContext";
-import { useState } from "react";
-import Image from "next/image";
 import { AppPlatformProvider, useAppPlatform } from "@/components/providers/AppPlatformProvider";
-import { AllPlatformSidebar } from "./AllPlatformSidebar";
-import { MaterialIcon } from "@/components/ui";
+import { AllPlatformSidebarShadcn } from "./AllPlatformSidebarShadcn";
+import { buildEntries, findCurrentPageLabel } from "./AllPlatformSidebar";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { Separator } from "@/components/ui/separator";
 import { GlobalCrawlNotification } from "../components/global-crawl-notification";
 
+// Dung buildEntries(true, true, "team") - tap hop day du nhat (bao gom ca muc admin/leader) -
+// chi de TRA TEN TRANG hien thi o thanh tieu de, khong lien quan phan quyen thuc te (phan quyen
+// that van do AllPlatformSidebarShadcn tu quan ly rieng dua tren role that cua user).
+const ALL_ENTRIES_FOR_TITLE_LOOKUP = buildEntries(true, true, "team");
+
 /**
- * AllPlatformShell — Layout shell dành riêng cho module All-Platform.
+ * AllPlatformShell — Layout shell danh rieng cho module All-Platform.
  *
- * - Tự động redirect về /auth/login nếu chưa đăng nhập.
- * - Không phụ thuộc vào DashboardProvider, useDashboardCrawler, hay
- *   bất kỳ context cũ nào của Facebook/LinkedIn.
- * - Role check lấy trực tiếp từ Supabase thông qua useAppAuth().
- * - Bọc AppPlatformProvider và tự động set platform = "general".
+ * - Tu dong redirect ve /auth/login neu chua dang nhap.
+ * - Khong phu thuoc vao DashboardProvider, useDashboardCrawler, hay
+ *   bat ky context cu nao cua Facebook/LinkedIn.
+ * - Role check lay truc tiep tu Supabase thong qua useAppAuth().
+ * - Boc AppPlatformProvider va tu dong set platform = "general".
+ *
+ * Dung shadcn/ui Sidebar block (SidebarProvider/Sidebar/SidebarInset) lay mau
+ * that tu app.markeeai.com production CSS, thay cho ban tu viet truoc day
+ * (div + margin-left thu cong). Giu nguyen 100% logic auth/platform/notification
+ * ben duoi - chi doi lop hien thi sidebar + khung trang.
  */
 function AllPlatformShellInner({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAppAuth();
   const { platform, setPlatform } = useAppPlatform();
   const router = useRouter();
   const pathname = usePathname();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Force platform to "general" for all-platform routes
   useEffect(() => {
@@ -53,49 +61,29 @@ function AllPlatformShellInner({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated) return null;
 
   const isChatPage = pathname === "/zalo-chat" || pathname.startsWith("/zalo-chat");
+  const pageTitle = findCurrentPageLabel(ALL_ENTRIES_FOR_TITLE_LOOKUP, pathname) ?? "Marketing Agents";
 
   return (
-    <div className="min-h-screen bg-background text-on-background flex flex-col lg:flex-row">
-      {/* Mobile Top Header */}
-      <div className="lg:hidden sticky top-0 z-30 flex items-center justify-between border-b border-outline-variant bg-surface/95 px-md py-sm shadow-sm backdrop-blur">
-        <div className="flex items-center gap-2">
-          <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-lg border border-outline-variant bg-surface">
-            <Image
-              src="/markeeai_logo.svg"
-              alt="Marketing Agents"
-              fill
-              sizes="32px"
-              className="object-contain p-1"
-              priority
-            />
-          </div>
-          <span className="text-h3 text-primary">Marketing Agents</span>
-        </div>
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-outline-variant bg-surface text-on-surface-variant transition hover:border-primary hover:text-primary"
-          aria-label="Mở menu"
+    <SidebarProvider>
+      <AllPlatformSidebarShadcn />
+      <SidebarInset className="bg-white">
+        <header className="sticky top-0 z-20 flex h-12 shrink-0 items-center gap-2 border-b border-border bg-white px-3">
+          <SidebarTrigger className="lg:hidden" />
+          <Separator orientation="vertical" className="h-4 lg:hidden" />
+          <span className="text-sm font-semibold text-foreground">{pageTitle}</span>
+        </header>
+        <div
+          className={
+            isChatPage
+              ? "flex-1 h-[calc(100svh-3rem)] overflow-hidden p-0"
+              : "flex-1 overflow-x-hidden bg-white p-3 sm:p-5 lg:p-8"
+          }
         >
-          <MaterialIcon name="menu" className="text-[22px]" />
-        </button>
-      </div>
-
-      <AllPlatformSidebar
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        isCollapsed={sidebarCollapsed}
-        onCollapsedChange={setSidebarCollapsed}
-      />
-
-      <main className={`min-w-0 max-w-full flex-1 w-full transition-all duration-300 flex flex-col ${
-        sidebarCollapsed ? "lg:ml-[70px] lg:w-[calc(100%-70px)]" : "lg:ml-[280px] lg:w-[calc(100%-280px)]"
-      } ${
-        isChatPage ? "h-screen p-0 overflow-hidden" : "overflow-x-hidden p-3 sm:p-5 lg:p-8"
-      }`}>
-        <GlobalCrawlNotification />
-        {children}
-      </main>
-    </div>
+          <GlobalCrawlNotification />
+          {children}
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
 

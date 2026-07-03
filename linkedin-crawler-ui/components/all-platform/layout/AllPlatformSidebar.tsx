@@ -9,7 +9,7 @@ import { MaterialIcon, type MaterialSymbolName } from "@/components/ui";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { cn } from "@/lib/utils";
 
-interface NavLeafItem {
+export interface NavLeafItem {
   type: "item";
   id: string;
   href: string;
@@ -19,7 +19,7 @@ interface NavLeafItem {
   badge?: number;
 }
 
-interface NavGroupItem {
+export interface NavGroupItem {
   type: "group";
   id: string;
   icon: MaterialSymbolName;
@@ -27,7 +27,7 @@ interface NavGroupItem {
   items: NavLeafItem[];
 }
 
-type SidebarEntry = NavLeafItem | NavGroupItem;
+export type SidebarEntry = NavLeafItem | NavGroupItem;
 
 const navBaseClass =
   "group relative flex min-h-[36px] items-center gap-2.5 overflow-hidden rounded-xl px-2.5 py-1.5 text-sm font-medium leading-relaxed transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-markee-primary)]/40";
@@ -44,13 +44,13 @@ function pathMatchesPrefix(pathname: string, prefix: string): boolean {
   return pathname.startsWith(prefix.endsWith("/") ? prefix : `${prefix}/`);
 }
 
-function isLeafActive(pathname: string, item: NavLeafItem) {
+export function isLeafActive(pathname: string, item: NavLeafItem) {
   if (pathname === item.href) return true;
   if (item.matchStartsWith?.some((prefix) => pathMatchesPrefix(pathname, prefix))) return true;
   return pathMatchesPrefix(pathname, item.href) && item.href !== "/all-platform/post-feed";
 }
 
-function getInitials(name?: string) {
+export function getInitials(name?: string) {
   if (!name) return "U";
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length >= 2) {
@@ -63,7 +63,7 @@ function getInitials(name?: string) {
   return parts[0]?.[0]?.toUpperCase() || "U";
 }
 
-function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: "personal" | "team"): SidebarEntry[] {
+export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: "personal" | "team"): SidebarEntry[] {
   const dashboardHref = isAdmin
     ? "/all-platform/admin/dashboard"
     : isLeader
@@ -266,6 +266,20 @@ function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: "person
       matchStartsWith: ["/all-platform/profile"],
     },
   ];
+}
+
+// Tra ten trang hien tai tu pathname, dung chung 1 nguon du lieu voi menu (entries) -
+// tranh phai duy tri rieng 1 bang ten trang khac de rendera thanh tieu de o dau khung noi dung.
+export function findCurrentPageLabel(entries: SidebarEntry[], pathname: string): string | undefined {
+  for (const entry of entries) {
+    if (entry.type === "item") {
+      if (isLeafActive(pathname, entry)) return entry.label;
+    } else {
+      const child = entry.items.find((item) => isLeafActive(pathname, item));
+      if (child) return child.label;
+    }
+  }
+  return undefined;
 }
 
 function SidebarLink({

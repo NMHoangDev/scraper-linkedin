@@ -12,8 +12,13 @@
   --spacing-gutter: 20px;
   --spacing-base: 4px;
 
-  --radius-xl: 0.5rem;
-  --radius-lg: 0.25rem;
+  /* Radius chuẩn shadcn/app.markeeai.com (base --radius: 0.625rem của app chính).
+     Trước đây bị ghi đè nhỏ bất thường (lg=0.25rem, xl=0.5rem) làm bo góc gắt hơn
+     app chính; đổi về chuẩn để mọi trang tự "tròn" giống app.markee. */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.875rem;
 
   --color-background: #f6faff;
   --color-foreground: #171c20;
@@ -64,12 +69,49 @@
   --color-on-tertiary-fixed: #181c1e;
   --color-on-primary-container: #ffffff;
 
-  --color-sidebar: #ffffff;
-  --color-sidebar-foreground: #171717;
+  /* --color-sidebar* : cap nhat dung gia tri that tu app.markeeai.com (xac nhan
+     dung shadcn Sidebar block chuan qua token --sidebar-* trong CSS production).
+     Chua co component nao dung bg-sidebar/text-sidebar truoc gio (grep xac nhan
+     0 ket qua) nen doi an toan, khong anh huong giao dien hien co. */
+  --color-sidebar: #fafafa;
+  --color-sidebar-foreground: #0a0a0a;
+  --color-sidebar-primary: #ba244a;
+  --color-sidebar-primary-foreground: #ffffff;
   --color-sidebar-accent: #f5f5f5;
   --color-sidebar-accent-foreground: #171717;
   --color-sidebar-border: #e5e5e5;
+  --color-sidebar-ring: #a1a1a1;
   --color-markee-primary: #ba244a;
+
+  /* ── shadcn/ui tokens — lay dung tu CSS production cua app.markeeai.com
+     (fetch truc tiep https://app.markeeai.com, extract --var trong :root),
+     dung lam nen tang de dong bo dan UI voi app chinh.
+     CHI THEM ten CHUA TUNG dung trong he Material o tren — KHONG dua
+     background/foreground/secondary vao day vi 3 ten nay DA CO nghia
+     Material rieng dang dung that o 26+ file (vd bg-secondary = xanh la
+     KPI, khac hoan toan mau xam trung tinh cua shadcn) — ghi de se vo
+     giao dien production ngay lap tuc. primary da trung gia tri san
+     (#ba244a) nen khong can khai bao lai. */
+  --color-primary-foreground: #ffffff;
+  --color-secondary-foreground: #ffffff;
+  --color-card: #ffffff;
+  --color-card-foreground: #0a0a0a;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #0a0a0a;
+  --color-muted: #f5f5f5;
+  --color-muted-foreground: #737373;
+  --color-accent: #f5f5f5;
+  --color-accent-foreground: #171717;
+  --color-destructive: #e40014;
+  --color-destructive-foreground: #fff1f2;
+  --color-border: #e5e5e5;
+  --color-input: #e5e5e5;
+  --color-ring: #a1a1a1;
+  --color-chart-1: #f05100;
+  --color-chart-2: #00bb7f;
+  --color-chart-3: #f99c00;
+  --color-chart-4: #fcbb00;
+  --color-chart-5: #ff2357;
 
   --text-h1: 24px;
   --text-h1--line-height: 32px;
