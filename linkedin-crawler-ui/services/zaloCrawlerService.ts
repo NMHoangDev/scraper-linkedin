@@ -138,6 +138,13 @@ export function getZaloInboxReport(ownerId = "default", accountIds: string[] = [
   });
 }
 
+export function resolveZaloConversationAccount(convId: string): Promise<{ account_id: string; conv_id: string }> {
+  const params = new URLSearchParams({ conv_id: convId });
+  return requestJson<{ account_id: string; conv_id: string }>(`/api/all-platform/zalo/conversations/resolve-account?${params.toString()}`, {
+    method: "GET",
+  });
+}
+
 export function getZaloConversations(accountId = "default"): Promise<ZaloConversationListResponse> {
   const params = new URLSearchParams({ account_id: accountId });
   return requestJson<ZaloConversationListResponse>(`/api/all-platform/zalo/conversations?${params.toString()}`, {

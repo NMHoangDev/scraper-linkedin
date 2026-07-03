@@ -268,6 +268,32 @@ async def get_conversations(
         raise HTTPException(status_code=500, detail=f"Không thể tải danh sách hội thoại Zalo: {exc}")
 
 
+@router.get("/resolve-account")
+async def resolve_conversation_account(
+    conv_id: str = Query(...),
+    x_caller_email: Optional[str] = Header(None, alias="X-Caller-Email"),
+):
+    """Tim tai khoan Zalo dang giu 1 conv_id, dung cho luong 'Xu ly' tu trang
+    Khach hang (CRM) - bam vao la tu dong chon dung acc + nhay thang toi hoi
+    thoai, khong can biet truoc acc nao dang giu no."""
+    rows = await _rest(
+        "GET",
+        "zalo_groups",
+        params={"select": "user_id", "group_id": f"eq.{conv_id}", "limit": "1"},
+    )
+    if not rows:
+        raise HTTPException(status_code=404, detail="Không tìm thấy hội thoại này.")
+    account_id = str(rows[0].get("user_id") or "")
+    if not account_id:
+        raise HTTPException(status_code=404, detail="Không tìm thấy hội thoại này.")
+
+    allowed_ids = await check_caller_conversation_access(account_id, x_caller_email)
+    if allowed_ids is not None and conv_id not in allowed_ids:
+        raise HTTPException(status_code=403, detail="Bạn không có quyền truy cập hội thoại này.")
+
+    return {"account_id": account_id, "conv_id": conv_id}
+
+
 @router.post("/sync-recent", response_model=SyncRecentResponse)
 async def sync_recent_conversations(
     body: SyncRecentRequest,

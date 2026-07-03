@@ -184,7 +184,11 @@ export default function CustomerLeadsPage() {
                       <div className="flex justify-end gap-3">
                         {lead.conv_id && (
                           <a
-                            href={`/all-platform/inbox?conv=${lead.conv_id}`}
+                            href={
+                              lead.source_platform === "Zalo"
+                                ? `/all-platform/zalo-inbox?conv=${lead.conv_id}`
+                                : `/all-platform/inbox?conv=${lead.conv_id}`
+                            }
                             target="_blank"
                             rel="noreferrer"
                             className="text-primary hover:text-red-700 flex items-center gap-1 bg-red-50 px-2 py-1 rounded border border-red-100 transition-all"

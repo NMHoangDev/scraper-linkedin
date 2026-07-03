@@ -6,6 +6,8 @@ import { useZaloAdminInbox, type ZaloConv } from "@/hooks/useZaloAdminInbox";
 import ZaloTeamAccountTree from "./ZaloTeamAccountTree";
 import ZaloAccountAuthView from "./ZaloAccountAuthView";
 import { CrmCustomerModal } from "@/components/all-platform/components/CrmCustomerModal";
+import { useSearchParams } from "next/navigation";
+import { resolveZaloConversationAccount } from "@/services/zaloCrawlerService";
 import { KpiProgressCard } from "@/components/all-platform/components/kpi-progress-card";
 import { MaterialIcon } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -138,6 +140,37 @@ export function ZaloInboxAdminShell() {
   const [campaignLogs, setCampaignLogs] = useState<{ name: string; status: "sending" | "success" | "failed" }[]>([]);
   const [editedMessagesText, setEditedMessagesText] = useState<Record<string, string>>({});
   const [showCrmModal, setShowCrmModal] = useState(false);
+
+  // Luong "Xu ly" tu trang Khach hang (CRM): ?conv=<conv_id> tren URL -> tu dong
+  // do tim dung acc Zalo dang giu hoi thoai nay (qua API resolve-account, da co san
+  // kiem tra quyen theo team/leader/admin) roi tu chon acc + nhay thang toi hoi thoai,
+  // khong bat nguoi dung phai tu tim acc nao dang giu no.
+  const searchParams = useSearchParams();
+  const jumpToConvRef = useRef<string | null>(null);
+  useEffect(() => {
+    const targetConv = searchParams.get("conv");
+    if (!targetConv || jumpToConvRef.current === targetConv) return;
+    jumpToConvRef.current = targetConv;
+    (async () => {
+      try {
+        const res = await resolveZaloConversationAccount(targetConv);
+        if (res?.account_id) {
+          inbox.onSelectAccount(res.account_id);
+        }
+      } catch (e) {
+        console.warn("Không tự động mở được hội thoại từ link Xử lý:", e);
+      }
+    })();
+  }, [searchParams, inbox]);
+
+  useEffect(() => {
+    const targetConv = jumpToConvRef.current;
+    if (!targetConv || !inbox.selectedAccountId) return;
+    if (inbox.filtered.some((c) => c.conv_id === targetConv)) {
+      inbox.openChat(targetConv);
+      jumpToConvRef.current = null;
+    }
+  }, [inbox.selectedAccountId, inbox.filtered, inbox]);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
