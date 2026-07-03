@@ -93,6 +93,23 @@ export default function DangBaiPage() {
   const [deletingAccountGroupKeys, setDeletingAccountGroupKeys] = useState<Set<string>>(new Set());
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
+  const [pendingJobs, setPendingJobs] = useState<Array<{ jobId: string; uid: string; group: string; status: "processing" | "success" | "failed"; postUrl?: string; error?: string }>>([]);
+
+  async function pollJobStatus(jobId: string, attemptsLeft = 30) {
+    try {
+      const r = await fbFetch(`/jobs/${encodeURIComponent(jobId)}`);
+      const d = await r.json().catch(() => ({}));
+      if (r.ok && (d.status === "success" || d.status === "failed")) {
+        setPendingJobs(prev => prev.map(p => p.jobId === jobId ? { ...p, status: d.status, postUrl: d.post_url, error: d.error } : p));
+        return;
+      }
+    } catch { /* bo qua, thu lai */ }
+    if (attemptsLeft <= 1) {
+      setPendingJobs(prev => prev.map(p => p.jobId === jobId ? { ...p, status: "failed", error: "Hết thời gian chờ xác nhận từ extension" } : p));
+      return;
+    }
+    setTimeout(() => { void pollJobStatus(jobId, attemptsLeft - 1); }, 2000);
+  }
   const [connErr, setConnErr] = useState(false);
   const [extInstalled, setExtInstalled] = useState<boolean | null>(null);
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
@@ -462,12 +479,20 @@ export default function DangBaiPage() {
           }),
         });
         const d = await r.json().catch(() => ({}));
-        return { uid: job.user_id, group: job.group_name, ok: r.ok, detail: d.detail };
-      } catch { return { uid: job.user_id, group: job.group_name, ok: false, detail: "không kết nối được" }; }
+        return { uid: job.user_id, group: job.group_name, ok: r.ok, detail: d.detail, jobId: d.job_id as string | undefined };
+      } catch { return { uid: job.user_id, group: job.group_name, ok: false, detail: "không kết nối được", jobId: undefined as string | undefined }; }
     }));
 
     const ok = results.filter(x => x.ok).length;
     const fail = results.filter(x => !x.ok);
+
+    const newPending = results
+      .filter(x => x.ok && x.jobId)
+      .map(x => ({ jobId: x.jobId as string, uid: x.uid, group: x.group, status: "processing" as const }));
+    if (newPending.length) {
+      setPendingJobs(prev => [...newPending, ...prev].slice(0, 20));
+      newPending.forEach(p => { void pollJobStatus(p.jobId); });
+    }
 
     if (fail.length === 0) {
       toast.success(`Đã gửi ${ok}/${jobs.length} lệnh đăng!`);
@@ -529,6 +554,52 @@ export default function DangBaiPage() {
       {/* KPI Progress Bar */}
       {userEmail && (
         <KpiProgressCard email={userEmail} type="post" />
+      )}
+
+      {/* Cac lenh dang dang moi bam - hien ngay, khong doi bang KPI */}
+      {pendingJobs.length > 0 && (
+        <div className={DS.card}>
+          <div className={`${DS.cardHeader} flex items-center justify-between`}>
+            <h2 className={DS.sectionTitle}>
+              <MaterialIcon name="sync" className="text-on-surface-variant" />
+              Đang xử lý ({pendingJobs.filter(j => j.status === "processing").length})
+            </h2>
+            <button type="button" onClick={() => setPendingJobs([])} className={`${DS.muted} font-medium hover:underline`}>Xoá danh sách</button>
+          </div>
+          <div className="divide-y divide-outline-variant">
+            {pendingJobs.map(job => (
+              <div key={job.jobId} className="flex items-center justify-between gap-md px-lg py-sm">
+                <div className="min-w-0">
+                  <div className="text-body-sm font-semibold text-on-surface truncate">
+                    {(() => { const ext = exts.find(e => e.user_id === job.uid); return ext ? labelOf(ext) : shortFbId(job.uid); })()}
+                    {job.group ? ` → ${job.group}` : " → Cá nhân"}
+                  </div>
+                  {job.status === "failed" && job.error && <div className="text-body-sm text-red-600 truncate">{job.error}</div>}
+                </div>
+                <div className="shrink-0">
+                  {job.status === "processing" && (
+                    <span className="inline-flex items-center gap-xs text-amber-700 bg-amber-50 px-sm py-xs rounded-full text-body-sm font-bold border border-amber-100">
+                      <span className="w-3 h-3 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" /> Đang xử lý
+                    </span>
+                  )}
+                  {job.status === "success" && (
+                    <span className="inline-flex items-center gap-xs text-green-700 bg-green-50 px-sm py-xs rounded-full text-body-sm font-bold border border-green-100">
+                      <MaterialIcon name="check" className="text-[14px]" /> Thành công
+                      {job.postUrl && (
+                        <a href={job.postUrl} target="_blank" rel="noopener noreferrer" className="ml-xs underline">Xem bài</a>
+                      )}
+                    </span>
+                  )}
+                  {job.status === "failed" && (
+                    <span className="inline-flex items-center gap-xs text-red-700 bg-red-50 px-sm py-xs rounded-full text-body-sm font-bold border border-red-100">
+                      <MaterialIcon name="error" className="text-[14px]" /> Thất bại
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Lịch sử gần đây */}
