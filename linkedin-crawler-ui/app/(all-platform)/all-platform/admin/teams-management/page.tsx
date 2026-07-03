@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { MaterialIcon } from "@/components/ui";
+import { MaterialIcon, type MaterialSymbolName } from "@/components/ui";
 import { useAppAuth } from "@/contexts/AppAuthContext";
+import { cn } from "@/lib/utils";
 import { teamsService, allPlatformKpiService } from "@/services/all-platform.service";
 import type { TeamRow } from "@/services/all-platform.service";
 import { AdminTeamModal } from "@/components/all-platform/admin/AdminTeamModal";
@@ -246,11 +247,16 @@ export default function TeamsManagementPage() {
 
       {/* Tong quan KPI day du theo Team - Post/Comment/Lead/Inbox, khong chi rieng Inbox
           (rieng Inbox can buoc "Xac nhan Inbox" thu cong nen hay 0% du team van co
-          tien do that o cac chi so khac, de gay hieu nham team khong lam gi). */}
+          tien do that o cac chi so khac, de gay hieu nham team khong lam gi).
+          Dung lai dung ngon ngu thiet ke (card, icon mau, PlatformStatCard) da co
+          san tren trang nay + AssignKpiModal de dong bo giao dien. */}
       {!isLoading && teams.length > 0 && (
-        <div className="bg-surface p-5 rounded-xl border border-outline-variant shadow-sm">
-          <h3 className="text-sm font-bold text-on-surface mb-4">Tổng quan KPI theo Team (Post / Comment / Lead / Inbox)</h3>
-          <div className="flex flex-col gap-4">
+        <div>
+          <h3 className="text-sm font-bold text-on-surface mb-3 flex items-center gap-2">
+            <MaterialIcon name="analytics" className="text-primary text-base" />
+            Tổng quan KPI theo Team
+          </h3>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             {teams.map(team => {
               const teamKpis = kpiResultsData.find(r => r.teamId === team.id)?.members || [];
               const totals = { post: 0, postTarget: 0, comment: 0, commentTarget: 0, lead: 0, leadTarget: 0, inbox: 0, inboxTarget: 0 };
@@ -271,39 +277,57 @@ export default function TeamsManagementPage() {
               const overallTarget = totals.postTarget + totals.commentTarget + totals.leadTarget + totals.inboxTarget;
               const overallCurrent = totals.post + totals.comment + totals.lead + totals.inbox;
               const percentage = overallTarget > 0 ? Math.min(Math.round((overallCurrent / overallTarget) * 100), 100) : 0;
-              const barColor = percentage >= 100 ? "bg-emerald-500" : percentage >= 50 ? "bg-orange-500" : "bg-red-500";
-              const textColor = percentage >= 100 ? "text-emerald-600" : percentage >= 50 ? "text-orange-600" : "text-red-600";
+              const barColor = percentage >= 100 ? "bg-[var(--color-success,#22c55e)]" : percentage >= 50 ? "bg-[var(--color-warning,#f59e0b)]" : "bg-primary";
+              const badgeCls = percentage >= 100
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                : percentage >= 50
+                  ? "bg-amber-50 text-amber-700 border-amber-200"
+                  : overallTarget > 0
+                    ? "bg-red-50 text-red-600 border-red-200"
+                    : "bg-surface-container-low text-on-surface-variant border-outline-variant";
 
               const metrics = [
-                { label: "Post", current: totals.post, target: totals.postTarget },
-                { label: "Comment", current: totals.comment, target: totals.commentTarget },
-                { label: "Lead", current: totals.lead, target: totals.leadTarget },
-                { label: "Inbox", current: totals.inbox, target: totals.inboxTarget },
+                { label: "Post", icon: "article", current: totals.post, target: totals.postTarget, tone: "text-emerald-600 bg-emerald-50" },
+                { label: "Comment", icon: "comment", current: totals.comment, target: totals.commentTarget, tone: "text-blue-600 bg-blue-50" },
+                { label: "Lead", icon: "person_add", current: totals.lead, target: totals.leadTarget, tone: "text-purple-600 bg-purple-50" },
+                { label: "Inbox", icon: "chat", current: totals.inbox, target: totals.inboxTarget, tone: "text-orange-600 bg-orange-50" },
               ];
 
+              const initial = (team.name_team || "?").trim().charAt(0).toUpperCase();
+
               return (
-                <div key={team.id} className="flex flex-col gap-2.5 rounded-lg border border-outline-variant p-3">
-                  <div className="flex flex-wrap justify-between items-center gap-2">
-                    <div>
-                      <span className="font-bold text-on-surface text-xs">{team.name_team}</span>
-                      <span className="text-on-surface-variant font-medium text-[10px] ml-2">
-                        Leader: {team.leader_name || "Chưa đặt tên"} · {team.number_of_member || 0} TV
-                      </span>
+                <div key={team.id} className="flex flex-col gap-3 rounded-xl border border-outline-variant bg-surface p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-black text-primary">
+                        {initial}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-bold text-on-surface text-sm truncate">{team.name_team}</div>
+                        <div className="text-on-surface-variant font-medium text-[11px] truncate">
+                          {team.leader_name || "Chưa đặt tên"} · {team.number_of_member || 0} thành viên
+                        </div>
+                      </div>
                     </div>
-                    <span className={`font-bold text-xs ${textColor}`}>{overallTarget > 0 ? `${percentage}%` : "Chưa có chỉ tiêu"}</span>
+                    <span className={cn("shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-bold", badgeCls)}>
+                      {overallTarget > 0 ? `${percentage}%` : "Chưa giao KPI"}
+                    </span>
                   </div>
 
                   <div className="h-1.5 w-full bg-surface-container-low rounded-full overflow-hidden">
-                    <div className={`h-full ${barColor} transition-all duration-500`} style={{ width: `${percentage}%` }} />
+                    <div className={cn("h-full transition-all duration-500", barColor)} style={{ width: `${percentage}%` }} />
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {metrics.map((m) => (
-                      <div key={m.label} className="rounded-lg bg-surface-container-low px-2.5 py-1.5">
-                        <div className="text-[10px] font-semibold text-on-surface-variant">{m.label}</div>
-                        <div className="text-xs font-bold text-on-surface">
+                      <div key={m.label} className="rounded-lg border border-outline-variant p-2">
+                        <div className={cn("mb-1 inline-flex h-6 w-6 items-center justify-center rounded-md", m.tone)}>
+                          <MaterialIcon name={m.icon as MaterialSymbolName} className="text-[14px]" />
+                        </div>
+                        <div className="text-[10px] font-bold text-on-surface-variant uppercase">{m.label}</div>
+                        <div className="text-sm font-extrabold text-on-surface tabular-nums leading-none mt-0.5">
                           {m.current}
-                          <span className="text-[10px] font-medium text-on-surface-variant"> / {m.target}</span>
+                          <span className="text-[11px] font-medium text-on-surface-variant"> / {m.target}</span>
                         </div>
                       </div>
                     ))}
