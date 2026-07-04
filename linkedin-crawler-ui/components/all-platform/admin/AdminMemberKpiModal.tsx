@@ -82,7 +82,16 @@ export function AdminMemberKpiModal({ isOpen, onClose, team }: AdminMemberKpiMod
   const membersWithKpi = useMemo(() => {
     if (!team) return [];
     const teamMembers = team.members || [];
-    return teamMembers.map(member => {
+    // 2026-07-04: them chinh leader vao danh sach hien thi - truoc day
+    // team.members chi lay tu member_of_teams (thanh vien thuong), KPI cua
+    // leader khong bao gio hien o modal nay. Backend /kpi/get-all gio da
+    // tra them 1 dong is_leader=true cho leader trong kpiData - chi con
+    // thieu 1 "member object" (id/email/name) tuong ung de map() qua duoc.
+    const hasLeaderAlready = teamMembers.some(m => m.id === team.id_leader);
+    const allMembers = team.id_leader && !hasLeaderAlready
+      ? [...teamMembers, { id: team.id_leader, email: team.leader_email, name: team.leader_name || team.leader_email }]
+      : teamMembers;
+    return allMembers.map(member => {
       const kpiInfo = kpiData.find(k => k.id === member.id) || {};
       const stats = kpiInfo.seeding_stats || {};
       const commentTarget = stats.kpi_target || 0;
@@ -192,7 +201,12 @@ export function AdminMemberKpiModal({ isOpen, onClose, team }: AdminMemberKpiMod
                   {membersWithKpi.map((m) => (
                     <tr key={m.id} className="hover:bg-surface-container-low transition">
                       <td className="px-3 py-2.5">
-                        <div className="font-bold text-on-surface text-xs">{m.name || "N/A"}</div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-on-surface text-xs">{m.name || "N/A"}</span>
+                          {team && m.id === team.id_leader && (
+                            <span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[9px] font-bold text-violet-700">Leader</span>
+                          )}
+                        </div>
                         <div className="text-[10px] text-on-surface-variant font-medium">{m.email}</div>
                       </td>
                       <td className="px-1 py-2.5 text-center">

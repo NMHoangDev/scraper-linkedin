@@ -350,6 +350,17 @@ def get_all_kpis_for_leader(
         
     member_ids = [r["id_member"] for r in (members_result.data or []) if r.get("id_member")]
 
+    # 2026-07-04: them chinh leader vao danh sach tinh KPI - truoc day
+    # member_ids CHI lay tu member_of_teams (thanh vien thuong), KPI cua
+    # leader "mat tich" khoi modal "Xem TV" (Teams-management). Them
+    # leader_id vao day de toan bo pipeline tinh actual ben duoi (seeding,
+    # zalo inbox, fb inbox/post) tu dong ap dung luon cho leader, khong can
+    # viet lai logic. Dung leader_id_set de kiem tra is_leader khi build
+    # members_data ben duoi.
+    leader_id_str = str(leader_id)
+    if leader_id_str not in {str(m) for m in member_ids}:
+        member_ids = [*member_ids, leader_id]
+
     if not member_ids:
         return {"total": 0, "members": []}
 
@@ -482,6 +493,7 @@ def get_all_kpis_for_leader(
             "email": member_email,
             "name": user.get("name"),
             "role": user.get("role", "member"),
+            "is_leader": mid == leader_id_str,
             "profile_slug": user.get("slug"),
             "email_leader": leader_email,
             "kpi": [active_kpi] if active_kpi else [],
