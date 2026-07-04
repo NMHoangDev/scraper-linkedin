@@ -163,11 +163,11 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
     },
     {
       type: "item",
-      id: "customers",
-      href: "/all-platform/customers",
+      id: "crm",
+      href: "/all-platform/crm",
       icon: "group",
-      label: "Khách hàng",
-      matchStartsWith: ["/all-platform/customers"],
+      label: "CRM",
+      matchStartsWith: ["/all-platform/crm"],
     },
   ];
 

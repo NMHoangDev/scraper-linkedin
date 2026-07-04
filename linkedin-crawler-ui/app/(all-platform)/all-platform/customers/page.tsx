@@ -1,11 +1,9 @@
-import CrmCustomersPage from "@/components/all-platform/customers/CrmCustomersPage";
-import { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Quản lý Khách hàng CRM - Markee",
-  description: "Quản lý khách hàng CRM từ Facebook Inbox, Zalo, FB Group",
-};
-
-export default function CustomersRoute() {
-  return <CrmCustomersPage />;
+/**
+ * Route cũ "/all-platform/customers" — đã được đổi tên thành
+ * "/all-platform/crm". Vẫn support link cũ bằng cách redirect.
+ */
+export default function LegacyCustomersRoute() {
+  redirect("/all-platform/crm");
 }
