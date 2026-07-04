@@ -507,17 +507,8 @@ export function ZaloInboxAdminShell() {
             Quản lý hội thoại Zalo của tất cả nhân sự, theo dõi online/offline và tính KPI inbox.
           </p>
         </div>
-        <button
-          onClick={inbox.scan}
-          disabled={inbox.scanning || !inbox.selectedAccountId || accountStatus !== "online"}
-          className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#E3000F] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#C40009] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <MaterialIcon
-            name={inbox.scanning ? "sync" : "refresh"}
-            className={cn("text-base", inbox.scanning && "animate-spin")}
-          />
-          {inbox.scanning ? "Đang quét" : "Quét ngay"}
-        </button>
+        {/* Nút "Quét ngay" đã bị bỏ (2026-07-04) — cùng gọi inbox.scan() như 2
+            nút Đồng bộ khác trong file này. Xem ghi chú trong useZaloAdminInbox.ts. */}
       </div>
 
       {/* Toast Alert */}
@@ -619,15 +610,12 @@ export function ZaloInboxAdminShell() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 min-w-0">
                 <h2 className="text-sm font-bold">Hộp thư</h2>
-                <button
-                  onClick={() => void inbox.scan()}
-                  disabled={inbox.scanning || !inbox.selectedAccountId}
-                  title="Đồng bộ lại tin nhắn"
-                  className="inline-flex items-center gap-1 rounded-md border border-[#E5E5E5] bg-white px-1.5 py-0.5 text-[10px] font-semibold text-[#666666] transition hover:border-[#E3000F] hover:text-[#E3000F] disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <MaterialIcon name={inbox.scanning ? "sync" : "refresh"} className={cn("text-[12px]", inbox.scanning && "animate-spin")} />
-                  {inbox.scanning ? "Đồng bộ" : "Đồng bộ"}
-                </button>
+                {/* Nút "Đồng bộ" thủ công đã bị bỏ (2026-07-04): nó gọi
+                    syncZaloRecentConversations -> backend tự đăng nhập lại
+                    phiên Zalo qua worker pool, chạy song song với listener
+                    realtime đang giữ phiên đó -> 2 phiên đè/kick nhau, làm gãy
+                    đồng bộ tự động cho tài khoản đó. Listener realtime đã tự lo
+                    đồng bộ, không cần nút này nữa. */}
                 {inbox.role === "member" && inbox.suggestedConvIds.size > 0 && (
                   <button
                     onClick={() => void inbox.onRevokeAllShares()}
@@ -782,23 +770,10 @@ export function ZaloInboxAdminShell() {
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <h2 className="truncate text-sm font-bold text-slate-800">{selectedName || "Hội thoại"}</h2>
-                {inbox.openConv && (
-                  <button
-                    onClick={() => void inbox.onSyncConversationMessages(inbox.openConv)}
-                    disabled={inbox.isSyncingMessages[inbox.openConv]}
-                    title="Đồng bộ tin nhắn mới nhất từ Zalo"
-                    className="inline-flex items-center gap-0.5 rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[9px] font-bold text-slate-500 hover:border-[#E3000F] hover:text-[#E3000F] transition disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
-                  >
-                    <MaterialIcon
-                      name="sync"
-                      className={cn(
-                        "text-[11px]",
-                        inbox.isSyncingMessages[inbox.openConv] && "animate-spin"
-                      )}
-                    />
-                    <span>{inbox.isSyncingMessages[inbox.openConv] ? "Đồng bộ" : "Đồng bộ"}</span>
-                  </button>
-                )}
+                {/* Nút "Đồng bộ" tin nhắn theo hội thoại đã bị bỏ (2026-07-04) —
+                    cùng lý do với nút đồng bộ ở Hộp thư: gọi syncZaloConversationMessages
+                    làm backend đăng nhập lại phiên Zalo qua worker pool, đè lên
+                    phiên listener realtime đang chạy cho tài khoản đó. */}
                 {selectedMessageIds.length > 0 && (
                   <span className="bg-red-105 text-[#E3000F] text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse border border-red-200">
                     Đã chọn {selectedMessageIds.length} tin

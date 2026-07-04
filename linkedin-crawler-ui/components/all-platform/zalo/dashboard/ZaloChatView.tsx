@@ -16,12 +16,10 @@ import {
   buildZaloRealtimeStreamUrl,
   getZaloConversationShareStatus,
   setZaloConversationShare,
-  syncZaloRecentConversations,
 } from "@/services/zaloCrawlerService";
 import type {
   ZaloConversationSummary,
   ZaloLibraryMessage,
-  ZaloSyncRecentResponse,
   ZaloBroadcastTarget,
 } from "@/types/zalo-api";
 import { ZaloChatHeaderSkeleton, ZaloMessageListSkeleton } from "./chat/ZaloChatSkeleton";
@@ -32,8 +30,6 @@ import { ZaloKpiPanel } from "./ZaloKpiPanel";
 
 const REFRESH_INTERVAL_MS = 2000;
 const MESSAGE_PAGE_SIZE = 50;
-const SYNC_CONVERSATION_LIMIT = 50;
-const SYNC_MESSAGES_PER_CONVERSATION = 50;
 const BOTTOM_THRESHOLD_PX = 96;
 
 interface ZaloChatViewProps {
@@ -238,11 +234,8 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false);
-  const [isSyncingRecent, setIsSyncingRecent] = useState(false);
   const [conversationError, setConversationError] = useState<string | null>(null);
   const [messageError, setMessageError] = useState<string | null>(null);
-  const [syncSummary, setSyncSummary] = useState<ZaloSyncRecentResponse | null>(null);
-  const [syncError, setSyncError] = useState<string | null>(null);
 
   // Chat UI states
   const [searchQuery, setSearchQuery] = useState("");
@@ -761,37 +754,6 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
     },
     [loadConversations],
   );
-
-  const syncRecentConversations = useCallback(async () => {
-    if (!flow.userId || flow.userId === "default" || isSyncingRecent) return;
-    setIsSyncingRecent(true);
-    setSyncSummary(null);
-    setSyncError(null);
-    try {
-      const response = await syncZaloRecentConversations(
-        flow.userId,
-        SYNC_CONVERSATION_LIMIT,
-        SYNC_MESSAGES_PER_CONVERSATION,
-      );
-      setSyncSummary(response);
-      if (response.errors === response.scanned && response.scanned > 0) {
-        setSyncError(
-          `Đồng bộ thất bại (quét ${response.scanned} nhóm, lỗi toàn bộ). Listener Zalo có thể chưa kết nối.`,
-        );
-      }
-      await loadConversations();
-      if (selectedConversationId) await loadLatestMessages(selectedConversationId, { silent: true });
-    } catch (error) {
-      if (isSessionExpiredError(error)) {
-        setSyncError("Phiên đăng nhập Zalo đã hết hạn. Vui lòng đăng nhập lại bằng mã QR.");
-        void flow.refreshLoginStatus();
-      } else {
-        setSyncError(error instanceof Error ? error.message : "Không thể đồng bộ tin nhắn.");
-      }
-    } finally {
-      setIsSyncingRecent(false);
-    }
-  }, [flow, isSyncingRecent, loadConversations, loadLatestMessages, selectedConversationId]);
 
   useEffect(() => {
     const action = pendingScrollRef.current;
@@ -1530,26 +1492,6 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
             </div>
           )}
 
-          <div className="p-2.5 border-t border-outline-variant">
-             <button
-               onClick={() => void syncRecentConversations()}
-               disabled={isSyncingRecent}
-               className="w-full flex items-center justify-center space-x-1.5 text-primary font-semibold text-[12px] py-1.5 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-             >
-               <MaterialIcon name="sync" className={`text-sm ${isSyncingRecent ? "animate-spin" : ""}`} />
-               <span>Đồng bộ tin nhắn mới</span>
-             </button>
-             {syncError && (
-               <div className="mt-1.5 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[10px] text-red-600">
-                 {syncError}
-               </div>
-             )}
-             {!syncError && syncSummary && (
-               <div className="mt-1.5 rounded-lg border border-outline-variant bg-surface-container-low px-2 py-1 text-[10px] text-on-surface-variant">
-                 Đã quét {syncSummary.scanned} nhóm · lưu {syncSummary.messages_saved} tin · {syncSummary.groups_with_messages} nhóm có tin mới
-               </div>
-             )}
-          </div>
         </section>
 
         {/* Middle Column: Chat Workspace */}
@@ -2138,8 +2080,6 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
             <ZaloEmptyChat
               hasConversations={conversations.length > 0}
               isLoggedIn={flow.isLoggedIn ?? false}
-              isLoading={isSyncingRecent}
-              onSync={() => void syncRecentConversations()}
               onLogin={handleOpenZaloWeb}
             />
           )}

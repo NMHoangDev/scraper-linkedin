@@ -22,8 +22,6 @@ import { MaterialIcon } from "@/components/ui";
 interface ZaloEmptyChatProps {
   hasConversations: boolean;
   isLoggedIn: boolean;
-  isLoading?: boolean;
-  onSync?: () => void;
   onSelectFirst?: () => void;
   onLogin?: () => void;
 }
@@ -31,8 +29,6 @@ interface ZaloEmptyChatProps {
 export function ZaloEmptyChat({
   hasConversations,
   isLoggedIn,
-  isLoading = false,
-  onSync,
   onSelectFirst,
   onLogin,
 }: ZaloEmptyChatProps) {
@@ -67,6 +63,11 @@ export function ZaloEmptyChat({
   }
 
   // 2. Đã đăng nhập nhưng chưa có cuộc hội thoại nào
+  // Không còn nút "Đồng bộ ngay" — tin nhắn tự động đổ về qua listener realtime
+  // ngay sau khi đăng nhập (first-time sync). Nút đồng bộ thủ công đã bị bỏ vì
+  // nó tự đăng nhập lại phiên Zalo song song với listener đang chạy, làm 2 phiên
+  // đè/kick lẫn nhau và làm gãy luồng đồng bộ tự động (xem ghi chú ở
+  // useZaloAdminInbox.ts / ZaloInboxAdminShell.tsx).
   if (!hasConversations) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gradient-to-b from-white to-zinc-50">
@@ -74,22 +75,12 @@ export function ZaloEmptyChat({
           <MaterialIcon name="chat" className="text-5xl text-zinc-400" />
         </div>
         <h3 className="text-lg font-semibold text-zinc-900 mb-2 text-center">
-          Chưa có cuộc hội thoại
+          Đang đồng bộ hội thoại...
         </h3>
         <p className="text-sm text-zinc-500 mb-6 text-center max-w-[360px] leading-relaxed">
-          Bấm nút bên dưới để đồng bộ tin nhắn từ Zalo. Lần đầu có thể mất
-          1-2 phút tùy số lượng nhóm.
+          Tin nhắn và danh sách hội thoại sẽ tự động hiện ra sau khi đăng nhập
+          (thường trong 1-2 phút tùy số lượng nhóm). Không cần bấm gì thêm.
         </p>
-        {onSync && (
-          <button
-            onClick={onSync}
-            disabled={isLoading}
-            className="bg-[#0068FF] hover:bg-blue-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold transition-all shadow-md hover:shadow-lg active:scale-95 disabled:opacity-50 flex items-center gap-2"
-          >
-            <MaterialIcon name="sync" className={`text-base ${isLoading ? "animate-spin" : ""}`} />
-            {isLoading ? "Đang đồng bộ..." : "Đồng bộ ngay"}
-          </button>
-        )}
       </div>
     );
   }
