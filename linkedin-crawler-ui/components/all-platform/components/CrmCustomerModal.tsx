@@ -324,7 +324,7 @@ export function CrmCustomerModal({
 
             {/* ── Section: Quản lý Deal (CRM Pipeline) ──
                 Khớp với các cột deal_stage/decision_maker/estimated_budget/follow_up_date
-                trong migration 020_crm_pipeline.sql. Đặt ngay sau Nguồn để gây chú ý:
+                trong migration 021_crm_pipeline.sql. Đặt ngay sau Nguồn để gây chú ý:
                 người dùng tạo khách mới nên chọn stage phù hợp từ đầu. */}
             <div className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-4">
               <div className="flex items-center justify-between mb-3">

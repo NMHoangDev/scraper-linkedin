@@ -1,5 +1,5 @@
 -- ============================================================
--- Migration: 020_crm_pipeline.sql
+-- Migration: 021_crm_pipeline.sql
 -- Thêm các cột cho Sales Pipeline (state machine theo quy tắc nghiệp vụ):
 --   deal_stage           : stage hiện tại (10 stage)
 --   prev_stage           : stage trước khi vào On Hold (để resume)
