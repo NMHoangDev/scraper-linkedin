@@ -6,15 +6,12 @@ import {
   customerLeadService,
   type Customer,
   type SourcePlatform,
-  type RejectReasonType,
-  type ReviewResult,
+  type DealStage,
   SOURCE_PLATFORM_OPTIONS,
   INDUSTRY_OPTIONS,
   CITY_OPTIONS,
-  HAS_BUDGET_OPTIONS,
-  CARE_NOTE_OPTIONS,
-  REJECT_REASON_TYPE_OPTIONS,
-  REVIEW_RESULT_OPTIONS,
+  SERVICE_PACKAGE_OPTIONS,
+  DEAL_STAGE_META,
 } from "@/services/customer-lead.service";
 import { toast } from "sonner";
 
@@ -31,32 +28,27 @@ interface CrmCustomerModalProps {
   onSuccess?: (customer: Customer) => void;
 }
 
+/**
+ * Khởi tạo form rỗng — CHỈ giữ các field cốt lõi cho CRM pipeline.
+ * Cố ý bỏ: status, activity_status, review_result, has_budget, service_package,
+ * lifetime_value, contract_*, warranty_*, customer_since, care_note, tags.
+ * Xem comment trên CrmCustomerModal để biết lý do đơn giản hoá.
+ */
 const emptyForm = (): Partial<Customer> => ({
   customer_name: "",
   company_name: "",
   phone: "",
   email: "",
-  address: "",
-  city: "",
   website: "",
-  industry: "",
-  tax_code: "",
   conv_id: "",
   source_platform: "FB_Inbox",
-  status: "pending",
-  activity_status: "active",
-  has_budget: false,
-  service_package: "",
-  lifetime_value: null,
-  contract_signed_at: null,
-  contract_status: "active",
-  warranty_expires_at: null,
-  care_note: "",
-  tags: [],
+  // Gói dịch vụ — optional, không bắt buộc khi tạo lead
+  service_package: null,
   note: "",
-  reject_reason: "",
-  reject_reason_type: null,
-  review_result: "Chua_xem_xet",
+  // CRM pipeline
+  deal_stage: "new_lead",
+  // Phân công
+  leaded_by: "",
   sdr_id: "",
   is_assigned: false,
 });
@@ -73,8 +65,8 @@ export function CrmCustomerModal({
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sdrs, setSdrs] = useState<any[]>([]);
+  const [leaders, setLeaders] = useState<any[]>([]);
   const [formData, setFormData] = useState<Partial<Customer>>(emptyForm());
-  const [tagInput, setTagInput] = useState("");
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -94,6 +86,9 @@ export function CrmCustomerModal({
     }
 
     customerLeadService.getSdrs().then(setSdrs).catch(() => {});
+    // Leaders pool: cùng nguồn với SDRs (admin/leader). Tách riêng state chỉ
+    // cho semantic rõ ràng — nếu sau này tách bảng leaders thì không phải sửa UI.
+    customerLeadService.getSdrs().then(setLeaders).catch(() => {});
   }, [isOpen, customer, defaultConvId, defaultCustomerName, defaultSourcePlatform]);
 
   if (!isOpen) return null;
@@ -109,9 +104,24 @@ export function CrmCustomerModal({
     }
     setLoading(true);
     try {
-      const payload = { ...formData };
-      if (payload.sdr_id) payload.is_assigned = true;
-      else { payload.is_assigned = false; payload.sdr_id = undefined; }
+      // CHỈ gửi các field có trong form. Tránh ghi đè các trường cũ (service_package,
+      // tags, contract_*, ...) về null/empty khi user chỉnh sửa thông tin lead.
+      const payload: Partial<Customer> = {
+        customer_name: formData.customer_name?.trim(),
+        company_name: formData.company_name?.trim() || null,
+        phone: formData.phone?.trim() || null,
+        email: formData.email?.trim() || null,
+        website: formData.website?.trim() || null,
+        conv_id: formData.conv_id?.trim() || null,
+        source_platform: formData.source_platform,
+        // Optional — chỉ gửi khi user đã chọn, tránh ghi đè deal cũ về null
+        service_package: formData.service_package || null,
+        note: formData.note?.trim() || null,
+        deal_stage: formData.deal_stage ?? "new_lead",
+        leaded_by: formData.leaded_by?.trim() || null,
+        sdr_id: formData.sdr_id?.trim() || null,
+        is_assigned: !!formData.sdr_id?.trim(),
+      };
 
       let res: any;
       if (customer?.id) {
@@ -132,17 +142,6 @@ export function CrmCustomerModal({
     } finally {
       setLoading(false);
     }
-  };
-
-  const removeTag = (tag: string) =>
-    set("tags", (formData.tags ?? []).filter((t) => t !== tag));
-
-  const handleAddTag = (tag: string) => {
-    const t = tag.trim();
-    if (t && !(formData.tags ?? []).includes(t)) {
-      set("tags", [...(formData.tags ?? []), t]);
-    }
-    setTagInput("");
   };
 
   const modalContent = (
@@ -249,28 +248,15 @@ export function CrmCustomerModal({
                     placeholder="https://..."
                   />
                 </div>
-
-                {/* Mã số thuế */}
-                <div className="col-span-2">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Mã số thuế</label>
-                  <input
-                    type="text"
-                    value={formData.tax_code ?? ""}
-                    onChange={(e) => set("tax_code", e.target.value || null)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
-                    placeholder="0123456789"
-                  />
-                </div>
               </div>
             </div>
 
-            {/* ── Section: Địa chỉ & Lĩnh vực ── */}
+            {/* ── Section: Địa chỉ (tóm tắt) ── */}
             <div>
               <p className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-3">
-                Địa chỉ & Lĩnh vực
+                Địa chỉ
               </p>
               <div className="grid grid-cols-2 gap-3">
-                {/* Thành phố */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Thành phố</label>
                   <select
@@ -278,14 +264,12 @@ export function CrmCustomerModal({
                     onChange={(e) => set("city", e.target.value || null)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
                   >
-                    <option value="">-- Chọn thành phố --</option>
+                    <option value="">-- Chọn --</option>
                     {CITY_OPTIONS.map((c) => (
                       <option key={c} value={c}>{c}</option>
                     ))}
                   </select>
                 </div>
-
-                {/* Lĩnh vực */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Lĩnh vực</label>
                   <select
@@ -293,34 +277,21 @@ export function CrmCustomerModal({
                     onChange={(e) => set("industry", e.target.value || null)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
                   >
-                    <option value="">-- Chọn lĩnh vực --</option>
+                    <option value="">-- Chọn --</option>
                     {INDUSTRY_OPTIONS.map((ind) => (
                       <option key={ind} value={ind}>{ind}</option>
                     ))}
                   </select>
                 </div>
-
-                {/* Địa chỉ */}
-                <div className="col-span-2">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Địa chỉ</label>
-                  <input
-                    type="text"
-                    value={formData.address ?? ""}
-                    onChange={(e) => set("address", e.target.value || null)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
-                    placeholder="123 Đường ABC, Quận 1, TP.HCM"
-                  />
-                </div>
               </div>
             </div>
 
-            {/* ── Section: Nguồn & Ngân sách ── */}
+            {/* ── Section: Nguồn & Gói dịch vụ ── */}
             <div>
               <p className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-3">
-                Nguồn & Ngân sách
+                Nguồn & Gói dịch vụ
               </p>
               <div className="grid grid-cols-2 gap-3">
-                {/* Nguồn */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Nguồn</label>
                   <select
@@ -333,282 +304,176 @@ export function CrmCustomerModal({
                     ))}
                   </select>
                 </div>
-
-                {/* Ngân sách */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Ngân sách</label>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Gói dịch vụ <span className="text-slate-400 font-normal">(tuỳ chọn)</span>
+                  </label>
                   <select
-                    value={String(formData.has_budget ?? false)}
-                    onChange={(e) => set("has_budget", e.target.value === "true")}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
-                  >
-                    {HAS_BUDGET_OPTIONS.map((o) => (
-                      <option key={String(o.value)} value={String(o.value)}>{o.label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* ── Section: Trạng thái & Review ── */}
-            <div>
-              <p className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-3">
-                Trạng thái & Review
-              </p>
-              <div className="grid grid-cols-3 gap-3">
-                {/* Trạng thái */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Trạng thái</label>
-                  <select
-                    value={formData.status ?? "pending"}
-                    onChange={(e) => set("status", e.target.value as any)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
-                  >
-                    <option value="pending">Đang chờ</option>
-                    <option value="closed">Đã chốt</option>
-                    <option value="rejected">Từ chối</option>
-                  </select>
-                </div>
-
-                {/* Hoạt động */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Hoạt động</label>
-                  <select
-                    value={formData.activity_status ?? "active"}
-                    onChange={(e) => set("activity_status", e.target.value as any)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
-                  >
-                    <option value="active">Active</option>
-                    <option value="paused">Tạm ngưng</option>
-                    <option value="churned">Đã rời</option>
-                  </select>
-                </div>
-
-                {/* Review result */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Review</label>
-                  <select
-                    value={formData.review_result ?? "Chua_xem_xet"}
-                    onChange={(e) => set("review_result", e.target.value as ReviewResult)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
-                  >
-                    {REVIEW_RESULT_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* ── Reject reason block ── */}
-            {formData.status === "rejected" && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-xl space-y-3">
-                <p className="text-xs font-bold uppercase text-red-500 tracking-wider">
-                  Lý do từ chối
-                </p>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Loại lý do</label>
-                  <select
-                    value={formData.reject_reason_type ?? ""}
-                    onChange={(e) => set("reject_reason_type", e.target.value as RejectReasonType || null)}
-                    className="w-full px-3 py-2 border border-red-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
-                  >
-                    <option value="">-- Chọn lý do --</option>
-                    {REJECT_REASON_TYPE_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Mô tả thêm</label>
-                  <input
-                    type="text"
-                    value={formData.reject_reason ?? ""}
-                    onChange={(e) => set("reject_reason", e.target.value || null)}
-                    className="w-full px-3 py-2 border border-red-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
-                    placeholder="Ghi chú thêm..."
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* ── Section: Giao dịch ── */}
-            <div>
-              <p className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-3">
-                Giao dịch & Hợp đồng
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Gói dịch vụ</label>
-                  <input
-                    type="text"
                     value={formData.service_package ?? ""}
                     onChange={(e) => set("service_package", e.target.value || null)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
-                    placeholder="Gói Nâng cao 2tr/tháng"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
+                  >
+                    <option value="">-- Chưa chọn --</option>
+                    {SERVICE_PACKAGE_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Section: Quản lý Deal (CRM Pipeline) ──
+                Khớp với các cột deal_stage/decision_maker/estimated_budget/follow_up_date
+                trong migration 020_crm_pipeline.sql. Đặt ngay sau Nguồn để gây chú ý:
+                người dùng tạo khách mới nên chọn stage phù hợp từ đầu. */}
+            <div className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-bold uppercase text-indigo-700 tracking-wider">
+                  Quản lý Deal (Pipeline)
+                </p>
+                {formData.deal_stage && (
+                  <span
+                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white ${
+                      DEAL_STAGE_META[formData.deal_stage as DealStage]?.headerClass ?? "bg-slate-400"
+                    }`}
+                  >
+                    {DEAL_STAGE_META[formData.deal_stage as DealStage]?.label ?? formData.deal_stage}
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {/* Deal stage */}
+                <div className="col-span-2">
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Giai đoạn deal
+                  </label>
+                  <select
+                    value={formData.deal_stage ?? "new_lead"}
+                    onChange={(e) => set("deal_stage", e.target.value as DealStage)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm bg-white"
+                  >
+                    {(Object.entries(DEAL_STAGE_META) as [DealStage, typeof DEAL_STAGE_META[DealStage]][])
+                      .sort((a, b) => a[1].order - b[1].order)
+                      .map(([key, meta]) => (
+                        <option key={key} value={key}>
+                          {meta.label} — {meta.description}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                {/* Decision maker — chỉ cần từ qualified trở đi */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Người quyết định (DM)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.decision_maker ?? ""}
+                    onChange={(e) => set("decision_maker", e.target.value || null)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm"
+                    placeholder="Giám đốc, chủ đầu tư…"
                   />
                 </div>
+
+                {/* Estimated budget */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Giá trị (VNĐ)</label>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Ngân sách ước tính (VNĐ)
+                  </label>
                   <input
                     type="number"
                     min="0"
-                    value={formData.lifetime_value ?? ""}
-                    onChange={(e) => set("lifetime_value", e.target.value ? Number(e.target.value) : null)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
-                    placeholder="2,000,000"
+                    step="1000000"
+                    value={formData.estimated_budget ?? 0}
+                    onChange={(e) =>
+                      set("estimated_budget", e.target.value ? Number(e.target.value) : 0)
+                    }
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm"
+                    placeholder="50,000,000"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Ngày ký HĐ</label>
+
+                {/* Follow-up date — cho on_hold / dự kiến gọi lại */}
+                <div className="col-span-2">
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Follow-up dự kiến
+                  </label>
                   <input
-                    type="date"
-                    value={formData.contract_signed_at ? String(formData.contract_signed_at).split("T")[0] : ""}
-                    onChange={(e) => set("contract_signed_at", e.target.value ? `${e.target.value}T00:00:00Z` : null)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
+                    type="datetime-local"
+                    value={
+                      formData.follow_up_date
+                        ? String(formData.follow_up_date).slice(0, 16)
+                        : ""
+                    }
+                    onChange={(e) =>
+                      set(
+                        "follow_up_date",
+                        e.target.value ? new Date(e.target.value).toISOString() : null,
+                      )
+                    }
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm"
                   />
+                  <p className="mt-1 text-[10px] text-slate-400">
+                    Bắt buộc khi chuyển sang On Hold. Có thể đặt trước để nhắc nhở.
+                  </p>
                 </div>
+              </div>
+            </div>
+
+
+
+            {/* ── Section: Ghi chú ── */}
+            <div>
+              <p className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-3">
+                Ghi chú
+              </p>
+              <textarea
+                value={formData.note ?? ""}
+                onChange={(e) => set("note", e.target.value || null)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm min-h-[90px]"
+                placeholder="Yêu cầu cụ thể, ghi chú liên lạc, mục tiêu kinh doanh…"
+              />
+            </div>
+
+
+            {/* ── Section: Phân công ── */}
+            <div>
+              <p className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-3">
+                Phân công
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                {/* Người lead (leaded_by) — KPI lead của người này sẽ +1 khi tạo deal */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Trạng thái HĐ</label>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Người lead
+                  </label>
                   <select
-                    value={formData.contract_status ?? "active"}
-                    onChange={(e) => set("contract_status", e.target.value as any)}
+                    value={formData.leaded_by ?? ""}
+                    onChange={(e) => set("leaded_by", e.target.value || null)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
                   >
-                    <option value="active">Đang triển khai</option>
-                    <option value="completed">Đã hoàn thành</option>
-                    <option value="maintenance">Đang bảo trì</option>
+                    <option value="">-- Chưa gán --</option>
+                    {leaders.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({u.role})
+                      </option>
+                    ))}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Ngày hết BH</label>
-                  <input
-                    type="date"
-                    value={formData.warranty_expires_at ? String(formData.warranty_expires_at).split("T")[0] : ""}
-                    onChange={(e) => set("warranty_expires_at", e.target.value ? `${e.target.value}T00:00:00Z` : null)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Khách từ ngày</label>
-                  <input
-                    type="date"
-                    value={formData.customer_since ? String(formData.customer_since).split("T")[0] : ""}
-                    onChange={(e) => set("customer_since", e.target.value ? `${e.target.value}T00:00:00Z` : null)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
-                  />
-                </div>
-              </div>
-            </div>
 
-            {/* ── Section: Ghi chú liên lạc ── */}
-            <div>
-              <p className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-3">
-                Ghi chú liên lạc
-              </p>
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Ghi chú nhu cầu / Liên lạc
-                </label>
-                <select
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val) {
-                      const existing = formData.note ?? "";
-                      set("note", existing ? `${existing}\n- ${val}` : `- ${val}`);
-                    }
-                    e.target.value = "";
-                  }}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white mb-2"
-                >
-                  <option value="">+ Thêm nhanh ghi chú liên lạc...</option>
-                  {CARE_NOTE_OPTIONS.map((o) => (
-                    <option key={o} value={o}>{o}</option>
-                  ))}
-                </select>
-                <textarea
-                  value={formData.note ?? ""}
-                  onChange={(e) => set("note", e.target.value || null)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm min-h-[80px]"
-                  placeholder="Yêu cầu cụ thể, ghi chú liên lạc..."
-                />
-              </div>
-            </div>
-
-            {/* ── Section: Chăm sóc sau bán ── */}
-            <div>
-              <p className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-3">
-                Chăm sóc sau bán
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Ghi chú chăm sóc</label>
-                  <textarea
-                    value={formData.care_note ?? ""}
-                    onChange={(e) => set("care_note", e.target.value || null)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm min-h-[60px]"
-                    placeholder="Nhắc nhở: gọi lại sau 1 tuần, upsell gói B..."
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* ── Section: Tags & Giao SDR ── */}
-            <div>
-              <p className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-3">
-                Tags & Phân công
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                {/* Tags */}
+                {/* Người xử lý (sdr_id) — sẽ xử lý deal này */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Tags</label>
-                  <div className="flex flex-wrap gap-1 mb-1.5 min-h-[28px]">
-                    {(formData.tags ?? []).map((tag) => (
-                      <span
-                        key={tag}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded-full"
-                      >
-                        {tag}
-                        <button
-                          type="button"
-                          onClick={() => removeTag(tag)}
-                          className="text-slate-400 hover:text-red-500 leading-none"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                  <div className="flex gap-1">
-                    <input
-                      type="text"
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") { e.preventDefault(); handleAddTag(tagInput); }
-                      }}
-                      className="flex-1 px-2 py-1.5 border border-slate-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-red-500/30"
-                      placeholder="VIP, referral..."
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleAddTag(tagInput)}
-                      className="px-2 py-1.5 bg-slate-100 text-slate-600 text-xs rounded hover:bg-slate-200 border border-slate-300"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-
-                {/* SDR giao */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">Giao cho SDR</label>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Người xử lý (SDR)
+                  </label>
                   <select
                     value={formData.sdr_id ?? ""}
                     onChange={(e) => set("sdr_id", e.target.value || null)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
                   >
-                    <option value="">-- Không giao --</option>
+                    <option value="">-- Chưa giao --</option>
                     {sdrs.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.name ?? s.email}

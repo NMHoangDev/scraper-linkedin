@@ -3,11 +3,41 @@ from typing import Optional, List
 from datetime import datetime
 
 
+# ---------------------------------------------------------------------------
+# Bảng stage hợp lệ — dùng để validate input từ client lẫn output ra view.
+# Backend KHÔNG hard-code rule nhảy stage để tránh phân kỳ với frontend.
+# (logic state machine nghiệp vụ ở client; server chỉ enforce required-fields
+# cho từng stage để bảo vệ data integrity).
+# ---------------------------------------------------------------------------
+DEAL_STAGES = [
+    "new_lead", "contacted", "qualified", "requirement",
+    "proposal_sent", "negotiation", "contract_sent",
+    "on_hold", "won", "lost",
+]
+TERMINAL_STAGES = ["won", "lost"]
+
+# Required fields theo stage — server-side enforcement, mirror với client.
+# Khi client POST transition, server check lại để chặn hack.
+STAGE_REQUIRED_FIELDS: dict[str, dict[str, list[str]]] = {
+    "new_lead":       {},
+    "contacted":      {"required": ["note"]},
+    "qualified":      {"required": ["decision_maker", "estimated_budget", "note"]},
+    "requirement":    {"required": ["note", "attachment_url"]},
+    "proposal_sent":  {"required": ["attachment_url"]},
+    "negotiation":    {"required": ["note"]},
+    "contract_sent":  {"required": ["attachment_url"]},
+    "on_hold":        {"required": ["follow_up_date", "note"]},
+    "won":            {},
+    "lost":           {"required": ["reject_reason_type", "note"]},
+}
+
+
+# ---------------------------------------------------------------------------
+# Base customer schemas (giữ từ schema cũ + thêm pipeline fields)
+# ---------------------------------------------------------------------------
 class CustomerLeadCreate(BaseModel):
-    # Thông tin bắt buộc
     customer_name: str
 
-    # Thông tin định danh
     company_name: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
@@ -17,48 +47,52 @@ class CustomerLeadCreate(BaseModel):
     industry: Optional[str] = None
     tax_code: Optional[str] = None
 
-    # Truy vết nguồn gốc
     leaded_by: Optional[str] = None
     conv_id: Optional[str] = None
-    source_platform: Optional[str] = "FB_Inbox"  # FB_Inbox | FB_Group | Zalo | Manual
+    source_platform: Optional[str] = "FB_Inbox"
 
-    # Phân công
     is_assigned: bool = False
     sdr_id: Optional[str] = None
 
-    # Trạng thái (legacy + mới)
-    status: str = "pending"  # pending | closed | rejected
-    activity_status: str = "active"  # active | paused | churned
+    # Legacy status + activity
+    status: str = "pending"
+    activity_status: str = "active"
 
-    # Giao dịch & hợp đồng
+    # CRM pipeline (mới)
+    deal_stage: Optional[str] = "new_lead"  # nếu None sẽ fall back về new_lead
+    prev_stage: Optional[str] = None
+    follow_up_date: Optional[datetime] = None
+    decision_maker: Optional[str] = None
+    estimated_budget: Optional[float] = 0
+    stage_entered_at: Optional[datetime] = None
+
     customer_since: Optional[datetime] = None
     service_package: Optional[str] = None
     lifetime_value: Optional[float] = 0
     contract_signed_at: Optional[datetime] = None
-    contract_status: str = "active"  # active | completed | maintenance
+    contract_status: str = "active"
 
-    # Chăm sóc sau bán
     warranty_expires_at: Optional[datetime] = None
     care_note: Optional[str] = None
     last_care_at: Optional[datetime] = None
 
-    # Phân loại & CRM
     tags: Optional[List[str]] = []
     has_budget: bool = False
     note: Optional[str] = None
 
-    # Reject flow (dùng khi status = rejected)
     reject_reason: Optional[str] = None
-    reject_reason_type: Optional[str] = None  # Khong_lien_lac_duoc | Chua_co_nhu_cau | ...
+    reject_reason_type: Optional[str] = None
 
-    # KPI review
-    review_result: Optional[str] = None  # Qualify | Disqualify | Chua_xem_xet
+    review_result: Optional[str] = None
+
+    last_attachment_url: Optional[str] = None
+    last_attachment_name: Optional[str] = None
+    closed_reason: Optional[str] = None
 
 
 class CustomerLeadUpdate(BaseModel):
-    # Thông tin định danh
-    customer_name: Optional[str] = None
     company_name: Optional[str] = None
+    customer_name: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
     address: Optional[str] = None
@@ -67,77 +101,137 @@ class CustomerLeadUpdate(BaseModel):
     industry: Optional[str] = None
     tax_code: Optional[str] = None
 
-    # Truy vết nguồn gốc
     leaded_by: Optional[str] = None
     conv_id: Optional[str] = None
     source_platform: Optional[str] = None
 
-    # Phân công
     is_assigned: Optional[bool] = None
     sdr_id: Optional[str] = None
 
-    # Trạng thái
     status: Optional[str] = None
     activity_status: Optional[str] = None
 
-    # Giao dịch & hợp đồng
+    # CRM pipeline
+    deal_stage: Optional[str] = None
+    prev_stage: Optional[str] = None
+    follow_up_date: Optional[datetime] = None
+    decision_maker: Optional[str] = None
+    estimated_budget: Optional[float] = None
+    stage_entered_at: Optional[datetime] = None
+
     customer_since: Optional[datetime] = None
     service_package: Optional[str] = None
     lifetime_value: Optional[float] = None
     contract_signed_at: Optional[datetime] = None
     contract_status: Optional[str] = None
 
-    # Chăm sóc sau bán
     warranty_expires_at: Optional[datetime] = None
     care_note: Optional[str] = None
     last_care_at: Optional[datetime] = None
 
-    # Phân loại & CRM
     tags: Optional[List[str]] = None
     has_budget: Optional[bool] = None
     note: Optional[str] = None
 
-    # Reject flow
     reject_reason: Optional[str] = None
     reject_reason_type: Optional[str] = None
 
-    # KPI review
     review_result: Optional[str] = None
+
+    last_attachment_url: Optional[str] = None
+    last_attachment_name: Optional[str] = None
+    closed_reason: Optional[str] = None
 
 
 class CustomerLeadResponse(BaseModel):
     id: str
     customer_name: str
-    company_name: Optional[str]
-    phone: Optional[str]
-    email: Optional[str]
-    address: Optional[str]
-    city: Optional[str]
-    website: Optional[str]
-    industry: Optional[str]
-    tax_code: Optional[str]
-    leaded_by: Optional[str]
-    conv_id: Optional[str]
-    source_platform: Optional[str]
-    is_assigned: bool
-    sdr_id: Optional[str]
-    status: str
-    activity_status: str
-    customer_since: Optional[datetime]
-    service_package: Optional[str]
-    lifetime_value: Optional[float]
-    contract_signed_at: Optional[datetime]
-    contract_status: str
-    warranty_expires_at: Optional[datetime]
-    care_note: Optional[str]
-    last_care_at: Optional[datetime]
-    tags: Optional[List[str]]
-    has_budget: bool
-    note: Optional[str]
-    reject_reason: Optional[str]
-    reject_reason_type: Optional[str]
-    review_result: Optional[str]
+    company_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    website: Optional[str] = None
+    industry: Optional[str] = None
+    tax_code: Optional[str] = None
+    leaded_by: Optional[str] = None
+    conv_id: Optional[str] = None
+    source_platform: Optional[str] = None
+    is_assigned: bool = False
+    sdr_id: Optional[str] = None
+
+    # legacy
+    status: str = "pending"
+    activity_status: str = "active"
+
+    # CRM pipeline
+    deal_stage: Optional[str] = "new_lead"
+    prev_stage: Optional[str] = None
+    follow_up_date: Optional[datetime] = None
+    decision_maker: Optional[str] = None
+    estimated_budget: Optional[float] = 0
+    stage_entered_at: Optional[datetime] = None
+    days_in_stage: Optional[int] = 0  # computed field
+    last_attachment_url: Optional[str] = None
+    last_attachment_name: Optional[str] = None
+    closed_reason: Optional[str] = None
+
+    customer_since: Optional[datetime] = None
+    service_package: Optional[str] = None
+    lifetime_value: Optional[float] = 0
+    contract_signed_at: Optional[datetime] = None
+    contract_status: str = "active"
+    warranty_expires_at: Optional[datetime] = None
+    care_note: Optional[str] = None
+    last_care_at: Optional[datetime] = None
+    tags: Optional[List[str]] = []
+    has_budget: bool = False
+    note: Optional[str] = None
+    reject_reason: Optional[str] = None
+    reject_reason_type: Optional[str] = None
+    review_result: Optional[str] = None
+
     created_at: datetime
     updated_at: datetime
     leader_name: Optional[str] = None
     sdr_name: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Pipeline-specific schemas
+# ---------------------------------------------------------------------------
+class StageTransitionRequest(BaseModel):
+    """Body gửi kèm khi client kéo-thả sang stage mới."""
+    to_stage: str = Field(..., description="Stage đích, phải nằm trong DEAL_STAGES")
+    note: Optional[str] = None
+    attachment_url: Optional[str] = None
+    attachment_name: Optional[str] = None
+    reject_reason_type: Optional[str] = None
+    reject_reason_text: Optional[str] = None
+    prev_stage: Optional[str] = None
+    follow_up_date: Optional[datetime] = None
+    decision_maker: Optional[str] = None
+    estimated_budget: Optional[float] = None
+    closed_reason: Optional[str] = None
+
+
+class ActivityLogEntry(BaseModel):
+    id: str
+    customer_id: str
+    action: str
+    from_stage: Optional[str] = None
+    to_stage: Optional[str] = None
+    field: Optional[str] = None
+    old_value: Optional[str] = None
+    new_value: Optional[str] = None
+    actor_id: Optional[str] = None
+    actor_name: Optional[str] = None
+    note: Optional[str] = None
+    attachment_url: Optional[str] = None
+    attachment_name: Optional[str] = None
+    created_at: datetime
+
+
+class ActivityLogResponse(BaseModel):
+    items: List[ActivityLogEntry]
+    total: int

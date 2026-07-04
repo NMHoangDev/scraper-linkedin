@@ -1345,6 +1345,25 @@ def get_team_kpi_history(
     inbox_rows = inbox_res.data or []
     post_rows = post_res.data or []
 
+    # 5b. CRM lead count từ customer_leads (1 truy vấn batch)
+    crm_lead_rows: List[Dict[str, Any]] = []
+    try:
+        latest_iso = datetime.combine(
+            monday_this + timedelta(days=6), datetime.max.time(), tzinfo=VN_TZ
+        ).astimezone(timezone.utc).isoformat()
+        crm_res = (
+            supabase.table("customer_leads")
+            .select("leaded_by, created_at")
+            .in_("leaded_by", all_member_ids)
+            .not_.is_("leaded_by", "null")
+            .gte("created_at", earliest_start_dt)
+            .lte("created_at", latest_iso)
+            .execute()
+        )
+        crm_lead_rows = crm_res.data or []
+    except Exception as exc:
+        logger.warning(f"customer_leads lead-count (history v1) failed: {exc}")
+
     # 6. Build snapshots
     result: List[Dict[str, Any]] = []
     for week_name, w_start, w_end in week_ranges:
@@ -1396,6 +1415,17 @@ def get_team_kpi_history(
                     continue
                 if w_start <= d <= w_end:
                     post_actual += 1
+
+            # CRM lead: deal được tạo với leaded_by = member trong tuần này
+            for row in crm_lead_rows:
+                mid = str(row.get("leaded_by"))
+                if mid not in mids:
+                    continue
+                d = _vn_date(row.get("created_at") or "")
+                if d is None:
+                    continue
+                if w_start <= d <= w_end:
+                    lead_actual += 1
 
             week_teams.append({
                 "team_id": tid,
@@ -1572,6 +1602,41 @@ def _build_team_kpi_history_optimized(
         mid = str(kt["id_member"])
         kpi_by_member.setdefault(mid, []).append(kt)
 
+    # 6b. CRM lead count từ customer_leads (1 truy vấn batch)
+    # Pre-index: dict[mid] -> dict[week_idx] -> count
+    crm_lead_by_member: Dict[str, Dict[int, int]] = {}
+    try:
+        earliest_iso = earliest_start_dt
+        latest_iso = datetime.combine(
+            monday_this + timedelta(days=6), datetime.max.time(), tzinfo=VN_TZ
+        ).astimezone(timezone.utc).isoformat()
+        crm_res = (
+            supabase.table("customer_leads")
+            .select("leaded_by, created_at")
+            .in_("leaded_by", all_member_ids)
+            .not_.is_("leaded_by", "null")
+            .gte("created_at", earliest_iso)
+            .lte("created_at", latest_iso)
+            .execute()
+        )
+        for row in (crm_res.data or []):
+            mid = str(row.get("leaded_by"))
+            d = _vn_date(row.get("created_at") or "")
+            if d is None or mid not in set(all_member_ids):
+                continue
+            wk_idx = None
+            for idx, (_, w_start, w_end) in enumerate(week_ranges):
+                if w_start <= d <= w_end:
+                    wk_idx = idx
+                    break
+            if wk_idx is None:
+                continue
+            crm_lead_by_member.setdefault(mid, {})[wk_idx] = (
+                crm_lead_by_member.get(mid, {}).get(wk_idx, 0) + 1
+            )
+    except Exception as exc:
+        logger.warning(f"customer_leads lead-count (history) failed: {exc}")
+
     # 7. Build snapshots — O(W × T), tra cứu dict O(1)
     result: List[Dict[str, Any]] = []
     for week_idx, (week_name, w_start, w_end) in enumerate(week_ranges):
@@ -1609,6 +1674,10 @@ def _build_team_kpi_history_optimized(
                     inbox_actual += slot[0]
                     lead_actual += slot[1]
                 post_actual += post_by_member.get(mid, {}).get(week_idx, 0)
+                # Cộng lead từ CRM deal (customer_leads) — người lead tạo deal
+                # trong tuần này được tính +1 KPI lead.
+                crm_lead_n = crm_lead_by_member.get(mid, {}).get(week_idx, 0)
+                lead_actual += crm_lead_n
 
             week_teams.append({
                 "team_id": tid,
@@ -1908,6 +1977,28 @@ def get_team_kpi_overview_v2(
     ]
     fb_seeder_count = _batch_fb_inbox_count_from_seeder(member_emails, default_start, default_end)
 
+    # ── 6b. CRM lead count từ customer_leads ───────────────────────────────
+    # Mỗi deal có `leaded_by = member_id` và `created_at` nằm trong tuần KPI
+    # được tính là 1 lead cho member đó. Leader quản lý member; admin xem tất cả.
+    # Cộng dồn vào lead_actual của member.
+    crm_lead_count: Dict[str, int] = {m: 0 for m in member_ids}
+    try:
+        crm_lead_res = (
+            supabase.table("customer_leads")
+            .select("leaded_by, created_at")
+            .in_("leaded_by", member_ids)
+            .not_.is_("leaded_by", "null")
+            .gte("created_at", start_iso_utc)
+            .lte("created_at", end_iso_utc)
+            .execute()
+        )
+        for r in (crm_lead_res.data or []):
+            mid = str(r.get("leaded_by"))
+            if mid in crm_lead_count:
+                crm_lead_count[mid] += 1
+    except Exception as exc:
+        logger.warning(f"customer_leads lead-count query failed: {exc}")
+
     # ── 7. Build response (không có truy vấn) ───────────────────────────────
     verified_keywords = ("yes", "đã seeding", "xác minh", "verified")
     members_data: List[Dict[str, Any]] = []
@@ -1937,9 +2028,11 @@ def get_team_kpi_overview_v2(
         lead_fb_kpi = int(fb_lead_count.get(mid, 0))
         inbox_fb_seeder = int(fb_seeder_count.get(member_email, 0))
         fb_post_n = int(fb_post_count.get(mid, 0))
+        # CRM lead: deal được tạo với leaded_by = member, created_at trong tuần KPI
+        lead_crm = int(crm_lead_count.get(mid, 0))
 
         total_inbox_current = inbox_zalo + inbox_fb_seeder + inbox_fb_kpi
-        total_lead_current = lead_zalo + lead_fb_kpi
+        total_lead_current = lead_zalo + lead_fb_kpi + lead_crm
 
         members_data.append({
             "id": mid,

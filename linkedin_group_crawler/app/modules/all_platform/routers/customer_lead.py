@@ -1,12 +1,24 @@
-from fastapi import APIRouter, HTTPException, Depends, Query, Request, Header
+from fastapi import APIRouter, HTTPException, Depends, Query, Request, Header, UploadFile, File, Form
 from typing import List, Any, Optional
+import logging
 from app.modules.linkedin.schemas.response_models import BaseResponse
 from app.modules.all_platform.schemas.customer_lead import (
     CustomerLeadCreate,
     CustomerLeadUpdate,
     CustomerLeadResponse,
+    StageTransitionRequest,
+    ActivityLogResponse,
+    DEAL_STAGES,
 )
 from app.modules.all_platform.services import customer_lead_service, decode_token, get_user_by_id
+from app.modules.all_platform.services.customer_lead_service import TransitionError
+from app.modules.all_platform.services.crm_attachment_service import (
+    upload_attachment,
+    allowed_mime,
+    MAX_FILE_SIZE_BYTES,
+)
+
+logger = logging.getLogger(__name__)
 
 
 def get_current_user(request: Request, authorization: str | None = Header(None)) -> dict[str, Any]:
@@ -34,15 +46,20 @@ def get_current_user(request: Request, authorization: str | None = Header(None))
 router = APIRouter(prefix="/customer-leads", tags=["Customer Leads"])
 
 
+# ---------------------------------------------------------------------------
+# List + utility
+# ---------------------------------------------------------------------------
 @router.get("", response_model=BaseResponse)
 def get_customer_leads(
     search: str | None = Query(None),
     status: str | None = Query(None),
+    deal_stage: str | None = Query(None),
     city: str | None = Query(None),
     industry: str | None = Query(None),
     source_platform: str | None = Query(None),
+    exclude_terminal: bool = Query(False, description="Loại bỏ won/lost ra khỏi kết quả (UI tab chính)"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=200),
+    page_size: int = Query(50, ge=1, le=500),
     current_user: Any = Depends(get_current_user),
 ):
     try:
@@ -50,13 +67,25 @@ def get_customer_leads(
             current_user=current_user,
             search=search,
             status=status,
+            deal_stage=deal_stage,
             city=city,
             industry=industry,
             source_platform=source_platform,
+            exclude_terminal=exclude_terminal,
             page=page,
             page_size=page_size,
         )
         return BaseResponse(success=True, data=result, message="Success")
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@router.get("/stage-counts", response_model=BaseResponse)
+def get_stage_counts(current_user: Any = Depends(get_current_user)):
+    """Số deal ở mỗi stage — cho header KPI / Kanban column counts."""
+    try:
+        counts = customer_lead_service.get_stage_counts(current_user=current_user)
+        return BaseResponse(success=True, data=counts, message="Success")
     except Exception as e:
         return BaseResponse(success=False, message=str(e))
 
@@ -72,7 +101,6 @@ def get_sdrs(_: Any = Depends(get_current_user)):
 
 @router.get("/by-conv/{conv_id}", response_model=BaseResponse)
 def get_by_conv_id(conv_id: str, _: Any = Depends(get_current_user)):
-    """Find existing customer by conversation ID (used in FB/Zalo inbox)."""
     try:
         lead = customer_lead_service.get_customer_lead_by_conv_id(conv_id)
         if lead:
@@ -82,6 +110,147 @@ def get_by_conv_id(conv_id: str, _: Any = Depends(get_current_user)):
         return BaseResponse(success=False, message=str(e))
 
 
+# ---------------------------------------------------------------------------
+# Stage transition (state machine + audit log)
+# ---------------------------------------------------------------------------
+@router.post("/{lead_id}/transition", response_model=BaseResponse)
+def transition_stage(
+    lead_id: str,
+    payload: StageTransitionRequest,
+    current_user: Any = Depends(get_current_user),
+):
+    """
+    Body chứa: to_stage (+ note, attachment_url, reject_reason_type, ...).
+    Required fields cho stage đích được enforce server-side ở STAGE_REQUIRED_FIELDS.
+    Mỗi call hợp lệ sẽ ghi 1 dòng `stage_change` vào customer_lead_activity_log.
+    """
+    try:
+        # Validate to_stage
+        if payload.to_stage not in DEAL_STAGES:
+            return BaseResponse(
+                success=False,
+                message=f"Giá trị 'to_stage' không hợp lệ: {payload.to_stage}",
+            )
+        data = payload.model_dump(exclude_unset=True)
+        updated = customer_lead_service.transition_stage(
+            lead_id=lead_id,
+            payload=data,
+            actor=current_user,
+        )
+        return BaseResponse(success=True, data=updated, message="Success")
+    except TransitionError as te:
+        # 422 vì thiếu required fields — UI highlight ô thiếu
+        return BaseResponse(
+            success=False,
+            message=te.message,
+            data={"missing_fields": te.missing_fields},
+        )
+    except Exception as e:
+        logger_msg = f"transition_stage failed for {lead_id}: {e}"
+        return BaseResponse(success=False, message=logger_msg)
+
+
+@router.get("/{lead_id}/activity-log", response_model=BaseResponse)
+def get_activity_log(
+    lead_id: str,
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    _: Any = Depends(get_current_user),
+):
+    """Audit trail cho 1 deal — DESC theo created_at."""
+    try:
+        data = customer_lead_service.get_activity_log(lead_id, limit=limit, offset=offset)
+        return BaseResponse(success=True, data=data, message="Success")
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Attachment upload (lên Supabase Storage bucket `crm-attachments`)
+# ---------------------------------------------------------------------------
+_ALLOWED_UPLOAD_PREFIXES = {"brief", "proposal", "contract"}
+
+
+@router.post("/upload", response_model=BaseResponse)
+async def upload_crm_attachment(
+    file: UploadFile = File(...),
+    prefix: str = Form(..., description="brief | proposal | contract"),
+    customer_id: Optional[str] = Form(None),
+    _: Any = Depends(get_current_user),
+):
+    """
+    Upload 1 file đính kèm lên Supabase Storage bucket ``crm-attachments``.
+
+    - ``file``: multipart/form-data file
+    - ``prefix``: phân loại (``brief`` / ``proposal`` / ``contract``)
+    - ``customer_id`` (optional): UUID của deal — nếu chưa có cứ để trống
+
+    Trả về ``{ url, name }`` để frontend dán vào ``attachment_url`` khi gọi
+    transition. KHÔNG ghi vào DB ở step này — file chỉ được link với deal khi
+    transition hợp lệ xảy ra (đỡ phải dọn file orphaned).
+    """
+    try:
+        if prefix not in _ALLOWED_UPLOAD_PREFIXES:
+            return BaseResponse(
+                success=False,
+                message=(
+                    f"prefix không hợp lệ: '{prefix}'. "
+                    f"Cho phép: {sorted(_ALLOWED_UPLOAD_PREFIXES)}"
+                ),
+            )
+
+        content_type = (file.content_type or "").lower()
+        if not allowed_mime(content_type):
+            return BaseResponse(
+                success=False,
+                message=(
+                    f"Định dạng file không được phép: '{content_type}'. "
+                    "Chỉ nhận ảnh, PDF, Word/Excel/PowerPoint, video, audio, "
+                    "txt/csv, nén (zip/7z/rar)."
+                ),
+            )
+
+        # Đọc tối đa MAX_FILE_SIZE_BYTES — tránh RAM spike với file khổng lồ.
+        # FastAPI không tự giới hạn kích thước UploadFile.
+        raw = await file.read()
+        if len(raw) > MAX_FILE_SIZE_BYTES:
+            mb = MAX_FILE_SIZE_BYTES // (1024 * 1024)
+            return BaseResponse(
+                success=False,
+                message=f"File quá lớn (> {mb} MB). Vui lòng nén lại.",
+            )
+
+        # Lưu tên gốc (decode từ filename header — có thể latin1/utf-8)
+        filename = file.filename or "file"
+        try:
+            filename.encode("latin1").decode("utf-8")
+        except UnicodeError:
+            # File client gửi bytes không phải latin1 — fallback dùng tên mặc định
+            ext = filename.rsplit(".", 1)[-1] if "." in filename else "bin"
+            filename = f"file.{ext}"
+
+        url, err = upload_attachment(
+            prefix=prefix,
+            customer_id=customer_id or None,
+            filename=filename,
+            content=raw,
+            content_type=content_type,
+        )
+        if err:
+            return BaseResponse(success=False, message=err)
+        return BaseResponse(
+            success=True,
+            data={"url": url, "name": filename, "size": len(raw), "content_type": content_type},
+            message="Uploaded",
+        )
+    except Exception as e:
+        logger.exception("upload_crm_attachment failed")
+        return BaseResponse(success=False, message=f"Upload thất bại: {e}")
+
+
+# ---------------------------------------------------------------------------
+# CRUD
+# ---------------------------------------------------------------------------
 @router.post("", response_model=BaseResponse)
 def create_customer_lead(
     payload: CustomerLeadCreate,
@@ -89,9 +258,12 @@ def create_customer_lead(
 ):
     try:
         data_dict = payload.model_dump(exclude_unset=True)
-        # Auto-assign leaded_by from current user if not provided
         if not data_dict.get("leaded_by") and isinstance(current_user, dict) and current_user.get("id"):
             data_dict["leaded_by"] = current_user.get("id")
+            # NOTE: không ghi `leaded_by_name` vào customer_leads — bảng không có cột này
+            # (tên leader được JOIN qua `leader:leaded_by(name)` ở SELECT và cache qua
+            # `customer_lead_activity_log.actor_name` cho audit). Trước đây dòng này
+            # gây PGRST204 khi ghi.
         new_lead = customer_lead_service.create_customer_lead(data_dict)
         return BaseResponse(success=True, data=new_lead, message="Success")
     except Exception as e:
