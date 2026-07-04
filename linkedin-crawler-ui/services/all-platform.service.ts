@@ -787,6 +787,20 @@ export const allPlatformPostsService = {
   },
 
   /**
+   * Xu huong tong bai/comment/inbox theo tung ngay (14 ngay gan nhat) - dung
+   * cho khoi dashboard xu huong o trang Post Feed.
+   */
+  getDailyTrend: (payload: {
+    email: string;
+    platform: string;
+  }): Promise<ApiResponse<Array<{ date: string; posts: number; comments: number; inbox: number }>>> => {
+    return requestJson(`${BASE}/unified/stats/daily-trend`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /**
    * Phase 6: single RPC call for unified feed dashboard.
    * Returns: quick_stats + my_kpi (member) | team_kpi (leader) +
    *   top_seeding_today + top_seeders_today (admin/leader).

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { ApiExtensionLauncher } from "@/components/all-platform/components/api-extension-launcher";
@@ -391,6 +392,29 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
     } catch {}
   }, [CURRENT_USER_EMAIL, feedPlatform]);
 
+  // Xu huong 14 ngay gan nhat (tong bai/comment/inbox) — bo sung cho 4 the chi
+  // co so hom nay, theo yeu cau Thanh: "cần thêm dashboard để biết tổng
+  // comment, inbox... các ngày ra sao".
+  const [dailyTrend, setDailyTrend] = useState<Array<{ date: string; posts: number; comments: number; inbox: number }>>([]);
+  const [isLoadingTrend, setIsLoadingTrend] = useState(false);
+  const fetchDailyTrend = useCallback(async () => {
+    if (!CURRENT_USER_EMAIL) return;
+    setIsLoadingTrend(true);
+    try {
+      const res = await allPlatformPostsService.getDailyTrend({
+        email: CURRENT_USER_EMAIL,
+        platform: feedPlatform,
+      });
+      if (res.success && res.data) {
+        setDailyTrend(res.data);
+      }
+    } catch {
+      // im lang: khoi xu huong la thong tin bo sung, khong chan trang chinh
+    } finally {
+      setIsLoadingTrend(false);
+    }
+  }, [CURRENT_USER_EMAIL, feedPlatform]);
+
   useEffect(() => {
     if (!CURRENT_USER_EMAIL) return;
     fetchPosts();
@@ -400,6 +424,11 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
     if (!CURRENT_USER_EMAIL) return;
     fetchStats();
   }, [fetchStats]);
+
+  useEffect(() => {
+    if (!CURRENT_USER_EMAIL) return;
+    fetchDailyTrend();
+  }, [fetchDailyTrend]);
 
   useEffect(() => {
     if (!CURRENT_USER_EMAIL) return;
@@ -544,6 +573,60 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
             accent="indigo"
           />
         </div>
+      </div>
+
+      {/* Dashboard xu huong 14 ngay gan nhat (2026-07-04) — theo yeu cau Thanh:
+          4 the o tren chi co so HOM NAY, khong biet cac ngay truoc ra sao.
+          Chart nhe (khong chan trang neu loi/rong), dat ngay sau 4 the so lieu. */}
+      <div className="bg-card border border-border rounded-2xl p-5 mb-4">
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-bold text-foreground">Xu hướng 14 ngày gần nhất</h3>
+            <p className="text-xs text-muted-foreground">Tổng bài cào được · Comment đã verify · Inbox nhận được, theo từng ngày.</p>
+          </div>
+          {isLoadingTrend && <span className="text-xs text-muted-foreground">Đang tải...</span>}
+        </div>
+        {dailyTrend.length === 0 ? (
+          <div className="flex h-[220px] items-center justify-center text-sm text-muted-foreground">
+            {isLoadingTrend ? "Đang tải dữ liệu xu hướng..." : "Chưa có dữ liệu xu hướng."}
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={dailyTrend} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="colorPosts" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#2563eb" stopOpacity={0.35} />
+                  <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="colorComments" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#16a34a" stopOpacity={0.35} />
+                  <stop offset="95%" stopColor="#16a34a" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="colorInbox" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.35} />
+                  <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5e5" />
+              <XAxis
+                dataKey="date"
+                tickFormatter={(d: string) => d.slice(5).replace("-", "/")}
+                tick={{ fontSize: 11, fill: "#737373" }}
+                axisLine={{ stroke: "#e5e5e5" }}
+                tickLine={false}
+              />
+              <YAxis tick={{ fontSize: 11, fill: "#737373" }} axisLine={false} tickLine={false} allowDecimals={false} />
+              <Tooltip
+                labelFormatter={(d) => `Ngày ${String(d ?? "").slice(5).replace("-", "/")}`}
+                contentStyle={{ borderRadius: 8, fontSize: 12, border: "1px solid #e5e5e5" }}
+              />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Area type="monotone" dataKey="posts" name="Tổng bài" stroke="#2563eb" fill="url(#colorPosts)" strokeWidth={2} />
+              <Area type="monotone" dataKey="comments" name="Comment" stroke="#16a34a" fill="url(#colorComments)" strokeWidth={2} />
+              <Area type="monotone" dataKey="inbox" name="Inbox" stroke="#f59e0b" fill="url(#colorInbox)" strokeWidth={2} />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
       </div>
 
       {/* Phase 6: KPI personal progress — hiển thị cho cả member VÀ leader */}

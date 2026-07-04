@@ -17,6 +17,7 @@ from app.modules.all_platform.services.unified_posts_service import (
     get_unified_posts,
     filter_unified_posts,
     get_unified_stats,
+    get_unified_daily_trend,
 )
 
 router = APIRouter()
@@ -92,6 +93,23 @@ def unified_get_stats(payload: UnifiedPostsRequest) -> BaseResponse:
     """Get stats from all platforms — computed server-side from database."""
     try:
         data = get_unified_stats(
+            email=payload.email,
+            platform=payload.platform,
+        )
+        return BaseResponse(success=True, data=data)
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@router.post("/stats/daily-trend")
+def unified_get_daily_trend(payload: UnifiedPostsRequest) -> BaseResponse:
+    """Xu huong tong bai/comment/inbox theo tung ngay (14 ngay gan nhat).
+
+    Dung cho khoi dashboard xu huong o trang Post Feed - bo sung cho 4 the
+    "hom nay" da co san o /unified/stats.
+    """
+    try:
+        data = get_unified_daily_trend(
             email=payload.email,
             platform=payload.platform,
         )

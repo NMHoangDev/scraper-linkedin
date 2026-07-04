@@ -874,3 +874,127 @@ def get_unified_stats(
         "kpiTarget": fb.get("kpiTarget", 0) + li.get("kpiTarget", 0),
         "kpiProgressPercent": round(((fb.get("kpiProgress", 0) + li.get("kpiProgress", 0)) / (fb.get("kpiTarget", 0) + li.get("kpiTarget", 0))) * 100, 1) if (fb.get("kpiTarget", 0) + li.get("kpiTarget", 0)) > 0 else 0,
     }
+
+
+# ── Daily trend (Post Feed dashboard) ────────────────────────────────────────────
+
+def _resolve_member_scope(sb: Client, email: str) -> Optional[list[str]]:
+    """Tra ve allowed_member_ids theo role (None = khong gioi han, admin xem tat ca).
+
+    Dung lai dung logic phan quyen nhu _fetch_stats (khong doi ham cu de tranh
+    rui ro dung code dang chay tot) - trich rieng cho get_unified_daily_trend.
+    """
+    if not email:
+        return ["00000000-0000-0000-0000-000000000000"]
+    user_res = sb.table("app_users").select("id, role").eq("email", email.strip().lower()).limit(1).execute()
+    if not user_res.data:
+        return ["00000000-0000-0000-0000-000000000000"]
+    user_id = user_res.data[0]["id"]
+    role = user_res.data[0].get("role", "member")
+    if role == "admin":
+        return None
+    if role == "leader":
+        teams_res = sb.table("teams").select("id").eq("id_leader", user_id).execute()
+        team_ids = [t["id"] for t in (teams_res.data or [])]
+        allowed = []
+        if team_ids:
+            mot_res = sb.table("member_of_teams").select("id_member").in_("id_teams", team_ids).execute()
+            allowed = [m["id_member"] for m in (mot_res.data or []) if m.get("id_member")]
+        if user_id not in allowed:
+            allowed.append(user_id)
+        return allowed
+    return [user_id]
+
+
+def get_unified_daily_trend(
+    *,
+    email: str,
+    platform: str,
+    days: int = 14,
+) -> list[dict[str, Any]]:
+    """Tong hop bai/comment/inbox theo TUNG NGAY trong `days` ngay gan nhat.
+
+    Dung cho khoi dashboard xu huong o trang Post Feed (yeu cau cua Thanh:
+    "cần thêm dashboard để biết tổng comment, inbox... các ngày ra sao" -
+    4 the so hien tai chi co so cua HOM NAY, khong thay xu huong qua cac ngay).
+
+    Tra ve list [{date, posts, comments, inbox}] sap xep tang dan theo ngay,
+    du ca ngay khong co du lieu (gia tri 0) de FE ve bieu do lien mach.
+    """
+    sb = _supabase()
+    now_vn = datetime.now(timezone.utc) + timedelta(hours=7)
+    today = now_vn.date()
+    start_day = today - timedelta(days=days - 1)
+
+    allowed_member_ids = _resolve_member_scope(sb, email)
+
+    # Khung ngay rong truoc, dien du lieu that vao sau - dam bao bieu do lien tuc
+    buckets: dict[str, dict[str, int]] = {}
+    d = start_day
+    while d <= today:
+        buckets[d.isoformat()] = {"posts": 0, "comments": 0, "inbox": 0}
+        d += timedelta(days=1)
+
+    tables = ["facebook_posts", "linkedin_posts"] if platform in ("all", "general") else (
+        ["facebook_posts"] if platform == "facebook" else
+        ["linkedin_posts"] if platform == "linkedin" else
+        ["facebook_posts", "linkedin_posts"]
+    )
+
+    # 1) Posts theo ngay (crawl_date)
+    for table in tables:
+        query = sb.table(table).select("id, crawl_date").gte(
+            "crawl_date", f"{start_day.isoformat()}T00:00:00Z"
+        ).lte("crawl_date", f"{today.isoformat()}T23:59:59Z")
+        if table == "facebook_posts" and allowed_member_ids is not None:
+            query = query.in_("id_member", allowed_member_ids or ["00000000-0000-0000-0000-000000000000"])
+        elif table == "linkedin_posts" and allowed_member_ids is not None:
+            gq = sb.table("linkedin_groups").select("id").in_("id_member", allowed_member_ids or ["00000000-0000-0000-0000-000000000000"]).execute()
+            group_ids = [r.get("id") for r in (gq.data or []) if r.get("id")]
+            query = query.in_("id_group", group_ids or ["00000000-0000-0000-0000-000000000000"])
+        try:
+            rows = query.execute().data or []
+        except Exception:
+            rows = []
+        for row in rows:
+            day_key = _parse_date(row.get("crawl_date"))
+            if day_key in buckets:
+                buckets[day_key]["posts"] += 1
+
+    # 2) Comment/seeding da verify theo ngay (current_day)
+    try:
+        c_query = sb.table("seeding_content_kpi").select("current_day, verify").gte(
+            "current_day", start_day.isoformat()
+        ).lte("current_day", today.isoformat())
+        if allowed_member_ids is not None:
+            c_query = c_query.in_("id_member", allowed_member_ids or ["00000000-0000-0000-0000-000000000000"])
+        c_rows = c_query.execute().data or []
+    except Exception:
+        c_rows = []
+    for row in c_rows:
+        if row.get("verify") not in ("yes", "đã seeding", "xác minh", "verified"):
+            continue
+        day_key = _parse_date(row.get("current_day"))
+        if day_key in buckets:
+            buckets[day_key]["comments"] += 1
+
+    # 3) Inbox FB theo ngay (view co san v_member_daily_fb_inbox, da gop san
+    #    theo id_member + day_vn - chi can loc scope + cong don theo ngay)
+    try:
+        i_query = sb.table("v_member_daily_fb_inbox").select("day_vn, inbox_count, id_member").gte(
+            "day_vn", start_day.isoformat()
+        ).lte("day_vn", today.isoformat())
+        if allowed_member_ids is not None:
+            i_query = i_query.in_("id_member", allowed_member_ids or ["00000000-0000-0000-0000-000000000000"])
+        i_rows = i_query.execute().data or []
+    except Exception:
+        i_rows = []
+    for row in i_rows:
+        day_key = _parse_date(row.get("day_vn"))
+        if day_key in buckets:
+            buckets[day_key]["inbox"] += int(row.get("inbox_count") or 0)
+
+    return [
+        {"date": day, "posts": v["posts"], "comments": v["comments"], "inbox": v["inbox"]}
+        for day, v in sorted(buckets.items())
+    ]
