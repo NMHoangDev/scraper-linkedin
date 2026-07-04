@@ -16,6 +16,7 @@ import {
   Database,
   Activity,
   Settings,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 import type { MaterialSymbolName } from "@/components/ui";
@@ -42,6 +43,7 @@ const MAP: Partial<Record<MaterialSymbolName, LucideIcon>> = {
   database: Database,
   monitoring: Activity,
   settings: Settings,
+  verified_user: ShieldCheck,
 };
 
 export function materialToLucideIcon(name: MaterialSymbolName): LucideIcon {

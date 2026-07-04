@@ -149,15 +149,15 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       type: "item",
       id: "zalo-crawl",
       href: "/all-platform/zalo-crawl",
-      icon: "travel_explore",
-      label: "Cào Zalo",
+      icon: "chat",
+      label: "Chat Zalo",
       matchStartsWith: ["/all-platform/zalo-crawl"],
     },
     {
       type: "item",
       id: "zalo-accounts",
       href: "/all-platform/tai-khoan",
-      icon: "chat",
+      icon: "manage_accounts",
       label: "Tài khoản Zalo",
       matchStartsWith: ["/all-platform/tai-khoan"],
     },
@@ -168,6 +168,23 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       icon: "group",
       label: "Khách hàng",
       matchStartsWith: ["/all-platform/customers"],
+    },
+  ];
+
+  // Inbox Zalo Admin (/all-platform/zalo-inbox): xem hoi thoai Zalo cua TOAN
+  // BO nhan su + duyet KPI - dung phong voi "Teams"/"quan ly" nen chi hien o
+  // tab Nhom, khong hien o tab Ca nhan (giong dung tinh than comment o duoi:
+  // "Nhom: full bo cong cu quan ly"). Truoc day file nay khong co entry nao
+  // tro toi trang do ca - nguoi dung chi vao duoc qua link truc tiep.
+  const channelItemsTeam: NavLeafItem[] = [
+    ...channelItems,
+    {
+      type: "item",
+      id: "zalo-inbox-admin",
+      href: "/all-platform/zalo-inbox",
+      icon: "verified_user",
+      label: "Inbox Zalo Admin",
+      matchStartsWith: ["/all-platform/zalo-inbox"],
     },
   ];
 
@@ -212,6 +229,13 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
     label: "Quản lý kênh & CSKH",
     items: channelItems,
   };
+  const channelGroupTeam: SidebarEntry = {
+    type: "group",
+    id: "channel",
+    icon: "support_agent",
+    label: "Quản lý kênh & CSKH",
+    items: channelItemsTeam,
+  };
 
   // Ca nhan: chi viec hang ngay cua tung nguoi (dang bai, inbox, acc FB cua minh).
   // Nhom: full bo cong cu quan ly - Teams, thu vien nhom, KPI acc seeding, ha tang VPS.
@@ -249,7 +273,7 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       items: managementItems,
     },
     contentGroup,
-    channelGroup,
+    channelGroupTeam,
     {
       type: "group",
       id: "resources",
