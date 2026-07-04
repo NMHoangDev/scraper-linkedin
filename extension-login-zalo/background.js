@@ -526,6 +526,13 @@ async function getZaloCookiesPayload(options = {}) {
 
   const keys = cookieKeys(allCookies);
   const missing = missingRequiredKeys(keys);
+  // Fix 2026-07-04: REQUIRED_COOKIE_KEYS bi de trong (mang rong) o mot ban sua
+  // truoc day - "missing.length === 0" tren mang rong luon dung, nghia la
+  // is_logged_in luon = true KE CA KHI CHUA CO 1 COOKIE ZALO NAO CA (tab moi
+  // mo, chua dang nhap). Ket qua: waitForLoginCookies() coi la dang nhap xong
+  // ngay lap tuc o vong lap dau tien, dong tab + gui cookie RONG len backend.
+  // Them dieu kien toi thieu: phai tim thay it nhat 1 cookie zalo.me that.
+  const is_logged_in = missing.length === 0 && allCookies.length > 0;
 
   logStep("getZaloCookies.done", {
     tabId: tab?.id || null,
@@ -535,7 +542,7 @@ async function getZaloCookiesPayload(options = {}) {
     docCookies: newCookies.length,
     keysFound: keys,
     missing,
-    is_logged_in: missing.length === 0,
+    is_logged_in,
   });
 
   return {
@@ -544,7 +551,7 @@ async function getZaloCookiesPayload(options = {}) {
     user_agent: context.user_agent || (typeof navigator !== "undefined" ? navigator.userAgent : ""),
     imei: context.imei || "",
     missing,
-    is_logged_in: missing.length === 0,
+    is_logged_in,
   };
 }
 
