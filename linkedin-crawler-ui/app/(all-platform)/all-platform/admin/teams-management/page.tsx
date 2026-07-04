@@ -121,9 +121,10 @@ export default function TeamsManagementPage() {
   const { user } = useAppAuth();
   const [teams, setTeams] = useState<TeamRow[]>([]);
   const [kpiRows, setKpiRows] = useState<Array<{
-    team_id: string; member_id: string;
+    team_id: string; member_id: string; member_name?: string;
     kpi_post: number; kpi_lead: number; kpi_inbox: number; kpi_comment: number;
     verified_count: number; kpi_post_current: number; kpi_lead_current: number; kpi_inbox_current: number;
+    is_leader?: boolean;
   }>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -175,6 +176,11 @@ export default function TeamsManagementPage() {
 
   // Tong hop KPI (Post/Comment/Lead/Inbox) + % hoan thanh CO TRONG SO cho tung team -
   // tinh 1 lan, dung chung cho ca bang so sanh, cac card chi tiet va thong ke tong.
+  //
+  // 2026-07-04: RPC (migration 020) gio tra them 1 dong is_leader=true cho chinh
+  // leader cua team (truoc day KPI cua leader "mat tich" hoan toan khoi trang nay).
+  // Loai dong leader ra khoi tong % cua TEAM (giu nguyen cach tinh cu, khong lam
+  // lech so lieu admin da quen mat) - KPI cua leader hien RIENG o leaderKpi ben duoi.
   const teamKpiSummaries = useMemo(() => {
     return teams.map(team => {
       const totals = { post: 0, postTarget: 0, comment: 0, commentTarget: 0, lead: 0, leadTarget: 0, inbox: 0, inboxTarget: 0 };
@@ -184,7 +190,7 @@ export default function TeamsManagementPage() {
       // truoc khi cong don, tranh nhan doi target/actual cua thanh vien do.
       const seenMembers = new Set<string>();
       kpiRows
-        .filter(r => r.team_id === team.id)
+        .filter(r => r.team_id === team.id && !r.is_leader)
         .forEach(r => {
           if (seenMembers.has(r.member_id)) return;
           seenMembers.add(r.member_id);
@@ -199,7 +205,21 @@ export default function TeamsManagementPage() {
         });
 
       const { percentage, hasTarget } = computeWeightedPercentage(totals);
-      return { team, totals, hasTarget, percentage };
+
+      // KPI rieng cua leader (dong is_leader=true, neu co) - hien tach biet,
+      // KHONG cong vao tong cua team.
+      const leaderRow = kpiRows.find(r => r.team_id === team.id && r.is_leader);
+      const leaderKpi = leaderRow
+        ? {
+            post: leaderRow.kpi_post_current || 0, postTarget: leaderRow.kpi_post || 0,
+            comment: leaderRow.verified_count || 0, commentTarget: leaderRow.kpi_comment || 0,
+            lead: leaderRow.kpi_lead_current || 0, leadTarget: leaderRow.kpi_lead || 0,
+            inbox: leaderRow.kpi_inbox_current || 0, inboxTarget: leaderRow.kpi_inbox || 0,
+          }
+        : null;
+      const leaderPct = leaderKpi ? computeWeightedPercentage(leaderKpi) : null;
+
+      return { team, totals, hasTarget, percentage, leaderKpi, leaderHasTarget: leaderPct?.hasTarget ?? false, leaderPercentage: leaderPct?.percentage ?? 0 };
     });
   }, [teams, kpiRows]);
 
@@ -406,7 +426,7 @@ export default function TeamsManagementPage() {
               <span className="text-[15px] font-bold text-foreground">Quản lý từng Team</span>
             </div>
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-              {teamKpiSummaries.map(({ team, totals, hasTarget, percentage }) => {
+              {teamKpiSummaries.map(({ team, totals, hasTarget, percentage, leaderKpi, leaderHasTarget, leaderPercentage }) => {
                 const initial = (team.name_team || "?").trim().charAt(0).toUpperCase();
                 return (
                   <div key={team.id} className="flex flex-col gap-3 rounded-xl border border-border bg-white p-4 shadow-sm">
@@ -453,6 +473,20 @@ export default function TeamsManagementPage() {
                         </div>
                       ))}
                     </div>
+
+                    {/* KPI rieng cua leader (2026-07-04) - tach biet khoi tong cua team,
+                        chi hien khi leader co giao KPI rieng (co du lieu tu migration 020) */}
+                    {leaderKpi && (
+                      <div className="flex items-center justify-between rounded-lg border border-violet-100 bg-violet-50/60 px-3 py-2">
+                        <div className="flex items-center gap-1.5 min-w-0 text-[12px] font-semibold text-violet-700">
+                          <LuUsers size={13} className="shrink-0" />
+                          <span className="truncate">KPI của Leader ({team.leader_name || "chưa đặt tên"})</span>
+                        </div>
+                        <span className="shrink-0 text-[12px] font-bold text-violet-700">
+                          {leaderHasTarget ? `${leaderPercentage}%` : "Chưa giao KPI"}
+                        </span>
+                      </div>
+                    )}
 
                     <div className="flex gap-2 pt-3 border-t border-border">
                       <button
