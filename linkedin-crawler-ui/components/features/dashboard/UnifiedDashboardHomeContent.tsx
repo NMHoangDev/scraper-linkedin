@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
@@ -190,12 +190,42 @@ function StatCard({
   );
 }
 
+// â”€â”€â”€ Menu doc lap theo mang dich vu (2026-07-04) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Yeu cau Thanh: "trong post feed chia làm 2,3 menu độc lập theo từng mảng
+// dịch vụ" (CNTT rieng, luu tru/hotel rieng). Category "industry" hien chi
+// co 4 gia tri (IT & Software, Artificial Intelligence, Finance & Banking,
+// Marketing & Digital) - CHUA co danh muc "luu tru/hotel" nao ca (se rong
+// cho toi khi admin them danh muc + co bai crawl thuoc nhom do). Dung so
+// khop TU KHOA (khong phai danh sach ten co dinh) de tu dong nhan dien danh
+// muc moi duoc them sau nay ma khong can sua code lai.
+type ServiceAreaKey = "all" | "tech" | "hospitality" | "other";
+const SERVICE_AREA_TABS: { key: ServiceAreaKey; label: string; keywords?: string[] }[] = [
+  { key: "all", label: "Tất cả" },
+  { key: "tech", label: "CNTT / Công nghệ", keywords: ["it", "software", "công nghệ", "cong nghe", "ai", "artificial intelligence", "phần mềm", "phan mem", "tech"] },
+  { key: "hospitality", label: "Lưu trú / Hotel", keywords: ["hotel", "khách sạn", "khach san", "lưu trú", "luu tru", "resort", "du lịch", "du lich", "nhà nghỉ", "nha nghi", "homestay"] },
+  { key: "other", label: "Khác" },
+];
+
+function matchesServiceArea(industry: string | undefined, area: ServiceAreaKey): boolean {
+  if (area === "all") return true;
+  const name = (industry || "").toLowerCase();
+  if (area === "other") {
+    // "Khac" = khong khop tech VA khong khop hospitality
+    const techKw = SERVICE_AREA_TABS.find(t => t.key === "tech")?.keywords || [];
+    const hospKw = SERVICE_AREA_TABS.find(t => t.key === "hospitality")?.keywords || [];
+    return !techKw.some(k => name.includes(k)) && !hospKw.some(k => name.includes(k));
+  }
+  const keywords = SERVICE_AREA_TABS.find(t => t.key === area)?.keywords || [];
+  return keywords.some(k => name.includes(k));
+}
+
 // â”€â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boolean }) {
   const { user } = useAppAuth();
   const CURRENT_USER_EMAIL = user?.email || "";
 
   const [feedPlatform, setFeedPlatform] = useState<FeedPlatform>("facebook");
+  const [serviceArea, setServiceArea] = useState<ServiceAreaKey>("all");
   const [showBulkCommentModal, setShowBulkCommentModal] = useState(false);
 
   const [detailModalPost, setDetailModalPost] = useState<UnifiedPost | null>(null);
@@ -499,6 +529,15 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
 
   const fbDiff = stats.totalPostsToday - stats.postsYesterday;
 
+  // Loc client-side theo mang dich vu da chon (xem SERVICE_AREA_TABS o dau
+  // file) - khong doi lai backend/pagination, chi an/hien trong trang hien
+  // tai. Neu can loc dung tren toan bo du lieu (khong chi trang dang xem),
+  // viec nay nen chuyen xuong backend (them tham so service_area) o phien sau.
+  const visiblePosts = useMemo(
+    () => posts.filter(p => matchesServiceArea(p.industry, serviceArea)),
+    [posts, serviceArea],
+  );
+
   return (
     <div className="w-full space-y-6">
       {!hideHeader && (
@@ -682,6 +721,28 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
         </>
       )}
 
+      {/* Menu doc lap theo mang dich vu (2026-07-04) — loc theo industry, xem
+          ghi chu SERVICE_AREA_TABS o dau file. Tab "Lưu trú / Hotel" hien se
+          rong vi he thong chua co danh muc nao thuoc mang nay - se tu dong
+          co du lieu khi admin them danh muc + co bai crawl thuoc nhom do. */}
+      <div className="flex flex-wrap gap-1.5 rounded-xl border border-border bg-card p-1.5">
+        {SERVICE_AREA_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setServiceArea(tab.key)}
+            className={cn(
+              "rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer",
+              serviceArea === tab.key
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-accent hover:text-foreground",
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       <FilterBar
         intents={intents}
         industries={industries}
@@ -703,14 +764,16 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
             Thử lại
           </button>
         </div>
-      ) : posts.length === 0 ? (
+      ) : visiblePosts.length === 0 ? (
         <div className="py-12 text-center text-muted-foreground">
-          Không có bài viết nào phù hợp với bộ lọc.
+          {posts.length === 0
+            ? "Không có bài viết nào phù hợp với bộ lọc."
+            : "Không có bài viết nào trong mảng dịch vụ này."}
         </div>
       ) : (
         <>
           <div className="flex flex-col gap-4">
-            {posts.map((post) => (
+            {visiblePosts.map((post) => (
               <PostCard
                 key={post.id || post.post_url}
                 post={post}
