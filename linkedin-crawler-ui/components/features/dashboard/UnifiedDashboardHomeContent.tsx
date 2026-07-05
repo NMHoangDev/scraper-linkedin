@@ -249,7 +249,12 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
     kpiTarget: 0,
     kpiProgressPercent: 0,
   });
-  const [isLoadingPosts, setIsLoadingPosts] = useState(false);
+  // Mac dinh true (khong phai false): luc moi mount, user/CURRENT_USER_EMAIL tu
+  // AppAuthContext chua kip load xong nen fetchPosts() se return som (guard
+  // !CURRENT_USER_EMAIL) va KHONG bao gio set isLoadingPosts=true - neu khoi
+  // tao false, khoang thoi gian cho auth check xong se hien nham thanh "chua
+  // co bai dang" (trong) thay vi dang tai, nhin giong trang bi loi.
+  const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [postsError, setPostsError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -426,7 +431,9 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
   // co so hom nay, theo yeu cau Thanh: "cần thêm dashboard để biết tổng
   // comment, inbox... các ngày ra sao".
   const [dailyTrend, setDailyTrend] = useState<Array<{ date: string; posts: number; comments: number; inbox: number }>>([]);
-  const [isLoadingTrend, setIsLoadingTrend] = useState(false);
+  // Cung ly do voi isLoadingPosts o tren: fetchDailyTrend cung guard
+  // !CURRENT_USER_EMAIL nen phai khoi tao true, khong la false.
+  const [isLoadingTrend, setIsLoadingTrend] = useState(true);
   const fetchDailyTrend = useCallback(async () => {
     if (!CURRENT_USER_EMAIL) return;
     setIsLoadingTrend(true);
