@@ -490,13 +490,30 @@ function getDefaultHeaders(): Record<string, string> {
   return headers;
 }
 
-async function apiFetch(path: string, options?: RequestInit): Promise<any> {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    credentials: "include",
-    headers: getDefaultHeaders(),
-    ...options,
-  });
-  return res.json();
+async function apiFetch(path: string, options?: RequestInit, retries: number = 1): Promise<any> {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(`${API_BASE_URL}${path}`, {
+        credentials: "include",
+        headers: getDefaultHeaders(),
+        ...options,
+      });
+      const data = await res.json();
+      // HTTP loi that (401/500/503...) khac voi "success:false" nghiep vu (van la 200) -
+      // truoc day bi nuot am tham thanh du lieu rong, nhin giong "trang trong, F5 lai co".
+      if (!res.ok) {
+        throw new Error(data?.message || data?.detail || `Loi may chu (${res.status})`);
+      }
+      return data;
+    } catch (err) {
+      lastError = err;
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 800));
+      }
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Mat ket noi toi may chu");
 }
 
 export const customerLeadService = {

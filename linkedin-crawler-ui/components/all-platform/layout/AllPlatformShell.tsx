@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { AppPlatformProvider, useAppPlatform } from "@/components/providers/AppPlatformProvider";
@@ -30,10 +30,11 @@ const ALL_ENTRIES_FOR_TITLE_LOOKUP = buildEntries(true, true, "team");
  * ben duoi - chi doi lop hien thi sidebar + khung trang.
  */
 function AllPlatformShellInner({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAppAuth();
+  const { isAuthenticated, isLoading, refreshUser } = useAppAuth();
   const { platform, setPlatform } = useAppPlatform();
   const router = useRouter();
   const pathname = usePathname();
+  const [authRetried, setAuthRetried] = useState(false);
 
   // Force platform to "general" for all-platform routes
   useEffect(() => {
@@ -42,14 +43,22 @@ function AllPlatformShellInner({ children }: { children: React.ReactNode }) {
     }
   }, [platform, setPlatform]);
 
+  // Neu check auth lan dau that bai (co the do 1 request thoang qua bi loi,
+  // khong phai that su chua dang nhap), thu lai 1 lan truoc khi day ve login -
+  // tranh tinh trang session hop le van bi vang ve trang login/rong du lieu,
+  // nguoi dung phai F5 thu cong moi vao lai duoc.
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (isLoading || isAuthenticated) return;
+    if (authRetried) {
       router.push("/auth/login");
+      return;
     }
-  }, [isAuthenticated, isLoading, router]);
+    setAuthRetried(true);
+    void refreshUser();
+  }, [isAuthenticated, isLoading, authRetried, refreshUser, router]);
 
-  // Loading state
-  if (isLoading) {
+  // Loading state (bao gom ca luc dang thu lai auth check lan 2)
+  if (isLoading || (!isAuthenticated && !authRetried)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="border-primary h-10 w-10 rounded-full border-4 border-t-transparent animate-spin" />

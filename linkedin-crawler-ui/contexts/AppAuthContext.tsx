@@ -75,14 +75,11 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
   /** On mount: attempt to load current user from cookie */
   useEffect(() => {
     let alive = true;
-    const timer = window.setTimeout(() => {
-      void refreshUser().finally(() => {
-        if (alive) setIsLoading(false);
-      });
-    }, 0);
+    void refreshUser().finally(() => {
+      if (alive) setIsLoading(false);
+    });
     return () => {
       alive = false;
-      window.clearTimeout(timer);
     };
   }, [refreshUser]);
 
