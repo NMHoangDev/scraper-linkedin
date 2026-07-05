@@ -84,14 +84,6 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
     },
     {
       type: "item",
-      id: "fb-accounts",
-      href: "/all-platform/tai-khoan-fb",
-      icon: "account_circle",
-      label: "Tài khoản FB",
-      matchStartsWith: ["/all-platform/tai-khoan-fb"],
-    },
-    {
-      type: "item",
       id: "accounts",
       href: "/all-platform/quan-ly-tai-khoan",
       icon: "manage_accounts",
@@ -124,14 +116,6 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       icon: "radar",
       label: "Post feed",
       matchStartsWith: ["/all-platform/post-feed"],
-    },
-    {
-      type: "item",
-      id: "fb-posting",
-      href: "/all-platform/dang-bai",
-      icon: "send",
-      label: "Đăng bài FB",
-      matchStartsWith: ["/all-platform/dang-bai"],
     },
   ];
 
@@ -247,10 +231,10 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       {
         type: "item",
         id: "fb-accounts-personal",
-        href: "/all-platform/tai-khoan-fb",
+        href: "/all-platform/quan-ly-tai-khoan",
         icon: "account_circle",
         label: "Tài khoản FB",
-        matchStartsWith: ["/all-platform/tai-khoan-fb"],
+        matchStartsWith: ["/all-platform/quan-ly-tai-khoan"],
       },
       {
         type: "item",
