@@ -118,7 +118,7 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden flex flex-col transition-all duration-300 w-full mb-6 relative z-10">
+    <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden flex flex-col transition-all duration-300 w-full mb-6 relative">
       {/* Header */}
       <div className="flex items-center justify-between p-4 bg-slate-50/50">
         <div className="flex items-center gap-3">

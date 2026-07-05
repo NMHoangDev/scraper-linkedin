@@ -379,7 +379,7 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
 
   // ── Render button + dialog ────────────────────────────────────────────────
   return (
-    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden flex flex-col transition-all duration-300 w-full mb-6 relative z-10">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden flex flex-col transition-all duration-300 w-full mb-6 relative">
       {/* Header / Launcher */}
       <div className="flex items-center justify-between p-4 bg-muted">
         <div className="flex items-center gap-3">
