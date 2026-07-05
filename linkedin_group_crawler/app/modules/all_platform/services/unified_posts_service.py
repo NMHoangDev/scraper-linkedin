@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -447,38 +448,54 @@ def _fetch_stats(
             return query.in_("id_member", allowed_member_ids)
         return query
 
-    # Total posts today
-    today_start = f"{today}T00:00:00Z"
-    today_end = f"{today}T23:59:59Z"
-    today_r = apply_scope(sb.table(table).select("id", count="exact").gte("crawl_date", today_start).lte("crawl_date", today_end)).execute()
-    today_count = today_r.count or 0
-
-    # Posts yesterday
-    yesterday_start = f"{yesterday}T00:00:00Z"
-    yesterday_end = f"{yesterday}T23:59:59Z"
-    yesterday_r = apply_scope(sb.table(table).select("id", count="exact").gte("crawl_date", yesterday_start).lte("crawl_date", yesterday_end)).execute()
-    yesterday_count = yesterday_r.count or 0
-
-    # Total posts (all time)
-    total_r = apply_scope(sb.table(table).select("id", count="exact")).execute()
-    total_count = total_r.count or 0
-
-    # High score (>= 70)
-    high_r = apply_scope(sb.table(table).select("id", count="exact").gte("score", 70)).execute()
-    high_count = high_r.count or 0
-
     # id_member da resolve o buoc 1 (user_id_fetch) - khong query lai app_users lan 2
     # cho cung 1 email trong cung 1 ham (tung la 1 round-trip Supabase thua thai).
     id_member = user_id_fetch
-
-    # Seeded today count & KPI Progress
     platform_name = "facebook" if table == "facebook_posts" else "linkedin"
-    seeded_today = 0
-    kpi_progress = 0
-    kpi_target = 0
-    if id_member:
-        seeded_today = _get_seeded_today(sb, id_member, platform_name)
-        kpi_progress, kpi_target = _get_kpi_progress(sb, id_member, platform_name)
+
+    # 6 query/tinh toan doc lap ben duoi (khong cai nao phu thuoc ket qua cua
+    # nhau) truoc day chay tuan tu tung cai mot (~6 round-trip Supabase noi
+    # tiep) - gop lai chay song song bang thread pool, giam tu ~6 round-trip
+    # tuan tu con lai bang thoi gian cua request cham nhat.
+    today_start, today_end = f"{today}T00:00:00Z", f"{today}T23:59:59Z"
+    yesterday_start, yesterday_end = f"{yesterday}T00:00:00Z", f"{yesterday}T23:59:59Z"
+
+    def _today_count():
+        r = apply_scope(sb.table(table).select("id", count="exact").gte("crawl_date", today_start).lte("crawl_date", today_end)).execute()
+        return r.count or 0
+
+    def _yesterday_count():
+        r = apply_scope(sb.table(table).select("id", count="exact").gte("crawl_date", yesterday_start).lte("crawl_date", yesterday_end)).execute()
+        return r.count or 0
+
+    def _total_count():
+        r = apply_scope(sb.table(table).select("id", count="exact")).execute()
+        return r.count or 0
+
+    def _high_count():
+        r = apply_scope(sb.table(table).select("id", count="exact").gte("score", 70)).execute()
+        return r.count or 0
+
+    def _seeded_today():
+        return _get_seeded_today(sb, id_member, platform_name) if id_member else 0
+
+    def _kpi_progress():
+        return _get_kpi_progress(sb, id_member, platform_name) if id_member else (0, 0)
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        f_today = pool.submit(_today_count)
+        f_yesterday = pool.submit(_yesterday_count)
+        f_total = pool.submit(_total_count)
+        f_high = pool.submit(_high_count)
+        f_seeded = pool.submit(_seeded_today)
+        f_kpi = pool.submit(_kpi_progress)
+
+        today_count = f_today.result()
+        yesterday_count = f_yesterday.result()
+        total_count = f_total.result()
+        high_count = f_high.result()
+        seeded_today = f_seeded.result()
+        kpi_progress, kpi_target = f_kpi.result()
 
     return {
         "totalPostsToday": today_count,
@@ -518,15 +535,19 @@ def _compute_quick_stats(
                 pass
             return _zero_stats()
 
-    # Multi-platform: query both, merge
-    try:
-        fb = _fetch_stats(table="facebook_posts", email=email)
-    except Exception:
-        fb = _zero_stats()
-    try:
-        li = _fetch_stats(table="linkedin_posts", email=email)
-    except Exception:
-        li = _zero_stats()
+    # Multi-platform: query ca 2 bang song song (doc lap hoan toan voi nhau)
+    # thay vi tuan tu, giam mot nua thoi gian cho khi platform="all".
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        f_fb = pool.submit(_fetch_stats, table="facebook_posts", email=email)
+        f_li = pool.submit(_fetch_stats, table="linkedin_posts", email=email)
+        try:
+            fb = f_fb.result()
+        except Exception:
+            fb = _zero_stats()
+        try:
+            li = f_li.result()
+        except Exception:
+            li = _zero_stats()
 
     total = fb["totalPosts"] + li["totalPosts"]
     high = fb["highScoreCount"] + li["highScoreCount"]
