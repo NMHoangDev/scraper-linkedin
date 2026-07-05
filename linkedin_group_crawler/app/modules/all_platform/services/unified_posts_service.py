@@ -467,12 +467,9 @@ def _fetch_stats(
     high_r = apply_scope(sb.table(table).select("id", count="exact").gte("score", 70)).execute()
     high_count = high_r.count or 0
 
-    # Resolve id_member from email
-    id_member = None
-    if email:
-        user_res = sb.table("app_users").select("id").eq("email", email).limit(1).execute()
-        if user_res.data:
-            id_member = user_res.data[0]["id"]
+    # id_member da resolve o buoc 1 (user_id_fetch) - khong query lai app_users lan 2
+    # cho cung 1 email trong cung 1 ham (tung la 1 round-trip Supabase thua thai).
+    id_member = user_id_fetch
 
     # Seeded today count & KPI Progress
     platform_name = "facebook" if table == "facebook_posts" else "linkedin"
