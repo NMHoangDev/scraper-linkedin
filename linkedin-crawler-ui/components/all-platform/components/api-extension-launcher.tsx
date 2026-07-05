@@ -8,6 +8,7 @@ declare global {
 declare const chrome: any;
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { allPlatformGroupsService, authService } from "@/services/all-platform.service";
 import { API_BASE_URL } from "@/lib/env";
@@ -452,8 +453,11 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
         </div>
       </div>
 
-      {/* Select Groups Modal */}
-      {showModal && (
+      {/* Select Groups Modal - render qua portal thang ra document.body, tranh
+          bi ket trong stacking context "relative z-10" cua the wrapper ngoai
+          cung (khien z-[9999] chi co hieu luc cuc bo, card khac cung z-10 dung
+          sau trong DOM van de len tren modal). */}
+      {showModal && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
           <div className="bg-card rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
             <div className="flex items-center justify-between p-4 border-b border-border">
@@ -537,7 +541,8 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Progress & Content (Expanded when launching or has data) */}
