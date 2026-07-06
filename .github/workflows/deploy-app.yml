@@ -1,0 +1,42 @@
+name: Deploy App (Production)
+
+# Deploy len host APP/production (10.120.60.26) - CHI chay khi bam nut
+# "Run workflow" thu cong trong tab Actions tren GitHub, khong tu dong chay
+# khi push/merge code (khac voi Deploy Dev). Dung de kiem soat khi nao code
+# thuc su len production, sau khi da test o dev truoc.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Nhanh/commit muon deploy (de trong = dung restyle-form moi nhat)"
+        required: false
+        default: "restyle-form"
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, app]
+    defaults:
+      run:
+        working-directory: /opt/apps/seeding_markeeai/scraper-linkedin
+    steps:
+      - name: Pull code theo ref duoc chon
+        run: |
+          git fetch origin
+          git checkout "${{ github.event.inputs.ref }}"
+          git pull origin "${{ github.event.inputs.ref }}" || true
+
+      - name: Build frontend + backend
+        run: docker compose build frontend backend
+
+      - name: Ap dung container moi
+        run: |
+          docker compose up -d frontend backend
+          sleep 5
+          docker compose restart router
+          docker image prune -f
+
+      - name: Kiem tra healthcheck
+        run: |
+          sleep 3
+          curl -sf -o /dev/null http://localhost:8080/ || (echo "Frontend khong phan hoi" && exit 1)
+          curl -sf -o /dev/null http://localhost:8080/api/all-platform/auth/me || echo "Luu y: auth/me khong phai 200 (co the do chua dang nhap, khong tinh la loi)"

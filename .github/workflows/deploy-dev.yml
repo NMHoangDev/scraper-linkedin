@@ -1,0 +1,36 @@
+name: Deploy Dev
+
+# Tu dong deploy len host DEV (10.30.50.29) moi khi co code moi tren nhanh
+# restyle-form. Chay tren self-hosted runner cai san tren chinh host do,
+# thao tac truc tiep tren thu muc deploy hien co (khong dung actions/checkout
+# vi day la "pull + rebuild" tren may that, khong phai build tu checkout moi).
+on:
+  push:
+    branches:
+      - restyle-form
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, dev]
+    defaults:
+      run:
+        working-directory: /opt/apps/seeding_markeeai/scraper-linkedin
+    steps:
+      - name: Pull code moi nhat
+        run: git pull origin restyle-form
+
+      - name: Build frontend + backend
+        run: docker compose build frontend backend
+
+      - name: Ap dung container moi
+        run: |
+          docker compose up -d frontend backend
+          sleep 5
+          docker compose restart router
+          docker image prune -f
+
+      - name: Kiem tra healthcheck
+        run: |
+          sleep 3
+          curl -sf -o /dev/null http://localhost:8080/ || (echo "Frontend khong phan hoi" && exit 1)
+          curl -sf -o /dev/null http://localhost:8080/api/all-platform/auth/me || echo "Luu y: auth/me khong phai 200 (co the do chua dang nhap, khong tinh la loi)"
