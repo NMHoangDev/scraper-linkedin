@@ -324,6 +324,7 @@ export function LeaderDashboardContent() {
   const totalComments = memberMetrics.reduce((sum, member) => sum + member.commentCurrent, 0);
   const totalLeads = memberMetrics.reduce((sum, member) => sum + member.leadCurrent, 0);
   const totalTraffic = memberMetrics.reduce((sum, member) => sum + member.traffic, 0);
+  const totalInbox = memberMetrics.reduce((sum, member) => sum + member.inboxCurrent, 0);
 
   const industryDistribution = useMemo(
     () => buildDistribution(groups, (group) => group.industry_name || group.industry),
@@ -424,9 +425,10 @@ export function LeaderDashboardContent() {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <MetricCard label="Tổng groups" value={loading ? "..." : totalGroups} />
         <MetricCard label="Comment tuần này" value={loading ? "..." : totalComments} />
+        <MetricCard label="KPI Inbox" value={loading ? "..." : totalInbox} />
         <MetricCard label="Leads mang về" value={loading ? "..." : totalLeads} />
         <MetricCard label="UTM traffic" value={loading ? "..." : totalTraffic} />
       </div>
