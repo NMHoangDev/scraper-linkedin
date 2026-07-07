@@ -1,13 +1,13 @@
 name: Deploy Dev
 
 # Tu dong deploy len host DEV (10.30.50.29) moi khi co code moi tren nhanh
-# restyle-form. Chay tren self-hosted runner cai san tren chinh host do,
+# dev. Chay tren self-hosted runner cai san tren chinh host do,
 # thao tac truc tiep tren thu muc deploy hien co (khong dung actions/checkout
 # vi day la "pull + rebuild" tren may that, khong phai build tu checkout moi).
 on:
   push:
     branches:
-      - restyle-form
+      - dev
 
 jobs:
   deploy:
@@ -17,7 +17,9 @@ jobs:
         working-directory: /opt/apps/seeding_markeeai/scraper-linkedin
     steps:
       - name: Pull code moi nhat
-        run: git pull origin restyle-form
+        run: |
+          git checkout dev
+          git pull origin dev
 
       - name: Build frontend + backend
         run: docker compose build frontend backend

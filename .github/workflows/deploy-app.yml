@@ -8,9 +8,9 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Nhanh/commit muon deploy (de trong = dung restyle-form moi nhat)"
+        description: "Nhanh/commit muon deploy (de trong = dung main moi nhat)"
         required: false
-        default: "restyle-form"
+        default: "main"
 
 jobs:
   deploy:
