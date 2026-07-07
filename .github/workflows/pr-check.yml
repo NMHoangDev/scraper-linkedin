@@ -1,13 +1,14 @@
 name: PR Build Check
 
-# Kiem tra code build duoc TRUOC khi cho phep merge PR vao restyle-form.
-# Chi build-check, KHONG deploy len bat ky host nao - chay tren runner
-# GitHub-hosted (khong dung self-hosted dev/app), an toan cho code chua
-# duoc duyet tu team ngoai.
+# Kiem tra code build duoc TRUOC khi cho phep merge PR vao restyle-form
+# (team fix loi) hoac ui-trial (team UI thu nghiem). Chi build-check,
+# KHONG deploy len bat ky host nao - chay tren runner GitHub-hosted
+# (khong dung self-hosted dev/app), an toan cho code chua duoc duyet.
 on:
   pull_request:
     branches:
       - restyle-form
+      - ui-trial
 
 jobs:
   build-frontend:
