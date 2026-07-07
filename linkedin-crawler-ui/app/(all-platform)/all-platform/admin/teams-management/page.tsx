@@ -179,8 +179,12 @@ export default function TeamsManagementPage() {
   //
   // 2026-07-04: RPC (migration 020) gio tra them 1 dong is_leader=true cho chinh
   // leader cua team (truoc day KPI cua leader "mat tich" hoan toan khoi trang nay).
-  // Loai dong leader ra khoi tong % cua TEAM (giu nguyen cach tinh cu, khong lam
-  // lech so lieu admin da quen mat) - KPI cua leader hien RIENG o leaderKpi ben duoi.
+  //
+  // 2026-07-07: truoc day loai dong leader ra khoi tong % cua TEAM - nhung leader
+  // phan anh (vd team "Thao NT" da co 15 comment thuc te tu leader) rang % cua
+  // team khong nhich len du team da lam viec, gay hieu lam "khong len du lieu".
+  // Gio CONG ca hoat dong cua leader vao tong cua team (giong 1 thanh vien binh
+  // thuong) - phan anh dung cong suc thuc te ca team (leader + member) dong gop.
   const teamKpiSummaries = useMemo(() => {
     return teams.map(team => {
       const totals = { post: 0, postTarget: 0, comment: 0, commentTarget: 0, lead: 0, leadTarget: 0, inbox: 0, inboxTarget: 0 };
@@ -190,7 +194,7 @@ export default function TeamsManagementPage() {
       // truoc khi cong don, tranh nhan doi target/actual cua thanh vien do.
       const seenMembers = new Set<string>();
       kpiRows
-        .filter(r => r.team_id === team.id && !r.is_leader)
+        .filter(r => r.team_id === team.id)
         .forEach(r => {
           if (seenMembers.has(r.member_id)) return;
           seenMembers.add(r.member_id);
@@ -206,8 +210,9 @@ export default function TeamsManagementPage() {
 
       const { percentage, hasTarget } = computeWeightedPercentage(totals);
 
-      // KPI rieng cua leader (dong is_leader=true, neu co) - hien tach biet,
-      // KHONG cong vao tong cua team.
+      // KPI rieng cua leader (dong is_leader=true, neu co) - van hien tach biet o
+      // day de xem rieng dong gop cua leader, dong thoi da duoc cong vao "totals"
+      // cua ca team o tren (khong loai truong nay nua, xem comment 2026-07-07).
       const leaderRow = kpiRows.find(r => r.team_id === team.id && r.is_leader);
       const leaderKpi = leaderRow
         ? {
