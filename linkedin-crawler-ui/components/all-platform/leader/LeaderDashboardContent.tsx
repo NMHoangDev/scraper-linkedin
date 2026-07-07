@@ -276,8 +276,19 @@ export function LeaderDashboardContent() {
 
   const memberMetrics = useMemo(() => {
     const teamMembers = selectedTeam?.members || [];
+    // selectedTeam.members khong bao gio chua leader - them dong leader vao day
+    // vi /kpi/get-all da tra ve KPI cua leader trong kpiMembers, neu khong
+    // leader se "mat tich" khoi chinh dashboard cua minh (nhu team-management.tsx).
+    const hasLeaderAlready = selectedTeam && teamMembers.some((m) => m.id === selectedTeam.id_leader);
+    const allMembers =
+      selectedTeam && !hasLeaderAlready
+        ? [
+            ...teamMembers,
+            { id: selectedTeam.id_leader, email: selectedTeam.leader_email, name: selectedTeam.leader_name },
+          ]
+        : teamMembers;
 
-    return teamMembers.map((member) => {
+    return allMembers.map((member) => {
       const kpiInfo = kpiMembers.find((row) => row.id === member.id) || {};
       const stats = kpiInfo.seeding_stats || {};
       const commentCurrent = stats.verified_count || 0;

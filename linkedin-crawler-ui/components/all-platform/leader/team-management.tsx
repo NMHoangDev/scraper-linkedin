@@ -292,8 +292,24 @@ export function TeamManagement() {
   const teamMembers = selectedTeam?.members || [];
 
   // Map KPI data to members
+  // Them chinh leader vao danh sach hien thi: teamMembers (roster) khong bao gio
+  // chua leader, nhung RPC get_team_kpi_overview (migration 012) da tra ve KPI
+  // cua leader trong kpiData - neu khong them dong nay, du lieu leader bi fetch
+  // xong roi vut bo, leader "bien mat" khoi chinh trang team cua minh.
   const membersWithKpi = useMemo(() => {
-    return teamMembers.map(member => {
+    if (!selectedTeam) return [];
+    const hasLeaderAlready = teamMembers.some(m => m.id === selectedTeam.id_leader);
+    const allMembers = hasLeaderAlready
+      ? teamMembers
+      : [
+          ...teamMembers,
+          {
+            id: selectedTeam.id_leader,
+            email: selectedTeam.leader_email,
+            name: selectedTeam.leader_name,
+          },
+        ];
+    return allMembers.map(member => {
       const kpiInfo = kpiData.find(k => k.id === member.id) || {};
       const stats = kpiInfo.seeding_stats || {};
       return {
@@ -313,7 +329,7 @@ export function TeamManagement() {
         seedingItems: kpiInfo.seeding_items || [],
       };
     });
-  }, [teamMembers, kpiData]);
+  }, [teamMembers, kpiData, selectedTeam]);
 
   // Overall Stats
   const totalKPIProgress = useMemo(() => {

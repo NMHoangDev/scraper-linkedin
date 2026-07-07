@@ -897,7 +897,7 @@ def compute_kpi_inbox_progress(
         try:
             res = (
                 supabase.table("zalo_conversation_permissions")
-                .select("id, created_at, updated_at, verified_at, is_lead")
+                .select("id, verified_at, is_lead")
                 .eq("id_member", mid)
                 .eq("shared_role", "leader")
                 .eq("is_active", True)
@@ -908,14 +908,14 @@ def compute_kpi_inbox_progress(
             current = 0
             lead_current = 0
             for r in res.data or []:
-                c_at = r.get("created_at") or ""
-                u_at = r.get("updated_at") or ""
                 v_at = r.get("verified_at") or ""
-                if (
-                    (c_at >= start_dt and c_at <= end_dt) or 
-                    (u_at >= start_dt and u_at <= end_dt) or
-                    (v_at >= start_dt and v_at <= end_dt)
-                ):
+                # Chi xet verified_at (thoi diem leader xac minh) de xac dinh
+                # tuan tinh KPI - truoc day OR ca created_at/updated_at khien
+                # 1 conversation cu bi dem lai neu bi update vi ly do khac
+                # (vd toggle is_lead) trong tuan hien tai, gay trung/lech KPI
+                # giua cac tuan. verified_at cung la quy uoc dang dung o RPC
+                # get_team_kpi_overview (migration 012) cho cung 1 bang nay.
+                if v_at >= start_dt and v_at <= end_dt:
                     current += 1
                     if r.get("is_lead"):
                         lead_current += 1
