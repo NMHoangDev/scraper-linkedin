@@ -1149,7 +1149,12 @@ def get_fb_inbox_kpi_summary(
     member_id = res.data[0]["id"]
 
     # Convert YYYY-MM-DD -> VN timezone datetime range, then compare as UTC strings.
-    # This matches the same logic used in compute_kpi_inbox_progress for consistency.
+    #
+    # Dung created_at (set 1 lan luc insert, khong bao gio bi ghi de) thay vi
+    # synced_at (bi cap nhat lai = now() moi lan leader xac nhan/xac nhan lai
+    # CUNG 1 conv_id qua /kpi/fb-inbox-sync hoac /kpi/fb-inbox-bulk-verify) -
+    # tranh 1 hoi thoai cu "troi" vao tuan hien tai moi lan duoc dong lai,
+    # gay KPI Inbox cua member hay duoc xac nhan lien tuc bi phinh len sai.
     if start_date and end_date:
         vn_tz = VN_TZ
         start_iso = _parse_iso_date(start_date) or date.today()
@@ -1158,16 +1163,16 @@ def get_fb_inbox_kpi_summary(
         end_dt = datetime.combine(end_iso, datetime.max.time(), tzinfo=vn_tz).astimezone(timezone.utc).isoformat()
         query = (
             supabase.table("fb_inbox_kpi")
-            .select("id, conv_id, message_count, is_lead, synced_at")
+            .select("id, conv_id, message_count, is_lead, synced_at, created_at")
             .eq("id_member", member_id)
             .eq("is_confirmed", True)  # CHỈ đếm inbox ĐÃ XÁC NHẬN
-            .gte("synced_at", start_dt)
-            .lte("synced_at", end_dt)
+            .gte("created_at", start_dt)
+            .lte("created_at", end_dt)
         )
     else:
         query = (
             supabase.table("fb_inbox_kpi")
-            .select("id, conv_id, message_count, is_lead, synced_at")
+            .select("id, conv_id, message_count, is_lead, synced_at, created_at")
             .eq("id_member", member_id)
             .eq("is_confirmed", True)  # CHỈ đếm inbox ĐÃ XÁC NHẬN
         )
@@ -1340,11 +1345,12 @@ def get_team_kpi_history(
     kpi_rows = kpi_res.data or []
 
     # 5. Actuals cho toàn bộ khoảng
+    # created_at (on dinh, khong bi ghi de khi xac nhan lai) - xem migration 022.
     inbox_res = (
         supabase.table("fb_inbox_kpi")
-        .select("id_member, is_lead, is_confirmed, synced_at")
+        .select("id_member, is_lead, is_confirmed, created_at")
         .in_("id_member", all_member_ids)
-        .gte("synced_at", earliest_start_dt)
+        .gte("created_at", earliest_start_dt)
         .execute()
     )
     post_res = (
@@ -1410,7 +1416,7 @@ def get_team_kpi_history(
             for row in inbox_rows:
                 if str(row["id_member"]) not in mids:
                     continue
-                d = _vn_date(row.get("synced_at") or "")
+                d = _vn_date(row.get("created_at") or "")
                 if d is None:
                     continue
                 if w_start <= d <= w_end:
@@ -1552,12 +1558,13 @@ def _build_team_kpi_history_optimized(
     kpi_rows = kpi_res.data or []
 
     # 5. Bulk load inbox + post trong cửa sổ W tuần (giới hạn lte để không load lố)
+    # created_at (on dinh, khong bi ghi de khi xac nhan lai) - xem migration 022.
     inbox_res = (
         supabase.table("fb_inbox_kpi")
-        .select("id_member, is_lead, is_confirmed, synced_at")
+        .select("id_member, is_lead, is_confirmed, created_at")
         .in_("id_member", all_member_ids)
-        .gte("synced_at", earliest_start_dt)
-        .lte("synced_at", latest_end_dt)
+        .gte("created_at", earliest_start_dt)
+        .lte("created_at", latest_end_dt)
         .execute()
     )
     post_res = (
@@ -1574,7 +1581,7 @@ def _build_team_kpi_history_optimized(
     inbox_by_member: Dict[str, Dict[int, List[int]]] = {}
     for row in (inbox_res.data or []):
         mid = str(row.get("id_member"))
-        d = _vn_date(row.get("synced_at") or "")
+        d = _vn_date(row.get("created_at") or "")
         if d is None:
             continue
         wk_idx = None
@@ -1922,9 +1929,13 @@ def get_team_kpi_overview_v2(
         seeding_by_member.setdefault(mid, []).append(s)
 
     # ── 3. Bulk inbox Zalo (1 truy vấn) ─────────────────────────────────────
+    # Chi xet verified_at (thoi diem leader xac minh) de xac dinh tuan tinh
+    # KPI - truoc day OR ca created_at/updated_at khien 1 conversation cu bi
+    # dem lai/lech tuan khi bi update vi ly do khac (xem fix cung logic o
+    # compute_kpi_inbox_progress).
     zalo_res = (
         supabase.table("zalo_conversation_permissions")
-        .select("id_member, created_at, updated_at, verified_at, is_lead")
+        .select("id_member, verified_at, is_lead")
         .in_("id_member", member_ids)
         .eq("shared_role", "leader")
         .eq("is_active", True)
@@ -1937,26 +1948,21 @@ def get_team_kpi_overview_v2(
     zalo_lead: Dict[str, int] = {m: 0 for m in member_ids}
     for r in (zalo_res.data or []):
         mid = str(r.get("id_member"))
-        c_at = r.get("created_at") or ""
-        u_at = r.get("updated_at") or ""
         v_at = r.get("verified_at") or ""
-        if (
-            (start_iso_utc <= c_at <= end_iso_utc)
-            or (start_iso_utc <= u_at <= end_iso_utc)
-            or (start_iso_utc <= v_at <= end_iso_utc)
-        ):
+        if start_iso_utc <= v_at <= end_iso_utc:
             zalo_inbox[mid] = zalo_inbox.get(mid, 0) + 1
             if r.get("is_lead"):
                 zalo_lead[mid] = zalo_lead.get(mid, 0) + 1
 
     # ── 4. Bulk FB inbox KPI (1 truy vấn) ───────────────────────────────────
+    # created_at (on dinh, khong bi ghi de khi xac nhan lai) - xem migration 022.
     fb_inbox_res = (
         supabase.table("fb_inbox_kpi")
-        .select("id_member, is_lead, is_confirmed, synced_at")
+        .select("id_member, is_lead, is_confirmed, created_at")
         .in_("id_member", member_ids)
         .eq("is_confirmed", True)
-        .gte("synced_at", start_iso_utc)
-        .lte("synced_at", end_iso_utc)
+        .gte("created_at", start_iso_utc)
+        .lte("created_at", end_iso_utc)
         .execute()
     )
     fb_inbox_count: Dict[str, int] = {m: 0 for m in member_ids}

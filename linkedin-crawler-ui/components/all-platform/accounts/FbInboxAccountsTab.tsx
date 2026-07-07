@@ -113,6 +113,7 @@ export function FbInboxAccountsTab({ onChange }: FbInboxAccountsTabProps) {
     }
     setAdding(true);
     setStatus("⏳ Đang mở Facebook... Hãy đăng nhập tài khoản cần thêm trong tab mới. Hệ thống tự lưu khi xong.");
+    const beforeIds = new Set(sessions.map(s => s.user_id));
     const cfg = await getFbProvisionConfig();
     await provisionExtension({ serverUrl: cfg.serverUrl, owner, apiKey: cfg.extensionApiKey, label: user?.name || user?.email || owner });
     const res = await addAccountViaExtension();
@@ -120,6 +121,22 @@ export function FbInboxAccountsTab({ onChange }: FbInboxAccountsTabProps) {
     if (res.success) {
       setStatus("");
       showToast(relogin ? "Đã đăng nhập lại tài khoản." : "Đã thêm tài khoản Facebook.", true);
+      // Mac dinh tu dong bat KPI Inbox cho tai khoan VUA them (khong dong lai
+      // cho tai khoan relogin, vi no da co san tu truoc) - tranh phai bam
+      // tay "Bat tinh KPI" cho tung acc moi.
+      if (!relogin) {
+        try {
+          const fresh = await fbFetch("/sessions").then(r => r.json()).catch(() => ({ sessions: [] }));
+          const newSessions: Session[] = (fresh.sessions || []).filter((s: Session) => !beforeIds.has(s.user_id));
+          for (const s of newSessions) {
+            await fbInboxAccountService.create({
+              user_id: s.user_id,
+              fb_user_id: s.fb_user_id || undefined,
+              account_label: accLabel(s) || undefined,
+            }).catch(() => {});
+          }
+        } catch { /* khong chan luong them acc neu buoc auto-KPI loi */ }
+      }
       setTimeout(loadAll, 800);
     } else {
       setStatus("");
