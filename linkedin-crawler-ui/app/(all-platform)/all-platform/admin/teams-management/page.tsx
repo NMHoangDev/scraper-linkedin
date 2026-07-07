@@ -475,16 +475,26 @@ export default function TeamsManagementPage() {
                     </div>
 
                     {/* KPI rieng cua leader (2026-07-04) - tach biet khoi tong cua team,
-                        chi hien khi leader co giao KPI rieng (co du lieu tu migration 020) */}
+                        luon hien so lieu thuc te (comment/inbox/lead/post da lam) du
+                        chua duoc giao target, tranh an het hoat dong that cua leader
+                        sau nhan "Chua giao KPI" (leader van co the da lam viec that su). */}
                     {leaderKpi && (
-                      <div className="flex items-center justify-between rounded-lg border border-violet-100 bg-violet-50/60 px-3 py-2">
-                        <div className="flex items-center gap-1.5 min-w-0 text-[12px] font-semibold text-violet-700">
-                          <LuUsers size={13} className="shrink-0" />
-                          <span className="truncate">KPI của Leader ({team.leader_name || "chưa đặt tên"})</span>
+                      <div className="rounded-lg border border-violet-100 bg-violet-50/60 px-3 py-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 min-w-0 text-[12px] font-semibold text-violet-700">
+                            <LuUsers size={13} className="shrink-0" />
+                            <span className="truncate">KPI của Leader ({team.leader_name || "chưa đặt tên"})</span>
+                          </div>
+                          <span className="shrink-0 text-[12px] font-bold text-violet-700">
+                            {leaderHasTarget ? `${leaderPercentage}%` : "Chưa giao KPI"}
+                          </span>
                         </div>
-                        <span className="shrink-0 text-[12px] font-bold text-violet-700">
-                          {leaderHasTarget ? `${leaderPercentage}%` : "Chưa giao KPI"}
-                        </span>
+                        <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-violet-700/80">
+                          <span>Comment: {leaderKpi.comment}{leaderKpi.commentTarget > 0 ? `/${leaderKpi.commentTarget}` : ""}</span>
+                          <span>Inbox: {leaderKpi.inbox}{leaderKpi.inboxTarget > 0 ? `/${leaderKpi.inboxTarget}` : ""}</span>
+                          <span>Lead: {leaderKpi.lead}{leaderKpi.leadTarget > 0 ? `/${leaderKpi.leadTarget}` : ""}</span>
+                          <span>Post: {leaderKpi.post}{leaderKpi.postTarget > 0 ? `/${leaderKpi.postTarget}` : ""}</span>
+                        </div>
                       </div>
                     )}
 
