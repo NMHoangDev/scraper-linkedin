@@ -1,0 +1,5 @@
+# Nguoi duyet mac dinh - chi thuc su bat buoc o nhanh nao co bat
+# "Require review from Code Owners" trong branch protection (hien tai
+# chi bat o nhanh ui-trial - xem README/CI-CD-README neu co).
+# pinkyni-boo la truong nhom UI, duyet PR vao ui-trial.
+* @pinkyni-boo
