@@ -380,6 +380,18 @@ export const allPlatformKpiService = {
     });
   },
 
+  /** "Khách reply" — số tin nhắn thực tế khách gửi tới từng member (bulk, 1 request cho cả team). */
+  getFbInboxProgressBulk: (
+    emails: string[],
+    startDate?: string,
+    endDate?: string,
+  ): Promise<ApiResponse<Record<string, { kpi_fb_inbox_count: number; range: { start: string; end: string } }>>> => {
+    return requestJson(`${BASE}/kpi/fb-inbox-progress-bulk`, {
+      method: "POST",
+      body: JSON.stringify({ emails, start_date: startDate, end_date: endDate }),
+    });
+  },
+
   getFbPostKpiSummary: (
     email: string,
     startDate?: string,

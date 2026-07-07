@@ -77,6 +77,7 @@ export function TeamManagement() {
   const [teams, setTeams] = useState<TeamRow[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>("");
   const [kpiData, setKpiData] = useState<any[]>([]);
+  const [replyCounts, setReplyCounts] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<any>(null);
@@ -159,6 +160,39 @@ export function TeamManagement() {
         setIsLoading(false);
       });
   }, [user?.email, selectedTeamId, selectedWeek]);
+
+  // Effect: "Khach reply" - so tin nhan THUC TE khach gui toi tung member,
+  // khong phu thuoc da xac nhan tinh KPI hay chua (khac voi cot Inbox o tren,
+  // von chi tinh hoi thoai DA duoc leader xac nhan qua fb_inbox_kpi).
+  useEffect(() => {
+    const team = teams.find(t => t.id === selectedTeamId);
+    if (!team) {
+      setReplyCounts({});
+      return;
+    }
+    const emails = Array.from(
+      new Set([team.leader_email, ...(team.members || []).map(m => m.email)].filter(Boolean)),
+    );
+    if (emails.length === 0) {
+      setReplyCounts({});
+      return;
+    }
+    const [startDate, endDate] = selectedWeek.split("_");
+    allPlatformKpiService
+      .getFbInboxProgressBulk(emails, startDate, endDate)
+      .then((res) => {
+        if (!res.success || !res.data) {
+          setReplyCounts({});
+          return;
+        }
+        const next: Record<string, number> = {};
+        for (const [email, info] of Object.entries(res.data)) {
+          next[email] = info?.kpi_fb_inbox_count || 0;
+        }
+        setReplyCounts(next);
+      })
+      .catch(() => setReplyCounts({}));
+  }, [teams, selectedTeamId, selectedWeek]);
 
   // Get KPI date range for post view (from first member with KPI)
   useEffect(() => {
@@ -327,9 +361,10 @@ export function TeamManagement() {
         kpiInboxFbKpi: stats.kpi_inbox_fb_kpi || 0,
         kpiInboxRange: stats.kpi_inbox_range || null,
         seedingItems: kpiInfo.seeding_items || [],
+        replyCurrent: replyCounts[(member.email || "").toLowerCase()] || 0,
       };
     });
-  }, [teamMembers, kpiData, selectedTeam]);
+  }, [teamMembers, kpiData, selectedTeam, replyCounts]);
 
   // Overall Stats
   const totalKPIProgress = useMemo(() => {
@@ -609,16 +644,17 @@ export function TeamManagement() {
 
                   <div className="mt-4 grid grid-cols-2 gap-2">
                     {[
-                      { label: "Post", current: member.kpiPostCurrent, target: member.kpiPostTarget },
-                      { label: "Comment", current: member.kpiCommentCurrent, target: member.kpiCommentTarget },
-                      { label: "Inbox", current: member.kpiInboxCurrent, target: member.kpiInboxTarget },
-                      { label: "Lead", current: member.kpiLeadCurrent, target: member.kpiLeadTarget },
+                      { label: "Post", current: member.kpiPostCurrent, target: member.kpiPostTarget, hasTarget: true },
+                      { label: "Comment", current: member.kpiCommentCurrent, target: member.kpiCommentTarget, hasTarget: true },
+                      { label: "Inbox", current: member.kpiInboxCurrent, target: member.kpiInboxTarget, hasTarget: true },
+                      { label: "Khách reply", current: member.replyCurrent, target: 0, hasTarget: false },
+                      { label: "Lead", current: member.kpiLeadCurrent, target: member.kpiLeadTarget, hasTarget: true },
                     ].map((item) => (
                       <div key={item.label} className="rounded-xl bg-slate-50 px-3 py-2">
                         <p className="text-[11px] font-semibold text-slate-400">{item.label}</p>
                         <p className="mt-1 text-sm font-bold text-slate-900">
                           {item.current}
-                          <span className="ml-1 text-xs font-medium text-slate-400">/ {item.target}</span>
+                          {item.hasTarget && <span className="ml-1 text-xs font-medium text-slate-400">/ {item.target}</span>}
                         </p>
                       </div>
                     ))}
@@ -696,6 +732,7 @@ export function TeamManagement() {
                 <th className="px-1 py-2.5 text-center whitespace-nowrap">Post</th>
                 <th className="px-1 py-2.5 text-center whitespace-nowrap">Comment</th>
                 <th className="px-1 py-2.5 text-center whitespace-nowrap">Inbox</th>
+                <th className="px-1 py-2.5 text-center whitespace-nowrap" title="Số tin nhắn thực tế khách gửi tới (chưa cần xác nhận KPI)">Khách reply</th>
                 <th className="px-1 py-2.5 text-center whitespace-nowrap">Lead</th>
                 <th className="px-2 py-2.5 text-center whitespace-nowrap">Tiến độ</th>
                 <th className="px-2 py-2.5 text-center whitespace-nowrap">Hành động</th>
@@ -742,6 +779,9 @@ export function TeamManagement() {
                       <td className="px-1 py-2.5 text-center">
                         <span className={cn("text-[11px] font-bold", member.kpiInboxCurrent >= member.kpiInboxTarget && member.kpiInboxTarget > 0 ? "text-emerald-600" : "text-slate-800")}>{member.kpiInboxCurrent}</span>
                         <InlineKpiTarget member={member} field="kpiInboxTarget" value={member.kpiInboxTarget} />
+                      </td>
+                      <td className="px-1 py-2.5 text-center">
+                        <span className="text-[11px] font-bold text-slate-800">{member.replyCurrent}</span>
                       </td>
                       <td className="px-1 py-2.5 text-center">
                         <span className="text-[11px] font-bold text-slate-800">{member.kpiLeadCurrent}</span>

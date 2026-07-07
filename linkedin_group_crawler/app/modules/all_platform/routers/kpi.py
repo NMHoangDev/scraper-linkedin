@@ -282,6 +282,12 @@ class FbInboxProgressRequest(BaseModel):
     end_date: str = Field("", description="YYYY-MM-DD, mặc định = Sunday tuần hiện tại")
 
 
+class FbInboxProgressBulkRequest(BaseModel):
+    emails: List[str] = Field(..., min_length=1, description="Danh sách email member (app_users.email)")
+    start_date: str = Field("", description="YYYY-MM-DD, mặc định = Monday tuần hiện tại")
+    end_date: str = Field("", description="YYYY-MM-DD, mặc định = Sunday tuần hiện tại")
+
+
 class SyncFbInboxRequest(BaseModel):
     """Yêu cầu đếm/tính inbox KPI cho 1 hoặc nhiều hội thoại FB.
     Sau khi leader/admin xác nhận hội thoại là lead, gọi endpoint này."""
@@ -326,6 +332,35 @@ def fb_inbox_progress(payload: FbInboxProgressRequest) -> BaseResponse:
         data = result.get(email, {"kpi_fb_inbox_count": 0, "range": {"start": start, "end": end}})
         return BaseResponse(success=True, data=data)
     except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@router.post("/fb-inbox-progress-bulk")
+def fb_inbox_progress_bulk(payload: FbInboxProgressBulkRequest) -> BaseResponse:
+    """"Khách reply" - dem tin nhan Facebook Messenger tu khach (from='them') toi
+    tung member trong danh sach, trong khoang [start_date, end_date].
+
+    1 truy van batch cho ca team (tranh N+1 goi /fb-inbox-progress rieng le
+    cho tung thanh vien). Khac voi "KPI Inbox" (fb_inbox_kpi, chi tinh hoi
+    thoai DA duoc leader xac nhan) - day la SO TIN NHAN THUC TE khach gui,
+    khong phu thuoc da xac nhan KPI hay chua.
+    """
+    try:
+        emails = [e.strip().lower() for e in payload.emails if e.strip()]
+        start = payload.start_date.strip()
+        end = payload.end_date.strip()
+
+        if not start or not end:
+            today_d = datetime.now(VN_TZ).date()
+            monday = today_d - timedelta(days=today_d.weekday())
+            sunday = monday + timedelta(days=6)
+            start = start or monday.isoformat()
+            end = end or sunday.isoformat()
+
+        result = _compute_fb_inbox_progress(emails, start, end)
+        return BaseResponse(success=True, data=result)
+    except Exception as e:
+        logger.error(f"fb_inbox_progress_bulk error: {e}")
         return BaseResponse(success=False, message=str(e))
 
 

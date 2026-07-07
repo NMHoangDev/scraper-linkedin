@@ -181,6 +181,7 @@ export function LeaderDashboardContent() {
   const [groups, setGroups] = useState<GroupRecord[]>([]);
   const [posts, setPosts] = useState<UnifiedPost[]>([]);
   const [kpiMembers, setKpiMembers] = useState<any[]>([]);
+  const [replyCounts, setReplyCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -214,7 +215,11 @@ export function LeaderDashboardContent() {
       setError(null);
 
       try {
-        const [kpiRes, fbGroupsRes, liGroupsRes, fbPostsRes, liPostsRes] = await Promise.all([
+        const memberEmails = Array.from(
+          new Set([user.email, ...(selectedTeam.members || []).map((m) => m.email)].filter(Boolean)),
+        );
+
+        const [kpiRes, fbGroupsRes, liGroupsRes, fbPostsRes, liPostsRes, replyRes] = await Promise.all([
           allPlatformKpiService.getAll(user.email, selectedTeamId, startDate, endDate),
           allPlatformGroupsService.getAll("facebook"),
           allPlatformGroupsService.getAll("linkedin"),
@@ -236,9 +241,18 @@ export function LeaderDashboardContent() {
             page: 1,
             page_size: 20,
           }),
+          allPlatformKpiService.getFbInboxProgressBulk(memberEmails, startDate, endDate),
         ]);
 
         setKpiMembers(kpiRes.success && kpiRes.data?.members ? kpiRes.data.members : []);
+
+        const nextReplyCounts: Record<string, number> = {};
+        if (replyRes.success && replyRes.data) {
+          for (const [email, info] of Object.entries(replyRes.data)) {
+            nextReplyCounts[email] = info?.kpi_fb_inbox_count || 0;
+          }
+        }
+        setReplyCounts(nextReplyCounts);
 
         const allGroups = [
           ...((fbGroupsRes.success && fbGroupsRes.data ? fbGroupsRes.data : []) as FacebookGroup[]),
@@ -325,6 +339,10 @@ export function LeaderDashboardContent() {
   const totalLeads = memberMetrics.reduce((sum, member) => sum + member.leadCurrent, 0);
   const totalTraffic = memberMetrics.reduce((sum, member) => sum + member.traffic, 0);
   const totalInbox = memberMetrics.reduce((sum, member) => sum + member.inboxCurrent, 0);
+  // "Khach reply" - so tin nhan THUC TE khach gui toi (khong phu thuoc da xac
+  // nhan tinh KPI hay chua), khac voi "KPI Inbox" (chi tinh hoi thoai da duoc
+  // leader xac nhan qua fb_inbox_kpi).
+  const totalReply = Object.values(replyCounts).reduce((sum, c) => sum + (c || 0), 0);
 
   const industryDistribution = useMemo(
     () => buildDistribution(groups, (group) => group.industry_name || group.industry),
@@ -425,10 +443,11 @@ export function LeaderDashboardContent() {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">
         <MetricCard label="Tổng groups" value={loading ? "..." : totalGroups} />
         <MetricCard label="Comment tuần này" value={loading ? "..." : totalComments} />
         <MetricCard label="KPI Inbox" value={loading ? "..." : totalInbox} />
+        <MetricCard label="Khách reply" value={loading ? "..." : totalReply} />
         <MetricCard label="Leads mang về" value={loading ? "..." : totalLeads} />
         <MetricCard label="UTM traffic" value={loading ? "..." : totalTraffic} />
       </div>
