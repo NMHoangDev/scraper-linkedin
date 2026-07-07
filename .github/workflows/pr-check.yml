@@ -1,0 +1,48 @@
+name: PR Build Check
+
+# Kiem tra code build duoc TRUOC khi cho phep merge PR vao restyle-form.
+# Chi build-check, KHONG deploy len bat ky host nao - chay tren runner
+# GitHub-hosted (khong dung self-hosted dev/app), an toan cho code chua
+# duoc duyet tu team ngoai.
+on:
+  pull_request:
+    branches:
+      - restyle-form
+
+jobs:
+  build-frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: linkedin-crawler-ui
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: linkedin-crawler-ui/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (kiem tra loi TypeScript/syntax)
+        run: npm run build
+        env:
+          NEXT_PUBLIC_LINKEDIN_CRAWLER_API_URL: https://seeding.markeeai.com
+          NEXT_PUBLIC_API_FACEBOOK_BASE_URL: https://seeding.markeeai.com
+          NEXT_PUBLIC_LINKEDIN_CRAWLER_API_KEY: secret_api_key
+
+  check-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Kiem tra cu phap Python (khong can cai full dependency)
+        run: |
+          python -m py_compile $(find linkedin_group_crawler/app -name "*.py")
