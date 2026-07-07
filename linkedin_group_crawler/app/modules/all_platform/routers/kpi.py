@@ -373,6 +373,8 @@ def fb_inbox_sync(payload: SyncFbInboxRequest) -> BaseResponse:
     Nếu is_lead=True -> đánh dấu là lead tiềm năng.
     """
     try:
+        from app.modules.all_platform.services.fb_inbox_account_service import resolve_id_member
+
         supabase: Client = get_supabase_client()
         leader_email = payload.leader_email.strip().lower()
         member_email = payload.member_email.strip().lower()
@@ -383,6 +385,28 @@ def fb_inbox_sync(payload: SyncFbInboxRequest) -> BaseResponse:
         if not leader_res.data:
             return BaseResponse(success=False, message=f"Không tìm thấy leader với email: {leader_email}")
         id_leader = leader_res.data[0]["id"]
+
+        # Resolve id_member tu chinh tai khoan FB (user_id) dang duoc xac nhan -
+        # KHONG dua vao payload.member_email, vi FE co the truyen nham email cua
+        # nguoi dang dang nhap (leader) thay vi email cua member so huu tai khoan
+        # dang xem (gay KPI bi gan nham cho leader thay vi member thuc su lam viec).
+        # Day la cung 1 ham resolve_id_member() da dung o count_fb_inbox_kpi.
+        id_member: Optional[str] = resolve_id_member(user_id)
+        if not id_member:
+            # Fallback: thu resolve qua member_email neu tai khoan FB chua duoc
+            # dang ky trong fb_inbox_accounts (vd chua bam "Bat tinh KPI").
+            if member_email:
+                member_res = supabase.table("app_users").select("id").eq("email", member_email).limit(1).execute()
+                if member_res.data:
+                    id_member = member_res.data[0]["id"]
+        if not id_member:
+            return BaseResponse(
+                success=False,
+                message=(
+                    f"Không tìm thấy member sở hữu FB account [{user_id}]. "
+                    f"Vui lòng vào Quản lý tài khoản seeding -> bấm 'Bật tính KPI' cho tài khoản này trước."
+                ),
+            )
 
         now = datetime.now(timezone.utc).isoformat()
         synced = 0
@@ -401,8 +425,9 @@ def fb_inbox_sync(payload: SyncFbInboxRequest) -> BaseResponse:
 
             if existing.data:
                 row = existing.data[0]
-                # Update: set is_confirmed = True
-                update_data = {"is_confirmed": True, "synced_at": now}
+                # Update: set is_confirmed = True, va sua lai id_member cho dung
+                # chu so huu that su (phong khi row cu bi tao sai truoc khi fix nay).
+                update_data = {"is_confirmed": True, "synced_at": now, "id_member": id_member}
                 if payload.is_lead and not row.get("is_lead"):
                     update_data["is_lead"] = True
                     lead += 1
@@ -411,6 +436,7 @@ def fb_inbox_sync(payload: SyncFbInboxRequest) -> BaseResponse:
             else:
                 # Row chưa tồn tại - tạo mới với is_confirmed = True
                 supabase.table("fb_inbox_kpi").insert({
+                    "id_member": id_member,
                     "id_leader": id_leader,
                     "conv_id": conv_id,
                     "user_id": user_id,

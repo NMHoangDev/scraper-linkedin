@@ -213,6 +213,7 @@ function InboxPageContent() {
   const [scopeReady, setScopeReady] = useState(false);
   const [allowedOwnerIds, setAllowedOwnerIds] = useState<Set<string> | null>(new Set());
   const [ownerNames, setOwnerNames] = useState<Record<string, string>>({});
+  const [ownerEmails, setOwnerEmails] = useState<Record<string, string>>({});
   const [teams, setTeams] = useState<TeamRow[]>([]);
   const [extInstalled, setExtInstalled] = useState<boolean | null>(null);
   const [convs, setConvs] = useState<Conv[]>([]);
@@ -367,10 +368,21 @@ function InboxPageContent() {
     if (!owner) return;
     let cancelled = false;
     const myName = user?.name || user?.email || owner;
+    const myEmail = user?.email || "";
     const buildMap = (rows: UserRow[]): Record<string, string> => {
       const m: Record<string, string> = { [owner]: myName };
       for (const u of rows || []) {
         if (u?.id) m[u.id] = u.name || u.email || u.id;
+      }
+      return m;
+    };
+    // Song song voi ownerNames - can email that su cua chu tai khoan dang xem
+    // de xac nhan KPI cho DUNG member, khong bi nham thanh email cua nguoi
+    // dang dang nhap (leader/admin) khi ho dang xem tai khoan cua member khac.
+    const buildEmailMap = (rows: UserRow[]): Record<string, string> => {
+      const m: Record<string, string> = { [owner]: myEmail };
+      for (const u of rows || []) {
+        if (u?.id && u?.email) m[u.id] = u.email;
       }
       return m;
     };
@@ -387,7 +399,9 @@ function InboxPageContent() {
           const usersData = usersRes || {};
           const teamsData = teamsRes || {};
           if (!cancelled) {
-            setOwnerNames(buildMap(Array.isArray(usersData?.data) ? usersData.data : []));
+            const rows = Array.isArray(usersData?.data) ? usersData.data : [];
+            setOwnerNames(buildMap(rows));
+            setOwnerEmails(buildEmailMap(rows));
             setTeams(Array.isArray(teamsData?.data) ? teamsData.data : []);
             setAllowedOwnerIds(null);
             setScopeReady(true);
@@ -395,6 +409,7 @@ function InboxPageContent() {
         } catch {
           if (!cancelled) {
             setOwnerNames({ [owner]: myName });
+            setOwnerEmails({ [owner]: myEmail });
             setTeams([]);
             setAllowedOwnerIds(null);
             setScopeReady(true);
@@ -412,6 +427,7 @@ function InboxPageContent() {
           if (!cancelled) {
             setAllowedOwnerIds(new Set(all));
             setOwnerNames(buildMap(rows));
+            setOwnerEmails(buildEmailMap(rows));
             setTeams([{ id: `leader-${owner}`, name_team: "Team của tôi", id_leader: owner, leader_name: myName, members: rows }]);
             setScopeReady(true);
           }
@@ -419,6 +435,7 @@ function InboxPageContent() {
           if (!cancelled) {
             setAllowedOwnerIds(new Set([owner]));
             setOwnerNames({ [owner]: myName });
+            setOwnerEmails({ [owner]: myEmail });
             setTeams([{ id: `leader-${owner}`, name_team: "Team của tôi", id_leader: owner, leader_name: myName, members: [] }]);
             setScopeReady(true);
           }
@@ -429,6 +446,7 @@ function InboxPageContent() {
       if (!cancelled) {
         setAllowedOwnerIds(new Set([owner]));
         setOwnerNames({ [owner]: myName });
+        setOwnerEmails({ [owner]: myEmail });
         setTeams([]);
         setScopeReady(true);
       }
@@ -1262,6 +1280,11 @@ function InboxPageContent() {
   const selectedSession = sessions.find(s => s.user_id === acc);
   const accOnline = selectedSession?.status === "online";
   const accPaused = selectedSession?.status === "paused";
+  // Email cua CHU tai khoan FB dang xem (vd Le Hai) - khac voi user?.email (nguoi
+  // dang dang nhap, vd leader) khi leader dang xem tai khoan cua 1 member khac.
+  // Dung cho xac nhan/hien thi KPI dung nguoi, khong bi gan nham cho leader.
+  const selectedAccountOwnerEmail =
+    (selectedSession?.owner && ownerEmails[selectedSession.owner]) || user?.email || "";
 
   useEffect(() => {
     if (!openConv || archiveReading) return;
@@ -1354,6 +1377,7 @@ function InboxPageContent() {
         suggestedConvIds={suggestedConvIds}
         userEmail={user?.email || ""}
         ownerEmail={user?.email || ""}
+        accountOwnerEmail={selectedAccountOwnerEmail}
         onBulkVerifyKpi={bulkVerifyFbInboxKpi}
       />
     );

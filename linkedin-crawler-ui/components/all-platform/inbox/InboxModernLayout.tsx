@@ -106,6 +106,10 @@ interface Props {
   suggestedConvIds: Set<string>;
   userEmail: string;
   ownerEmail: string;
+  /** Email cua CHU tai khoan FB dang duoc xem (khac userEmail khi leader/admin
+   * dang xem tai khoan cua 1 member khac) - dung de xac nhan/hien thi KPI
+   * dung nguoi, tranh gan nham cho leader. */
+  accountOwnerEmail: string;
   onBulkVerifyKpi: (payload: { leader_email: string; target_date: string }) => Promise<void>;
 }
 
@@ -211,7 +215,7 @@ export default function InboxModernLayout(props: Props) {
     chatScrollRef, selectAcc, scan, setViewMode, setArchiveReading, setFilter,
     setReply, openChat, hoverConv, openArchive, mark, saveArchive, saveCustomerNote, sendReply,
     needsReply, accLabel, syncFbInbox, onSuggestKpi, verifiedConvIds, suggestedConvIds,
-    userEmail, ownerEmail,
+    userEmail, ownerEmail, accountOwnerEmail,
   } = props;
 
   const [panelTab, setPanelTab] = useState<PanelTab>("templates");
@@ -485,10 +489,10 @@ export default function InboxModernLayout(props: Props) {
           )}
         </div>
 
-        {userEmail && (
+        {(accountOwnerEmail || userEmail) && (
           <div className="grid grid-cols-1 gap-4 border-t border-border p-4 xl:grid-cols-2">
-            <KpiProgressCard email={userEmail} type="inbox" />
-            <KpiProgressCard email={userEmail} type="lead" />
+            <KpiProgressCard email={accountOwnerEmail || userEmail} type="inbox" />
+            <KpiProgressCard email={accountOwnerEmail || userEmail} type="lead" />
           </div>
         )}
       </div>
@@ -932,7 +936,7 @@ export default function InboxModernLayout(props: Props) {
                           <button onClick={async () => {
                             if (!acc) return;
                             try {
-                              await syncFbInbox({ leader_email: ownerEmail, member_email: userEmail, conv_ids: [openConv], user_id: acc, is_lead: false });
+                              await syncFbInbox({ leader_email: ownerEmail, member_email: accountOwnerEmail || userEmail, conv_ids: [openConv], user_id: acc, is_lead: false });
                               showToastKpi("Đã xác nhận inbox!", true);
                             } catch { showToastKpi("Lỗi xác nhận", false); }
                           }}
@@ -942,7 +946,7 @@ export default function InboxModernLayout(props: Props) {
                           <button onClick={async () => {
                             if (!acc) return;
                             try {
-                              await syncFbInbox({ leader_email: ownerEmail, member_email: userEmail, conv_ids: [openConv], user_id: acc, is_lead: true });
+                              await syncFbInbox({ leader_email: ownerEmail, member_email: accountOwnerEmail || userEmail, conv_ids: [openConv], user_id: acc, is_lead: true });
                               showToastKpi("Đã xác nhận Inbox + Lead!", true);
                               mark(openConv, "is_customer", true);
                             } catch { showToastKpi("Lỗi xác nhận lead", false); }
