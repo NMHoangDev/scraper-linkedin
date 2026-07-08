@@ -1118,6 +1118,101 @@ def count_fb_inbox_kpi(
     return {"synced": synced, "lead": lead, "member_email": member_email}
 
 
+def auto_count_fb_inbox_reply(user_id: str, conv_id: str) -> Optional[dict]:
+    """Tự động tính +1 KPI inbox khi nhân viên trả lời khách qua FB Messenger.
+
+    Gọi sau khi POST /inbox/reply gửi thành công. Idempotent theo
+    (id_member, conv_id, user_id) — mỗi hội thoại chỉ tính 1 lần — và ghi thẳng
+    is_confirmed=True nên không cần leader bấm xác nhận.
+
+    Trả None (không raise) nếu FB account chưa được link với member nào, để
+    không làm hỏng luồng gửi tin.
+    """
+    if not user_id or not conv_id:
+        return None
+
+    try:
+        from app.modules.all_platform.services.fb_inbox_account_service import resolve_id_member
+
+        id_member = resolve_id_member(user_id)
+        if not id_member:
+            logger.info(f"auto_count_fb_inbox_reply: no member linked to user_id={user_id}, skip")
+            return None
+
+        supabase: Client = get_supabase_client()
+
+        # Resolve leader của member (fallback: member tự làm leader nếu chưa có team)
+        id_leader = id_member
+        member_teams = (
+            supabase.table("member_of_teams")
+            .select("id_teams")
+            .eq("id_member", id_member)
+            .limit(1)
+            .execute()
+        )
+        if member_teams.data:
+            team_res = (
+                supabase.table("teams")
+                .select("id_leader")
+                .eq("id", member_teams.data[0]["id_teams"])
+                .limit(1)
+                .execute()
+            )
+            if team_res.data and team_res.data[0].get("id_leader"):
+                id_leader = team_res.data[0]["id_leader"]
+
+        now = datetime.now(timezone.utc).isoformat()
+
+        existing = (
+            supabase.table("fb_inbox_kpi")
+            .select("id, is_confirmed")
+            .eq("id_member", id_member)
+            .eq("conv_id", conv_id)
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+
+        if existing.data:
+            row = existing.data[0]
+            if row.get("is_confirmed"):
+                return None  # đã tính rồi, không làm gì thêm
+            supabase.table("fb_inbox_kpi").update(
+                {"is_confirmed": True, "synced_at": now}
+            ).eq("id", row["id"]).execute()
+        else:
+            supabase.table("fb_inbox_kpi").insert({
+                "id_member": id_member,
+                "id_leader": id_leader,
+                "conv_id": conv_id,
+                "user_id": user_id,
+                "message_count": 1,
+                "is_lead": False,
+                "is_confirmed": True,
+                "synced_at": now,
+            }).execute()
+
+        # Invalidate cache overview để dashboard cập nhật ngay
+        leader_email = None
+        try:
+            leader_res = supabase.table("app_users").select("email").eq("id", id_leader).limit(1).execute()
+            if leader_res.data:
+                leader_email = leader_res.data[0].get("email")
+        except Exception:
+            pass
+        invalidate_overview_cache(leader_email)
+
+        logger.info(
+            f"auto_count_fb_inbox_reply: counted conv_id={conv_id} for member={id_member} (user_id={user_id})"
+        )
+        return {"id_member": id_member, "id_leader": id_leader, "conv_id": conv_id}
+    except Exception as exc:
+        logger.warning(
+            f"auto_count_fb_inbox_reply failed (user_id={user_id}, conv_id={conv_id}): {exc}"
+        )
+        return None
+
+
 # Phase 1: gọi helper này từ bất kỳ đâu trong module khác để clear cache khi
 # leader verify/sync inbox. Tránh vòng import trực tiếp từ các module khác.
 def notify_fb_inbox_changed(leader_email: Optional[str] = None) -> None:

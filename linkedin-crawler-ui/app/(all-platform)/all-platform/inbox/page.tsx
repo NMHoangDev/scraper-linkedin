@@ -230,7 +230,6 @@ function InboxPageContent() {
   const [viewMode, setViewMode] = useState<"inbox" | "archive">("inbox");
   const [loadingArchives, setLoadingArchives] = useState(false);
   const [verifiedConvIds, setVerifiedConvIds] = useState<Set<string>>(new Set());
-  const [suggestedConvIds, setSuggestedConvIds] = useState<Set<string>>(new Set()); // local state for optimistic updates
   const [archiveReading, setArchiveReading] = useState(false);
   const [openConv, setOpenConv] = useState(() => searchParams.get("conv") || "");
   const [msgs, setMsgs] = useState<Msg[]>([]);
@@ -910,73 +909,18 @@ function InboxPageContent() {
     }
   }
 
-  async function syncFbInboxKpi(payload: {
-    leader_email: string;
-    member_email: string;
-    conv_ids: string[];
-    user_id: string;
-    is_lead: boolean;
-  }) {
-    try {
-      await allPlatformKpiService.syncFbInbox(payload);
-      // Refresh verified conv_ids after sync
-      await fetchVerifiedConvIds();
-    } catch {
-      showToast("Lỗi xác nhận KPI inbox", false);
-      throw new Error("KPI sync failed");
-    }
-  }
-
+  // KPI inbox được backend tự tính khi nhân viên trả lời khách (xem
+  // auto_count_fb_inbox_reply). FE chỉ cần đọc conv_ids đã tính để đánh dấu
+  // "đã tính KPI" trong filter, không còn thao tác đề xuất/xác nhận thủ công.
   async function fetchVerifiedConvIds() {
     if (!user?.email) return;
     try {
       const res = await allPlatformKpiService.getVerifiedConvIds(user.email);
       if (res.success) {
-        // confirmed = đã được leader duyệt
         setVerifiedConvIds(new Set(res.data?.confirmed_conv_ids || []));
-        // pending = đã đề xuất nhưng chưa được duyệt
-        setSuggestedConvIds(new Set(res.data?.pending_conv_ids || []));
       }
     } catch (e) {
       console.warn("Failed to fetch verified conv IDs:", e);
-    }
-  }
-
-  async function suggestFbInboxKpi(payload: {
-    member_email: string;
-    conv_ids: string[];
-    user_id: string;
-  }) {
-    // Optimistic update
-    setSuggestedConvIds(prev => new Set([...prev, ...payload.conv_ids]));
-
-    try {
-      await allPlatformKpiService.suggestFbInbox(payload);
-      await fetchVerifiedConvIds();
-      showToast(payload.conv_ids.length > 1 ? `Đã đề xuất ${payload.conv_ids.length} inbox cho KPI` : `Đã đề xuất inbox cho KPI`, true);
-    } catch {
-      // Revert optimistic update on error
-      setSuggestedConvIds(prev => {
-        const next = new Set(prev);
-        payload.conv_ids.forEach(id => next.delete(id));
-        return next;
-      });
-      showToast("Lỗi đề xuất KPI inbox", false);
-      throw new Error("Suggest KPI failed");
-    }
-  }
-
-  async function bulkVerifyFbInboxKpi(payload: {
-    leader_email: string;
-    target_date: string;
-  }) {
-    try {
-      await allPlatformKpiService.bulkVerifyFbInbox(payload);
-      await fetchVerifiedConvIds();
-      showToast(`Đã tính KPI hàng loạt thành công!`, true);
-    } catch {
-      showToast("Lỗi tính KPI hàng loạt", false);
-      throw new Error("Bulk verify KPI failed");
     }
   }
 
@@ -1238,6 +1182,9 @@ function InboxPageContent() {
             setTimeout(() => { void fetchThread(convId); }, 7000);
           }
           showToast("Đã gửi tin thành công", true);
+          // Nhắn cho khách xong → backend tự tính +1 KPI inbox. Refresh để hội
+          // thoại rời khỏi filter "Chưa tính KPI".
+          setTimeout(() => { void fetchVerifiedConvIds(); }, 1500);
         }
         else { setStatus("Gửi thất bại"); showToast("FB chưa gửi được — thử lại", false); }
         finish();
@@ -1266,7 +1213,7 @@ function InboxPageContent() {
     filter === "unread" ? c.unread :
     filter === "customer" ? c.is_customer :
     filter === "need_reply" ? needsReply(c) :
-    filter === "need_verify" ? (!verifiedConvIds.has(c.conv_id) && !suggestedConvIds.has(c.conv_id)) :
+    filter === "need_verify" ? !verifiedConvIds.has(c.conv_id) :
     true
   ));
   // Nổi ưu tiên lên đầu: cần trả lời > chưa đọc > khách; giữ thứ tự gốc trong cùng nhóm.
@@ -1371,14 +1318,8 @@ function InboxPageContent() {
         sendReply={sendReply}
         needsReply={needsReply}
         accLabel={accLabel}
-        syncFbInbox={syncFbInboxKpi}
-        onSuggestKpi={suggestFbInboxKpi}
-        verifiedConvIds={verifiedConvIds}
-        suggestedConvIds={suggestedConvIds}
         userEmail={user?.email || ""}
-        ownerEmail={user?.email || ""}
         accountOwnerEmail={selectedAccountOwnerEmail}
-        onBulkVerifyKpi={bulkVerifyFbInboxKpi}
       />
     );
   }
