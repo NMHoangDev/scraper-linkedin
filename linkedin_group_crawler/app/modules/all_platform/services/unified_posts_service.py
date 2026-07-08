@@ -86,7 +86,9 @@ def _fetch_posts(
     if table == "facebook_posts":
         query = tbl.select("*, author_post(*), facebook_groups(group_name, id_intent, id_industry, id_team, id_tier, id_icp, id_content_type, id_product_seeding, id_member)", count="exact")
     else:
-        query = tbl.select("*, author_post(*), linkedin_groups(group_name, id_intent, id_industry, id_team, id_tier, id_icp, id_content_type, id_product_seeding, id_member)", count="exact")
+        # linkedin_posts has no FK relationship to author_post (unlike facebook_posts.id_author) —
+        # embedding it here makes PostgREST fail with PGRST200 on every "all"/"linkedin" tab load.
+        query = tbl.select("*, linkedin_groups(group_name, id_intent, id_industry, id_team, id_tier, id_icp, id_content_type, id_product_seeding, id_member)", count="exact")
 
     # Scope to requesting user
     if email:
