@@ -27,6 +27,19 @@ interface AppAuthContextType {
 const AppAuthContext = createContext<AppAuthContextType | undefined>(undefined);
 const AUTH_CHECK_TIMEOUT_MS = 6000;
 
+// ─── DEV BYPASS ────────────────────────────────────────────────────────────
+// Bật NEXT_PUBLIC_SKIP_AUTH=true trong .env.local để bỏ qua gọi API /auth/me
+// và /auth/login khi backend (Supabase) chưa sẵn sàng. Dùng khi chỉ làm UI.
+// NHỚ: không để true khi build production.
+const SKIP_AUTH = process.env.NEXT_PUBLIC_SKIP_AUTH === "true";
+const MOCK_USER: AppUser = {
+  id: "dev-mock-user",
+  email: "dev@markee.ai",
+  name: "Dev User",
+  role: "admin",
+  is_active: true,
+};
+
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = window.setTimeout(() => reject(new Error("Auth check timeout")), ms);
@@ -48,6 +61,10 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const refreshUser = useCallback(async () => {
+    if (SKIP_AUTH) {
+      setUser(MOCK_USER);
+      return;
+    }
     try {
       const res = await withTimeout(authService.me(), AUTH_CHECK_TIMEOUT_MS);
       if (res.success && res.data) {
@@ -84,6 +101,10 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
   }, [refreshUser]);
 
   const login = useCallback(async (email: string, password: string) => {
+    if (SKIP_AUTH) {
+      setUser(MOCK_USER);
+      return;
+    }
     setIsLoading(true);
     try {
       const res = await authService.login({ email, password });
