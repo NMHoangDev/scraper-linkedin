@@ -1,0 +1,325 @@
+{
+  "angle": "broad-exception-fail-open",
+  "candidates": [
+    {
+      "severity": "critical",
+      "file": "backend/core/services/user_quota.py",
+      "line": 51,
+      "description": "_local_credit_remaining catches all Exception and returns None on DB failure; check_user_quota treats None as isAuthorized=True (fail-open). Comment on line 56 explicitly states 'fail-open (van cho chay)'. This means any DB connection issue grants unlimited AI credit.",
+      "pattern": "except Exception -> return None -> treated as authorized",
+      "code_snippet": "    except Exception as e:\n        print(f\"[WARN] _local_credit_remaining loi: {e}\")\n        return None\n...\n    if local_remaining is None:\n        print(f\"[WARN] check_user_quota: ... fail-open (cho chay)\")\n        return UserQuotaResponseData(isAuthorized=True)"
+    },
+    {
+      "severity": "critical",
+      "file": "backend/apis/featured.py",
+      "line": 36,
+      "description": "_get_local_credits catches all Exception and returns None; _resolve_credits treats None as DEFAULT_FREE_CREDITS=1000. When the DB is unreachable, users get 1000 free credits instead of failing closed.",
+      "pattern": "except Exception -> return None -> defaults to 1000 free credits",
+      "code_snippet": "    except Exception as exc:\n        logger.warning(f\"_get_local_credits loi user_id={user_id}: {exc}\")\n    return None\n...\n    base = local if local is not None else DEFAULT_FREE_CREDITS"
+    },
+    {
+      "severity": "high",
+      "file": "backend/core/services/facebook.py",
+      "line": 141,
+      "description": "Bare `except:` silently swallows Facebook API error JSON parsing failure. If response.json() fails (e.g. malformed response), the error is silently dropped and code falls through to raise a less informative generic Exception.",
+      "pattern": "bare except: pass",
+      "code_snippet": "                        except:\n                            pass"
+    },
+    {
+      "severity": "high",
+      "file": "backend/core/services/facebook.py",
+      "line": 146,
+      "description": "Outer except Exception catches all errors from Facebook API update call and returns None, silently hiding the failure from the caller. The function returns None instead of propagating the error or returning a meaningful failure state.",
+      "pattern": "except Exception -> return None",
+      "code_snippet": "    except Exception as e:\n        logger.error(f\"Error updating page info: {str(e)}\")\n        return None"
+    },
+    {
+      "severity": "high",
+      "file": "backend/core/services/fanpages.py",
+      "line": 248,
+      "description": "Token refresh failure is silently swallowed, and the existing (possibly expired) token is returned. This means a fanpage token could be expired but still be used, causing Facebook API failures downstream that are harder to diagnose.",
+      "pattern": "except Exception -> return existing (potentially expired) token",
+      "code_snippet": "    except Exception:\n        # Error refreshing, return existing token\n        return decrypt_access_token(fanpage.page_access_token)"
+    },
+    {
+      "severity": "high",
+      "file": "backend/apis/mcp_server.py",
+      "line": 117,
+      "description": "except Exception: pass silently ignores auth token verification failure during POST requests. While the comment says 'let the app/subsequent middleware decide', this means an invalid token is silently accepted and the middleware may proceed without authentication.",
+      "pattern": "except Exception: pass",
+      "code_snippet": "                    except Exception:\n                        pass  # Let the app/subsequent middleware decide"
+    },
+    {
+      "severity": "high",
+      "file": "backend/core/services/chat_pipeline.py",
+      "line": 113,
+      "description": "Knowledge base context fetch failure is silently caught and set to None. The downstream agent runs without any KB context, potentially producing low-quality answers without the user knowing context was missing.",
+      "pattern": "except Exception -> set to None",
+      "code_snippet": "            except Exception:\n                project_kb_context = None"
+    },
+    {
+      "severity": "high",
+      "file": "backend/core/services/wpcom.py",
+      "line": 40,
+      "description": "JSON parsing failure in _request silently returns a dict with raw text instead of failing or trying to parse properly. This could cause type errors in callers expecting structured JSON.",
+      "pattern": "except Exception -> return wrong type",
+      "code_snippet": "            except Exception:\n                return {\"text\": text}"
+    },
+    {
+      "severity": "high",
+      "file": "backend/core/services/wpcom.py",
+      "line": 47,
+      "description": "verify_token catches all Exception and returns False, but also silently swallows the underlying error (no logging). Failures unrelated to auth (network, parsing) are indistinguishable from actual auth failures.",
+      "pattern": "except Exception: return False (no logging)",
+      "code_snippet": "    except Exception:\n        return False"
+    },
+    {
+      "severity": "high",
+      "file": "backend/core/services/wpcom.py",
+      "line": 93,
+      "description": "URL parsing failure in create_post is silently swallowed with pass, and the unparsed site string is used as-is. This could cause confusing downstream errors.",
+      "pattern": "except Exception: pass",
+      "code_snippet": "    except Exception:\n        pass"
+    },
+    {
+      "severity": "high",
+      "file": "backend/apis/chat.py",
+      "line": 425,
+      "description": "Greeting message generation failure silently falls back to a hardcoded default result. The user gets a generic greeting without any indication the AI generation failed.",
+      "pattern": "except Exception -> return default result",
+      "code_snippet": "    except Exception:\n        logger.exception(\"Failed to generate greeting message\")\n        return default_result"
+    },
+    {
+      "severity": "high",
+      "file": "backend/apis/chat.py",
+      "line": 306,
+      "description": "Agent response persistence failure in on_complete is silently logged but the caller receives no indication the message was not saved. The user thinks their AI response was persisted but it was lost.",
+      "pattern": "except Exception -> just log",
+      "code_snippet": "            except Exception:\n                logger.exception(\"Failed to persist agent response in Vercel adapter\")"
+    },
+    {
+      "severity": "high",
+      "file": "backend/core/services/web_discovery.py",
+      "line": 410,
+      "description": "Crawl phase failure silently returns empty result list. Users receive search results without any crawled content, and no indication is shown that context enrichment failed.",
+      "pattern": "except Exception -> return empty list",
+      "code_snippet": "        except Exception:\n            logger.warning(\"Crawl phase failed ...\")\n            crawled = []"
+    },
+    {
+      "severity": "high",
+      "file": "backend/core/services/streaming.py",
+      "line": 264,
+      "description": "next_steps generation error in direct_reply branch is printed but silently swallowed. The stream continues without the suggested steps, but the user may see an incomplete or inconsistent experience.",
+      "pattern": "except Exception -> print and continue",
+      "code_snippet": "                    except Exception as e:\n                        print(f\"Error generating next steps for direct_reply: {e}\")"
+    },
+    {
+      "severity": "high",
+      "file": "backend/core/services/streaming.py",
+      "line": 454,
+      "description": "Sub-agent execution failure is printed but silently continued via `continue`, skipping error reporting to the user. Errors in content generation agents are swallowed and the user gets incomplete output.",
+      "pattern": "except Exception -> print and continue",
+      "code_snippet": "                        except Exception as e:\n                            print(f\"-> ERROR running agent {task.agent_name}: {e}\")\n                            continue"
+    },
+    {
+      "severity": "high",
+      "file": "backend/core/services/streaming.py",
+      "line": 572,
+      "description": "next_steps generation error in sub-agent branch is printed and silently swallowed, mirroring the same issue at line 264. Suggested steps silently disappear.",
+      "pattern": "except Exception -> print and swallow",
+      "code_snippet": "                except Exception as e:\n                    print(f\"Error generating next steps: {e}\")"
+    },
+    {
+      "severity": "high",
+      "file": "backend/apis/mcp_proxy.py",
+      "line": 244,
+      "description": "Session recording failure during SSE handshake silently returns (aborts the stream) without propagating the error. The client sees a dropped connection but no clear error message.",
+      "pattern": "except Exception -> return (silent abort)",
+      "code_snippet": "                        except Exception:\n                            logger.exception(\"MCP proxy: failed to record session\")\n                            return"
+    },
+    {
+      "severity": "high",
+      "file": "backend/apis/mcp_proxy.py",
+      "line": 262,
+      "description": "Session cleanup deletion failure during SSE teardown is silently logged and swallowed. This can leave orphaned session rows in the database.",
+      "pattern": "except Exception -> log and swallow",
+      "code_snippet": "            except Exception:\n                logger.exception(f\"MCP proxy: failed to delete session {session_id}\")"
+    },
+    {
+      "severity": "high",
+      "file": "backend/apis/mcp_proxy.py",
+      "line": 159,
+      "description": "Worker liveness loop catches all exceptions broadly and just logs with logger.exception. A transient error that returns (rather than raising CancelledError) is silently swallowed and the loop continues.",
+      "pattern": "except Exception -> log and continue",
+      "code_snippet": "        except Exception as exc:\n            logger.exception(f\"Worker liveness loop error: {exc}\")"
+    },
+    {
+      "severity": "medium",
+      "file": "backend/core/services/group.py",
+      "line": 47,
+      "description": "Bare except: pass silently swallows user profile creation failure. While this is a best-effort upsert, any failure (including programming errors) is hidden.",
+      "pattern": "except: pass",
+      "code_snippet": "    except Exception:\n        pass  # savepoint tu rollback, session van OK"
+    },
+    {
+      "severity": "medium",
+      "file": "backend/core/services/snapshot_ai_usage.py",
+      "line": 46,
+      "description": "AI usage recording failure is silently logged and swallowed. While this is intentionally best-effort, it can silently fail for all users if the DB table or schema changes, hiding the issue.",
+      "pattern": "except Exception -> just log",
+      "code_snippet": "    except Exception as e:\n        logger.exception(f\"Error snapshotting AI usage: {e}\")"
+    },
+    {
+      "severity": "medium",
+      "file": "backend/core/services/snapshot_ai_usage.py",
+      "line": 76,
+      "description": "Local DB write failure is silently logged with logger.warning. Intentionally best-effort, but can silently mask DB connectivity issues across all AI calls.",
+      "pattern": "except Exception -> log and swallow",
+      "code_snippet": "    except Exception as e:\n        logger.warning(f\"_write_local_usage bo qua: {e}\")"
+    },
+    {
+      "severity": "medium",
+      "file": "backend/core/services/chat_worker.py",
+      "line": 47,
+      "description": "Broad exception catch in chat task processing. While it does send an error response to Kafka, it also has nested broad Exception catches for rollback (line 52) and session close (line 66), which could hide other errors.",
+      "pattern": "except Exception -> rollback and close also catch Exception",
+      "code_snippet": "        except Exception as exc:\n            logger.exception(...)\n            if session:\n                try:\n                    await session.rollback()\n                except Exception:"
+    },
+    {
+      "severity": "medium",
+      "file": "backend/core/services/linkedin.py",
+      "line": 69,
+      "description": "Error response text fetch failure silently falls back to '<no body>' string. Minor — the outer error message still gets raised with useful information.",
+      "pattern": "except Exception -> fallback string",
+      "code_snippet": "                    except Exception:\n                        err_text = \"<no body>\""
+    },
+    {
+      "severity": "medium",
+      "file": "backend/core/tools/instagram_publisher.py",
+      "line": 137,
+      "description": "Instagram permalink fetch failure is silently logged as best-effort. Marked pragma: no cover. The post is published without a permalink reference.",
+      "pattern": "except Exception -> best-effort, log only",
+      "code_snippet": "            except Exception as exc:  # pragma: no cover - best effort\n                logger.warning(\"Unable to fetch Instagram permalink: %s\", exc)"
+    },
+    {
+      "severity": "medium",
+      "file": "backend/core/tools/facebook_publisher.py",
+      "line": 358,
+      "description": "Member posts tracking URL build failure silently returns None. Tracking URL for campaign member posts is lost but the main publishing flow continues.",
+      "pattern": "except Exception -> return None",
+      "code_snippet": "    except Exception as e:\n        print(f\"_build_member_posts_tracking_url loi (khong nghiem trong): {e}\")\n        return None"
+    },
+    {
+      "severity": "medium",
+      "file": "backend/apis/ga4_account.py",
+      "line": 31,
+      "description": "Cache TTL calculation failure silently returns default 30-minute TTL. Minor — caching still works but with a possibly suboptimal TTL.",
+      "pattern": "except Exception -> return default",
+      "code_snippet": "    except Exception:\n        return CacheTTL.MIN_30.value"
+    },
+    {
+      "severity": "medium",
+      "file": "webapp/src/context/rbac-context.tsx",
+      "line": 165,
+      "description": "Groups fetch failure silently sets empty groups list. The user sees no groups instead of seeing an error state, making it look like there are no groups rather than showing a connection issue.",
+      "pattern": "catch -> set empty list",
+      "code_snippet": "        } catch {\n            setGroups([]);"
+    },
+    {
+      "severity": "medium",
+      "file": "webapp/src/context/rbac-context.tsx",
+      "line": 179,
+      "description": "Campaigns fetch failure silently sets empty campaigns list. Same pattern as groups — errors are hidden from the user.",
+      "pattern": ".catch(() => setCampaigns([]))",
+      "code_snippet": "            .catch(() => setCampaigns([]))"
+    },
+    {
+      "severity": "medium",
+      "file": "webapp/src/context/rbac-context.tsx",
+      "line": 216,
+      "description": "Campaigns fetch in useEffect failure silently sets empty campaigns list (unless cancelled). Same silent empty-list pattern.",
+      "pattern": ".catch(() => { if (!cancelled) setCampaigns([]); })",
+      "code_snippet": "            .catch(() => {\n                if (!cancelled) setCampaigns([]);\n            })"
+    },
+    {
+      "severity": "medium",
+      "file": "webapp/src/context/rbac-context.tsx",
+      "line": 312,
+      "description": "Group role fetch failure silently sets role to null. User loses role-based permissions without any visible error.",
+      "pattern": ".catch(() => setGroupRole(null))",
+      "code_snippet": "            .catch(() => setGroupRole(null));"
+    },
+    {
+      "severity": "low",
+      "file": "webapp/src/utils/fileUpload.ts",
+      "line": 38,
+      "description": "JSON parse failure on error response silently returns empty object. The calling code may proceed with an empty object instead of proper error data.",
+      "pattern": ".catch(() => ({}))",
+      "code_snippet": "    const error = await response.json().catch(() => ({}));"
+    },
+    {
+      "severity": "low",
+      "file": "webapp/src/app/api/wpcom/me/route.ts",
+      "line": 14,
+      "description": "WPCOM API JSON parse failure silently returns empty object, which may be used downstream as valid data.",
+      "pattern": ".catch(() => ({}))",
+      "code_snippet": "        const data = await res.json().catch(() => ({}));"
+    },
+    {
+      "severity": "low",
+      "file": "webapp/src/app/api/wpcom/token/route.ts",
+      "line": 27,
+      "description": "WPCOM token API JSON parse failure silently returns empty object, obscuring OAuth errors.",
+      "pattern": ".catch(() => ({}))",
+      "code_snippet": "    const data = await res.json().catch(() => ({}));"
+    },
+    {
+      "severity": "low",
+      "file": "webapp/src/app/api/tiktok/publish/init/route.ts",
+      "line": 11,
+      "description": "Request body JSON parse failure silently returns null, which could cause downstream null reference errors.",
+      "pattern": ".catch(() => null)",
+      "code_snippet": "    const body = await req.json().catch(() => null);"
+    },
+    {
+      "severity": "low",
+      "file": "webapp/src/app/api/tiktok/publish/init/route.ts",
+      "line": 58,
+      "description": "TikTok creator info JSON parse failure silently returns empty object.",
+      "pattern": ".catch(() => ({}))",
+      "code_snippet": "    const creatorInfoData = await creatorInfoRes.json().catch(() => ({}));"
+    },
+    {
+      "severity": "low",
+      "file": "webapp/src/app/api/tiktok/publish/init/route.ts",
+      "line": 98,
+      "description": "TikTok upload response JSON parse failure silently returns empty object.",
+      "pattern": ".catch(() => ({}))",
+      "code_snippet": "    const uploadData = await res.json().catch(() => ({}));"
+    },
+    {
+      "severity": "low",
+      "file": "webapp/src/app/api/x/media/video/route.ts",
+      "line": 82,
+      "description": "X/Twitter video API response JSON parse failure silently returns empty object.",
+      "pattern": ".catch(() => ({}))",
+      "code_snippet": "      const result = await response.json().catch(() => ({}));"
+    },
+    {
+      "severity": "low",
+      "file": "webapp/src/components/autopost/EditMessageModal.tsx",
+      "line": 96,
+      "description": "JSON parse failure on autopost error response silently returns empty object for error data display.",
+      "pattern": ".catch(() => ({}))",
+      "code_snippet": "        const errorData = ((await res.json().catch(() => ({}))) as {"
+    },
+    {
+      "severity": "low",
+      "file": "webapp/src/components/content-review/ReviewDetailSheet.tsx",
+      "line": 209,
+      "description": "Review history fetch failure silently sets empty history list, showing nothing rather than an error state.",
+      "pattern": ".catch(() => setHistory([]))",
+      "code_snippet": "                .catch(() => setHistory([]));"
+    }
+  ]
+}
