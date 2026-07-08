@@ -1,0 +1,30 @@
+# Template override CHI danh cho dev local qua Docker Compose.
+#
+# CACH DUNG: cp docker-compose.override.yml.example docker-compose.override.yml
+# (file .example nay duoc commit lam mau; file that KHONG duoc commit - da
+# nam trong .gitignore - vi Docker Compose TU DONG gop docker-compose.override.yml
+# vao moi lan chay `docker compose up`, khong can flag `-f`. Cac host dev/app that cung
+# chay `docker compose build/up` trong CUNG thu muc sau `git pull` (xem
+# deploy-dev.yml/deploy-app.yml) - neu ban that bi commit va pull xuong do,
+# no se am tham ghi de build-arg cua dev/app that thanh localhost:8080, lam
+# hong deploy that. Vi vay file .example nay chi la mau, khong phai file dung
+# truc tiep.
+#
+# Van de duoc sua: docker-compose.yml goc build frontend voi
+# NEXT_PUBLIC_LINKEDIN_CRAWLER_API_URL = https://seeding.markeeai.com (production)
+# lam build-arg. Next.js dong cung gia tri nay vao bundle LUC BUILD, nen frontend
+# chay local van goi thang len production thay vi backend local - gay ca 2 loi
+# thuong gap: "loi service" (production co the tu choi CORS tu localhost) va
+# "khong dang nhap duoc" (cookie dang nhap gan voi domain production, trinh
+# duyet dang o localhost khong doc/gui duoc cookie do).
+#
+# Fix: build frontend tro ve chinh no qua router (http://localhost:8080) -
+# nginx-router/nginx.conf da proxy /api/* sang backend, nen 1 origin duy nhat
+# hoat dong dung cho ca gui API lan luu cookie dang nhap.
+services:
+  frontend:
+    build:
+      args:
+        NEXT_PUBLIC_LINKEDIN_CRAWLER_API_URL: http://localhost:8080
+        NEXT_PUBLIC_API_FACEBOOK_BASE_URL: http://localhost:8080
+        NEXT_PUBLIC_LINKEDIN_CRAWLER_API_KEY: secret_api_key
