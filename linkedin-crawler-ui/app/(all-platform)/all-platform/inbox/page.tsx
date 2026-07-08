@@ -817,36 +817,9 @@ function InboxPageContent() {
   async function mark(conv_id: string, field: string, value: boolean) {
     try {
       const r = await fbFetch("/inbox/mark", { method: "POST", headers: fbHeaders(), body: JSON.stringify({ user_id: acc, conv_id, field, value }) });
-      if (r.ok) {
-        setConvs(prev => prev.map(c => c.conv_id === conv_id ? { ...c, [field]: value } : c));
-        // Tu dong xac nhan KPI Inbox ngay khi hoi thoai duoc danh dau "la khach" -
-        // bo han buoc de xuat/xac nhan thu cong (theo yeu cau leader ban ron).
-        // Leader/member van xem duoc trang thai va bam "Xac nhan Inbox" thu cong
-        // neu can sua/bo sung rieng le.
-        if (field === "is_customer" && value === true) {
-          void autoConfirmInboxKpi(conv_id);
-        }
-      }
+      if (r.ok) { setConvs(prev => prev.map(c => c.conv_id === conv_id ? { ...c, [field]: value } : c)); }
       else { const d = await r.json().catch(() => ({})); showToast(d.detail || "Lỗi", false); }
     } catch { showToast("Không kết nối được", false); }
-  }
-
-  async function autoConfirmInboxKpi(conv_id: string) {
-    if (!acc || !user?.email) return;
-    try {
-      await allPlatformKpiService.syncFbInbox({
-        leader_email: user.email,
-        member_email: selectedAccountOwnerEmail || user.email,
-        conv_ids: [conv_id],
-        user_id: acc,
-        is_lead: false,
-      });
-      await fetchVerifiedConvIds();
-    } catch {
-      // Im lang - day la tu dong hoa nen, khong lam gian doan thao tac chinh
-      // (leader/member van thay trang thai qua tab KPI, co the bam xac nhan
-      // thu cong lai neu tu dong bi loi).
-    }
   }
 
   async function saveArchive(conv_id: string, hide = false) {
@@ -866,11 +839,6 @@ function InboxPageContent() {
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { showToast(d.detail || "Lỗi lưu trữ", false); return; }
       setConvs(prev => prev.map(c => c.conv_id === conv_id ? { ...c, archived: true, is_customer: hide ? c.is_customer : true, deleted: hide ? true : c.deleted } : c));
-      // "Luu khach" (khong hide) cung dan den is_customer = true - tu dong xac
-      // nhan KPI Inbox luon, giong het hanh vi trong mark() o tren.
-      if (!hide) {
-        void autoConfirmInboxKpi(conv_id);
-      }
       setArchives(prev => {
         const entry = d.archive as ArchiveConv | undefined;
         if (!entry) return prev;
