@@ -13,9 +13,11 @@ import { VerifyAccountModal } from "@/components/all-platform/components/verify-
 import { KpiProgressCard } from "@/components/all-platform/components/kpi-progress-card";
 import { BulkCommentLauncher } from "@/components/all-platform/components/bulk-comment-launcher";
 import { SeedingActivityPanel } from "@/components/all-platform/feed/SeedingActivityPanel";
+import { ScheduleCommentModal } from "@/components/all-platform/feed/ScheduleCommentModal";
+import { ScheduledCommentsPanel } from "@/components/all-platform/feed/ScheduledCommentsPanel";
 import { PostFeedSkeleton } from "@/components/all-platform/feed/PostFeedSkeleton";
-import { allPlatformPostsService, allPlatformCategoriesService, teamsService } from "@/services/all-platform.service";
-import type { UnifiedPost, UnifiedStats, Category, FeedPlatform } from "@/types/unified.types";
+import { allPlatformPostsService, allPlatformCategoriesService, teamsService, socialAccountsService } from "@/services/all-platform.service";
+import type { UnifiedPost, UnifiedStats, Category, FeedPlatform, SocialAccount } from "@/types/unified.types";
 
 // â”€â”€â”€ Retry helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function fetchWithRetry<T>(
@@ -230,6 +232,9 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
 
   const [detailModalPost, setDetailModalPost] = useState<UnifiedPost | null>(null);
   const [verifyModalPost, setVerifyModalPost] = useState<UnifiedPost | null>(null);
+  const [scheduleModalPost, setScheduleModalPost] = useState<UnifiedPost | null>(null);
+  const [scheduleRefreshKey, setScheduleRefreshKey] = useState(0);
+  const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]);
 
   // Result Modals
   const [showCrawlResultModal, setShowCrawlResultModal] = useState(false);
@@ -472,6 +477,13 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
     fetchCategories();
   }, [fetchCategories]);
 
+  useEffect(() => {
+    if (!CURRENT_USER_EMAIL) return;
+    socialAccountsService.getAll().then((res) => {
+      if (res.success) setSocialAccounts(res.data || []);
+    }).catch(() => {});
+  }, [CURRENT_USER_EMAIL]);
+
   const handleFilter = useCallback((f: FilterState) => {
     if (filterDebounceRef.current) clearTimeout(filterDebounceRef.current);
     filterDebounceRef.current = setTimeout(() => {
@@ -688,6 +700,10 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
       {(user?.role === "admin" || user?.role === "leader") && (
         <SeedingActivityPanel email={CURRENT_USER_EMAIL} />
       )}
+
+      {CURRENT_USER_EMAIL && (
+        <ScheduledCommentsPanel refreshKey={scheduleRefreshKey} />
+      )}
       {/* Phase 6: Siêu Tốc Cào Dữ Liệu + Bulk Comment — hiển thị cho cả 3 role
           (admin/leader/member) khi đang ở tab Facebook. SeedingActivityPanel
           vẫn chỉ admin/leader vì là panel tổng quan nhóm. */}
@@ -781,16 +797,17 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
         <>
           <div className="flex flex-col gap-4">
             {visiblePosts.map((post) => (
-              <PostCard
-                key={post.id || post.post_url}
-                post={post}
-                userRole={user?.role}
-                seeded={!!post.verify_status && post.verify_status !== "no"}
-                verifyStatus={post.verify_status as any}
-                onSeeding={() => {}}
-                onVerify={() => {}}
-                onViewDetail={(post) => setDetailModalPost(post)}
-              />
+                <PostCard
+                  key={post.id || post.post_url}
+                  post={post}
+                  userRole={user?.role}
+                  seeded={!!post.verify_status && post.verify_status !== "no"}
+                  verifyStatus={post.verify_status as any}
+                  onSeeding={() => {}}
+                  onVerify={() => {}}
+                  onSchedule={(post) => setScheduleModalPost(post)}
+                  onViewDetail={(post) => setDetailModalPost(post)}
+                />
             ))}
           </div>
 
@@ -840,6 +857,14 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
           memberEmail={CURRENT_USER_EMAIL}
         />
       )}
+
+      <ScheduleCommentModal
+        post={scheduleModalPost}
+        isOpen={!!scheduleModalPost}
+        onClose={() => setScheduleModalPost(null)}
+        socialAccounts={socialAccounts}
+        onScheduled={() => setScheduleRefreshKey((k) => k + 1)}
+      />
 
       {/* MODAL KẾT QUẢ CÀO */}
       {showCrawlResultModal && typeof document !== "undefined" && createPortal(
