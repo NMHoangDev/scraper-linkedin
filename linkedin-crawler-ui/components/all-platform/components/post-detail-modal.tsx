@@ -4,8 +4,9 @@ import React from "react";
 import { FaFacebook, FaLinkedin } from "react-icons/fa";
 import { FiExternalLink } from "react-icons/fi";
 import { cn } from "@/lib/utils";
+import { useMemo } from "react";
 import type { UnifiedPost } from "@/types/unified.types";
-import { INBOX_TEMPLATES, composeInboxMessage } from "./inbox-templates";
+import { useQuickInboxLibrary, composeQuickInboxMessage } from "./use-quick-inbox-library";
 
 interface PostDetailModalProps {
   post: UnifiedPost | null;
@@ -24,6 +25,20 @@ export function PostDetailModal({
 }: PostDetailModalProps) {
   const [isInboxOpen, setIsInboxOpen] = React.useState(false);
   const inboxRef = React.useRef<HTMLDivElement>(null);
+
+  const { libraryItems, fallbackItems } = useQuickInboxLibrary();
+  const inboxGroups = useMemo(() => {
+    const templates = libraryItems.length > 0 ? libraryItems : fallbackItems;
+    const groups = new Map<string, { category: string; templates: typeof templates }>();
+    templates.forEach((item) => {
+      const category = item.label || "Khác";
+      if (!groups.has(category)) {
+        groups.set(category, { category, templates: [] });
+      }
+      groups.get(category)!.templates.push(item);
+    });
+    return Array.from(groups.values());
+  }, [fallbackItems, libraryItems]);
 
   const isRejected = (link?: string) => {
     return link && link.startsWith("Bị từ chối");
@@ -65,6 +80,7 @@ export function PostDetailModal({
           </h2>
           <button
             onClick={onClose}
+            aria-label="Đóng"
             className="rounded-full p-2 text-muted-foreground hover:bg-muted hover:text-muted-foreground transition"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -225,17 +241,17 @@ export function PostDetailModal({
                       <span className="text-[10px] font-bold text-primary normal-case bg-red-50 border border-red-100 px-2 py-0.5 rounded">Tự chèn bài khách + Copy</span>
                     </div>
                     <div className="max-h-[320px] overflow-y-auto custom-scrollbar text-left">
-                      {INBOX_TEMPLATES.map((group, gIdx) => (
+                      {inboxGroups.map((group, gIdx) => (
                         <div key={gIdx}>
                           <div className="px-3 py-1.5 text-[11px] font-bold text-muted-foreground bg-muted uppercase sticky top-0 border-b border-border backdrop-blur-sm z-10 text-left">
                             {group.category}
                           </div>
-                          {group.templates.map((template, tIdx) => (
+                          {group.templates.map((template) => (
                             <button
-                              key={tIdx}
+                              key={template.id}
                               className="w-full text-left px-3 py-2.5 hover:bg-red-50 group/item transition border-b border-border last:border-0"
                               onClick={() => {
-                                const message = composeInboxMessage(template, post.content);
+                                const message = composeQuickInboxMessage(template, post.content);
                                 navigator.clipboard.writeText(message).then(() => {
                                   setIsInboxOpen(false);
                                   const targetUrl = post.author_url || post.post_url;
@@ -250,7 +266,7 @@ export function PostDetailModal({
                                 {template.title}
                               </div>
                               <div className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed opacity-90">
-                                {composeInboxMessage(template, post.content)}
+                                {composeQuickInboxMessage(template, post.content)}
                               </div>
                             </button>
                           ))}

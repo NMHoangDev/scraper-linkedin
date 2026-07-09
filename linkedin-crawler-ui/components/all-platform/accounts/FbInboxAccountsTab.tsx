@@ -60,8 +60,13 @@ export function FbInboxAccountsTab({ onChange }: FbInboxAccountsTabProps) {
       const { installed } = await pingExtension();
       setExtInstalled(installed);
       if (installed) {
-        const cfg = await getFbProvisionConfig();
-        await provisionExtension({ serverUrl: cfg.serverUrl, owner, apiKey: cfg.extensionApiKey, label: user?.name || user?.email || owner });
+        try {
+          const cfg = await getFbProvisionConfig();
+          await provisionExtension({ serverUrl: cfg.serverUrl, owner, apiKey: cfg.extensionApiKey, label: user?.name || user?.email || owner });
+        } catch (err) {
+          // Backend chưa cấu hình FB extension (thiếu env) — không crash trang, chỉ log để debug.
+          console.warn("[FbInboxAccountsTab] Không lấy được cấu hình FB extension:", err);
+        }
       }
     })();
   }, [owner, user?.email, user?.name]);

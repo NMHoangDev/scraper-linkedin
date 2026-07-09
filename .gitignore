@@ -24,7 +24,6 @@ linkedin-crawler-ui/.pnpm-debug.log*
 
 # FE env/local secrets
 linkedin-crawler-ui/.env*
-!linkedin-crawler-ui/.env.example
 
 # ---- Back-end (linkedin_group_crawler) ----
 linkedin_group_crawler/__pycache__/

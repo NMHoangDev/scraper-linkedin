@@ -14,11 +14,10 @@ import copy
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request
+from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 
 from app.modules.all_platform.services import decode_token, get_team_members, get_user_by_id
-from app.modules.all_platform.services.supabase_kpi_service import auto_count_fb_inbox_reply
 from app.core.supabase_client import get_supabase_client
 
 
@@ -583,22 +582,12 @@ async def fb_inbox_thread_get(request: Request, authorization: str | None = Head
 
 
 @router.post("/inbox/reply")
-async def fb_inbox_reply(
-    data: dict,
-    request: Request,
-    background_tasks: BackgroundTasks,
-    authorization: str | None = Header(None),
-) -> JSONResponse:
+async def fb_inbox_reply(data: dict, request: Request, authorization: str | None = Header(None)) -> JSONResponse:
     user = _current_user(request, authorization)
     uid = str(data.get("user_id") or "")
-    conv_id = str(data.get("conv_id") or "")
     await _require_fb_account_scope(user, uid)
     status, payload = await _markee_json("POST", "/inbox/reply", json_body=data)
     _clear_markee_cache("/inbox/conversations", "/inbox/thread", "/inbox/reply_status")
-    # Nhân viên đã nhắn cho khách → tự động tính +1 KPI inbox cho hội thoại này.
-    # Chạy nền để không làm chậm phản hồi gửi tin; idempotent theo conv_id.
-    if status < 400 and uid and conv_id:
-        background_tasks.add_task(auto_count_fb_inbox_reply, uid, conv_id)
     return _json_response(status, payload)
 
 
