@@ -168,21 +168,21 @@ export function SocialAccountsManager({ onAccountChange }: SocialAccountsProps) 
       </div>
 
       {/* Platform tabs */}
-      <div className="inline-flex w-full max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-outline-variant bg-surface-container-low p-1 sm:w-fit">
+      <div className="flex gap-2">
         {PLATFORMS.map(({ key, label, Icon }) => {
           const count = platformAccounts(key).length;
           const active = activePlatform === key;
           return (
             <button key={key} type="button" onClick={() => setActivePlatform(key)}
               className={cn(
-                "whitespace-nowrap flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wide transition-all duration-200 ease-out cursor-pointer",
-                active ? "bg-primary text-white shadow-[0_2px_8px_-1px_rgba(217,55,55,0.4)]"
-                  : "text-on-surface-variant hover:bg-surface hover:text-primary"
+                "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer border",
+                active ? "bg-primary/10 text-primary border-primary/20"
+                  : "bg-surface-container-low text-on-surface-variant border-outline-variant hover:bg-surface-container-highest hover:text-on-surface"
               )}>
-              <Icon size={9} /> {label}
+              <Icon size={12} /> {label}
               {count > 0 && (
-                <span className={cn("ml-0.5 px-1 py-0.5 rounded-full text-[8px] font-black normal-case leading-none",
-                  active ? "bg-white/25 text-white" : "bg-surface-container-highest text-on-surface-variant")}>
+                <span className={cn("ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-black",
+                  active ? "bg-primary/20 text-primary" : "bg-surface-container-highest text-on-surface-variant")}>
                   {count}
                 </span>)}
             </button>);
@@ -205,17 +205,11 @@ export function SocialAccountsManager({ onAccountChange }: SocialAccountsProps) 
       {loading ? (
         <div className="text-center py-12 text-on-surface-variant text-xs">Đang tải danh sách tài khoản...</div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-16 bg-surface-container-low/60 rounded-2xl border border-dashed border-outline-variant">
-          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
-            <MaterialIcon name="group_add" className="text-3xl text-primary" />
-          </div>
-          <p className="text-on-surface font-semibold text-sm">
-            Chưa có tài khoản {activePlatform === "facebook" ? "Facebook" : activePlatform === "linkedin" ? "LinkedIn" : ""} nào
-          </p>
-          <p className="text-on-surface-variant text-xs mt-1">Thêm tài khoản để bắt đầu quản lý</p>
-          <button onClick={openAdd}
-            className="mt-4 inline-flex items-center gap-1.5 bg-primary hover:bg-on-primary-fixed-variant text-white px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ease-out active:scale-95 shadow-[0_2px_8px_-1px_rgba(217,55,55,0.35)] cursor-pointer">
-            <FaPlus size={10} /> Thêm tài khoản ngay
+        <div className="text-center py-12 bg-surface-container-low rounded-xl border border-dashed border-outline-variant">
+          <MaterialIcon name="account_circle" className="text-4xl text-on-surface-variant mx-auto mb-2" />
+          <p className="text-on-surface-variant text-xs">Chưa có tài khoản {activePlatform === "facebook" ? "Facebook" : "LinkedIn"} nào</p>
+          <button onClick={openAdd} className="mt-3 text-primary text-xs font-bold hover:underline cursor-pointer">
+            + Thêm tài khoản mới
           </button>
         </div>
       ) : (
