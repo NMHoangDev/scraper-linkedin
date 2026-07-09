@@ -1,5 +1,9 @@
 // bridge.js - Cầu nối giao tiếp giữa React Frontend và Background của Extension API MỚI
 
+// Save the current backend URL to storage so popup.js and background.js
+// can read it instead of using hardcoded production URL.
+chrome.storage.local.set({ api_base_url: window.location.origin });
+
 window.addEventListener('message', (event) => {
     if (event.source !== window) return;
 

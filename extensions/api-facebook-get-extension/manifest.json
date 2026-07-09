@@ -10,7 +10,11 @@
     "storage"
   ],
   "host_permissions": [
-    "*://*.facebook.com/*"
+    "*://*.facebook.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "*://*.seeding.markeeai.com/*",
+    "*://*.zenithglobal.dev/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -29,7 +33,8 @@
         "*://localhost/*", 
         "*://127.0.0.1/*",
         "*://*.vercel.app/*",
-        "*://seeding.markeeai.com/*"
+        "*://*.seeding.markeeai.com/*",
+        "*://*.zenithglobal.dev/*"
       ],
       "js": ["bridge.js"],
       "run_at": "document_idle"

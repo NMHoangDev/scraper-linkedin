@@ -57,12 +57,16 @@ function sendFrontendDone(totalGroups, totalPosts) {
     });
 }
 
+let API_BASE = 'https://seeding.markeeai.com'; // global fallback for save-posts
+
 async function startAutoCrawl(groups, config = {}) {
     if (isRunning) return;
     isRunning = true;
     shouldStop = false;
     
     const idMember = config.idMember || null;
+    // Use the API URL detected by popup, or fall back to storage (bridge.js).
+    API_BASE = config.apiBase || (await chrome.storage.local.get('api_base_url')).api_base_url || API_BASE;
     sendLog(`🚀 Bắt đầu quá trình tự động cào ${groups.length} nhóm...`);
 
     try {
@@ -144,10 +148,11 @@ async function startAutoCrawl(groups, config = {}) {
                     
                     // Bước 4: Gửi đống này lên backend
                     let pushRes = null;
+
                     let backendRetry = 0;
                     while (backendRetry <= 2) {
                         try {
-                            pushRes = await fetch("https://seeding.markeeai.com/api/all-platform/extension/save-posts", {
+                            pushRes = await fetch(`${API_BASE}/api/all-platform/extension/save-posts`, {
                                 method: "POST",
                                 headers: { 
                                     "Content-Type": "application/json",

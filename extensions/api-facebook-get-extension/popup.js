@@ -24,10 +24,26 @@ btnAutoStart.addEventListener('click', async () => {
     addLog("Đang gọi API lấy danh sách Group...");
 
     try {
-        // Route cu "/api/all-platform/groups?platform=facebook" khong con ton tai (404) -
-        // backend da doi sang "/api/all-platform/facebook/groups". Them credentials: 'include'
-        // de gui kem cookie session dang nhap (backend yeu cau auth).
-        const response = await fetch("https://seeding.markeeai.com/api/all-platform/facebook/groups?for_extension=true", {
+        // Detect API URL from the currently active tab (most reliable — no need to
+        // pre-configure anything). Checks the tab the user was on when they clicked
+        // the extension icon.
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        const currentUrl = tabs[0]?.url || '';
+        const knownHosts = ['seeding.markeeai.com', 'zenithglobal.dev', 'localhost', '127.0.0.1'];
+        let API_BASE = null;
+        if (knownHosts.find(h => currentUrl.includes(h))) {
+            try { API_BASE = new URL(currentUrl).origin; } catch (_) {}
+        }
+
+        // Fall back to storage (set by bridge.js from a previous visit).
+        if (!API_BASE) {
+            const { api_base_url } = await chrome.storage.local.get('api_base_url');
+            API_BASE = api_base_url || 'https://seeding.markeeai.com';
+        }
+
+        addLog(`🌐 Backend: ${API_BASE}`);
+
+        const response = await fetch(`${API_BASE}/api/all-platform/facebook/groups?for_extension=true`, {
             credentials: 'include',
         });
         if (!response.ok) throw new Error("Backend không phản hồi danh sách group.");
@@ -55,7 +71,8 @@ btnAutoStart.addEventListener('click', async () => {
 
         chrome.runtime.sendMessage({
             action: 'START_AUTO_CRAWL',
-            groups: groups
+            groups: groups,
+            config: { apiBase: API_BASE }
         });
 
     } catch (err) {
