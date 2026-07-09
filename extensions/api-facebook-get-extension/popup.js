@@ -24,11 +24,23 @@ btnAutoStart.addEventListener('click', async () => {
     addLog("Đang gọi API lấy danh sách Group...");
 
     try {
-        const response = await fetch("https://seeding.markeeai.com/api/all-platform/groups?platform=facebook");
+        // Route cu "/api/all-platform/groups?platform=facebook" khong con ton tai (404) -
+        // backend da doi sang "/api/all-platform/facebook/groups". Them credentials: 'include'
+        // de gui kem cookie session dang nhap (backend yeu cau auth).
+        const response = await fetch("https://seeding.markeeai.com/api/all-platform/facebook/groups?for_extension=true", {
+            credentials: 'include',
+        });
         if (!response.ok) throw new Error("Backend không phản hồi danh sách group.");
-        
+
         const data = await response.json();
-        const groups = data.data || [];
+        if (data.success === false) throw new Error(data.message || "Backend tra ve loi.");
+        // Chuan hoa ten field: facebook_groups tra "group_name"/"group_url",
+        // background.js dang doc "name"/"url".
+        const groups = (data.data || []).map((g) => ({
+            ...g,
+            name: g.name || g.group_name,
+            url: g.url || g.group_url,
+        }));
         
         if (groups.length === 0) {
             addLog("❌ Không có group nào cần cào từ Backend.");

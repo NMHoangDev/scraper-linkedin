@@ -86,7 +86,9 @@ def _fetch_posts(
     if table == "facebook_posts":
         query = tbl.select("*, author_post(*), facebook_groups(group_name, id_intent, id_industry, id_team, id_tier, id_icp, id_content_type, id_product_seeding, id_member)", count="exact")
     else:
-        query = tbl.select("*, author_post(*), linkedin_groups(group_name, id_intent, id_industry, id_team, id_tier, id_icp, id_content_type, id_product_seeding, id_member)", count="exact")
+        # linkedin_posts has no FK relationship to author_post (unlike facebook_posts.id_author) —
+        # embedding it here makes PostgREST fail with PGRST200 on every "all"/"linkedin" tab load.
+        query = tbl.select("*, linkedin_groups(group_name, id_intent, id_industry, id_team, id_tier, id_icp, id_content_type, id_product_seeding, id_member)", count="exact")
 
     # Scope to requesting user
     if email:
@@ -202,11 +204,10 @@ def _fetch_posts(
             query = query.in_("id_group", group_ids or ["00000000-0000-0000-0000-000000000000"])
 
     if search:
-        # linkedin_posts does not have group_name column
-        if table == "facebook_posts":
-            query = query.or_(f"content.ilike.%{search}%,group_name.ilike.%{search}%")
-        else:
-            query = query.ilike("content", f"%{search}%")
+        # group_name lives on facebook_groups/linkedin_groups (joined tables), not directly
+        # on facebook_posts/linkedin_posts — referencing it here made every search fail with
+        # "column ... group_name does not exist" (42703), 100% of the time, on every search term.
+        query = query.ilike("content", f"%{search}%")
 
     # Sort
     if sort == "score_high":
