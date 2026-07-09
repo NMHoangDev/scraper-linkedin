@@ -175,140 +175,138 @@ export function AccountManagementContent() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-[1100px] min-w-0 space-y-6 font-sans">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <div className="rounded-xl bg-primary/10 p-3">
-          <MaterialIcon name="manage_accounts" className="text-primary text-3xl" />
-        </div>
-        <div>
-          <h1 className="text-h1 text-on-surface font-semibold">Quản lý tài khoản</h1>
-          <p className="text-body-md text-on-surface-variant">
-            Cấu hình danh sách tài khoản mạng xã hội và thông tin cào dữ liệu tự động
-          </p>
+<div className="w-full min-w-0 space-y-6 font-sans">      {/* Header */}
+      <div className="relative overflow-hidden rounded-2xl border border-outline-variant bg-surface p-6 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_10px_-2px_rgba(16,24,40,0.06)]">
+        <div className="absolute -right-10 -top-16 h-48 w-48 rounded-full bg-primary/[0.06] blur-2xl" aria-hidden="true" />
+        <div className="absolute -right-24 top-8 h-40 w-40 rounded-full bg-primary/[0.04] blur-3xl" aria-hidden="true" />
+        <div className="relative flex items-center gap-4">
+          <div className="rounded-2xl bg-primary/10 p-3">
+            <MaterialIcon name="manage_accounts" className="text-primary text-3xl" />
+          </div>
+          <div>
+            <h1 className="text-h1 text-on-surface font-bold tracking-tight">Quản lý tài khoản</h1>
+            <p className="text-body-md text-on-surface-variant">
+              Cấu hình danh sách tài khoản mạng xã hội và thông tin cào dữ liệu tự động
+            </p>
+          </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-outline-variant overflow-x-auto whitespace-nowrap">
-        <div className="flex gap-8 px-2">
-          {(["crawl", "social", "fb_inbox"] as Tab[]).map((tab) => (
-            <button key={tab} type="button" onClick={() => setActiveTab(tab)}
-              className={cn("py-4 text-xs font-bold border-b-2 transition-all uppercase cursor-pointer",
-                activeTab === tab
-                  ? "border-primary text-primary"
-                  : "border-transparent text-on-surface-variant hover:text-primary")}>
-              {tab === "crawl" ? "Tài khoản cào dữ liệu" : tab === "social" ? "Tài khoản mạng xã hội" : "Tài khoản FB & KPI"}
-            </button>))}
-        </div>
+      <div className="inline-flex w-full max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-outline-variant bg-surface-container-low p-1.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] sm:w-fit">
+        {(["crawl", "social", "fb_inbox"] as Tab[]).map((tab) => (
+          <button key={tab} type="button" onClick={() => setActiveTab(tab)}
+            className={cn("whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-bold uppercase tracking-wide transition-all duration-200 ease-out cursor-pointer",
+              activeTab === tab
+                ? "bg-primary text-white shadow-[0_2px_8px_-1px_rgba(217,55,55,0.4)]"
+                : "text-on-surface-variant hover:bg-surface hover:text-primary")}>
+            {tab === "crawl" ? "Tài khoản cào dữ liệu" : tab === "social" ? "Tài khoản mạng xã hội" : "Tài khoản FB & KPI"}
+          </button>))}
       </div>
 
       {/* TAB Content */}
-      <div className="rounded-xl border border-outline-variant bg-surface p-6 shadow-sm space-y-6">
+      <div className="space-y-6">
         {activeTab === "crawl" ? (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
               <div>
-                <h2 className="text-lg font-bold text-on-surface">Danh sách tài khoản cào LinkedIn</h2>
-                <p className="text-xs text-on-surface-variant">Các tài khoản dùng cho tính năng cào dữ liệu lưu trên hệ thống Supabase</p>
+                <h2 className="text-lg font-bold text-on-surface tracking-tight">Danh sách tài khoản cào LinkedIn</h2>
+                <p className="text-xs text-on-surface-variant mt-0.5">Các tài khoản dùng cho tính năng cào dữ liệu lưu trên hệ thống Supabase</p>
               </div>
               <button type="button" onClick={handleOpenAddCrawl}
-                className="flex items-center gap-1.5 bg-primary hover:bg-on-primary-fixed-variant text-white px-4 py-2 rounded-xl text-xs font-bold transition active:scale-95 shadow-sm cursor-pointer">
+                className="flex items-center gap-1.5 bg-primary hover:bg-on-primary-fixed-variant text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ease-out active:scale-95 shadow-[0_2px_8px_-1px_rgba(217,55,55,0.35)] hover:shadow-[0_4px_14px_-2px_rgba(217,55,55,0.45)] cursor-pointer shrink-0">
                 <FaPlus size={10} /> Thêm tài khoản
               </button>
             </div>
 
             {accountsLoading ? (
-              <div className="text-center py-12">
-                <div className="w-8 h-8 border-2 border-outline-variant border-t-primary rounded-full animate-spin mx-auto mb-2" />
-                <p className="text-on-surface-variant text-xs">Đang tải dữ liệu...</p>
+              <div className="text-center py-16">
+                <div className="w-9 h-9 border-[3px] border-outline-variant border-t-primary rounded-full animate-spin mx-auto mb-3" />
+                <p className="text-on-surface-variant text-xs font-medium">Đang tải dữ liệu...</p>
               </div>
             ) : !hasCreds ? (
-              <div className="text-center py-12 bg-surface-container-low rounded-xl border border-dashed border-outline-variant">
-                <MaterialIcon name="group_add" className="text-4xl text-on-surface-variant mx-auto mb-2" />
-                <p className="text-on-surface-variant text-xs">Chưa có tài khoản LinkedIn nào được cấu hình</p>
-                <button onClick={handleOpenAddCrawl} className="mt-3 text-primary text-xs font-bold hover:underline cursor-pointer">
-                  + Thêm tài khoản ngay
+              <div className="text-center py-16 bg-surface-container-low/60 rounded-2xl border border-dashed border-outline-variant">
+                <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                  <MaterialIcon name="group_add" className="text-3xl text-primary" />
+                </div>
+                <p className="text-on-surface font-semibold text-sm">Chưa có tài khoản LinkedIn nào được cấu hình</p>
+                <p className="text-on-surface-variant text-xs mt-1">Thêm tài khoản để bắt đầu cào dữ liệu tự động</p>
+                <button onClick={handleOpenAddCrawl}
+                  className="mt-4 inline-flex items-center gap-1.5 bg-primary hover:bg-on-primary-fixed-variant text-white px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ease-out active:scale-95 shadow-[0_2px_8px_-1px_rgba(217,55,55,0.35)] cursor-pointer">
+                  <FaPlus size={10} /> Thêm tài khoản ngay
                 </button>
               </div>
             ) : (
-              <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm">
-                <table className="w-full border-collapse text-left text-xs">
-                  <thead className="bg-surface-container-low border-b border-outline-variant text-[10px] font-bold text-on-surface-variant uppercase">
-                    <tr>
-                      <th className="py-3 px-4">Nền tảng</th>
-                      <th className="py-3 px-4">Tài khoản cào</th>
-                      <th className="py-3 px-4">Người sở hữu</th>
-                      <th className="py-3 px-4 text-center">Hành động</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-outline-variant text-on-surface-variant">
-                    {accounts.map((acc) => (
-                      <tr key={acc.id} className="hover:bg-surface-container-low/30 transition">
-                        <td className="py-3.5 px-4 font-bold text-on-surface flex items-center gap-2">
-                          <span className="w-6 h-6 rounded-lg bg-[#0077B5]/10 text-[#0077B5] flex items-center justify-center text-[10px]">
-                            <FaLinkedin size={12} />
+              <div className="space-y-2.5">
+                {accounts.map((acc) => (
+                  <div key={acc.id}
+                    className="group flex flex-col gap-3 rounded-2xl border border-outline-variant bg-surface p-4 transition-all duration-200 ease-out hover:border-primary/30 hover:shadow-[0_4px_16px_-4px_rgba(16,24,40,0.1)] sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#0077B5]/10 text-[#0077B5] transition-all duration-200 ease-out group-hover:scale-105">
+                        <FaLinkedin size={18} />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate font-mono text-xs font-bold text-on-surface">{acc.email_linkedin}</p>
+                        <div className="mt-1 flex items-center gap-1.5 text-[11px] text-on-surface-variant">
+                          <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[9px] font-bold text-primary uppercase">
+                            {(acc.email_member || "?").charAt(0)}
                           </span>
-                          <span>LinkedIn</span>
-                        </td>
-                        <td className="py-3.5 px-4 text-on-surface-variant font-mono text-[11px] font-bold">
-                          {acc.email_linkedin}
-                        </td>
-                        <td className="py-3.5 px-4 text-on-surface-variant text-[11px]">
-                          {acc.email_member}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center justify-center gap-1.5">
-                            {/* Xác minh */}
-                            <button onClick={() => void handleOpenVerify(acc)}
-                              className="flex items-center gap-1 px-2.5 py-1.5 text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition text-[10px] font-bold cursor-pointer border border-primary/20"
-                              title="Xác minh tài khoản (OTP)">
-                              <FaLock size={11} />
-                              Xác minh
-                            </button>
-                            {/* Xem chi tiết */}
-                            <button onClick={() => setViewCrawlAccount(acc)}
-                              className="p-1.5 text-on-surface-variant hover:bg-surface-container-low rounded-lg transition cursor-pointer"
-                              title="Xem chi tiết">
-                              <MaterialIcon name="visibility" className="text-base" />
-                            </button>
-                            {/* Sửa */}
-                            <button onClick={() => handleOpenEditCrawl(acc)}
-                              className="p-1.5 text-primary hover:bg-surface-container-low rounded-lg transition cursor-pointer"
-                              title="Sửa">
-                              <MaterialIcon name="edit" className="text-base" />
-                            </button>
-                            {/* Xóa */}
-                            <button onClick={() => void handleDeleteCrawl(acc.id)}
-                              className="p-1.5 text-primary-container hover:bg-red-50 rounded-lg transition cursor-pointer"
-                              title="Xóa">
-                              <MaterialIcon name="delete" className="text-base" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>))}
-                  </tbody>
-                </table>
+                          <span className="truncate">{acc.email_member}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                      <button onClick={() => void handleOpenVerify(acc)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 text-primary bg-primary/10 hover:bg-primary/20 rounded-xl transition-all duration-200 ease-out text-[10px] font-bold cursor-pointer border border-primary/20"
+                        title="Xác minh tài khoản (OTP)">
+                        <FaLock size={11} />
+                        Xác minh
+                      </button>
+                      <button onClick={() => setViewCrawlAccount(acc)}
+                        className="p-1.5 text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface rounded-xl transition-all duration-200 ease-out cursor-pointer"
+                        title="Xem chi tiết">
+                        <MaterialIcon name="visibility" className="text-base" />
+                      </button>
+                      <button onClick={() => handleOpenEditCrawl(acc)}
+                        className="p-1.5 text-primary hover:bg-primary/10 rounded-xl transition-all duration-200 ease-out cursor-pointer"
+                        title="Sửa">
+                        <MaterialIcon name="edit" className="text-base" />
+                      </button>
+                      <button onClick={() => void handleDeleteCrawl(acc.id)}
+                        className="p-1.5 text-on-surface-variant hover:text-red-600 hover:bg-red-50 rounded-xl transition-all duration-200 ease-out cursor-pointer"
+                        title="Xóa">
+                        <MaterialIcon name="delete" className="text-base" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>)}
           </div>
         ) : activeTab === "social" ? (
-          <SocialAccountsManager />
+          <div className="rounded-2xl border border-outline-variant bg-surface p-6 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_10px_-2px_rgba(16,24,40,0.06)]">
+            <SocialAccountsManager />
+          </div>
         ) : (
-          <FbInboxAccountsTab />
+          <div className="rounded-2xl border border-outline-variant bg-surface p-6 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_10px_-2px_rgba(16,24,40,0.06)]">
+            <FbInboxAccountsTab />
+          </div>
         )}
       </div>
 
       {/* ── View Details Modal ─────────────────────────────────────── */}
       {viewCrawlAccount && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[1px] animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div style={{ width: "100%", maxWidth: "448px" }}
-            className="bg-surface rounded-xl border border-outline-variant shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            className="bg-surface rounded-2xl border border-outline-variant shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant bg-surface-container-low">
-              <h3 className="font-bold text-on-surface flex items-center gap-2">
-                <span className="text-lg">ℹ️</span> Chi tiết tài khoản cào
+              <h3 className="font-bold text-on-surface flex items-center gap-2.5">
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <MaterialIcon name="info" className="text-lg" />
+                </span>
+                Chi tiết tài khoản cào
               </h3>
               <button onClick={() => setViewCrawlAccount(null)}
-                className="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-lg p-1.5 transition cursor-pointer">
+                className="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-xl p-1.5 transition-all duration-200 ease-out cursor-pointer">
                 <MaterialIcon name="close" className="text-xl" />
               </button>
             </div>
@@ -327,11 +325,11 @@ export function AccountManagementContent() {
             </div>
             <div className="px-6 py-4 bg-surface-container-low flex justify-end gap-2 border-t border-outline-variant">
               <button onClick={() => setViewCrawlAccount(null)}
-                className="px-4 py-2 bg-surface border border-outline-variant hover:bg-surface-container-low text-on-surface-variant hover:text-on-surface rounded-xl text-xs font-semibold transition cursor-pointer">
+                className="px-4 py-2 bg-surface border border-outline-variant hover:bg-surface-container-low text-on-surface-variant hover:text-on-surface rounded-2xl text-xs font-semibold transition-all duration-200 ease-out cursor-pointer">
                 Đóng
               </button>
               <button onClick={() => handleOpenEditCrawl(viewCrawlAccount)}
-                className="px-4 py-2 bg-primary hover:bg-on-primary-fixed-variant text-white rounded-xl text-xs font-semibold transition shadow-sm cursor-pointer">
+                className="px-4 py-2 bg-primary hover:bg-on-primary-fixed-variant text-white rounded-2xl text-xs font-semibold transition-all duration-200 ease-out shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_10px_-2px_rgba(16,24,40,0.06)] cursor-pointer">
                 Chỉnh sửa
               </button>
             </div>
@@ -340,21 +338,24 @@ export function AccountManagementContent() {
 
       {/* ── Add/Edit Form Modal ────────────────────────────────────── */}
       {showCrawlForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[1px] animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div style={{ width: "100%", maxWidth: "448px" }}
-            className="bg-surface rounded-xl border border-outline-variant shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            className="bg-surface rounded-2xl border border-outline-variant shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant bg-surface-container-low">
-              <h3 className="font-bold text-on-surface">
+              <h3 className="font-bold text-on-surface flex items-center gap-2.5">
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <MaterialIcon name={formId ? "edit" : "person_add"} className="text-lg" />
+                </span>
                 {formId ? "Cập nhật tài khoản cào" : "Thêm tài khoản cào LinkedIn"}
               </h3>
               <button onClick={() => setShowCrawlForm(false)}
-                className="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-lg p-1.5 transition cursor-pointer">
+                className="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-xl p-1.5 transition-all duration-200 ease-out cursor-pointer">
                 <MaterialIcon name="close" className="text-xl" />
               </button>
             </div>
             <form onSubmit={handleSaveCrawl} className="p-6 space-y-4">
               {formError && (
-                <div className="bg-red-50 text-red-600 text-xs p-3 rounded-lg border border-red-100 flex items-center gap-2">
+                <div className="bg-red-50 text-red-600 text-xs p-3 rounded-xl border border-red-100 flex items-center gap-2">
                   <MaterialIcon name="error" className="text-sm" /> {formError}
                 </div>)}
               <div className="space-y-1">
@@ -363,7 +364,7 @@ export function AccountManagementContent() {
                 </label>
                 <input type="email" required placeholder="name@example.com" value={formEmail}
                   onChange={(e) => setFormEmail(e.target.value)}
-                  className="w-full px-4 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-xs text-on-surface outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary transition" />
+                  className="w-full px-4 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-xs text-on-surface outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary transition-all duration-200 ease-out" />
               </div>
               <div className="space-y-1 relative">
                 <label className="block text-[10px] font-bold text-on-surface-variant uppercase">
@@ -372,7 +373,7 @@ export function AccountManagementContent() {
                 <input type={showCrawlPassword ? "text" : "password"} required={!formId}
                   placeholder={formId ? "Để trống nếu không đổi mật khẩu" : "Mật khẩu tài khoản LinkedIn"}
                   value={formPassword} onChange={(e) => setFormPassword(e.target.value)}
-                  className="w-full px-4 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-xs text-on-surface outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary transition pr-10" />
+                  className="w-full px-4 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-xs text-on-surface outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary transition-all duration-200 ease-out pr-10" />
                 <button type="button" onClick={() => setShowCrawlPassword(!showCrawlPassword)}
                   className="absolute right-3 top-7 text-on-surface-variant hover:text-on-surface cursor-pointer"
                   aria-label={showCrawlPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}>
@@ -381,11 +382,11 @@ export function AccountManagementContent() {
               </div>
               <div className="flex gap-3 pt-3 border-t border-outline-variant">
                 <button type="button" disabled={formSaving} onClick={() => setShowCrawlForm(false)}
-                  className="flex-1 border border-outline-variant hover:bg-surface-container-low text-on-surface-variant hover:text-on-surface font-bold py-2 rounded-xl text-xs transition cursor-pointer">
+                  className="flex-1 border border-outline-variant hover:bg-surface-container-low text-on-surface-variant hover:text-on-surface font-bold py-2 rounded-2xl text-xs transition-all duration-200 ease-out cursor-pointer">
                   Hủy
                 </button>
                 <button type="submit" disabled={formSaving}
-                  className="flex-1 bg-primary hover:bg-on-primary-fixed-variant text-white font-bold py-2 rounded-xl text-xs transition shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center">
+                  className="flex-1 bg-primary hover:bg-on-primary-fixed-variant text-white font-bold py-2 rounded-2xl text-xs transition-all duration-200 ease-out shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_10px_-2px_rgba(16,24,40,0.06)] cursor-pointer disabled:opacity-50 flex items-center justify-center">
                   {formSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     : formId ? "Cập nhật" : "Lưu cấu hình"}
                 </button>
@@ -396,17 +397,19 @@ export function AccountManagementContent() {
 
       {/* ── Verify / OTP Modal ─────────────────────────────────────── */}
       {verifyModalOpen && verifyAccount && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[1px] animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div style={{ width: "100%", maxWidth: "440px" }}
-            className="bg-surface rounded-xl border border-outline-variant shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            className="bg-surface rounded-2xl border border-outline-variant shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant bg-surface-container-low">
-              <h3 className="font-bold text-on-surface flex items-center gap-2">
-                <FaLock className="text-primary" size={18} />
+              <h3 className="font-bold text-on-surface flex items-center gap-2.5">
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <FaLock size={14} />
+                </span>
                 Xác minh tài khoản cào
               </h3>
               <button onClick={() => { setVerifyModalOpen(false); setVerifyError(""); setVerifySuccess(""); }}
-                className="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-lg p-1.5 transition cursor-pointer">
+                className="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-xl p-1.5 transition-all duration-200 ease-out cursor-pointer">
                 <MaterialIcon name="close" className="text-xl" />
               </button>
             </div>
@@ -419,15 +422,15 @@ export function AccountManagementContent() {
                 </div>
                 <p className="text-sm font-bold text-on-surface">{verifySuccess}</p>
                 <button onClick={() => { setVerifyModalOpen(false); setStepVerify("loading"); setVerifyError(""); setVerifySuccess(""); }}
-                  className="px-6 py-2.5 bg-primary hover:bg-on-primary-fixed-variant text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer">
+                  className="px-6 py-2.5 bg-primary hover:bg-on-primary-fixed-variant text-white rounded-2xl text-xs font-bold transition-all duration-200 ease-out shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_10px_-2px_rgba(16,24,40,0.06)] cursor-pointer">
                   Đóng
                 </button>
               </div>
             ) : (
               <div className="p-6 space-y-4">
                 {/* Account info */}
-                <div className="bg-surface-container-low rounded-xl p-3 flex items-center gap-3">
-                  <span className="w-8 h-8 rounded-lg bg-[#0077B5]/10 text-[#0077B5] flex items-center justify-center shrink-0">
+                <div className="bg-surface-container-low rounded-2xl p-3 flex items-center gap-3">
+                  <span className="w-8 h-8 rounded-xl bg-[#0077B5]/10 text-[#0077B5] flex items-center justify-center shrink-0">
                     <FaLinkedin size={14} />
                   </span>
                   <div className="min-w-0">
@@ -438,7 +441,7 @@ export function AccountManagementContent() {
 
                 {/* Error */}
                 {verifyError && (
-                  <div className="bg-red-50 text-red-600 text-xs p-3 rounded-lg border border-red-100 flex items-center gap-2">
+                  <div className="bg-red-50 text-red-600 text-xs p-3 rounded-xl border border-red-100 flex items-center gap-2">
                     <MaterialIcon name="error" className="text-sm shrink-0" /> {verifyError}
                   </div>)}
 
@@ -469,15 +472,15 @@ export function AccountManagementContent() {
                       maxLength={6}
                       value={verifyOtp}
                       onChange={(e) => setVerifyOtp(e.target.value.replace(/\D/g, ""))}
-                      className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant rounded-xl text-center text-2xl font-mono font-bold text-on-surface outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary transition letter-spacing-wider"
+                      className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant rounded-xl text-center text-2xl font-mono font-bold text-on-surface outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary transition-all duration-200 ease-out letter-spacing-wider"
                       autoFocus />
                     <div className="flex gap-3">
                       <button type="button" onClick={() => setStepVerify("initiate")}
-                        className="flex-1 border border-outline-variant hover:bg-surface-container-low text-on-surface-variant font-bold py-2.5 rounded-xl text-xs transition cursor-pointer">
+                        className="flex-1 border border-outline-variant hover:bg-surface-container-low text-on-surface-variant font-bold py-2.5 rounded-2xl text-xs transition-all duration-200 ease-out cursor-pointer">
                         ← Quay lại
                       </button>
                       <button type="submit" disabled={verifyLoading || verifyOtp.trim().length < 6}
-                        className="flex-[2] bg-primary hover:bg-on-primary-fixed-variant text-white font-bold py-2.5 rounded-xl text-xs transition shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2">
+                        className="flex-[2] bg-primary hover:bg-on-primary-fixed-variant text-white font-bold py-2.5 rounded-2xl text-xs transition-all duration-200 ease-out shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_10px_-2px_rgba(16,24,40,0.06)] cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2">
                         {verifyLoading
                           ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                           : <><FaLock size={12} /> Xác minh</>}
@@ -528,10 +531,10 @@ function LoginStep({
         <input type="password" placeholder="Mật khẩu LinkedIn"
           value={password}
           onChange={(e) => { setPassword(e.target.value); onError(""); }}
-          className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-xl text-xs text-on-surface outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary transition" />
+          className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-xl text-xs text-on-surface outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary transition-all duration-200 ease-out" />
       </div>
       <button type="submit" disabled={loading || !password.trim()}
-        className="w-full bg-primary hover:bg-on-primary-fixed-variant text-white font-bold py-2.5 rounded-xl text-xs transition shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2">
+        className="w-full bg-primary hover:bg-on-primary-fixed-variant text-white font-bold py-2.5 rounded-2xl text-xs transition-all duration-200 ease-out shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_10px_-2px_rgba(16,24,40,0.06)] cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2">
         {loading
           ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
           : <><FaLock size={12} /> Đăng nhập &amp; xác minh</>}
