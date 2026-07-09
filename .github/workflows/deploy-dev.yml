@@ -24,9 +24,10 @@ jobs:
     steps:
       - name: Pull code theo ref duoc chon
         run: |
+          REF="${{ github.event.inputs.ref || github.ref_name }}"
           git fetch origin
-          git checkout "${{ github.event.inputs.ref }}"
-          git pull origin "${{ github.event.inputs.ref }}" || true
+          git checkout "$REF"
+          git pull origin "$REF" || true
 
       - name: Build frontend + backend
         run: docker compose build frontend backend
