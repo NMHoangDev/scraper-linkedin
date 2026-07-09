@@ -602,6 +602,20 @@ async def fb_inbox_reply(
     return _json_response(status, payload)
 
 
+@router.post("/inbox/reply-detected")
+async def fb_inbox_reply_detected(data: dict, background_tasks: BackgroundTasks) -> JSONResponse:
+    """Nội bộ: service gọi khi quét Inbox phát hiện nhân viên đã trả lời khách
+    TRỰC TIẾP trên Facebook (không qua nút Trả lời trong tool). Cho phép tính KPI
+    cả 2 đường (qua tool + trả lời thẳng trên FB), không yêu cầu user token vì đây
+    là gọi server-to-server (giống pattern /fb/post-kpi/save).
+    idempotent theo (id_member, conv_id, user_id) trong auto_count_fb_inbox_reply."""
+    uid = str(data.get("user_id") or "")
+    conv_id = str(data.get("conv_id") or "")
+    if uid and conv_id:
+        background_tasks.add_task(auto_count_fb_inbox_reply, uid, conv_id)
+    return _json_response(200, {"success": True})
+
+
 @router.get("/inbox/reply_status")
 async def fb_inbox_reply_status(request: Request, authorization: str | None = Header(None)) -> JSONResponse:
     user = _current_user(request, authorization)
