@@ -240,14 +240,7 @@ export function AllPlatformSidebarShadcn() {
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
                 <div className="absolute bottom-full left-0 z-50 mb-2 w-56 overflow-hidden rounded-xl border border-sidebar-border bg-popover text-popover-foreground shadow-lg">
-                  <Link
-                    href="/all-platform/profile"
-                    onClick={() => setShowProfileMenu(false)}
-                    className="flex items-center gap-2.5 px-3 py-2.5 text-sm transition hover:bg-accent"
-                  >
-                    <Settings2 className="size-4" />
-                    Cài đặt tài khoản
-                  </Link>
+                  
                   <button
                     type="button"
                     onClick={() => void handleLogout()}
