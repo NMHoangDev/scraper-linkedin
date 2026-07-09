@@ -42,16 +42,13 @@ const MOCK_USER: AppUser = {
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
-    const timer = window.setTimeout(
-      () => reject(new Error("Auth check timeout")),
-      ms,
-    );
+    const timer = window.setTimeout(() => reject(new Error("Auth check timeout")), ms);
     promise.then(
-      (value) => {
+      value => {
         window.clearTimeout(timer);
         resolve(value);
       },
-      (error) => {
+      error => {
         window.clearTimeout(timer);
         reject(error);
       },
@@ -122,23 +119,20 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const register = useCallback(
-    async (email: string, password: string, name?: string) => {
-      setIsLoading(true);
-      try {
-        const res = await authService.register({ email, password, name });
-        if (!res.success || !res.data) {
-          throw new Error(res.message || "Registration failed");
-        }
-        // Cookie is set by backend; just take user.
-        const data = res.data as { user: AppUser };
-        setUser(data.user);
-      } finally {
-        setIsLoading(false);
+  const register = useCallback(async (email: string, password: string, name?: string) => {
+    setIsLoading(true);
+    try {
+      const res = await authService.register({ email, password, name });
+      if (!res.success || !res.data) {
+        throw new Error(res.message || "Registration failed");
       }
-    },
-    [],
-  );
+      // Cookie is set by backend; just take user.
+      const data = res.data as { user: AppUser };
+      setUser(data.user);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   const logout = useCallback(async () => {
     await authService.logout();
