@@ -88,12 +88,13 @@ def parse_facebook_time(time_str: str) -> str | None:
         return None
 
 def save_facebook_crawl_to_supabase(user_id: str, summaries: List[GroupSummary]) -> dict:
-    """
-    Save Facebook crawl results (hot posts) to Supabase facebook_posts table.
-    Inherits taxonomy (intent, industry, team, tier, icp) from facebook_groups.
+    """Save Facebook crawl results (hot posts) to Supabase facebook_posts table.
+
+    Returns a dict including inserted_posts for follow-up background filtering.
     """
     if not summaries:
-        return {"total_posts": 0, "errors": []}
+        return {"total_posts": 0, "errors": [], "inserted_posts": []}
+
 
     supabase = get_supabase_client()
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -117,51 +118,83 @@ def save_facebook_crawl_to_supabase(user_id: str, summaries: List[GroupSummary])
     posts_to_insert = []
     errors = []
     duplicates = 0
-    
+    inserted_posts: list[dict] = []
+
+
+
+    def iter_selected_posts(summary: GroupSummary):
+        # Prefer selected_posts; fallback to hot_post for backward compatibility
+        if getattr(summary, "selected_posts", None):
+            return summary.selected_posts or []
+        if getattr(summary, "hot_post", None):
+            return [summary.hot_post]
+        return []
+
     for summary in summaries:
-        if not summary.hot_post:
-            continue
-            
         group_url = summary.link_group
         db_group = group_map.get(group_url, {})
         group_id = db_group.get("id")
-        
-        post = summary.hot_post
-        
-        if post.url in existing_urls:
-            duplicates += 1
-            continue
-        
-        # Format post.date properly if needed, parsing Vietnamese relative times
-        post_time = parse_facebook_time(post.date) if post.date else None
-        
-        post_data = {
-            "group_id": group_id,
-            "post_url": post.url,
-            "crawl_date": now_iso,
-            "post_time": post_time,
-            "content": post.content,
-            "score": post.score,
-            "reactions": post.reactions,
-            "comments": post.comments,
-            "shares": post.shares,
-            "media_url": None,
-            "image_urls": [],
-            "created_at": now_iso,
-            "updated_at": now_iso,
-            "id_member": summary.id_member or user_id
-        }
-        
-        # Chỉ chèn các bài có group_id để đảm bảo Foreign Key Constraint (nếu có)
-        if group_id:
-            posts_to_insert.append(post_data)
+
+        for post in iter_selected_posts(summary):
+            if not post or not post.url:
+                continue
+
+            if post.url in existing_urls:
+                duplicates += 1
+                continue
+
+            post_time = parse_facebook_time(post.date) if post.date else None
+
+            post_data = {
+                "group_id": group_id,
+                "post_url": post.url,
+                "crawl_date": now_iso,
+                "post_time": post_time,
+                "content": post.content,
+                "score": post.score,
+                "reactions": post.reactions,
+                "comments": post.comments,
+                "shares": post.shares,
+                "media_url": None,
+                "image_urls": post.images or [],
+                "created_at": now_iso,
+                "updated_at": now_iso,
+                "id_member": summary.id_member or user_id,
+            }
+
+            inserted_posts.append(
+                {
+                    "id_member": summary.id_member or user_id,
+                    "post_url": post.url,
+                    "content": post.content,
+                    # Use group intent as context for AI
+                    "industry": getattr(summary, "Intent", None),
+                }
+            )
+
+
+            if group_id:
+                posts_to_insert.append(post_data)
+
         
     if posts_to_insert:
         try:
             res = supabase.table("facebook_posts").insert(posts_to_insert).execute()
-            return {"total_posts": len(res.data or []), "errors": errors, "duplicates": duplicates}
+
+            # Ensure inserted_posts aligns with successful insert count is not exact
+            # (supabase insert may ignore duplicates if unique constraints exist).
+            # We still return candidate inserted_posts and background task will be
+            # fail-safe by attempting delete by post_url.
+            return {
+                "total_posts": len(res.data or []),
+                "errors": errors,
+                "duplicates": duplicates,
+                "inserted_posts": inserted_posts,
+            }
+
         except Exception as e:
             logger.error(f"Error saving FB posts to Supabase: {e}")
             errors.append(str(e))
             
-    return {"total_posts": 0, "errors": errors, "duplicates": duplicates}
+    return {"total_posts": 0, "errors": errors, "duplicates": duplicates, "inserted_posts": inserted_posts}
+

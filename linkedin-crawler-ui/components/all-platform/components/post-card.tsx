@@ -15,9 +15,11 @@ interface PostCardProps {
   onSeeding?: (post: UnifiedPost) => void;
   onSchedule?: (post: UnifiedPost) => void;
   onViewDetail?: (post: UnifiedPost) => void;
+  onDelete?: (post: UnifiedPost) => void | Promise<void>;
   seeded?: boolean;
   verifyStatus?: "pending" | "yes" | "no";
 }
+
 
 function PlatformIcon({ platform }: { platform: FeedPlatform }) {
   if (platform === "facebook") {
@@ -26,7 +28,7 @@ function PlatformIcon({ platform }: { platform: FeedPlatform }) {
   return <FaLinkedin className="text-blue-700 shrink-0" />;
 }
 
-export function PostCard({ post, userRole, onVerify, onSeeding, onSchedule, onViewDetail, seeded, verifyStatus }: PostCardProps) {
+export function PostCard({ post, userRole, onVerify, onSeeding, onSchedule, onViewDetail, onDelete, seeded, verifyStatus }: PostCardProps) {
   const [isInboxOpen, setIsInboxOpen] = useState(false);
   const inboxRef = useRef<HTMLDivElement>(null);
 
@@ -75,6 +77,7 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onSchedule, onVi
 
   const score = post.score || 0;
   let scoreBg = "bg-muted text-muted-foreground border-border";
+
   if (score >= 85) scoreBg = "bg-primary/10 text-primary border-primary/20";
   else if (score >= 60) scoreBg = "bg-amber-50 text-amber-600 border-amber-100";
 
@@ -131,16 +134,18 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onSchedule, onVi
 
           <span className="text-sm text-muted-foreground shrink-0 font-medium text-right leading-tight">
             <span className="block">
-              {post.crawl_date ? new Date(post.crawl_date).toLocaleDateString("vi-VN") : ""}
-              {post.posted_at ? ` • ${new Date(post.posted_at).toLocaleTimeString("vi-VN", {hour: '2-digit', minute:'2-digit'})}` : ""}
+              {post.crawl_date ? new Date(post.crawl_date).toLocaleDateString('vi-VN') : ''}
+              {post.posted_at ? ` • ${new Date(post.posted_at).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})}` : ''}
+
             </span>
           </span>
         </div>
 
         {/* Nội dung */}
         <p className="text-sm text-foreground italic line-clamp-2 leading-relaxed bg-muted px-3 py-2 rounded-lg border border-border mb-3">
-          "{post.content || "Nội dung bài viết rỗng hoặc chứa thuần hình ảnh/video."}"
+          {post.content || "Nội dung bài viết rỗng hoặc chứa thuần hình ảnh/video."}
         </p>
+
 
         {(userRole === "admin" || userRole === "leader") && post.all_seedings && post.all_seedings.length > 0 ? (
           <div className="mb-3 flex flex-col gap-2">
@@ -152,7 +157,8 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onSchedule, onVi
                 <p className="text-sm text-muted-foreground line-clamp-2">
                   <span className="text-emerald-500 font-serif font-bold text-lg leading-none mr-1">"</span>
                   {seed.seeding_content}
-                  <span className="text-emerald-500 font-serif font-bold text-lg leading-none ml-1">"</span>
+                  <span className="text-emerald-500 font-serif font-bold text-lg leading-none ml-1">“</span>
+
                 </p>
                 <div className="flex items-center justify-between mt-1">
                   {seed.link_comment && !isRejected(seed.link_comment) && (
@@ -185,6 +191,7 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onSchedule, onVi
             <p className="text-sm text-muted-foreground line-clamp-2">
               <span className="text-emerald-500 font-serif font-bold text-lg leading-none mr-1">"</span>
               {post.seeding_content}
+
               <span className="text-emerald-500 font-serif font-bold text-lg leading-none ml-1">"</span>
             </p>
             {post.link_comment && !isRejected(post.link_comment) && (
@@ -223,7 +230,23 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onSchedule, onVi
           </div>
 
           <div className="flex items-center gap-2">
+            {(userRole === "admin" || userRole === "leader") && onDelete && post.id && (
+              <button
+                type="button"
+                onClick={() => {
+                  const ok = window.confirm(`Xóa bài viết này?\n\n${post.group_name || "(không có nhóm)"}`);
+                  if (!ok) return;
+                  void onDelete(post);
+                }}
+                className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-sm font-semibold transition shadow-sm cursor-pointer"
+                aria-label="Xóa bài viết"
+              >
+                Xóa
+              </button>
+            )}
+
             {(verifyStatus === "yes" || verifyStatus === "pending") && isRejected(post.link_comment) ? (
+
               <span className="px-2.5 py-1 rounded-md text-[11px] font-bold border bg-red-100 text-red-700 border-red-200">
                 X Bị từ chối
               </span>

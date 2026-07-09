@@ -43,6 +43,9 @@ def extract_ts_hint(raw: str) -> str:
 def classify_timestamp(ts: str) -> str:
     """
     Phân loại timestamp thành: 'recent' | 'old' | 'unknown'
+
+    DEBUG: log đường parse để kiểm tra so sánh 'hôm nay'.
+
     
     - recent : trong vòng 24 giờ → lấy bài
     - old    : quá 24 giờ        → bỏ qua
@@ -56,6 +59,9 @@ def classify_timestamp(ts: str) -> str:
 
     try:
         post_time = now
+        # DEBUG
+        # print/log được phụ thuộc logger, nên dùng exception-free logger tại đây không đảm bảo.
+
 
         # 1. "Vừa xong"
         if "vừa xong" in t:
@@ -66,10 +72,11 @@ def classify_timestamp(ts: str) -> str:
             match = re.search(r'(\d+)\s*phút', t)
             if match:
                 post_time = now - timedelta(minutes=int(match.group(1)))
-                
+
         # 3. Giờ
         elif "giờ" in t:
             match = re.search(r'(\d+)\s*giờ', t)
+
             if match:
                 post_time = now - timedelta(hours=int(match.group(1)))
                 
@@ -123,10 +130,29 @@ def classify_timestamp(ts: str) -> str:
 
         # Kiểm tra khoảng cách thời gian
         delta = now - post_time
-        if delta.total_seconds() <= 24 * 3600:
+        is_recent = delta.total_seconds() <= 24 * 3600
+
+        # DEBUG logging
+        try:
+            from app.core.logger import get_logger
+            _lg = get_logger(__name__)
+            _lg.info(
+                "[DEBUG TS-B] classify_timestamp ts=%r lowered=%r post_time=%s today_now=%s delta_sec=%.0f result=%s",
+                ts,
+                t,
+                getattr(post_time, 'isoformat', lambda: str(post_time))(),
+                getattr(now, 'isoformat', lambda: str(now))(),
+                delta.total_seconds(),
+                'recent' if is_recent else 'old',
+            )
+        except Exception:
+            pass
+
+        if is_recent:
             return 'recent'
         else:
             return 'old'
+
 
     except Exception:
         return 'unknown'

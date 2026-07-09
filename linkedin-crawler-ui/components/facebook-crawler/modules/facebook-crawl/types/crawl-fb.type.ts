@@ -1,7 +1,11 @@
 export interface CrawlFBType {
   name: string;
   url: string;
+  // Optional per-group selection config
+  keywords?: string[] | null;
+  post_limit?: number | null;
 }
+
 export interface AccountCrawlFBType {
   useName?: string;
   password?: string;
@@ -11,6 +15,7 @@ export interface CrawlFBRequest {
   groups: CrawlFBType[];
   tkFB?: AccountCrawlFBType | null;
 }
+
 
 export interface PostType {
   group_name: string;

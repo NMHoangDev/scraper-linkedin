@@ -67,7 +67,9 @@ def crawl_sync(
             name=g.get("name", g.get("url", "")),
             url=g.get("url", ""),
             Intent=g.get("Intent", g.get("intent", "")),
-            id_member=g.get("id_member", "")
+            id_member=g.get("id_member", ""),
+            keywords=g.get("keywords"),
+            post_limit=g.get("post_limit"),
         )
         for g in groups
         if g.get("url")

@@ -70,6 +70,14 @@ class CrawlTriggerRequest(BaseModel):
     url: str
     intent: Optional[str] = None
 
+    # Optional per-group selection config
+    # - keywords: match substring in post content (ignore case)
+    # - post_limit: desired final number of posts to pick for this group
+    keywords: Optional[List[str]] = None
+    post_limit: Optional[int] = None
+
+
+
 
 class CrawlFacebookRequest(BaseModel):
     groups: List[CrawlTriggerRequest]
@@ -123,14 +131,26 @@ async def crawl_facebook(
             )
 
         # Build group list
+        for g in payload.groups:
+            logger.info(
+                "[DEBUG crawl_facebook payload] group=%s keywords(raw)=%s post_limit(raw)=%s",
+                getattr(g, "name", None),
+                getattr(g, "keywords", None),
+                getattr(g, "post_limit", None),
+            )
+
         group_list = [
             {
                 "name": g.name,
                 "url": g.url,
                 "intent": g.intent,
+                "keywords": g.keywords,
+                "post_limit": g.post_limit,
             }
             for g in payload.groups
         ]
+
+
 
         # Lấy user từ auth token để ghi nhận ai thực hiện crawl
         current_user = _get_user_from_header(authorization, request)

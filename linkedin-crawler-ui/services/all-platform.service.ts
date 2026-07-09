@@ -8,6 +8,8 @@ import type {
   KpiMember,
   KpiAssignment,
   Category,
+  QuickCommentTemplate,
+  QuickInboxTemplate,
   FacebookGroup,
   LinkedInGroup,
   ApiResponse,
@@ -939,6 +941,109 @@ export const allPlatformCategoriesService = {
   delete: (id: string): Promise<ApiResponse<{ deleted: number }>> => {
     return requestJson(`${BASE}/categories/delete?id=${encodeURIComponent(id)}`, {
       method: "DELETE",
+    });
+  },
+};
+
+// ── QUICK COMMENT LIBRARY ─────────────────────────────────────────────────────
+
+export const allPlatformQuickCommentService = {
+  getAll: (platform?: string): Promise<ApiResponse<QuickCommentTemplate[]>> => {
+    const url = platform
+      ? `${BASE}/quick-comments?platform=${encodeURIComponent(platform)}`
+      : `${BASE}/quick-comments`;
+    return requestJson<QuickCommentTemplate[]>(url);
+  },
+
+  add: (payload: {
+    title: string;
+    label?: string;
+    content: string;
+    platform?: string;
+    id_member?: string;
+  }): Promise<ApiResponse<QuickCommentTemplate>> => {
+    return requestJson(`${BASE}/quick-comments/add`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  update: (payload: {
+    id: string;
+    title?: string;
+    label?: string;
+    content?: string;
+    platform?: string;
+  }): Promise<ApiResponse<QuickCommentTemplate>> => {
+    return requestJson(`${BASE}/quick-comments/update`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  delete: (id: string): Promise<ApiResponse<{ deleted: number }>> => {
+    return requestJson(`${BASE}/quick-comments/delete?id=${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+  },
+
+  reorder: (
+    id: string,
+    direction: "up" | "down",
+  ): Promise<ApiResponse<QuickCommentTemplate[]>> => {
+    return requestJson(`${BASE}/quick-comments/reorder`, {
+      method: "PUT",
+      body: JSON.stringify({ id, direction }),
+    });
+  },
+};
+
+// ── QUICK INBOX LIBRARY ───────────────────────────────────────────────────────
+
+export const allPlatformQuickInboxService = {
+  getAll: (): Promise<ApiResponse<QuickInboxTemplate[]>> => {
+    return requestJson<QuickInboxTemplate[]>(`${BASE}/quick-inbox`);
+  },
+
+  add: (payload: {
+    title: string;
+    label?: string;
+    content: string;
+    content_with_post?: string;
+    id_member?: string;
+  }): Promise<ApiResponse<QuickInboxTemplate>> => {
+    return requestJson(`${BASE}/quick-inbox/add`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  update: (payload: {
+    id: string;
+    title?: string;
+    label?: string;
+    content?: string;
+    content_with_post?: string;
+  }): Promise<ApiResponse<QuickInboxTemplate>> => {
+    return requestJson(`${BASE}/quick-inbox/update`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  delete: (id: string): Promise<ApiResponse<{ deleted: number }>> => {
+    return requestJson(`${BASE}/quick-inbox/delete?id=${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+  },
+
+  reorder: (
+    id: string,
+    direction: "up" | "down",
+  ): Promise<ApiResponse<QuickInboxTemplate[]>> => {
+    return requestJson(`${BASE}/quick-inbox/reorder`, {
+      method: "PUT",
+      body: JSON.stringify({ id, direction }),
     });
   },
 };

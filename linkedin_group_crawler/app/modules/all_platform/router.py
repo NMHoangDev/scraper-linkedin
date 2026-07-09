@@ -8,6 +8,8 @@ from app.modules.all_platform.routers import (
     seeding_router,
     kpi_router,
     categories_router,
+    quick_comment_router,
+    quick_inbox_router,
     users_router,
     teams_router,
     auth_router,
@@ -29,8 +31,18 @@ from app.modules.all_platform.routers.websocket import router as websocket_route
 from app.modules.all_platform.routers.fb_inbox_accounts import router as fb_inbox_accounts_router
 from app.modules.all_platform.routers.customer_lead import router as customer_lead_router
 from app.modules.all_platform.routers.scheduled_comments import router as scheduled_comments_router
+from app.modules.all_platform.routers.posts_delete import router as posts_delete_router
 
 all_platform_router = APIRouter()
+
+# ── Delete posts ────────────────────────────────────────────────────────────
+all_platform_router.include_router(
+    posts_delete_router,
+    prefix="/unified",
+    tags=["All-Platform Posts Delete"],
+)
+
+
 
 # ── Facebook ────────────────────────────────────────────────────────────────────
 all_platform_router.include_router(
@@ -125,6 +137,20 @@ all_platform_router.include_router(
     categories_router,
     prefix="/categories",
     tags=["All-Platform Categories"],
+)
+
+# ── Quick Comment Library (platform-agnostic) ─────────────────────────────────
+all_platform_router.include_router(
+    quick_comment_router,
+    prefix="/quick-comments",
+    tags=["All-Platform Quick Comments"],
+)
+
+# ── Quick Inbox Library (platform-agnostic) ───────────────────────────────────
+all_platform_router.include_router(
+    quick_inbox_router,
+    prefix="/quick-inbox",
+    tags=["All-Platform Quick Inbox"],
 )
 
 # ── Users & Teams ──────────────────────────────────────────────────────────────

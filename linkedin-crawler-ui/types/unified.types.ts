@@ -149,6 +149,30 @@ export interface Category {
   created_at?: string;
 }
 
+export interface QuickCommentTemplate {
+  id: string;
+  title: string;
+  label: string;
+  content: string;
+  platform: "all" | "facebook" | "linkedin";
+  order_index: number;
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface QuickInboxTemplate {
+  id: string;
+  title: string;
+  label: string;
+  content: string;
+  content_with_post?: string;
+  order_index: number;
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // ── Users & Teams ─────────────────────────────────────────────────────────────
 
 export interface TeamMember {

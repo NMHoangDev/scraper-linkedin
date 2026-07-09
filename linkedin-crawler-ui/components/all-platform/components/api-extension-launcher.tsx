@@ -7,7 +7,7 @@ declare global {
 }
 declare const chrome: any;
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { allPlatformGroupsService, authService } from "@/services/all-platform.service";
@@ -36,7 +36,40 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
   const [availableGroups, setAvailableGroups] = useState<ExtensionGroup[]>([]);
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
-  const [showGroupList, setShowGroupList] = useState(false);
+
+  // Per-job common inputs (applied to each selected group)
+  const [keywordsInput, setKeywordsInput] = useState<string>("");
+  const [postLimitInput, setPostLimitInput] = useState<string>("");
+
+  const parsedKeywords = useMemo(() => {
+    const raw = keywordsInput
+      .split(/[,\n]/g)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    // de-dup + stable order
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const k of raw) {
+      const lower = k.toLowerCase();
+      if (seen.has(lower)) continue;
+      seen.add(lower);
+      out.push(k);
+    }
+    return out;
+  }, [keywordsInput]);
+
+  const parsedPostLimit = useMemo(() => {
+    const v = Number(postLimitInput);
+    if (!postLimitInput.trim()) return null;
+    if (Number.isNaN(v)) return null;
+    if (v <= 0) return null;
+    return Math.floor(v);
+  }, [postLimitInput]);
+
+  const clearModalInputs = () => {
+    setKeywordsInput("");
+    setPostLimitInput("");
+  };
 
   const onCompleteRef = useRef(onComplete);
   const onCrawlSavedRef = useRef(onCrawlSaved);
@@ -108,9 +141,10 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
         setIsDone(true);
         setLaunchLog((prev) => [
           ...prev,
-          `🎉 Hoàn tất! ${msg.totalPosts ?? 0} bài viết từ ${msg.totalGroups ?? 0} groups`,
+          `🎉 Hoàn tất! (xem log CRAWL_SAVED để biết số bài insert thật)`,
         ]);
-        onCompleteRef.current?.(msg.totalPosts ?? 0);
+        // msg.totalPosts thường là raw scrape count, không phải số insert thật.
+        onCompleteRef.current?.(0);
       } else if (msg.type === 'API_LAUNCH_FROM_APP_RESULT') {
         if (msg.success) {
           setLaunchLog((prev) => [
@@ -334,6 +368,8 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
         id: g.id || '',
         name: g.group_name || 'Group',
         url: g.group_url,
+        keywords: parsedKeywords.length ? parsedKeywords : null,
+        post_limit: parsedPostLimit,
       }));
 
       window.postMessage(
@@ -475,7 +511,43 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
               </button>
             </div>
 
-            <div className="p-4 flex-1 overflow-y-auto bg-muted">
+      <div className="p-4 flex-1 overflow-y-auto bg-muted">
+              <div className="space-y-3 mb-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-bold text-on-surface-variant">Danh sách từ khoá (keywords)</label>
+                  <input
+                    type="text"
+                    placeholder="Nhập từ khoá, cách nhau bởi dấu phẩy hoặc Enter"
+                    value={keywordsInput}
+                    onChange={(e) => setKeywordsInput(e.target.value)}
+                    className="w-full border-outline-variant bg-card focus:border-violet-300 focus:ring-violet-300 rounded-lg border px-3 py-2 text-xs outline-none"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-bold text-on-surface-variant">Số lượng bài muốn lấy (post_limit)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    placeholder="Ví dụ: 20"
+                    value={postLimitInput}
+                    onChange={(e) => setPostLimitInput(e.target.value)}
+                    className="w-full border-outline-variant bg-card focus:border-violet-300 focus:ring-violet-300 rounded-lg border px-3 py-2 text-xs outline-none"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setKeywordsInput("");
+                      setPostLimitInput("");
+                    }}
+                    className="text-sm font-medium text-muted-foreground bg-card border border-border hover:bg-muted px-3 py-1.5 rounded-lg transition"
+                    type="button"
+                  >
+                    Xoá input
+                  </button>
+                </div>
+              </div>
+
               <div className="flex gap-2 mb-4">
                 <button
                   onClick={() => setSelectedGroupIds(availableGroups.map(g => g.id))}

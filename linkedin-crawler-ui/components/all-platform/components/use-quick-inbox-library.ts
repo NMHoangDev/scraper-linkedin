@@ -1,12 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { allPlatformQuickInboxService } from "@/services/all-platform.service";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { INBOX_TEMPLATES, POST_PLACEHOLDER } from "./inbox-templates";
-
-const STORAGE_KEY = "quick_inbox_library_v1";
-const HISTORY_KEY = "quick_inbox_library_history_v1";
-const MAX_QUOTE_LENGTH = 300;
+import type { QuickInboxTemplate } from "@/types/unified.types";
 
 export interface QuickInboxLibraryEntry {
   id: string;
@@ -15,61 +13,24 @@ export interface QuickInboxLibraryEntry {
   content: string;
   contentWithPost?: string;
   order: number;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-export type QuickInboxLibraryAction = "create" | "update" | "delete" | "reorder";
-
-export interface QuickInboxLibraryHistoryEntry {
-  id: string;
-  itemId?: string;
-  action: QuickInboxLibraryAction;
-  title: string;
-  label: string;
-  before?: string;
-  after?: string;
-  user?: string;
-  timestamp: string;
+function toEntry(record: QuickInboxTemplate): QuickInboxLibraryEntry {
+  return {
+    id: record.id,
+    title: record.title,
+    label: record.label,
+    content: record.content,
+    contentWithPost: record.content_with_post || undefined,
+    order: record.order_index,
+    createdAt: record.created_at,
+    updatedAt: record.updated_at,
+  };
 }
 
-function createId() {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return `qi-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function nowIso() {
-  return new Date().toISOString();
-}
-
-function normalizeItems(items: QuickInboxLibraryEntry[]) {
-  return [...items]
-    .sort((a, b) => a.order - b.order)
-    .map((item, index) => ({ ...item, order: index + 1 }));
-}
-
-function loadFromStorage<T>(key: string): T | null {
-  try {
-    const raw = typeof window !== "undefined" ? window.localStorage.getItem(key) : null;
-    if (!raw) return null;
-    return JSON.parse(raw) as T;
-  } catch {
-    return null;
-  }
-}
-
-function saveToStorage(key: string, value: unknown) {
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // ignore storage errors
-  }
-}
-
-function buildDefaultLibraryItems(): QuickInboxLibraryEntry[] {
-  const now = nowIso();
+function buildFallbackItems(): QuickInboxLibraryEntry[] {
   return INBOX_TEMPLATES.flatMap((group, groupIndex) =>
     group.templates.map((template, templateIndex) => ({
       id: `fallback-${groupIndex}-${templateIndex}`,
@@ -78,8 +39,6 @@ function buildDefaultLibraryItems(): QuickInboxLibraryEntry[] {
       content: template.content,
       contentWithPost: template.contentWithPost,
       order: groupIndex * 100 + templateIndex + 1,
-      createdAt: now,
-      updatedAt: now,
     })),
   );
 }
@@ -113,89 +72,44 @@ export function composeQuickInboxMessage(
 export function useQuickInboxLibrary() {
   const { user } = useAppAuth();
   const [items, setItems] = useState<QuickInboxLibraryEntry[]>([]);
-  const [history, setHistory] = useState<QuickInboxLibraryHistoryEntry[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const rawItems = window.localStorage.getItem(STORAGE_KEY);
-    const loadedItems = rawItems ? loadFromStorage<QuickInboxLibraryEntry[]>(STORAGE_KEY) : null;
-    const loadedHistory = loadFromStorage<QuickInboxLibraryHistoryEntry[]>(HISTORY_KEY) ?? [];
-
-    if (rawItems === null) {
-      const defaults = normalizeItems(buildDefaultLibraryItems());
-      setItems(defaults);
-      saveToStorage(STORAGE_KEY, defaults);
-    } else if (loadedItems && Array.isArray(loadedItems)) {
-      setItems(normalizeItems(loadedItems));
+  const refresh = useCallback(async () => {
+    const res = await allPlatformQuickInboxService.getAll();
+    if (res.success) {
+      setItems((res.data || []).map(toEntry));
+      setError(null);
     } else {
-      setItems([]);
+      setError(res.message || "Không tải được thư viện mẫu inbox.");
     }
-
-    setHistory(Array.isArray(loadedHistory) ? loadedHistory : []);
     setIsLoaded(true);
   }, []);
 
-  const fallbackItems = useMemo(() => normalizeItems(buildDefaultLibraryItems()), []);
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
-  const persistItems = (nextItems: QuickInboxLibraryEntry[]) => {
-    const normalized = normalizeItems(nextItems);
-    setItems(normalized);
-    saveToStorage(STORAGE_KEY, normalized);
-  };
+  const fallbackItems = useMemo(() => buildFallbackItems(), []);
 
-  const persistHistory = (nextHistory: QuickInboxLibraryHistoryEntry[]) => {
-    setHistory(nextHistory);
-    saveToStorage(HISTORY_KEY, nextHistory);
-  };
-
-  const addHistory = (
-    action: QuickInboxLibraryAction,
-    item: QuickInboxLibraryEntry,
-    details: { before?: string; after?: string },
-  ) => {
-    const next: QuickInboxLibraryHistoryEntry[] = [
-      {
-        id: createId(),
-        itemId: item.id,
-        action,
-        title: item.title,
-        label: item.label,
-        before: details.before,
-        after: details.after,
-        user: user?.email || user?.name || "Unknown",
-        timestamp: nowIso(),
-      },
-      ...history,
-    ].slice(0, 100);
-    persistHistory(next);
-  };
-
-  const createTemplate = (payload: {
+  const createTemplate = async (payload: {
     title: string;
     label: string;
     content: string;
     contentWithPost?: string;
   }) => {
-    const now = nowIso();
-    const nextItem: QuickInboxLibraryEntry = {
-      id: createId(),
+    const res = await allPlatformQuickInboxService.add({
       title: payload.title.trim() || payload.content.slice(0, 40),
-      label: payload.label.trim(),
+      label: payload.label.trim() || "Khác",
       content: payload.content.trim(),
-      contentWithPost: payload.contentWithPost?.trim() || undefined,
-      order: items.length + 1,
-      createdAt: now,
-      updatedAt: now,
-    };
-    const nextItems = [...items, nextItem];
-    persistItems(nextItems);
-    addHistory("create", nextItem, { after: nextItem.content });
+      content_with_post: payload.contentWithPost?.trim() || undefined,
+      id_member: user?.id,
+    });
+    if (res.success) await refresh();
+    return res;
   };
 
-  const updateTemplate = (
+  const updateTemplate = async (
     templateId: string,
     payload: {
       title: string;
@@ -204,57 +118,38 @@ export function useQuickInboxLibrary() {
       contentWithPost?: string;
     },
   ) => {
-    const now = nowIso();
-    const nextItems = items.map((item) => {
-      if (item.id !== templateId) return item;
-      const updated: QuickInboxLibraryEntry = {
-        ...item,
-        title: payload.title.trim() || payload.content.slice(0, 40),
-        label: payload.label.trim(),
-        content: payload.content.trim(),
-        contentWithPost: payload.contentWithPost?.trim() || undefined,
-        updatedAt: now,
-      };
-      addHistory("update", updated, { before: item.content, after: updated.content });
-      return updated;
+    const res = await allPlatformQuickInboxService.update({
+      id: templateId,
+      title: payload.title.trim() || payload.content.slice(0, 40),
+      label: payload.label.trim() || "Khác",
+      content: payload.content.trim(),
+      content_with_post: payload.contentWithPost?.trim() || undefined,
     });
-    persistItems(nextItems);
+    if (res.success) await refresh();
+    return res;
   };
 
-  const deleteTemplate = (templateId: string) => {
-    const target = items.find((item) => item.id === templateId);
-    if (!target) return;
-    const nextItems = items.filter((item) => item.id !== templateId);
-    persistItems(nextItems);
-    addHistory("delete", target, { before: target.content });
+  const deleteTemplate = async (templateId: string) => {
+    const res = await allPlatformQuickInboxService.delete(templateId);
+    if (res.success) await refresh();
+    return res;
   };
 
-  const moveTemplate = (templateId: string, direction: "up" | "down") => {
-    const normalized = normalizeItems(items);
-    const index = normalized.findIndex((item) => item.id === templateId);
-    if (index === -1) return;
-    const targetIndex = direction === "up" ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= normalized.length) return;
-    const next = [...normalized];
-    const [moved] = next.splice(index, 1);
-    next.splice(targetIndex, 0, moved);
-    const reordered = normalizeItems(next).map((item) => ({ ...item, updatedAt: nowIso() }));
-    persistItems(reordered);
-    addHistory("reorder", moved, {
-      before: `pos ${index + 1}`,
-      after: `pos ${targetIndex + 1}`,
-    });
+  const moveTemplate = async (templateId: string, direction: "up" | "down") => {
+    const res = await allPlatformQuickInboxService.reorder(templateId, direction);
+    if (res.success) await refresh();
+    return res;
   };
 
   return {
     libraryItems: items,
     fallbackItems,
-    history,
     isLoaded,
     error,
     createTemplate,
     updateTemplate,
     deleteTemplate,
     moveTemplate,
+    refresh,
   };
 }

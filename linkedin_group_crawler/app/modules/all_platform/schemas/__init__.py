@@ -30,6 +30,16 @@ from app.modules.all_platform.schemas.categories import (
     CategoryUpdateRequest,
     CategoryDeleteRequest,
 )
+from app.modules.all_platform.schemas.quick_comment import (
+    QuickCommentAddRequest,
+    QuickCommentUpdateRequest,
+    QuickCommentReorderRequest,
+)
+from app.modules.all_platform.schemas.quick_inbox import (
+    QuickInboxAddRequest,
+    QuickInboxUpdateRequest,
+    QuickInboxReorderRequest,
+)
 from app.modules.all_platform.schemas.auth import (
     RegisterRequest,
     LoginRequest,

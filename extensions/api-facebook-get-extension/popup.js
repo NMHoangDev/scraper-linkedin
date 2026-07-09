@@ -38,7 +38,7 @@ btnAutoStart.addEventListener('click', async () => {
         // Fall back to storage (set by bridge.js from a previous visit).
         if (!API_BASE) {
             const { api_base_url } = await chrome.storage.local.get('api_base_url');
-            API_BASE = api_base_url || 'https://seeding.markeeai.com';
+            API_BASE = api_base_url || 'https://dev.seeding.markeeai.com';
         }
 
         addLog(`🌐 Backend: ${API_BASE}`);
