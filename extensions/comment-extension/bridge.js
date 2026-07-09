@@ -15,6 +15,10 @@ window.addEventListener("message", function(event) {
                 window.postMessage({ action: "BULK_COMMENT_STARTED", success: true }, "*");
             }
         });
+    } else if (event.data.action === "STOP_BULK_COMMENT") {
+        chrome.runtime.sendMessage({ action: "STOP_BULK_COMMENT" }, response => {
+            window.postMessage({ action: "STOP_BULK_COMMENT_RESPONSE", payload: response }, "*");
+        });
     } else if (event.data.action === "PING_COMMENT_EXTENSION") {
         window.postMessage({ action: "COMMENT_EXTENSION_READY" }, "*");
     } else if (event.data.action === "GET_STATUS") {
