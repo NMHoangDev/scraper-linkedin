@@ -147,7 +147,7 @@ async function startAutoCrawl(groups, config = {}) {
                     let backendRetry = 0;
                     while (backendRetry <= 2) {
                         try {
-                            pushRes = await fetch("https://seeding.markeeai.com/api/all-platform/extension/save-posts", {
+                            pushRes = await fetch("http://127.0.0.1:8000/api/all-platform/extension/save-posts", {
                                 method: "POST",
                                 headers: { 
                                     "Content-Type": "application/json",
@@ -158,8 +158,12 @@ async function startAutoCrawl(groups, config = {}) {
                                     group_id: '',
                                     group_url: group.url,
                                     id_member: idMember,
-                                    extension_version: "API-Automated-1.0"
+                                    extension_version: "API-Automated-1.0",
+                                    // Pass keyword filter params (from app UI) to backend
+                                    keywords: group.keywords || null,
+                                    post_limit: group.post_limit ?? null
                                 })
+
                             });
                             break;
                         } catch(err) {

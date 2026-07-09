@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json as _json
 import logging
 import re
 import uuid
@@ -9,12 +10,19 @@ import asyncio
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
 
-from fastapi import APIRouter, HTTPException, Header
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Header, Request
+from pydantic import BaseModel, model_validator
 
 from app.core.supabase_client import get_supabase_client
 from app.modules.all_platform.websocket import manager
 from app.modules.all_platform.services.supabase_facebook_crawl_service import parse_facebook_time
+
+# Reuse facebook keyword picker logic
+from app.modules.facebook.src.modules.facebook.services.facebook_scraper import (
+    _pick_by_keywords_and_threshold,
+)
+from app.modules.facebook.src.modules.crawl_fb.models.post import Post as FBPost
+
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +53,66 @@ class ExtensionCrawlRequest(BaseModel):
     group_id: Optional[str] = None
     id_member: Optional[str] = None
     extension_version: Optional[str] = None
+
+    # Optional keyword-based picking (sent by extension)
+    keywords: Optional[List[str]] = None
+    post_limit: Optional[int] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_keywords(cls, data):
+        """
+        Chuẩn hoá field keyword từ nhiều biến thể tên/kiểu dữ liệu khác nhau
+        mà extension có thể gửi, gộp hết về đúng field `keywords: List[str]`.
+
+        Hỗ trợ:
+        - keywords: ["a", "b"]           -> giữ nguyên
+        - keywords: "a, b"               -> tách theo dấu phẩy
+        - keyword: "a"                   -> map sang keywords=["a"]
+        - search_keyword / search_keywords / kw / filter_keyword -> tương tự
+        """
+        if not isinstance(data, dict):
+            return data
+
+        existing = data.get("keywords")
+        if isinstance(existing, list) and existing:
+            # Đã có list hợp lệ, chỉ cần strip khoảng trắng
+            cleaned = [str(k).strip() for k in existing if str(k).strip()]
+            if cleaned:
+                data["keywords"] = cleaned
+                return data
+
+        candidates = [
+            data.get("keyword"),
+            data.get("search_keyword"),
+            data.get("search_keywords"),
+            data.get("kw"),
+            data.get("filter_keyword"),
+            existing,  # có thể là string thay vì list
+        ]
+
+        for val in candidates:
+            if val is None:
+                continue
+            if isinstance(val, str) and val.strip():
+                data["keywords"] = [k.strip() for k in val.split(",") if k.strip()]
+                logger.info(
+                    "[KEYWORD-NORMALIZE] Đã map keyword từ field khác -> keywords=%s",
+                    data["keywords"],
+                )
+                return data
+            if isinstance(val, list) and val:
+                cleaned = [str(k).strip() for k in val if str(k).strip()]
+                if cleaned:
+                    data["keywords"] = cleaned
+                    logger.info(
+                        "[KEYWORD-NORMALIZE] Đã map keyword từ field khác -> keywords=%s",
+                        data["keywords"],
+                    )
+                    return data
+
+        return data
+
 
 def sync_process_and_save_posts_db(payload: ExtensionCrawlRequest, legacy: bool):
     """
@@ -81,7 +149,7 @@ def sync_process_and_save_posts_db(payload: ExtensionCrawlRequest, legacy: bool)
     now_vn = datetime.now(vietnam_tz)
     today_vn_str = now_vn.strftime('%Y-%m-%d')
 
-    today_posts = []  # List of (post, raw_time_str)
+    today_posts = []  # List of (ext_post, raw_time_str)
     skipped_old = 0
     skipped_no_time = 0
 
@@ -112,6 +180,16 @@ def sync_process_and_save_posts_db(payload: ExtensionCrawlRequest, legacy: bool)
 
             if post_date_vn != today_vn_str:
                 skipped_old += 1
+                post_url_for_log = post_url or ''
+                raw_time_for_log = raw_time
+                logger.info(
+                    "[FILTER-DEBUG-OLD] "
+                    f"post_url={post_url_for_log} | "
+                    f"raw_time={raw_time_for_log} | "
+                    f"dt_utc={dt_utc.isoformat()} | "
+                    f"dt_vn={dt_vn.isoformat()} | "
+                    f"post_date_vn={post_date_vn} | today_vn_str={today_vn_str}"
+                )
                 continue
 
             today_posts.append((p, raw_time))
@@ -126,16 +204,93 @@ def sync_process_and_save_posts_db(payload: ExtensionCrawlRequest, legacy: bool)
         f"| Bài HÔM NAY={len(today_posts)} (today_vn={today_vn_str})"
     )
 
-    # 5. Sắp xếp bài hôm nay theo Reactions + Comments (cao nhất lên đầu)
-    today_posts.sort(key=lambda x: (x[0].reactions or 0, x[0].comments or 0), reverse=True)
+    # 4b. Build map theo post_url để MAP NGƯỢC object gốc (có author_url/author_name/content đầy đủ)
+    ext_post_by_url = {}
+    for (ext_post, _raw_time) in today_posts:
+        p_url = ext_post.post_url or ext_post.url
+        if p_url:
+            ext_post_by_url[p_url] = ext_post
 
-    # 6. Chỉ lấy tối đa 3 bài xịn nhất
-    top_posts = today_posts[:3]
-    top_posts_objects = [p for p, raw_time in top_posts]
+    # Helper để map ngược từ FBPost(url=...) về object extension gốc
+    def get_ext_post_by_fb_url(fb_url: str) -> Optional[ExtensionPost]:
+        return ext_post_by_url.get(fb_url)
+
+
+
+    # 5. Build FB Post objects để tái sử dụng keyword picker
+    # NOTE: FBPost model chỉ có url/date/reactions/comments/shares/score/content/media/images
+    # KHÔNG có author_url/author_name => sau khi picker chọn xong phải map ngược object gốc theo post_url.
+
+    # Note: _pick_by_keywords_and_threshold cần: url, date, reactions/comments/shares/score, content
+    keywords = payload.keywords or []
+    post_limit = payload.post_limit
+
+    logger.info(
+        "[KEYWORD-CHECK] payload.keywords=%s | post_limit=%s | total_posts_in_day=%s",
+        keywords,
+        post_limit,
+        len(today_posts),
+    )
+
+    posts_in_day: list[FBPost] = []
+    for (ext_post, raw_time) in today_posts:
+        post_url = ext_post.post_url or ext_post.url
+        if not post_url:
+            continue
+
+        reactions = ext_post.reactions or 0
+        comments = ext_post.comments or 0
+        shares = ext_post.shares or 0
+        score = comments * 2 + reactions + shares * 3
+
+        # _pick_by_keywords_and_threshold dùng p.content + p.url + p.score
+        # p.date dùng cho các logic calendar nếu có (ở đây ta đã lọc hôm nay rồi)
+        fb_post = FBPost(
+            url=post_url,
+            date=raw_time,
+            reactions=reactions,
+            comments=comments,
+            shares=shares,
+            score=score,
+            content=ext_post.content or "",
+            media_url=ext_post.video_url or ext_post.media_url,
+            video_url=ext_post.video_url,
+            author_url=ext_post.author_url,
+            author_name=ext_post.author_name,
+            crawled_at=ext_post.crawled_at,
+            images=ext_post.images or [],
+        )
+        posts_in_day.append(fb_post)
+
+    # 6. Gọi lại picker keyword/thresh
+    selected_posts = _pick_by_keywords_and_threshold(
+        posts_in_day=posts_in_day,
+        keywords=keywords,
+        post_limit=post_limit,
+    )
+
+    top_posts_objects = selected_posts
+
 
     # 7. Resolve authors (chỉ lấy tác giả cho những bài top 3 sẽ lưu)
-    author_urls = [p.author_url for p in top_posts_objects if p.author_url and p.author_url.strip()]
+    # LƯU Ý: top_posts_objects không có author_url/author_name (coming from picker FBPost model)
+    # -> map ngược theo post_url về ExtensionPost gốc để lấy author fields.
+    top_ext_posts: list[ExtensionPost] = []
+    for p in top_posts_objects:
+        fb_url = p.url
+        ext_post = get_ext_post_by_fb_url(fb_url) if fb_url else None
+        if ext_post:
+            top_ext_posts.append(ext_post)
+        else:
+            logger.warning(f"[AUTHOR] Không map ngược ExtensionPost cho fb_url={fb_url}")
+
+    author_urls = [
+        p.author_url
+        for p in top_ext_posts
+        if p.author_url and str(p.author_url).strip()
+    ]
     author_map = {}
+
     if author_urls:
         try:
             res_authors = supabase.table("author_post").select("id, url_profile").in_("url_profile", author_urls).execute()
@@ -145,9 +300,11 @@ def sync_process_and_save_posts_db(payload: ExtensionCrawlRequest, legacy: bool)
             logger.warning(f"Error fetching authors: {e}")
 
     new_authors = []
-    for p in top_posts_objects:
+    # Tạo author new theo ExtensionPost gốc
+    for p in top_ext_posts:
         url = p.author_url.strip() if p.author_url else ""
         name = p.author_name.strip() if p.author_name else ""
+
         logger.info(f"[AUTHOR-DEBUG] author_name='{name}' | author_url='{url}'")
         
         if url and url not in author_map:
@@ -195,8 +352,10 @@ def sync_process_and_save_posts_db(payload: ExtensionCrawlRequest, legacy: bool)
 
     # 8. Chuẩn bị dữ liệu để insert vào Supabase
     posts_to_insert = []
-    for p, raw_time in top_posts:
-        post_url = p.post_url or p.url
+    for p in top_posts_objects:
+        post_url = p.url
+
+        # top_posts_objects đến từ keyword picker (FBPost)
         author_url_key = (p.author_url or "").strip()
         author_name_key = (p.author_name or "").strip()
         # Tìm id_author: ưu tiên URL, sau đó fallback theo tên
@@ -205,26 +364,39 @@ def sync_process_and_save_posts_db(payload: ExtensionCrawlRequest, legacy: bool)
             (author_map.get(f"__name__{author_name_key}") if author_name_key and author_name_key not in ("Ẩn danh", "") else None)
         )
         logger.info(f"[SAVE-AUTHOR] post={post_url[:60]} | author_url='{author_url_key}' | id_author={id_author}")
+        # debug để verify content và mapping keyword
+        ext_dbg = get_ext_post_by_fb_url(post_url)
+
+        if ext_dbg:
+            logger.info(
+                "[SAVE-DEBUG] post_url=%s | author_url=%s | keyword_content_preview=%r",
+                post_url,
+                (ext_dbg.author_url or "").strip(),
+                (ext_dbg.content or "")[:120],
+            )
+
         post_data = {
             "group_id": group_id,
             "post_url": post_url,
             "crawl_date": now_iso,
-            "post_time": raw_time,
+            "post_time": p.date,
+
             "content": p.content,
             "score": 0,
             "reactions": p.reactions,
             "comments": p.comments,
             "shares": p.shares,
-            "media_url": p.video_url or p.media_url,
+            "media_url": (p.video_url or p.media_url),
             "image_urls": p.images or [],
-            "created_at": p.crawled_at if legacy else now_iso,
+            "created_at": (p.crawled_at if legacy else now_iso),
             "updated_at": now_iso,
             "id_author": id_author,
             "id_member": payload.id_member or None
         }
+
         posts_to_insert.append(post_data)
 
-    logger.info(f"[SAVE] Sẽ lưu {len(posts_to_insert)} bài (top 3 hôm nay) vào DB")
+        logger.info(f"[SAVE] Sẽ lưu {len(posts_to_insert)} bài (top 3 hôm nay) vào DB")
 
     inserted_count = 0
     inserted_post_urls = []
@@ -258,8 +430,33 @@ async def process_and_save_posts(payload: ExtensionCrawlRequest, event_name: str
 
     return {"success": True, "count": inserted_count, "post_urls": inserted_post_urls}
 
+
+async def _log_raw_body_debug(request: Request) -> None:
+    """
+    Log toàn bộ raw JSON body gửi lên, để xác định chính xác tên field keyword
+    thật sự mà extension đang gửi (dùng để chẩn đoán, có thể xoá sau khi đã
+    xác nhận field name chuẩn và dọn code normalize_keywords cho gọn).
+    """
+    try:
+        raw_body = await request.body()
+        raw_dict = _json.loads(raw_body)
+        top_level_keys = list(raw_dict.keys())
+        keyword_like_fields = {
+            k: v for k, v in raw_dict.items()
+            if any(tok in k.lower() for tok in ("key", "kw", "search"))
+        }
+        logger.info(
+            "[RAW-BODY-DEBUG] top_level_keys=%s | keyword_like_fields=%s",
+            top_level_keys,
+            keyword_like_fields,
+        )
+    except Exception as e:
+        logger.warning(f"[RAW-BODY-DEBUG] Không parse được raw body: {e}")
+
+
 @router.post("/save-posts")
 async def save_posts(
+    request: Request,
     payload: ExtensionCrawlRequest,
     x_api_key: Optional[str] = Header(None)
 ):
@@ -268,10 +465,14 @@ async def save_posts(
         logger.warning(f"Invalid API Key: {x_api_key}")
         raise HTTPException(status_code=403, detail="Invalid API Key")
 
+    await _log_raw_body_debug(request)
+    logger.info("[KEYWORD-FINAL] payload.keywords sau khi validate = %s", payload.keywords)
+
     return await process_and_save_posts(payload, event_name="extension_crawl_saved", legacy=False)
 
 @router.post("/crawl-result")
 async def crawl_result(
+    request: Request,
     payload: ExtensionCrawlRequest,
     x_api_key: Optional[str] = Header(None)
 ):
@@ -279,5 +480,8 @@ async def crawl_result(
     if x_api_key != "markee-extension-key-2024":
         logger.warning(f"Invalid API Key: {x_api_key}")
         raise HTTPException(status_code=403, detail="Invalid API Key")
+
+    await _log_raw_body_debug(request)
+    logger.info("[KEYWORD-FINAL] payload.keywords sau khi validate = %s", payload.keywords)
 
     return await process_and_save_posts(payload, event_name="extension_crawl_saved_legacy", legacy=True)

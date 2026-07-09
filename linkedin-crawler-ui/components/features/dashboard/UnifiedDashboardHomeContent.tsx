@@ -8,6 +8,9 @@ import { ApiExtensionLauncher } from "@/components/all-platform/components/api-e
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { FilterBar, type FilterState } from "@/components/all-platform/components/filter-bar";
 import { PostCard } from "@/components/all-platform/components/post-card";
+import { toast } from "sonner";
+import { allPlatformPostsDeleteService } from "@/services/all-platform-posts-delete.service";
+
 import { PostDetailModal } from "@/components/all-platform/components/post-detail-modal";
 import { VerifyAccountModal } from "@/components/all-platform/components/verify-account-modal";
 import { KpiProgressCard } from "@/components/all-platform/components/kpi-progress-card";
@@ -239,6 +242,8 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
 
   // States
   const [posts, setPosts] = useState<UnifiedPost[]>([]);
+  const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
+
   const [stats, setStats] = useState<UnifiedStats>({
     totalPostsToday: 0,
     postsYesterday: 0,
@@ -301,9 +306,32 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
     } catch {}
   }, []);
 
-  // Fetch Posts (Phase 6: dùng luôn quick_stats từ response, tiết kiệm 1 round-trip)
-  const fetchPosts = useCallback(async () => {
+  // Fetch Stats
+  const fetchStats = useCallback(async () => {
     if (!CURRENT_USER_EMAIL) return;
+    try {
+      const res = await allPlatformPostsService.getStats({
+        email: CURRENT_USER_EMAIL,
+        platform: feedPlatform,
+      });
+      if (res.success && res.data) {
+        setStats(res.data as UnifiedStats);
+      }
+    } catch {}
+  }, [CURRENT_USER_EMAIL, feedPlatform]);
+
+  // Fetch Posts (Phase 6: dùng luôn quick_stats từ response, tiết kiệm 1 round-trip)
+
+  const fetchPosts = useCallback(async () => {
+    // Tránh stuck spinner khi auth chưa load xong / user không có email.
+    if (!CURRENT_USER_EMAIL) {
+      setIsLoadingPosts(false);
+      setPosts([]);
+      setTotalCount(0);
+      setTotalPages(1);
+      setPostsError(null);
+      return;
+    }
     setIsLoadingPosts(true);
     setPostsError(null);
     try {
@@ -413,22 +441,9 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
     }
   }, [CURRENT_USER_EMAIL, feedPlatform, filters, page]);
 
-  // Fetch Stats
-  const fetchStats = useCallback(async () => {
-    if (!CURRENT_USER_EMAIL) return;
-    try {
-      const res = await allPlatformPostsService.getStats({
-        email: CURRENT_USER_EMAIL,
-        platform: feedPlatform,
-      });
-      if (res.success && res.data) {
-        setStats(res.data as UnifiedStats);
-      }
-    } catch {}
-  }, [CURRENT_USER_EMAIL, feedPlatform]);
-
   // Xu huong 14 ngay gan nhat (tong bai/comment/inbox) — bo sung cho 4 the chi
   // co so hom nay, theo yeu cau Thanh: "cần thêm dashboard để biết tổng
+
   // comment, inbox... các ngày ra sao".
   const [dailyTrend, setDailyTrend] = useState<Array<{ date: string; posts: number; comments: number; inbox: number }>>([]);
   // Cung ly do voi isLoadingPosts o tren: fetchDailyTrend cung guard
@@ -535,6 +550,39 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
   }));
 
   const fbDiff = stats.totalPostsToday - stats.postsYesterday;
+
+  const handleDeletePost = useCallback(
+    async (post: UnifiedPost) => {
+      if (!post?.id) {
+        toast.error("Không có id bài viết để xóa");
+        return;
+      }
+
+      // Optimistic + rollback
+      const prevPosts = posts;
+      const prevTotal = totalCount;
+
+      setDeletingPostId(post.id);
+      setPosts((prev) => prev.filter((p) => p.id !== post.id));
+      setTotalCount((c) => Math.max(0, c - 1));
+
+      try {
+        const res = await allPlatformPostsDeleteService.deleteFacebookPost({ id: post.id });
+        if (!res?.success) {
+          throw new Error(res?.message || "Xóa thất bại");
+        }
+      } catch (e) {
+        // rollback UI
+        setPosts(prevPosts);
+        setTotalCount(prevTotal);
+        toast.error(e instanceof Error ? e.message : "Xóa thất bại");
+      } finally {
+        setDeletingPostId(null);
+      }
+    },
+    [posts, totalCount],
+  );
+
 
   // Loc client-side theo mang dich vu da chon (xem SERVICE_AREA_TABS o dau
   // file) - khong doi lai backend/pagination, chi an/hien trong trang hien
@@ -786,11 +834,14 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
                 post={post}
                 userRole={user?.role}
                 seeded={!!post.verify_status && post.verify_status !== "no"}
-                verifyStatus={post.verify_status as any}
+                verifyStatus={post.verify_status as "pending" | "yes" | "no"}
+
                 onSeeding={() => {}}
                 onVerify={() => {}}
                 onViewDetail={(post) => setDetailModalPost(post)}
+                onDelete={(p) => void handleDeletePost(p)}
               />
+
             ))}
           </div>
 

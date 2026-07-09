@@ -28,8 +28,18 @@ from app.modules.all_platform.routers.fb import router as fb_automation_router
 from app.modules.all_platform.routers.websocket import router as websocket_router
 from app.modules.all_platform.routers.fb_inbox_accounts import router as fb_inbox_accounts_router
 from app.modules.all_platform.routers.customer_lead import router as customer_lead_router
+from app.modules.all_platform.routers.posts_delete import router as posts_delete_router
 
 all_platform_router = APIRouter()
+
+# ── Delete posts ────────────────────────────────────────────────────────────
+all_platform_router.include_router(
+    posts_delete_router,
+    prefix="/unified",
+    tags=["All-Platform Posts Delete"],
+)
+
+
 
 # ── Facebook ────────────────────────────────────────────────────────────────────
 all_platform_router.include_router(
