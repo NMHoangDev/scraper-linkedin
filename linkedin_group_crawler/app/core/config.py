@@ -407,6 +407,10 @@ class Settings:
     seeder_service_url: str = os.getenv("SEEDER_SERVICE_URL", "http://localhost:8000").rstrip("/")
     seeder_service_api_key: str = os.getenv("SEEDER_SERVICE_API_KEY", "")
 
+    openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
+    openai_base_url: str = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
+    ai_model: str = os.getenv("AI_MODEL", "gpt-4o")
+
     def __post_init__(self) -> None:
         if self.cors_origins is None:
             self.cors_origins = _parse_csv(

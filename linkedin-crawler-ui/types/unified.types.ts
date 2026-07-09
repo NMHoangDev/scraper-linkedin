@@ -348,3 +348,41 @@ export interface CustomerLead {
   updated_at?: string;
 }
 
+// ── Scheduled Comments ─────────────────────────────────────────────────────────
+
+export type ScheduledCommentStatus = "pending" | "processing" | "posted" | "failed" | "cancelled";
+
+export interface ScheduledComment {
+  id: string;
+  id_post_fb?: string;
+  id_post_li?: string;
+  platform: FeedPlatform;
+  post_url: string;
+  group_name?: string;
+  post_content?: string;
+  id_member: string;
+  id_social_account?: string;
+  comment_content?: string;
+  ai_generated: boolean;
+  status: ScheduledCommentStatus;
+  scheduled_at: string;
+  posted_at?: string;
+  error_message?: string;
+  link_comment?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface CreateScheduledCommentRequest {
+  id_post_fb?: string;
+  id_post_li?: string;
+  platform: FeedPlatform;
+  post_url: string;
+  group_name?: string;
+  post_content?: string;
+  id_social_account?: string;
+  comment_content?: string;
+  ai_generated: boolean;
+  scheduled_at: string;
+}
+

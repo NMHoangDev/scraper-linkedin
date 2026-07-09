@@ -62,6 +62,13 @@ async def lifespan(_: FastAPI):
     if _os.getenv("DISABLE_SCHEDULER", "").strip() in ("1", "true", "True"):
         logger.warning("DISABLE_SCHEDULER enabled -> not starting scheduler.")
     else:
+        if _os.getenv("DISABLE_COMMENT_SCHEDULER", "").strip() not in ("1", "true", "True"):
+            try:
+                from app.modules.all_platform.jobs.scheduled_comment_job import setup_scheduled_comment_job
+                setup_scheduled_comment_job()
+                logger.info("Scheduled comment job started")
+            except Exception:
+                logger.exception("Failed to start scheduled comment job")
         # TODO: Re-enable when needed
         # setup_all_platform_jobs()
         logger.warning("24h crawl scheduler DISABLED - comment this block to re-enable")

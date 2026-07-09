@@ -28,6 +28,7 @@ from app.modules.all_platform.routers.fb import router as fb_automation_router
 from app.modules.all_platform.routers.websocket import router as websocket_router
 from app.modules.all_platform.routers.fb_inbox_accounts import router as fb_inbox_accounts_router
 from app.modules.all_platform.routers.customer_lead import router as customer_lead_router
+from app.modules.all_platform.routers.scheduled_comments import router as scheduled_comments_router
 
 all_platform_router = APIRouter()
 
@@ -221,4 +222,11 @@ all_platform_router.include_router(zalo_conversations_router, prefix="/zalo", ta
 all_platform_router.include_router(zalo_events_router, prefix="/zalo", tags=["Zalo Events"])
 all_platform_router.include_router(zalo_inbox_share_router, prefix="/zalo", tags=["Zalo Inbox Share"])
 all_platform_router.include_router(zalo_proxy_router, prefix="/zalo", tags=["Zalo Proxy"])
+
+# ── Scheduled Comments ─────────────────────────────────────────────────────────
+all_platform_router.include_router(
+    scheduled_comments_router,
+    prefix="/scheduled-comments",
+    tags=["All-Platform Scheduled Comments"],
+)
 
