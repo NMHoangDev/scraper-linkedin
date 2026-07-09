@@ -7,7 +7,7 @@ import { adminDashboardService } from "@/services/all-platform.service";
 import type {
   AdminDashboardSummaryData,
   AdminKpiPerformanceData,
-  AdminLeaderboardsData
+  AdminLeaderboardsData,
 } from "@/services/all-platform.service";
 import { AdminDashboardSummary } from "@/components/all-platform/admin/dashboard/AdminDashboardSummary";
 import { AdminBentoWidgets } from "@/components/all-platform/admin/dashboard/AdminBentoWidgets";
@@ -20,9 +20,13 @@ export default function AdminDashboardPage() {
   const { user } = useAppAuth();
   const isAdmin = user?.role === "admin";
 
-  const [summaryData, setSummaryData] = useState<AdminDashboardSummaryData | null>(null);
-  const [kpiPerformance, setKpiPerformance] = useState<AdminKpiPerformanceData[]>([]);
-  const [leaderboards, setLeaderboards] = useState<AdminLeaderboardsData | null>(null);
+  const [summaryData, setSummaryData] =
+    useState<AdminDashboardSummaryData | null>(null);
+  const [kpiPerformance, setKpiPerformance] = useState<
+    AdminKpiPerformanceData[]
+  >([]);
+  const [leaderboards, setLeaderboards] =
+    useState<AdminLeaderboardsData | null>(null);
 
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [loadingPerformance, setLoadingPerformance] = useState(false);
@@ -84,22 +88,29 @@ export default function AdminDashboardPage() {
   if (!isAdmin) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-on-surface-variant space-y-2">
-        <MaterialIcon name="block" className="text-5xl text-primary-container" />
-        <p className="font-bold text-base text-on-surface">Quyền truy cập bị từ chối</p>
-        <p className="text-sm">Trang này chỉ dành riêng cho tài khoản Admin quản trị.</p>
+        <MaterialIcon
+          name="block"
+          className="text-5xl text-primary-container"
+        />
+        <p className="font-bold text-base text-on-surface">
+          Quyền truy cập bị từ chối
+        </p>
+        <p className="text-sm">
+          Trang này chỉ dành riêng cho tài khoản Admin quản trị.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h2 className="flex items-center gap-2 text-2xl font-bold text-on-surface">
+          <h1 className="text-3xl font-bold text-on-surface">
             Dashboard Quản trị (Admin)
-          </h2>
-          <p className="text-sm text-on-surface-variant hidden lg:block mt-1">
+          </h1>
+          <p className="mt-1 text-sm text-on-surface-variant">
             Tổng quan toàn bộ hệ thống
           </p>
         </div>
@@ -107,44 +118,48 @@ export default function AdminDashboardPage() {
         <button
           onClick={loadDashboardData}
           disabled={loadingSummary || loadingPerformance || loadingLeaderboards}
-          className="flex items-center justify-center gap-2 bg-surface border border-outline-variant hover:border-primary text-primary rounded-xl text-sm transition shrink-0 cursor-pointer shadow-none active:scale-95 disabled:opacity-50 w-10 h-10 lg:w-auto lg:px-4 lg:py-1.5 lg:font-medium"
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-outline-variant bg-surface px-4 py-2 text-sm font-medium text-on-surface transition hover:border-primary hover:text-primary disabled:opacity-50"
         >
-          <FaSyncAlt className={loadingSummary || loadingPerformance || loadingLeaderboards ? "animate-spin" : ""} />
-          <span className="hidden lg:inline">Làm mới</span>
+          <FaSyncAlt
+            className={
+              loadingSummary || loadingPerformance || loadingLeaderboards
+                ? "animate-spin"
+                : ""
+            }
+          />
+          Làm mới
         </button>
       </div>
 
-      {/* Account Safety Alert Banner */}
-      <div className="bg-red-50 text-primary font-medium border border-red-100 rounded-xl p-3 flex items-center gap-3">
+      {/* Banner */}
+      <div className="flex items-start gap-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-primary">
         <MaterialIcon name="warning" className="text-xl shrink-0" />
+
         <div className="text-sm">
-          Cảnh báo hệ thống: <span className="font-bold ml-1">Đã phát hiện 3 nhóm bị khóa và 1 tài khoản seed bị hạn chế tương tác. Cần rà soát và khắc phục ngay!</span>
+          Cảnh báo hệ thống:
+          <span className="ml-1 font-bold">
+            Đã phát hiện 3 nhóm bị khóa và 1 tài khoản seed bị hạn chế tương
+            tác. Cần rà soát và khắc phục ngay!
+          </span>
         </div>
       </div>
 
       {error && (
-        <div className="bg-red-50 text-primary p-4 rounded-xl text-xs font-semibold flex items-center gap-2 border border-red-100">
+        <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-primary">
           <MaterialIcon name="error" className="text-[16px] shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
-      {/* 1. Top Summary Stats */}
-      <AdminDashboardSummary
-        data={summaryData}
-        isLoading={loadingSummary}
-      />
+      <AdminDashboardSummary data={summaryData} isLoading={loadingSummary} />
 
-      {/* 2. Main Content Grid - Bento Style */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Block - Table/Accordion */}
-        <div className="lg:col-span-2 flex flex-col gap-6 min-w-0">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <div className="flex min-w-0 flex-col gap-6 xl:col-span-2">
           <AdminKpiHistoryTable />
           <AdminUnassignedPosts />
         </div>
 
-        {/* Right Block - Widgets */}
-        <div className="lg:col-span-1">
+        <div className="xl:col-span-1">
           <AdminBentoWidgets
             leaderboardsData={leaderboards}
             isLoading={loadingLeaderboards}
@@ -152,7 +167,6 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* 3. KPI Performance Chart (Full width) */}
       <AdminKpiPerformanceChart
         data={kpiPerformance}
         isLoading={loadingPerformance}
