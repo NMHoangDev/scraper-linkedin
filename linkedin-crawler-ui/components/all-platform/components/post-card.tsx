@@ -12,6 +12,7 @@ interface PostCardProps {
   userRole?: string;
   onVerify?: (post: UnifiedPost) => void;
   onSeeding?: (post: UnifiedPost) => void;
+  onSchedule?: (post: UnifiedPost) => void;
   onViewDetail?: (post: UnifiedPost) => void;
   seeded?: boolean;
   verifyStatus?: "pending" | "yes" | "no";
@@ -24,7 +25,7 @@ function PlatformIcon({ platform }: { platform: FeedPlatform }) {
   return <FaLinkedin className="text-blue-700 shrink-0" />;
 }
 
-export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, seeded, verifyStatus }: PostCardProps) {
+export function PostCard({ post, userRole, onVerify, onSeeding, onSchedule, onViewDetail, seeded, verifyStatus }: PostCardProps) {
   const [isInboxOpen, setIsInboxOpen] = useState(false);
   const inboxRef = useRef<HTMLDivElement>(null);
 
@@ -229,6 +230,14 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, se
               className="px-4 py-2 bg-card border border-primary text-primary hover:bg-primary hover:text-primary-foreground rounded-lg text-sm font-semibold transition shadow-sm cursor-pointer"
             >
               Xem chi tiết
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSchedule?.(post)}
+              className="px-3 py-2 bg-card border border-amber-300 text-amber-600 hover:bg-amber-50 rounded-lg text-sm font-semibold transition shadow-sm cursor-pointer"
+            >
+              Lên lịch
             </button>
 
 

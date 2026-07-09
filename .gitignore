@@ -146,4 +146,13 @@ node_modules/
 # Cau hinh docker rieng tung host (dev vs app co domain build-arg khac nhau) - khong commit
 docker-compose.override.yml
 
+# ---- Root-level generated artifacts ----
+__pycache__/
+scratch/*.xlsx
+scratch/*.png
+scratch/*.html
+
+# Code review reports
+code-review-report-*.md
+
 
