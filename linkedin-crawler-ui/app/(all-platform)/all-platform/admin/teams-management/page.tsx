@@ -28,13 +28,22 @@ import { LeaderInboxView } from "@/components/all-platform/leader/LeaderInboxVie
 // Trong so KPI theo yeu cau nghiep vu: Lead quan trong nhat -> Inbox -> Comment -> Post.
 // % hoan thanh tong cua team = trung binh CO TRONG SO cua ty le hoan thanh tung chi so
 // (chi tinh cac chi so da co chi tieu > 0, ty le moi chi so gioi han toi da 100%).
-const KPI_WEIGHTS = { lead: 0.45, inbox: 0.4, comment: 0.05, post: 0.1 } as const;
+const KPI_WEIGHTS = {
+  lead: 0.45,
+  inbox: 0.4,
+  comment: 0.05,
+  post: 0.1,
+} as const;
 
 function computeWeightedPercentage(t: {
-  post: number; postTarget: number;
-  comment: number; commentTarget: number;
-  lead: number; leadTarget: number;
-  inbox: number; inboxTarget: number;
+  post: number;
+  postTarget: number;
+  comment: number;
+  commentTarget: number;
+  lead: number;
+  leadTarget: number;
+  inbox: number;
+  inboxTarget: number;
 }): { percentage: number; hasTarget: boolean } {
   const parts = [
     { w: KPI_WEIGHTS.lead, cur: t.lead, tgt: t.leadTarget },
@@ -51,7 +60,10 @@ function computeWeightedPercentage(t: {
     }
   }
   const hasTarget = weightTotal > 0;
-  return { percentage: hasTarget ? Math.round((weightedSum / weightTotal) * 100) : 0, hasTarget };
+  return {
+    percentage: hasTarget ? Math.round((weightedSum / weightTotal) * 100) : 0,
+    hasTarget,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -76,16 +88,32 @@ function StatCard({
   iconClassName?: string;
 }) {
   return (
-    <div className="flex h-full items-center gap-3 rounded-xl border border-border bg-white p-4 shadow-sm">
-      <div className={cn("shrink-0 rounded-lg p-2", iconClassName)}>
-        <Icon size={18} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-        <span className="text-xl font-bold tracking-tight text-foreground tabular-nums">
-          {typeof value === "number" ? value.toLocaleString("vi-VN") : value}
-        </span>
-        {hint ? <p className="truncate text-[11px] text-muted-foreground">{hint}</p> : null}
+    <div className="h-full rounded-xl border border-border bg-white shadow-sm transition-all">
+      <div className="flex items-center gap-3 p-4">
+        <div
+          className={cn(
+            "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+            iconClassName,
+          )}
+        >
+          <Icon size={20} />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            {label}
+          </p>
+
+          <p className="mt-1 text-2xl font-bold tracking-tight text-foreground tabular-nums">
+            {typeof value === "number" ? value.toLocaleString("vi-VN") : value}
+          </p>
+
+          {hint && (
+            <p className="mt-1 truncate text-[11px] text-muted-foreground">
+              {hint}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -103,15 +131,21 @@ function getRecentWeeks(numWeeks = 8) {
     sunday.setDate(monday.getDate() + 6);
 
     const yearStart = new Date(monday.getFullYear(), 0, 1);
-    const weekNo = Math.ceil((((monday.getTime() - yearStart.getTime()) / 86400000) + yearStart.getDay() + 1) / 7);
+    const weekNo = Math.ceil(
+      ((monday.getTime() - yearStart.getTime()) / 86400000 +
+        yearStart.getDay() +
+        1) /
+        7,
+    );
 
-    const fmt = (dt: Date) => dt.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+    const fmt = (dt: Date) =>
+      dt.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
     const valStart = monday.toISOString().split("T")[0];
     const valEnd = sunday.toISOString().split("T")[0];
 
     weeks.push({
       label: `Tuần ${weekNo} (${fmt(monday)} - ${fmt(sunday)})`,
-      value: `${valStart}_${valEnd}`
+      value: `${valStart}_${valEnd}`,
     });
   }
   return weeks;
@@ -120,30 +154,48 @@ function getRecentWeeks(numWeeks = 8) {
 export default function TeamsManagementPage() {
   const { user } = useAppAuth();
   const [teams, setTeams] = useState<TeamRow[]>([]);
-  const [kpiRows, setKpiRows] = useState<Array<{
-    team_id: string; member_id: string; member_name?: string;
-    kpi_post: number; kpi_lead: number; kpi_inbox: number; kpi_comment: number;
-    verified_count: number; kpi_post_current: number; kpi_lead_current: number; kpi_inbox_current: number;
-    is_leader?: boolean;
-  }>>([]);
+  const [kpiRows, setKpiRows] = useState<
+    Array<{
+      team_id: string;
+      member_id: string;
+      member_name?: string;
+      kpi_post: number;
+      kpi_lead: number;
+      kpi_inbox: number;
+      kpi_comment: number;
+      verified_count: number;
+      kpi_post_current: number;
+      kpi_lead_current: number;
+      kpi_inbox_current: number;
+      is_leader?: boolean;
+    }>
+  >([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   // Modals
   const [teamModalOpen, setTeamModalOpen] = useState(false);
-  const [selectedTeamForEdit, setSelectedTeamForEdit] = useState<TeamRow | null>(null);
+  const [selectedTeamForEdit, setSelectedTeamForEdit] =
+    useState<TeamRow | null>(null);
 
   const [kpiModalOpen, setKpiModalOpen] = useState(false);
-  const [selectedTeamForKpi, setSelectedTeamForKpi] = useState<TeamRow | null>(null);
+  const [selectedTeamForKpi, setSelectedTeamForKpi] = useState<TeamRow | null>(
+    null,
+  );
 
   const [inboxModalOpen, setInboxModalOpen] = useState(false);
-  const [selectedLeaderForInbox, setSelectedLeaderForInbox] = useState<{ email: string; name: string } | null>(null);
+  const [selectedLeaderForInbox, setSelectedLeaderForInbox] = useState<{
+    email: string;
+    name: string;
+  } | null>(null);
 
   const recentWeeks = useMemo(() => getRecentWeeks(8), []);
   const [selectedWeek, setSelectedWeek] = useState(recentWeeks[0].value);
 
-  const isAdmin = (user?.role as string) === "admin" || (user?.role as string) === "superadmin";
+  const isAdmin =
+    (user?.role as string) === "admin" ||
+    (user?.role as string) === "superadmin";
 
   // Dung 1 RPC gop teams+KPI duy nhat (get_admin_teams_kpi_overview qua /teams/with-kpi)
   // thay cho kieu cu 1 + N request song song (N = so team, moi request lai keo theo ca
@@ -186,16 +238,25 @@ export default function TeamsManagementPage() {
   // Gio CONG ca hoat dong cua leader vao tong cua team (giong 1 thanh vien binh
   // thuong) - phan anh dung cong suc thuc te ca team (leader + member) dong gop.
   const teamKpiSummaries = useMemo(() => {
-    return teams.map(team => {
-      const totals = { post: 0, postTarget: 0, comment: 0, commentTarget: 0, lead: 0, leadTarget: 0, inbox: 0, inboxTarget: 0 };
+    return teams.map((team) => {
+      const totals = {
+        post: 0,
+        postTarget: 0,
+        comment: 0,
+        commentTarget: 0,
+        lead: 0,
+        leadTarget: 0,
+        inbox: 0,
+        inboxTarget: 0,
+      };
 
       // Phong ve: RPC backend co the tra >1 dong cho cung 1 member (du lieu
       // kpi_tracker mo coi/trung khoang ngay o phia DB) - dedupe theo member_id
       // truoc khi cong don, tranh nhan doi target/actual cua thanh vien do.
       const seenMembers = new Set<string>();
       kpiRows
-        .filter(r => r.team_id === team.id)
-        .forEach(r => {
+        .filter((r) => r.team_id === team.id)
+        .forEach((r) => {
           if (seenMembers.has(r.member_id)) return;
           seenMembers.add(r.member_id);
           totals.post += r.kpi_post_current || 0;
@@ -213,18 +274,32 @@ export default function TeamsManagementPage() {
       // KPI rieng cua leader (dong is_leader=true, neu co) - van hien tach biet o
       // day de xem rieng dong gop cua leader, dong thoi da duoc cong vao "totals"
       // cua ca team o tren (khong loai truong nay nua, xem comment 2026-07-07).
-      const leaderRow = kpiRows.find(r => r.team_id === team.id && r.is_leader);
+      const leaderRow = kpiRows.find(
+        (r) => r.team_id === team.id && r.is_leader,
+      );
       const leaderKpi = leaderRow
         ? {
-            post: leaderRow.kpi_post_current || 0, postTarget: leaderRow.kpi_post || 0,
-            comment: leaderRow.verified_count || 0, commentTarget: leaderRow.kpi_comment || 0,
-            lead: leaderRow.kpi_lead_current || 0, leadTarget: leaderRow.kpi_lead || 0,
-            inbox: leaderRow.kpi_inbox_current || 0, inboxTarget: leaderRow.kpi_inbox || 0,
+            post: leaderRow.kpi_post_current || 0,
+            postTarget: leaderRow.kpi_post || 0,
+            comment: leaderRow.verified_count || 0,
+            commentTarget: leaderRow.kpi_comment || 0,
+            lead: leaderRow.kpi_lead_current || 0,
+            leadTarget: leaderRow.kpi_lead || 0,
+            inbox: leaderRow.kpi_inbox_current || 0,
+            inboxTarget: leaderRow.kpi_inbox || 0,
           }
         : null;
       const leaderPct = leaderKpi ? computeWeightedPercentage(leaderKpi) : null;
 
-      return { team, totals, hasTarget, percentage, leaderKpi, leaderHasTarget: leaderPct?.hasTarget ?? false, leaderPercentage: leaderPct?.percentage ?? 0 };
+      return {
+        team,
+        totals,
+        hasTarget,
+        percentage,
+        leaderKpi,
+        leaderHasTarget: leaderPct?.hasTarget ?? false,
+        leaderPercentage: leaderPct?.percentage ?? 0,
+      };
     });
   }, [teams, kpiRows]);
 
@@ -236,17 +311,26 @@ export default function TeamsManagementPage() {
   // Thong ke tong - suy ra tu teamKpiSummaries (dung chung cong thuc co trong so).
   const stats = useMemo(() => {
     const totalTeams = teams.length;
-    const totalMembers = teams.reduce((acc, t) => acc + (t.number_of_member || 0), 0);
-    const withTarget = teamKpiSummaries.filter(s => s.hasTarget);
-    const achievedTeams = withTarget.filter(s => s.percentage >= 100).length;
-    const completionRate = withTarget.length > 0
-      ? Math.round(withTarget.reduce((acc, s) => acc + s.percentage, 0) / withTarget.length)
-      : 0;
+    const totalMembers = teams.reduce(
+      (acc, t) => acc + (t.number_of_member || 0),
+      0,
+    );
+    const withTarget = teamKpiSummaries.filter((s) => s.hasTarget);
+    const achievedTeams = withTarget.filter((s) => s.percentage >= 100).length;
+    const completionRate =
+      withTarget.length > 0
+        ? Math.round(
+            withTarget.reduce((acc, s) => acc + s.percentage, 0) /
+              withTarget.length,
+          )
+        : 0;
     return { totalTeams, totalMembers, achievedTeams, completionRate };
   }, [teams, teamKpiSummaries]);
 
   const handleDeleteTeam = async (team: TeamRow) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa team "${team.name_team}"?`)) {
+    if (
+      !window.confirm(`Bạn có chắc chắn muốn xóa team "${team.name_team}"?`)
+    ) {
       return;
     }
 
@@ -285,8 +369,12 @@ export default function TeamsManagementPage() {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-muted-foreground space-y-2">
         <MaterialIcon name="block" className="text-5xl text-primary" />
-        <p className="font-semibold text-base text-foreground">Quyền truy cập bị từ chối</p>
-        <p className="text-sm">Trang này chỉ khả dụng đối với tài khoản Admin.</p>
+        <p className="font-semibold text-base text-foreground">
+          Quyền truy cập bị từ chối
+        </p>
+        <p className="text-sm">
+          Trang này chỉ khả dụng đối với tài khoản Admin.
+        </p>
       </div>
     );
   }
@@ -294,42 +382,81 @@ export default function TeamsManagementPage() {
   // Thu tu hien thi theo do quan trong (trong so): Lead -> Inbox -> Comment -> Post.
   // Moi chi so co 1 icon mau nhat rieng cho card chi tiet do mat, khong don dieu.
   const metricDefs = [
-    { key: "lead" as const, label: "Lead", weight: "45%", icon: LuUserPlus, tone: "bg-violet-50 text-violet-500" },
-    { key: "inbox" as const, label: "Inbox", weight: "40%", icon: LuInbox, tone: "bg-orange-50 text-orange-600" },
-    { key: "comment" as const, label: "Comment", weight: "5%", icon: LuMessageSquare, tone: "bg-blue-50 text-blue-600" },
-    { key: "post" as const, label: "Post", weight: "10%", icon: LuFileText, tone: "bg-green-50 text-green-600" },
+    {
+      key: "lead" as const,
+      label: "Lead",
+      weight: "45%",
+      icon: LuUserPlus,
+      tone: "bg-violet-50 text-violet-500",
+    },
+    {
+      key: "inbox" as const,
+      label: "Inbox",
+      weight: "40%",
+      icon: LuInbox,
+      tone: "bg-orange-50 text-orange-600",
+    },
+    {
+      key: "comment" as const,
+      label: "Comment",
+      weight: "5%",
+      icon: LuMessageSquare,
+      tone: "bg-blue-50 text-blue-600",
+    },
+    {
+      key: "post" as const,
+      label: "Post",
+      weight: "10%",
+      icon: LuFileText,
+      tone: "bg-green-50 text-green-600",
+    },
   ];
 
   return (
     <div className="space-y-5 text-foreground">
       {/* ── Thanh tieu de trang (hien muc dang xem, giong app) ─────────────── */}
-      <div className="rounded-xl border border-border bg-white px-5 py-4">
-        <div className="flex items-center gap-1.5 text-[12px] text-muted-foreground mb-1.5">
+      <div className="rounded-xl border border-border bg-white p-5">
+        <div className="mb-2 flex items-center gap-1.5 text-[12px] text-muted-foreground">
           <span>Quản lý</span>
+
           <LuChevronRight size={13} />
+
           <span className="font-medium text-primary">Quản lý Teams</span>
         </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-foreground leading-tight">Quản lý Teams</h1>
-            <p className="text-[13.5px] text-muted-foreground mt-0.5">Theo dõi KPI và so sánh hiệu suất giữa các team</p>
+
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-foreground">
+              Quản lý Teams
+            </h1>
+
+            <p className="mt-1 text-[13px] text-muted-foreground">
+              Theo dõi KPI và so sánh hiệu suất giữa các team
+            </p>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 border border-border rounded-[10px] px-3 py-1.5 bg-white">
-              <span className="text-[11px] font-medium text-muted-foreground">Tuần</span>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex h-11 items-center gap-2 rounded-xl border border-border bg-white px-3">
+              <span className="text-[11px] font-medium text-muted-foreground">
+                Tuần
+              </span>
+
               <select
                 value={selectedWeek}
                 onChange={(e) => setSelectedWeek(e.target.value)}
-                className="text-[13px] font-medium text-foreground outline-none bg-transparent cursor-pointer"
+                className="bg-transparent text-[13px] font-medium outline-none"
               >
-                {recentWeeks.map(w => (
-                  <option key={w.value} value={w.value}>{w.label}</option>
+                {recentWeeks.map((w) => (
+                  <option key={w.value} value={w.value}>
+                    {w.label}
+                  </option>
                 ))}
               </select>
             </div>
+
             <button
               onClick={handleCreateTeam}
-              className="flex items-center justify-center gap-1.5 bg-primary text-white px-4 py-2 rounded-[10px] text-[13px] font-semibold hover:bg-primary/90 transition shrink-0 cursor-pointer active:scale-95"
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 text-[13px] font-semibold text-white transition hover:bg-primary/90 sm:w-auto"
             >
               <LuUserPlus size={16} />
               Thêm Team
@@ -338,9 +465,9 @@ export default function TeamsManagementPage() {
         </div>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-5">
         {/* ── The thong ke tong (icon chip pastel nhat, giong MetricCard cua app) ── */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
           <StatCard
             icon={LuLayoutGrid}
             label="Tổng số Team"
@@ -375,33 +502,63 @@ export default function TeamsManagementPage() {
             <div className="px-5 py-4 border-b border-border bg-muted/50">
               <div className="flex items-center gap-2">
                 <LuChartBar size={17} className="text-foreground" />
-                <span className="text-[15px] font-bold text-foreground">So sánh & xếp hạng Team</span>
+                <span className="text-base font-bold text-foreground">
+                  So sánh & xếp hạng Team
+                </span>
               </div>
-              <p className="text-[12.5px] text-muted-foreground mt-0.5">Xếp theo % hoàn thành KPI có trọng số: Lead 45% · Inbox 40% · Comment 5% · Post 10%</p>
+              <p className="text-[12.5px] text-muted-foreground mt-0.5">
+                Xếp theo % hoàn thành KPI có trọng số: Lead 45% · Inbox 40% ·
+                Comment 5% · Post 10%
+              </p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-[14px]">
                 <thead>
                   <tr className="bg-muted">
-                    <th className="text-left px-5 py-2.5 text-[11px] font-bold text-muted-foreground uppercase w-12">#</th>
-                    <th className="text-left px-3 py-2.5 text-[11px] font-bold text-muted-foreground uppercase">Team</th>
-                    <th className="text-left px-3 py-2.5 text-[11px] font-bold text-muted-foreground uppercase hidden md:table-cell">Leader</th>
-                    <th className="text-center px-3 py-2.5 text-[11px] font-bold text-muted-foreground uppercase">Thành viên</th>
-                    <th className="text-left px-5 py-2.5 text-[11px] font-bold text-muted-foreground uppercase w-[45%]">Tiến độ hoàn thành</th>
+                    <th className="text-left px-5 py-2.5 text-[11px] font-bold text-muted-foreground uppercase w-12">
+                      #
+                    </th>
+                    <th className="text-left px-3 py-2.5 text-[11px] font-bold text-muted-foreground uppercase">
+                      Team
+                    </th>
+                    <th className="text-left px-3 py-2.5 text-[11px] font-bold text-muted-foreground uppercase hidden md:table-cell">
+                      Leader
+                    </th>
+                    <th className="text-center px-3 py-2.5 text-[11px] font-bold text-muted-foreground uppercase">
+                      Thành viên
+                    </th>
+                    <th className="text-left px-5 py-2.5 text-[11px] font-bold text-muted-foreground uppercase w-[45%]">
+                      Tiến độ hoàn thành
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {teamKpiSummariesRanked.map((s, idx) => (
-                    <tr key={s.team.id} className="border-t border-border hover:bg-muted transition">
+                    <tr
+                      key={s.team.id}
+                      className="border-t border-border hover:bg-muted transition"
+                    >
                       <td className="px-5 py-3">
-                        <span className={cn(
-                          "inline-flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-bold",
-                          idx === 0 && s.hasTarget ? "bg-green-600 text-white" : "bg-zinc-200 text-muted-foreground",
-                        )}>{idx + 1}</span>
+                        <span
+                          className={cn(
+                            "inline-flex h-8 w-8 items-center justify-center rounded-full text-[12px] font-bold",
+                            idx === 0 && s.hasTarget
+                              ? "bg-green-600 text-white"
+                              : "bg-zinc-200 text-muted-foreground",
+                          )}
+                        >
+                          {idx + 1}
+                        </span>
                       </td>
-                      <td className="px-3 py-3 font-bold text-foreground whitespace-nowrap">{s.team.name_team}</td>
-                      <td className="px-3 py-3 text-muted-foreground hidden md:table-cell whitespace-nowrap">{s.team.leader_name || "Chưa đặt tên"}</td>
-                      <td className="px-3 py-3 text-center font-semibold text-foreground">{s.team.number_of_member || 0}</td>
+                      <td className="px-3 py-3 font-bold text-foreground whitespace-nowrap">
+                        {s.team.name_team}
+                      </td>
+                      <td className="px-3 py-3 text-muted-foreground hidden md:table-cell whitespace-nowrap">
+                        {s.team.leader_name || "Chưa đặt tên"}
+                      </td>
+                      <td className="px-3 py-3 text-center font-semibold text-foreground">
+                        {s.team.number_of_member || 0}
+                      </td>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-3">
                           <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-zinc-200">
@@ -410,7 +567,7 @@ export default function TeamsManagementPage() {
                               style={{ width: `${s.percentage}%` }}
                             />
                           </div>
-                          <span className="w-11 text-right text-[15px] font-bold text-foreground tabular-nums">
+                          <span className="w-11 text-right text-base font-bold text-foreground tabular-nums">
                             {s.hasTarget ? `${s.percentage}%` : "—"}
                           </span>
                         </div>
@@ -428,148 +585,226 @@ export default function TeamsManagementPage() {
           <div>
             <div className="flex items-center gap-2 mb-3">
               <LuLayoutGrid size={17} className="text-foreground" />
-              <span className="text-[15px] font-bold text-foreground">Quản lý từng Team</span>
+              <span className="text-base font-bold text-foreground">
+                Quản lý từng Team
+              </span>
             </div>
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-              {teamKpiSummaries.map(({ team, totals, hasTarget, percentage, leaderKpi, leaderHasTarget, leaderPercentage }) => {
-                const initial = (team.name_team || "?").trim().charAt(0).toUpperCase();
-                return (
-                  <div key={team.id} className="flex flex-col gap-3 rounded-xl border border-border bg-white p-4 shadow-sm">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[13px] font-bold text-primary">
-                          {initial}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="font-bold text-foreground text-[15px] truncate">{team.name_team}</div>
-                          <div className="text-muted-foreground text-[12.5px] truncate">
-                            {team.leader_name || "Chưa đặt tên"} · {team.number_of_member || 0} thành viên
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {teamKpiSummaries.map(
+                ({
+                  team,
+                  totals,
+                  hasTarget,
+                  percentage,
+                  leaderKpi,
+                  leaderHasTarget,
+                  leaderPercentage,
+                }) => {
+                  const initial = (team.name_team || "?")
+                    .trim()
+                    .charAt(0)
+                    .toUpperCase();
+                  return (
+                    <div
+                      key={team.id}
+                      className="flex flex-col gap-4 rounded-xl border border-border bg-white p-5 shadow-sm transition-all hover:shadow-md"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[13px] font-bold text-primary">
+                            {initial}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-bold text-foreground text-base truncate">
+                              {team.name_team}
+                            </div>
+                            <div className="text-muted-foreground text-xs truncate">
+                              {team.leader_name || "Chưa đặt tên"} ·{" "}
+                              {team.number_of_member || 0} thành viên
+                            </div>
                           </div>
                         </div>
+                        <span
+                          className={cn(
+                            "shrink-0 rounded-full px-2.5 py-1 text-[11.5px] font-bold",
+                            hasTarget
+                              ? "bg-green-600/10 text-green-700"
+                              : "bg-muted text-muted-foreground",
+                          )}
+                        >
+                          {hasTarget ? `${percentage}%` : "Chưa giao KPI"}
+                        </span>
                       </div>
-                      <span
-                        className={cn(
-                          "shrink-0 rounded-full px-2.5 py-1 text-[11.5px] font-bold",
-                          hasTarget ? "bg-green-600/10 text-green-700" : "bg-muted text-muted-foreground",
-                        )}
-                      >
-                        {hasTarget ? `${percentage}%` : "Chưa giao KPI"}
-                      </span>
-                    </div>
 
-                    <div className="h-1.5 w-full bg-zinc-200 rounded-full overflow-hidden">
-                      <div className="h-full bg-green-600 rounded-full transition-all duration-500" style={{ width: `${percentage}%` }} />
-                    </div>
+                      <div className="mt-1 h-2 w-full bg-zinc-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-green-600 rounded-full transition-all duration-500"
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
 
-                    <div className="grid grid-cols-4 gap-2">
-                      {metricDefs.map((m) => (
-                        <div key={m.label} className="rounded-lg border border-border bg-muted/50 px-2.5 py-2.5">
-                          <div className={cn("mb-1.5 inline-flex h-7 w-7 items-center justify-center rounded-lg", m.tone)}>
-                            <m.icon size={14} />
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                        {metricDefs.map((m) => (
+                          <div
+                            key={m.label}
+                            className="rounded-xl border border-border bg-muted/30 p-3"
+                          >
+                            <div
+                              className={cn(
+                                "mb-1.5 inline-flex h-8 w-8 items-center justify-center rounded-lg",
+                                m.tone,
+                              )}
+                            >
+                              <m.icon size={14} />
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                                {m.label}
+                              </span>
+                              <span className="text-[11px] font-bold text-muted-foreground">
+                                {m.weight}
+                              </span>
+                            </div>
+                            <div className="text-lg font-bold text-foreground tabular-nums leading-none mt-1">
+                              {totals[m.key]}
+                              <span className="text-[11px] font-normal text-muted-foreground">
+                                {" "}
+                                /{" "}
+                                {
+                                  totals[
+                                    `${m.key}Target` as keyof typeof totals
+                                  ]
+                                }
+                              </span>
+                            </div>
                           </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase">{m.label}</span>
-                            <span className="text-[11px] font-bold text-muted-foreground">{m.weight}</span>
-                          </div>
-                          <div className="text-[16px] font-bold text-foreground tabular-nums leading-none mt-1">
-                            {totals[m.key]}
-                            <span className="text-[11px] font-normal text-muted-foreground"> / {totals[`${m.key}Target` as keyof typeof totals]}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
 
-                    {/* KPI rieng cua leader (2026-07-04) - tach biet khoi tong cua team,
+                      {/* KPI rieng cua leader (2026-07-04) - tach biet khoi tong cua team,
                         luon hien so lieu thuc te (comment/inbox/lead/post da lam) du
                         chua duoc giao target, tranh an het hoat dong that cua leader
                         sau nhan "Chua giao KPI" (leader van co the da lam viec that su). */}
-                    {leaderKpi && (
-                      <div className="rounded-lg border border-violet-100 bg-violet-50/60 px-3 py-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5 min-w-0 text-[12px] font-semibold text-violet-700">
-                            <LuUsers size={13} className="shrink-0" />
-                            <span className="truncate">KPI của Leader ({team.leader_name || "chưa đặt tên"})</span>
+                      {leaderKpi && (
+                        <div className="rounded-xl border border-violet-100 bg-violet-50/60 px-3 py-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5 min-w-0 text-[12px] font-semibold text-violet-700">
+                              <LuUsers size={13} className="shrink-0" />
+                              <span className="truncate">
+                                KPI của Leader (
+                                {team.leader_name || "chưa đặt tên"})
+                              </span>
+                            </div>
+                            <span className="shrink-0 text-[12px] font-bold text-violet-700">
+                              {leaderHasTarget
+                                ? `${leaderPercentage}%`
+                                : "Chưa giao KPI"}
+                            </span>
                           </div>
-                          <span className="shrink-0 text-[12px] font-bold text-violet-700">
-                            {leaderHasTarget ? `${leaderPercentage}%` : "Chưa giao KPI"}
-                          </span>
+                          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-violet-700/80">
+                            <span>
+                              Comment: {leaderKpi.comment}
+                              {leaderKpi.commentTarget > 0
+                                ? `/${leaderKpi.commentTarget}`
+                                : ""}
+                            </span>
+                            <span>
+                              Inbox: {leaderKpi.inbox}
+                              {leaderKpi.inboxTarget > 0
+                                ? `/${leaderKpi.inboxTarget}`
+                                : ""}
+                            </span>
+                            <span>
+                              Lead: {leaderKpi.lead}
+                              {leaderKpi.leadTarget > 0
+                                ? `/${leaderKpi.leadTarget}`
+                                : ""}
+                            </span>
+                            <span>
+                              Post: {leaderKpi.post}
+                              {leaderKpi.postTarget > 0
+                                ? `/${leaderKpi.postTarget}`
+                                : ""}
+                            </span>
+                          </div>
                         </div>
-                        <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-violet-700/80">
-                          <span>Comment: {leaderKpi.comment}{leaderKpi.commentTarget > 0 ? `/${leaderKpi.commentTarget}` : ""}</span>
-                          <span>Inbox: {leaderKpi.inbox}{leaderKpi.inboxTarget > 0 ? `/${leaderKpi.inboxTarget}` : ""}</span>
-                          <span>Lead: {leaderKpi.lead}{leaderKpi.leadTarget > 0 ? `/${leaderKpi.leadTarget}` : ""}</span>
-                          <span>Post: {leaderKpi.post}{leaderKpi.postTarget > 0 ? `/${leaderKpi.postTarget}` : ""}</span>
-                        </div>
-                      </div>
-                    )}
+                      )}
 
-                    <div className="flex gap-2 pt-3 border-t border-border">
-                      <button
-                        onClick={() => handleViewMembers(team)}
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-zinc-200 px-2 py-2 text-[12.5px] font-semibold text-foreground transition hover:bg-primary hover:text-white cursor-pointer"
-                      >
-                        <LuEye size={13} /> Xem TV
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSelectedLeaderForInbox({ email: team.leader_email, name: team.name_team });
-                          setInboxModalOpen(true);
-                        }}
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-zinc-200 px-2 py-2 text-[12.5px] font-semibold text-foreground transition hover:bg-primary hover:text-white cursor-pointer"
-                        title="Xem toàn bộ Inbox của Team này"
-                      >
-                        <LuMessageSquare size={13} /> Inbox
-                      </button>
-                      <button
-                        onClick={() => handleEditTeam(team)}
-                        className="inline-flex items-center justify-center rounded-lg bg-zinc-950 px-2.5 py-2 text-white transition hover:bg-primary cursor-pointer"
-                        title="Sửa team"
-                      >
-                        <LuPencil size={13} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteTeam(team)}
-                        className="inline-flex items-center justify-center rounded-lg bg-primary/10 px-2.5 py-2 text-primary transition hover:bg-primary hover:text-white cursor-pointer"
-                        title="Xóa team"
-                      >
-                        <LuTrash2 size={13} />
-                      </button>
+                      <div className="mt-2 flex flex-wrap gap-2 border-t border-border pt-4">
+                        <button
+                          onClick={() => handleViewMembers(team)}
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-zinc-200 px-2 py-2 text-[12.5px] font-semibold text-foreground transition hover:bg-primary hover:text-white cursor-pointer"
+                        >
+                          <LuEye size={13} /> Xem TV
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedLeaderForInbox({
+                              email: team.leader_email,
+                              name: team.name_team,
+                            });
+                            setInboxModalOpen(true);
+                          }}
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-zinc-200 px-2 py-2 text-[12.5px] font-semibold text-foreground transition hover:bg-primary hover:text-white cursor-pointer"
+                          title="Xem toàn bộ Inbox của Team này"
+                        >
+                          <LuMessageSquare size={13} /> Inbox
+                        </button>
+                        <button
+                          onClick={() => handleEditTeam(team)}
+                          className="inline-flex items-center justify-center rounded-lg bg-zinc-950 px-2.5 py-2 text-white transition hover:bg-primary cursor-pointer"
+                          title="Sửa team"
+                        >
+                          <LuPencil size={13} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTeam(team)}
+                          className="inline-flex items-center justify-center rounded-lg bg-primary/10 px-2.5 py-2 text-primary transition hover:bg-primary hover:text-white cursor-pointer"
+                          title="Xóa team"
+                        >
+                          <LuTrash2 size={13} />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                },
+              )}
             </div>
           </div>
         )}
 
         {/* ── Thong bao ──────────────────────────────────────────────────── */}
         {success && (
-          <div className="bg-green-50 text-green-700 border border-green-200 px-4 py-3 rounded-xl text-[13px] font-medium flex items-center gap-2">
-            <MaterialIcon name="check_circle" className="text-[16px] shrink-0" />
+          <div className="bg-green-50 text-green-700 border border-green-200 px-4 py-2.5 rounded-xl text-[13px] font-medium flex items-center gap-2">
+            <MaterialIcon name="check_circle" className="text-lg shrink-0" />
             <span>{success}</span>
           </div>
         )}
         {error && (
-          <div className="bg-primary/10 text-primary border border-primary/20 px-4 py-3 rounded-xl text-[13px] font-medium flex items-center gap-2">
-            <MaterialIcon name="error" className="text-[16px] shrink-0" />
+          <div className="bg-primary/10 text-primary border border-primary/20 px-4 py-2.5 rounded-xl text-[13px] font-medium flex items-center gap-2">
+            <MaterialIcon name="error" className="text-lg shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
         {/* ── Trang thai loading / rong ──────────────────────────────────── */}
         {isLoading && (
-          <div className="text-center py-16 text-muted-foreground flex flex-col items-center justify-center gap-2 bg-white rounded-xl border border-border">
+          <div className="text-center py-24 text-muted-foreground flex flex-col items-center justify-center gap-2 bg-white rounded-xl border border-border">
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-            <p className="text-[13px] font-medium">Đang tải danh sách team...</p>
+            <p className="text-[13px] font-medium">
+              Đang tải danh sách team...
+            </p>
           </div>
         )}
         {!isLoading && teams.length === 0 && (
-          <div className="text-center py-16 bg-white rounded-xl border border-dashed border-border flex flex-col items-center justify-center">
+          <div className="text-center py-20 bg-white rounded-xl border border-dashed border-border flex flex-col items-center justify-center">
             <LuLayoutGrid size={36} className="text-muted-foreground mb-2" />
-            <p className="text-muted-foreground text-[13px] font-medium">Chưa có team nào</p>
+            <p className="text-muted-foreground text-[13px] font-medium">
+              Chưa có team nào
+            </p>
             <button
               onClick={handleCreateTeam}
-              className="mt-3 text-primary text-[13px] font-semibold hover:underline cursor-pointer"
+              className="mt-5 text-primary text-[13px] font-semibold hover:underline cursor-pointer"
             >
               + Tạo team đầu tiên
             </button>
@@ -587,7 +822,11 @@ export default function TeamsManagementPage() {
         team={selectedTeamForEdit}
         onSuccess={() => {
           fetchTeams();
-          setSuccess(selectedTeamForEdit ? "Cập nhật team thành công" : "Tạo team mới thành công");
+          setSuccess(
+            selectedTeamForEdit
+              ? "Cập nhật team thành công"
+              : "Tạo team mới thành công",
+          );
           setTimeout(() => setSuccess(null), 4000);
         }}
       />
