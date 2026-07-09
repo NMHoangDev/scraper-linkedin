@@ -31,6 +31,7 @@ linkedin_group_crawler/.venv/
 linkedin_group_crawler/venv/
 linkedin_group_crawler/.pytest_cache/
 linkedin_group_crawler/.env
+linkedin_group_crawler/*.env.dev
 
 # BE runtime/session/state
 linkedin_group_crawler/storage/session/**
@@ -129,6 +130,8 @@ linkedin-crawler-ui/realtime_explore/
 /api-facebook-get-extension.zip
 /post-feed-extension/build.rar
 /post-feed-extension/postfeed_extension.rar
+/post-feed-extension/dist/
+/post-feed-extension/markee-extension.zip
 /*.txt
 /*.rar
 /*.zip
