@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { UnifiedPost, SocialAccount } from "@/types/unified.types";
 import { socialAccountsService } from "@/services/all-platform.service";
+import { scheduledCommentService } from "@/services/scheduled-comment.service";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { API_BASE_URL } from "@/lib/env";
 import { cn } from "@/lib/utils";
@@ -10,6 +11,11 @@ import { cn } from "@/lib/utils";
 interface BulkCommentLauncherProps {
   posts: UnifiedPost[];
   onComplete?: (seededUrls: string[]) => void;
+}
+
+function toLocalDatetimeLocal(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherProps) {
@@ -21,6 +27,9 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
   const [isReady, setIsReady] = useState(false);
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
+  const [scheduledAt, setScheduledAt] = useState<string>("");
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [scheduleResult, setScheduleResult] = useState<{ success: number; failed: number; message: string } | null>(null);
 
   const { user } = useAppAuth();
 
@@ -117,6 +126,58 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
     }, "*");
   };
 
+  const handleSchedule = async () => {
+    if (!commentText.trim()) return alert("Vui lòng nhập nội dung comment!");
+    if (selectedUrls.size === 0) return alert("Vui lòng chọn ít nhất 1 bài viết!");
+    if (!scheduledAt) return alert("Vui lòng chọn thời gian hẹn!");
+    if (new Date(scheduledAt) <= new Date()) return alert("Thời gian phải trong tương lai!");
+    if (!selectedAccountId) return alert("Vui lòng chọn tài khoản Seeding!");
+
+    setIsScheduling(true);
+    setScheduleResult(null);
+
+    let success = 0;
+    let failed = 0;
+    const failedUrls: string[] = [];
+    const urls = Array.from(selectedUrls);
+
+    for (const url of urls) {
+      const post = validPosts.find(p => p.post_url === url);
+      try {
+        await scheduledCommentService.create({
+          id_post_fb: post?.id,
+          platform: "facebook",
+          post_url: url,
+          group_name: post?.group_name,
+          post_content: post?.content,
+          id_social_account: selectedAccountId,
+          comment_content: commentText.trim(),
+          ai_generated: false,
+          scheduled_at: new Date(scheduledAt).toISOString(),
+        });
+        success++;
+      } catch {
+        failed++;
+        failedUrls.push(url);
+      }
+    }
+
+    const msg = failed === 0
+      ? `Đã lên lịch ${success} bài viết thành công!`
+      : `Đã lên lịch ${success}/${urls.length} bài viết. ${failed} bài thất bại.`;
+
+    setScheduleResult({ success, failed, message: msg });
+
+    if (success > 0) {
+      const succeededUrls = urls.filter(u => !failedUrls.includes(u));
+      onComplete?.(succeededUrls);
+    }
+
+    setIsScheduling(false);
+  };
+
+  const minScheduleTime = toLocalDatetimeLocal(new Date());
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden flex flex-col transition-all duration-300 w-full mb-6 relative">
       {/* Header */}
@@ -171,7 +232,7 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
                   className="w-full rounded-xl border border-slate-200 p-2.5 text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none"
                   value={selectedAccountId}
                   onChange={e => setSelectedAccountId(e.target.value)}
-                  disabled={isCommenting}
+                  disabled={isCommenting || isScheduling}
                 >
                   <option value="">-- Tự do (Dùng acc đang đăng nhập FB) --</option>
                   {socialAccounts.map(acc => (
@@ -188,7 +249,7 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
                   placeholder="Nhập nội dung bạn muốn seeding..."
                   value={commentText}
                   onChange={e => setCommentText(e.target.value)}
-                  disabled={isCommenting}
+                  disabled={isCommenting || isScheduling}
                 />
               </div>
             </div>
@@ -232,6 +293,22 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
             </div>
           </div>
 
+          {/* New: Hẹn giờ section */}
+          <div className="pt-3 border-t border-slate-100 space-y-2">
+            <label className="text-sm font-bold text-slate-700">Hẹn giờ (không bắt buộc):</label>
+            <p className="text-xs text-slate-500">
+              Nếu có thời gian, dùng nút "Lên lịch" thay vì "Bắt đầu Seeding".
+            </p>
+            <input
+              type="datetime-local"
+              value={scheduledAt}
+              min={minScheduleTime}
+              onChange={(e) => setScheduledAt(e.target.value)}
+              disabled={isCommenting || isScheduling}
+              className="w-full rounded-xl border border-slate-200 p-2.5 text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
+            />
+          </div>
+
           <div className="flex flex-col gap-3 pt-3 border-t border-slate-100">
             {progress && (
               <div className="bg-red-50 border border-red-100 rounded-xl p-3 space-y-2">
@@ -249,16 +326,45 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
               </div>
             )}
             
-            <div className="flex justify-end gap-3">
+            {scheduleResult && (
+              <div className={`rounded-xl p-3 text-sm font-medium ${scheduleResult.failed === 0 ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' : 'bg-amber-50 border border-amber-200 text-amber-700'}`}>
+                {scheduleResult.message}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 flex-wrap">
               {isCommenting && (
                 <div className="flex items-center text-xs font-medium text-slate-500 mr-auto">
                   <span className="material-symbols-outlined animate-spin text-[16px] mr-1">progress_activity</span>
                   Đang chạy ngầm. Bạn có thể làm việc khác.
                 </div>
               )}
+              {isScheduling && (
+                <div className="flex items-center text-xs font-medium text-slate-500 mr-auto">
+                  <span className="material-symbols-outlined animate-spin text-[16px] mr-1">progress_activity</span>
+                  Đang lên lịch...
+                </div>
+              )}
+              {scheduledAt && (
+                <button
+                  type="button"
+                  onClick={handleSchedule}
+                  disabled={isScheduling || isCommenting || selectedUrls.size === 0 || !commentText.trim() || !selectedAccountId}
+                  className="px-6 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold transition shadow-sm disabled:opacity-50 disabled:shadow-none flex items-center gap-2 cursor-pointer"
+                >
+                  {isScheduling ? (
+                    <>Đang lưu...</>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-[18px]">schedule</span>
+                      Lên lịch
+                    </>
+                  )}
+                </button>
+              )}
               <button 
                 onClick={handleStart}
-                disabled={isCommenting || selectedUrls.size === 0 || !isReady || !commentText.trim()}
+                disabled={isCommenting || isScheduling || selectedUrls.size === 0 || !isReady || !commentText.trim()}
                 className="px-6 py-2 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 text-white font-bold hover:from-red-700 hover:to-rose-700 transition shadow-sm shadow-red-600/20 disabled:opacity-50 disabled:shadow-none flex items-center gap-2 cursor-pointer"
               >
                 {isCommenting ? (

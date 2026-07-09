@@ -1,13 +1,19 @@
 name: Deploy Dev
 
-# Tu dong deploy len host DEV (10.30.50.29) moi khi co code moi tren nhanh
-# dev. Chay tren self-hosted runner cai san tren chinh host do,
-# thao tac truc tiep tren thu muc deploy hien co (khong dung actions/checkout
-# vi day la "pull + rebuild" tren may that, khong phai build tu checkout moi).
+# Auto-deploy khi push/merge len dev (chay tren self-hosted runner tren host
+# DEV). Nhan nut "Run workflow" neu muon deploy mot nhanh/commit cu the.
+# KHONG dung actions/checkout vi day la "pull + rebuild" tren may that,
+# khong phai build tu checkout moi.
 on:
   push:
     branches:
       - dev
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Nhanh/commit muon deploy (de trong = dung dev moi nhat)"
+        required: false
+        default: "dev"
 
 jobs:
   deploy:
@@ -16,10 +22,12 @@ jobs:
       run:
         working-directory: /opt/apps/seeding_markeeai/scraper-linkedin
     steps:
-      - name: Pull code moi nhat
+      - name: Pull code theo ref duoc chon
         run: |
-          git checkout dev
-          git pull origin dev
+          REF="${{ github.event.inputs.ref || github.ref_name }}"
+          git fetch origin
+          git checkout "$REF"
+          git pull origin "$REF" || true
 
       - name: Build frontend + backend
         run: docker compose build frontend backend
