@@ -20,7 +20,7 @@ from fastapi.concurrency import run_in_threadpool
 from loguru import logger
 
 from app.modules.all_platform.services import decode_token, get_team_members, get_user_by_id
-from app.modules.all_platform.services.supabase_kpi_service import auto_count_fb_inbox_reply
+from app.modules.all_platform.services.supabase_kpi_service import auto_count_fb_inbox_reply, mark_fb_inbox_lead
 from app.core.supabase_client import get_supabase_client
 
 
@@ -621,10 +621,30 @@ async def fb_inbox_reply_detected(data: dict) -> JSONResponse:
     if not uid or not conv_id:
         return _json_response(200, {"success": False, "message": "Thiếu user_id/conv_id"})
     try:
-        result = await run_in_threadpool(auto_count_fb_inbox_reply, uid, conv_id)
+        result = await run_in_threadpool(auto_count_fb_inbox_reply, uid, conv_id, True)
         return _json_response(200, {"success": True, "data": result})
     except Exception as e:
         logger.warning(f"auto_count_fb_inbox_reply (reply-detected) that bai user_id={uid} conv_id={conv_id}: {e}")
+        return _json_response(200, {"success": False, "message": str(e)})
+
+
+@router.post("/inbox/mark-lead")
+async def fb_inbox_mark_lead(data: dict) -> JSONResponse:
+    """Nội bộ: service gọi khi nhân viên bấm "Đánh dấu là khách" trong tab Inbox
+    (field=is_customer, value=true). Set is_lead=True cho hội thoại đó trong
+    fb_inbox_kpi — nếu chưa có dòng KPI (chưa từng tính reply) thì tạo mới luôn.
+    Không yêu cầu user token, gọi server-to-server giống /fb/post-kpi/save.
+    Chạy đồng bộ, trả kết quả thật (không dùng BackgroundTasks) — cùng lý do với
+    /inbox/reply-detected, tránh mất lead khi Supabase disconnect thoáng qua."""
+    uid = str(data.get("user_id") or "")
+    conv_id = str(data.get("conv_id") or "")
+    if not uid or not conv_id:
+        return _json_response(200, {"success": False, "message": "Thiếu user_id/conv_id"})
+    try:
+        result = await run_in_threadpool(mark_fb_inbox_lead, uid, conv_id, True)
+        return _json_response(200, {"success": True, "data": result})
+    except Exception as e:
+        logger.warning(f"mark_fb_inbox_lead that bai user_id={uid} conv_id={conv_id}: {e}")
         return _json_response(200, {"success": False, "message": str(e)})
 
 

@@ -1118,7 +1118,9 @@ def count_fb_inbox_kpi(
     return {"synced": synced, "lead": lead, "member_email": member_email}
 
 
-def auto_count_fb_inbox_reply(user_id: str, conv_id: str) -> Optional[dict]:
+def auto_count_fb_inbox_reply(
+    user_id: str, conv_id: str, raise_on_error: bool = False
+) -> Optional[dict]:
     """Tự động tính +1 KPI inbox khi nhân viên trả lời khách qua FB Messenger.
 
     Gọi sau khi POST /inbox/reply gửi thành công. Idempotent theo
@@ -1127,7 +1129,12 @@ def auto_count_fb_inbox_reply(user_id: str, conv_id: str) -> Optional[dict]:
 
     Trả None (không raise) nếu FB account chưa được link với member nào, để
     không làm hỏng luồng gửi tin.
-    """
+
+    raise_on_error: mặc định False để KHÔNG đổi hành vi cũ (gọi từ BackgroundTasks
+    của /inbox/reply — fire-and-forget, không ai đọc lỗi). Đặt True khi caller CẦN
+    phân biệt "thành công/no-op hợp lệ" với "lỗi tạm thời nên thử lại" (vd endpoint
+    /fb/inbox/reply-detected — nếu nuốt lỗi Supabase disconnect rồi vẫn trả None
+    như thành công thì y hệt bug đã xảy ra với acc Lê Hải 2026-07-09)."""
     if not user_id or not conv_id:
         return None
 
@@ -1210,6 +1217,103 @@ def auto_count_fb_inbox_reply(user_id: str, conv_id: str) -> Optional[dict]:
         logger.warning(
             f"auto_count_fb_inbox_reply failed (user_id={user_id}, conv_id={conv_id}): {exc}"
         )
+        if raise_on_error:
+            raise
+        return None
+
+
+def mark_fb_inbox_lead(
+    user_id: str, conv_id: str, raise_on_error: bool = False
+) -> Optional[dict]:
+    """Set is_lead=True cho 1 hội thoại FB Inbox — gọi khi nhân viên bấm "Đánh dấu
+    là khách" trong tab Inbox (field=is_customer, value=true).
+
+    Trước giờ "Đánh dấu là khách" chỉ lưu cờ is_customer trong file JSON local
+    của service, KHÔNG hề ghi lên Supabase -> phần "Lead" (45% trọng số KPI team,
+    nặng nhất) luôn = 0 dù nhân viên đã đánh dấu đủ khách thật. Hàm này nối lại
+    hành động đó vào fb_inbox_kpi.is_lead.
+
+    Nếu chưa có dòng KPI cho hội thoại này (nhân viên đánh dấu khách trước khi
+    được auto-count reply) thì tạo mới luôn (is_confirmed=True) thay vì bỏ qua.
+    Idempotent: chỉ update khi is_lead đang False, gọi lại nhiều lần không sao.
+    """
+    if not user_id or not conv_id:
+        return None
+
+    try:
+        from app.modules.all_platform.services.fb_inbox_account_service import resolve_id_member
+
+        id_member = resolve_id_member(user_id)
+        if not id_member:
+            logger.info(f"mark_fb_inbox_lead: no member linked to user_id={user_id}, skip")
+            return None
+
+        supabase: Client = get_supabase_client()
+
+        id_leader = id_member
+        member_teams = (
+            supabase.table("member_of_teams")
+            .select("id_teams")
+            .eq("id_member", id_member)
+            .limit(1)
+            .execute()
+        )
+        if member_teams.data:
+            team_res = (
+                supabase.table("teams")
+                .select("id_leader")
+                .eq("id", member_teams.data[0]["id_teams"])
+                .limit(1)
+                .execute()
+            )
+            if team_res.data and team_res.data[0].get("id_leader"):
+                id_leader = team_res.data[0]["id_leader"]
+
+        now = datetime.now(timezone.utc).isoformat()
+
+        existing = (
+            supabase.table("fb_inbox_kpi")
+            .select("id, is_lead")
+            .eq("id_member", id_member)
+            .eq("conv_id", conv_id)
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+
+        if existing.data:
+            row = existing.data[0]
+            if not row.get("is_lead"):
+                supabase.table("fb_inbox_kpi").update(
+                    {"is_lead": True, "synced_at": now}
+                ).eq("id", row["id"]).execute()
+        else:
+            supabase.table("fb_inbox_kpi").insert({
+                "id_member": id_member,
+                "id_leader": id_leader,
+                "conv_id": conv_id,
+                "user_id": user_id,
+                "message_count": 1,
+                "is_lead": True,
+                "is_confirmed": True,
+                "synced_at": now,
+            }).execute()
+
+        leader_email = None
+        try:
+            leader_res = supabase.table("app_users").select("email").eq("id", id_leader).limit(1).execute()
+            if leader_res.data:
+                leader_email = leader_res.data[0].get("email")
+        except Exception:
+            pass
+        invalidate_overview_cache(leader_email)
+
+        logger.info(f"mark_fb_inbox_lead: marked lead conv_id={conv_id} for member={id_member} (user_id={user_id})")
+        return {"id_member": id_member, "id_leader": id_leader, "conv_id": conv_id}
+    except Exception as exc:
+        logger.warning(f"mark_fb_inbox_lead failed (user_id={user_id}, conv_id={conv_id}): {exc}")
+        if raise_on_error:
+            raise
         return None
 
 
