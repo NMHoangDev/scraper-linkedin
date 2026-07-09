@@ -13,7 +13,8 @@
     "*://*.facebook.com/*",
     "http://localhost:*/*",
     "http://127.0.0.1:*/*",
-    "*://seeding.markeeai.com/*"
+    "*://seeding.markeeai.com/*",
+    "*://*.seeding.markeeai.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -32,7 +33,8 @@
         "http://localhost:*/*", 
         "http://127.0.0.1:*/*",
         "*://*.vercel.app/*",
-        "*://seeding.markeeai.com/*"
+        "*://seeding.markeeai.com/*",
+        "*://*.seeding.markeeai.com/*"
       ],
       "js": ["bridge.js"],
       "run_at": "document_idle"

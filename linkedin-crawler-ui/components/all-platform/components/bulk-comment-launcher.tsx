@@ -29,6 +29,7 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
   const [scheduledAt, setScheduledAt] = useState<string>("");
   const [isScheduling, setIsScheduling] = useState(false);
+  const [stopping, setStopping] = useState(false);
   const [scheduleResult, setScheduleResult] = useState<{ success: number; failed: number; message: string } | null>(null);
 
   const { user } = useAppAuth();
@@ -55,6 +56,8 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
         } else if (isCommenting) { // If it was commenting but extension says it stopped
           setIsCommenting(false);
         }
+      } else if (event.data?.action === "STOP_BULK_COMMENT_RESPONSE") {
+        setStopping(false);
       }
     };
 
@@ -79,6 +82,11 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
           if (res.data.length > 0) setSelectedAccountId(res.data[0].id);
         }
       });
+    }
+    if (isExpanded && !scheduledAt) {
+      const now = new Date();
+      now.setMinutes(now.getMinutes() + 30);
+      setScheduledAt(toLocalDatetimeLocal(now));
     }
   }, [isExpanded, socialAccounts.length]);
 
@@ -174,6 +182,11 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
     }
 
     setIsScheduling(false);
+  };
+
+  const handleStop = () => {
+    setStopping(true);
+    window.postMessage({ action: "STOP_BULK_COMMENT" }, "*");
   };
 
   const minScheduleTime = toLocalDatetimeLocal(new Date());
@@ -334,9 +347,19 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
 
             <div className="flex justify-end gap-3 flex-wrap">
               {isCommenting && (
-                <div className="flex items-center text-xs font-medium text-slate-500 mr-auto">
-                  <span className="material-symbols-outlined animate-spin text-[16px] mr-1">progress_activity</span>
-                  Đang chạy ngầm. Bạn có thể làm việc khác.
+                <div className="flex items-center gap-2 mr-auto">
+                  <div className="flex items-center text-xs font-medium text-slate-500">
+                    <span className="material-symbols-outlined animate-spin text-[16px] mr-1">progress_activity</span>
+                    {progress ? `${progress.current}/${progress.total}` : "Đang chạy ngầm"}.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleStop}
+                    disabled={stopping}
+                    className="px-3 py-1.5 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold transition disabled:opacity-50 cursor-pointer"
+                  >
+                    {stopping ? "Đang dừng..." : "Dừng"}
+                  </button>
                 </div>
               )}
               {isScheduling && (
@@ -345,23 +368,21 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
                   Đang lên lịch...
                 </div>
               )}
-              {scheduledAt && (
-                <button
-                  type="button"
-                  onClick={handleSchedule}
-                  disabled={isScheduling || isCommenting || selectedUrls.size === 0 || !commentText.trim() || !selectedAccountId}
-                  className="px-6 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold transition shadow-sm disabled:opacity-50 disabled:shadow-none flex items-center gap-2 cursor-pointer"
-                >
-                  {isScheduling ? (
-                    <>Đang lưu...</>
-                  ) : (
-                    <>
-                      <span className="material-symbols-outlined text-[18px]">schedule</span>
-                      Lên lịch
-                    </>
-                  )}
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={handleSchedule}
+                disabled={isScheduling || isCommenting || selectedUrls.size === 0 || !commentText.trim() || !selectedAccountId || !scheduledAt}
+                className="px-6 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold transition shadow-sm disabled:opacity-50 disabled:shadow-none flex items-center gap-2 cursor-pointer"
+              >
+                {isScheduling ? (
+                  <>Đang lưu...</>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-[18px]">schedule</span>
+                    Lên lịch
+                  </>
+                )}
+              </button>
               <button 
                 onClick={handleStart}
                 disabled={isCommenting || isScheduling || selectedUrls.size === 0 || !isReady || !commentText.trim()}
