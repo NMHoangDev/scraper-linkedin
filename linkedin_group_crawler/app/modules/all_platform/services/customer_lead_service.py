@@ -2,7 +2,7 @@ import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone, date
 from app.core.supabase_client import get_supabase_client
-from app.modules.all_platform.schemas.customer_lead import STAGE_REQUIRED_FIELDS
+from app.modules.all_platform.schemas.customer_lead import STAGE_REQUIRED_FIELDS, is_transition_allowed
 
 logger = logging.getLogger(__name__)
 
@@ -324,8 +324,13 @@ def transition_stage(
                 "Muốn tiếp tục hãy tạo deal mới."
             )
 
-        # Server KHÔNG enforce state-machine transitions (allowed next stages) — để tránh
-        # phân kỳ logic với client. Required fields là đủ để bảo vệ data integrity.
+        # Chặn nhảy stage bậy (VD new_lead -> won bỏ qua pipeline) — backend có API
+        # riêng gọi trực tiếp được nên không thể chỉ dựa vào validate client-side.
+        if not is_transition_allowed(from_stage, to_stage):
+            raise TransitionError(
+                f"Không thể chuyển trực tiếp từ '{from_stage}' sang '{to_stage}' — "
+                "không đúng thứ tự pipeline."
+            )
 
         # Check required fields
         missing = _validate_required_fields(to_stage, payload)

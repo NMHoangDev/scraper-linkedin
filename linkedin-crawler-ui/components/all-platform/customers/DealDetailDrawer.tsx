@@ -20,6 +20,8 @@ import {
   Building2,
   Tag as TagIcon,
   Clock,
+  CalendarDays,
+  FileText,
   ArrowRight,
   AlertCircle,
   CheckCircle2,
@@ -54,6 +56,28 @@ interface Props {
   onRequestTransition: (c: Customer, to: DealStage) => void;
   onEditCustomer: (c: Customer) => void;
   onDeleteCustomer: (c: Customer) => void;
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("vi-VN");
+}
+
+function formatVND(value?: number | null) {
+  if (!value) return null;
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function contractStatusLabel(value?: Customer["contract_status"] | null) {
+  if (value === "completed") return "Đã hoàn thành";
+  if (value === "maintenance") return "Bảo trì / bảo hành";
+  return "Đang hoạt động";
 }
 
 export function DealDetailDrawer({ customer, open, onClose, onRequestTransition, onEditCustomer, onDeleteCustomer }: Props) {
@@ -226,6 +250,108 @@ export function DealDetailDrawer({ customer, open, onClose, onRequestTransition,
           </section>
 
           {/* Ghi chú hiện tại */}
+          {(customer.service_package ||
+            customer.lifetime_value ||
+            customer.contract_status ||
+            customer.contract_signed_at ||
+            customer.warranty_expires_at ||
+            customer.customer_since ||
+            customer.last_care_at ||
+            customer.last_attachment_name ||
+            customer.care_note) && (
+            <section className="space-y-2">
+              <h4 className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-500">
+                Hợp đồng & chăm sóc
+              </h4>
+              <div className="grid grid-cols-2 gap-2">
+                {customer.service_package && (
+                  <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                    <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
+                      <TagIcon className="size-3" /> Gói dịch vụ
+                    </div>
+                    <div className="mt-0.5 truncate font-medium text-slate-700">{customer.service_package}</div>
+                  </div>
+                )}
+                {customer.lifetime_value ? (
+                  <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                    <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
+                      <Wallet className="size-3" /> Giá trị hợp đồng
+                    </div>
+                    <div className="mt-0.5 font-semibold text-slate-700">{formatVND(customer.lifetime_value)}</div>
+                  </div>
+                ) : null}
+                {customer.contract_status && (
+                  <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                    <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
+                      <FileText className="size-3" /> Trạng thái hợp đồng
+                    </div>
+                    <div className="mt-0.5 truncate font-medium text-slate-700">
+                      {contractStatusLabel(customer.contract_status)}
+                    </div>
+                  </div>
+                )}
+                {customer.last_attachment_name && (
+                  <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                    <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
+                      <FileText className="size-3" /> File hợp đồng / báo giá
+                    </div>
+                    {customer.last_attachment_url ? (
+                      <a
+                        href={customer.last_attachment_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-0.5 block truncate font-medium text-blue-700 hover:underline"
+                      >
+                        {customer.last_attachment_name}
+                      </a>
+                    ) : (
+                      <div className="mt-0.5 truncate font-medium text-slate-700">
+                        {customer.last_attachment_name}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {customer.customer_since && (
+                  <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                    <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
+                      <CalendarDays className="size-3" /> Ngày thành khách hàng
+                    </div>
+                    <div className="mt-0.5 font-medium text-slate-700">{formatDate(customer.customer_since)}</div>
+                  </div>
+                )}
+                {customer.contract_signed_at && (
+                  <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                    <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
+                      <CalendarDays className="size-3" /> Ngày ký
+                    </div>
+                    <div className="mt-0.5 font-medium text-slate-700">{formatDate(customer.contract_signed_at)}</div>
+                  </div>
+                )}
+                {customer.warranty_expires_at && (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+                    <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-amber-700">
+                      <CalendarDays className="size-3" /> Hết hạn bảo hành
+                    </div>
+                    <div className="mt-0.5 font-medium text-amber-800">{formatDate(customer.warranty_expires_at)}</div>
+                  </div>
+                )}
+                {customer.last_care_at && (
+                  <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                    <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
+                      <Clock className="size-3" /> Chăm sóc gần nhất
+                    </div>
+                    <div className="mt-0.5 font-medium text-slate-700">{formatDate(customer.last_care_at)}</div>
+                  </div>
+                )}
+              </div>
+              {customer.care_note && (
+                <p className="whitespace-pre-line rounded-md border border-slate-200 bg-white p-3 text-sm text-slate-700">
+                  {customer.care_note}
+                </p>
+              )}
+            </section>
+          )}
+
           {customer.note && (
             <section>
               <h4 className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-500">
