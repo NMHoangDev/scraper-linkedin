@@ -16,8 +16,11 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
+from fastapi.concurrency import run_in_threadpool
+from loguru import logger
 
 from app.modules.all_platform.services import decode_token, get_team_members, get_user_by_id
+from app.modules.all_platform.services.supabase_kpi_service import auto_count_fb_inbox_reply, mark_fb_inbox_lead
 from app.core.supabase_client import get_supabase_client
 
 
@@ -592,17 +595,47 @@ async def fb_inbox_reply(data: dict, request: Request, authorization: str | None
 
 
 @router.post("/inbox/reply-detected")
-async def fb_inbox_reply_detected(data: dict, background_tasks: BackgroundTasks) -> JSONResponse:
+async def fb_inbox_reply_detected(data: dict) -> JSONResponse:
     """Nội bộ: service gọi khi quét Inbox phát hiện nhân viên đã trả lời khách
     TRỰC TIẾP trên Facebook (không qua nút Trả lời trong tool). Cho phép tính KPI
     cả 2 đường (qua tool + trả lời thẳng trên FB), không yêu cầu user token vì đây
     là gọi server-to-server (giống pattern /fb/post-kpi/save).
-    idempotent theo (id_member, conv_id, user_id) trong auto_count_fb_inbox_reply."""
+
+    QUAN TRỌNG: chạy ĐỒNG BỘ (không dùng BackgroundTasks) và trả về đúng kết quả
+    thật (success=False nếu ghi Supabase lỗi, vd mất kết nối tạm thời) — để
+    service biết CHẮC là đã ghi được rồi mới đánh dấu kpi_notified, tránh mất
+    KPI vĩnh viễn khi Supabase disconnect thoáng qua (service sẽ tự thử lại ở
+    lần quét sau nếu response này báo fail)."""
     uid = str(data.get("user_id") or "")
     conv_id = str(data.get("conv_id") or "")
-    if uid and conv_id:
-        background_tasks.add_task(auto_count_fb_inbox_reply, uid, conv_id)
-    return _json_response(200, {"success": True})
+    if not uid or not conv_id:
+        return _json_response(200, {"success": False, "message": "Thiếu user_id/conv_id"})
+    try:
+        result = await run_in_threadpool(auto_count_fb_inbox_reply, uid, conv_id, True)
+        return _json_response(200, {"success": True, "data": result})
+    except Exception as e:
+        logger.warning(f"auto_count_fb_inbox_reply (reply-detected) that bai user_id={uid} conv_id={conv_id}: {e}")
+        return _json_response(200, {"success": False, "message": str(e)})
+
+
+@router.post("/inbox/mark-lead")
+async def fb_inbox_mark_lead(data: dict) -> JSONResponse:
+    """Nội bộ: service gọi khi nhân viên bấm "Đánh dấu là khách" trong tab Inbox
+    (field=is_customer, value=true). Set is_lead=True cho hội thoại đó trong
+    fb_inbox_kpi — nếu chưa có dòng KPI (chưa từng tính reply) thì tạo mới luôn.
+    Không yêu cầu user token, gọi server-to-server giống /fb/post-kpi/save.
+    Chạy đồng bộ, trả kết quả thật (không dùng BackgroundTasks) — cùng lý do với
+    /inbox/reply-detected, tránh mất lead khi Supabase disconnect thoáng qua."""
+    uid = str(data.get("user_id") or "")
+    conv_id = str(data.get("conv_id") or "")
+    if not uid or not conv_id:
+        return _json_response(200, {"success": False, "message": "Thiếu user_id/conv_id"})
+    try:
+        result = await run_in_threadpool(mark_fb_inbox_lead, uid, conv_id, True)
+        return _json_response(200, {"success": True, "data": result})
+    except Exception as e:
+        logger.warning(f"mark_fb_inbox_lead that bai user_id={uid} conv_id={conv_id}: {e}")
+        return _json_response(200, {"success": False, "message": str(e)})
 
 
 @router.get("/inbox/reply_status")

@@ -4,12 +4,26 @@ from __future__ import annotations
 
 import time
 from datetime import date, datetime, timedelta, timezone
+from functools import wraps
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from loguru import logger
 from supabase import Client
 
-from app.core.supabase_client import get_supabase_client
+from app.core.supabase_client import execute_supabase_query, get_supabase_client
+
+
+def _retry_supabase(func):
+    """Re-run a read-only KPI query when the Supabase connection drops.
+
+    These functions re-resolve the client via ``get_supabase_client()`` on entry,
+    so replaying the whole body after ``reset_supabase_client()`` picks up a fresh
+    connection. Only safe on reads — never decorate a function that writes.
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        return execute_supabase_query(lambda: func(*args, **kwargs))
+    return wrapper
 
 # Vietnam timezone (+07:00) — used consistently in all date comparisons
 vn_tz = VN_TZ = timezone(timedelta(hours=7))
@@ -153,6 +167,7 @@ def _normalize_rpc_response(payload: Any) -> dict:
     return {"total": len(out_members), "members": out_members}
 
 
+@_retry_supabase
 def get_team_kpi_overview_v2_rpc(
     *,
     leader_email: Optional[str],
@@ -425,6 +440,27 @@ def get_all_kpis_for_leader(
 
     verified_keywords = ("yes", "đã seeding", "xác minh", "verified")
 
+    # CRM lead count từ customer_leads — cùng công thức với get_team_kpi_overview_v2.
+    # Thiếu term này thì lead_actual của endpoint legacy luôn nhỏ hơn v2/v3.
+    legacy_start_utc, legacy_end_utc = _vn_week_range_to_utc(default_start, default_end)
+    crm_lead_count: Dict[str, int] = {str(m): 0 for m in member_ids}
+    try:
+        crm_lead_res = (
+            supabase.table("customer_leads")
+            .select("leaded_by, created_at")
+            .in_("leaded_by", member_ids)
+            .not_.is_("leaded_by", "null")
+            .gte("created_at", legacy_start_utc)
+            .lte("created_at", legacy_end_utc)
+            .execute()
+        )
+        for r in (crm_lead_res.data or []):
+            _mid = str(r.get("leaded_by"))
+            if _mid in crm_lead_count:
+                crm_lead_count[_mid] += 1
+    except Exception as exc:
+        logger.warning(f"customer_leads lead-count (legacy get_all) failed: {exc}")
+
     members_data = []
     for mid in set(str(m) for m in member_ids):
         user = user_map.get(mid)
@@ -443,7 +479,13 @@ def get_all_kpis_for_leader(
             and s.get("current_day")
             and eff_start_date <= s["current_day"] <= eff_end_date
         ]
-        comment_current = len(member_comments)
+        # Chỉ đếm comment ĐÃ VERIFY — giống get_team_kpi_overview_v2 và view
+        # v_member_daily_seeding. Trước đây hàm này đếm mọi dòng bất kể `verify`
+        # nên cùng team/tuần lại ra số comment khác endpoint v2/v3.
+        comment_current = sum(
+            1 for s in member_comments
+            if str(s.get("verify", "")).strip().lower() in verified_keywords
+        )
 
         # Set Posts to 0 as requested
         post_current = 0
@@ -485,8 +527,10 @@ def get_all_kpis_for_leader(
         except Exception as exc:
             logger.warning(f"get_fb_post_kpi_summary failed for member={mid}: {exc}")
 
-        # Tổng inbox = Zalo inbox + FB seeder messages + FB counted via "Tính Inbox"
-        total_inbox_current = inbox_current + fb_inbox_from_seeder + fb_inbox_from_kpi
+        # Tổng inbox = SỐ HỘI THOẠI: Zalo đã verify + FB đã tính KPI.
+        # `fb_inbox_from_seeder` là SỐ TIN NHẮN khách gửi (khác đơn vị) -> chỉ
+        # hiển thị tham khảo ở `kpi_inbox_fb_seeder`, không cộng vào tổng.
+        total_inbox_current = inbox_current + fb_inbox_from_kpi
 
         members_data.append({
             "id": mid,
@@ -503,7 +547,7 @@ def get_all_kpis_for_leader(
                 "kpi_post": active_kpi.get("kpi_post", 0),
                 "kpi_post_current": fb_post_count,  # FB Post KPI từ fb_post_kpi
                 "kpi_lead": active_kpi.get("kpi_lead", 0),
-                "kpi_lead_current": lead_current + fb_lead_from_kpi,
+                "kpi_lead_current": lead_current + fb_lead_from_kpi + int(crm_lead_count.get(mid, 0)),
                 "kpi_inbox": active_kpi.get("kpi_inbox", 0),
                 "kpi_inbox_current": total_inbox_current,
                 "kpi_inbox_zalo": inbox_current,
@@ -522,6 +566,7 @@ def get_all_kpis_for_leader(
     return {"total": len(members_data), "members": members_data}
 
 
+@_retry_supabase
 def get_kpi_by_email(email: str) -> dict:
     """Get KPI for a specific member."""
     supabase: Client = get_supabase_client()
@@ -558,6 +603,7 @@ def get_kpi_by_email(email: str) -> dict:
     )
     
     # Fallback to latest KPI if no exact match for current week
+    carried_over_from: Optional[Dict[str, Any]] = None
     if not result.data:
         result = (
             supabase.table("kpi_tracker")
@@ -570,7 +616,13 @@ def get_kpi_by_email(email: str) -> dict:
         )
         # Virtual carry-over: keep targets from old KPI, but update dates to current week
         # so the progress is correctly calculated for the new week (reset to 0).
+        # Ghi lại nguồn gốc: nếu không, UI hiển thị thanh tiến độ chạy trên chỉ
+        # tiêu của TUẦN CŨ mà không ai biết tuần này leader chưa giao KPI.
         if result.data:
+            carried_over_from = {
+                "start": result.data[0].get("start_date"),
+                "end": result.data[0].get("end_date"),
+            }
             result.data[0]["start_date"] = current_monday
             result.data[0]["end_date"] = current_sunday
 
@@ -621,7 +673,9 @@ def get_kpi_by_email(email: str) -> dict:
         except Exception as exc:
             logger.warning(f"get_fb_inbox_kpi_summary failed for email={email}: {exc}")
 
-        kpi_inbox_current = kpi_inbox_zalo + kpi_inbox_fb_seeder + kpi_inbox_fb_kpi
+        # Xem chú thích ở get_team_kpi_overview_v2: kpi_inbox_fb_seeder là số TIN
+        # NHẮN, không phải số hội thoại -> không cộng vào KPI Inbox.
+        kpi_inbox_current = kpi_inbox_zalo + kpi_inbox_fb_kpi
 
         return {
             "email": email,
@@ -635,6 +689,9 @@ def get_kpi_by_email(email: str) -> dict:
             "kpi_inbox_fb_seeder": kpi_inbox_fb_seeder,
             "kpi_inbox_fb_kpi": kpi_inbox_fb_kpi,
             "kpi_inbox_target": kpi_inbox_target,
+            # True = tuần này leader CHƯA giao KPI, đang mượn chỉ tiêu tuần cũ.
+            "not_assigned": carried_over_from is not None,
+            "carried_over_from": carried_over_from,
             "profile_id": user.get("profile_id"),
             "facebook_name": user.get("facebook_name"),
         }
@@ -1118,6 +1175,205 @@ def count_fb_inbox_kpi(
     return {"synced": synced, "lead": lead, "member_email": member_email}
 
 
+def auto_count_fb_inbox_reply(
+    user_id: str, conv_id: str, raise_on_error: bool = False
+) -> Optional[dict]:
+    """Tự động tính +1 KPI inbox khi nhân viên trả lời khách qua FB Messenger.
+
+    Gọi sau khi POST /inbox/reply gửi thành công. Idempotent theo
+    (id_member, conv_id, user_id) — mỗi hội thoại chỉ tính 1 lần — và ghi thẳng
+    is_confirmed=True nên không cần leader bấm xác nhận.
+
+    Trả None (không raise) nếu FB account chưa được link với member nào, để
+    không làm hỏng luồng gửi tin.
+
+    raise_on_error: mặc định False để KHÔNG đổi hành vi cũ (gọi từ BackgroundTasks
+    của /inbox/reply — fire-and-forget, không ai đọc lỗi). Đặt True khi caller CẦN
+    phân biệt "thành công/no-op hợp lệ" với "lỗi tạm thời nên thử lại" (vd endpoint
+    /fb/inbox/reply-detected — nếu nuốt lỗi Supabase disconnect rồi vẫn trả None
+    như thành công thì y hệt bug đã xảy ra với acc Lê Hải 2026-07-09)."""
+    if not user_id or not conv_id:
+        return None
+
+    try:
+        from app.modules.all_platform.services.fb_inbox_account_service import resolve_id_member
+
+        id_member = resolve_id_member(user_id)
+        if not id_member:
+            logger.info(f"auto_count_fb_inbox_reply: no member linked to user_id={user_id}, skip")
+            return None
+
+        supabase: Client = get_supabase_client()
+
+        # Resolve leader của member (fallback: member tự làm leader nếu chưa có team)
+        id_leader = id_member
+        member_teams = (
+            supabase.table("member_of_teams")
+            .select("id_teams")
+            .eq("id_member", id_member)
+            .limit(1)
+            .execute()
+        )
+        if member_teams.data:
+            team_res = (
+                supabase.table("teams")
+                .select("id_leader")
+                .eq("id", member_teams.data[0]["id_teams"])
+                .limit(1)
+                .execute()
+            )
+            if team_res.data and team_res.data[0].get("id_leader"):
+                id_leader = team_res.data[0]["id_leader"]
+
+        now = datetime.now(timezone.utc).isoformat()
+
+        existing = (
+            supabase.table("fb_inbox_kpi")
+            .select("id, is_confirmed")
+            .eq("id_member", id_member)
+            .eq("conv_id", conv_id)
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+
+        if existing.data:
+            row = existing.data[0]
+            if row.get("is_confirmed"):
+                return None  # đã tính rồi, không làm gì thêm
+            supabase.table("fb_inbox_kpi").update(
+                {"is_confirmed": True, "synced_at": now}
+            ).eq("id", row["id"]).execute()
+        else:
+            supabase.table("fb_inbox_kpi").insert({
+                "id_member": id_member,
+                "id_leader": id_leader,
+                "conv_id": conv_id,
+                "user_id": user_id,
+                "message_count": 1,
+                "is_lead": False,
+                "is_confirmed": True,
+                "synced_at": now,
+            }).execute()
+
+        # Invalidate cache overview để dashboard cập nhật ngay
+        leader_email = None
+        try:
+            leader_res = supabase.table("app_users").select("email").eq("id", id_leader).limit(1).execute()
+            if leader_res.data:
+                leader_email = leader_res.data[0].get("email")
+        except Exception:
+            pass
+        invalidate_overview_cache(leader_email)
+
+        logger.info(
+            f"auto_count_fb_inbox_reply: counted conv_id={conv_id} for member={id_member} (user_id={user_id})"
+        )
+        return {"id_member": id_member, "id_leader": id_leader, "conv_id": conv_id}
+    except Exception as exc:
+        logger.warning(
+            f"auto_count_fb_inbox_reply failed (user_id={user_id}, conv_id={conv_id}): {exc}"
+        )
+        if raise_on_error:
+            raise
+        return None
+
+
+def mark_fb_inbox_lead(
+    user_id: str, conv_id: str, raise_on_error: bool = False
+) -> Optional[dict]:
+    """Set is_lead=True cho 1 hội thoại FB Inbox — gọi khi nhân viên bấm "Đánh dấu
+    là khách" trong tab Inbox (field=is_customer, value=true).
+
+    Trước giờ "Đánh dấu là khách" chỉ lưu cờ is_customer trong file JSON local
+    của service, KHÔNG hề ghi lên Supabase -> phần "Lead" (45% trọng số KPI team,
+    nặng nhất) luôn = 0 dù nhân viên đã đánh dấu đủ khách thật. Hàm này nối lại
+    hành động đó vào fb_inbox_kpi.is_lead.
+
+    Nếu chưa có dòng KPI cho hội thoại này (nhân viên đánh dấu khách trước khi
+    được auto-count reply) thì tạo mới luôn (is_confirmed=True) thay vì bỏ qua.
+    Idempotent: chỉ update khi is_lead đang False, gọi lại nhiều lần không sao.
+    """
+    if not user_id or not conv_id:
+        return None
+
+    try:
+        from app.modules.all_platform.services.fb_inbox_account_service import resolve_id_member
+
+        id_member = resolve_id_member(user_id)
+        if not id_member:
+            logger.info(f"mark_fb_inbox_lead: no member linked to user_id={user_id}, skip")
+            return None
+
+        supabase: Client = get_supabase_client()
+
+        id_leader = id_member
+        member_teams = (
+            supabase.table("member_of_teams")
+            .select("id_teams")
+            .eq("id_member", id_member)
+            .limit(1)
+            .execute()
+        )
+        if member_teams.data:
+            team_res = (
+                supabase.table("teams")
+                .select("id_leader")
+                .eq("id", member_teams.data[0]["id_teams"])
+                .limit(1)
+                .execute()
+            )
+            if team_res.data and team_res.data[0].get("id_leader"):
+                id_leader = team_res.data[0]["id_leader"]
+
+        now = datetime.now(timezone.utc).isoformat()
+
+        existing = (
+            supabase.table("fb_inbox_kpi")
+            .select("id, is_lead")
+            .eq("id_member", id_member)
+            .eq("conv_id", conv_id)
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+
+        if existing.data:
+            row = existing.data[0]
+            if not row.get("is_lead"):
+                supabase.table("fb_inbox_kpi").update(
+                    {"is_lead": True, "synced_at": now}
+                ).eq("id", row["id"]).execute()
+        else:
+            supabase.table("fb_inbox_kpi").insert({
+                "id_member": id_member,
+                "id_leader": id_leader,
+                "conv_id": conv_id,
+                "user_id": user_id,
+                "message_count": 1,
+                "is_lead": True,
+                "is_confirmed": True,
+                "synced_at": now,
+            }).execute()
+
+        leader_email = None
+        try:
+            leader_res = supabase.table("app_users").select("email").eq("id", id_leader).limit(1).execute()
+            if leader_res.data:
+                leader_email = leader_res.data[0].get("email")
+        except Exception:
+            pass
+        invalidate_overview_cache(leader_email)
+
+        logger.info(f"mark_fb_inbox_lead: marked lead conv_id={conv_id} for member={id_member} (user_id={user_id})")
+        return {"id_member": id_member, "id_leader": id_leader, "conv_id": conv_id}
+    except Exception as exc:
+        logger.warning(f"mark_fb_inbox_lead failed (user_id={user_id}, conv_id={conv_id}): {exc}")
+        if raise_on_error:
+            raise
+        return None
+
+
 # Phase 1: gọi helper này từ bất kỳ đâu trong module khác để clear cache khi
 # leader verify/sync inbox. Tránh vòng import trực tiếp từ các module khác.
 def notify_fb_inbox_changed(leader_email: Optional[str] = None) -> None:
@@ -1128,6 +1384,7 @@ def notify_fb_inbox_changed(leader_email: Optional[str] = None) -> None:
         logger.debug(f"invalidate_overview_cache failed: {exc}")
 
 
+@_retry_supabase
 def get_fb_inbox_kpi_summary(
     member_email: str,
     start_date: Optional[str] = None,
@@ -1190,6 +1447,7 @@ def get_fb_inbox_kpi_summary(
     }
 
 
+@_retry_supabase
 def get_pending_fb_inbox_kpi(
     member_email: str,
     start_date: Optional[str] = None,
@@ -1218,11 +1476,14 @@ def get_pending_fb_inbox_kpi(
         end_dt = datetime.combine(end_iso, datetime.max.time(), tzinfo=vn_tz).astimezone(timezone.utc).isoformat()
         query = (
             supabase.table("fb_inbox_kpi")
-            .select("id, conv_id, message_count, is_lead, synced_at")
+            .select("id, conv_id, message_count, is_lead, synced_at, created_at")
             .eq("id_member", member_id)
             .eq("is_confirmed", False)  # CHỈ lấy inbox CHƯA XÁC NHẬN
-            .gte("synced_at", start_dt)
-            .lte("synced_at", end_dt)
+            # created_at, không phải synced_at: synced_at bị ghi đè mỗi lần
+            # (re)confirm nên hội thoại tuần cũ trôi sang tuần hiện tại. Cùng cột
+            # với get_fb_inbox_kpi_summary + overview v2 (migration 022).
+            .gte("created_at", start_dt)
+            .lte("created_at", end_dt)
         )
     else:
         query = (
@@ -1810,6 +2071,7 @@ def _batch_fb_inbox_count_from_seeder(
     return result
 
 
+@_retry_supabase
 def get_team_kpi_overview_v2(
     *,
     leader_email: Optional[str],
@@ -1870,6 +2132,12 @@ def get_team_kpi_overview_v2(
     if leader_id and leader_id not in member_ids:
         member_ids.append(leader_id)
 
+    # Một member có thể thuộc NHIỀU team dưới cùng 1 leader (hoặc khi admin xem
+    # tất cả, id_team rỗng). Không dedup ở đây thì vòng lặp build response chạy
+    # 2 lần cho member đó -> KPI nhân đôi. Cùng lớp bug mà migration
+    # 018_fix_admin_teams_kpi_dup.sql đã sửa ở phía RPC.
+    member_ids = list(dict.fromkeys(member_ids))
+
     if not member_ids:
         return _overview_cache_set(cache_key, {"total": 0, "members": []})
 
@@ -1895,8 +2163,23 @@ def get_team_kpi_overview_v2(
     kpi_rows = kpi_query.execute().data or []
     kpi_map: Dict[str, Any] = {}
     for k in kpi_rows:
-        # Nếu có nhiều active, ưu tiên record trùng start/end đã lọc ở trên
-        kpi_map[str(k["id_member"])] = k
+        # Nếu 1 member có nhiều KPI active, gán tất định thay vì last-write-wins
+        # theo thứ tự Supabase trả về: ưu tiên record khớp đúng tuần đang xem,
+        # sau đó tới record có start_date mới nhất.
+        mid = str(k["id_member"])
+        prev = kpi_map.get(mid)
+        if prev is None:
+            kpi_map[mid] = k
+            continue
+        if start_date and end_date:
+            k_exact = k.get("start_date") == start_date and k.get("end_date") == end_date
+            prev_exact = prev.get("start_date") == start_date and prev.get("end_date") == end_date
+            if k_exact != prev_exact:
+                if k_exact:
+                    kpi_map[mid] = k
+                continue
+        if str(k.get("start_date") or "") > str(prev.get("start_date") or ""):
+            kpi_map[mid] = k
 
     # Default date range
     default_start, default_end = start_date, end_date
@@ -2049,7 +2332,11 @@ def get_team_kpi_overview_v2(
         # CRM lead: deal được tạo với leaded_by = member, created_at trong tuần KPI
         lead_crm = int(crm_lead_count.get(mid, 0))
 
-        total_inbox_current = inbox_zalo + inbox_fb_seeder + inbox_fb_kpi
+        # KPI Inbox = SỐ HỘI THOẠI (zalo đã verify + fb đã tính KPI).
+        # KHÔNG cộng `inbox_fb_seeder`: đó là SỐ TIN NHẮN khách gửi, khác đơn vị
+        # -> cộng vào sẽ thổi phồng KPI. Nó chỉ để hiển thị tham khảo
+        # (`kpi_inbox_fb_seeder` bên dưới).
+        total_inbox_current = inbox_zalo + inbox_fb_kpi
         total_lead_current = lead_zalo + lead_fb_kpi + lead_crm
 
         members_data.append({

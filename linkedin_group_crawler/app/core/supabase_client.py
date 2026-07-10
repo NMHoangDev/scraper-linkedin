@@ -68,9 +68,22 @@ _TRANSIENT_OS_EXC_CLASSES = (
 
 
 def reset_supabase_client() -> None:
-    """Drop the cached Supabase client after a broken HTTP connection."""
+    """Drop the cached Supabase client after a broken HTTP connection.
+
+    Closes the underlying ``httpx.Client`` first — otherwise its connection
+    pool (and the half-dead sockets in it) is leaked on every reset.
+    """
     global _supabase_client
+    client = _supabase_client
     _supabase_client = None
+    if client is None:
+        return
+    try:
+        session = getattr(getattr(client, "postgrest", None), "session", None)
+        if session is not None:
+            session.close()
+    except Exception:
+        pass
 
 
 def is_transient_supabase_error(exc: BaseException) -> bool:
@@ -190,11 +203,20 @@ def get_supabase_client() -> Client:
         # retries. We let httpx handle them so the call site stays clean.
         try:
             import httpx
-            from httpx import Retry
             _http_client = httpx.Client(
                 timeout=httpx.Timeout(connect=10.0, read=30.0, write=30.0, pool=10.0),
                 headers={"Connection": "keep-alive"},
+                # `retries` only covers connect failures, never a RemoteProtocolError
+                # on a pooled socket the upstream closed. execute_supabase_query()
+                # is what actually recovers from that.
                 transport=httpx.HTTPTransport(retries=3),
+                # Expire idle sockets well before Kong/nginx (keepalive_timeout 60s)
+                # reaps them, so we rarely hand out an already-closed connection.
+                limits=httpx.Limits(
+                    max_keepalive_connections=20,
+                    max_connections=100,
+                    keepalive_expiry=15.0,
+                ),
             )
         except Exception:
             _http_client = None
