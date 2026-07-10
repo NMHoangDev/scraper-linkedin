@@ -2223,7 +2223,10 @@ def get_team_kpi_overview_v2(
         .eq("shared_role", "leader")
         .eq("is_active", True)
         .eq("is_verify", True)
-        .not_("verified_at", "is", None)
+        # .not_ là property, phải chain .is_(col, "null") — gọi .not_(...) như hàm
+        # sẽ ném "'SyncSelectRequestBuilder' object is not callable" và làm hỏng
+        # cả nhánh fallback v2 khi RPC lỗi.
+        .not_.is_("verified_at", "null")
         .execute()
     )
     start_iso_utc, end_iso_utc = _vn_week_range_to_utc(default_start, default_end)
