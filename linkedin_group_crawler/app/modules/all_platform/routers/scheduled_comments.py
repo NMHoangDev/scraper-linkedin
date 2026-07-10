@@ -17,6 +17,7 @@ from app.modules.all_platform.services.scheduled_comment_service import (
     update_scheduled_comment,
     cancel_scheduled_comment,
     process_comment,
+    mark_comment_posted,
 )
 from app.modules.all_platform.services.auth_service import decode_token
 
@@ -34,14 +35,14 @@ def _get_email(request: Request, authorization: Optional[str] = Header(None)) ->
     payload = decode_token(token)
     if not payload or "sub" not in payload:
         raise HTTPException(status_code=401, detail="Invalid token")
-    return payload["sub"]
+    return payload.get("email") or payload["sub"]
 
 
 @router.post("/")
 def create(request: Request, payload: CreateScheduledCommentRequest, authorization: Optional[str] = Header(None)) -> BaseResponse:
     try:
         email = _get_email(request, authorization)
-        data = create_scheduled_comment(payload.model_dump(exclude_none=True), email)
+        data = create_scheduled_comment(payload.model_dump(mode="json", exclude_none=True), email)
         return BaseResponse(success=True, message="Scheduled comment created", data=data)
     except ValueError as e:
         return BaseResponse(success=False, message=str(e))
@@ -80,7 +81,7 @@ def update(
 ) -> BaseResponse:
     try:
         email = _get_email(request, authorization)
-        data = update_scheduled_comment(comment_id, payload.model_dump(exclude_none=True), email)
+        data = update_scheduled_comment(comment_id, payload.model_dump(mode="json", exclude_none=True), email)
         return BaseResponse(success=True, message="Updated", data=data)
     except ValueError as e:
         return BaseResponse(success=False, message=str(e))
@@ -147,3 +148,20 @@ async def ai_preview(payload: AiPreviewRequest) -> BaseResponse:
         return BaseResponse(success=True, data={"comment": content})
     except Exception as e:
         return BaseResponse(success=False, message=str(e))
+
+
+@router.post("/{comment_id}/mark-posted")
+def mark_posted(
+    comment_id: str,
+    request: Request,
+    link_comment: str = "",
+    authorization: Optional[str] = Header(None),
+) -> BaseResponse:
+    try:
+        email = _get_email(request, authorization)
+        data = mark_comment_posted(comment_id, email, link_comment)
+        return BaseResponse(success=True, message="Comment marked as posted", data=data)
+    except ValueError as e:
+        return BaseResponse(success=False, message=str(e))
+    except Exception as e:
+        return BaseResponse(success=False, message=f"Unexpected error: {e}")
