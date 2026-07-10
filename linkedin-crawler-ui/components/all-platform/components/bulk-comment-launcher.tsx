@@ -119,22 +119,23 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
         );
         if (dueComments.length === 0) return;
 
-        const postsPayload = dueComments.map(sc => ({
-          url: sc.post_url,
-          id_post: sc.id_post_fb,
-        }));
-        dueComments.forEach(sc => processingScheduledRef.current.add(sc.id));
+        // Process ONE due comment per poll cycle to preserve per-comment content + account
+        const comment = dueComments[0];
+        processingScheduledRef.current.add(comment.id);
         setIsCommenting(true);
 
         window.postMessage({
           action: "START_BULK_COMMENT",
           payload: {
-            posts: postsPayload,
-            text: dueComments[0].comment_content || "",
+            posts: [{
+              url: comment.post_url,
+              id_post: comment.id_post_fb,
+            }],
+            text: comment.comment_content || "",
             verifyConfig: {
               apiBase: API_BASE_URL || "https://seeding.markeeai.com",
               email_member: user.email,
-              id_social_account: dueComments[0].id_social_account || undefined,
+              id_social_account: comment.id_social_account || undefined,
               id_platform: 1,
             },
           },

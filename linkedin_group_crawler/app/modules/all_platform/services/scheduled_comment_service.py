@@ -34,8 +34,10 @@ def _get_member_email_by_id(member_id: str) -> Optional[str]:
 
 
 def create_scheduled_comment(data: dict, member_email: str) -> dict:
+    logger.info(f"[create_scheduled_comment] called with email={member_email}")
     supabase: Client = get_supabase_client()
     member_id = _get_member_id(member_email)
+    logger.info(f"[create_scheduled_comment] member_id={member_id}")
     if not member_id:
         raise ValueError("Member not found")
 
@@ -55,6 +57,7 @@ def create_scheduled_comment(data: dict, member_email: str) -> dict:
         "created_at": _now_iso(),
         "updated_at": _now_iso(),
     }
+    logger.info(f"[create_scheduled_comment] inserting: scheduled_at={data['scheduled_at']} type={type(data['scheduled_at']).__name__}")
     res = supabase.table("scheduled_comments").insert(record).execute()
     return res.data[0] if res.data else {}
 
@@ -146,22 +149,65 @@ def cancel_scheduled_comment(comment_id: str, member_email: str) -> dict:
     return res.data[0] if res.data else {}
 
 
+def mark_comment_posted(comment_id: str, email: str, link_comment: str = "") -> dict:
+    supabase: Client = get_supabase_client()
+    member_id = _get_member_id(email)
+    if not member_id:
+        raise ValueError("Member not found")
+
+    res = (
+        supabase.table("scheduled_comments")
+        .select("*")
+        .eq("id", comment_id)
+        .eq("id_member", member_id)
+        .limit(1)
+        .execute()
+    )
+    if not res.data:
+        raise ValueError("Scheduled comment not found")
+    record = res.data[0]
+    if record["status"] != "pending":
+        if record["status"] != "processing":
+            raise ValueError(f"Cannot mark comment with status '{record['status']}' as posted")
+
+    supabase.table("scheduled_comments").update({
+        "status": "posted",
+        "posted_at": _now_iso(),
+        "link_comment": link_comment or None,
+        "updated_at": _now_iso(),
+    }).eq("id", comment_id).execute()
+
+    return {"id": comment_id, "status": "posted"}
+
+
 # ── Scheduler ────────────────────────────────────────────────────────────
 
 
 def get_due_comments() -> list:
     supabase: Client = get_supabase_client()
     now_val = _now_iso()
-    res = (
-        supabase.table("scheduled_comments")
-        .select("*")
-        .eq("status", "pending")
-        .lte("scheduled_at", now_val)
-        .order("scheduled_at", asc=True)
-        .limit(10)
-        .execute()
-    )
-    return res.data or []
+    logger.info(f"[get_due_comments] now_val={now_val}")
+    try:
+        # Atomic claim: UPDATE + RETURN in one operation.
+        # Only rows that were still 'pending' get claimed — eliminates
+        # the race between SELECT and a separate UPDATE in process_comment.
+        res = (
+            supabase.table("scheduled_comments")
+            .update({"status": "processing", "updated_at": now_val})
+            .eq("status", "pending")
+            .lte("scheduled_at", now_val)
+            .order("scheduled_at")
+            .limit(10)
+            .execute()
+        )
+        logger.info(f"[get_due_comments] claimed {len(res.data)} comment(s)")
+        if res.data:
+            for r in res.data:
+                logger.info(f"[get_due_comments] claimed id={r['id']} scheduled_at={r.get('scheduled_at')}")
+        return res.data or []
+    except Exception as e:
+        logger.error(f"[get_due_comments] error: {e}")
+        return []
 
 
 async def process_comment(record: dict) -> None:

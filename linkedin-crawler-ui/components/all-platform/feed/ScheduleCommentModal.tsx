@@ -3,6 +3,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { FaFacebook, FaLinkedin } from "react-icons/fa";
 import { scheduledCommentService } from "@/services/scheduled-comment.service";
 import type { UnifiedPost, SocialAccount } from "@/types/unified.types";
@@ -66,6 +67,7 @@ export function ScheduleCommentModal({
   }, [isOpen, onClose]);
 
   if (!isOpen || !post) return null;
+  if (typeof document === "undefined") return null;
 
   const minDatetime = toLocalDatetimeLocal(new Date());
 
@@ -112,9 +114,29 @@ export function ScheduleCommentModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-lg rounded-xl bg-card shadow-xl">
+  return createPortal(
+    <div
+      className="flex items-center justify-center bg-black/50 p-4"
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: "100vw",
+        height: "100vh",
+        zIndex: 9999,
+      }}
+    >
+      <div
+        className="rounded-xl bg-card shadow-xl"
+        style={{
+          width: "100%",
+          maxWidth: "512px",
+          maxHeight: "90vh",
+          overflowY: "auto",
+        }}
+      >
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
             {post.platform === "facebook" ? (
@@ -242,6 +264,7 @@ export function ScheduleCommentModal({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
