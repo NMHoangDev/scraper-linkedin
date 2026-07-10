@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { UnifiedPost, SocialAccount } from "@/types/unified.types";
+import React, { useState, useEffect, useRef } from "react";
+import { UnifiedPost, SocialAccount, ScheduledComment } from "@/types/unified.types";
 import { socialAccountsService } from "@/services/all-platform.service";
 import { scheduledCommentService } from "@/services/scheduled-comment.service";
 import { useAppAuth } from "@/contexts/AppAuthContext";
@@ -33,6 +33,7 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
   const [scheduleResult, setScheduleResult] = useState<{ success: number; failed: number; message: string } | null>(null);
 
   const { user } = useAppAuth();
+  const processingScheduledRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
@@ -45,15 +46,24 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
         setProgress(event.data.payload);
       } else if (event.data?.action === "BULK_COMMENT_DONE") {
         setIsCommenting(false);
-        setProgress(p => p ? { ...p, status: "Hoàn tất toàn bộ tiến trình!" } : null);
-        if (onComplete) onComplete(Array.from(selectedUrls));
+        const pendingIds = Array.from(processingScheduledRef.current);
+        if (pendingIds.length > 0) {
+          for (const id of pendingIds) {
+            scheduledCommentService.markPosted(id).catch(() => {});
+          }
+          processingScheduledRef.current.clear();
+          setProgress(p => p ? { ...p, status: "Đã hoàn tất comment hẹn giờ!" } : null);
+        } else {
+          setProgress(p => p ? { ...p, status: "Hoàn tất toàn bộ tiến trình!" } : null);
+          if (onComplete) onComplete(Array.from(selectedUrls));
+        }
       } else if (event.data?.action === "STATUS_RESPONSE") {
         const { isCommenting: extIsCommenting, currentProgress } = event.data.payload || {};
         if (extIsCommenting) {
           setIsCommenting(true);
-          setIsExpanded(true); // Tự động mở khung nếu đang chạy
+          setIsExpanded(true);
           if (currentProgress) setProgress(currentProgress);
-        } else if (isCommenting) { // If it was commenting but extension says it stopped
+        } else if (isCommenting) {
           setIsCommenting(false);
         }
       } else if (event.data?.action === "STOP_BULK_COMMENT_RESPONSE") {
@@ -64,7 +74,6 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
     window.addEventListener("message", handleMessage);
     const interval = setInterval(() => {
       if (!isReady) window.postMessage({ action: "PING_COMMENT_EXTENSION" }, "*");
-      // Poll trạng thái liên tục để phục hồi khi chuyển trang về
       window.postMessage({ action: "GET_STATUS" }, "*");
     }, 1000);
 
@@ -72,7 +81,7 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
       window.removeEventListener("message", handleMessage);
       clearInterval(interval);
     };
-  }, [selectedUrls.size, isReady]);
+  }, [selectedUrls.size, isReady, onComplete]);
 
   useEffect(() => {
     if (isExpanded && socialAccounts.length === 0) {
@@ -89,6 +98,55 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
       setScheduledAt(toLocalDatetimeLocal(now));
     }
   }, [isExpanded, socialAccounts.length]);
+
+  useEffect(() => {
+    if (!isReady || !user?.email) return;
+
+    const pollScheduled = async () => {
+      if (isCommenting) return;
+      try {
+        const res = await scheduledCommentService.getAll({
+          status: "pending",
+          platform: "facebook",
+          page: 1,
+          limit: 50,
+        });
+        if (!res.data || res.data.length === 0) return;
+        const now = new Date();
+        const dueComments = res.data.filter(sc =>
+          !processingScheduledRef.current.has(sc.id) &&
+          new Date(sc.scheduled_at) <= now
+        );
+        if (dueComments.length === 0) return;
+
+        const postsPayload = dueComments.map(sc => ({
+          url: sc.post_url,
+          id_post: sc.id_post_fb,
+        }));
+        dueComments.forEach(sc => processingScheduledRef.current.add(sc.id));
+        setIsCommenting(true);
+
+        window.postMessage({
+          action: "START_BULK_COMMENT",
+          payload: {
+            posts: postsPayload,
+            text: dueComments[0].comment_content || "",
+            verifyConfig: {
+              apiBase: API_BASE_URL || "https://seeding.markeeai.com",
+              email_member: user.email,
+              id_social_account: dueComments[0].id_social_account || undefined,
+              id_platform: 1,
+            },
+          },
+        }, "*");
+      } catch {
+        // Silently retry on next poll
+      }
+    };
+
+    const interval = setInterval(pollScheduled, 10000);
+    return () => clearInterval(interval);
+  }, [isReady, user?.email]);
 
   const validPosts = posts.filter(p => 
     p.platform === "facebook" && p.post_url && !p.seeding_content && (!p.all_seedings || p.all_seedings.length === 0)
@@ -164,7 +222,8 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
           scheduled_at: new Date(scheduledAt).toISOString(),
         });
         success++;
-      } catch {
+      } catch (err) {
+        console.error("[Schedule] Failed to schedule comment for", url, err);
         failed++;
         failedUrls.push(url);
       }
@@ -175,11 +234,6 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
       : `Đã lên lịch ${success}/${urls.length} bài viết. ${failed} bài thất bại.`;
 
     setScheduleResult({ success, failed, message: msg });
-
-    if (success > 0) {
-      const succeededUrls = urls.filter(u => !failedUrls.includes(u));
-      onComplete?.(succeededUrls);
-    }
 
     setIsScheduling(false);
   };

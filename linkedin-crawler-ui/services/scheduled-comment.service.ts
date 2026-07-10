@@ -19,7 +19,20 @@ async function request<T = any>(
     headers: { "Content-Type": "application/json", ...options.headers },
     ...options,
   });
-  return res.json();
+  let body: any;
+  try {
+    body = await res.json();
+  } catch {
+    throw new Error(`Server returned ${res.status} — không thể parse JSON response`);
+  }
+  if (!res.ok) {
+    const detail = body?.detail || body?.message || `HTTP ${res.status}`;
+    throw new Error(Array.isArray(detail) ? detail.map((d: any) => d.msg || String(d)).join("; ") : detail);
+  }
+  if (!body.success) {
+    throw new Error(body.message || "Request failed");
+  }
+  return body;
 }
 
 export const scheduledCommentService = {
@@ -39,7 +52,7 @@ export const scheduledCommentService = {
   },
 
   async create(data: CreateScheduledCommentRequest) {
-    return request<ScheduledComment>(BASE, {
+    return request<ScheduledComment>(`${BASE}/`, {
       method: "POST",
       body: JSON.stringify(data),
     });
@@ -62,6 +75,11 @@ export const scheduledCommentService = {
 
   async executeNow(id: string) {
     return request(`${BASE}/${id}/execute-now`, { method: "POST" });
+  },
+
+  async markPosted(id: string, link_comment?: string) {
+    const params = link_comment ? `?link_comment=${encodeURIComponent(link_comment)}` : "";
+    return request(`${BASE}/${id}/mark-posted${params}`, { method: "POST" });
   },
 
   async aiPreview(postContent: string) {
