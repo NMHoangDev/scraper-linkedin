@@ -5,9 +5,6 @@ from datetime import datetime
 
 # ---------------------------------------------------------------------------
 # Bảng stage hợp lệ — dùng để validate input từ client lẫn output ra view.
-# Backend KHÔNG hard-code rule nhảy stage để tránh phân kỳ với frontend.
-# (logic state machine nghiệp vụ ở client; server chỉ enforce required-fields
-# cho từng stage để bảo vệ data integrity).
 # ---------------------------------------------------------------------------
 DEAL_STAGES = [
     "new_lead", "contacted", "qualified", "requirement",
@@ -15,6 +12,36 @@ DEAL_STAGES = [
     "on_hold", "won", "lost",
 ]
 TERMINAL_STAGES = ["won", "lost"]
+
+# ---------------------------------------------------------------------------
+# Transition graph — mirror 1:1 DEAL_STAGE_TRANSITIONS trong
+# linkedin-crawler-ui/services/customer-lead.service.ts. Backend có API riêng
+# gọi trực tiếp được (bypass UI) nên phải enforce lại ở đây, không chỉ ở client.
+# ---------------------------------------------------------------------------
+DEAL_STAGE_TRANSITIONS: dict[str, list[str]] = {
+    "new_lead":      ["contacted", "lost"],
+    "contacted":     ["qualified", "proposal_sent", "on_hold", "lost"],
+    "qualified":     ["requirement", "proposal_sent", "on_hold", "lost"],
+    "requirement":   ["proposal_sent", "on_hold", "lost"],
+    "proposal_sent": ["negotiation", "on_hold", "lost"],
+    "negotiation":   ["contract_sent", "on_hold", "lost"],
+    "contract_sent": ["won", "lost"],
+    # on_hold có thể resume về bất kỳ stage pipeline nào (quay lại prev_stage,
+    # xử lý ở transition_stage()) hoặc đóng deal won/lost.
+    "on_hold": [
+        "contacted", "qualified", "requirement", "proposal_sent",
+        "negotiation", "contract_sent", "won", "lost",
+    ],
+    "won":           [],
+    "lost":          [],
+}
+
+
+def is_transition_allowed(from_stage: str, to_stage: str) -> bool:
+    """True nếu được phép chuyển from_stage -> to_stage (hoặc giữ nguyên)."""
+    if from_stage == to_stage:
+        return True
+    return to_stage in DEAL_STAGE_TRANSITIONS.get(from_stage, [])
 
 # Required fields theo stage — server-side enforcement, mirror với client.
 # Khi client POST transition, server check lại để chặn hack.
