@@ -41,6 +41,7 @@ import {
   Inbox,
   Pencil,
   Trash2,
+  MessageSquare,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -125,6 +126,11 @@ function DealCard({
   // Từ stage "proposal_sent" trở đi mới show giá đã báo (estimated_budget đã được set)
   const showPrice =
     stage !== "new_lead" && stage !== "contacted" && budget > 0;
+
+  // Ghi chú chăm sóc — trước đây chỉ hiện trong DealDetailDrawer, không hiện
+  // trên card ngoài Kanban nên leader phải bấm vào từng deal mới biết có ghi
+  // chú hay chưa. Ưu tiên care_note (ghi chú chăm sóc/hợp đồng), fallback note.
+  const notePreview = (customer.care_note || customer.note || "").trim();
 
   return (
     <div
@@ -278,6 +284,19 @@ function DealCard({
               </span>
             </div>
           )}
+        </div>
+      )}
+
+      {notePreview && (
+        <div
+          className={cn(
+            "mb-1.5 flex items-start gap-1 truncate text-muted-foreground",
+            compact ? "text-[10px]" : "text-[11px]",
+          )}
+          title={notePreview}
+        >
+          <MessageSquare className="mt-px size-3 shrink-0" />
+          <span className="truncate">{notePreview}</span>
         </div>
       )}
 

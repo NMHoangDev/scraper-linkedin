@@ -31,9 +31,11 @@ import {
   Loader2,
   Trash2,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   customerLeadService,
   type ActivityLogEntry,
+  type ContractStatus,
   type Customer,
   type DealStage,
   DEAL_STAGE_META,
@@ -56,7 +58,15 @@ interface Props {
   onRequestTransition: (c: Customer, to: DealStage) => void;
   onEditCustomer: (c: Customer) => void;
   onDeleteCustomer: (c: Customer) => void;
+  /** Gọi lại sau khi sửa nhanh 1 field trong drawer (vd đổi trạng thái hợp đồng) — parent nên refetch list. */
+  onCustomerUpdated?: (customer: Customer) => void;
 }
+
+const CONTRACT_STATUS_OPTIONS: { value: ContractStatus; label: string }[] = [
+  { value: "active", label: "Đang hoạt động" },
+  { value: "completed", label: "Đã hoàn thành" },
+  { value: "maintenance", label: "Bảo trì / bảo hành" },
+];
 
 function formatDate(value?: string | null) {
   if (!value) return null;
@@ -74,16 +84,12 @@ function formatVND(value?: number | null) {
   }).format(value);
 }
 
-function contractStatusLabel(value?: Customer["contract_status"] | null) {
-  if (value === "completed") return "Đã hoàn thành";
-  if (value === "maintenance") return "Bảo trì / bảo hành";
-  return "Đang hoạt động";
-}
-
-export function DealDetailDrawer({ customer, open, onClose, onRequestTransition, onEditCustomer, onDeleteCustomer }: Props) {
+export function DealDetailDrawer({ customer, open, onClose, onRequestTransition, onEditCustomer, onDeleteCustomer, onCustomerUpdated }: Props) {
   const [log, setLog] = useState<ActivityLogEntry[]>([]);
   const [loadingLog, setLoadingLog] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [contractStatusDraft, setContractStatusDraft] = useState<ContractStatus>("active");
+  const [savingContractStatus, setSavingContractStatus] = useState(false);
 
   const stage = useMemo(() => (customer ? getCurrentStage(customer) : null), [customer]);
   const nextOptions = useMemo(() => (stage ? allowedNextStages(stage) : []), [stage]);
@@ -100,6 +106,33 @@ export function DealDetailDrawer({ customer, open, onClose, onRequestTransition,
       .catch(() => setLog([]))
       .finally(() => setLoadingLog(false));
   }, [open, customer?.id]);
+
+  // Đồng bộ dropdown với deal đang mở — customer đổi (chuyển sang deal khác)
+  // hoặc load lại sau update thì phải nạp lại giá trị hiện tại.
+  useEffect(() => {
+    setContractStatusDraft(customer?.contract_status ?? "active");
+  }, [customer?.id, customer?.contract_status]);
+
+  async function handleContractStatusChange(next: ContractStatus) {
+    if (!customer || next === customer.contract_status) {
+      setContractStatusDraft(next);
+      return;
+    }
+    const prev = contractStatusDraft;
+    setContractStatusDraft(next);
+    setSavingContractStatus(true);
+    try {
+      const res = await customerLeadService.update(customer.id, { contract_status: next });
+      if (res?.success === false) throw new Error(res?.message || "Cập nhật thất bại");
+      toast.success("Đã cập nhật trạng thái hợp đồng");
+      onCustomerUpdated?.({ ...customer, contract_status: next });
+    } catch (err: any) {
+      setContractStatusDraft(prev);
+      toast.error(err?.message || "Không cập nhật được trạng thái hợp đồng");
+    } finally {
+      setSavingContractStatus(false);
+    }
+  }
 
   if (!customer || !stage) return null;
 
@@ -280,16 +313,24 @@ export function DealDetailDrawer({ customer, open, onClose, onRequestTransition,
                     <div className="mt-0.5 font-semibold text-slate-700">{formatVND(customer.lifetime_value)}</div>
                   </div>
                 ) : null}
-                {customer.contract_status && (
-                  <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
-                    <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
-                      <FileText className="size-3" /> Trạng thái hợp đồng
-                    </div>
-                    <div className="mt-0.5 truncate font-medium text-slate-700">
-                      {contractStatusLabel(customer.contract_status)}
-                    </div>
+                <div className="col-span-2 rounded-md border border-slate-200 bg-white px-3 py-2">
+                  <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
+                    <FileText className="size-3" /> Trạng thái hợp đồng
+                    {savingContractStatus && <Loader2 className="size-3 animate-spin text-slate-400" />}
                   </div>
-                )}
+                  <select
+                    value={contractStatusDraft}
+                    disabled={savingContractStatus}
+                    onChange={(e) => handleContractStatusChange(e.target.value as ContractStatus)}
+                    className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm font-medium text-slate-700 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
+                  >
+                    {CONTRACT_STATUS_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 {customer.last_attachment_name && (
                   <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
                     <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
