@@ -31,10 +31,8 @@ from fastapi.responses import JSONResponse
 from app.modules.linkedin.router import linkedin_app_router, router
 from app.modules.linkedin.schemas.response_models import BaseResponse
 from app.core.config import settings
-from app.modules.all_platform.jobs.crawl_24h_job import setup_all_platform_jobs
 from app.modules.facebook.src.modules.api_router.index import api_router
 from app.modules.all_platform.router import all_platform_router
-from app.modules.all_platform.routers.websocket import router as websocket_router
 from app.core.playwright_browser_pool import (
     shutdown_playwright_pool,
     warmup_playwright_pool,
@@ -69,8 +67,6 @@ async def lifespan(_: FastAPI):
                 logger.info("Scheduled comment job started")
             except Exception:
                 logger.exception("Failed to start scheduled comment job")
-        # TODO: Re-enable when needed
-        # setup_all_platform_jobs()
         logger.warning("24h crawl scheduler DISABLED - comment this block to re-enable")
     async def _warmup_background() -> None:
         try:
