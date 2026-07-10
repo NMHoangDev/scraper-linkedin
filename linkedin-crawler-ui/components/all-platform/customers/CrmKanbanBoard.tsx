@@ -80,6 +80,20 @@ function contractStatusLabel(value: Customer["contract_status"] | null | undefin
   return "Đang HĐ";
 }
 
+/**
+ * Card trước đây hiện ngày/tên file trần trụi (vd chỉ "markeeai", chỉ "13/7/2026")
+ * không rõ đó là ngày ký hay ngày hết hạn bảo hành hay tên file gì — phải bấm vào
+ * xem chi tiết mới rõ. Trả về nhãn đúng theo field nào thực sự có giá trị, cùng
+ * thứ tự ưu tiên với logic chọn ngày hiển thị ở dưới (follow-up > ký > bảo hành > KH từ).
+ */
+function importantDateLine(customer: Customer): string | null {
+  if (customer.follow_up_date) return `Follow-up: ${formatDate(customer.follow_up_date)}`;
+  if (customer.contract_signed_at) return `Ngày ký: ${formatDate(customer.contract_signed_at)}`;
+  if (customer.warranty_expires_at) return `BH đến: ${formatDate(customer.warranty_expires_at)}`;
+  if (customer.customer_since) return `KH từ: ${formatDate(customer.customer_since)}`;
+  return null;
+}
+
 /** Tỉ lệ opacity cho dot màu của 7 stage (giảm dần như thiết kế SalesFlow). */
 const STAGE_DOT_OPACITY: DealStage[] = [
   "new_lead",       // 100%
@@ -257,31 +271,21 @@ function DealCard({
           )}
         >
           {customer.contract_status && (
-            <div className="flex items-center gap-1 truncate">
+            <div className="flex items-center gap-1 truncate" title={`Trạng thái: ${contractStatusLabel(customer.contract_status)}`}>
               <FileText className="size-3 shrink-0" />
-              <span className="truncate">{contractStatusLabel(customer.contract_status)}</span>
+              <span className="truncate">Trạng thái: {contractStatusLabel(customer.contract_status)}</span>
             </div>
           )}
           {customer.last_attachment_name && (
-            <div className="flex items-center gap-1 truncate">
+            <div className="flex items-center gap-1 truncate" title={`Hợp đồng: ${customer.last_attachment_name}`}>
               <FileText className="size-3 shrink-0" />
-              <span className="truncate">{customer.last_attachment_name}</span>
+              <span className="truncate">Hợp đồng: {customer.last_attachment_name}</span>
             </div>
           )}
-          {(customer.follow_up_date ||
-            customer.contract_signed_at ||
-            customer.warranty_expires_at ||
-            customer.customer_since) && (
-            <div className="flex items-center gap-1 truncate">
+          {importantDateLine(customer) && (
+            <div className="flex items-center gap-1 truncate" title={importantDateLine(customer)!}>
               <CalendarDays className="size-3 shrink-0" />
-              <span className="truncate">
-                {formatDate(
-                  customer.follow_up_date ||
-                    customer.contract_signed_at ||
-                    customer.warranty_expires_at ||
-                    customer.customer_since,
-                )}
-              </span>
+              <span className="truncate">{importantDateLine(customer)}</span>
             </div>
           )}
         </div>
