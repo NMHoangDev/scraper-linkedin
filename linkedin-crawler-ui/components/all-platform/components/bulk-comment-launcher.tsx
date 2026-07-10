@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { UnifiedPost, SocialAccount, ScheduledComment } from "@/types/unified.types";
 import { socialAccountsService } from "@/services/all-platform.service";
 import { scheduledCommentService } from "@/services/scheduled-comment.service";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { API_BASE_URL } from "@/lib/env";
 import { cn } from "@/lib/utils";
+import { useQuickCommentLibrary } from "./use-quick-comment-library";
 
 interface BulkCommentLauncherProps {
   posts: UnifiedPost[];
@@ -27,6 +28,7 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
   const [isReady, setIsReady] = useState(false);
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
+  const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
   const [scheduledAt, setScheduledAt] = useState<string>("");
   const [isScheduling, setIsScheduling] = useState(false);
   const [stopping, setStopping] = useState(false);
@@ -34,6 +36,16 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
 
   const { user } = useAppAuth();
   const processingScheduledRef = useRef<Set<string>>(new Set());
+  const { libraryItems: commentTemplates } = useQuickCommentLibrary("facebook");
+  const commentTemplateGroups = useMemo(() => {
+    const groups = new Map<string, { label: string; templates: typeof commentTemplates }>();
+    commentTemplates.forEach((item) => {
+      const label = item.label || "Khác";
+      if (!groups.has(label)) groups.set(label, { label, templates: [] });
+      groups.get(label)!.templates.push(item);
+    });
+    return Array.from(groups.values());
+  }, [commentTemplates]);
 
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
@@ -310,8 +322,19 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
                   ))}
                 </select>
               </div>
-              <div className="space-y-2 flex-1 flex flex-col">
-                <label className="text-sm font-bold text-slate-700">Nội dung Comment chung:</label>
+              <div className="space-y-2 flex-1 flex flex-col relative">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-bold text-slate-700">Nội dung Comment chung:</label>
+                  <button
+                    type="button"
+                    onClick={() => setIsTemplatePickerOpen(v => !v)}
+                    disabled={isCommenting}
+                    className="text-xs font-semibold text-red-600 hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">bookmark</span>
+                    Chọn mẫu câu
+                  </button>
+                </div>
                 <textarea
                   className="w-full flex-1 rounded-xl border border-slate-200 p-3 text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none resize-y min-h-[120px]"
                   placeholder="Nhập nội dung bạn muốn seeding..."
@@ -319,6 +342,49 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
                   onChange={e => setCommentText(e.target.value)}
                   disabled={isCommenting || isScheduling}
                 />
+
+                {isTemplatePickerOpen && (
+                  <div className="absolute right-0 top-8 z-20 w-80 max-h-[320px] overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+                    <div className="px-3 py-2 text-xs font-bold text-slate-700 border-b border-slate-100 bg-slate-50 sticky top-0">
+                      Thư viện mẫu câu comment
+                    </div>
+                    {commentTemplateGroups.length === 0 ? (
+                      <div className="p-3 text-xs text-slate-500">
+                        Chưa có mẫu nào. Vào trang Quick Comment Library để thêm.
+                      </div>
+                    ) : (
+                      commentTemplateGroups.map((group) => (
+                        <div key={group.label}>
+                          <div className="px-3 py-1.5 text-[10px] font-bold text-slate-500 bg-slate-50/70">
+                            {group.label}
+                          </div>
+                          {group.templates.map((template) => (
+                            <button
+                              key={template.id}
+                              type="button"
+                              className="w-full text-left px-3 py-2 hover:bg-red-50 border-b border-slate-100 last:border-0 transition"
+                              onClick={() => {
+                                setCommentText(template.content);
+                                setIsTemplatePickerOpen(false);
+                              }}
+                            >
+                              <div className="text-xs font-semibold text-slate-800">{template.title}</div>
+                              <div className="text-[11px] text-slate-500 line-clamp-2">{template.content}</div>
+                            </button>
+                          ))}
+                        </div>
+                      ))
+                    )}
+                    <a
+                      href="/all-platform/library?tab=comment"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block px-3 py-2 text-[11px] font-semibold text-red-600 hover:underline bg-slate-50 border-t border-slate-100"
+                    >
+                      Quản lý thư viện mẫu câu →
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
 

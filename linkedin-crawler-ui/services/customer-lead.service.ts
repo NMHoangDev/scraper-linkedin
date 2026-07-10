@@ -314,6 +314,8 @@ export interface Customer {
   warranty_expires_at: string | null;
   care_note: string | null;
   last_care_at: string | null;
+  last_attachment_url?: string | null;
+  last_attachment_name?: string | null;
   tags: string[];
   has_budget: boolean;
   note: string | null;
@@ -463,16 +465,8 @@ export const CARE_NOTE_OPTIONS = [
   "Khách từ chối — theo dõi lại sau",
 ];
 
-export const REJECT_REASON_TYPE_OPTIONS: { value: RejectReasonType; label: string }[] = [
-  { value: "Khong_lien_lac_duoc", label: "Không liên lạc được" },
-  { value: "Chua_co_nhu_cau", label: "Chưa có nhu cầu" },
-  { value: "Cham_trai_nghiem", label: "Chấm trái nghiệm" },
-  { value: "Thieu_nhan_su", label: "Thiếu nhân sự" },
-  { value: "Chia_tay_doi_tac_cu", label: "Chia tay đối tác cũ" },
-  { value: "Khong_du_tai_chinh", label: "Không đủ tài chính" },
-  { value: "Chua_phu_hop_thoi_diem", label: "Chưa phù hợp thời điểm" },
-  { value: "Khac", label: "Khác" },
-];
+/** @deprecated Dùng LOST_REASON_OPTIONS — cùng giá trị, đã gộp về 1 nguồn nhãn duy nhất. */
+export const REJECT_REASON_TYPE_OPTIONS = LOST_REASON_OPTIONS;
 
 export const REVIEW_RESULT_OPTIONS: { value: ReviewResult; label: string }[] = [
   { value: "Qualify", label: "Qualify ✓" },

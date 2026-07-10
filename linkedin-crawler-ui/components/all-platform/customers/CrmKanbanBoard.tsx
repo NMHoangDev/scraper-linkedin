@@ -25,7 +25,7 @@
  * với `toStage` tương ứng khi user kéo-thả.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Plus,
   MoreVertical,
@@ -34,6 +34,9 @@ import {
   PauseCircle,
   Wallet,
   Clock,
+  CalendarDays,
+  FileText,
+  MapPin,
   UserCog,
   Inbox,
   Pencil,
@@ -61,6 +64,19 @@ function formatVND(value: number | null | undefined) {
     currency: "VND",
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("vi-VN");
+}
+
+function contractStatusLabel(value: Customer["contract_status"] | null | undefined) {
+  if (value === "completed") return "Hoàn thành";
+  if (value === "maintenance") return "Bảo trì";
+  return "Đang HĐ";
 }
 
 /** Tỉ lệ opacity cho dot màu của 7 stage (giảm dần như thiết kế SalesFlow). */
@@ -195,6 +211,76 @@ function DealCard({
       )}
 
       {/* Giá đã báo (chỉ từ stage proposal_sent trở đi) */}
+      {(customer.city || customer.industry || customer.decision_maker) && (
+        <div
+          className={cn(
+            "mb-1.5 space-y-0.5 text-muted-foreground",
+            compact ? "text-[10px]" : "text-[11px]",
+          )}
+        >
+          {customer.city && (
+            <div className="flex items-center gap-1 truncate">
+              <MapPin className="size-3 shrink-0" />
+              <span className="truncate">{customer.city}</span>
+            </div>
+          )}
+          {customer.industry && (
+            <div className="flex items-center gap-1 truncate">
+              <Inbox className="size-3 shrink-0" />
+              <span className="truncate">{customer.industry}</span>
+            </div>
+          )}
+          {customer.decision_maker && (
+            <div className="flex items-center gap-1 truncate">
+              <UserCog className="size-3 shrink-0" />
+              <span className="truncate">{customer.decision_maker}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {(customer.contract_status ||
+        customer.contract_signed_at ||
+        customer.warranty_expires_at ||
+        customer.customer_since ||
+        customer.last_attachment_name) && (
+        <div
+          className={cn(
+            "mb-1.5 space-y-0.5 text-muted-foreground",
+            compact ? "text-[10px]" : "text-[11px]",
+          )}
+        >
+          {customer.contract_status && (
+            <div className="flex items-center gap-1 truncate">
+              <FileText className="size-3 shrink-0" />
+              <span className="truncate">{contractStatusLabel(customer.contract_status)}</span>
+            </div>
+          )}
+          {customer.last_attachment_name && (
+            <div className="flex items-center gap-1 truncate">
+              <FileText className="size-3 shrink-0" />
+              <span className="truncate">{customer.last_attachment_name}</span>
+            </div>
+          )}
+          {(customer.follow_up_date ||
+            customer.contract_signed_at ||
+            customer.warranty_expires_at ||
+            customer.customer_since) && (
+            <div className="flex items-center gap-1 truncate">
+              <CalendarDays className="size-3 shrink-0" />
+              <span className="truncate">
+                {formatDate(
+                  customer.follow_up_date ||
+                    customer.contract_signed_at ||
+                    customer.warranty_expires_at ||
+                    customer.customer_since,
+                )}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
       {showPrice ? (
         <div
           className={cn(
@@ -522,9 +608,14 @@ export function CrmKanbanBoard({
 
   // Khi viewport rất rộng (2xl = 1536px) → 7 cột, card cần compact để không tràn
   // Khi nhỏ hơn → 4/3/2/1 cột, card ở dạng đầy đủ
-  const useCompactCard = useMemo(() => {
-    if (typeof window === "undefined") return false;
-    return window.innerWidth >= 1536;
+  const [useCompactCard, setUseCompactCard] = useState(
+    () => typeof window !== "undefined" && window.innerWidth >= 1536,
+  );
+
+  useEffect(() => {
+    const onResize = () => setUseCompactCard(window.innerWidth >= 1536);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   }, []);
 
   // Lookup customer theo id cho dropzone terminal

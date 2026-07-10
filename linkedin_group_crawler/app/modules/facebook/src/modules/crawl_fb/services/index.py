@@ -1,5 +1,9 @@
 import logging
 import asyncio
+import os
+import time
+from typing import Any
+
 from typing import List, Optional
 from fastapi import HTTPException, status 
 from fastapi.concurrency import run_in_threadpool
@@ -83,14 +87,177 @@ class CrawlService:
             if scraped_data:
                 email_crawl = client_id or (getattr(payload.tkFB, 'useName', '') if payload.tkFB else '')
                 
+
                 try:
                     # Chuyển đổi và lưu bài viết lên Supabase facebook_posts
-                    await asyncio.to_thread(save_facebook_crawl_to_supabase, email_crawl, scraped_data)
+                    save_result = await asyncio.to_thread(
+                        save_facebook_crawl_to_supabase,
+                        email_crawl,
+                        scraped_data,
+                    )
+
+                    # Background AI filter (không chặn UI)
+                    try:
+                        from app.modules.all_platform.services.post_relevance_ai_service import (
+                            classify_post_relevance,
+                        )
+                        from app.core.supabase_client import get_supabase_client
+
+                        async def _ai_filter_and_cleanup():
+                            inserted_posts = save_result.get("inserted_posts") or []
+                            if not inserted_posts:
+                                return
+
+                            supabase = get_supabase_client()
+
+
+                            # Config validation (non-crashing defaults)
+                            def _safe_int(env_key: str, default: int) -> int:
+                                try:
+                                    v = int(os.getenv(env_key, str(default)))
+                                    return v if v > 0 else default
+                                except Exception:
+                                    logger.warning("[AI FILTER] Invalid int env %s, using default=%s", env_key, default)
+                                    return default
+
+                            def _safe_float(env_key: str, default: float) -> float:
+                                try:
+                                    v = float(os.getenv(env_key, str(default)))
+                                    return v if v >= 0 else default
+                                except Exception:
+                                    logger.warning("[AI FILTER] Invalid float env %s, using default=%s", env_key, default)
+                                    return default
+
+                            batch_size = _safe_int("RELEVANCE_AI_BATCH_SIZE", 8)
+                            delay_s = _safe_float("RELEVANCE_AI_DELAY_S", 1.2)
+
+                            start_all_t = time.time()
+                            total = len(inserted_posts)
+                            approved = 0
+                            rejected = 0
+                            failed = 0
+
+                            # prompt version may be exposed by the service; keep stable in logs
+                            prompt_version = None
+
+                            # Rate limit / batch nhỏ
+
+
+                            for i in range(0, len(inserted_posts), batch_size):
+                                chunk = inserted_posts[i : i + batch_size]
+
+                                for p in chunk:
+                                    post_url = p.get("post_url")
+                                    content = p.get("content") or ""
+                                    industry = p.get("industry")
+                                    if not post_url or not content:
+                                        continue
+
+                                    try:
+                                        start_post_t = time.time()
+
+                                        result = classify_post_relevance(content, industry)
+                                        label = result.get("label")
+                                        reason = result.get("reason")
+
+                                        # Fill counters for metrics
+                                        elapsed = time.time() - start_post_t
+
+                                        batch_no = (i // batch_size) + 1
+                                        prompt_version = result.get("prompt_version")
+                                        model = result.get("model")
+
+                                        logger.info(
+                                            "AI classify",
+                                            extra={
+                                                "post_url": post_url,
+                                                "id_member": email_crawl,
+                                                "label": label,
+                                                "reason": reason,
+                                                "elapsed": elapsed,
+                                                "batch": batch_no,
+                                                "prompt_version": prompt_version,
+                                            },
+                                        )
+
+                                    except Exception as ai_exc:
+                                        failed += 1
+                                        logger.exception(
+                                            "Gemini classify failed (fail-safe keep post). post_url=%s err=%s",
+                                            post_url,
+                                            ai_exc,
+                                        )
+                                        continue
+
+                                    if label == "seeding_reject":
+
+                                        rejected += 1
+                                    else:
+                                        approved += 1
+
+
+                                        # MUST reuse same business rule as endpoint delete:
+
+                                        # member only delete own posts. Here we only have id_member (email_crawl)
+                                        # as stored in facebook_posts.id_member.
+                                        try:
+                                            supabase.table("facebook_posts").delete().eq(
+                                                "post_url", post_url
+                                            ).eq("id_member", email_crawl).execute()
+
+                                            # log AI metadata for audit
+                                            ai_success = result.get("ai_success") if isinstance(result, dict) else None
+                                            model = result.get("model") if isinstance(result, dict) else None
+                                            prompt_version = result.get("prompt_version") if isinstance(result, dict) else None
+                                            logger.info(
+                                                "AI rejected post deleted. post_url=%s reason=%s ai_success=%s model=%s prompt_version=%s",
+                                                post_url,
+                                                reason,
+                                                ai_success,
+                                                model,
+                                                prompt_version,
+                                            )
+
+                                        except Exception as del_exc:
+                                            logger.exception(
+                                                "Failed to delete rejected post (keep safe). post_url=%s err=%s",
+                                                post_url,
+                                                del_exc,
+                                            )
+                                    # else: keep
+
+                                    # small delay to protect quota
+                                    time.sleep(delay_s)
+
+                                # extra delay between chunks
+                                time.sleep(delay_s)
+
+                            # Metrics summary
+                            total_duration = time.time() - start_all_t
+                            avg_per_post = (total_duration / total) if total else 0
+                            logger.info(
+                                "AI FILTER FINISHED",
+                                extra={
+                                    "total_posts": total,
+                                    "approved": approved,
+                                    "rejected": rejected,
+                                    "failed": failed,
+                                    "total_duration": total_duration,
+                                    "avg_per_post": avg_per_post,
+                                },
+                            )
+
+                        asyncio.create_task(_ai_filter_and_cleanup())
+
+                    except Exception as bg_exc:
+                        logger.exception("Failed to start AI background filter: %s", bg_exc)
+
                 except Exception as db_err:
                     logger.error(f"Lỗi khi lưu Supabase: {db_err}")
                     # Không văng lỗi 500 để vẫn trả về data cho FE, chỉ log lại
-                    
+
                 return {"status": "success", "message": "Cào thành công.", "data": scraped_data}
+
             else:
                 return {"status": "success", "message": "Không có bài viết mới.", "data": []}
 

@@ -57,7 +57,7 @@ function sendFrontendDone(totalGroups, totalPosts) {
     });
 }
 
-let API_BASE = 'https://seeding.markeeai.com'; // global fallback for save-posts
+let API_BASE = 'https://dev.seeding.markeeai.com'; // global fallback for save-posts (dev)
 
 async function startAutoCrawl(groups, config = {}) {
     if (isRunning) return;
@@ -163,8 +163,12 @@ async function startAutoCrawl(groups, config = {}) {
                                     group_id: '',
                                     group_url: group.url,
                                     id_member: idMember,
-                                    extension_version: "API-Automated-1.0"
+                                    extension_version: "API-Automated-1.0",
+                                    // Pass keyword filter params (from app UI) to backend
+                                    keywords: group.keywords || null,
+                                    post_limit: group.post_limit ?? null
                                 })
+
                             });
                             break;
                         } catch(err) {

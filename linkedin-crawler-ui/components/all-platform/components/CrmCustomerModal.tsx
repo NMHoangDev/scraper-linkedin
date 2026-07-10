@@ -28,12 +28,7 @@ interface CrmCustomerModalProps {
   onSuccess?: (customer: Customer) => void;
 }
 
-/**
- * Khởi tạo form rỗng — CHỈ giữ các field cốt lõi cho CRM pipeline.
- * Cố ý bỏ: status, activity_status, review_result, has_budget, service_package,
- * lifetime_value, contract_*, warranty_*, customer_since, care_note, tags.
- * Xem comment trên CrmCustomerModal để biết lý do đơn giản hoá.
- */
+/** Khởi tạo form rỗng cho tạo lead mới. */
 const emptyForm = (): Partial<Customer> => ({
   customer_name: "",
   company_name: "",
@@ -44,6 +39,15 @@ const emptyForm = (): Partial<Customer> => ({
   source_platform: "FB_Inbox",
   // Gói dịch vụ — optional, không bắt buộc khi tạo lead
   service_package: null,
+  lifetime_value: 0,
+  contract_status: "active",
+  contract_signed_at: null,
+  warranty_expires_at: null,
+  customer_since: null,
+  care_note: null,
+  last_care_at: null,
+  last_attachment_name: null,
+  last_attachment_url: null,
   note: "",
   // CRM pipeline
   deal_stage: "new_lead",
@@ -52,6 +56,10 @@ const emptyForm = (): Partial<Customer> => ({
   sdr_id: "",
   is_assigned: false,
 });
+
+const dateInputValue = (value?: string | null) => (value ? String(value).slice(0, 10) : "");
+const dateTimeInputValue = (value?: string | null) => (value ? String(value).slice(0, 16) : "");
+const toIsoDate = (value: string) => (value ? new Date(value).toISOString() : null);
 
 export function CrmCustomerModal({
   isOpen,
@@ -112,10 +120,27 @@ export function CrmCustomerModal({
         phone: formData.phone?.trim() || null,
         email: formData.email?.trim() || null,
         website: formData.website?.trim() || null,
+        address: formData.address?.trim() || null,
+        city: formData.city || null,
+        industry: formData.industry || null,
+        tax_code: formData.tax_code?.trim() || null,
         conv_id: formData.conv_id?.trim() || null,
         source_platform: formData.source_platform,
+        // Pipeline fields — form đã thu thập nhưng trước đây không gửi
+        decision_maker: formData.decision_maker?.trim() || null,
+        estimated_budget: formData.estimated_budget ? Number(formData.estimated_budget) : 0,
+        follow_up_date: formData.follow_up_date || null,
         // Optional — chỉ gửi khi user đã chọn, tránh ghi đè deal cũ về null
         service_package: formData.service_package || null,
+        lifetime_value: formData.lifetime_value ? Number(formData.lifetime_value) : 0,
+        contract_status: formData.contract_status ?? "active",
+        contract_signed_at: formData.contract_signed_at || null,
+        warranty_expires_at: formData.warranty_expires_at || null,
+        customer_since: formData.customer_since || null,
+        care_note: formData.care_note?.trim() || null,
+        last_care_at: formData.last_care_at || null,
+        last_attachment_name: formData.last_attachment_name?.trim() || null,
+        last_attachment_url: formData.last_attachment_url?.trim() || null,
         note: formData.note?.trim() || null,
         deal_stage: formData.deal_stage ?? "new_lead",
         leaded_by: formData.leaded_by?.trim() || null,
@@ -238,7 +263,7 @@ export function CrmCustomerModal({
                 </div>
 
                 {/* Website */}
-                <div className="col-span-2">
+                <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Website</label>
                   <input
                     type="text"
@@ -246,6 +271,18 @@ export function CrmCustomerModal({
                     onChange={(e) => set("website", e.target.value || null)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
                     placeholder="https://..."
+                  />
+                </div>
+
+                {/* Mã số thuế */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Mã số thuế</label>
+                  <input
+                    type="text"
+                    value={formData.tax_code ?? ""}
+                    onChange={(e) => set("tax_code", e.target.value || null)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
+                    placeholder="0312345678"
                   />
                 </div>
               </div>
@@ -257,6 +294,16 @@ export function CrmCustomerModal({
                 Địa chỉ
               </p>
               <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Địa chỉ</label>
+                  <input
+                    type="text"
+                    value={formData.address ?? ""}
+                    onChange={(e) => set("address", e.target.value || null)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm"
+                    placeholder="Số nhà, đường, phường/xã..."
+                  />
+                </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Thành phố</label>
                   <select
@@ -418,6 +465,105 @@ export function CrmCustomerModal({
                   <p className="mt-1 text-[10px] text-slate-400">
                     Bắt buộc khi chuyển sang On Hold. Có thể đặt trước để nhắc nhở.
                   </p>
+                </div>
+
+                {/* ── Hợp đồng & báo giá (gộp vào Pipeline để khớp flow SMB) ── */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Tên file hợp đồng / báo giá</label>
+                  <input
+                    type="text"
+                    value={formData.last_attachment_name ?? ""}
+                    onChange={(e) => set("last_attachment_name", e.target.value || null)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm"
+                    placeholder="Bao_gia_ABC.pdf"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Link báo giá / hợp đồng</label>
+                  <input
+                    type="url"
+                    value={formData.last_attachment_url ?? ""}
+                    onChange={(e) => set("last_attachment_url", e.target.value || null)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm"
+                    placeholder="https://..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Trạng thái hợp đồng</label>
+                  <select
+                    value={formData.contract_status ?? "active"}
+                    onChange={(e) => set("contract_status", e.target.value as Customer["contract_status"])}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm bg-white"
+                  >
+                    <option value="active">Đang hoạt động</option>
+                    <option value="completed">Đã hoàn thành</option>
+                    <option value="maintenance">Bảo trì / bảo hành</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Giá trị hợp đồng / LTV (VND)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1000000"
+                    value={formData.lifetime_value ?? 0}
+                    onChange={(e) => set("lifetime_value", e.target.value ? Number(e.target.value) : 0)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm"
+                    placeholder="20000000"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Ngày ký hợp đồng</label>
+                  <input
+                    type="date"
+                    value={dateInputValue(formData.contract_signed_at)}
+                    onChange={(e) => set("contract_signed_at", toIsoDate(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Hết hạn bảo hành</label>
+                  <input
+                    type="date"
+                    value={dateInputValue(formData.warranty_expires_at)}
+                    onChange={(e) => set("warranty_expires_at", toIsoDate(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Ngày thành khách hàng</label>
+                  <input
+                    type="date"
+                    value={dateInputValue(formData.customer_since)}
+                    onChange={(e) => set("customer_since", toIsoDate(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Lần chăm sóc gần nhất</label>
+                  <input
+                    type="datetime-local"
+                    value={dateTimeInputValue(formData.last_care_at)}
+                    onChange={(e) => set("last_care_at", e.target.value ? new Date(e.target.value).toISOString() : null)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm"
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Ghi chú chăm sóc / hợp đồng</label>
+                  <textarea
+                    value={formData.care_note ?? ""}
+                    onChange={(e) => set("care_note", e.target.value || null)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm min-h-[72px]"
+                    placeholder="Tình trạng hợp đồng, ngày tháng cần theo dõi, ghi chú chăm sóc..."
+                  />
                 </div>
               </div>
             </div>

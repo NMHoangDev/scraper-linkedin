@@ -36,6 +36,20 @@ from app.modules.all_platform.services.supabase_categories_service import (
     update_category,
     delete_category,
 )
+from app.modules.all_platform.services.supabase_quick_comment_service import (
+    get_all_quick_comments,
+    add_quick_comment,
+    update_quick_comment,
+    delete_quick_comment,
+    reorder_quick_comment,
+)
+from app.modules.all_platform.services.supabase_quick_inbox_service import (
+    get_all_quick_inbox,
+    add_quick_inbox,
+    update_quick_inbox,
+    delete_quick_inbox,
+    reorder_quick_inbox,
+)
 from app.modules.all_platform.services.supabase_groups_service import (
     get_facebook_groups,
     add_facebook_group,

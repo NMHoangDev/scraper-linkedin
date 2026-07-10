@@ -1,8 +1,40 @@
 // bridge.js - Cầu nối giao tiếp giữa React Frontend và Background của Extension API MỚI
 
+// Sau khi extension được reload/update (chrome://extensions), content script cũ
+// đang chạy trong tab đã mở sẵn sẽ bị Chrome "cắt dây" khỏi background - mọi lệnh
+// gọi chrome.runtime.* lúc này throw "Extension context invalidated". Bọc lại để
+// báo cho React app biết và tự F5 lại trang (thay vì crash im lặng khi bấm cào).
+function isExtensionContextValid() {
+    try {
+        return !!(chrome && chrome.runtime && chrome.runtime.id);
+    } catch (e) {
+        return false;
+    }
+}
+
+function notifyExtensionInvalidated() {
+    window.postMessage({ type: 'API_EXTENSION_INVALIDATED' }, '*');
+}
+
+function safeSendMessage(message, callback) {
+    if (!isExtensionContextValid()) {
+        notifyExtensionInvalidated();
+        return;
+    }
+    try {
+        chrome.runtime.sendMessage(message, callback);
+    } catch (e) {
+        notifyExtensionInvalidated();
+    }
+}
+
 // Save the current backend URL to storage so popup.js and background.js
 // can read it instead of using hardcoded production URL.
-chrome.storage.local.set({ api_base_url: window.location.origin });
+try {
+    chrome.storage.local.set({ api_base_url: window.location.origin });
+} catch (e) {
+    // Context đã invalidated ngay từ lúc inject - bỏ qua, chờ user F5.
+}
 
 window.addEventListener('message', (event) => {
     if (event.source !== window) return;
@@ -10,8 +42,8 @@ window.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'API_LAUNCH_FROM_APP') {
         const groups = event.data.data.groups;
         const config = event.data.data.config;
-        
-        chrome.runtime.sendMessage({
+
+        safeSendMessage({
             action: 'START_AUTO_CRAWL',
             groups: groups,
             config: config
@@ -21,10 +53,14 @@ window.addEventListener('message', (event) => {
     }
 
     if (event.data && event.data.type === 'API_STOP_CRAWL') {
-        chrome.runtime.sendMessage({ action: 'STOP_AUTO_CRAWL' });
+        safeSendMessage({ action: 'STOP_AUTO_CRAWL' });
     }
 
     if (event.data && event.data.type === 'API_MARKEE_FB_PING') {
+        if (!isExtensionContextValid()) {
+            notifyExtensionInvalidated();
+            return;
+        }
         window.postMessage({ type: 'API_MARKEE_FB_PONG', installed: true, isRunning: false }, '*');
     }
 });

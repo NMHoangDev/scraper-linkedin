@@ -189,6 +189,11 @@ export function CrawlFacebookPopup({
   const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
   const [groupSearch, setGroupSearch] = useState("");
 
+  // Per-job (applied to all selected groups)
+  const [keywordsInput, setKeywordsInput] = useState(""); // comma/enter separated
+  const [postLimitInput, setPostLimitInput] = useState<string>(""); // keep as string for input
+
+
   // Crawl state
   const [crawling, setCrawling] = useState(false);
   const [crawlError, setCrawlError] = useState<string | null>(null);
@@ -229,6 +234,9 @@ export function CrawlFacebookPopup({
       setSelectedAccount(null);
       setSelectedGroups(new Set());
       setGroupSearch("");
+      setKeywordsInput("");
+      setPostLimitInput("");
+
       setCrawlError(null);
       setCrawlResult(null);
       setUseDefaultAccount(true);
@@ -277,9 +285,23 @@ export function CrawlFacebookPopup({
     setCrawling(true);
     setStep(3); // Chuyển sang step 3 ngay lập tức khi bắt đầu cào
 
+    const keywords = keywordsInput
+      .split(/[,\n]/g)
+      .map((k) => k.trim())
+      .filter(Boolean);
+
+    const post_limit = postLimitInput.trim() === "" ? null : Number(postLimitInput);
+
     const selectedGroupObjects = groups
       .filter((g) => selectedGroups.has(g.group_url))
-      .map((g) => ({ name: g.group_name || g.group_url, url: g.group_url, intent: g.intent_name || undefined }));
+      .map((g) => ({
+        name: g.group_name || g.group_url,
+        url: g.group_url,
+        intent: g.intent_name || undefined,
+        keywords: keywordsInput.trim() ? keywords : null,
+        post_limit: post_limit,
+      }));
+
 
     const requestPayload = {
       groups: selectedGroupObjects,
@@ -514,8 +536,57 @@ export function CrawlFacebookPopup({
                 )}
               </div>
 
+              {/* Per-job keywords + post_limit */}
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <p className="text-[11px] font-bold text-on-surface uppercase">Danh sách từ khoá (keywords)</p>
+                  <div className="flex flex-wrap gap-2 px-3 py-2 rounded-xl border border-outline-variant bg-surface-container-low">
+                    {keywordsInput.trim() !== "" &&
+                      keywordsInput
+                        .split(/[,\n]/g)
+                        .map((k) => k.trim())
+                        .filter(Boolean)
+                        .slice(0, 10)
+                        .map((k, idx) => (
+                          <span
+                            key={`${k}-${idx}`}
+                            className="bg-primary/10 text-primary border border-primary/20 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                          >
+                            {k}
+                          </span>
+                        ))}
+                    <input
+                      type="text"
+                      placeholder="Nhập từ khoá, ngăn cách bởi dấu phẩy hoặc Enter..."
+                      value={keywordsInput}
+                      onChange={(e) => setKeywordsInput(e.target.value)}
+                      className="flex-1 min-w-[140px] border-none outline-none bg-transparent text-xs text-on-surface"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-[11px] font-bold text-on-surface uppercase">Số lượng bài muốn lấy (post_limit)</p>
+                  <input
+                    type="number"
+                    min={1}
+                    inputMode="numeric"
+                    value={postLimitInput}
+                    onChange={(e) => setPostLimitInput(e.target.value)}
+                    placeholder="(tùy chọn)"
+                    className="w-full px-3 py-2.5 bg-surface-container-low border border-outline-variant rounded-xl text-xs text-on-surface outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary transition"
+                  />
+                </div>
+              </div>
+
               {/* Groups list */}
               {groupsLoading ? (
+
                 <div className="flex items-center justify-center py-10 text-on-surface-variant">
                   <div className="w-5 h-5 border-2 border-outline-variant border-t-primary rounded-full animate-spin mr-2" />
                   <span className="text-xs">Đang tải nhóm...</span>

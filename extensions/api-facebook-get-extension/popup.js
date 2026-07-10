@@ -38,7 +38,7 @@ btnAutoStart.addEventListener('click', async () => {
         // Fall back to storage (set by bridge.js from a previous visit).
         if (!API_BASE) {
             const { api_base_url } = await chrome.storage.local.get('api_base_url');
-            API_BASE = api_base_url || 'https://seeding.markeeai.com';
+            API_BASE = api_base_url || 'https://dev.seeding.markeeai.com';
         }
 
         addLog(`🌐 Backend: ${API_BASE}`);
@@ -47,16 +47,9 @@ btnAutoStart.addEventListener('click', async () => {
             credentials: 'include',
         });
         if (!response.ok) throw new Error("Backend không phản hồi danh sách group.");
-
+        
         const data = await response.json();
-        if (data.success === false) throw new Error(data.message || "Backend tra ve loi.");
-        // Chuan hoa ten field: facebook_groups tra "group_name"/"group_url",
-        // background.js dang doc "name"/"url".
-        const groups = (data.data || []).map((g) => ({
-            ...g,
-            name: g.name || g.group_name,
-            url: g.url || g.group_url,
-        }));
+        const groups = data.data || [];
         
         if (groups.length === 0) {
             addLog("❌ Không có group nào cần cào từ Backend.");
