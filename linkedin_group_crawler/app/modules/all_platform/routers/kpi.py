@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import Dict, List, Optional
 from supabase import Client
 from loguru import logger
 
@@ -312,6 +312,26 @@ class BulkVerifyInboxRequest(BaseModel):
     target_date: str = Field(..., description="YYYY-MM-DD")
 
 
+def _resolve_email_to_member_id(supabase: Client, emails: List[str]) -> Dict[str, str]:
+    """Map email -> app_users.id.
+
+    `_compute_fb_inbox_progress`/seeder nhận UUID (owner mà extension gửi khi
+    provision cookie là app_users.id, không phải email — xem chú thích ở
+    supabase_kpi_service._compute_fb_inbox_progress). API công khai của 2
+    endpoint dưới đây vẫn nhận/trả email để không đổi contract phía frontend,
+    nên phải resolve ở biên router này.
+    """
+    if not emails:
+        return {}
+    res = (
+        supabase.table("app_users")
+        .select("id, email")
+        .in_("email", emails)
+        .execute()
+    )
+    return {str(r["email"]).strip().lower(): str(r["id"]) for r in (res.data or []) if r.get("email")}
+
+
 @router.post("/fb-inbox-progress")
 def fb_inbox_progress(payload: FbInboxProgressRequest) -> BaseResponse:
     """Tính số tin nhắn Facebook Messenger khách gửi tới member trong khoảng [start_date, end_date].
@@ -331,8 +351,17 @@ def fb_inbox_progress(payload: FbInboxProgressRequest) -> BaseResponse:
             start = start or monday.isoformat()
             end = end or sunday.isoformat()
 
-        result = _compute_fb_inbox_progress([email], start, end)
-        data = result.get(email, {"kpi_fb_inbox_count": 0, "range": {"start": start, "end": end}})
+        supabase: Client = get_supabase_client()
+        email_to_id = _resolve_email_to_member_id(supabase, [email])
+        member_id = email_to_id.get(email)
+        if not member_id:
+            return BaseResponse(
+                success=True,
+                data={"kpi_fb_inbox_count": 0, "range": {"start": start, "end": end}},
+            )
+
+        result = _compute_fb_inbox_progress([member_id], start, end)
+        data = result.get(member_id, {"kpi_fb_inbox_count": 0, "range": {"start": start, "end": end}})
         return BaseResponse(success=True, data=data)
     except Exception as e:
         return BaseResponse(success=False, message=str(e))
@@ -360,7 +389,19 @@ def fb_inbox_progress_bulk(payload: FbInboxProgressBulkRequest) -> BaseResponse:
             start = start or monday.isoformat()
             end = end or sunday.isoformat()
 
-        result = _compute_fb_inbox_progress(emails, start, end)
+        supabase: Client = get_supabase_client()
+        email_to_id = _resolve_email_to_member_id(supabase, emails)
+        id_to_email = {v: k for k, v in email_to_id.items()}
+        member_ids = list(email_to_id.values())
+
+        by_id = _compute_fb_inbox_progress(member_ids, start, end)
+        default_data = {"kpi_fb_inbox_count": 0, "range": {"start": start, "end": end}}
+        # Trả về email-keyed để giữ contract cũ cho frontend; email nào không
+        # resolve được id (chưa có app_users) thì mặc định 0.
+        result = {
+            email: by_id.get(email_to_id.get(email, ""), default_data)
+            for email in emails
+        }
         return BaseResponse(success=True, data=result)
     except Exception as e:
         logger.error(f"fb_inbox_progress_bulk error: {e}")
