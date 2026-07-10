@@ -464,8 +464,8 @@ def get_all_kpis_for_leader(
         fb_lead_from_kpi = 0
         if member_email:
             try:
-                fb_progress = _compute_fb_inbox_progress([member_email], eff_start_date, eff_end_date)
-                fb_inbox_from_seeder = int(fb_progress.get(member_email, {}).get("kpi_fb_inbox_count", 0))
+                fb_progress = _compute_fb_inbox_progress([mid], eff_start_date, eff_end_date)
+                fb_inbox_from_seeder = int(fb_progress.get(mid, {}).get("kpi_fb_inbox_count", 0))
             except Exception as exc:
                 logger.warning(f"_compute_fb_inbox_progress failed for member={mid}: {exc}")
 
@@ -596,17 +596,18 @@ def get_kpi_by_email(email: str) -> dict:
             except Exception as exc:
                 logger.warning(f"compute_kpi_inbox_progress failed for email={email}: {exc}")
 
-        # FB Messenger inbox từ seeder service
+        # FB Messenger inbox từ seeder service — owner trên seeder LÀ user_id (UUID),
+        # không phải email (xem chú thích ở _compute_fb_inbox_progress).
         member_email_lower = email.strip().lower()
         kpi_inbox_fb_seeder = 0
         kpi_inbox_fb_kpi = 0
         try:
             fb_progress = _compute_fb_inbox_progress(
-                [member_email_lower],
+                [str(user_id)],
                 kpi.get("start_date"),
                 kpi.get("end_date"),
             )
-            kpi_inbox_fb_seeder = int(fb_progress.get(member_email_lower, {}).get("kpi_fb_inbox_count", 0))
+            kpi_inbox_fb_seeder = int(fb_progress.get(str(user_id), {}).get("kpi_fb_inbox_count", 0))
         except Exception as exc:
             logger.warning(f"_compute_fb_inbox_progress failed for email={email}: {exc}")
 
@@ -761,22 +762,29 @@ def _parse_iso_date(value: Optional[str]) -> Optional[date]:
 #
 # Seeder service lưu tin nhắn khách (from='them') vào data/inbox_messages/{owner}/{yyyy-MM-dd}.json.
 # Hàm này gọi GET /inbox/messages/count của seeder để đếm tin theo owner + khoảng ngày KPI.
+#
+# QUAN TRỌNG: `owner` trên seeder LÀ member UUID (app_users.id), KHÔNG PHẢI email.
+# Extension gửi cookie kèm `owner: user.id` khi provision (markee-ext-provision.ts:119),
+# và mọi endpoint khác trên seeder (/inbox/conversations?owner=, /extensions?owner=...)
+# đều so khớp bằng UUID này. Bản đầu tiên của hàm này gọi `?owner={email}` — so sánh
+# email với UUID không bao giờ khớp -> "Khách reply" luôn = 0 dù seeder đã có dữ liệu.
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _compute_fb_inbox_progress(
-    member_emails: Iterable[str],
+    member_ids: Iterable[str],
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
 ) -> Dict[str, Dict[str, Any]]:
     """Gọi seeder service để đếm tin nhắn khách (FB Messenger) của từng member trong tuần KPI.
 
     Args:
-        member_emails: danh sách email của các member cần đếm.
+        member_ids: danh sách UUID (app_users.id) của các member cần đếm — PHẢI khớp
+            với `owner` mà extension gửi khi provision cookie, không phải email.
         start_date: ISO date (YYYY-MM-DD). Mặc định = Monday tuần hiện tại.
         end_date: ISO date. Mặc định = Sunday tuần hiện tại.
 
     Returns:
-        Dict map ``email -> {kpi_fb_inbox_count, range: {start, end}}``.
+        Dict map ``member_id -> {kpi_fb_inbox_count, range: {start, end}}``.
     """
     from app.core.config import settings
 
@@ -791,8 +799,8 @@ def _compute_fb_inbox_progress(
     base_url = settings.seeder_service_url.rstrip("/")
     api_key = settings.seeder_service_api_key
 
-    for email in member_emails:
-        out[email] = {
+    for member_id in member_ids:
+        out[member_id] = {
             "kpi_fb_inbox_count": 0,
             "range": {"start": start_date, "end": end_date},
         }
@@ -807,23 +815,23 @@ def _compute_fb_inbox_progress(
 
             url = (
                 f"{base_url}/inbox/messages/count"
-                f"?owner={email}&start={start_date}&end={end_date}"
+                f"?owner={member_id}&start={start_date}&end={end_date}"
             )
             with httpx.Client(timeout=10.0) as client:
                 resp = client.get(url, headers=headers)
             if resp.status_code == 200:
                 data = resp.json()
-                out[email] = {
+                out[member_id] = {
                     "kpi_fb_inbox_count": int(data.get("count", 0)),
                     "range": data.get("range", {"start": start_date, "end": end_date}),
                 }
             else:
                 logger.warning(
                     f"Seeder service /inbox/messages/count returned {resp.status_code} "
-                    f"for {email}: {resp.text[:200]}"
+                    f"for member={member_id}: {resp.text[:200]}"
                 )
         except Exception as exc:
-            logger.warning(f"Failed to fetch FB inbox from seeder for {email}: {exc}")
+            logger.warning(f"Failed to fetch FB inbox from seeder for member={member_id}: {exc}")
 
     return out
 
@@ -1941,26 +1949,30 @@ def _vn_week_range_to_utc(start_date: str, end_date: str) -> Tuple[str, str]:
 
 
 def _batch_fb_inbox_count_from_seeder(
-    member_emails: List[str],
+    member_ids: List[str],
     start_date: str,
     end_date: str,
 ) -> Dict[str, int]:
     """Gọi seeder service 1 lần duy nhất cho N owners.
+
+    `member_ids` PHẢI là UUID (app_users.id) — khớp với `owner` mà extension gửi
+    khi provision cookie (markee-ext-provision.ts:119). Xem chú thích ở
+    `_compute_fb_inbox_progress` — bản đầu dùng email, không bao giờ khớp.
 
     Seeder service hỗ trợ nhiều `owner` qua comma-separated; nếu chưa hỗ trợ,
     sẽ fallback về gọi tuần tự (giống hàm cũ).
     """
     from app.core.config import settings
 
-    if not member_emails:
+    if not member_ids:
         return {}
 
     base_url = (getattr(settings, "seeder_service_url", "") or "").rstrip("/")
     api_key = getattr(settings, "seeder_service_api_key", "") or ""
     if not base_url:
-        return {email: 0 for email in member_emails}
+        return {mid: 0 for mid in member_ids}
 
-    result: Dict[str, int] = {email: 0 for email in member_emails}
+    result: Dict[str, int] = {mid: 0 for mid in member_ids}
 
     try:
         import httpx
@@ -1970,39 +1982,39 @@ def _batch_fb_inbox_count_from_seeder(
         # Nếu trả 400/422, fallback gọi tuần tự.
         url_batch = (
             f"{base_url}/inbox/messages/count-batch"
-            f"?owners={','.join(member_emails)}&start={start_date}&end={end_date}"
+            f"?owners={','.join(member_ids)}&start={start_date}&end={end_date}"
         )
         with httpx.Client(timeout=15.0) as client:
             resp = client.get(url_batch, headers=headers)
         if resp.status_code == 200:
             data = resp.json()
             counts = data.get("counts") or {}
-            for email in member_emails:
-                result[email] = int(counts.get(email, 0))
+            for mid in member_ids:
+                result[mid] = int(counts.get(mid, 0))
             return result
 
         # Fallback: gọi tuần tự (giống hàm cũ) — không quá N=20 nên an toàn
         if resp.status_code not in (400, 404, 422):
             logger.warning(
-                f"Seeder batch endpoint returned {resp.status_code}, falling back to per-email"
+                f"Seeder batch endpoint returned {resp.status_code}, falling back to per-member"
             )
     except Exception as exc:
-        logger.debug(f"Seeder batch call failed ({exc}), falling back to per-email")
+        logger.debug(f"Seeder batch call failed ({exc}), falling back to per-member")
 
-    # Per-email fallback (giống _compute_fb_inbox_progress cũ)
+    # Per-member fallback (giống _compute_fb_inbox_progress cũ)
     try:
         import httpx
 
         headers = {"X-API-Key": api_key} if api_key else {}
         with httpx.Client(timeout=10.0) as client:
-            for email in member_emails:
+            for mid in member_ids:
                 try:
-                    url = f"{base_url}/inbox/messages/count?owner={email}&start={start_date}&end={end_date}"
+                    url = f"{base_url}/inbox/messages/count?owner={mid}&start={start_date}&end={end_date}"
                     r = client.get(url, headers=headers)
                     if r.status_code == 200:
-                        result[email] = int(r.json().get("count", 0))
+                        result[mid] = int(r.json().get("count", 0))
                 except Exception as exc:
-                    logger.debug(f"FB inbox fallback for {email} failed: {exc}")
+                    logger.debug(f"FB inbox fallback for member={mid} failed: {exc}")
     except Exception as exc:
         logger.warning(f"FB inbox fallback overall failed: {exc}")
 
@@ -2187,12 +2199,9 @@ def get_team_kpi_overview_v2(
         fb_post_count[mid] = fb_post_count.get(mid, 0) + 1
 
     # ── 6. Bulk FB inbox từ seeder (1 HTTP call batch) ──────────────────────
-    member_emails = [
-        str(user_map.get(m, {}).get("email", "")).lower()
-        for m in member_ids
-        if user_map.get(m, {}).get("email")
-    ]
-    fb_seeder_count = _batch_fb_inbox_count_from_seeder(member_emails, default_start, default_end)
+    # owner trên seeder LÀ member UUID (xem chú thích ở _compute_fb_inbox_progress),
+    # nên gọi thẳng bằng member_ids — không cần resolve email.
+    fb_seeder_count = _batch_fb_inbox_count_from_seeder(member_ids, default_start, default_end)
 
     # ── 6b. CRM lead count từ customer_leads ───────────────────────────────
     # Mỗi deal có `leaded_by = member_id` và `created_at` nằm trong tuần KPI
@@ -2243,7 +2252,7 @@ def get_team_kpi_overview_v2(
         lead_zalo = int(zalo_lead.get(mid, 0))
         inbox_fb_kpi = int(fb_inbox_count.get(mid, 0))
         lead_fb_kpi = int(fb_lead_count.get(mid, 0))
-        inbox_fb_seeder = int(fb_seeder_count.get(member_email, 0))
+        inbox_fb_seeder = int(fb_seeder_count.get(mid, 0))
         fb_post_n = int(fb_post_count.get(mid, 0))
         # CRM lead: deal được tạo với leaded_by = member, created_at trong tuần KPI
         lead_crm = int(crm_lead_count.get(mid, 0))
