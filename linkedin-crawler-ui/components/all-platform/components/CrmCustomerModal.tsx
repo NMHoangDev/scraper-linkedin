@@ -15,6 +15,7 @@ import {
   PAYMENT_STATUS_OPTIONS,
 } from "@/services/customer-lead.service";
 import { toast } from "sonner";
+import { ThousandsInput } from "./thousands-input";
 
 interface CrmCustomerModalProps {
   isOpen: boolean;
@@ -434,16 +435,11 @@ export function CrmCustomerModal({
                   <label className="block text-xs font-semibold text-slate-600 mb-1">
                     Ngân sách ước tính (VNĐ)
                   </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1000000"
+                  <ThousandsInput
                     value={formData.estimated_budget ?? 0}
-                    onChange={(e) =>
-                      set("estimated_budget", e.target.value ? Number(e.target.value) : 0)
-                    }
+                    onChange={(n) => set("estimated_budget", n)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm"
-                    placeholder="50,000,000"
+                    placeholder="50.000.000"
                   />
                 </div>
 
@@ -536,14 +532,11 @@ export function CrmCustomerModal({
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Giá trị hợp đồng / LTV (VND)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1000000"
+                  <ThousandsInput
                     value={formData.lifetime_value ?? 0}
-                    onChange={(e) => set("lifetime_value", e.target.value ? Number(e.target.value) : 0)}
+                    onChange={(n) => set("lifetime_value", n)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm"
-                    placeholder="20000000"
+                    placeholder="20.000.000"
                   />
                 </div>
 

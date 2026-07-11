@@ -76,6 +76,7 @@ import {
 } from "@/services/customer-lead.service";
 import { getCurrentStage } from "@/services/crm-pipeline.helpers";
 import { cn } from "@/lib/utils";
+import { ThousandsInput } from "../components/thousands-input";
 
 interface Props {
   customer: Customer;
@@ -410,14 +411,13 @@ export function StageTransitionModal({
                   <Wallet className="mr-1 inline size-3.5" /> Ngân sách dự kiến (VNĐ){" "}
                   <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="number"
+                <ThousandsInput
                   required
-                  min="1"
+                  min={1}
                   value={estBudget}
-                  onChange={(e) => setEstBudget(e.target.value)}
+                  onChange={(n) => setEstBudget(String(n))}
                   className={inputCls}
-                  placeholder="VD: 50,000,000"
+                  placeholder="VD: 50.000.000"
                 />
               </div>
             )}
