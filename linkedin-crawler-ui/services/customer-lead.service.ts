@@ -549,12 +549,21 @@ export const customerLeadService = {
     if (params?.page_size) q.set("page_size", String(params.page_size));
     const qs = q.toString() ? `?${q.toString()}` : "";
     const data = await apiFetch(`/api/all-platform/customer-leads${qs}`);
+    // success:false van la HTTP 200 (BaseResponse) nen apiFetch khong tu throw —
+    // truoc day rot xuong fallback {items:[]} lang le, nhin giong "khong co khach
+    // hang nao" thay vi loi that (vd schema mismatch tren 1 Supabase project khac).
+    if (data?.success === false) {
+      throw new Error(data?.message || "Không tải được danh sách khách hàng");
+    }
     return data?.data as CustomerListResponse ?? { items: [], total: 0, page: 1, page_size: 50 };
   },
 
   /** Số deal ở mỗi stage — cho header KPI / tab counts. */
   getStageCounts: async (): Promise<Record<string, number>> => {
     const data = await apiFetch(`/api/all-platform/customer-leads/stage-counts`);
+    if (data?.success === false) {
+      throw new Error(data?.message || "Không tải được số liệu theo stage");
+    }
     return data?.data ?? {};
   },
 

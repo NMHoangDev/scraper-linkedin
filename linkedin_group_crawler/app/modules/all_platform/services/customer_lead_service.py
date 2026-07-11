@@ -135,8 +135,11 @@ def get_all_customer_leads(
             "page_size": page_size,
         }
     except Exception as e:
+        # KHONG nuot loi thanh ket qua rong "thanh cong" - truoc day lam vay khien
+        # loi schema (vd thieu cot moi tren mot Supabase project khac) hien ra nhu
+        # "khong co khach hang nao" thay vi bao loi that, rat kho debug.
         logger.error(f"Error getting customer leads: {e}")
-        return {"items": [], "total": 0, "page": page, "page_size": page_size}
+        raise
 
 
 def get_stage_counts(current_user: Optional[Dict[str, Any]] = None) -> Dict[str, int]:
@@ -158,7 +161,7 @@ def get_stage_counts(current_user: Optional[Dict[str, Any]] = None) -> Dict[str,
         return counts
     except Exception as e:
         logger.error(f"Error getting stage counts: {e}")
-        return {}
+        raise
 
 
 def get_customer_lead_by_id(lead_id: str) -> Optional[Dict[str, Any]]:
