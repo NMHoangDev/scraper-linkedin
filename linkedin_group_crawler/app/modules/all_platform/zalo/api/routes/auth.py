@@ -59,6 +59,8 @@ from app.modules.all_platform.zalo.services.zca_qr_bridge import (
     read_zca_event,
     start_zca_qr_process,
 )
+from app.modules.all_platform.auth_deps import get_authenticated_caller_email
+from app.modules.all_platform.zalo.api.routes.accounts import _require_admin_leader_or_self
 from app.modules.all_platform.zalo.api.security import verify_zalo_api_key
 
 router = APIRouter(
@@ -1622,6 +1624,7 @@ async def import_session_from_extension(
 async def delete_account_full(
     request: Request,
     x_user_id: str = Header("default", alias="X-User-ID"),
+    caller_email: Optional[str] = Depends(get_authenticated_caller_email),
 ):
     """Xoá HOÀN TOÀN một tài khoản Zalo:
     * File auth local: ``artifacts/zca-auth/{user_id}.json``
@@ -1646,6 +1649,18 @@ async def delete_account_full(
         raise HTTPException(status_code=400, detail="Missing 'account_id'")
     account_id = _normalize_user_id(raw_account_id)
     owner_id = _normalize_user_id(body.get("owner_id") or x_user_id)
+
+    # Truoc day khong check gi ca -> ai cung xoa sach duoc du lieu 1 tai khoan
+    # Zalo bat ky (accounts/sessions/users/groups/messages) chi can biet
+    # account_id. Gio bat buoc phai la admin/leader hoac chinh chu.
+    from app.modules.all_platform.zalo.services.supabase_service import get_zalo_account_by_id
+    target_account = await get_zalo_account_by_id(account_id)
+    target_owner = (
+        (target_account.get("id_member") or target_account.get("owner_id"))
+        if target_account
+        else None
+    )
+    await _require_admin_leader_or_self(caller_email, target_owner)
 
     result: Dict[str, Any] = {
         "account_id": account_id,
