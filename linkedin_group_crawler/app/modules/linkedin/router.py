@@ -3000,7 +3000,10 @@ def add_member(payload: AddMemberRequest) -> AddMemberResponse:
 )
 def verify_leader_code(payload: VerifyLeaderCodeRequest) -> BaseResponse:
     """Xác nhận mã code leader."""
-    is_valid = (payload.code == "888" or payload.code == settings.leader_code)
+    # Truoc day chuoi literal "888" luon duoc chap nhan bat ke settings.leader_code
+    # duoc cau hinh la gi -> bat ky ai biet "888" (hardcode trong code, khong phai
+    # bi mat) deu tu phong duoc Leader cho email bat ky. Bo backdoor nay.
+    is_valid = payload.code == settings.leader_code
     if not is_valid:
         return BaseResponse(success=False, message="Mã code không đúng.")
     
