@@ -20,6 +20,7 @@ from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_posts impo
 from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_groups_24h import TargetGroupSheet24HService
 from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_intent_service import IntentSheetService
 from app.modules.facebook.src.core.config.env import Config
+from app.modules.all_platform.auth_deps import require_admin
 
 from fastapi.encoders import jsonable_encoder
 import traceback
@@ -484,7 +485,8 @@ async def submit_otp_api(payload: SubmitOTPPayload):
 @crawl_fb_router.delete("/groups/delete", status_code=status.HTTP_200_OK)
 async def delete_group_api(
     group_url: str,
-    service: CrawlService = Depends(get_crawl_service)
+    service: CrawlService = Depends(get_crawl_service),
+    _admin: dict = Depends(require_admin),
 ):
     """
     Endpoint xóa Group Facebook

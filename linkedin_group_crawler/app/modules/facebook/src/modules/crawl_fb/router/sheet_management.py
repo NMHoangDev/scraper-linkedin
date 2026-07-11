@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.concurrency import run_in_threadpool
 
+from app.modules.all_platform.auth_deps import get_current_user, require_admin
+
 # Import schemas và service vừa tạo ở trên
 from app.modules.facebook.src.core.config.env import Config
 from app.modules.facebook.src.modules.crawl_fb.schemas.sheet_schema import (
@@ -42,8 +44,9 @@ async def api_get_all_groups(service: SheetManagementService = Depends(get_sheet
         }
 @sheet_management_router.post("/groups/bulk-add", status_code=status.HTTP_200_OK)
 async def api_bulk_add_groups(
-    payload: BulkAddGroupPayload, 
-    service: SheetManagementService = Depends(get_sheet_management_service)
+    payload: BulkAddGroupPayload,
+    service: SheetManagementService = Depends(get_sheet_management_service),
+    _admin: dict = Depends(require_admin),
 ):
     # Ép kiểu pydantic models sang mảng dictionary
     groups_data = [g.dict() for g in payload.groups]
@@ -83,8 +86,9 @@ async def api_bulk_add_groups(
 
 @sheet_management_router.delete("/groups/bulk-delete", status_code=status.HTTP_200_OK)
 async def api_bulk_delete_groups(
-    payload: BulkDeleteGroupPayload, 
-    service: SheetManagementService = Depends(get_sheet_management_service)
+    payload: BulkDeleteGroupPayload,
+    service: SheetManagementService = Depends(get_sheet_management_service),
+    _admin: dict = Depends(require_admin),
 ):
     await service.bulk_delete_groups(payload.urls)
     
@@ -115,8 +119,9 @@ async def api_get_all_intents(service: SheetManagementService = Depends(get_shee
         }
 @sheet_management_router.post("/intents/bulk-add", status_code=status.HTTP_200_OK)
 async def api_bulk_add_intents(
-    payload: BulkAddIntentPayload, 
-    service: SheetManagementService = Depends(get_sheet_management_service)
+    payload: BulkAddIntentPayload,
+    service: SheetManagementService = Depends(get_sheet_management_service),
+    _admin: dict = Depends(require_admin),
 ):
     intents_data = [item.dict() for item in payload.intents]
     
@@ -127,8 +132,9 @@ async def api_bulk_add_intents(
 
 @sheet_management_router.delete("/intents/bulk-delete", status_code=status.HTTP_200_OK)
 async def api_bulk_delete_intents(
-    payload: BulkDeleteIntentPayload, 
-    service: SheetManagementService = Depends(get_sheet_management_service)
+    payload: BulkDeleteIntentPayload,
+    service: SheetManagementService = Depends(get_sheet_management_service),
+    _admin: dict = Depends(require_admin),
 ):
     success = await service.bulk_delete_intents(payload.intents)
     if success:
@@ -157,7 +163,7 @@ async def api_get_all_categories():
         return {"status": "error", "message": f"Lỗi khi lấy danh mục: {str(e)}", "data": {}}
 
 @sheet_management_router.post("/categories/add", status_code=status.HTTP_200_OK)
-async def api_add_category(payload: AddCategoryPayload):
+async def api_add_category(payload: AddCategoryPayload, _admin: dict = Depends(require_admin)):
     """Thêm một danh mục mới vào Google Sheet."""
     svc = _get_category_service()
     success = await _asyncio.to_thread(
@@ -176,7 +182,7 @@ async def api_add_category(payload: AddCategoryPayload):
     return {"status": "error", "message": "Thêm danh mục thất bại (có thể đã tồn tại hoặc lỗi hệ thống)."}
 
 @sheet_management_router.put("/categories/update", status_code=status.HTTP_200_OK)
-async def api_update_category(payload: UpdateCategoryPayload):
+async def api_update_category(payload: UpdateCategoryPayload, _admin: dict = Depends(require_admin)):
     """Cập nhật một danh mục trong Google Sheet."""
     svc = _get_category_service()
     success = await _asyncio.to_thread(
@@ -197,7 +203,8 @@ async def api_update_category(payload: UpdateCategoryPayload):
 @sheet_management_router.delete("/categories/delete", status_code=status.HTTP_200_OK)
 async def api_delete_category(
     payload: DeleteCategoryPayload,
-    service: SheetManagementService = Depends(get_sheet_management_service)
+    service: SheetManagementService = Depends(get_sheet_management_service),
+    _admin: dict = Depends(require_admin),
 ):
     """Xóa một danh mục khỏi Google Sheet."""
     svc = _get_category_service()
@@ -215,7 +222,11 @@ async def api_delete_category(
 
 from app.modules.facebook.src.modules.facebook.services.FacebookInteractor import FacebookInteractor, InteractionResult,InteractionTarget
 @sheet_management_router.post("/posts/interact", status_code=status.HTTP_200_OK)
-async def auto_interact(req_data: dict,service: SheetManagementService = Depends(get_sheet_management_service)):
+async def auto_interact(
+    req_data: dict,
+    service: SheetManagementService = Depends(get_sheet_management_service),
+    _user: dict = Depends(get_current_user),
+):
     """
     Payload gửi lên mẫu:
     {
