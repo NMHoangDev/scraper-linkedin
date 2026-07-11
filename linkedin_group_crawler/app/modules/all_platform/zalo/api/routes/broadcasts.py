@@ -5,6 +5,8 @@ import re
 from fastapi import APIRouter, Depends, Header, HTTPException
 from loguru import logger
 
+from app.modules.all_platform.auth_deps import get_authenticated_caller_email
+from app.modules.all_platform.zalo.api.routes.accounts import _require_admin_leader_or_self
 from app.modules.all_platform.zalo.api.security import verify_zalo_api_key
 from app.modules.all_platform.zalo.config import settings
 from app.modules.all_platform.zalo.crawler.broadcast_sender import send_broadcast_to_targets
@@ -29,6 +31,7 @@ from app.modules.all_platform.zalo.services.supabase_service import (
     create_broadcast_campaign,
     fetch_messages_by_ids,
     get_broadcast_status,
+    get_zalo_account_by_id,
     update_campaign_status,
 )
 
@@ -144,12 +147,25 @@ async def preview_broadcast(
 async def create_broadcast(
     body: ZaloBroadcastRequest,
     x_user_id: str = Header("default", alias="X-User-ID"),
+    caller_email: Optional[str] = Depends(get_authenticated_caller_email),
 ):
     user_id = _normalize_user_id(body.user_id or x_user_id)
     if not body.message_ids:
         raise HTTPException(status_code=400, detail="message_ids is required")
     if not body.targets:
         raise HTTPException(status_code=400, detail="targets is required")
+
+    # Truoc day ai giu duoc shared API key cua extension cung gui broadcast
+    # (tin nhan that) tu BAT KY tai khoan Zalo nao chi can biet user_id, vi
+    # danh tinh nguoi goi khong he duoc kiem tra. Gio bat buoc phai la
+    # admin/leader hoac chinh chu tai khoan Zalo dang gui.
+    target_account = await get_zalo_account_by_id(user_id)
+    target_owner = (
+        (target_account.get("id_member") or target_account.get("owner_id"))
+        if target_account
+        else None
+    )
+    await _require_admin_leader_or_self(caller_email, target_owner)
 
     session = await get_latest_session_for_user(user_id, preferred_statuses={"confirmed"})
     if not session:
