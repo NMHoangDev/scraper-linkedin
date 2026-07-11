@@ -8,7 +8,7 @@ from typing import Any, Optional
 
 from supabase import Client
 
-from app.core.supabase_client import get_supabase_client
+from app.core.supabase_client import execute_supabase_query, get_supabase_client
 
 
 def _parse_date(val: Any) -> str:
@@ -25,28 +25,21 @@ def _supabase() -> Client:
 
 # ── Core fetch ──────────────────────────────────────────────────────────────────
 
-import time
 from functools import wraps
 
 def retry_on_winerror(func):
+    """Retry a read that touches Supabase when the connection fails transiently.
+
+    Delegates to ``execute_supabase_query`` so the transient set stays in one
+    place. The previous inline substring check ("10035"/"Connection"/"Timeout")
+    matched neither ``RemoteProtocolError`` nor its message "Server disconnected
+    without sending a response.", so the single most common failure — reusing a
+    pooled socket the upstream already closed — was re-raised without a retry
+    and surfaced to the user as a red banner.
+    """
     @wraps(func)
     def wrapper(*args, **kwargs):
-        attempts = 3
-        last_exc = None
-        for attempt in range(attempts):
-            try:
-                return func(*args, **kwargs)
-            except Exception as e:
-                last_exc = e
-                msg = str(e)
-                if "10035" in msg or "WSAEWOULDBLOCK" in msg or "Connection" in msg or "Timeout" in msg:
-                    # Reset the global supabase client to clear broken sockets
-                    from app.core.supabase_client import reset_supabase_client
-                    reset_supabase_client()
-                    time.sleep(0.5 * (attempt + 1))
-                else:
-                    raise
-        raise last_exc
+        return execute_supabase_query(lambda: func(*args, **kwargs))
     return wrapper
 
 @retry_on_winerror
@@ -86,7 +79,10 @@ def _fetch_posts(
     if table == "facebook_posts":
         query = tbl.select("*, author_post(*), facebook_groups(group_name, id_intent, id_industry, id_team, id_tier, id_icp, id_content_type, id_product_seeding, id_member)", count="exact")
     else:
-        query = tbl.select("*, author_post(*), linkedin_groups(group_name, id_intent, id_industry, id_team, id_tier, id_icp, id_content_type, id_product_seeding, id_member)", count="exact")
+        # linkedin_posts KHÔNG có FK tới author_post (khác facebook_posts.id_author) —
+        # embed author_post ở đây khiến PostgREST lỗi PGRST200 mỗi lần tab "all"/
+        # "linkedin" load -> FE hiện "Server disconnected". Giữ nguyên fix 7d4ed43.
+        query = tbl.select("*, linkedin_groups(group_name, id_intent, id_industry, id_team, id_tier, id_icp, id_content_type, id_product_seeding, id_member)", count="exact")
 
     # Scope to requesting user
     if email:
@@ -726,23 +722,34 @@ def get_unified_posts(
     # Fetch seeding info for the returned posts
     if all_posts and email:
         try:
-            sb = _supabase()
-            user_res = sb.table("app_users").select("id, role").eq("email", email).limit(1).execute()
+            # Each lambda re-resolves the client via _supabase(). Capturing `sb`
+            # would hand a retry the same dead client execute_supabase_query just
+            # dropped, defeating the reset.
+            user_res = execute_supabase_query(
+                lambda: _supabase().table("app_users").select("id, role").eq("email", email).limit(1).execute()
+            )
             if user_res.data:
                 id_member = user_res.data[0]["id"]
                 role = user_res.data[0].get("role", "member")
                 post_ids = [p.get("id") for p in all_posts if p.get("id")]
                 if post_ids:
+                    seeding_sel = "id_post, id_member, content, verify, link_comment, social_accounts(account_name)"
                     if role in ["admin", "leader"]:
-                        kpi_res = sb.table("seeding_content_kpi").select("id_post, id_member, content, verify, link_comment, social_accounts(account_name)").in_("id_post", post_ids).execute()
+                        kpi_res = execute_supabase_query(
+                            lambda: _supabase().table("seeding_content_kpi").select(seeding_sel).in_("id_post", post_ids).execute()
+                        )
                     else:
-                        kpi_res = sb.table("seeding_content_kpi").select("id_post, id_member, content, verify, link_comment, social_accounts(account_name)").eq("id_member", id_member).in_("id_post", post_ids).execute()
-                    
+                        kpi_res = execute_supabase_query(
+                            lambda: _supabase().table("seeding_content_kpi").select(seeding_sel).eq("id_member", id_member).in_("id_post", post_ids).execute()
+                        )
+
                     kpi_data = kpi_res.data or []
                     seeding_member_ids = list(set([k.get("id_member") for k in kpi_data if k.get("id_member")]))
                     member_name_map = {}
                     if seeding_member_ids:
-                        mem_res = sb.table("app_users").select("id, name").in_("id", seeding_member_ids).execute()
+                        mem_res = execute_supabase_query(
+                            lambda: _supabase().table("app_users").select("id, name").in_("id", seeding_member_ids).execute()
+                        )
                         for m in (mem_res.data or []):
                             member_name_map[m["id"]] = m.get("name") or "Unknown"
 
@@ -924,6 +931,7 @@ def _resolve_member_scope(sb: Client, email: str) -> Optional[list[str]]:
     return [user_id]
 
 
+@retry_on_winerror
 def get_unified_daily_trend(
     *,
     email: str,

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
+
+from datetime import timedelta
 
 from pydantic import BaseModel, field_validator
 
@@ -30,7 +32,7 @@ class CreateScheduledCommentRequest(BaseModel):
     @field_validator("scheduled_at")
     @classmethod
     def validate_future(cls, v: datetime) -> datetime:
-        if v <= datetime.now():
+        if v + timedelta(seconds=5) <= datetime.now(timezone.utc):
             raise ValueError("scheduled_at must be in the future")
         return v
 

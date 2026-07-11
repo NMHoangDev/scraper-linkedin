@@ -2,7 +2,7 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat tzdata
 
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -26,7 +26,8 @@ FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-ENV NODE_ENV=production
+ENV NODE_ENV=production \
+    TZ=Asia/Ho_Chi_Minh
 
 RUN addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1002 nextjs

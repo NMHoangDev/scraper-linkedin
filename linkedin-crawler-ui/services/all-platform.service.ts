@@ -106,13 +106,37 @@ function getDefaultHeaders(): Record<string, string> {
   return headers;
 }
 
+const CONNECTION_ERROR_MESSAGE = "Mất kết nối tới máy chủ, vui lòng thử lại.";
+
+// Backend đôi khi trả HTTP 200 kèm success:false mang nguyên văn lỗi httpx
+// (vd "Server disconnected without sending a response."). Đó là lỗi hạ tầng
+// tạm thời, phải thử lại chứ không phải hiển thị cho người dùng.
+const TRANSIENT_MESSAGE_MARKERS = [
+  "server disconnected",
+  "remoteprotocolerror",
+  "connectionterminated",
+  "pooltimeout",
+  "readtimeout",
+  "connecttimeout",
+  "timed out",
+  "502 bad gateway",
+  "503 service unavailable",
+  "504 gateway",
+];
+
+function isTransientMessage(message: unknown): boolean {
+  if (typeof message !== "string" || !message) return false;
+  const lower = message.toLowerCase();
+  return TRANSIENT_MESSAGE_MARKERS.some(marker => lower.includes(marker));
+}
+
 async function requestJson<T = any>(
   path: string,
   init?: RequestInit,
-  retries: number = 1
+  retries: number = 2
 ): Promise<ApiResponse<T>> {
   let lastError: any = null;
-  
+
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const res = await fetch(path, {
@@ -123,25 +147,42 @@ async function requestJson<T = any>(
           ...(init?.headers || {}),
         },
       });
-      
+
       // Nếu server trả về lỗi 5xx, có thể do đang khởi động lại hoặc load balancer ngắt kết nối
       if (!res.ok && res.status >= 500) {
         throw new Error(`Lỗi máy chủ (${res.status})`);
       }
-      
-      return await res.json();
+
+      const body = (await res.json()) as ApiResponse<T>;
+
+      // 200 nhưng backend báo lỗi hạ tầng tạm thời -> thử lại như với 5xx.
+      if (body && body.success === false && isTransientMessage(body.message)) {
+        throw new Error(body.message as string);
+      }
+
+      return body;
     } catch (err) {
       lastError = err;
+      // Request bị huỷ chủ động (timeout, đổi tab, unmount): không phải lỗi hạ
+      // tầng -> dừng ngay, không retry. Vẫn RETURN (không throw) để
+      // requestJsonWithTimeout còn đọc được controller.signal.aborted.
+      if (err instanceof Error && err.name === "AbortError") {
+        break;
+      }
       if (attempt < retries) {
-        // Đợi 1 giây trước khi thử lại
-        await new Promise(r => setTimeout(r, 1000));
+        // Backoff tăng dần: 400ms, 800ms...
+        await new Promise(r => setTimeout(r, 400 * 2 ** attempt));
       }
     }
   }
 
+  // Không bao giờ đổ nguyên văn lỗi httpx/tiếng Anh ra UI.
+  const rawMessage = lastError instanceof Error ? lastError.message : "";
   return {
     success: false,
-    message: lastError instanceof Error ? lastError.message : "Mất kết nối tới máy chủ (Server disconnected).",
+    message: !rawMessage || isTransientMessage(rawMessage)
+      ? CONNECTION_ERROR_MESSAGE
+      : rawMessage,
   };
 }
 

@@ -10,7 +10,9 @@
   ],
   "host_permissions": [
     "https://*.facebook.com/*",
-    "https://*.fb.com/*"
+    "https://*.fb.com/*",
+    "http://localhost:*/*",
+    "http://127.0.0.1:*/*"
   ],
   "action": {
     "default_title": "Facebook Seeding KPI",
