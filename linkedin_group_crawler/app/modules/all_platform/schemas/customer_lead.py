@@ -13,6 +13,9 @@ DEAL_STAGES = [
 ]
 TERMINAL_STAGES = ["won", "lost"]
 
+# Trạng thái thanh toán — dùng để lọc nhanh "khách nào còn nợ tiền".
+PAYMENT_STATUSES = ["unpaid", "partial", "paid"]
+
 # ---------------------------------------------------------------------------
 # Transition graph — mirror 1:1 DEAL_STAGE_TRANSITIONS trong
 # linkedin-crawler-ui/services/customer-lead.service.ts. Backend có API riêng
@@ -103,6 +106,10 @@ class CustomerLeadCreate(BaseModel):
     care_note: Optional[str] = None
     last_care_at: Optional[datetime] = None
 
+    # Thanh toán — hạn trả tiền + trạng thái (chưa/một phần/đã thanh toán)
+    payment_due_date: Optional[datetime] = None
+    payment_status: Optional[str] = "unpaid"
+
     tags: Optional[List[str]] = []
     has_budget: bool = False
     note: Optional[str] = None
@@ -155,6 +162,9 @@ class CustomerLeadUpdate(BaseModel):
     warranty_expires_at: Optional[datetime] = None
     care_note: Optional[str] = None
     last_care_at: Optional[datetime] = None
+
+    payment_due_date: Optional[datetime] = None
+    payment_status: Optional[str] = None
 
     tags: Optional[List[str]] = None
     has_budget: Optional[bool] = None
@@ -211,6 +221,8 @@ class CustomerLeadResponse(BaseModel):
     warranty_expires_at: Optional[datetime] = None
     care_note: Optional[str] = None
     last_care_at: Optional[datetime] = None
+    payment_due_date: Optional[datetime] = None
+    payment_status: str = "unpaid"
     tags: Optional[List[str]] = []
     has_budget: bool = False
     note: Optional[str] = None

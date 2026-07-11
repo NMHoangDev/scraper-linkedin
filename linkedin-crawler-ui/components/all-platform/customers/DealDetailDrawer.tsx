@@ -38,14 +38,17 @@ import {
   type ContractStatus,
   type Customer,
   type DealStage,
+  type PaymentStatus,
   DEAL_STAGE_META,
   LOST_REASON_OPTIONS,
+  PAYMENT_STATUS_OPTIONS,
   REJECT_REASON_TYPE_OPTIONS,
   type RejectReasonType,
 } from "@/services/customer-lead.service";
 import {
   allowedNextStages,
   getCurrentStage,
+  isPaymentOverdue,
   stageBadgeClass,
   stageLabel,
 } from "@/services/crm-pipeline.helpers";
@@ -90,6 +93,8 @@ export function DealDetailDrawer({ customer, open, onClose, onRequestTransition,
   const [chatOpen, setChatOpen] = useState(false);
   const [contractStatusDraft, setContractStatusDraft] = useState<ContractStatus>("active");
   const [savingContractStatus, setSavingContractStatus] = useState(false);
+  const [paymentStatusDraft, setPaymentStatusDraft] = useState<PaymentStatus>("unpaid");
+  const [savingPaymentStatus, setSavingPaymentStatus] = useState(false);
 
   const stage = useMemo(() => (customer ? getCurrentStage(customer) : null), [customer]);
   const nextOptions = useMemo(() => (stage ? allowedNextStages(stage) : []), [stage]);
@@ -113,6 +118,10 @@ export function DealDetailDrawer({ customer, open, onClose, onRequestTransition,
     setContractStatusDraft(customer?.contract_status ?? "active");
   }, [customer?.id, customer?.contract_status]);
 
+  useEffect(() => {
+    setPaymentStatusDraft(customer?.payment_status ?? "unpaid");
+  }, [customer?.id, customer?.payment_status]);
+
   async function handleContractStatusChange(next: ContractStatus) {
     if (!customer || next === customer.contract_status) {
       setContractStatusDraft(next);
@@ -131,6 +140,27 @@ export function DealDetailDrawer({ customer, open, onClose, onRequestTransition,
       toast.error(err?.message || "Không cập nhật được trạng thái hợp đồng");
     } finally {
       setSavingContractStatus(false);
+    }
+  }
+
+  async function handlePaymentStatusChange(next: PaymentStatus) {
+    if (!customer || next === customer.payment_status) {
+      setPaymentStatusDraft(next);
+      return;
+    }
+    const prev = paymentStatusDraft;
+    setPaymentStatusDraft(next);
+    setSavingPaymentStatus(true);
+    try {
+      const res = await customerLeadService.update(customer.id, { payment_status: next });
+      if (res?.success === false) throw new Error(res?.message || "Cập nhật thất bại");
+      toast.success("Đã cập nhật trạng thái thanh toán");
+      onCustomerUpdated?.({ ...customer, payment_status: next });
+    } catch (err: any) {
+      setPaymentStatusDraft(prev);
+      toast.error(err?.message || "Không cập nhật được trạng thái thanh toán");
+    } finally {
+      setSavingPaymentStatus(false);
     }
   }
 
@@ -331,6 +361,49 @@ export function DealDetailDrawer({ customer, open, onClose, onRequestTransition,
                     ))}
                   </select>
                 </div>
+                <div className="col-span-2 rounded-md border border-slate-200 bg-white px-3 py-2">
+                  <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
+                    <Wallet className="size-3" /> Trạng thái thanh toán
+                    {savingPaymentStatus && <Loader2 className="size-3 animate-spin text-slate-400" />}
+                  </div>
+                  <select
+                    value={paymentStatusDraft}
+                    disabled={savingPaymentStatus}
+                    onChange={(e) => handlePaymentStatusChange(e.target.value as PaymentStatus)}
+                    className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm font-medium text-slate-700 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
+                  >
+                    {PAYMENT_STATUS_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {customer.payment_due_date && (
+                  <div
+                    className={`rounded-md border px-3 py-2 ${
+                      isPaymentOverdue(customer)
+                        ? "border-red-200 bg-red-50"
+                        : "border-slate-200 bg-white"
+                    }`}
+                  >
+                    <div
+                      className={`flex items-center gap-1.5 text-[11px] uppercase tracking-wider ${
+                        isPaymentOverdue(customer) ? "text-red-700" : "text-slate-500"
+                      }`}
+                    >
+                      <CalendarDays className="size-3" />
+                      {isPaymentOverdue(customer) ? "Đã quá hạn thanh toán" : "Hạn thanh toán"}
+                    </div>
+                    <div
+                      className={`mt-0.5 font-medium ${
+                        isPaymentOverdue(customer) ? "text-red-800" : "text-slate-700"
+                      }`}
+                    >
+                      {formatDate(customer.payment_due_date)}
+                    </div>
+                  </div>
+                )}
                 {customer.last_attachment_name && (
                   <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
                     <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">

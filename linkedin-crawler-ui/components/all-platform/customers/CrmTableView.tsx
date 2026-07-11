@@ -13,8 +13,8 @@ import { useMemo, useState } from "react";
 import { ChevronUp, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Customer, DealStage } from "@/services/customer-lead.service";
-import { DEAL_STAGE_META } from "@/services/customer-lead.service";
-import { getCurrentStage } from "@/services/crm-pipeline.helpers";
+import { DEAL_STAGE_META, PAYMENT_STATUS_OPTIONS } from "@/services/customer-lead.service";
+import { getCurrentStage, isPaymentOverdue } from "@/services/crm-pipeline.helpers";
 
 interface ColumnDef<T> {
   key: keyof T | string;
@@ -129,6 +129,32 @@ export function CrmTableView({ customers, onCardClick, onEdit, onChat, onDelete 
         render: (c) => (
           <span className="text-xs text-amber-700">{formatDate(c.follow_up_date)}</span>
         ),
+      },
+      {
+        key: "payment_status",
+        label: "Thanh toán",
+        sortable: true,
+        render: (c) => {
+          const meta = PAYMENT_STATUS_OPTIONS.find((o) => o.value === c.payment_status) ?? PAYMENT_STATUS_OPTIONS[0];
+          const overdue = isPaymentOverdue(c);
+          return (
+            <div>
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold",
+                  overdue ? "border-red-200 bg-red-100 text-red-700" : meta.badgeClass,
+                )}
+              >
+                {overdue ? "Quá hạn" : meta.label}
+              </span>
+              {c.payment_due_date && (
+                <div className={cn("mt-0.5 text-[11px]", overdue ? "text-red-600" : "text-slate-500")}>
+                  Hạn: {formatDate(c.payment_due_date)}
+                </div>
+              )}
+            </div>
+          );
+        },
       },
       {
         key: "created_at",

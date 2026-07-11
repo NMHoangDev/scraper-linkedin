@@ -27,6 +27,7 @@ import {
   RotateCcw,
   Plus,
   Flag,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -41,13 +42,15 @@ import {
   customerLeadService,
   type Customer,
   type DealStage,
+  type PaymentStatus,
   type SourcePlatform,
   DEAL_STAGE_META,
+  PAYMENT_STATUS_OPTIONS,
   SOURCE_PLATFORM_OPTIONS,
   INDUSTRY_OPTIONS,
   CITY_OPTIONS,
 } from "@/services/customer-lead.service";
-import { getCurrentStage } from "@/services/crm-pipeline.helpers";
+import { getCurrentStage, isPaymentOverdue } from "@/services/crm-pipeline.helpers";
 import { cn } from "@/lib/utils";
 
 type ViewMode = "kanban" | "table";
@@ -59,6 +62,10 @@ interface FilterState {
   source_platform: string;
   /** Lọc theo 1 stage cụ thể (multi-select qua OR logic). */
   stageFilter: Set<DealStage>;
+  /** Lọc theo trạng thái thanh toán (multi-select qua OR logic). */
+  paymentFilter: Set<PaymentStatus>;
+  /** Chỉ hiện khách đã quá hạn thanh toán. */
+  onlyOverdue: boolean;
 }
 
 const inputCls =
@@ -88,12 +95,20 @@ function FilterBar({
     else next.add(s);
     set("stageFilter", next);
   };
+  const togglePayment = (s: PaymentStatus) => {
+    const next = new Set(filters.paymentFilter);
+    if (next.has(s)) next.delete(s);
+    else next.add(s);
+    set("paymentFilter", next);
+  };
   const hasFilter =
     filters.search ||
     filters.city ||
     filters.industry ||
     filters.source_platform ||
-    filters.stageFilter.size > 0;
+    filters.stageFilter.size > 0 ||
+    filters.paymentFilter.size > 0 ||
+    filters.onlyOverdue;
 
   return (
     <div className="space-y-2">
@@ -147,6 +162,8 @@ function FilterBar({
                 industry: "",
                 source_platform: "",
                 stageFilter: new Set(),
+                paymentFilter: new Set(),
+                onlyOverdue: false,
               })
             }
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-500 transition hover:bg-slate-100"
@@ -182,6 +199,39 @@ function FilterBar({
           );
         })}
       </div>
+
+      {/* Payment filter pills — lọc nhanh khách còn nợ / quá hạn thanh toán */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-xs font-semibold text-slate-500">Thanh toán:</span>
+        {PAYMENT_STATUS_OPTIONS.map((opt) => {
+          const active = filters.paymentFilter.has(opt.value);
+          return (
+            <button
+              key={opt.value}
+              onClick={() => togglePayment(opt.value)}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition",
+                active
+                  ? opt.badgeClass + " ring-2 ring-primary/30"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
+              )}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+        <button
+          onClick={() => onChange({ ...filters, onlyOverdue: !filters.onlyOverdue })}
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition",
+            filters.onlyOverdue
+              ? "border-red-200 bg-red-100 text-red-700 ring-2 ring-primary/30"
+              : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
+          )}
+        >
+          <AlertTriangle className="size-3" /> Chỉ khách quá hạn
+        </button>
+      </div>
     </div>
   );
 }
@@ -198,6 +248,8 @@ export default function CrmCustomersPage() {
     industry: "",
     source_platform: "",
     stageFilter: new Set(),
+    paymentFilter: new Set(),
+    onlyOverdue: false,
   });
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -247,26 +299,36 @@ export default function CrmCustomersPage() {
     void fetchStageCounts();
   }, [fetchCustomers, fetchStageCounts]);
 
-  // ─────────── Filter theo stageFilter (client-side) ───────────
+  // ─────────── Filter theo stageFilter + paymentFilter/onlyOverdue (client-side) ───────────
   const filteredCustomers = useMemo(() => {
-    if (filters.stageFilter.size === 0) return customers;
-    return customers.filter((c) => filters.stageFilter.has(getCurrentStage(c)));
-  }, [customers, filters.stageFilter]);
+    return customers.filter((c) => {
+      if (filters.stageFilter.size > 0 && !filters.stageFilter.has(getCurrentStage(c))) return false;
+      if (filters.paymentFilter.size > 0 && !filters.paymentFilter.has(c.payment_status ?? "unpaid")) return false;
+      if (filters.onlyOverdue && !isPaymentOverdue(c)) return false;
+      return true;
+    });
+  }, [customers, filters.stageFilter, filters.paymentFilter, filters.onlyOverdue]);
 
   // ─────────── KPI stats (server-fetched, fallback local) ───────────
   const stats = useMemo(() => {
     const localCounts: Record<string, number> = {};
     let openCount = 0;
     let wonValue = 0;
+    let owingCount = 0;
+    let overdueCount = 0;
     for (const c of filteredCustomers) {
       const s = getCurrentStage(c);
       localCounts[s] = (localCounts[s] ?? 0) + 1;
       if (s !== "won" && s !== "lost") openCount++;
       if (s === "won") wonValue += c.estimated_budget ?? c.lifetime_value ?? 0;
+      if ((c.payment_status ?? "unpaid") !== "paid") owingCount++;
+      if (isPaymentOverdue(c)) overdueCount++;
     }
     return {
       openCount,
       wonValue,
+      owingCount,
+      overdueCount,
       counts: { ...stageCounts, ...localCounts },
     };
   }, [filteredCustomers, stageCounts]);
@@ -407,7 +469,7 @@ export default function CrmCustomersPage() {
       </div>
 
       {/* KPI strip */}
-      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
           <div className="text-[11px] uppercase tracking-wider text-slate-500">Tổng deal</div>
           <div className="mt-0.5 text-xl font-bold text-slate-800">{filteredCustomers.length}</div>
@@ -433,6 +495,16 @@ export default function CrmCustomersPage() {
               maximumFractionDigits: 0,
             }).format(stats.wonValue)}
           </div>
+        </div>
+        <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2.5">
+          <div className="text-[11px] uppercase tracking-wider text-orange-700">Đang nợ</div>
+          <div className="mt-0.5 text-xl font-bold text-orange-800">{stats.owingCount}</div>
+        </div>
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
+          <div className="flex items-center gap-1 text-[11px] uppercase tracking-wider text-red-700">
+            <AlertTriangle className="size-3" /> Quá hạn
+          </div>
+          <div className="mt-0.5 text-xl font-bold text-red-800">{stats.overdueCount}</div>
         </div>
       </div>
 
