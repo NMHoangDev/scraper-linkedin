@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from typing import List
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from app.modules.all_platform.auth_deps import require_admin
 from app.modules.all_platform.schemas import BaseResponse
 from app.modules.all_platform.services import (
     get_user,
@@ -51,8 +52,9 @@ def users_update_slug(payload: dict) -> BaseResponse:
 
 
 @router.post("/update-role")
-def users_update_role(payload: dict) -> BaseResponse:
-    """Update user's role."""
+def users_update_role(payload: dict, _admin: dict = Depends(require_admin)) -> BaseResponse:
+    """Update user's role. CHỈ admin — endpoint này trước đây không có auth gì cả,
+    bất kỳ ai (kể cả member) cũng tự đổi role mình thành admin được."""
     try:
         email = payload.get("email")
         role = payload.get("role")
