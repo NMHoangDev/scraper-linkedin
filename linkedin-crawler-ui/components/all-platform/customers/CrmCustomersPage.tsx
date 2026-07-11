@@ -511,6 +511,13 @@ export default function CrmCustomersPage() {
           setDetailCustomer(null);
           handleDelete(c.id);
         }}
+        onCustomerUpdated={(updated) => {
+          // Cập nhật ngay trong list + drawer đang mở (đổi trạng thái hợp đồng
+          // xong không cần đóng/mở lại), rồi refetch để đồng bộ đầy đủ với server.
+          setDetailCustomer(updated);
+          setCustomers((list) => list.map((c) => (c.id === updated.id ? updated : c)));
+          void fetchCustomers();
+        }}
       />
 
       {/* Quick chat */}

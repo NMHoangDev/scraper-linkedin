@@ -482,11 +482,8 @@ def update_team(team_name: str, leader_email_or_id: str, member_emails_or_ids: l
     supabase.table("teams").update({"id_leader": leader_id, "name_team": team_name}).eq("id", found_team_id).execute()
     team_id = found_team_id
 
-    # 3. Remove all existing members from member_of_teams for this team
-    supabase.table("member_of_teams").delete().eq("id_teams", team_id).execute()
-
-    # 4. Insert new members
-    mot_records = []
+    # 3. Resolve danh sach member moi duoc gui len
+    desired_member_ids: set[str] = set()
     for mid in member_emails_or_ids:
         m_str = str(mid).strip()
         if not m_str:
@@ -495,13 +492,26 @@ def update_team(team_name: str, leader_email_or_id: str, member_emails_or_ids: l
             resolved_member_id = _resolve_user_id(supabase, m_str)
         except ValueError:
             continue
-        mot_records.append({
-            "id_teams": team_id,
-            "id_member": resolved_member_id
-        })
+        desired_member_ids.add(resolved_member_id)
 
-    if mot_records:
-        supabase.table("member_of_teams").insert(mot_records).execute()
+    # 4. Chi xoa/them phan THAY DOI (khong con xoa het roi insert lai toan bo).
+    # Truoc day xoa het + insert lai toan bo -> neu 1 member vua duoc them thang
+    # vao DB (vd fix du lieu tay) ma khong nam trong danh sach FE dang gui (FE
+    # load form tu truoc, chua biet ve thay doi do) thi lan luu tiep theo se
+    # xoa mat member do, du nguoi sua team khong co y dinh xoa ai ca.
+    existing_res = supabase.table("member_of_teams").select("id_member").eq("id_teams", team_id).execute()
+    existing_member_ids = {r["id_member"] for r in (existing_res.data or [])}
+
+    to_remove = existing_member_ids - desired_member_ids
+    to_add = desired_member_ids - existing_member_ids
+
+    if to_remove:
+        supabase.table("member_of_teams").delete().eq("id_teams", team_id).in_("id_member", list(to_remove)).execute()
+
+    if to_add:
+        supabase.table("member_of_teams").insert(
+            [{"id_teams": team_id, "id_member": mid} for mid in to_add]
+        ).execute()
 
     _clear_people_caches()
     return [{"id": team_id, "name_team": team_name, "id_leader": leader_id}]
