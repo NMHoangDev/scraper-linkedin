@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Header, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 
+from app.modules.all_platform.auth_deps import require_admin
 from app.modules.all_platform.schemas import (
     RegisterRequest,
     LoginRequest,
@@ -293,8 +294,16 @@ class AdminResetPasswordRequest(BaseModel):
     email: str
 
 @router.post("/admin/reset-password")
-def auth_admin_reset_password(payload: AdminResetPasswordRequest) -> BaseResponse:
-    """Admin tool to reset password to 123123."""
+def auth_admin_reset_password(
+    payload: AdminResetPasswordRequest,
+    _admin: dict = Depends(require_admin),
+) -> BaseResponse:
+    """Admin tool to reset password to 123123.
+
+    Truoc day khong co Depends() nao ca -> bat ky ai cung reset duoc mat khau
+    cua bat ky tai khoan nao (ke ca admin) ve gia tri co dinh "123123" ->
+    chiem tai khoan hoan toan. Gio bat buoc phai la admin da xac thuc.
+    """
     try:
         from app.modules.all_platform.services.auth_service import _hash_password
         from app.core.supabase_client import get_supabase_client
