@@ -39,10 +39,12 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, BackgroundTasks
+from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
 
+from app.modules.all_platform.auth_deps import get_authenticated_caller_email
 from app.modules.all_platform.zalo.api.security import verify_zalo_api_key
+from app.modules.all_platform.zalo.services.supabase_service import get_user_role
 from app.modules.all_platform.zalo.services.supabase_inbox_share_service import (
     bulk_sync_shares,
     count_verified_inbox_shares,
@@ -108,6 +110,20 @@ class CountVerifiedRequest(BaseModel):
     member_email: str = Field(..., min_length=3)
     start_date: str = Field(..., description="ISO date hoặc ISO datetime (bao gồm)")
     end_date: str = Field(..., description="ISO date hoặc ISO datetime (bao gồm)")
+
+
+async def _require_leader_or_admin(caller_email: Optional[str]) -> str:
+    """403 nếu người gọi không phải leader/admin THẬT (tra role từ DB theo email
+    đã xác thực bằng JWT) — trước đây verify()/toggle-lead không check gì cả,
+    `leader_email` chỉ là 1 field trong body do client tự điền. Một member tự
+    điền leader_email = email của chính mình là tự duyệt KPI Inbox cho bản thân
+    được, không cần là leader thật."""
+    if not caller_email:
+        raise HTTPException(status_code=401, detail="Cần đăng nhập")
+    role = await get_user_role(caller_email)
+    if role not in ("admin", "leader"):
+        raise HTTPException(status_code=403, detail="Chỉ leader/admin được xác minh KPI Inbox")
+    return caller_email
 
 
 async def _background_fetch_20_messages(account_id: str, conversation_id: str):
@@ -226,22 +242,34 @@ def share_bulk_sync(payload: BulkSyncRequest, background_tasks: BackgroundTasks)
 
 
 @router.post("/verify")
-def share_verify(payload: VerifyRequest) -> Dict[str, Any]:
+async def share_verify(
+    payload: VerifyRequest,
+    caller_email: Optional[str] = Depends(get_authenticated_caller_email),
+) -> Dict[str, Any]:
     """Leader xác minh 1 share conversation.
 
     Sau khi verify, conversation này mới được tính vào kpi_inbox_current
     (chỉ trong khoảng kpi_tracker.start_date..end_date).
     """
     try:
+        verified_email = await _require_leader_or_admin(caller_email)
         result = verify_inbox_share(
             row_id=payload.row_id,
-            leader_email=payload.leader_email,
+            # Dùng email đã xác thực (KHÔNG dùng payload.leader_email) — tránh
+            # trường hợp caller là leader thật nhưng ghi "verified_by" thành
+            # email người khác.
+            leader_email=verified_email,
             note=payload.note,
         )
         resp = {"success": result.get("ok", False), **result}
         if result.get("ok") and "row" in result:
             resp["data"] = {"row": result["row"]}
         return resp
+    except HTTPException:
+        # Không nuốt 401/403 của _require_leader_or_admin thành 200 giả — phải
+        # để FastAPI trả đúng status code, không phải {success:false} lẫn vào
+        # lỗi nghiệp vụ bình thường.
+        raise
     except Exception as exc:
         return {"success": False, "message": str(exc)}
 
@@ -260,18 +288,24 @@ def share_unverify(payload: UnverifyRequest) -> Dict[str, Any]:
 
 
 @router.post("/toggle-lead")
-def share_toggle_lead(payload: ToggleLeadRequest) -> Dict[str, Any]:
+async def share_toggle_lead(
+    payload: ToggleLeadRequest,
+    caller_email: Optional[str] = Depends(get_authenticated_caller_email),
+) -> Dict[str, Any]:
     """Leader đánh dấu conversation có tiềm năng hay không."""
     try:
+        verified_email = await _require_leader_or_admin(caller_email)
         result = toggle_lead_inbox_share(
             row_id=payload.row_id,
-            leader_email=payload.leader_email,
+            leader_email=verified_email,
             is_lead=payload.is_lead,
         )
         resp = {"success": result.get("ok", False), **result}
         if result.get("ok") and "row" in result:
             resp["data"] = {"row": result["row"]}
         return resp
+    except HTTPException:
+        raise
     except Exception as exc:
         return {"success": False, "message": str(exc)}
 
