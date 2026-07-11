@@ -53,6 +53,22 @@ def require_admin(request: Request, authorization: str | None = Header(default=N
     return resolved
 
 
+def get_authenticated_caller_email(request: Request, authorization: str | None = Header(default=None)) -> str | None:
+    """Email người gọi THẬT, lấy từ JWT (cookie `crawlpro_access_token`) — dùng thay
+    cho việc tin header `X-Caller-Email` client tự gửi (giá trị đó trước đây lấy
+    thẳng từ `localStorage`, ai cũng sửa được bằng DevTools để mạo danh bất kỳ ai).
+
+    Trả None nếu không có JWT hợp lệ (KHÔNG raise 401) — một số route Zalo hiện coi
+    "không có caller_email" là truy cập đầy đủ cho tương thích ngược; giữ nguyên
+    hành vi đó, chỉ đổi NGUỒN của email từ "client tự khai" sang "xác thực thật".
+    """
+    try:
+        user = get_current_user(request, authorization)
+    except HTTPException:
+        return None
+    return str(user.get("email") or "").strip().lower() or None
+
+
 async def require_admin_ws(websocket, authorization: str | None = None) -> dict[str, Any] | None:
     """Bản cho WebSocket — không raise HTTPException (không áp dụng được), tự đóng
     connection với close code 4403 nếu thiếu quyền. Trả None nếu đã đóng — caller
