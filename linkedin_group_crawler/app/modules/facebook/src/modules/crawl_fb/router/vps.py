@@ -1,10 +1,11 @@
 import asyncio
 import logging
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from typing import Optional
 import asyncssh
 
+from app.modules.all_platform.auth_deps import require_admin, require_admin_ws
 from app.modules.facebook.src.modules.crud.vps_fb.vps import (
     get_all_vps,
     get_vps_by_id,
@@ -38,8 +39,11 @@ class VpsUpdate(BaseModel):
     id_member: Optional[str] = None
     Username: Optional[str] = None
 
+Admin = Depends(require_admin)
+
+
 @router.get("")
-def read_vps_list():
+def read_vps_list(_admin: dict = Admin):
     try:
         data = get_all_vps()
         return {"data": data}
@@ -47,7 +51,7 @@ def read_vps_list():
         raise HTTPException(status_code=500, detail=str(exc))
 
 @router.post("")
-def add_vps(vps: VpsCreate):
+def add_vps(vps: VpsCreate, _admin: dict = Admin):
     try:
         data_to_insert = vps.model_dump()
         data = create_vps(data_to_insert)
@@ -56,7 +60,7 @@ def add_vps(vps: VpsCreate):
         raise HTTPException(status_code=500, detail=str(exc))
 
 @router.put("/{vps_id}")
-def edit_vps(vps_id: str, vps: VpsUpdate):
+def edit_vps(vps_id: str, vps: VpsUpdate, _admin: dict = Admin):
     update_data = vps.model_dump(exclude_unset=True)
     if not update_data:
         raise HTTPException(status_code=400, detail="No fields to update")
@@ -67,7 +71,7 @@ def edit_vps(vps_id: str, vps: VpsUpdate):
         raise HTTPException(status_code=500, detail=str(exc))
 
 @router.delete("/{vps_id}")
-def remove_vps(vps_id: str):
+def remove_vps(vps_id: str, _admin: dict = Admin):
     try:
         data = delete_vps(vps_id)
         return {"data": data, "message": "Deleted successfully"}
@@ -84,13 +88,21 @@ async def vnc_proxy(websocket: WebSocket, vps_id: str):
     WebSocket proxy cho noVNC. Kết nối Backend với VPS qua TCP port chỉ định hoặc fallback 5900/5901.
     """
     await websocket.accept()
-    
+
+    # Trước đây KHÔNG có bước này — bất kỳ ai biết vps_id (hoặc dò tuần tự UUID)
+    # đều mở được phiên VNC thẳng vào VPS thật. Cookie JWT tự gửi kèm handshake
+    # WebSocket (trình duyệt gửi Cookie như request HTTP thường), nên noVNC không
+    # cần đổi gì phía client.
+    admin = await require_admin_ws(websocket)
+    if admin is None:
+        return
+
     try:
         vps_info = get_vps_by_id(vps_id)
         if not vps_info:
             await websocket.close(code=1008, reason="VPS not found in DB")
             return
-            
+
         vps_ip = vps_info.get("ip")
         if not vps_ip:
             await websocket.close(code=1008, reason="VPS IP is empty")
@@ -194,7 +206,13 @@ async def ssh_proxy(websocket: WebSocket, vps_id: str):
     WebSocket proxy cho SSH Terminal (xterm.js).
     """
     await websocket.accept()
-    
+
+    # Xem chú thích ở vnc_proxy — trước đây thiếu bước này, ai cũng mở được
+    # SSH shell thật vào VPS chỉ cần biết vps_id.
+    admin = await require_admin_ws(websocket)
+    if admin is None:
+        return
+
     try:
         vps_info = get_vps_by_id(vps_id)
         if not vps_info:
