@@ -12,6 +12,7 @@ import {
   CITY_OPTIONS,
   SERVICE_PACKAGE_OPTIONS,
   DEAL_STAGE_META,
+  PAYMENT_STATUS_OPTIONS,
 } from "@/services/customer-lead.service";
 import { toast } from "sonner";
 
@@ -43,6 +44,8 @@ const emptyForm = (): Partial<Customer> => ({
   contract_status: "active",
   contract_signed_at: null,
   warranty_expires_at: null,
+  payment_due_date: null,
+  payment_status: "unpaid",
   customer_since: null,
   care_note: null,
   last_care_at: null,
@@ -136,6 +139,8 @@ export function CrmCustomerModal({
         contract_status: formData.contract_status ?? "active",
         contract_signed_at: formData.contract_signed_at || null,
         warranty_expires_at: formData.warranty_expires_at || null,
+        payment_due_date: formData.payment_due_date || null,
+        payment_status: formData.payment_status ?? "unpaid",
         customer_since: formData.customer_since || null,
         care_note: formData.care_note?.trim() || null,
         last_care_at: formData.last_care_at || null,
@@ -501,6 +506,32 @@ export function CrmCustomerModal({
                     <option value="completed">Đã hoàn thành</option>
                     <option value="maintenance">Bảo trì / bảo hành</option>
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Trạng thái thanh toán</label>
+                  <select
+                    value={formData.payment_status ?? "unpaid"}
+                    onChange={(e) => set("payment_status", e.target.value as Customer["payment_status"])}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm bg-white"
+                  >
+                    {PAYMENT_STATUS_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Ngày cần thanh toán</label>
+                  <input
+                    type="date"
+                    value={dateInputValue(formData.payment_due_date)}
+                    onChange={(e) => set("payment_due_date", toIsoDate(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm"
+                  />
+                  <p className="mt-1 text-[10px] text-slate-400">
+                    Hạn khách cần thanh toán kỳ hiện tại/tiếp theo — dùng để lọc khách còn nợ tiền.
+                  </p>
                 </div>
 
                 <div>

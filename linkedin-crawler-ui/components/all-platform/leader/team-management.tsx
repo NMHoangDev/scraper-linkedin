@@ -647,7 +647,7 @@ export function TeamManagement() {
                       { label: "Post", current: member.kpiPostCurrent, target: member.kpiPostTarget, hasTarget: true },
                       { label: "Comment", current: member.kpiCommentCurrent, target: member.kpiCommentTarget, hasTarget: true },
                       { label: "Inbox", current: member.kpiInboxCurrent, target: member.kpiInboxTarget, hasTarget: true },
-                      { label: "Khách reply", current: member.replyCurrent, target: 0, hasTarget: false },
+                      { label: "Khách reply (tham khảo)", current: member.replyCurrent, target: 0, hasTarget: false },
                       { label: "Lead", current: member.kpiLeadCurrent, target: member.kpiLeadTarget, hasTarget: true },
                     ].map((item) => (
                       <div key={item.label} className="rounded-xl bg-slate-50 px-3 py-2">
@@ -731,8 +731,8 @@ export function TeamManagement() {
                 <th className="px-3 py-2.5 text-left whitespace-nowrap">Thành viên</th>
                 <th className="px-1 py-2.5 text-center whitespace-nowrap">Post</th>
                 <th className="px-1 py-2.5 text-center whitespace-nowrap">Comment</th>
-                <th className="px-1 py-2.5 text-center whitespace-nowrap">Inbox</th>
-                <th className="px-1 py-2.5 text-center whitespace-nowrap" title="Số tin nhắn thực tế khách gửi tới (chưa cần xác nhận KPI)">Khách reply</th>
+                <th className="px-1 py-2.5 text-center whitespace-nowrap" title="Số HỘI THOẠI tính KPI: Zalo đã xác minh + Facebook đã tính KPI">Inbox</th>
+                <th className="px-1 py-2.5 text-center whitespace-nowrap" title="Số TIN NHẮN khách gửi tới. Chỉ tham khảo — không cộng vào KPI Inbox.">Khách reply (tham khảo)</th>
                 <th className="px-1 py-2.5 text-center whitespace-nowrap">Lead</th>
                 <th className="px-2 py-2.5 text-center whitespace-nowrap">Tiến độ</th>
                 <th className="px-2 py-2.5 text-center whitespace-nowrap">Hành động</th>
@@ -765,7 +765,17 @@ export function TeamManagement() {
                   return (
                     <tr key={member.id} className="transition hover:bg-slate-50/50">
                       <td className="px-3 py-2.5">
-                        <div className="whitespace-nowrap text-xs font-bold text-slate-800">{member.name || "N/A"}</div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="whitespace-nowrap text-xs font-bold text-slate-800">{member.name || "N/A"}</span>
+                          {totalTarget === 0 && (
+                            <span
+                              className="whitespace-nowrap rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700"
+                              title="Tuần này chưa giao chỉ tiêu KPI cho thành viên này"
+                            >
+                              Chưa giao KPI
+                            </span>
+                          )}
+                        </div>
                         <div className="max-w-[120px] truncate text-[10px] font-medium text-slate-400" title={member.email}>{member.email}</div>
                       </td>
                       <td className="px-1 py-2.5 text-center">
@@ -777,11 +787,21 @@ export function TeamManagement() {
                         <InlineKpiTarget member={member} field="kpiCommentTarget" value={member.kpiCommentTarget} />
                       </td>
                       <td className="px-1 py-2.5 text-center">
-                        <span className={cn("text-[11px] font-bold", member.kpiInboxCurrent >= member.kpiInboxTarget && member.kpiInboxTarget > 0 ? "text-emerald-600" : "text-slate-800")}>{member.kpiInboxCurrent}</span>
+                        <span
+                          className={cn("text-[11px] font-bold", member.kpiInboxCurrent >= member.kpiInboxTarget && member.kpiInboxTarget > 0 ? "text-emerald-600" : "text-slate-800")}
+                          title={`Tổng ${member.kpiInboxCurrent} hội thoại — Zalo đã xác minh: ${member.kpiInboxZalo}, Facebook đã tính KPI: ${member.kpiInboxFbKpi}`}
+                        >
+                          {member.kpiInboxCurrent}
+                        </span>
                         <InlineKpiTarget member={member} field="kpiInboxTarget" value={member.kpiInboxTarget} />
                       </td>
                       <td className="px-1 py-2.5 text-center">
-                        <span className="text-[11px] font-bold text-slate-800">{member.replyCurrent}</span>
+                        <span
+                          className="text-[11px] font-bold text-slate-500"
+                          title="Số tin nhắn khách gửi tới trong tuần. Chỉ để tham khảo — KHÔNG cộng vào KPI Inbox."
+                        >
+                          {member.replyCurrent}
+                        </span>
                       </td>
                       <td className="px-1 py-2.5 text-center">
                         <span className="text-[11px] font-bold text-slate-800">{member.kpiLeadCurrent}</span>

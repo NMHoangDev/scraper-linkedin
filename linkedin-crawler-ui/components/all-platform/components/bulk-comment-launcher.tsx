@@ -1,15 +1,22 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { UnifiedPost, SocialAccount } from "@/types/unified.types";
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import { UnifiedPost, SocialAccount, ScheduledComment } from "@/types/unified.types";
 import { socialAccountsService } from "@/services/all-platform.service";
+import { scheduledCommentService } from "@/services/scheduled-comment.service";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { API_BASE_URL } from "@/lib/env";
 import { cn } from "@/lib/utils";
+import { useQuickCommentLibrary } from "./use-quick-comment-library";
 
 interface BulkCommentLauncherProps {
   posts: UnifiedPost[];
   onComplete?: (seededUrls: string[]) => void;
+}
+
+function toLocalDatetimeLocal(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherProps) {
@@ -21,8 +28,24 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
   const [isReady, setIsReady] = useState(false);
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
+  const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState<string>("");
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [stopping, setStopping] = useState(false);
+  const [scheduleResult, setScheduleResult] = useState<{ success: number; failed: number; message: string } | null>(null);
 
   const { user } = useAppAuth();
+  const processingScheduledRef = useRef<Set<string>>(new Set());
+  const { libraryItems: commentTemplates } = useQuickCommentLibrary("facebook");
+  const commentTemplateGroups = useMemo(() => {
+    const groups = new Map<string, { label: string; templates: typeof commentTemplates }>();
+    commentTemplates.forEach((item) => {
+      const label = item.label || "Khác";
+      if (!groups.has(label)) groups.set(label, { label, templates: [] });
+      groups.get(label)!.templates.push(item);
+    });
+    return Array.from(groups.values());
+  }, [commentTemplates]);
 
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
@@ -35,24 +58,34 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
         setProgress(event.data.payload);
       } else if (event.data?.action === "BULK_COMMENT_DONE") {
         setIsCommenting(false);
-        setProgress(p => p ? { ...p, status: "Hoàn tất toàn bộ tiến trình!" } : null);
-        if (onComplete) onComplete(Array.from(selectedUrls));
+        const pendingIds = Array.from(processingScheduledRef.current);
+        if (pendingIds.length > 0) {
+          for (const id of pendingIds) {
+            scheduledCommentService.markPosted(id).catch(() => {});
+          }
+          processingScheduledRef.current.clear();
+          setProgress(p => p ? { ...p, status: "Đã hoàn tất comment hẹn giờ!" } : null);
+        } else {
+          setProgress(p => p ? { ...p, status: "Hoàn tất toàn bộ tiến trình!" } : null);
+          if (onComplete) onComplete(Array.from(selectedUrls));
+        }
       } else if (event.data?.action === "STATUS_RESPONSE") {
         const { isCommenting: extIsCommenting, currentProgress } = event.data.payload || {};
         if (extIsCommenting) {
           setIsCommenting(true);
-          setIsExpanded(true); // Tự động mở khung nếu đang chạy
+          setIsExpanded(true);
           if (currentProgress) setProgress(currentProgress);
-        } else if (isCommenting) { // If it was commenting but extension says it stopped
+        } else if (isCommenting) {
           setIsCommenting(false);
         }
+      } else if (event.data?.action === "STOP_BULK_COMMENT_RESPONSE") {
+        setStopping(false);
       }
     };
 
     window.addEventListener("message", handleMessage);
     const interval = setInterval(() => {
       if (!isReady) window.postMessage({ action: "PING_COMMENT_EXTENSION" }, "*");
-      // Poll trạng thái liên tục để phục hồi khi chuyển trang về
       window.postMessage({ action: "GET_STATUS" }, "*");
     }, 1000);
 
@@ -60,7 +93,7 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
       window.removeEventListener("message", handleMessage);
       clearInterval(interval);
     };
-  }, [selectedUrls.size, isReady]);
+  }, [selectedUrls.size, isReady, onComplete]);
 
   useEffect(() => {
     if (isExpanded && socialAccounts.length === 0) {
@@ -71,7 +104,62 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
         }
       });
     }
+    if (isExpanded && !scheduledAt) {
+      const now = new Date();
+      now.setMinutes(now.getMinutes() + 30);
+      setScheduledAt(toLocalDatetimeLocal(now));
+    }
   }, [isExpanded, socialAccounts.length]);
+
+  useEffect(() => {
+    if (!isReady || !user?.email) return;
+
+    const pollScheduled = async () => {
+      if (isCommenting) return;
+      try {
+        const res = await scheduledCommentService.getAll({
+          status: "pending",
+          platform: "facebook",
+          page: 1,
+          limit: 50,
+        });
+        if (!res.data || res.data.length === 0) return;
+        const now = new Date();
+        const dueComments = res.data.filter(sc =>
+          !processingScheduledRef.current.has(sc.id) &&
+          new Date(sc.scheduled_at) <= now
+        );
+        if (dueComments.length === 0) return;
+
+        // Process ONE due comment per poll cycle to preserve per-comment content + account
+        const comment = dueComments[0];
+        processingScheduledRef.current.add(comment.id);
+        setIsCommenting(true);
+
+        window.postMessage({
+          action: "START_BULK_COMMENT",
+          payload: {
+            posts: [{
+              url: comment.post_url,
+              id_post: comment.id_post_fb,
+            }],
+            text: comment.comment_content || "",
+            verifyConfig: {
+              apiBase: API_BASE_URL || "https://seeding.markeeai.com",
+              email_member: user.email,
+              id_social_account: comment.id_social_account || undefined,
+              id_platform: 1,
+            },
+          },
+        }, "*");
+      } catch {
+        // Silently retry on next poll
+      }
+    };
+
+    const interval = setInterval(pollScheduled, 10000);
+    return () => clearInterval(interval);
+  }, [isReady, user?.email]);
 
   const validPosts = posts.filter(p => 
     p.platform === "facebook" && p.post_url && !p.seeding_content && (!p.all_seedings || p.all_seedings.length === 0)
@@ -116,6 +204,59 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
       }
     }, "*");
   };
+
+  const handleSchedule = async () => {
+    if (!commentText.trim()) return alert("Vui lòng nhập nội dung comment!");
+    if (selectedUrls.size === 0) return alert("Vui lòng chọn ít nhất 1 bài viết!");
+    if (!scheduledAt) return alert("Vui lòng chọn thời gian hẹn!");
+    if (new Date(scheduledAt) <= new Date()) return alert("Thời gian phải trong tương lai!");
+    if (!selectedAccountId) return alert("Vui lòng chọn tài khoản Seeding!");
+
+    setIsScheduling(true);
+    setScheduleResult(null);
+
+    let success = 0;
+    let failed = 0;
+    const failedUrls: string[] = [];
+    const urls = Array.from(selectedUrls);
+
+    for (const url of urls) {
+      const post = validPosts.find(p => p.post_url === url);
+      try {
+        await scheduledCommentService.create({
+          id_post_fb: post?.id,
+          platform: "facebook",
+          post_url: url,
+          group_name: post?.group_name,
+          post_content: post?.content,
+          id_social_account: selectedAccountId,
+          comment_content: commentText.trim(),
+          ai_generated: false,
+          scheduled_at: new Date(scheduledAt).toISOString(),
+        });
+        success++;
+      } catch (err) {
+        console.error("[Schedule] Failed to schedule comment for", url, err);
+        failed++;
+        failedUrls.push(url);
+      }
+    }
+
+    const msg = failed === 0
+      ? `Đã lên lịch ${success} bài viết thành công!`
+      : `Đã lên lịch ${success}/${urls.length} bài viết. ${failed} bài thất bại.`;
+
+    setScheduleResult({ success, failed, message: msg });
+
+    setIsScheduling(false);
+  };
+
+  const handleStop = () => {
+    setStopping(true);
+    window.postMessage({ action: "STOP_BULK_COMMENT" }, "*");
+  };
+
+  const minScheduleTime = toLocalDatetimeLocal(new Date());
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden flex flex-col transition-all duration-300 w-full mb-6 relative">
@@ -171,7 +312,7 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
                   className="w-full rounded-xl border border-slate-200 p-2.5 text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none"
                   value={selectedAccountId}
                   onChange={e => setSelectedAccountId(e.target.value)}
-                  disabled={isCommenting}
+                  disabled={isCommenting || isScheduling}
                 >
                   <option value="">-- Tự do (Dùng acc đang đăng nhập FB) --</option>
                   {socialAccounts.map(acc => (
@@ -181,15 +322,69 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
                   ))}
                 </select>
               </div>
-              <div className="space-y-2 flex-1 flex flex-col">
-                <label className="text-sm font-bold text-slate-700">Nội dung Comment chung:</label>
+              <div className="space-y-2 flex-1 flex flex-col relative">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-bold text-slate-700">Nội dung Comment chung:</label>
+                  <button
+                    type="button"
+                    onClick={() => setIsTemplatePickerOpen(v => !v)}
+                    disabled={isCommenting}
+                    className="text-xs font-semibold text-red-600 hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">bookmark</span>
+                    Chọn mẫu câu
+                  </button>
+                </div>
                 <textarea
                   className="w-full flex-1 rounded-xl border border-slate-200 p-3 text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none resize-y min-h-[120px]"
                   placeholder="Nhập nội dung bạn muốn seeding..."
                   value={commentText}
                   onChange={e => setCommentText(e.target.value)}
-                  disabled={isCommenting}
+                  disabled={isCommenting || isScheduling}
                 />
+
+                {isTemplatePickerOpen && (
+                  <div className="absolute right-0 top-8 z-20 w-80 max-h-[320px] overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+                    <div className="px-3 py-2 text-xs font-bold text-slate-700 border-b border-slate-100 bg-slate-50 sticky top-0">
+                      Thư viện mẫu câu comment
+                    </div>
+                    {commentTemplateGroups.length === 0 ? (
+                      <div className="p-3 text-xs text-slate-500">
+                        Chưa có mẫu nào. Vào trang Quick Comment Library để thêm.
+                      </div>
+                    ) : (
+                      commentTemplateGroups.map((group) => (
+                        <div key={group.label}>
+                          <div className="px-3 py-1.5 text-[10px] font-bold text-slate-500 bg-slate-50/70">
+                            {group.label}
+                          </div>
+                          {group.templates.map((template) => (
+                            <button
+                              key={template.id}
+                              type="button"
+                              className="w-full text-left px-3 py-2 hover:bg-red-50 border-b border-slate-100 last:border-0 transition"
+                              onClick={() => {
+                                setCommentText(template.content);
+                                setIsTemplatePickerOpen(false);
+                              }}
+                            >
+                              <div className="text-xs font-semibold text-slate-800">{template.title}</div>
+                              <div className="text-[11px] text-slate-500 line-clamp-2">{template.content}</div>
+                            </button>
+                          ))}
+                        </div>
+                      ))
+                    )}
+                    <a
+                      href="/all-platform/library?tab=comment"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block px-3 py-2 text-[11px] font-semibold text-red-600 hover:underline bg-slate-50 border-t border-slate-100"
+                    >
+                      Quản lý thư viện mẫu câu →
+                    </a>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -232,6 +427,22 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
             </div>
           </div>
 
+          {/* New: Hẹn giờ section */}
+          <div className="pt-3 border-t border-slate-100 space-y-2">
+            <label className="text-sm font-bold text-slate-700">Hẹn giờ (không bắt buộc):</label>
+            <p className="text-xs text-slate-500">
+              Nếu có thời gian, dùng nút "Lên lịch" thay vì "Bắt đầu Seeding".
+            </p>
+            <input
+              type="datetime-local"
+              value={scheduledAt}
+              min={minScheduleTime}
+              onChange={(e) => setScheduledAt(e.target.value)}
+              disabled={isCommenting || isScheduling}
+              className="w-full rounded-xl border border-slate-200 p-2.5 text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
+            />
+          </div>
+
           <div className="flex flex-col gap-3 pt-3 border-t border-slate-100">
             {progress && (
               <div className="bg-red-50 border border-red-100 rounded-xl p-3 space-y-2">
@@ -249,16 +460,53 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
               </div>
             )}
             
-            <div className="flex justify-end gap-3">
+            {scheduleResult && (
+              <div className={`rounded-xl p-3 text-sm font-medium ${scheduleResult.failed === 0 ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' : 'bg-amber-50 border border-amber-200 text-amber-700'}`}>
+                {scheduleResult.message}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 flex-wrap">
               {isCommenting && (
-                <div className="flex items-center text-xs font-medium text-slate-500 mr-auto">
-                  <span className="material-symbols-outlined animate-spin text-[16px] mr-1">progress_activity</span>
-                  Đang chạy ngầm. Bạn có thể làm việc khác.
+                <div className="flex items-center gap-2 mr-auto">
+                  <div className="flex items-center text-xs font-medium text-slate-500">
+                    <span className="material-symbols-outlined animate-spin text-[16px] mr-1">progress_activity</span>
+                    {progress ? `${progress.current}/${progress.total}` : "Đang chạy ngầm"}.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleStop}
+                    disabled={stopping}
+                    className="px-3 py-1.5 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold transition disabled:opacity-50 cursor-pointer"
+                  >
+                    {stopping ? "Đang dừng..." : "Dừng"}
+                  </button>
                 </div>
               )}
+              {isScheduling && (
+                <div className="flex items-center text-xs font-medium text-slate-500 mr-auto">
+                  <span className="material-symbols-outlined animate-spin text-[16px] mr-1">progress_activity</span>
+                  Đang lên lịch...
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={handleSchedule}
+                disabled={isScheduling || isCommenting || selectedUrls.size === 0 || !commentText.trim() || !selectedAccountId || !scheduledAt}
+                className="px-6 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold transition shadow-sm disabled:opacity-50 disabled:shadow-none flex items-center gap-2 cursor-pointer"
+              >
+                {isScheduling ? (
+                  <>Đang lưu...</>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-[18px]">schedule</span>
+                    Lên lịch
+                  </>
+                )}
+              </button>
               <button 
                 onClick={handleStart}
-                disabled={isCommenting || selectedUrls.size === 0 || !isReady || !commentText.trim()}
+                disabled={isCommenting || isScheduling || selectedUrls.size === 0 || !isReady || !commentText.trim()}
                 className="px-6 py-2 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 text-white font-bold hover:from-red-700 hover:to-rose-700 transition shadow-sm shadow-red-600/20 disabled:opacity-50 disabled:shadow-none flex items-center gap-2 cursor-pointer"
               >
                 {isCommenting ? (

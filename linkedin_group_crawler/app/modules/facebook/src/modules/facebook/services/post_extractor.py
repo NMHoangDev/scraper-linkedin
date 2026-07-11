@@ -35,6 +35,20 @@ class PostExtractor:
                     raw = (link.get_attribute('aria-label') or link.inner_text() or '').strip()
                     if raw:
                         ts = extract_ts_hint(raw)
+                        # Tạm debug luồng timestamp: raw -> hint -> classify
+                        logger = None
+                        try:
+                            from app.modules.facebook.src.core.utils.logger import setup_logger
+                            logger = setup_logger(__name__)
+                        except Exception:
+                            logger = None
+
+                        if logger:
+                            logger.info(
+                                "[DEBUG TS-A] raw_ts=%r hint_ts=%r",
+                                raw,
+                                ts,
+                            )
                         # Nếu ngày giờ hợp lệ, chốt hạ luôn và thoát vòng lặp
                         if classify_timestamp(ts) != 'unknown':
                             url = candidate

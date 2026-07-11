@@ -8,14 +8,19 @@ import { ApiExtensionLauncher } from "@/components/all-platform/components/api-e
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { FilterBar, type FilterState } from "@/components/all-platform/components/filter-bar";
 import { PostCard } from "@/components/all-platform/components/post-card";
+import { toast } from "sonner";
+import { allPlatformPostsDeleteService } from "@/services/all-platform-posts-delete.service";
+
 import { PostDetailModal } from "@/components/all-platform/components/post-detail-modal";
 import { VerifyAccountModal } from "@/components/all-platform/components/verify-account-modal";
 import { KpiProgressCard } from "@/components/all-platform/components/kpi-progress-card";
 import { BulkCommentLauncher } from "@/components/all-platform/components/bulk-comment-launcher";
 import { SeedingActivityPanel } from "@/components/all-platform/feed/SeedingActivityPanel";
+import { ScheduleCommentModal } from "@/components/all-platform/feed/ScheduleCommentModal";
+import { ScheduledCommentsPanel } from "@/components/all-platform/feed/ScheduledCommentsPanel";
 import { PostFeedSkeleton } from "@/components/all-platform/feed/PostFeedSkeleton";
-import { allPlatformPostsService, allPlatformCategoriesService, teamsService } from "@/services/all-platform.service";
-import type { UnifiedPost, UnifiedStats, Category, FeedPlatform } from "@/types/unified.types";
+import { allPlatformPostsService, allPlatformCategoriesService, teamsService, socialAccountsService } from "@/services/all-platform.service";
+import type { UnifiedPost, UnifiedStats, Category, FeedPlatform, SocialAccount } from "@/types/unified.types";
 
 // â”€â”€â”€ Retry helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function fetchWithRetry<T>(
@@ -230,6 +235,9 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
 
   const [detailModalPost, setDetailModalPost] = useState<UnifiedPost | null>(null);
   const [verifyModalPost, setVerifyModalPost] = useState<UnifiedPost | null>(null);
+  const [scheduleModalPost, setScheduleModalPost] = useState<UnifiedPost | null>(null);
+  const [scheduleRefreshKey, setScheduleRefreshKey] = useState(0);
+  const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]);
 
   // Result Modals
   const [showCrawlResultModal, setShowCrawlResultModal] = useState(false);
@@ -239,6 +247,8 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
 
   // States
   const [posts, setPosts] = useState<UnifiedPost[]>([]);
+  const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
+
   const [stats, setStats] = useState<UnifiedStats>({
     totalPostsToday: 0,
     postsYesterday: 0,
@@ -301,9 +311,32 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
     } catch {}
   }, []);
 
-  // Fetch Posts (Phase 6: dùng luôn quick_stats từ response, tiết kiệm 1 round-trip)
-  const fetchPosts = useCallback(async () => {
+  // Fetch Stats
+  const fetchStats = useCallback(async () => {
     if (!CURRENT_USER_EMAIL) return;
+    try {
+      const res = await allPlatformPostsService.getStats({
+        email: CURRENT_USER_EMAIL,
+        platform: feedPlatform,
+      });
+      if (res.success && res.data) {
+        setStats(res.data as UnifiedStats);
+      }
+    } catch {}
+  }, [CURRENT_USER_EMAIL, feedPlatform]);
+
+  // Fetch Posts (Phase 6: dùng luôn quick_stats từ response, tiết kiệm 1 round-trip)
+
+  const fetchPosts = useCallback(async () => {
+    // Tránh stuck spinner khi auth chưa load xong / user không có email.
+    if (!CURRENT_USER_EMAIL) {
+      setIsLoadingPosts(false);
+      setPosts([]);
+      setTotalCount(0);
+      setTotalPages(1);
+      setPostsError(null);
+      return;
+    }
     setIsLoadingPosts(true);
     setPostsError(null);
     try {
@@ -413,22 +446,9 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
     }
   }, [CURRENT_USER_EMAIL, feedPlatform, filters, page]);
 
-  // Fetch Stats
-  const fetchStats = useCallback(async () => {
-    if (!CURRENT_USER_EMAIL) return;
-    try {
-      const res = await allPlatformPostsService.getStats({
-        email: CURRENT_USER_EMAIL,
-        platform: feedPlatform,
-      });
-      if (res.success && res.data) {
-        setStats(res.data as UnifiedStats);
-      }
-    } catch {}
-  }, [CURRENT_USER_EMAIL, feedPlatform]);
-
   // Xu huong 14 ngay gan nhat (tong bai/comment/inbox) — bo sung cho 4 the chi
   // co so hom nay, theo yeu cau Thanh: "cần thêm dashboard để biết tổng
+
   // comment, inbox... các ngày ra sao".
   const [dailyTrend, setDailyTrend] = useState<Array<{ date: string; posts: number; comments: number; inbox: number }>>([]);
   // Cung ly do voi isLoadingPosts o tren: fetchDailyTrend cung guard
@@ -471,6 +491,13 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
     if (!CURRENT_USER_EMAIL) return;
     fetchCategories();
   }, [fetchCategories]);
+
+  useEffect(() => {
+    if (!CURRENT_USER_EMAIL) return;
+    socialAccountsService.getAll().then((res) => {
+      if (res.success) setSocialAccounts(res.data || []);
+    }).catch(() => {});
+  }, [CURRENT_USER_EMAIL]);
 
   const handleFilter = useCallback((f: FilterState) => {
     if (filterDebounceRef.current) clearTimeout(filterDebounceRef.current);
@@ -535,6 +562,39 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
   }));
 
   const fbDiff = stats.totalPostsToday - stats.postsYesterday;
+
+  const handleDeletePost = useCallback(
+    async (post: UnifiedPost) => {
+      if (!post?.id) {
+        toast.error("Không có id bài viết để xóa");
+        return;
+      }
+
+      // Optimistic + rollback
+      const prevPosts = posts;
+      const prevTotal = totalCount;
+
+      setDeletingPostId(post.id);
+      setPosts((prev) => prev.filter((p) => p.id !== post.id));
+      setTotalCount((c) => Math.max(0, c - 1));
+
+      try {
+        const res = await allPlatformPostsDeleteService.deleteFacebookPost({ id: post.id });
+        if (!res?.success) {
+          throw new Error(res?.message || "Xóa thất bại");
+        }
+      } catch (e) {
+        // rollback UI
+        setPosts(prevPosts);
+        setTotalCount(prevTotal);
+        toast.error(e instanceof Error ? e.message : "Xóa thất bại");
+      } finally {
+        setDeletingPostId(null);
+      }
+    },
+    [posts, totalCount],
+  );
+
 
   // Loc client-side theo mang dich vu da chon (xem SERVICE_AREA_TABS o dau
   // file) - khong doi lai backend/pagination, chi an/hien trong trang hien
@@ -688,6 +748,10 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
       {(user?.role === "admin" || user?.role === "leader") && (
         <SeedingActivityPanel email={CURRENT_USER_EMAIL} />
       )}
+
+      {CURRENT_USER_EMAIL && (
+        <ScheduledCommentsPanel refreshKey={scheduleRefreshKey} />
+      )}
       {/* Phase 6: Siêu Tốc Cào Dữ Liệu + Bulk Comment — hiển thị cho cả 3 role
           (admin/leader/member) khi đang ở tab Facebook. SeedingActivityPanel
           vẫn chỉ admin/leader vì là panel tổng quan nhóm. */}
@@ -781,16 +845,18 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
         <>
           <div className="flex flex-col gap-4">
             {visiblePosts.map((post) => (
-              <PostCard
-                key={post.id || post.post_url}
-                post={post}
-                userRole={user?.role}
-                seeded={!!post.verify_status && post.verify_status !== "no"}
-                verifyStatus={post.verify_status as any}
-                onSeeding={() => {}}
-                onVerify={() => {}}
-                onViewDetail={(post) => setDetailModalPost(post)}
-              />
+                <PostCard
+                  key={post.id || post.post_url}
+                  post={post}
+                  userRole={user?.role}
+                  seeded={!!post.verify_status && post.verify_status !== "no"}
+                  verifyStatus={post.verify_status as "pending" | "yes" | "no"}
+                  onSeeding={() => {}}
+                  onVerify={() => {}}
+                  onSchedule={(post) => setScheduleModalPost(post)}
+                  onViewDetail={(post) => setDetailModalPost(post)}
+                  onDelete={(p) => void handleDeletePost(p)}
+                />
             ))}
           </div>
 
@@ -840,6 +906,14 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
           memberEmail={CURRENT_USER_EMAIL}
         />
       )}
+
+      <ScheduleCommentModal
+        post={scheduleModalPost}
+        isOpen={!!scheduleModalPost}
+        onClose={() => setScheduleModalPost(null)}
+        socialAccounts={socialAccounts}
+        onScheduled={() => setScheduleRefreshKey((k) => k + 1)}
+      />
 
       {/* MODAL KẾT QUẢ CÀO */}
       {showCrawlResultModal && typeof document !== "undefined" && createPortal(

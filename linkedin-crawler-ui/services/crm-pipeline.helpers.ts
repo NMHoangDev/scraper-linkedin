@@ -153,5 +153,13 @@ export function stageHeaderClass(s: DealStage): string {
   return DEAL_STAGE_META[s]?.headerClass ?? "bg-slate-500";
 }
 
+/** Khách còn nợ (chưa/một phần) VÀ đã qua hạn thanh toán → cần nhắc thu tiền gấp. */
+export function isPaymentOverdue(
+  c: Pick<Customer, "payment_status" | "payment_due_date">,
+): boolean {
+  if (!c.payment_due_date || c.payment_status === "paid") return false;
+  return new Date(c.payment_due_date).getTime() < Date.now();
+}
+
 export { DEAL_STAGE_META, DEAL_STAGE_TRANSITIONS, LOST_REASON_OPTIONS, PIPELINE_COLUMNS, REQ as STAGE_REQ_MAP, TERMINAL_STAGES };
 export type { DealStage, StageRequirements, StageTransitionPayload };

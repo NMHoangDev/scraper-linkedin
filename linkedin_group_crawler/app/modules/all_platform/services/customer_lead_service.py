@@ -41,6 +41,7 @@ BASE_COLUMNS = (
     "last_attachment_url, last_attachment_name, closed_reason, "
     "customer_since, service_package, lifetime_value, contract_signed_at, contract_status, "
     "warranty_expires_at, care_note, last_care_at, "
+    "payment_due_date, payment_status, "
     "tags, has_budget, note, reject_reason, reject_reason_type, review_result, "
     "created_at, updated_at, leader:leaded_by(name), sdr:sdr_id(name)"
 )

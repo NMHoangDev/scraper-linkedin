@@ -149,6 +149,30 @@ export interface Category {
   created_at?: string;
 }
 
+export interface QuickCommentTemplate {
+  id: string;
+  title: string;
+  label: string;
+  content: string;
+  platform: "all" | "facebook" | "linkedin";
+  order_index: number;
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface QuickInboxTemplate {
+  id: string;
+  title: string;
+  label: string;
+  content: string;
+  content_with_post?: string;
+  order_index: number;
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // ── Users & Teams ─────────────────────────────────────────────────────────────
 
 export interface TeamMember {
@@ -346,5 +370,43 @@ export interface CustomerLead {
   reject_reason?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+// ── Scheduled Comments ─────────────────────────────────────────────────────────
+
+export type ScheduledCommentStatus = "pending" | "processing" | "posted" | "failed" | "cancelled";
+
+export interface ScheduledComment {
+  id: string;
+  id_post_fb?: string;
+  id_post_li?: string;
+  platform: FeedPlatform;
+  post_url: string;
+  group_name?: string;
+  post_content?: string;
+  id_member: string;
+  id_social_account?: string;
+  comment_content?: string;
+  ai_generated: boolean;
+  status: ScheduledCommentStatus;
+  scheduled_at: string;
+  posted_at?: string;
+  error_message?: string;
+  link_comment?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface CreateScheduledCommentRequest {
+  id_post_fb?: string;
+  id_post_li?: string;
+  platform: FeedPlatform;
+  post_url: string;
+  group_name?: string;
+  post_content?: string;
+  id_social_account?: string;
+  comment_content?: string;
+  ai_generated: boolean;
+  scheduled_at: string;
 }
 

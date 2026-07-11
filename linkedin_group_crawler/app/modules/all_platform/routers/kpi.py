@@ -11,7 +11,10 @@ from supabase import Client
 from loguru import logger
 
 from app.core.supabase_client import get_supabase_client
-from app.modules.all_platform.services.supabase_kpi_service import VN_TZ
+from app.modules.all_platform.services.supabase_kpi_service import (
+    VN_TZ,
+    _vn_week_range_to_utc,
+)
 
 from app.modules.all_platform.schemas import (
     AssignKpiRequest,
@@ -516,8 +519,12 @@ def fb_inbox_bulk_verify(payload: BulkVerifyInboxRequest) -> BaseResponse:
         id_leader = leader_res.data[0]["id"]
 
         now = datetime.now(timezone.utc).isoformat()
-        start_ts = f"{target_date}T00:00:00"
-        end_ts = f"{target_date}T23:59:59"
+        # target_date là NGÀY GIỜ VN. Cột thời gian lưu UTC, nên phải quy đổi —
+        # trước đây so chuỗi "YYYY-MM-DDT00:00:00" (naive) với timestamp UTC làm
+        # hội thoại lúc rạng sáng giờ VN rơi nhầm sang ngày UTC hôm trước.
+        # Lọc theo created_at (ổn định) thay vì synced_at (bị ghi đè mỗi lần xác
+        # nhận lại) — xem migration 022_fix_fb_inbox_week_bucket.sql.
+        start_ts, end_ts = _vn_week_range_to_utc(target_date, target_date)
 
         # Cập nhật tất cả các record chưa được xác nhận của leader này trong ngày target_date
         update_res = (
@@ -525,8 +532,8 @@ def fb_inbox_bulk_verify(payload: BulkVerifyInboxRequest) -> BaseResponse:
             .update({"is_confirmed": True, "synced_at": now})
             .eq("id_leader", id_leader)
             .eq("is_confirmed", False)
-            .gte("synced_at", start_ts)
-            .lte("synced_at", end_ts)
+            .gte("created_at", start_ts)
+            .lte("created_at", end_ts)
             .execute()
         )
         
@@ -806,13 +813,18 @@ def get_verified_fb_inbox_ids(payload: GetVerifiedConvIdsRequest) -> BaseRespons
             })
 
         # Query fb_inbox_kpi for all these members in the date range - SEPARATE confirmed and pending
+        # `start`/`end` là ngày giờ VN -> quy đổi sang UTC trước khi so với cột
+        # timestamp (trước đây so chuỗi naive nên lệch tới 7 tiếng quanh nửa đêm).
+        # Dùng created_at cho khớp với get_fb_inbox_kpi_summary / overview v2
+        # (synced_at bị ghi đè mỗi lần xác nhận lại -> hội thoại cũ trôi tuần).
+        start_utc, end_utc = _vn_week_range_to_utc(start, end)
         confirmed_rows = (
             supabase.table("fb_inbox_kpi")
             .select("conv_id")
             .in_("id_member", member_ids)
             .eq("is_confirmed", True)
-            .gte("synced_at", start)
-            .lte("synced_at", end + "T23:59:59")
+            .gte("created_at", start_utc)
+            .lte("created_at", end_utc)
             .execute()
         )
         pending_rows = (
@@ -820,8 +832,8 @@ def get_verified_fb_inbox_ids(payload: GetVerifiedConvIdsRequest) -> BaseRespons
             .select("conv_id")
             .in_("id_member", member_ids)
             .eq("is_confirmed", False)
-            .gte("synced_at", start)
-            .lte("synced_at", end + "T23:59:59")
+            .gte("created_at", start_utc)
+            .lte("created_at", end_utc)
             .execute()
         )
 

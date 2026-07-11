@@ -42,6 +42,7 @@ import {
   Pencil,
   Trash2,
   MessageSquare,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -49,9 +50,11 @@ import type { Customer, DealStage } from "@/services/customer-lead.service";
 import {
   DEAL_STAGE_META,
   PIPELINE_COLUMNS,
+  PAYMENT_STATUS_OPTIONS,
 } from "@/services/customer-lead.service";
 import {
   getCurrentStage,
+  isPaymentOverdue,
   validateTransition,
 } from "@/services/crm-pipeline.helpers";
 import { useDragAutoScroll } from "@/hooks/useDragAutoScroll";
@@ -78,6 +81,10 @@ function contractStatusLabel(value: Customer["contract_status"] | null | undefin
   if (value === "completed") return "Hoàn thành";
   if (value === "maintenance") return "Bảo trì";
   return "Đang HĐ";
+}
+
+function paymentStatusMeta(value: Customer["payment_status"] | null | undefined) {
+  return PAYMENT_STATUS_OPTIONS.find((o) => o.value === value) ?? PAYMENT_STATUS_OPTIONS[0];
 }
 
 /**
@@ -145,6 +152,8 @@ function DealCard({
   // trên card ngoài Kanban nên leader phải bấm vào từng deal mới biết có ghi
   // chú hay chưa. Ưu tiên care_note (ghi chú chăm sóc/hợp đồng), fallback note.
   const notePreview = (customer.care_note || customer.note || "").trim();
+  const paymentMeta = paymentStatusMeta(customer.payment_status);
+  const overdue = isPaymentOverdue(customer);
 
   return (
     <div
@@ -193,6 +202,28 @@ function DealCard({
           <MoreVertical className="size-3.5" />
         </button>
       </div>
+
+      {/* Trạng thái thanh toán — nổi bật nếu còn nợ/quá hạn để dễ biết ai cần thu tiền */}
+      {customer.payment_status && customer.payment_status !== "paid" && (
+        <div
+          className={cn(
+            "mb-1.5 flex items-center gap-1 truncate rounded px-1.5 py-0.5 font-medium",
+            compact ? "text-[10px]" : "text-[11px]",
+            overdue ? "bg-red-100 text-red-700" : paymentMeta.badgeClass,
+          )}
+          title={
+            customer.payment_due_date
+              ? `${paymentMeta.label} — hạn ${formatDate(customer.payment_due_date)}`
+              : paymentMeta.label
+          }
+        >
+          {overdue ? <AlertTriangle className="size-3 shrink-0" /> : <Wallet className="size-3 shrink-0" />}
+          <span className="truncate">
+            {overdue ? "Quá hạn thanh toán" : paymentMeta.label}
+            {customer.payment_due_date ? ` · ${formatDate(customer.payment_due_date)}` : ""}
+          </span>
+        </div>
+      )}
 
       {/* Sản phẩm (service_package) */}
       {customer.service_package && (

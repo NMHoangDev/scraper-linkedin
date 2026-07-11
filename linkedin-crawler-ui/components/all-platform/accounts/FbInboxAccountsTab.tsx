@@ -60,8 +60,13 @@ export function FbInboxAccountsTab({ onChange }: FbInboxAccountsTabProps) {
       const { installed } = await pingExtension();
       setExtInstalled(installed);
       if (installed) {
-        const cfg = await getFbProvisionConfig();
-        await provisionExtension({ serverUrl: cfg.serverUrl, owner, apiKey: cfg.extensionApiKey, label: user?.name || user?.email || owner });
+        try {
+          const cfg = await getFbProvisionConfig();
+          await provisionExtension({ serverUrl: cfg.serverUrl, owner, apiKey: cfg.extensionApiKey, label: user?.name || user?.email || owner });
+        } catch (err) {
+          // Backend chưa cấu hình FB extension (thiếu env) — không crash trang, chỉ log để debug.
+          console.warn("[FbInboxAccountsTab] Không lấy được cấu hình FB extension:", err);
+        }
       }
     })();
   }, [owner, user?.email, user?.name]);
@@ -359,10 +364,17 @@ export function FbInboxAccountsTab({ onChange }: FbInboxAccountsTabProps) {
             <p className="text-on-surface-variant text-xs">Đang tải dữ liệu...</p>
           </div>
         ) : unifiedList.length === 0 ? (
-          <div className="text-center py-12 bg-surface-container-low">
-            <FaFacebook className="text-4xl text-on-surface-variant mx-auto mb-2" size={32} />
-            <p className="text-on-surface-variant text-xs">Chưa có tài khoản Facebook nào được thêm</p>
-            <p className="text-on-surface-variant text-[10px] mt-1">Hãy cài extension và thêm tài khoản để bắt đầu</p>
+          <div className="text-center py-16 bg-surface-container-low/60">
+            <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
+              <FaFacebook className="text-3xl text-primary" />
+            </div>
+            <p className="text-on-surface font-semibold text-sm">Chưa có tài khoản Facebook nào được thêm</p>
+            <p className="text-on-surface-variant text-xs mt-1">Hãy cài extension và thêm tài khoản để bắt đầu</p>
+            <button onClick={() => addAccount(false)} disabled={adding}
+              className="mt-4 inline-flex items-center gap-1.5 bg-primary hover:bg-on-primary-fixed-variant text-white px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ease-out active:scale-95 shadow-[0_2px_8px_-1px_rgba(217,55,55,0.35)] cursor-pointer disabled:opacity-50">
+              <FaPlus size={10} />
+              {adding ? "Đang chờ đăng nhập..." : "Thêm tài khoản ngay"}
+            </button>
           </div>
         ) : (
           <table className="w-full border-collapse text-left text-xs">

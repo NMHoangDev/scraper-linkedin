@@ -5,6 +5,7 @@ import { API_BASE_URL, API_KEY } from "@/lib/env";
    ============================================================= */
 
 export type ContractStatus = "active" | "completed" | "maintenance";
+export type PaymentStatus = "unpaid" | "partial" | "paid";
 export type ActivityStatus = "active" | "paused" | "churned";
 export type LeadStatus = "pending" | "closed" | "rejected";
 export type ReviewResult = "Qualify" | "Disqualify" | "Chua_xem_xet";
@@ -314,6 +315,10 @@ export interface Customer {
   warranty_expires_at: string | null;
   care_note: string | null;
   last_care_at: string | null;
+  /** Ngày khách hàng cần thanh toán (hạn thu tiền kỳ hiện tại/tiếp theo). */
+  payment_due_date?: string | null;
+  /** unpaid (chưa thanh toán) | partial (một phần) | paid (đã thanh toán đủ). */
+  payment_status?: PaymentStatus | null;
   last_attachment_url?: string | null;
   last_attachment_name?: string | null;
   tags: string[];
@@ -443,6 +448,16 @@ export const CITY_OPTIONS = [
   "Vĩnh Long",
   "Vĩnh Phúc",
   "Yên Bái",
+];
+
+export const PAYMENT_STATUS_OPTIONS: {
+  value: PaymentStatus;
+  label: string;
+  badgeClass: string;
+}[] = [
+  { value: "unpaid", label: "Chưa thanh toán", badgeClass: "bg-red-100 text-red-700 border-red-200" },
+  { value: "partial", label: "Thanh toán một phần", badgeClass: "bg-amber-100 text-amber-700 border-amber-200" },
+  { value: "paid", label: "Đã thanh toán", badgeClass: "bg-green-100 text-green-700 border-green-200" },
 ];
 
 export const HAS_BUDGET_OPTIONS: { value: boolean; label: string }[] = [

@@ -157,7 +157,7 @@ export function ProfileContent() {
     : "-";
 
   return (
-    <div className="mx-auto w-full max-w-[1100px] min-w-0 space-y-6 font-sans">
+    <div className="w-full min-w-0 space-y-6 font-sans">
       {/* Header */}
       <div className="flex items-center gap-4">
         <div className="rounded-xl bg-primary/10 p-3">
