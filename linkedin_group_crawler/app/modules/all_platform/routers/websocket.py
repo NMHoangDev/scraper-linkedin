@@ -26,3 +26,7 @@ async def crawl_status_websocket(websocket: WebSocket):
             ping_task.cancel()
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+    except Exception:
+        # Mạng rớt không đúng chuẩn (không gửi close frame) vẫn phải dọn kết nối,
+        # tránh "half-open" treo vô thời hạn trong active_connections.
+        manager.disconnect(websocket)

@@ -127,6 +127,7 @@ class FacebookAuth:
 
                 # 1. Thử đăng nhập bằng Cookie
                 if self._try_login_with_cookie(context, page, cookie_file):
+                    self._push_cookie_to_pool(custom_email, cookie_file)
                     self._update_cache_status(otp_cache_file, "SUCCESS", "Đăng nhập sẵn qua cookie.")
                     return {"status": "success", "message": "Đăng nhập sẵn qua cookie."}
 
@@ -138,6 +139,7 @@ class FacebookAuth:
 
                 if is_success:
                     self._save_session(context, page, cookie_file)
+                    self._push_cookie_to_pool(custom_email, cookie_file)
                     self._update_cache_status(otp_cache_file, "SUCCESS", "Đăng nhập thành công.")
                     return {"status": "success", "message": "Đăng nhập thành công."}
                 else:
@@ -504,6 +506,16 @@ class FacebookAuth:
             pass
         context.storage_state(path=str(cookie_file))
         #logger.info("✅ Đã lưu phiên đăng nhập (Storage State) thành công!")
+
+    def _push_cookie_to_pool(self, email: str, cookie_file: Path) -> None:
+        """Đẩy cookie vừa login/refresh vào pool cho VPS worker "xin" dùng.
+        Không phá luồng login nếu lỗi -- chỉ log cảnh báo."""
+        try:
+            state = json.loads(cookie_file.read_text(encoding="utf-8"))
+            from app.modules.all_platform.services import supabase_fb_account_pool_service as pool_service
+            pool_service.upsert_account_cookie(email, state)
+        except Exception as e:
+            logger.warning(f"[FB-ACCOUNT-POOL] Không đẩy được cookie {email} vào pool: {e}")
 
     def _is_bot_check_screen(self, page: Page) -> bool:
         try:

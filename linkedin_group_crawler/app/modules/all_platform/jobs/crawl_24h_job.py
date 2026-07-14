@@ -7,6 +7,7 @@ from datetime import datetime, timezone, timedelta
 
 from app.core.supabase_client import get_supabase_client
 from app.modules.all_platform.websocket import manager
+from app.modules.all_platform.services import supabase_crawl_queue_service as queue_service
 
 # Sử dụng dịch vụ cào từ all_platform
 from app.modules.all_platform.services.facebook_crawl_service import crawl_facebook_groups
@@ -201,6 +202,24 @@ async def execute_all_platform_crawl_workflow():
             pass
 
 
+async def execute_requeue_stale_worker_jobs():
+    """Thả job 'assigned'/'processing' của worker VPS đã mất heartbeat về 'pending'."""
+    try:
+        await asyncio.to_thread(queue_service.requeue_stale_jobs)
+    except Exception as e:
+        logger.error(f"❌ Lỗi khi kiểm tra worker VPS mất kết nối: {e}", exc_info=True)
+
+
+async def execute_release_stale_fb_accounts():
+    """Thả acc Facebook 'assigned' của worker VPS đã mất heartbeat về 'available'
+    (VM claim acc rồi crash cứng -- mất mạng/tắt máy -- mà không kịp báo report-invalid)."""
+    try:
+        from app.modules.all_platform.services import supabase_fb_account_pool_service as pool_service
+        await asyncio.to_thread(pool_service.release_stale_account_claims)
+    except Exception as e:
+        logger.error(f"❌ Lỗi khi kiểm tra acc FB pool bị kẹt: {e}", exc_info=True)
+
+
 def setup_all_platform_jobs():
     """
     Khởi tạo scheduler cho All-Platform.
@@ -226,6 +245,26 @@ def setup_all_platform_jobs():
             replace_existing=True,
             max_instances=1  # CHỈ 1 lượt cào tại một thời điểm (chống 1 token mở nhiều luồng -> FB khóa acc)
         )
+
+    # Kiểm tra worker VPS mất heartbeat mỗi phút, thả job treo về hàng đợi
+    scheduler.add_job(
+        func=execute_requeue_stale_worker_jobs,
+        trigger='cron',
+        minute='*',
+        id='crawl_queue_requeue_stale_worker_jobs',
+        replace_existing=True,
+        max_instances=1
+    )
+
+    # Kiểm tra acc Facebook pool bị kẹt 'assigned' do worker VPS crash, thả về 'available'
+    scheduler.add_job(
+        func=execute_release_stale_fb_accounts,
+        trigger='cron',
+        minute='*',
+        id='crawl_fb_accounts_release_stale',
+        replace_existing=True,
+        max_instances=1
+    )
 
     # Chuyển job weekly backup từ module cũ sang để không làm đứt gãy logic
     from app.modules.facebook.src.jobs.daily_crawl_job import execute_weekly_backup_and_reset_workflow
