@@ -19,6 +19,7 @@ from app.modules.all_platform.services.crm_attachment_service import (
 )
 
 logger = logging.getLogger(__name__)
+CRM_MANAGER_ROLES = {"admin", "leader"}
 
 
 def get_current_user(request: Request, authorization: str | None = Header(None)) -> dict[str, Any]:
@@ -44,6 +45,71 @@ def get_current_user(request: Request, authorization: str | None = Header(None))
 
 
 router = APIRouter(prefix="/customer-leads", tags=["Customer Leads"])
+
+
+def _is_crm_manager(user: dict[str, Any] | None) -> bool:
+    role = str((user or {}).get("role") or "").strip().lower()
+    return role in CRM_MANAGER_ROLES
+
+
+def _lead_visible_for_user(lead: dict[str, Any] | None, user: dict[str, Any] | None) -> bool:
+    if not lead:
+        return False
+    if _is_crm_manager(user):
+        return True
+    uid = str((user or {}).get("id") or "").strip()
+    if not uid:
+        return False
+    return uid in {
+        str(lead.get("leaded_by") or "").strip(),
+        str(lead.get("sdr_id") or "").strip(),
+    }
+
+
+def _require_lead_access(lead_id: str, current_user: dict[str, Any]) -> dict[str, Any]:
+    lead = customer_lead_service.get_customer_lead_by_id(lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Customer lead not found")
+    if not _lead_visible_for_user(lead, current_user):
+        raise HTTPException(status_code=403, detail="Forbidden: You cannot access this customer lead")
+    return lead
+
+
+def _normalize_mutation_payload(
+    payload: dict[str, Any],
+    current_user: dict[str, Any],
+    existing_lead: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """
+    Siết quyền phân công:
+    - admin/leader: giữ nguyên payload.
+    - member: không được đổi leaded_by / sdr_id của deal người khác.
+    """
+    if _is_crm_manager(current_user):
+        return payload
+
+    user_id = str(current_user.get("id") or "").strip()
+    safe_payload = dict(payload)
+
+    if existing_lead is None:
+        requested_leader = safe_payload.get("leaded_by")
+        requested_handler = safe_payload.get("sdr_id")
+        if requested_leader and str(requested_leader).strip() != user_id:
+            raise HTTPException(status_code=403, detail="Forbidden: Members cannot assign lead owner to another user")
+        if requested_handler and str(requested_handler).strip() != user_id:
+            raise HTTPException(status_code=403, detail="Forbidden: Members cannot assign handler to another user")
+        if not safe_payload.get("leaded_by"):
+            safe_payload["leaded_by"] = user_id
+        return safe_payload
+
+    for field in ("leaded_by", "sdr_id"):
+        if field in safe_payload:
+            requested = str(safe_payload.get(field) or "").strip()
+            current = str(existing_lead.get(field) or "").strip()
+            if requested != current:
+                raise HTTPException(status_code=403, detail="Forbidden: Members cannot change CRM assignment")
+
+    return safe_payload
 
 
 # ---------------------------------------------------------------------------
@@ -99,11 +165,20 @@ def get_sdrs(_: Any = Depends(get_current_user)):
         return BaseResponse(success=False, message=str(e))
 
 
+@router.get("/assignees", response_model=BaseResponse)
+def get_assignees(_: Any = Depends(get_current_user)):
+    try:
+        data = customer_lead_service.get_assignable_users()
+        return BaseResponse(success=True, data=data, message="Success")
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
 @router.get("/by-conv/{conv_id}", response_model=BaseResponse)
-def get_by_conv_id(conv_id: str, _: Any = Depends(get_current_user)):
+def get_by_conv_id(conv_id: str, current_user: Any = Depends(get_current_user)):
     try:
         lead = customer_lead_service.get_customer_lead_by_conv_id(conv_id)
-        if lead:
+        if lead and _lead_visible_for_user(lead, current_user):
             return BaseResponse(success=True, data=lead, message="Found")
         return BaseResponse(success=True, data=None, message="Not found")
     except Exception as e:
@@ -125,6 +200,7 @@ def transition_stage(
     Mỗi call hợp lệ sẽ ghi 1 dòng `stage_change` vào customer_lead_activity_log.
     """
     try:
+        _require_lead_access(lead_id, current_user)
         # Validate to_stage
         if payload.to_stage not in DEAL_STAGES:
             return BaseResponse(
@@ -145,6 +221,8 @@ def transition_stage(
             message=te.message,
             data={"missing_fields": te.missing_fields},
         )
+    except HTTPException as e:
+        return BaseResponse(success=False, message=e.detail)
     except Exception as e:
         logger_msg = f"transition_stage failed for {lead_id}: {e}"
         return BaseResponse(success=False, message=logger_msg)
@@ -155,12 +233,15 @@ def get_activity_log(
     lead_id: str,
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
-    _: Any = Depends(get_current_user),
+    current_user: Any = Depends(get_current_user),
 ):
     """Audit trail cho 1 deal — DESC theo created_at."""
     try:
+        _require_lead_access(lead_id, current_user)
         data = customer_lead_service.get_activity_log(lead_id, limit=limit, offset=offset)
         return BaseResponse(success=True, data=data, message="Success")
+    except HTTPException as e:
+        return BaseResponse(success=False, message=e.detail)
     except Exception as e:
         return BaseResponse(success=False, message=str(e))
 
@@ -257,7 +338,10 @@ def create_customer_lead(
     current_user: Any = Depends(get_current_user),
 ):
     try:
-        data_dict = payload.model_dump(exclude_unset=True)
+        data_dict = _normalize_mutation_payload(
+            payload.model_dump(exclude_unset=True),
+            current_user=current_user,
+        )
         if not data_dict.get("leaded_by") and isinstance(current_user, dict) and current_user.get("id"):
             data_dict["leaded_by"] = current_user.get("id")
             # NOTE: không ghi `leaded_by_name` vào customer_leads — bảng không có cột này
@@ -266,6 +350,8 @@ def create_customer_lead(
             # gây PGRST204 khi ghi.
         new_lead = customer_lead_service.create_customer_lead(data_dict)
         return BaseResponse(success=True, data=new_lead, message="Success")
+    except HTTPException as e:
+        return BaseResponse(success=False, message=e.detail)
     except Exception as e:
         return BaseResponse(success=False, message=str(e))
 
@@ -274,26 +360,36 @@ def create_customer_lead(
 def update_customer_lead(
     lead_id: str,
     payload: CustomerLeadUpdate,
-    _: Any = Depends(get_current_user),
+    current_user: Any = Depends(get_current_user),
 ):
     try:
+        existing = _require_lead_access(lead_id, current_user)
         updated = customer_lead_service.update_customer_lead(
             lead_id,
-            payload.model_dump(exclude_unset=True),
+            _normalize_mutation_payload(
+                payload.model_dump(exclude_unset=True),
+                current_user=current_user,
+                existing_lead=existing,
+            ),
         )
         if not updated:
             return BaseResponse(success=False, message="Not found or update failed")
         return BaseResponse(success=True, data=updated, message="Success")
+    except HTTPException as e:
+        return BaseResponse(success=False, message=e.detail)
     except Exception as e:
         return BaseResponse(success=False, message=str(e))
 
 
 @router.delete("/{lead_id}", response_model=BaseResponse)
-def delete_customer_lead(lead_id: str, _: Any = Depends(get_current_user)):
+def delete_customer_lead(lead_id: str, current_user: Any = Depends(get_current_user)):
     try:
+        _require_lead_access(lead_id, current_user)
         success = customer_lead_service.delete_customer_lead(lead_id)
         if success:
             return BaseResponse(success=True, message="Deleted successfully")
         return BaseResponse(success=False, message="Delete failed")
+    except HTTPException as e:
+        return BaseResponse(success=False, message=e.detail)
     except Exception as e:
         return BaseResponse(success=False, message=str(e))

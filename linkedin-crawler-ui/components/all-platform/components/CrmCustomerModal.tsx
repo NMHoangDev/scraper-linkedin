@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   customerLeadService,
+  type AssigneeOption,
   type Customer,
   type SourcePlatform,
   type DealStage,
@@ -76,8 +77,8 @@ export function CrmCustomerModal({
 }: CrmCustomerModalProps) {
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [sdrs, setSdrs] = useState<any[]>([]);
-  const [leaders, setLeaders] = useState<any[]>([]);
+  const [handlers, setHandlers] = useState<AssigneeOption[]>([]);
+  const [leaders, setLeaders] = useState<AssigneeOption[]>([]);
   const [formData, setFormData] = useState<Partial<Customer>>(emptyForm());
 
   useEffect(() => { setMounted(true); }, []);
@@ -97,10 +98,16 @@ export function CrmCustomerModal({
       });
     }
 
-    customerLeadService.getSdrs().then(setSdrs).catch(() => {});
-    // Leaders pool: cùng nguồn với SDRs (admin/leader). Tách riêng state chỉ
-    // cho semantic rõ ràng — nếu sau này tách bảng leaders thì không phải sửa UI.
-    customerLeadService.getSdrs().then(setLeaders).catch(() => {});
+    customerLeadService
+      .getAssignees()
+      .then((data) => {
+        setLeaders(data.leaders ?? []);
+        setHandlers(data.handlers ?? []);
+      })
+      .catch(() => {
+        setLeaders([]);
+        setHandlers([]);
+      });
   }, [isOpen, customer, defaultConvId, defaultCustomerName, defaultSourcePlatform]);
 
   if (!isOpen) return null;
@@ -644,9 +651,9 @@ export function CrmCustomerModal({
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
                   >
                     <option value="">-- Chưa giao --</option>
-                    {sdrs.map((s) => (
+                    {handlers.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.name ?? s.email}
+                        {s.name ?? s.email} ({s.role})
                       </option>
                     ))}
                   </select>

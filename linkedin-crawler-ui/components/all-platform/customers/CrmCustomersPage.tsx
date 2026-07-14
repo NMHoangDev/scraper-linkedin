@@ -398,6 +398,7 @@ export default function CrmCustomersPage() {
       ...(payload.decision_maker ? { decision_maker: payload.decision_maker } : {}),
       ...(payload.estimated_budget ? { estimated_budget: payload.estimated_budget } : {}),
       ...(payload.follow_up_date ? { follow_up_date: payload.follow_up_date } : {}),
+      ...(payload.closed_reason ? { closed_reason: payload.closed_reason } : {}),
       ...(payload.reject_reason_type
         ? {
             reject_reason_type: payload.reject_reason_type,

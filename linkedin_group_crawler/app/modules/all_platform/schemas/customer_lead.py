@@ -57,7 +57,7 @@ STAGE_REQUIRED_FIELDS: dict[str, dict[str, list[str]]] = {
     "negotiation":    {"required": ["note"]},
     "contract_sent":  {"required": ["attachment_url"]},
     "on_hold":        {"required": ["follow_up_date", "note"]},
-    "won":            {},
+    "won":            {"required": ["closed_reason"]},
     "lost":           {"required": ["reject_reason_type", "note"]},
 }
 

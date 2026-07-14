@@ -105,6 +105,7 @@ export interface StageRequirements {
   requireBudget?: boolean;
   /** Buộc phải có người quyết định (chỉ qualified). */
   requireDecisionMaker?: boolean;
+  requireClosedReason?: boolean;
   /** Ngày chuyển stage (để tracking thời gian trung bình). */
   trackTransitionDate?: boolean;
 }
@@ -118,7 +119,7 @@ export const STAGE_REQUIREMENTS: Record<DealStage, StageRequirements> = {
   negotiation:    { requireNote: true, trackTransitionDate: true },
   contract_sent:  { requireAttachment: true, trackTransitionDate: true },
   on_hold:        { requireNote: true, trackTransitionDate: true },
-  won:            { trackTransitionDate: true },
+  won:            { requireClosedReason: true, trackTransitionDate: true },
   lost:           { requireNote: true, requireRejectReason: true, trackTransitionDate: true },
 };
 
@@ -254,6 +255,7 @@ export interface ActivityLogEntry {
   new_value?: string | null;
   actor?: string;
   actor_id?: string;
+  actor_name?: string | null;
   note?: string | null;
   attachment_url?: string | null;
   attachment_name?: string | null;
@@ -268,6 +270,7 @@ export interface StageTransitionPayload {
   attachment_name?: string;
   reject_reason_type?: RejectReasonType;
   reject_reason_text?: string;
+  closed_reason?: string;
   prev_stage?: DealStage;
   follow_up_date?: string; // cho on_hold
   decision_maker?: string; // cho qualified
@@ -321,6 +324,7 @@ export interface Customer {
   payment_status?: PaymentStatus | null;
   last_attachment_url?: string | null;
   last_attachment_name?: string | null;
+  closed_reason?: string | null;
   tags: string[];
   has_budget: boolean;
   note: string | null;
@@ -343,7 +347,20 @@ export interface CustomerListResponse {
 export interface SDRUser {
   id: string;
   name: string;
+  email?: string | null;
   role: string;
+}
+
+export interface AssigneeOption {
+  id: string;
+  name: string;
+  email?: string | null;
+  role: string;
+}
+
+export interface CustomerLeadAssignees {
+  leaders: AssigneeOption[];
+  handlers: AssigneeOption[];
 }
 
 /* =============================================================
@@ -575,6 +592,11 @@ export const customerLeadService = {
   getSdrs: async (): Promise<SDRUser[]> => {
     const data = await apiFetch(`/api/all-platform/customer-leads/sdrs`);
     return (data?.data as SDRUser[]) ?? [];
+  },
+
+  getAssignees: async (): Promise<CustomerLeadAssignees> => {
+    const data = await apiFetch(`/api/all-platform/customer-leads/assignees`);
+    return (data?.data as CustomerLeadAssignees) ?? { leaders: [], handlers: [] };
   },
 
   create: async (payload: Partial<Customer>): Promise<any> => {

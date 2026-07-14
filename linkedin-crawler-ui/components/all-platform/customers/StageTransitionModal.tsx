@@ -135,6 +135,7 @@ export function StageTransitionModal({
   const [attachInputMode, setAttachInputMode] = useState<"file" | "url">("file");
   const [rejectReason, setRejectReason] = useState<RejectReasonType | "">("");
   const [rejectText, setRejectText] = useState("");
+  const [closedReason, setClosedReason] = useState(customer.closed_reason ?? "");
   const [decisionMaker, setDecisionMaker] = useState(customer.decision_maker ?? "");
   const [estBudget, setEstBudget] = useState<string>(String(customer.estimated_budget ?? ""));
   const [followUpDate, setFollowUpDate] = useState("");
@@ -159,11 +160,12 @@ export function StageTransitionModal({
     setAttachInputMode("file");
     setRejectReason("");
     setRejectText("");
+    setClosedReason(customer.closed_reason ?? "");
     setDecisionMaker(customer.decision_maker ?? "");
     setEstBudget(String(customer.estimated_budget ?? ""));
     setFollowUpDate("");
     setBusy(false);
-  }, [isOpen, customer.id, toStage, customer.decision_maker, customer.estimated_budget]);
+  }, [isOpen, customer.id, toStage, customer.closed_reason, customer.decision_maker, customer.estimated_budget]);
 
   /**
    * Validate phía client trước khi submit (server vẫn validate lại).
@@ -183,6 +185,10 @@ export function StageTransitionModal({
     if (req.requireDecisionMaker && !decisionMaker.trim()) return "Vui lòng nhập người ra quyết định";
     if (req.requireBudget && (!estBudget || Number(estBudget) <= 0)) return "Vui lòng nhập ngân sách dự kiến (>0)";
     if (toStage === "on_hold" && !followUpDate) return "Vui lòng chọn ngày follow-up lại";
+    if (toStage === "lost" && rejectReason === "Khac" && !rejectText.trim()) {
+      return "Vui long mo ta ro ly do khac";
+    }
+    if (req.requireClosedReason && !closedReason.trim()) return "Vui long nhap Win Review";
     return null;
   }
 
@@ -265,6 +271,7 @@ export function StageTransitionModal({
       attachment_name: attachName.trim() || undefined,
       reject_reason_type: rejectReason || undefined,
       reject_reason_text: rejectText.trim() || undefined,
+      closed_reason: closedReason.trim() || undefined,
       prev_stage: fromStage === "on_hold" ? fromStage : undefined,
       decision_maker: decisionMaker.trim() || undefined,
       estimated_budget: estBudget ? Number(estBudget) : undefined,
@@ -350,8 +357,29 @@ export function StageTransitionModal({
             </div>
 
             {/* ─────────── LOST: chọn lý do + ghi chú ─────────── */}
+            {toStage === "won" && (
+              <div className="rounded-md border border-green-200 bg-green-50 p-3">
+                <label className={labelCls}>
+                  Win Review <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  required={req.requireClosedReason}
+                  value={closedReason}
+                  onChange={(e) => setClosedReason(e.target.value)}
+                  className={`${inputCls} min-h-[96px] border-green-200 bg-white`}
+                  placeholder="Vi sao deal nay chot thanh cong? Ai quyet dinh, diem thang chinh, luu y ban giao..."
+                />
+                <p className="mt-1 text-[11px] text-green-700/80">
+                  Review nay se luu vao deal da thang de team xem lai sau.
+                </p>
+              </div>
+            )}
+
             {toStage === "lost" && (
-              <>
+              <div className="space-y-3 rounded-md border border-red-200 bg-red-50 p-3">
+                <div className="text-xs font-semibold uppercase tracking-wider text-red-700">
+                  Loss Review
+                </div>
                 <div>
                   <label className={labelCls}>
                     Lý do rớt <span className="text-red-500">*</span>
@@ -385,7 +413,7 @@ export function StageTransitionModal({
                     />
                   </div>
                 )}
-              </>
+              </div>
             )}
 
             {/* ─────────── QUALIFIED: ngân sách + decision maker ─────────── */}

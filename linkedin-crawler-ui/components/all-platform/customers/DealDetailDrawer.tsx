@@ -172,6 +172,7 @@ export function DealDetailDrawer({ customer, open, onClose, onRequestTransition,
       ? LOST_REASON_OPTIONS.find((r) => r.value === customer.reject_reason_type)?.label ??
         customer.reject_reason_type
       : null;
+  const activityActor = (entry: ActivityLogEntry) => entry.actor_name ?? entry.actor;
 
   return (
     <>
@@ -270,6 +271,11 @@ export function DealDetailDrawer({ customer, open, onClose, onRequestTransition,
                 <div className="font-semibold">
                   Deal {stage === "won" ? "đã thắng" : "đã thua"} — trạng thái kết thúc.
                 </div>
+                {stage === "won" && customer.closed_reason && (
+                  <div className="mt-0.5">
+                    Win Review: <b>{customer.closed_reason}</b>
+                  </div>
+                )}
                 {lostReasonLabel && (
                   <div className="mt-0.5">
                     Lý do: <b>{lostReasonLabel}</b>
@@ -284,6 +290,22 @@ export function DealDetailDrawer({ customer, open, onClose, onRequestTransition,
 
           {/* Pipeline meta */}
           <section className="grid grid-cols-2 gap-2">
+            {customer.leader_name && (
+              <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
+                  <UserCog className="size-3" /> Leader
+                </div>
+                <div className="mt-0.5 truncate font-medium text-slate-700">{customer.leader_name}</div>
+              </div>
+            )}
+            {customer.sdr_name && (
+              <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
+                  <UserCog className="size-3" /> Handler
+                </div>
+                <div className="mt-0.5 truncate font-medium text-slate-700">{customer.sdr_name}</div>
+              </div>
+            )}
             {customer.decision_maker && (
               <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
                 <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
@@ -536,7 +558,7 @@ export function DealDetailDrawer({ customer, open, onClose, onRequestTransition,
                     />
                     <div className="text-[11px] uppercase tracking-wider text-slate-400">
                       {new Date(entry.created_at).toLocaleString("vi-VN")}
-                      {entry.actor ? ` • ${entry.actor}` : ""}
+                      {activityActor(entry) ? ` • ${activityActor(entry)}` : ""}
                     </div>
                     {entry.from_stage && entry.to_stage ? (
                       <div className="mt-0.5 flex items-center gap-1.5 text-sm font-medium text-slate-700">

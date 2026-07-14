@@ -516,3 +516,29 @@ def get_all_sdrs() -> List[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"Error getting SDRs: {e}")
         return []
+
+
+def get_assignable_users() -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Danh sách user dùng cho CRM assignment.
+
+    - leaders: admin + leader (phụ trách lead / owner)
+    - handlers: mọi user active (người xử lý deal, gồm member/seeder)
+    """
+    try:
+        supabase = get_supabase_client()
+        res = (
+            supabase.table("app_users")
+            .select("id, email, name, role, is_active")
+            .eq("is_active", True)
+            .order("name")
+            .order("email")
+            .execute()
+        )
+        rows = res.data or []
+        leaders = [row for row in rows if row.get("role") in {"admin", "leader"}]
+        handlers = list(rows)
+        return {"leaders": leaders, "handlers": handlers}
+    except Exception as e:
+        logger.error(f"Error getting assignable users: {e}")
+        return {"leaders": [], "handlers": []}
