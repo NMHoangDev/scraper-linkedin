@@ -8,6 +8,7 @@ import { teamsService } from "@/services/all-platform.service";
 import type { TeamRow } from "@/services/all-platform.service";
 import { AdminTeamModal } from "@/components/all-platform/admin/AdminTeamModal";
 import { AdminMemberKpiModal } from "@/components/all-platform/admin/AdminMemberKpiModal";
+import { TeamPerformanceTrendSection } from "@/components/all-platform/admin/TeamPerformanceTrendSection";
 import {
   LuLayoutGrid,
   LuUsers,
@@ -497,6 +498,10 @@ export default function TeamsManagementPage() {
         </div>
 
         {/* ── So sanh chi tiet giua cac team (bang, xep hang theo % hoan thanh) ── */}
+        {!isLoading && teams.length > 0 && (
+          <TeamPerformanceTrendSection teams={teams} />
+        )}
+
         {!isLoading && teamKpiSummariesRanked.length > 0 && (
           <div className="rounded-xl border border-border bg-white overflow-hidden shadow-sm">
             <div className="px-5 py-4 border-b border-border bg-muted/50">

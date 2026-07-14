@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, timedelta, timezone
+from datetime import date, datetime, time as dt_time, timedelta, timezone
 from typing import Dict, List, Any
 import time
 from app.core.supabase_client import execute_supabase_query, get_supabase_client
@@ -507,3 +507,319 @@ def get_groups_health_stats() -> Any:
         payload = {}
 
     return _set_groups_health_cached(payload)
+
+
+_TEAM_DAILY_TREND_CACHE_TTL = 60.0
+_TEAM_DAILY_TREND_CACHE: dict[str, tuple[float, Any]] = {}
+
+
+def _get_team_daily_trend_cached(key: str) -> Any | None:
+    item = _TEAM_DAILY_TREND_CACHE.get(key)
+    if not item:
+        return None
+    expires_at, value = item
+    if expires_at > time.monotonic():
+        return value
+    _TEAM_DAILY_TREND_CACHE.pop(key, None)
+    return None
+
+
+def _set_team_daily_trend_cached(key: str, value: Any) -> Any:
+    _TEAM_DAILY_TREND_CACHE[key] = (
+        time.monotonic() + _TEAM_DAILY_TREND_CACHE_TTL,
+        value,
+    )
+    return value
+
+
+def _date_head(raw: Any) -> str:
+    if not raw:
+        return ""
+    if isinstance(raw, datetime):
+        return raw.date().isoformat()
+    if isinstance(raw, date):
+        return raw.isoformat()
+    return str(raw).strip()[:10]
+
+
+def _vn_day(raw: Any) -> str:
+    if not raw:
+        return ""
+    if isinstance(raw, datetime):
+        dt = raw
+    elif isinstance(raw, date):
+        return raw.isoformat()
+    else:
+        text = str(raw).strip()
+        if len(text) >= 10 and text[4:5] == "-" and text[7:8] == "-":
+            if len(text) == 10:
+                return text[:10]
+            try:
+                dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+            except ValueError:
+                return text[:10]
+        else:
+            return text[:10]
+
+    if dt.tzinfo is None:
+        return dt.date().isoformat()
+    return dt.astimezone(VN_TZ).date().isoformat()
+
+
+def _parse_iso_date(raw: str | None) -> date | None:
+    if not raw:
+        return None
+    try:
+        return date.fromisoformat(str(raw).strip())
+    except ValueError:
+        return None
+
+
+def get_team_daily_trend(
+    days: int = 14,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    team_ids: List[str] | None = None,
+    metric: str | None = None,
+) -> Dict[str, Any]:
+    """Return daily activity counts split by team for a date range."""
+    safe_days = max(7, min(days, 31))
+    today_vn = datetime.now(timezone.utc).astimezone(VN_TZ).date()
+    parsed_start = _parse_iso_date(start_date)
+    parsed_end = _parse_iso_date(end_date)
+
+    if parsed_start and parsed_end and parsed_start <= parsed_end:
+        start_day = parsed_start
+        end_day = min(parsed_end, today_vn, parsed_start + timedelta(days=92))
+        days_in_range = (end_day - start_day).days + 1
+    else:
+        end_day = today_vn
+        start_day = today_vn - timedelta(days=safe_days - 1)
+        days_in_range = safe_days
+
+    normalized_team_ids = sorted(
+        {
+            str(team_id).strip()
+            for team_id in (team_ids or [])
+            if str(team_id).strip()
+        }
+    )
+    cache_key = (
+        f"team_daily_trend_v2|start={start_day.isoformat()}|end={end_day.isoformat()}|"
+        f"teams={','.join(normalized_team_ids) or 'all'}|metric={metric or 'all'}"
+    )
+    cached = _get_team_daily_trend_cached(cache_key)
+    if cached is not None:
+        return cached
+
+    day_keys = [
+        (start_day + timedelta(days=offset)).isoformat()
+        for offset in range(days_in_range)
+    ]
+    start_dt_utc = datetime.combine(start_day, dt_time.min, VN_TZ).astimezone(timezone.utc)
+    end_dt_utc = datetime.combine(end_day, dt_time.max, VN_TZ).astimezone(timezone.utc)
+
+    payload: Dict[str, Any] = {
+        "days": days_in_range,
+        "range": {"start": start_day.isoformat(), "end": end_day.isoformat()},
+        "filters": {
+            "team_ids": normalized_team_ids,
+            "metric": metric or "total_kpi",
+        },
+        "teams": [],
+    }
+
+    try:
+        teams = execute_supabase_query(
+            lambda: get_supabase_client().table("teams").select("id, name_team, id_leader").order("name_team").execute()
+        ).data or []
+        if normalized_team_ids:
+            teams = [
+                team for team in teams
+                if str(team.get("id") or "") in normalized_team_ids
+            ]
+        if not teams:
+            return _set_team_daily_trend_cached(cache_key, payload)
+
+        mot_rows = execute_supabase_query(
+            lambda: get_supabase_client().table("member_of_teams").select("id_teams, id_member").execute()
+        ).data or []
+
+        team_name_by_id: dict[str, str] = {}
+        team_buckets: dict[str, Dict[str, Dict[str, int]]] = {}
+        member_to_team_ids: dict[str, set[str]] = {}
+        member_ids: set[str] = set()
+
+        for team in teams:
+            team_id = str(team.get("id") or "")
+            if not team_id:
+                continue
+            team_name_by_id[team_id] = str(team.get("name_team") or "Chưa gắn team")
+            team_buckets[team_id] = {
+                day: {
+                    "posts": 0,
+                    "comments": 0,
+                    "inbox": 0,
+                    "leads": 0,
+                    "total_kpi": 0,
+                }
+                for day in day_keys
+            }
+            leader_id = str(team.get("id_leader") or "")
+            if leader_id:
+                member_ids.add(leader_id)
+                member_to_team_ids.setdefault(leader_id, set()).add(team_id)
+
+        for row in mot_rows:
+            team_id = str(row.get("id_teams") or "")
+            member_id = str(row.get("id_member") or "")
+            if not team_id or not member_id or team_id not in team_buckets:
+                continue
+            member_ids.add(member_id)
+            member_to_team_ids.setdefault(member_id, set()).add(team_id)
+
+        if not member_ids:
+            return _set_team_daily_trend_cached(cache_key, payload)
+
+        fb_post_rows = execute_supabase_query(
+            lambda: (
+                get_supabase_client()
+                .table("fb_post_kpi")
+                .select("id_member, posted_at")
+                .in_("id_member", list(member_ids))
+                .gte("posted_at", start_dt_utc.isoformat())
+                .lte("posted_at", end_dt_utc.isoformat())
+                .execute()
+            )
+        ).data or []
+        for row in fb_post_rows:
+            member_id = str(row.get("id_member") or "")
+            day = _vn_day(row.get("posted_at"))
+            if day not in team_buckets.get(next(iter(team_buckets)), {}):
+                continue
+            for team_id in member_to_team_ids.get(member_id, set()):
+                team_buckets[team_id][day]["posts"] += 1
+
+        seeding_rows = execute_supabase_query(
+            lambda: (
+                get_supabase_client()
+                .table("seeding_content_kpi")
+                .select("id_member, current_day, verify")
+                .in_("id_member", list(member_ids))
+                .gte("current_day", start_day.isoformat())
+                .lte("current_day", end_day.isoformat())
+                .execute()
+            )
+        ).data or []
+        verified_statuses = {"yes", "đã seeding", "xác minh", "verified"}
+        verified_statuses.update({"da seeding", "đã seeding", "xac minh", "xác minh"})
+        for row in seeding_rows:
+            verify = str(row.get("verify") or "").strip().lower()
+            if verify not in verified_statuses:
+                continue
+            member_id = str(row.get("id_member") or "")
+            day = _date_head(row.get("current_day"))
+            if day not in team_buckets.get(next(iter(team_buckets)), {}):
+                continue
+            for team_id in member_to_team_ids.get(member_id, set()):
+                team_buckets[team_id][day]["comments"] += 1
+
+        fb_inbox_rows = execute_supabase_query(
+            lambda: (
+                get_supabase_client()
+                .table("fb_inbox_kpi")
+                .select("id_member, is_confirmed, is_lead, created_at")
+                .in_("id_member", list(member_ids))
+                .eq("is_confirmed", True)
+                .gte("created_at", start_dt_utc.isoformat())
+                .lte("created_at", end_dt_utc.isoformat())
+                .execute()
+            )
+        ).data or []
+        for row in fb_inbox_rows:
+            member_id = str(row.get("id_member") or "")
+            day = _vn_day(row.get("created_at"))
+            if day not in team_buckets.get(next(iter(team_buckets)), {}):
+                continue
+            for team_id in member_to_team_ids.get(member_id, set()):
+                team_buckets[team_id][day]["inbox"] += 1
+                if row.get("is_lead"):
+                    team_buckets[team_id][day]["leads"] += 1
+
+        zalo_rows = execute_supabase_query(
+            lambda: (
+                get_supabase_client()
+                .table("zalo_conversation_permissions")
+                .select("id_member, verified_at, is_lead")
+                .in_("id_member", list(member_ids))
+                .eq("shared_role", "leader")
+                .eq("is_active", True)
+                .eq("is_verify", True)
+                .not_.is_("verified_at", "null")
+                .gte("verified_at", start_dt_utc.isoformat())
+                .lte("verified_at", end_dt_utc.isoformat())
+                .execute()
+            )
+        ).data or []
+        for row in zalo_rows:
+            member_id = str(row.get("id_member") or "")
+            day = _vn_day(row.get("verified_at"))
+            if day not in team_buckets.get(next(iter(team_buckets)), {}):
+                continue
+            for team_id in member_to_team_ids.get(member_id, set()):
+                team_buckets[team_id][day]["inbox"] += 1
+                if row.get("is_lead"):
+                    team_buckets[team_id][day]["leads"] += 1
+
+        lead_rows = execute_supabase_query(
+            lambda: (
+                get_supabase_client()
+                .table("customer_leads")
+                .select("leaded_by, created_at")
+                .in_("leaded_by", list(member_ids))
+                .not_.is_("leaded_by", "null")
+                .gte("created_at", start_dt_utc.isoformat())
+                .lte("created_at", end_dt_utc.isoformat())
+                .execute()
+            )
+        ).data or []
+        for row in lead_rows:
+            member_id = str(row.get("leaded_by") or "")
+            day = _vn_day(row.get("created_at"))
+            if day not in team_buckets.get(next(iter(team_buckets)), {}):
+                continue
+            for team_id in member_to_team_ids.get(member_id, set()):
+                team_buckets[team_id][day]["leads"] += 1
+
+        for buckets in team_buckets.values():
+            for day in day_keys:
+                values = buckets[day]
+                values["total_kpi"] = (
+                    values["posts"]
+                    + values["comments"]
+                    + values["inbox"]
+                    + values["leads"]
+                )
+
+        payload["teams"] = [
+            {
+                "team_id": team_id,
+                "team_name": team_name_by_id.get(team_id, "Chưa gắn team"),
+                "series": [
+                    {
+                        "date": day,
+                        "posts": values["posts"],
+                        "comments": values["comments"],
+                        "inbox": values["inbox"],
+                        "leads": values["leads"],
+                        "total_kpi": values["total_kpi"],
+                    }
+                    for day, values in sorted(team_buckets[team_id].items())
+                ],
+            }
+            for team_id in sorted(team_buckets.keys(), key=lambda key: team_name_by_id.get(key, ""))
+        ]
+    except Exception as exc:
+        logger.warning("get_team_daily_trend failed: %s", exc)
+
+    return _set_team_daily_trend_cached(cache_key, payload)
