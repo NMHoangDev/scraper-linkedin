@@ -176,6 +176,8 @@ async def handle_cors_middleware(request: Request, call_next):
         if origin.startswith("chrome-extension://") else "",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
         "http://localhost:8080",
         "http://127.0.0.1:8080",
     }

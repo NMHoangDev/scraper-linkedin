@@ -429,12 +429,11 @@ export default function CrmCustomersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/60 p-6">
+    <div className="min-h-screen w-full min-w-0 bg-white">
       {/* Header */}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-800">CRM</h1>
-          <p className="mt-0.5 text-sm text-slate-500">
+          <p className="text-sm text-slate-500">
             Quản lý pipeline bán hàng theo 7 stage chính + 3 trạng thái cuối (On Hold / Won / Lost).
           </p>
         </div>
@@ -569,12 +568,11 @@ export default function CrmCustomersPage() {
         />
       )}
 
-      {/* Deal detail drawer */}
       <DealDetailDrawer
         customer={detailCustomer}
         open={!!detailCustomer}
         onClose={() => setDetailCustomer(null)}
-        onRequestTransition={(c, to) => requestMove(c, to)}
+        onRequestTransition={(c, to) => setTransitionTarget({ customer: c, toStage: to })}
         onEditCustomer={(c) => {
           setDetailCustomer(null);
           openEditModal(c);

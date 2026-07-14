@@ -4,7 +4,13 @@ import { API_BASE_URL, API_KEY } from "@/lib/env";
    CRM Customer Interface — full schema
    ============================================================= */
 
-export type ContractStatus = "active" | "completed" | "maintenance";
+export type ContractStatus =
+  | "active"
+  | "completed"
+  | "maintenance"
+  | "da_bao_gia"
+  | "dang_xu_ly"
+  | "da_chot";
 export type PaymentStatus = "unpaid" | "partial" | "paid";
 export type ActivityStatus = "active" | "paused" | "churned";
 export type LeadStatus = "pending" | "closed" | "rejected";

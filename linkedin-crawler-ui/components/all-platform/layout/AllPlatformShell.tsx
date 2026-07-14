@@ -75,7 +75,7 @@ function AllPlatformShellInner({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <AllPlatformSidebarShadcn />
-      <SidebarInset className="bg-white">
+      <SidebarInset className="min-w-0 bg-white">
         <header className="sticky top-0 z-20 flex h-12 shrink-0 items-center gap-2 border-b border-border bg-white px-3">
           <SidebarTrigger className="lg:hidden" />
           <Separator orientation="vertical" className="h-4 lg:hidden" />

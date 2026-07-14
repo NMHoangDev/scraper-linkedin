@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   customerLeadService,
+  type ContractStatus,
   type Customer,
+  type SDRUser,
   type SourcePlatform,
   type DealStage,
   SOURCE_PLATFORM_OPTIONS,
@@ -42,7 +44,7 @@ const emptyForm = (): Partial<Customer> => ({
   // Gói dịch vụ — optional, không bắt buộc khi tạo lead
   service_package: null,
   lifetime_value: 0,
-  contract_status: "active",
+  contract_status: "dang_xu_ly",
   contract_signed_at: null,
   warranty_expires_at: null,
   payment_due_date: null,
@@ -65,6 +67,15 @@ const dateInputValue = (value?: string | null) => (value ? String(value).slice(0
 const dateTimeInputValue = (value?: string | null) => (value ? String(value).slice(0, 16) : "");
 const toIsoDate = (value: string) => (value ? new Date(value).toISOString() : null);
 
+const CONTRACT_STATUS_OPTIONS: { value: ContractStatus; label: string }[] = [
+  { value: "dang_xu_ly", label: "Đang xử lý" },
+  { value: "da_bao_gia", label: "Đã báo giá" },
+  { value: "da_chot", label: "Đã chốt" },
+  { value: "active", label: "Đang hoạt động" },
+  { value: "completed", label: "Đã hoàn thành" },
+  { value: "maintenance", label: "Bảo trì / bảo hành" },
+];
+
 export function CrmCustomerModal({
   isOpen,
   onClose,
@@ -76,8 +87,8 @@ export function CrmCustomerModal({
 }: CrmCustomerModalProps) {
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [sdrs, setSdrs] = useState<any[]>([]);
-  const [leaders, setLeaders] = useState<any[]>([]);
+  const [sdrs, setSdrs] = useState<SDRUser[]>([]);
+  const [leaders, setLeaders] = useState<SDRUser[]>([]);
   const [formData, setFormData] = useState<Partial<Customer>>(emptyForm());
 
   useEffect(() => { setMounted(true); }, []);
@@ -108,6 +119,30 @@ export function CrmCustomerModal({
   const set = <K extends keyof Customer>(key: K, value: Customer[K]) =>
     setFormData((prev) => ({ ...prev, [key]: value }));
 
+  const selectedLeaderId = formData.leaded_by?.trim() || "";
+  const selectedSdrId = formData.sdr_id?.trim() || "";
+  const currentLeaderName = customer?.leader_name?.trim() || "";
+  const currentSdrName = customer?.sdr_name?.trim() || "";
+
+  const resolvedLeaderId =
+    selectedLeaderId ||
+    leaders.find((item) => item.name.trim().toLowerCase() === currentLeaderName.toLowerCase())?.id ||
+    "";
+  const resolvedSdrId =
+    selectedSdrId ||
+    sdrs.find((item) => item.name.trim().toLowerCase() === currentSdrName.toLowerCase())?.id ||
+    "";
+
+  const leaderOptions =
+    resolvedLeaderId || !currentLeaderName || leaders.some((item) => item.name === currentLeaderName)
+      ? leaders
+      : [{ id: `current-leader-${customer?.id ?? "new"}`, name: currentLeaderName, role: "leader" }, ...leaders];
+
+  const sdrOptions =
+    resolvedSdrId || !currentSdrName || sdrs.some((item) => item.name === currentSdrName)
+      ? sdrs
+      : [{ id: `current-sdr-${customer?.id ?? "new"}`, name: currentSdrName, role: "SDR" }, ...sdrs];
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.customer_name?.trim()) {
@@ -137,7 +172,7 @@ export function CrmCustomerModal({
         // Optional — chỉ gửi khi user đã chọn, tránh ghi đè deal cũ về null
         service_package: formData.service_package || null,
         lifetime_value: formData.lifetime_value ? Number(formData.lifetime_value) : 0,
-        contract_status: formData.contract_status ?? "active",
+        contract_status: formData.contract_status ?? "dang_xu_ly",
         contract_signed_at: formData.contract_signed_at || null,
         warranty_expires_at: formData.warranty_expires_at || null,
         payment_due_date: formData.payment_due_date || null,
@@ -149,9 +184,9 @@ export function CrmCustomerModal({
         last_attachment_url: formData.last_attachment_url?.trim() || null,
         note: formData.note?.trim() || null,
         deal_stage: formData.deal_stage ?? "new_lead",
-        leaded_by: formData.leaded_by?.trim() || null,
-        sdr_id: formData.sdr_id?.trim() || null,
-        is_assigned: !!formData.sdr_id?.trim(),
+        leaded_by: (formData.leaded_by?.trim() || resolvedLeaderId || "") || null,
+        sdr_id: (formData.sdr_id?.trim() || resolvedSdrId || "") || null,
+        is_assigned: !!(formData.sdr_id?.trim() || resolvedSdrId),
       };
 
       let res: any;
@@ -494,7 +529,7 @@ export function CrmCustomerModal({
                 <div>
                   <label className="block text-xs font-semibold text-slate-600 mb-1">Trạng thái hợp đồng</label>
                   <select
-                    value={formData.contract_status ?? "active"}
+                    value={formData.contract_status ?? "dang_xu_ly"}
                     onChange={(e) => set("contract_status", e.target.value as Customer["contract_status"])}
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 text-sm bg-white"
                   >
@@ -620,17 +655,20 @@ export function CrmCustomerModal({
                     Người lead
                   </label>
                   <select
-                    value={formData.leaded_by ?? ""}
+                    value={resolvedLeaderId}
                     onChange={(e) => set("leaded_by", e.target.value || null)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
                   >
                     <option value="">-- Chưa gán --</option>
-                    {leaders.map((u) => (
+                    {leaderOptions.map((u) => (
                       <option key={u.id} value={u.id}>
-                        {u.name} ({u.role})
+                        {u.name}{u.role ? ` (${u.role})` : ""}
                       </option>
                     ))}
                   </select>
+                  {!resolvedLeaderId && currentLeaderName && (
+                    <p className="mt-1 text-[11px] text-slate-500">Hiện tại: {currentLeaderName}</p>
+                  )}
                 </div>
 
                 {/* Người xử lý (sdr_id) — sẽ xử lý deal này */}
@@ -639,17 +677,20 @@ export function CrmCustomerModal({
                     Người xử lý (SDR)
                   </label>
                   <select
-                    value={formData.sdr_id ?? ""}
+                    value={resolvedSdrId}
                     onChange={(e) => set("sdr_id", e.target.value || null)}
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500 text-sm bg-white"
                   >
                     <option value="">-- Chưa giao --</option>
-                    {sdrs.map((s) => (
+                    {sdrOptions.map((s) => (
                       <option key={s.id} value={s.id}>
-                        {s.name ?? s.email}
+                        {s.name}{s.role ? ` (${s.role})` : ""}
                       </option>
                     ))}
                   </select>
+                  {!resolvedSdrId && currentSdrName && (
+                    <p className="mt-1 text-[11px] text-slate-500">Hiện tại: {currentSdrName}</p>
+                  )}
                 </div>
               </div>
             </div>

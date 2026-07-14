@@ -1,0 +1,19 @@
+
+> linkedin-crawler-ui@0.1.0 dev
+> next dev --port 3001
+
+▲ Next.js 16.2.4 (Turbopack)
+- Local:         http://localhost:3001
+- Network:       http://172.30.144.1:3001
+- Environments: .env.local
+✓ Ready in 1255ms
+Creating turbopack project {
+  dir: 'C:\\Code\\scraper-linkedin\\linkedin-crawler-ui',
+  testMode: true
+}
+
+ GET /auth/login 200 in 1880ms (next.js: 924ms, application-code: 956ms)
+ GET /auth/login 200 in 677ms (next.js: 16ms, application-code: 661ms)
+ GET /all-platform/post-feed 200 in 251ms (next.js: 107ms, application-code: 144ms)
+ GET /all-platform/crm 200 in 145ms (next.js: 72ms, application-code: 74ms)
+ GET /auth/login 200 in 66ms (next.js: 4ms, application-code: 62ms)

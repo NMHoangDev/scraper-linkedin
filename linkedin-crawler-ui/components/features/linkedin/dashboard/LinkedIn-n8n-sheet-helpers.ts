@@ -1,16 +1,15 @@
 import type { CrawlSessionGroup } from "@/types/api";
 
-/** Giá trị string từ bản ghi sheet/webhook (key thường gặp). */
 export function pickStr(
   record: Record<string, unknown>,
   keys: string[],
 ): string {
-  for (const k of keys) {
-    if (!(k in record)) continue;
-    const v = record[k];
-    if (v == null) continue;
-    const s = String(v).trim();
-    if (s) return s;
+  for (const key of keys) {
+    if (!(key in record)) continue;
+    const value = record[key];
+    if (value == null) continue;
+    const normalized = String(value).trim();
+    if (normalized) return normalized;
   }
   return "";
 }
@@ -19,19 +18,18 @@ export function pickNum(
   record: Record<string, unknown>,
   keys: string[],
 ): number {
-  for (const k of keys) {
-    if (!(k in record)) continue;
-    const v = record[k];
-    if (typeof v === "number" && !Number.isNaN(v)) return v;
-    if (typeof v === "string" && v.trim()) {
-      const n = Number(v);
-      if (!Number.isNaN(n)) return n;
+  for (const key of keys) {
+    if (!(key in record)) continue;
+    const value = record[key];
+    if (typeof value === "number" && !Number.isNaN(value)) return value;
+    if (typeof value === "string" && value.trim()) {
+      const parsed = Number(value);
+      if (!Number.isNaN(parsed)) return parsed;
     }
   }
   return 0;
 }
 
-/** Các key thường dùng cho số dòng sheet / STT. */
 const ROW_NUMBER_KEYS = [
   "row_number",
   "rowNumber",
@@ -40,31 +38,31 @@ const ROW_NUMBER_KEYS = [
   "Stt",
 ] as const;
 
-/** Có số dòng thực sự (>0) từ sheet/webhook — không tính ô trống / 0. */
 export function hasMeaningfulRowNumber(
   record: Record<string, unknown>,
 ): boolean {
-  for (const k of ROW_NUMBER_KEYS) {
-    if (!(k in record)) continue;
-    const v = record[k];
-    if (v == null) continue;
-    if (typeof v === "string" && !v.trim()) continue;
-    const n = typeof v === "number" ? v : Number(String(v).trim());
-    if (!Number.isNaN(n) && n > 0) return true;
+  for (const key of ROW_NUMBER_KEYS) {
+    if (!(key in record)) continue;
+    const value = record[key];
+    if (value == null) continue;
+    if (typeof value === "string" && !value.trim()) continue;
+    const parsed = typeof value === "number" ? value : Number(String(value).trim());
+    if (!Number.isNaN(parsed) && parsed > 0) return true;
   }
   return false;
 }
 
-/** ``row_number`` / ``STT`` … đúng như bản ghi từ API (get-all-posts); không ép số cột «#». Chỉ fallback khi không có số ≥ 1. */
 const POST_URL_KEYS = [
   "URL_Bài_Viết",
+  "URL_Bai_Viet",
   "post_url",
   "postUrl",
   "urlbaiviet",
 ] as const;
 
-/** URL bài từ bản ghi sheet/API. */
-export function pickPostUrlFromRecord(record: Record<string, unknown>): string {
+export function pickPostUrlFromRecord(
+  record: Record<string, unknown>,
+): string {
   return pickStr(record, [...POST_URL_KEYS]);
 }
 
@@ -73,41 +71,30 @@ function linkedinActivityIdFromUrl(url: string): string {
   return match?.[1] ?? "";
 }
 
-/** So khớp cùng bài LinkedIn (ưu tiên activity id). */
-export function postsShareSameLinkedInUrl(
-  left: string,
-  right: string,
-): boolean {
-  const a = left.trim();
-  const b = right.trim();
-  if (!a || !b) return false;
-  const idA = linkedinActivityIdFromUrl(a);
-  const idB = linkedinActivityIdFromUrl(b);
-  if (idA && idB && idA === idB) return true;
-  return a.replace(/\/$/, "") === b.replace(/\/$/, "");
+export function postsShareSameLinkedInUrl(left: string, right: string): boolean {
+  const first = left.trim();
+  const second = right.trim();
+  if (!first || !second) return false;
+  const firstId = linkedinActivityIdFromUrl(first);
+  const secondId = linkedinActivityIdFromUrl(second);
+  if (firstId && secondId && firstId === secondId) return true;
+  return first.replace(/\/$/, "") === second.replace(/\/$/, "");
 }
 
 export function pickPositiveRowNumberFromPost(
   record: Record<string, unknown>,
 ): number | undefined {
-  for (const k of ROW_NUMBER_KEYS) {
-    if (!(k in record)) continue;
-    const v = record[k];
-    if (v == null) continue;
-    if (typeof v === "string" && !v.trim()) continue;
-    const n = typeof v === "number" ? v : Number(String(v).trim());
-    if (!Number.isNaN(n) && n >= 1) return Math.trunc(n);
+  for (const key of ROW_NUMBER_KEYS) {
+    if (!(key in record)) continue;
+    const value = record[key];
+    if (value == null) continue;
+    if (typeof value === "string" && !value.trim()) continue;
+    const parsed = typeof value === "number" ? value : Number(String(value).trim());
+    if (!Number.isNaN(parsed) && parsed >= 1) return Math.trunc(parsed);
   }
   return undefined;
 }
 
-/**
- * Khi sheet/n8n không trả ``row_number``/``STT``, gán fallback là **thứ tự bài trong phiên** (1…n)
- * để UI và ``sheet_row`` gửi webhook không bị trống.
- *
- * Lưu ý: Đây là ordinal trong phiên, không phải tự động bằng **số hàng Google Sheet** —
- * để khớp đúng hàng sheet cần map STT trong workflow n8n.
- */
 export function enrichPostRowNumberIfMissing(
   record: Record<string, unknown>,
   fallbackOrdinalInSession: number,
@@ -122,51 +109,50 @@ export function enrichPostRowNumberIfMissing(
   };
 }
 
-function isEmptySheetCell(v: unknown): boolean {
-  if (v == null) return true;
-  if (typeof v === "string" && !v.trim()) return true;
+function isEmptySheetCell(value: unknown): boolean {
+  if (value == null) return true;
+  if (typeof value === "string" && !value.trim()) return true;
   return false;
 }
 
-/**
- * Gộp meta phiên (email, id phiên, nhóm, **tổng số bài trong phiên**) vào bản ghi bài trước khi gửi ``sheet_row``.
- *
- * - Email / nhóm / id phiên: chỉ điền khi ô trên dòng đang trống (không ghi đè ``Ngày``, nội dung, …).
- * - ``posts_count`` và cột «Tổng số bài lấy được mỗi lần cào»: **luôn** gán theo bảng phiên (khớp UI).
- * - ``row_number`` / ``STT``: giữ nguyên như object ``post`` (dữ liệu GET); không ghi đè ordinal bảng.
- */
 export function buildReactionWebhookSheetRow(
   post: Record<string, unknown>,
   session: CrawlSessionGroup,
 ): Record<string, unknown> {
   const out = { ...post };
-  const sid = session.id_session_crawl?.trim();
-  const ec = session.email_crawl?.trim();
-  const gu = session.group_url?.trim();
-  const gn = session.group_name?.trim();
+  const sessionId = session.id_session_crawl?.trim();
+  const crawlEmail = session.email_crawl?.trim();
+  const groupUrl = session.group_url?.trim();
+  const groupName = session.group_name?.trim();
 
-  const fill = (key: string, val: string | undefined) => {
-    if (!val) return;
+  const fill = (key: string, value: string | undefined) => {
+    if (!value) return;
     if (!isEmptySheetCell(out[key])) return;
-    out[key] = val;
+    out[key] = value;
   };
 
-  fill("ID_session_crawl", sid);
-  fill("id_session_crawl", sid);
-  fill("Email_crawl", ec);
-  fill("email_crawl", ec);
-  fill("group_url", gu);
-  fill("groupUrl", gu);
-  fill("URL_Nhóm", gu);
-  fill("URL_nhom", gu);
-  fill("group_name", gn);
-  fill("groupName", gn);
-  fill("Tên nhóm", gn);
+  fill("ID_session_crawl", sessionId);
+  fill("id_session_crawl", sessionId);
+  fill("Email_crawl", crawlEmail);
+  fill("email_crawl", crawlEmail);
+  fill("group_url", groupUrl);
+  fill("groupUrl", groupUrl);
+  fill("URL_Nhóm", groupUrl);
+  fill("URL_Nhom", groupUrl);
+  fill("group_name", groupName);
+  fill("groupName", groupName);
+  fill("Tên nhóm", groupName);
+  fill("Ten nhom", groupName);
 
-  const pc = session.posts_count;
-  if (typeof pc === "number" && Number.isFinite(pc) && pc >= 0) {
-    out["posts_count"] = pc;
-    out["Tổng số bài lấy được mỗi lần cào"] = pc;
+  const postsCount = session.posts_count;
+  if (
+    typeof postsCount === "number" &&
+    Number.isFinite(postsCount) &&
+    postsCount >= 0
+  ) {
+    out.posts_count = postsCount;
+    out["Tổng số bài lấy được mỗi lần cào"] = postsCount;
+    out["Tong so bai lay duoc moi lan cao"] = postsCount;
   }
 
   return out;
@@ -174,76 +160,98 @@ export function buildReactionWebhookSheetRow(
 
 export function shortenSessionId(id: string, head = 14, tail = 8): string {
   if (id.length <= head + tail + 3) return id;
-  return `${id.slice(0, head)}…${id.slice(-tail)}`;
+  return `${id.slice(0, head)}...${id.slice(-tail)}`;
 }
 
-/** Ngày đại diện của phiên (max ``Ngày`` / ``date`` trong các bài). */
+function formatDateDdMm(raw: string): string {
+  const day = raw.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return raw || "-";
+  return `${day.slice(8, 10)}/${day.slice(5, 7)}`;
+}
+
 export function sessionLatestDateLabel(session: CrawlSessionGroup): string {
   let best = "";
-  for (const p of session.posts) {
-    const d = pickStr(p, ["Ngày", "date", "targetDate"]).slice(0, 10).trim();
-    if (d && d > best) best = d;
-    const raw = pickStr(p, ["Đăng vào", "posted_at", "created_at"]);
+  for (const post of session.posts) {
+    const date = pickStr(post, ["Ngày", "Ngay", "date", "targetDate"])
+      .slice(0, 10)
+      .trim();
+    if (date && date > best) best = date;
+
+    const raw = pickStr(post, [
+      "Đăng vào",
+      "Dang vao",
+      "posted_at",
+      "created_at",
+    ]);
     if (raw.length >= 10) {
       const head = raw.slice(0, 10);
       if (head > best) best = head;
     }
   }
-  return best || "—";
+  return best ? formatDateDdMm(best) : "-";
 }
 
-export function formatCellValue(v: unknown): string {
-  if (v == null) return "—";
-  if (typeof v === "object")
+export function formatCellValue(value: unknown): string {
+  if (value == null) return "-";
+  if (typeof value === "object") {
     try {
-      return JSON.stringify(v);
+      return JSON.stringify(value);
     } catch {
-      return String(v);
+      return String(value);
     }
-  return String(v);
+  }
+  return String(value);
 }
 
 export function sortedRecordEntries(
   record: Record<string, unknown>,
 ): [string, unknown][] {
-  return Object.entries(record).sort(([a], [b]) =>
-    a.localeCompare(b, "vi", { sensitivity: "base" }),
+  return Object.entries(record).sort(([left], [right]) =>
+    left.localeCompare(right, "vi", { sensitivity: "base" }),
   );
 }
 
 export function getPostCrawlError(
   post: Record<string, unknown>,
 ): string | null {
-  const errKeys = [
+  const errorKeys = [
     "error",
     "errorMessage",
     "error_message",
     "Lỗi",
+    "Loi",
     "loi",
     "Reason",
     "reason",
     "ghi_chu",
     "Ghi chú",
+    "Ghi chu",
     "note",
     "status",
     "Trạng thái",
+    "Trang thai",
   ];
-  for (const k of errKeys) {
-    const val = String(post[k] ?? "").trim();
-    if (!val) continue;
-    const lower = val.toLowerCase();
+
+  for (const key of errorKeys) {
+    const value = String(post[key] ?? "").trim();
+    if (!value) continue;
+    const lower = value.toLowerCase();
     if (
       lower.includes("lỗi") ||
+      lower.includes("loi") ||
       lower.includes("error") ||
       lower.includes("failed") ||
       lower.includes("thất bại") ||
-      lower.includes("hỏng") ||
+      lower.includes("that bai") ||
+      lower.includes("hong") ||
       lower.includes("không thể") ||
+      lower.includes("khong the") ||
       lower.includes("cannot") ||
       lower.includes("missing")
     ) {
-      return val;
+      return value;
     }
   }
+
   return null;
 }

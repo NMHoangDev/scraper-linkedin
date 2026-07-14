@@ -39,10 +39,13 @@ import {
   type Customer,
   type DealStage,
   type PaymentStatus,
+  type ReviewResult,
   DEAL_STAGE_META,
   LOST_REASON_OPTIONS,
   PAYMENT_STATUS_OPTIONS,
   REJECT_REASON_TYPE_OPTIONS,
+  REVIEW_RESULT_OPTIONS,
+  SERVICE_PACKAGE_OPTIONS,
   type RejectReasonType,
 } from "@/services/customer-lead.service";
 import {
@@ -66,6 +69,9 @@ interface Props {
 }
 
 const CONTRACT_STATUS_OPTIONS: { value: ContractStatus; label: string }[] = [
+  { value: "dang_xu_ly", label: "Đang xử lý" },
+  { value: "da_bao_gia", label: "Đã báo giá" },
+  { value: "da_chot", label: "Đã chốt" },
   { value: "active", label: "Đang hoạt động" },
   { value: "completed", label: "Đã hoàn thành" },
   { value: "maintenance", label: "Bảo trì / bảo hành" },
@@ -87,17 +93,39 @@ function formatVND(value?: number | null) {
   }).format(value);
 }
 
+function getServicePackageText(value?: string | null) {
+  if (!value) return "";
+  return SERVICE_PACKAGE_OPTIONS.find((option) => option.value === value)?.label || value;
+}
+
+function getTerminalContractStatus(stage: DealStage, currentLabel?: string | null) {
+  if (stage === "won") return "Đã chốt";
+  if (stage === "lost") return "Không hoạt động";
+  return currentLabel || "Đang xử lý";
+}
+
 export function DealDetailDrawer({ customer, open, onClose, onRequestTransition, onEditCustomer, onDeleteCustomer, onCustomerUpdated }: Props) {
   const [log, setLog] = useState<ActivityLogEntry[]>([]);
   const [loadingLog, setLoadingLog] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const [contractStatusDraft, setContractStatusDraft] = useState<ContractStatus>("active");
+  const [contractStatusDraft, setContractStatusDraft] = useState<ContractStatus>("dang_xu_ly");
   const [savingContractStatus, setSavingContractStatus] = useState(false);
   const [paymentStatusDraft, setPaymentStatusDraft] = useState<PaymentStatus>("unpaid");
   const [savingPaymentStatus, setSavingPaymentStatus] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewDraft, setReviewDraft] = useState<ReviewResult>("Chua_xem_xet");
+  const [savingReview, setSavingReview] = useState(false);
 
   const stage = useMemo(() => (customer ? getCurrentStage(customer) : null), [customer]);
   const nextOptions = useMemo(() => (stage ? allowedNextStages(stage) : []), [stage]);
+  const reviewButtonLabel = useMemo(() => (stage === "won" ? "Won Review" : "Lost Review"), [stage]);
+  const reviewButtonClass = useMemo(
+    () =>
+      stage === "lost"
+        ? "inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100"
+        : "inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100",
+    [stage],
+  );
 
   useEffect(() => {
     if (!open || !customer) {
@@ -115,12 +143,16 @@ export function DealDetailDrawer({ customer, open, onClose, onRequestTransition,
   // Đồng bộ dropdown với deal đang mở — customer đổi (chuyển sang deal khác)
   // hoặc load lại sau update thì phải nạp lại giá trị hiện tại.
   useEffect(() => {
-    setContractStatusDraft(customer?.contract_status ?? "active");
+    setContractStatusDraft(customer?.contract_status ?? "dang_xu_ly");
   }, [customer?.id, customer?.contract_status]);
 
   useEffect(() => {
     setPaymentStatusDraft(customer?.payment_status ?? "unpaid");
   }, [customer?.id, customer?.payment_status]);
+
+  useEffect(() => {
+    setReviewDraft(customer?.review_result ?? "Chua_xem_xet");
+  }, [customer?.id, customer?.review_result]);
 
   async function handleContractStatusChange(next: ContractStatus) {
     if (!customer || next === customer.contract_status) {
@@ -164,9 +196,32 @@ export function DealDetailDrawer({ customer, open, onClose, onRequestTransition,
     }
   }
 
+  async function handleSaveReview() {
+    if (!customer) return;
+    setSavingReview(true);
+    try {
+      const res = await customerLeadService.update(customer.id, { review_result: reviewDraft });
+      if (res?.success === false) throw new Error(res?.message || "Cập nhật review thất bại");
+      toast.success(`${reviewButtonLabel} đã được cập nhật`);
+      onCustomerUpdated?.({ ...customer, review_result: reviewDraft });
+      setReviewOpen(false);
+    } catch (err: any) {
+      toast.error(err?.message || "Không lưu được review");
+    } finally {
+      setSavingReview(false);
+    }
+  }
+
   if (!customer || !stage) return null;
 
   const isTerminal = stage === "won" || stage === "lost";
+  const leadName = customer.leader_name || customer.sdr_name || null;
+  const handlerName = customer.sdr_name || customer.leader_name || null;
+  const servicePackageLabel = getServicePackageText(customer.service_package);
+  const terminalContractStatus = getTerminalContractStatus(
+    stage,
+    CONTRACT_STATUS_OPTIONS.find((option) => option.value === contractStatusDraft)?.label || null,
+  );
   const lostReasonLabel =
     customer.reject_reason_type
       ? LOST_REASON_OPTIONS.find((r) => r.value === customer.reject_reason_type)?.label ??
@@ -184,7 +239,7 @@ export function DealDetailDrawer({ customer, open, onClose, onRequestTransition,
       />
       {/* Drawer */}
       <aside
-        className={`fixed right-0 top-0 z-[99991] flex h-screen w-full max-w-2xl flex-col border-l border-slate-200 bg-white shadow-2xl transition-transform duration-300 ${
+        className={`fixed right-0 top-0 z-[99991] flex h-screen w-full max-w-[42rem] flex-col border-l border-slate-200 bg-white shadow-2xl transition-transform duration-300 ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
       >
@@ -310,6 +365,32 @@ export function DealDetailDrawer({ customer, open, onClose, onRequestTransition,
                 Follow-up dự kiến: <b>{new Date(customer.follow_up_date).toLocaleDateString("vi-VN")}</b>
               </div>
             )}
+            {leadName && (
+              <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
+                  <UserCog className="size-3" /> Người lead
+                </div>
+                <div className="mt-0.5 truncate font-medium text-slate-700">{leadName}</div>
+              </div>
+            )}
+            {handlerName && (
+              <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
+                  <UserCog className="size-3" /> Người xử lý
+                </div>
+                <div className="mt-0.5 truncate font-medium text-slate-700">{handlerName}</div>
+              </div>
+            )}
+            {isTerminal && (
+              <div className="col-span-2 rounded-md border border-slate-200 bg-white px-3 py-2">
+                <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
+                  <CheckCircle2 className="size-3" /> Kết quả review
+                </div>
+                <div className="mt-0.5 font-medium text-slate-700">
+                  {REVIEW_RESULT_OPTIONS.find((item) => item.value === (customer.review_result ?? "Chua_xem_xet"))?.label ?? "Chưa xem xét"}
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Ghi chú hiện tại */}
@@ -327,12 +408,12 @@ export function DealDetailDrawer({ customer, open, onClose, onRequestTransition,
                 Hợp đồng & chăm sóc
               </h4>
               <div className="grid grid-cols-2 gap-2">
-                {customer.service_package && (
+                {servicePackageLabel && (
                   <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
                     <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
                       <TagIcon className="size-3" /> Gói dịch vụ
                     </div>
-                    <div className="mt-0.5 truncate font-medium text-slate-700">{customer.service_package}</div>
+                    <div className="mt-0.5 truncate font-medium text-slate-700">{servicePackageLabel}</div>
                   </div>
                 )}
                 {customer.lifetime_value ? (
@@ -346,20 +427,26 @@ export function DealDetailDrawer({ customer, open, onClose, onRequestTransition,
                 <div className="col-span-2 rounded-md border border-slate-200 bg-white px-3 py-2">
                   <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
                     <FileText className="size-3" /> Trạng thái hợp đồng
-                    {savingContractStatus && <Loader2 className="size-3 animate-spin text-slate-400" />}
+                    {!isTerminal && savingContractStatus && <Loader2 className="size-3 animate-spin text-slate-400" />}
                   </div>
-                  <select
-                    value={contractStatusDraft}
-                    disabled={savingContractStatus}
-                    onChange={(e) => handleContractStatusChange(e.target.value as ContractStatus)}
-                    className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm font-medium text-slate-700 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
-                  >
-                    {CONTRACT_STATUS_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
+                  {isTerminal ? (
+                    <div className="mt-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm font-medium text-slate-700">
+                      {terminalContractStatus}
+                    </div>
+                  ) : (
+                    <select
+                      value={contractStatusDraft}
+                      disabled={savingContractStatus}
+                      onChange={(e) => handleContractStatusChange(e.target.value as ContractStatus)}
+                      className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm font-medium text-slate-700 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
+                    >
+                      {CONTRACT_STATUS_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
                 <div className="col-span-2 rounded-md border border-slate-200 bg-white px-3 py-2">
                   <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
@@ -383,13 +470,13 @@ export function DealDetailDrawer({ customer, open, onClose, onRequestTransition,
                   <div
                     className={`rounded-md border px-3 py-2 ${
                       isPaymentOverdue(customer)
-                        ? "border-red-200 bg-red-50"
+                        ? "border-amber-200 bg-amber-50"
                         : "border-slate-200 bg-white"
                     }`}
                   >
                     <div
                       className={`flex items-center gap-1.5 text-[11px] uppercase tracking-wider ${
-                        isPaymentOverdue(customer) ? "text-red-700" : "text-slate-500"
+                        isPaymentOverdue(customer) ? "text-amber-700" : "text-slate-500"
                       }`}
                     >
                       <CalendarDays className="size-3" />
@@ -397,7 +484,7 @@ export function DealDetailDrawer({ customer, open, onClose, onRequestTransition,
                     </div>
                     <div
                       className={`mt-0.5 font-medium ${
-                        isPaymentOverdue(customer) ? "text-red-800" : "text-slate-700"
+                        isPaymentOverdue(customer) ? "text-amber-800" : "text-slate-700"
                       }`}
                     >
                       {formatDate(customer.payment_due_date)}
@@ -580,6 +667,14 @@ export function DealDetailDrawer({ customer, open, onClose, onRequestTransition,
             >
               <UserCog className="size-3.5" /> Sửa thông tin
             </button>
+            {isTerminal && (
+              <button
+                onClick={() => onRequestTransition?.(customer, stage as DealStage)}
+                className={reviewButtonClass}
+              >
+                <CheckCircle2 className="size-3.5" /> {reviewButtonLabel}
+              </button>
+            )}
             <button
               onClick={() => {
                 if (confirm(`Xóa khách hàng "${customer.customer_name}"?\nHành động này không thể hoàn tác.`)) {
@@ -600,6 +695,50 @@ export function DealDetailDrawer({ customer, open, onClose, onRequestTransition,
           </button>
         </footer>
       </aside>
+
+      {reviewOpen && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-950/35 p-6 backdrop-blur-[1px]">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="border-b border-slate-100 px-5 py-4">
+              <h3 className="text-base font-bold text-slate-900">{reviewButtonLabel}</h3>
+              <p className="mt-1 text-sm text-slate-500">Cập nhật đánh giá cho deal terminal này.</p>
+            </div>
+            <div className="space-y-4 px-5 py-4">
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Kết quả review</span>
+                <select
+                  value={reviewDraft}
+                  onChange={(e) => setReviewDraft(e.target.value as ReviewResult)}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  {REVIEW_RESULT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4">
+              <button
+                type="button"
+                onClick={() => setReviewOpen(false)}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={savingReview}
+                onClick={handleSaveReview}
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-50"
+              >
+                {savingReview ? "Đang lưu..." : "Lưu review"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {chatOpen && customer.conv_id && (
         <QuickChatBox

@@ -77,6 +77,7 @@ import {
 import { getCurrentStage } from "@/services/crm-pipeline.helpers";
 import { cn } from "@/lib/utils";
 import { ThousandsInput } from "../components/thousands-input";
+import { TerminalReviewForm } from "./TerminalReviewForm";
 
 interface Props {
   customer: Customer;
@@ -580,8 +581,37 @@ export function StageTransitionModal({
     </div>
   );
 
+  let finalContent = modalContent;
+  if (toStage === "won" || toStage === "lost") {
+    finalContent = (
+      <div 
+        className="fixed inset-0 z-[99999] isolate flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" 
+        onClick={(e) => {
+          if (e.target === e.currentTarget && !busy) onClose();
+        }}
+      >
+        <div onClick={e => e.stopPropagation()}>
+          <TerminalReviewForm
+            toStage={toStage}
+            customerName={customer.customer_name}
+            onCancel={onClose}
+            onSubmit={async (payload) => {
+              setBusy(true);
+              try {
+                await onSubmit(payload);
+              } finally {
+                setBusy(false);
+              }
+            }}
+            busy={busy}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return mounted && typeof document !== "undefined"
-    ? createPortal(modalContent, document.body)
+    ? createPortal(finalContent, document.body)
     : null;
 }
 

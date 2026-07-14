@@ -47,9 +47,6 @@ export function isValidDealStage(s: unknown): s is DealStage {
 /** Lấy stage hiện tại của 1 customer — fallback về new_lead nếu không có. */
 export function getCurrentStage(c: Pick<Customer, "deal_stage" | "status">): DealStage {
   if (c.deal_stage && isValidDealStage(c.deal_stage)) return c.deal_stage;
-  // Backward-compat: map từ status cũ
-  if (c.status === "closed") return "won";
-  if (c.status === "rejected") return "lost";
   return "new_lead";
 }
 

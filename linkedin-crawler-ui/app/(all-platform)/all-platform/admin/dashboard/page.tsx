@@ -8,11 +8,13 @@ import type {
   AdminDashboardSummaryData,
   AdminKpiPerformanceData,
   AdminLeaderboardsData,
+  AdminTeamDailyTrendData,
 } from "@/services/all-platform.service";
 import { AdminDashboardSummary } from "@/components/all-platform/admin/dashboard/AdminDashboardSummary";
 import { AdminBentoWidgets } from "@/components/all-platform/admin/dashboard/AdminBentoWidgets";
 import { AdminKpiHistoryTable } from "@/components/all-platform/admin/dashboard/AdminKpiHistoryTable";
 import { AdminKpiPerformanceChart } from "@/components/all-platform/admin/dashboard/AdminKpiPerformanceChart";
+import { AdminTeamTrendChart } from "@/components/all-platform/admin/dashboard/AdminTeamTrendChart";
 import { AdminUnassignedPosts } from "@/components/all-platform/admin/dashboard/AdminUnassignedPosts";
 import { FaSyncAlt } from "react-icons/fa";
 
@@ -27,10 +29,13 @@ export default function AdminDashboardPage() {
   >([]);
   const [leaderboards, setLeaderboards] =
     useState<AdminLeaderboardsData | null>(null);
+  const [teamDailyTrend, setTeamDailyTrend] =
+    useState<AdminTeamDailyTrendData | null>(null);
 
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [loadingPerformance, setLoadingPerformance] = useState(false);
   const [loadingLeaderboards, setLoadingLeaderboards] = useState(false);
+  const [loadingTeamTrend, setLoadingTeamTrend] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -76,6 +81,18 @@ export default function AdminDashboardPage() {
       console.error("Lỗi khi tải bảng xếp hạng");
     } finally {
       setLoadingLeaderboards(false);
+    }
+
+    setLoadingTeamTrend(true);
+    try {
+      const trendRes = await adminDashboardService.getTeamDailyTrend(14);
+      if (trendRes.success && trendRes.data) {
+        setTeamDailyTrend(trendRes.data);
+      }
+    } catch {
+      console.error("Lá»—i khi táº£i biá»ƒu Ä‘á»“ xu hÆ°á»›ng theo team");
+    } finally {
+      setLoadingTeamTrend(false);
     }
   }, []);
 
@@ -155,6 +172,10 @@ export default function AdminDashboardPage() {
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-6 xl:col-span-2">
+          <AdminTeamTrendChart
+            data={teamDailyTrend}
+            isLoading={loadingTeamTrend}
+          />
           <AdminKpiHistoryTable />
           <AdminUnassignedPosts />
         </div>
