@@ -1681,6 +1681,31 @@ export interface GroupsHealthStats {
   by_tier: Array<{ tier_name: string; count: number }>;
 }
 
+export interface AdminTeamDailyTrendPoint {
+  date: string;
+  posts: number;
+  comments: number;
+  inbox: number;
+  leads: number;
+  total_kpi: number;
+}
+
+export interface AdminTeamDailyTrendSeries {
+  team_id: string;
+  team_name: string;
+  series: AdminTeamDailyTrendPoint[];
+}
+
+export interface AdminTeamDailyTrendData {
+  days: number;
+  range: { start: string; end: string };
+  filters?: {
+    team_ids?: string[];
+    metric?: string;
+  };
+  teams: AdminTeamDailyTrendSeries[];
+}
+
 export interface HighInteractionPostsData {
   posts: HighInteractionPost[];
   total: number;
@@ -1736,6 +1761,35 @@ export const adminDashboardService = {
    */
   getGroupsHealth: (): Promise<ApiResponse<GroupsHealthStats>> => {
     return requestJson(`${BASE}/admin/dashboard/groups-health`);
+  },
+
+  getTeamDailyTrend: (params?: number | {
+    days?: number;
+    startDate?: string;
+    endDate?: string;
+    metric?: string;
+    teamIds?: string[];
+  }): Promise<ApiResponse<AdminTeamDailyTrendData>> => {
+    const normalized =
+      typeof params === "number" ? { days: params } : (params ?? {});
+    const searchParams = new URLSearchParams();
+    if (normalized.days) {
+      searchParams.set("days", String(normalized.days));
+    }
+    if (normalized.startDate) {
+      searchParams.set("start_date", normalized.startDate);
+    }
+    if (normalized.endDate) {
+      searchParams.set("end_date", normalized.endDate);
+    }
+    if (normalized.metric) {
+      searchParams.set("metric", normalized.metric);
+    }
+    for (const teamId of normalized.teamIds ?? []) {
+      searchParams.append("team_ids", teamId);
+    }
+    const query = searchParams.toString();
+    return requestJson(`${BASE}/admin/dashboard/team-daily-trend${query ? `?${query}` : ""}`);
   },
 };
 

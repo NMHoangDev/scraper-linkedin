@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Header, Request, HTTPException
+from fastapi import APIRouter, Header, Request, HTTPException, Query
 
 from app.modules.all_platform.schemas import BaseResponse
 from app.modules.all_platform.services import decode_token, get_user_by_id
@@ -13,6 +13,7 @@ from app.modules.all_platform.services.admin_dashboard_service import (
     get_admin_dashboard_overview,
     get_high_interaction_unseeded_posts,
     get_groups_health_stats,
+    get_team_daily_trend,
 )
 
 router = APIRouter()
@@ -126,4 +127,26 @@ def get_groups_health(
     """
     _get_admin_from_header(authorization, request)
     data = get_groups_health_stats()
+    return BaseResponse(success=True, message="Success", data=data)
+
+
+@router.get("/team-daily-trend")
+def get_admin_team_daily_trend(
+    request: Request,
+    days: int = 14,
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    metric: str | None = Query(None),
+    team_ids: list[str] | None = Query(None),
+    authorization: str | None = Header(None),
+) -> BaseResponse:
+    """Get daily team trend data with optional date range and team filters."""
+    _get_admin_from_header(authorization, request)
+    data = get_team_daily_trend(
+        days=days,
+        start_date=start_date,
+        end_date=end_date,
+        team_ids=team_ids,
+        metric=metric,
+    )
     return BaseResponse(success=True, message="Success", data=data)
