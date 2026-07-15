@@ -270,7 +270,11 @@ export function getContractLabel(deal?: Pick<Deal, 'contract' | 'quote'> | null)
 
 export function isCrmDocumentUrl(value?: string | null) {
   const raw = String(value || '').trim();
-  if (!raw || !/^https?:\/\//i.test(raw)) return false;
+  if (!raw) return false;
+  // Link báo giá thật sinh từ module Quotes là route nội bộ (cùng origin), không phải
+  // file đính kèm ngoài — bỏ qua yêu cầu "http(s) + đuôi file" bên dưới cho 2 prefix này.
+  if (/^\/public\/(quotes|quote-forms)\//i.test(raw)) return true;
+  if (!/^https?:\/\//i.test(raw)) return false;
   try {
     const url = new URL(raw);
     const hostname = url.hostname.toLowerCase();

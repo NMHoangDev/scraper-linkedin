@@ -43,6 +43,24 @@ from app.modules.all_platform.services.supabase_quick_comment_service import (
     delete_quick_comment,
     reorder_quick_comment,
 )
+from app.modules.all_platform.services.supabase_quote_service import (
+    list_quote_forms,
+    get_quote_form,
+    get_public_quote_form,
+    create_quote_form,
+    update_quote_form,
+    delete_quote_form,
+    duplicate_quote_form,
+    share_quote_form,
+    list_quotes,
+    get_quote,
+    get_public_quote,
+    create_quote,
+    update_quote,
+    delete_quote,
+    publish_quote,
+    link_quote_to_deal,
+)
 from app.modules.all_platform.services.supabase_quick_inbox_service import (
     get_all_quick_inbox,
     add_quick_inbox,

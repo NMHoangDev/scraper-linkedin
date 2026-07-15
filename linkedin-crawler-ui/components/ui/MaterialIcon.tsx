@@ -116,7 +116,8 @@ export type MaterialSymbolName =
   | "cookie"
   | "warning_amber"
   | "navigate_next"
-  | "keyboard_arrow_down";
+  | "keyboard_arrow_down"
+  | "request_quote";
 
 export interface MaterialIconProps {
   name: MaterialSymbolName;

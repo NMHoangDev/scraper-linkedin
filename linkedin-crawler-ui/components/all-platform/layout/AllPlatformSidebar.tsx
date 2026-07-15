@@ -153,6 +153,14 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       label: "CRM",
       matchStartsWith: ["/all-platform/crm"],
     },
+    {
+      type: "item",
+      id: "quotes",
+      href: "/all-platform/quotes",
+      icon: "request_quote",
+      label: "Mẫu báo giá",
+      matchStartsWith: ["/all-platform/quotes"],
+    },
   ];
 
   // Inbox Zalo Admin (/all-platform/zalo-inbox): xem hoi thoai Zalo cua TOAN

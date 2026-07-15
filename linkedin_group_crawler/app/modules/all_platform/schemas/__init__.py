@@ -40,6 +40,13 @@ from app.modules.all_platform.schemas.quick_inbox import (
     QuickInboxUpdateRequest,
     QuickInboxReorderRequest,
 )
+from app.modules.all_platform.schemas.quote import (
+    QuoteFormCreateRequest,
+    QuoteFormUpdateRequest,
+    QuoteItemInput,
+    QuoteCreateRequest,
+    QuoteUpdateRequest,
+)
 from app.modules.all_platform.schemas.auth import (
     RegisterRequest,
     LoginRequest,

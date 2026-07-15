@@ -349,7 +349,18 @@ function DealCard({
       <div className="mt-2 space-y-1.5">
         {contractLabel && (
           <div
-            className="flex items-start gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-1.5 py-1 text-[10px] text-slate-600"
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (customer.last_attachment_url) {
+                window.open(customer.last_attachment_url, "_blank");
+              } else {
+                toast.error("Chưa có link đính kèm cho hợp đồng/báo giá này");
+              }
+            }}
+            className="flex cursor-pointer transition-colors hover:bg-slate-100 hover:border-slate-300 items-start gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-1.5 py-1 text-[10px] text-slate-600"
             title={contractLabel}
           >
             <FileText className="mt-0.5 size-3.5 shrink-0 text-slate-500" />

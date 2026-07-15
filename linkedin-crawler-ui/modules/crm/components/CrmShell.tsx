@@ -9,6 +9,7 @@ import { DealFormModal } from './DealFormModal';
 import { DetailDrawer } from './DetailDrawer';
 import { LayoutGrid, Loader2, Plus, RotateCcw, TableIcon, Trophy } from './icons';
 import { StageModal } from './StageModal';
+import { DealQuoteWizard } from '../integrations/quotes';
 import {
   CITY_OPTIONS,
   DEAL_STAGE_META,
@@ -28,7 +29,7 @@ type FilterState = {
 };
 
 export function CrmShell() {
-  const { deals, agents, loading, saving, error, stats, getDeal, createDeal, updateDeal, deleteDeal, moveDeal } = useCrm();
+  const { deals, agents, loading, saving, error, stats, loadDeals, getDeal, createDeal, updateDeal, deleteDeal, moveDeal } = useCrm();
   const [viewMode, setViewMode] = useState<'kanban' | 'table'>('kanban');
   const [filters, setFilters] = useState<FilterState>({ search: '', source: '', city: '', industry: '' });
   const [activeStageFilters, setActiveStageFilters] = useState<DealStage[]>([]);
@@ -112,6 +113,12 @@ export function CrmShell() {
     } catch (err) {
       window.alert(err instanceof Error ? err.message : 'Không tạo được deal. Vui lòng kiểm tra lại thông tin.');
     }
+  }
+
+  async function handleWizardCreated(deal: Deal) {
+    await loadDeals();
+    setSelectedDeal(deal);
+    setDetailOpen(true);
   }
 
   async function handleUpdate(id: string, input: UpdateDealInput) {
@@ -315,7 +322,7 @@ export function CrmShell() {
         onClose={() => setReviewData(null)}
         onSubmit={() => undefined}
       />
-      <DealFormModal open={createOpen} loading={saving} agents={agents} onClose={() => setCreateOpen(false)} onCreate={handleCreate} onUpdate={handleUpdate} />
+      <DealQuoteWizard open={createOpen} agents={agents} onClose={() => setCreateOpen(false)} onCreated={handleWizardCreated} />
       <DealFormModal open={Boolean(editingDeal)} deal={editingDeal} loading={saving} agents={agents} onClose={() => setEditingDeal(null)} onCreate={handleCreate} onUpdate={handleUpdate} />
       <ContractDetailModal deal={contractDeal} open={Boolean(contractDeal)} onClose={() => setContractDeal(null)} />
     </div>

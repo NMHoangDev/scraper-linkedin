@@ -30,6 +30,7 @@ from app.modules.all_platform.routers.fb import router as fb_automation_router
 from app.modules.all_platform.routers.websocket import router as websocket_router
 from app.modules.all_platform.routers.fb_inbox_accounts import router as fb_inbox_accounts_router
 from app.modules.all_platform.routers.customer_lead import router as customer_lead_router
+from app.modules.all_platform.routers.quote import quote_forms_router, quotes_router
 from app.modules.all_platform.routers.scheduled_comments import router as scheduled_comments_router
 from app.modules.all_platform.routers.posts_delete import router as posts_delete_router
 
@@ -212,6 +213,18 @@ all_platform_router.include_router(
 all_platform_router.include_router(
     customer_lead_router,
     tags=["Customer Leads"]
+)
+
+# ── Quote Forms + Quotes ───────────────────────────────────────────────────────
+all_platform_router.include_router(
+    quote_forms_router,
+    prefix="/quote-forms",
+    tags=["All-Platform Quote Forms"],
+)
+all_platform_router.include_router(
+    quotes_router,
+    prefix="/quotes",
+    tags=["All-Platform Quotes"],
 )
 
 # ── WebSocket ────────────────────────────────────────────────────────────────
