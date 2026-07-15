@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import "@/modules/crm/styles/crm.css";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/components/facebook-crawler/shared/components/contexts/AuthContext";
 import { AppAuthProvider } from "@/contexts/AppAuthContext";
