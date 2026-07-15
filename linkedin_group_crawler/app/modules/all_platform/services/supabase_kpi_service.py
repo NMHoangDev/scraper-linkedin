@@ -273,6 +273,9 @@ def assign_kpi(payload: dict) -> dict:
         "start_date": start_date,
         "end_date": end_date,
         "status": "active",
+        "is_failed": latest.is_failed,
+        "reason_not_met": (
+        latest.reason_not_met if latest.is_failed else None),
     }
 
     # ── Check for existing record (unique key: member + team + week) ───────────

@@ -92,6 +92,8 @@ def create_social_account(
     id_platform: int | None = None,
     is_primary: bool = False,
     notes: str | None = None,
+    is_banned: bool = False,
+    ban_reason: str | None = None,
 ) -> dict:
     """Create a new social account."""
     # Auto-resolve id_platform if not provided
@@ -113,6 +115,8 @@ def create_social_account(
         "id_platform": id_platform,
         "is_primary": is_primary,
         "notes": notes,
+        "is_banned": is_banned,
+        "ban_reason": ban_reason if is_banned else None,
         "is_active": True,
     }
 
@@ -138,11 +142,37 @@ def update_social_account(
         raise ValueError("Social account not found")
 
     allowed_fields = (
-        "account_name", "account_email", "account_password",
-        "account_profile_id", "id_platform",
-        "is_active", "is_primary", "notes",
+        "account_name",
+        "account_email",
+        "account_password",
+        "account_profile_id",
+        "id_platform",
+        "is_active",
+        "is_primary",
+        "notes",
+        "is_banned",
+        "ban_reason",
     )
-    safe_updates = {k: v for k, v in updates.items() if k in allowed_fields}
+
+    safe_updates = {
+        k: v
+        for k, v in updates.items()
+        if k in allowed_fields
+    }
+
+    # Nếu bỏ tick BAN thì xóa lý do
+    if safe_updates.get("is_banned") is False:
+        safe_updates["ban_reason"] = None
+
+    # Nếu tick BAN thì bắt buộc nhập lý do
+    if safe_updates.get("is_banned") is True:
+        reason = (safe_updates.get("ban_reason") or "").strip()
+
+        if not reason:
+            raise ValueError("Ban reason is required.")
+
+        safe_updates["ban_reason"] = reason
+
     safe_updates["updated_at"] = "now()"
 
     result = execute_supabase_query(
@@ -154,6 +184,7 @@ def update_social_account(
             .execute()
         )
     )
+
     return result.data[0] if result.data else {}
 
 

@@ -45,6 +45,8 @@ export function SocialAccountsManager({ onAccountChange }: SocialAccountsProps) 
     session_cookie: "",
     is_primary: false,
     notes: "",
+    is_banned: false,
+    ban_reason: "",
   });
 
   const fetchAccounts = useCallback(async () => {
@@ -101,6 +103,8 @@ export function SocialAccountsManager({ onAccountChange }: SocialAccountsProps) 
       notes: acc.notes || "",
       two_fa_secret: acc.two_fa_secret || "",
       session_cookie: acc.session_cookie || "",
+      is_banned: acc.is_banned ?? false,
+      ban_reason: acc.ban_reason || "",
     });
     setShowForm(true);
   };
@@ -112,6 +116,8 @@ export function SocialAccountsManager({ onAccountChange }: SocialAccountsProps) 
       account_profile_id: "", id_platform: null,
       is_primary: false, notes: "",
       two_fa_secret: "", session_cookie: "",
+      is_banned: false,
+      ban_reason: "",
     });
     setShowForm(true);
   };
@@ -129,6 +135,12 @@ export function SocialAccountsManager({ onAccountChange }: SocialAccountsProps) 
         id_platform: formData.id_platform,
         is_primary: formData.is_primary,
         notes: formData.notes || undefined,
+        is_banned: formData.is_banned,
+
+    ban_reason:
+        formData.is_banned
+            ? formData.ban_reason
+            : undefined,
       };
       let res;
       if (editingId) {
@@ -223,8 +235,9 @@ export function SocialAccountsManager({ onAccountChange }: SocialAccountsProps) 
           <table className="w-full border-collapse text-left text-xs">
             <thead className="bg-surface-container-low border-b border-outline-variant text-[10px] font-bold text-on-surface-variant uppercase">
               <tr>
+                <th className="py-3 px-4">FB Ban</th>
                 <th className="py-3 px-4">Tên tài khoản</th>
-                <th className="py-3 px-4">Email đăng nhập</th>
+                <th className="py-3 px-4">Email đăng nhập</th>   
                 <th className="py-3 px-4">Trạng thái</th>
                 <th className="py-3 px-4">Platform</th>
                 <th className="py-3 px-4 text-center">Hành động</th>
@@ -232,7 +245,37 @@ export function SocialAccountsManager({ onAccountChange }: SocialAccountsProps) 
             </thead>
             <tbody className="divide-y divide-outline-variant text-on-surface-variant">
               {filtered.map((acc) => (
+                
                 <tr key={acc.id} className="hover:bg-surface-container-low/30 transition">
+                  <td className="py-3 px-4">
+
+    {acc.is_banned ? (
+
+        <div>
+
+            <span className="bg-red-100 text-red-600 px-2 py-1 rounded">
+                Đã BAN
+            </span>
+
+            {acc.ban_reason && (
+
+                <div className="text-xs text-gray-500 mt-1">
+                    {acc.ban_reason}
+                </div>
+
+            )}
+
+        </div>
+
+    ) : (
+
+        <span className="text-green-600">
+            Bình thường
+        </span>
+
+    )}
+
+</td>
                   <td className="py-3.5 px-4 font-bold text-on-surface flex items-center gap-2">
                     <span className={cn("w-6 h-6 rounded-lg flex items-center justify-center text-[10px]",
                       acc.platform === "facebook" ? "bg-primary/10 text-primary" :
@@ -438,7 +481,48 @@ export function SocialAccountsManager({ onAccountChange }: SocialAccountsProps) 
                   </select>
                 </div>
               </div>
+              <div className="space-y-3">
 
+    <label className="flex items-center gap-2">
+
+        <input
+            type="checkbox"
+            checked={formData.is_banned}
+            onChange={(e)=>
+                setFormData({
+                    ...formData,
+                    is_banned:e.target.checked,
+                    ban_reason:e.target.checked
+                        ? formData.ban_reason
+                        : "",
+                })
+            }
+        />
+
+        <span className="text-sm font-medium">
+            Facebook Account bị BAN
+        </span>
+
+    </label>
+
+    {formData.is_banned && (
+
+        <textarea
+            rows={1}
+            placeholder="Nhập lý do tài khoản bị BAN..."
+            value={formData.ban_reason}
+            onChange={(e)=>
+                setFormData({
+                    ...formData,
+                    ban_reason:e.target.value,
+                })
+            }
+            className="w-full px-3 py-2 border rounded-xl"
+        />
+
+    )}
+
+</div>
               {/* Ghi chú */}
               <div className="space-y-1">
                 <label className="block text-[10px] font-bold text-on-surface-variant uppercase">Ghi chú</label>
