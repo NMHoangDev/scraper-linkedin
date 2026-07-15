@@ -109,6 +109,50 @@ def get_accounts_by_member(id_member: str) -> list[dict]:
     return result.data or []
 
 
+def get_accounts_by_members(id_members: list[str]) -> list[dict]:
+    """Lấy danh sách FB inbox accounts của nhiều member cùng lúc.
+
+    Dùng cho Leader/Admin xem KPI của cả team (thay vì chỉ thấy account của
+    chính mình) — trước đây list_inbox_accounts() chỉ lọc theo id_member của
+    người đang gọi API nên Leader luôn thấy team member "chưa bật KPI" dù
+    member đã tự bật.
+
+    Args:
+        id_members: Danh sách app_users.id (chính leader + các member trong team)
+
+    Returns:
+        Danh sách accounts
+    """
+    if not id_members:
+        return []
+
+    supabase: Client = get_supabase_client()
+
+    result = (
+        supabase.table("fb_inbox_accounts")
+        .select("*")
+        .in_("id_member", id_members)
+        .order("created_at", desc=True)
+        .execute()
+    )
+
+    return result.data or []
+
+
+def get_all_accounts() -> list[dict]:
+    """Lấy toàn bộ FB inbox accounts (dùng cho Admin xem hết mọi team)."""
+    supabase: Client = get_supabase_client()
+
+    result = (
+        supabase.table("fb_inbox_accounts")
+        .select("*")
+        .order("created_at", desc=True)
+        .execute()
+    )
+
+    return result.data or []
+
+
 def get_accounts_by_user_ids(user_ids: list[str]) -> dict[str, dict]:
     """Lấy thông tin accounts theo nhiều user_ids.
 
@@ -344,6 +388,49 @@ def update_account(
         logger.info(f"✏️ Updated fb_inbox_account: id={account_id}")
 
     return result.data[0] if result.data else {}
+
+
+def auto_link_accounts_from_sessions(sessions: list[dict]) -> int:
+    """Tự động bật KPI cho các FB session đã có owner (id_member) nhưng chưa
+    có trong fb_inbox_accounts.
+
+    Gọi từ router /fb/sessions mỗi khi liệt kê session, để đảm bảo KPI được
+    bật ngay bất kể tài khoản được kết nối qua đường nào (nút "Thêm tài khoản
+    FB", trang Inbox, hay extension tự phát hiện session có sẵn) — không phụ
+    thuộc vào 1 luồng frontend cụ thể nào.
+
+    Args:
+        sessions: Danh sách session trả về từ Markee (mỗi item có user_id,
+            owner, fb_user_id, label).
+
+    Returns:
+        Số account mới được link.
+    """
+    candidates = [s for s in sessions if s.get("user_id") and s.get("owner")]
+    if not candidates:
+        return 0
+
+    user_ids = [str(s["user_id"]) for s in candidates]
+    existing = get_accounts_by_user_ids(user_ids)
+
+    linked = 0
+    for s in candidates:
+        uid = str(s["user_id"])
+        row = existing.get(uid)
+        if row and row.get("is_active"):
+            continue
+        try:
+            link_user_account(
+                id_member=str(s["owner"]),
+                user_id=uid,
+                fb_user_id=s.get("fb_user_id"),
+                account_label=s.get("label"),
+            )
+            linked += 1
+        except ValueError:
+            # Da link voi member khac truoc do - khong ghi de.
+            continue
+    return linked
 
 
 def get_account_by_user_id(user_id: str) -> Optional[dict]:

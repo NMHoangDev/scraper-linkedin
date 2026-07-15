@@ -101,19 +101,27 @@ async def check_caller_conversation_access(
     caller_user_id = str(caller_user.get("id"))
     caller_role = str(caller_user.get("role") or "").strip().lower()
 
-    # 2. Tìm chủ sở hữu của tài khoản Zalo (owner_id trong zalo_accounts)
+    # 2. Tìm chủ sở hữu của tài khoản Zalo.
+    # QUAN TRỌNG: cột "owner_id" chỉ là nhãn/slug cũ (thường là "default" hoặc
+    # slug tự sinh từ trình duyệt), KHÔNG phải app_users.id. Cột thật sự dùng
+    # để phân quyền xem account ở khắp nơi khác (list_accounts, resolve leader
+    # xem team...) là "id_member" (app_users.id). Trước đây hàm này chỉ so
+    # caller_user_id với "owner_id" nên hầu như luôn sai (kể cả chính chủ tài
+    # khoản), khiến leader/member tự kết nối account của mình vẫn bị coi là
+    # người ngoài và rơi vào nhánh "chỉ xem hội thoại đã share" -> 403 riêng tư.
     account_rows = await _rest(
         "GET",
         "zalo_accounts",
         params={
-            "select": "owner_id",
+            "select": "owner_id,id_member",
             "account_id": f"eq.{account_id}",
             "limit": "1",
         },
     )
     owner_user_id = None
     if account_rows:
-        owner_user_id = str(account_rows[0].get("owner_id") or "")
+        row = account_rows[0]
+        owner_user_id = str(row.get("id_member") or row.get("owner_id") or "") or None
 
     # 3. Nếu là chủ sở hữu, cho phép xem toàn bộ
     if owner_user_id and caller_user_id == owner_user_id:

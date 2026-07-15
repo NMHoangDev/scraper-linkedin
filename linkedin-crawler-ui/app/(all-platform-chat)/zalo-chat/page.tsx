@@ -18,8 +18,11 @@ export default function ZaloChatFullScreenPage() {
   useEffect(() => {
     if (isLoading || !user) return;
     if (user.role === "leader") {
-      // Leader thì dùng flow team-management (đã có nút "Xem Inbox"). Admin xem chat trực tiếp như member.
-      router.replace("/all-platform/leader/team");
+      // Leader dùng trang Zalo Inbox Admin (xem/chat được TOÀN BỘ tài khoản
+      // trong team + nút tải extension đăng nhập Zalo), không phải trang
+      // Quản lý Team (chỉ có bảng KPI, không có ô chat) — trước đây đẩy nhầm
+      // về đó khiến leader bấm "Mở chat" nhưng lại thấy trang KPI team.
+      router.replace("/all-platform/zalo-inbox");
     }
   }, [user, isLoading, router]);
 

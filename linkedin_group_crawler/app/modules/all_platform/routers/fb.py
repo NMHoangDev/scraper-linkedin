@@ -21,6 +21,7 @@ from loguru import logger
 
 from app.modules.all_platform.services import decode_token, get_team_members, get_user_by_id
 from app.modules.all_platform.services.supabase_kpi_service import auto_count_fb_inbox_reply, mark_fb_inbox_lead
+from app.modules.all_platform.services.fb_inbox_account_service import auto_link_accounts_from_sessions
 from app.core.supabase_client import get_supabase_client
 
 
@@ -38,6 +39,42 @@ _MARKEE_INFLIGHT: dict[str, asyncio.Task[tuple[int, Any]]] = {}
 _MARKEE_CACHE_LIMIT = 1000
 _THREAD_LOAD_RECENT: dict[str, tuple[float, dict[str, Any]]] = {}
 _THREAD_LOAD_RECENT_TTL = 12.0
+_AUTO_KPI_LINK_RECENT: dict[str, float] = {}
+_AUTO_KPI_LINK_TTL = 30.0
+
+
+def _schedule_auto_kpi_link(sessions: list[dict[str, Any]]) -> None:
+    """Fire-and-forget: tự động bật KPI cho session FB mới xuất hiện, không
+    chặn response /sessions. Throttle theo user_id để tránh query lặp lại mỗi
+    lần trang poll (5s)."""
+    if not sessions:
+        return
+    now = time.monotonic()
+    pending: list[dict[str, Any]] = []
+    for s in sessions:
+        uid = s.get("user_id")
+        if not uid or not s.get("owner"):
+            continue
+        last = _AUTO_KPI_LINK_RECENT.get(uid, 0.0)
+        if now - last < _AUTO_KPI_LINK_TTL:
+            continue
+        _AUTO_KPI_LINK_RECENT[uid] = now
+        pending.append(s)
+    if not pending:
+        return
+    if len(_AUTO_KPI_LINK_RECENT) > 1000:
+        for key in list(_AUTO_KPI_LINK_RECENT.keys())[:-1000]:
+            _AUTO_KPI_LINK_RECENT.pop(key, None)
+
+    async def _run() -> None:
+        try:
+            linked = await run_in_threadpool(auto_link_accounts_from_sessions, pending)
+            if linked:
+                logger.info(f"[auto-kpi-link] Da tu dong bat KPI cho {linked} tai khoan FB moi")
+        except Exception as exc:
+            logger.warning(f"[auto-kpi-link] Loi tu dong bat KPI: {exc}")
+
+    asyncio.create_task(_run())
 
 
 def _current_user(request: Request, authorization: str | None = None) -> dict[str, Any]:
@@ -279,6 +316,8 @@ async def fb_health(request: Request, authorization: str | None = Header(None)) 
 async def fb_sessions(request: Request, authorization: str | None = Header(None)) -> JSONResponse:
     user = _current_user(request, authorization)
     status, payload = await _markee_json("GET", "/sessions", params=_scope_query(user), cache_ttl=5.0)
+    if status < 400 and isinstance(payload, dict):
+        _schedule_auto_kpi_link(payload.get("sessions") or [])
     return _json_response(status, payload)
 
 

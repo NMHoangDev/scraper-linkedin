@@ -19,10 +19,11 @@ from app.modules.all_platform.schemas.fb_inbox_account import (
     FbInboxAccountListResponse,
     ResolveMemberResponse,
 )
-from app.modules.all_platform.services import decode_token, get_user_by_id
+from app.modules.all_platform.services import decode_token, get_team_members, get_user_by_id
 from app.modules.all_platform.services.fb_inbox_account_service import (
     link_user_account,
-    get_accounts_by_member,
+    get_accounts_by_members,
+    get_all_accounts,
     resolve_id_member,
     delete_account,
     update_account,
@@ -64,6 +65,32 @@ def _get_user_from_header(authorization: str | None, request: Request | None = N
     return user
 
 
+def _allowed_id_members(user: dict) -> list[str] | None:
+    """Phạm vi id_member được phép xem KPI:
+      - admin  -> None (xem HẾT toàn bộ team)
+      - leader -> chính mình + toàn bộ member trong team mình quản lý
+      - member -> CHỈ chính mình
+
+    Cùng logic với _allowed_owners() trong routers/fb.py — tách riêng ở đây vì
+    router fb_inbox_accounts không dùng chung state/cache với router fb.
+    """
+    user_id = str(user.get("id") or "")
+    role = str(user.get("role") or "member").strip().lower()
+    if role == "admin":
+        return None
+    if role == "leader":
+        ids = {user_id}
+        try:
+            for m in get_team_members(user_id) or []:
+                mid = m.get("id")
+                if mid:
+                    ids.add(str(mid))
+        except Exception:
+            pass
+        return list(ids)
+    return [user_id]
+
+
 @router.post("/inbox-accounts", response_model=BaseResponse)
 def create_inbox_account(
     payload: FbInboxAccountCreate,
@@ -101,12 +128,21 @@ def list_inbox_accounts(
     request: Request,
     authorization: str | None = Header(None),
 ) -> BaseResponse:
-    """Lấy danh sách FB inbox accounts của member hiện tại."""
+    """Lấy danh sách FB inbox accounts.
+
+    Member chỉ thấy account của chính mình. Leader/Admin thấy KPI của CẢ TEAM
+    (trước đây luôn lọc theo id_member của người gọi API, nên Leader mở tab
+    Inbox Accounts luôn thấy account của member là "chưa bật KPI" dù member đã
+    tự bật — vì account đó có id_member = member, không phải id_member = leader).
+    """
     user = _get_user_from_header(authorization, request)
-    id_member = user["id"]
+    scope = _allowed_id_members(user)
 
     try:
-        accounts = get_accounts_by_member(id_member)
+        if scope is None:
+            accounts = get_all_accounts()
+        else:
+            accounts = get_accounts_by_members(scope)
         return BaseResponse(
             success=True,
             message="Success",

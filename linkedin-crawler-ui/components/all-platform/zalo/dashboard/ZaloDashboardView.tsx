@@ -88,6 +88,15 @@ export function ZaloDashboardView({ flow, onEnterChat }: ZaloDashboardViewProps)
               className="border border-outline-variant bg-surface rounded-lg py-1.5 pl-8 pr-3 text-[13px] w-[220px] focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none transition-all placeholder:text-on-surface-variant"
             />
           </div>
+          <a
+            href="/extension-login-zalo.zip"
+            download
+            title="Cài extension để đăng nhập & đồng bộ tin nhắn Zalo ổn định hơn quét QR"
+            className="bg-blue-50 border border-blue-200 text-blue-700 inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold hover:bg-blue-100 transition"
+          >
+            <MaterialIcon name="download" className="text-[16px]" />
+            Tải extension Zalo
+          </a>
           <button className="bg-surface border border-outline-variant inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-low hover:border-outline-variant transition">
             <MaterialIcon name="group_add" className="text-[16px]" />
             Gộp TK
@@ -305,14 +314,16 @@ export function ZaloDashboardView({ flow, onEnterChat }: ZaloDashboardViewProps)
                   <>
                     <button
                       onClick={() => {
-                        // Chuyển sang account này rồi gọi startSession (QR login)
+                        // Chuyển sang account này rồi gọi restartSession: tự thử
+                        // đăng nhập qua Chrome Extension (ổn định hơn, tự đồng bộ
+                        // tin nhắn) trước, chỉ fallback về QR nếu chưa cài extension.
                         if (account.account_id !== flow.userId) {
                           flow.switchAccount(account.account_id);
                         }
-                        void flow.startSession();
+                        void flow.restartSession();
                       }}
                       className="flex-1 h-8 bg-primary text-white flex items-center justify-center gap-1 rounded-lg text-[12px] font-semibold transition-all duration-200 hover:bg-[#C2000D] hover:shadow-sm shadow-red-500/20 active:scale-95 animate-pulse"
-                      title="Phiên đã hết hạn — bấm để đăng nhập lại bằng QR"
+                      title="Phiên đã hết hạn — bấm để đăng nhập lại (tự thử Extension trước, fallback QR)"
                     >
                       <MaterialIcon name="login" className="text-[14px]" />
                       Đăng nhập lại

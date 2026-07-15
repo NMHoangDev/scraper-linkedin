@@ -1655,6 +1655,15 @@ export function ZaloInboxAdminShell() {
                       <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Thao tác kỹ thuật</div>
                       <div className="space-y-2">
                         <button
+                          onClick={() => setShowAuthModal(true)}
+                          className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white py-2 font-bold transition shadow-sm"
+                          title="Đăng nhập tài khoản Zalo này qua Chrome Extension (ổn định hơn quét QR, tự đồng bộ tin nhắn) hoặc tải extension nếu chưa cài"
+                        >
+                          <MaterialIcon name="sync" className="text-[16px]" />
+                          {inbox.selectedAccountInfo?.has_auth ? "Đăng nhập lại / Tải extension" : "Đăng nhập qua Extension"}
+                        </button>
+
+                        <button
                           onClick={handleRestartListener}
                           className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 hover:border-[#E3000F] hover:text-[#E3000F] py-2 font-bold transition bg-white"
                         >

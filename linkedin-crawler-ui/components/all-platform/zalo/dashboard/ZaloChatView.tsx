@@ -485,6 +485,17 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
   // when the user switches groups faster than the API responds.
   const messagesRequestIdRef = useRef(0);
   const lastLoadedConversationIdRef = useRef<string | null>(null);
+  // Luôn phản ánh selectedConversationId MỚI NHẤT, đọc được từ bên trong closure
+  // của các callback async (loadOlderMessages, handleSingleSend, handleQuickReply,
+  // SSE listener) — khác với đọc trực tiếp biến state trong closure (giá trị đó bị
+  // "đóng băng" tại thời điểm callback được tạo, không thấy được các lần chuyển
+  // hội thoại xảy ra trong lúc đang await). Đây là nguyên nhân gây "đè hộp thoại
+  // của nhau": 1 request cũ (của hội thoại A) resolve sau khi đã chuyển sang hội
+  // thoại B, rồi ghi đè state tin nhắn của B bằng dữ liệu của A.
+  const selectedConversationIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    selectedConversationIdRef.current = selectedConversationId;
+  }, [selectedConversationId]);
 
   // Click outside listener for emoji picker & quick replies
   useEffect(() => {
@@ -700,6 +711,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
 
   const loadOlderMessages = useCallback(async () => {
     if (!flow.userId || !selectedConversationId || isLoadingOlderMessages || !hasOlderMessages) return;
+    const conversationIdAtRequest = selectedConversationId;
     const element = messageListRef.current;
     const previousHeight = element?.scrollHeight ?? 0;
     const previousTop = element?.scrollTop ?? 0;
@@ -708,10 +720,13 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
     try {
       const response = await getZaloConversationMessages(
         flow.userId,
-        selectedConversationId,
+        conversationIdAtRequest,
         MESSAGE_PAGE_SIZE,
         messages.length,
       );
+      // Bỏ qua nếu người dùng đã chuyển sang hội thoại khác trong lúc chờ —
+      // tránh chèn tin nhắn cũ của hội thoại A vào hội thoại B đang mở.
+      if (selectedConversationIdRef.current !== conversationIdAtRequest) return;
       const olderMessages = response.messages ?? [];
       preservedScrollRef.current = { previousHeight, previousTop };
       pendingScrollRef.current = "preserve";
@@ -723,9 +738,12 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
       setMessageTotal(response.total ?? messageTotal);
       setHasOlderMessages(messages.length + olderMessages.length < (response.total ?? 0));
     } catch (error) {
+      if (selectedConversationIdRef.current !== conversationIdAtRequest) return;
       setMessageError(error instanceof Error ? error.message : "Không thể tải tin nhắn cũ hơn.");
     } finally {
-      setIsLoadingOlderMessages(false);
+      if (selectedConversationIdRef.current === conversationIdAtRequest) {
+        setIsLoadingOlderMessages(false);
+      }
     }
   }, [flow.userId, hasOlderMessages, isLoadingOlderMessages, messageTotal, messages.length, selectedConversationId]);
 
@@ -895,7 +913,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                         latest_content: lastMsg.content || lastMsg.type || "Tin nhắn mới",
                         latest_message_at: lastMsg.timestamp || lastMsg.time_text,
                         latest_sender_name: lastMsg.sender_name,
-                        unread_count: c.conversation_id === selectedConversationId ? c.unread_count : (c.unread_count || 0) + 1
+                        unread_count: c.conversation_id === selectedConversationIdRef.current ? c.unread_count : (c.unread_count || 0) + 1
                       }
                     : c
                 );
@@ -911,7 +929,7 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                   latest_message_at: lastMsg.timestamp || lastMsg.time_text,
                   latest_content: lastMsg.content || lastMsg.type || "Tin nhắn mới",
                   latest_sender_name: lastMsg.sender_name,
-                  unread_count: groupId === selectedConversationId ? 0 : 1,
+                  unread_count: groupId === selectedConversationIdRef.current ? 0 : 1,
                   is_pinned: false,
                 };
                 updated = [newConv, ...prev];
@@ -921,8 +939,14 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
             });
           }
 
-          // 2. Chỉ cập nhật tin nhắn vào khung chat nếu đang mở đúng cuộc trò chuyện đó
-          if (groupId !== selectedConversationId) return;
+          // 2. Chỉ cập nhật tin nhắn vào khung chat nếu đang mở đúng cuộc trò chuyện đó.
+          // Dùng ref (không phải biến state selectedConversationId) vì closure này
+          // được tạo 1 lần trong useEffect có deps không bao gồm selectedConversationId
+          // (effect chỉ chạy lại khi đổi tài khoản/đăng nhập) — nếu so bằng biến state
+          // trực tiếp, nó sẽ mãi mãi so với giá trị TẠI THỜI ĐIỂM effect chạy, không
+          // thấy được các lần user chuyển hội thoại sau đó, khiến tin nhắn của hội
+          // thoại khác vẫn lọt vào khung chat đang mở.
+          if (groupId !== selectedConversationIdRef.current) return;
 
           setMessages((prev) => {
             const seen = new Set(prev.map(messageKey));
@@ -1235,7 +1259,10 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
         if (m.previewUrl) URL.revokeObjectURL(m.previewUrl);
       });
       // Only refresh the chat if the user is still viewing the same conversation.
-      if (selectedConversationId === conversationIdToSend) {
+      // (selectedConversationIdRef, not the state variable, vì biến state bị "đóng
+      // băng" ở giá trị lúc hàm này được gọi — so nó với chính nó luôn đúng, không
+      // phát hiện được việc user đã chuyển hội thoại trong lúc chờ gửi tin.)
+      if (selectedConversationIdRef.current === conversationIdToSend) {
         await loadLatestMessages(conversationIdToSend, { silent: true });
       }
     } catch (err) {
@@ -1254,12 +1281,16 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
 
   const handleQuickReply = async (text: string) => {
     if (!selectedConversationId || isSendingDirect) return;
+    const conversationIdToSend = selectedConversationId;
     setDirectSendError(null);
     setIsSendingDirect(true);
 
     try {
-      await sendZaloMessage(flow.userId, selectedConversationId, { text });
-      await loadLatestMessages(selectedConversationId, { silent: true });
+      await sendZaloMessage(flow.userId, conversationIdToSend, { text });
+      // Chỉ refresh nếu vẫn đang xem đúng hội thoại này (xem comment ở handleSingleSend).
+      if (selectedConversationIdRef.current === conversationIdToSend) {
+        await loadLatestMessages(conversationIdToSend, { silent: true });
+      }
     } catch (err) {
       if (isSessionExpiredError(err)) {
         setDirectSendError("Phiên đăng nhập Zalo đã hết hạn. Vui lòng đăng nhập lại để tiếp tục gửi tin.");
@@ -2068,6 +2099,22 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
                     <MaterialIcon name="open_in_new" className="text-sm" />
                     Tiến hành đăng nhập
                   </button>
+                  <div
+                    className="mt-4 text-center"
+                    style={{ minWidth: "280px", maxWidth: "100%", width: "100%" }}
+                  >
+                    <p className="text-on-surface-variant text-[10.5px] mb-1.5 leading-relaxed">
+                      Cần cài Chrome Extension trước để bước trên tự đồng bộ (đăng nhập ổn định hơn quét QR):
+                    </p>
+                    <a
+                      href="/extension-login-zalo.zip"
+                      download
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-3 py-1.5 text-[11px] transition"
+                    >
+                      <MaterialIcon name="download" className="text-sm" />
+                      Tải extension Zalo (giải nén rồi Load unpacked ở chrome://extensions)
+                    </a>
+                  </div>
                 </>
               )}
               {flow.authStatus === "qr_expired" && (
