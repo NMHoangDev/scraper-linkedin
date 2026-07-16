@@ -110,6 +110,8 @@ def sa_create(
             id_platform=payload.id_platform,
             is_primary=payload.is_primary,
             notes=payload.notes,
+            is_banned=payload.is_banned,
+            ban_reason=payload.ban_reason,
         )
         return BaseResponse(success=True, message="Social account created", data=data)
     except HTTPException as e:

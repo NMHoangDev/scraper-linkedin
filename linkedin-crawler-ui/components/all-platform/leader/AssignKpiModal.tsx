@@ -24,7 +24,8 @@ export function AssignKpiModal({ isOpen, onClose, member, teamId, selectedWeekVa
   const [kpiPost, setKpiPost] = useState<number>(member.kpiPostTarget || 0);
   const [kpiLead, setKpiLead] = useState<number>(member.kpiLeadTarget || 0);
   const [kpiInbox, setKpiInbox] = useState<number>(member.kpiInboxTarget || member.kpi_inbox_target || 0);
-
+  const [isFailed, setIsFailed] = useState(false);
+  const [reasonNotMet, setReasonNotMet] = useState("");
   // Generate weeks for current year
   const generateWeeks = () => {
     const year = new Date().getFullYear();
@@ -79,7 +80,8 @@ export function AssignKpiModal({ isOpen, onClose, member, teamId, selectedWeekVa
       setKpiPost(member.kpiPostTarget || 0);
       setKpiLead(member.kpiLeadTarget || 0);
       setKpiInbox(member.kpiInboxTarget || member.kpi_inbox_target || 0);
-
+      setIsFailed(false);
+      setReasonNotMet("");
       let initialWeek = getCurrentWeek();
       if (selectedWeekValue) {
         const [start] = selectedWeekValue.split("_");
@@ -115,10 +117,16 @@ export function AssignKpiModal({ isOpen, onClose, member, teamId, selectedWeekVa
           kpi_post: kpiPost,
           kpi_lead: kpiLead,
           kpi_inbox: kpiInbox,
+          is_failed: isFailed,
+          reason_not_met: isFailed ? reasonNotMet : null,
         }],
         platform: "All"
       };
-
+if (isFailed && !reasonNotMet.trim()) {
+    setError("Vui lòng nhập lý do không đạt KPI.");
+    setIsSubmitting(false);
+    return;
+}
       const res = await allPlatformKpiService.assign(payload);
       if (res.success) {
         onSuccess();
@@ -215,8 +223,43 @@ export function AssignKpiModal({ isOpen, onClose, member, teamId, selectedWeekVa
               ))}
             </select>
           </div>
-
+          
           <div className="space-y-4 pt-2">
+            <div className="rounded-xl border border-outline-variant p-4 space-y-3">
+
+  <label className="flex items-center gap-2 cursor-pointer">
+
+    <input
+      type="checkbox"
+      checked={isFailed}
+      onChange={(e) => {
+        setIsFailed(e.target.checked);
+
+        if (!e.target.checked) {
+          setReasonNotMet("");
+        }
+      }}
+    />
+
+    <span className="font-medium">
+      KPI không đạt
+    </span>
+
+  </label>
+
+  {isFailed && (
+
+    <textarea
+      rows={3}
+      value={reasonNotMet}
+      onChange={(e)=>setReasonNotMet(e.target.value)}
+      placeholder="Nhập lý do không đạt KPI..."
+      className="w-full rounded-lg border border-outline-variant px-3 py-2"
+    />
+
+  )}
+
+</div>
             <div className="flex items-center justify-between gap-4 p-3 rounded-xl border border-outline-variant bg-surface shadow-sm">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">

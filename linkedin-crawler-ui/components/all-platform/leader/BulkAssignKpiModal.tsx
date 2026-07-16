@@ -46,7 +46,8 @@ export function BulkAssignKpiModal({
   const [kpiPost, setKpiPost] = useState<number>(0);
   const [kpiLead, setKpiLead] = useState<number>(0);
   const [kpiInbox, setKpiInbox] = useState<number>(0);
-
+  const [isFailed, setIsFailed] = useState(false);
+  const [reasonNotMet, setReasonNotMet] = useState("");
   // Generate weeks
   const generateWeeks = useCallback(() => {
     const year = new Date().getFullYear();
@@ -104,7 +105,8 @@ export function BulkAssignKpiModal({
       setKpiPost(0);
       setKpiLead(0);
       setKpiInbox(0);
-
+      setIsFailed(false);
+      setReasonNotMet("");
       // Set current week
       let initialWeek = getCurrentWeek();
       if (selectedWeekValue) {
@@ -156,6 +158,20 @@ export function BulkAssignKpiModal({
     setError(null);
 
     try {
+      if (isFailed) {
+
+  const words = reasonNotMet
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (words.length < 5) {
+    setError("Lý do phải có ít nhất 5 từ.");
+    setIsSubmitting(false);
+    return;
+  }
+
+}
       const selectedMembers = members.filter((m) => selectedMemberIds.has(m.id));
 
       const payload = {
@@ -170,6 +186,8 @@ export function BulkAssignKpiModal({
           kpi_post: kpiPost,
           kpi_lead: kpiLead,
           kpi_inbox: kpiInbox,
+          is_failed: isFailed,
+          reason_not_met: isFailed ? reasonNotMet : null,
         })),
         platform: "All",
       };
@@ -437,6 +455,39 @@ export function BulkAssignKpiModal({
 
             {/* KPI Values */}
             <div className="space-y-4 pt-2">
+              <div className="rounded-xl border border-slate-200 p-4 space-y-3 mt-4">
+
+  <label className="flex items-center gap-2 cursor-pointer">
+
+    <input
+      type="checkbox"
+      checked={isFailed}
+      onChange={(e) => {
+        setIsFailed(e.target.checked);
+
+        if (!e.target.checked) {
+          setReasonNotMet("");
+        }
+      }}
+    />
+
+    <span className="text-sm font-medium">
+      KPI không đạt
+    </span>
+
+  </label>
+
+  {isFailed && (
+    <textarea
+      rows={3}
+      value={reasonNotMet}
+      onChange={(e) => setReasonNotMet(e.target.value)}
+      placeholder="Nhập lý do không đạt KPI..."
+      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#E3000F]"
+    />
+  )}
+
+</div>
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                 KPI cho tất cả thành viên được chọn
               </label>
