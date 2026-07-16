@@ -275,8 +275,7 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
         </div>
         
         <div className="flex items-center gap-2">
-          <a href="https://drive.google.com/uc?export=download&id=18SWlDWIlXXQZ-t00ZDIG6B4weUwVgBJO"
-            target="_blank" rel="noopener noreferrer"
+          <a href="/comment-extension.zip" download
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold transition cursor-pointer">
             <span className="material-symbols-outlined text-[16px]">download</span>
             Tải Extension

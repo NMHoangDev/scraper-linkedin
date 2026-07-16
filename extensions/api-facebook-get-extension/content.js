@@ -1,3 +1,99 @@
+// ─── Dò doc_id động từ chính request thật của Facebook ──────────────────────
+// graphql-sniffer.js (chạy ở MAIN world) bắt request GraphQL thật Facebook tự gửi
+// rồi bắn CustomEvent này ra. Nhờ vậy khi Facebook đổi doc_id, extension tự cập nhật
+// theo mà không cần sửa code tay. Nếu chưa bắt được lần nào thì dùng giá trị dự phòng
+// cố định bên dưới (đã cập nhật theo request thật gần nhất tính tới thời điểm sửa code).
+const FALLBACK_DOC_ID = "25454082720955898";
+const FALLBACK_VARIABLES = {
+    feedLocation: "GROUP",
+    feedType: "DISCUSSION",
+    feedbackSource: 0,
+    filterTopicId: null,
+    focusCommentID: null,
+    privacySelectorRenderLocation: "COMET_STREAM",
+    referringStoryRenderLocation: null,
+    renderLocation: "group",
+    scale: 1.5,
+    sortingSetting: "RECENT_ACTIVITY",
+    useDefaultActor: false,
+    __relay_internal__pv__GHLShouldChangeAdIdFieldNamerelayprovider: true,
+    __relay_internal__pv__GHLShouldChangeSponsoredDataFieldNamerelayprovider: true,
+    __relay_internal__pv__CometFeedStory_enable_reactor_facepilerelayprovider: false,
+    __relay_internal__pv__CometFeedStory_enable_social_bubblesrelayprovider: false,
+    __relay_internal__pv__CometFeedStory_enable_post_permalink_white_space_clickrelayprovider: false,
+    __relay_internal__pv__CometUFICommentActionLinksRewriteEnabledrelayprovider: true,
+    __relay_internal__pv__CometUFICommentAvatarStickerAnimatedImagerelayprovider: false,
+    __relay_internal__pv__IsWorkUserrelayprovider: false,
+    __relay_internal__pv__TestPilotShouldIncludeDemoAdUseCaserelayprovider: false,
+    __relay_internal__pv__FBReels_deprecate_short_form_video_context_gkrelayprovider: true,
+    __relay_internal__pv__FBReels_enable_view_dubbed_audio_type_gkrelayprovider: true,
+    __relay_internal__pv__CometFeedShareMedia_shouldPrefetchShareImagerelayprovider: false,
+    __relay_internal__pv__CometImmersivePhotoCanUserDisable3DMotionrelayprovider: false,
+    __relay_internal__pv__WorkCometIsEmployeeGKProviderrelayprovider: false,
+    __relay_internal__pv__IsMergQAPollsrelayprovider: false,
+    __relay_internal__pv__FBReelsMediaFooter_comet_enable_reels_ads_gkrelayprovider: true,
+    __relay_internal__pv__CometUFIReactionsEnableShortNamerelayprovider: false,
+    __relay_internal__pv__CometUFICommentAutoTranslationTyperelayprovider: "AUTO_TRANSLATE",
+    __relay_internal__pv__CometUFIShareActionMigrationrelayprovider: true,
+    __relay_internal__pv__CometUFISingleLineUFIrelayprovider: false,
+    __relay_internal__pv__relay_provider_comet_ufi_ssr_seo_deferrelayprovider: true,
+    __relay_internal__pv__CometUFI_dedicated_comment_routable_dialog_gkrelayprovider: true,
+    __relay_internal__pv__ReelsIFUCard_reelsIFULikeCountrelayprovider: false,
+    __relay_internal__pv__FBReelsIFUTileContent_reelsIFUPlayOnHoverrelayprovider: true,
+    __relay_internal__pv__GroupsCometGYSJFeedItemHeightrelayprovider: 206,
+    __relay_internal__pv__ShouldEnableBakedInTextStoriesrelayprovider: false,
+    __relay_internal__pv__StoriesShouldIncludeFbNotesrelayprovider: false,
+};
+const CAPTURE_STORAGE_KEY = "fbGraphqlCapture_GroupsCometFeedRegularStoriesPaginationQuery";
+const CAPTURE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // quá 7 ngày thì không tin tưởng nữa, quay lại giá trị dự phòng
+
+let capturedQueryTemplate = null; // { docId, variables } lấy được từ chính request thật của Facebook
+
+chrome.storage.local.get(CAPTURE_STORAGE_KEY, (result) => {
+    const cached = result?.[CAPTURE_STORAGE_KEY];
+    if (cached && Date.now() - cached.capturedAt < CAPTURE_MAX_AGE_MS) {
+        capturedQueryTemplate = { docId: cached.docId, variables: cached.variables };
+    }
+});
+
+document.addEventListener("fb-graphql-docid-captured", (evt) => {
+    try {
+        const { friendlyName, docId, variables } = evt.detail || {};
+        if (friendlyName !== "GroupsCometFeedRegularStoriesPaginationQuery") return;
+        const parsedVariables = JSON.parse(variables);
+        capturedQueryTemplate = { docId, variables: parsedVariables };
+        chrome.storage.local.set({
+            [CAPTURE_STORAGE_KEY]: { docId, variables: parsedVariables, capturedAt: Date.now() },
+        });
+        console.log("[FB API Crawler] Đã bắt được doc_id mới nhất từ Facebook:", docId);
+    } catch (e) {
+        // Bỏ qua nếu payload bắt được không hợp lệ
+    }
+});
+
+// Cuộn nhẹ trang để dụ Facebook tự bắn ra request PaginationQuery thật (nếu chưa có sẵn
+// giá trị đã bắt trước đó), cho graphql-sniffer.js cơ hội bắt được doc_id mới nhất.
+function nudgeFeedAndWaitForCapture(timeoutMs = 2500) {
+    return new Promise((resolve) => {
+        if (capturedQueryTemplate) return resolve();
+        let settled = false;
+        const finish = () => {
+            if (settled) return;
+            settled = true;
+            document.removeEventListener("fb-graphql-docid-captured", onCapture);
+            clearTimeout(timer);
+            resolve();
+        };
+        const onCapture = () => finish();
+        document.addEventListener("fb-graphql-docid-captured", onCapture);
+        const timer = setTimeout(finish, timeoutMs);
+        try {
+            window.scrollBy(0, 1200);
+            setTimeout(() => window.scrollBy(0, -400), 300);
+        } catch (e) {}
+    });
+}
+
 // Lắng nghe yêu cầu từ popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'FETCH_API_POSTS') {
@@ -81,6 +177,14 @@ async function fetchPosts(count = 20) {
 
     addLog(`Đã lấy Tokens thành công! GroupID: ${tokens.groupId}, có fb_dtsg: ${!!tokens.fb_dtsg}, có lsd: ${!!tokens.lsd}`);
 
+    addLog("Đang dò doc_id mới nhất từ chính Facebook (cuộn nhẹ trang)...");
+    await nudgeFeedAndWaitForCapture();
+    if (capturedQueryTemplate) {
+        addLog(`Đã bắt được doc_id động: ${capturedQueryTemplate.docId}`);
+    } else {
+        addLog("Chưa bắt được doc_id động, dùng giá trị dự phòng cố định.");
+    }
+
     const targetCount = parseInt(count, 10);
     const allPosts = [];
     let cursor = null;
@@ -91,27 +195,17 @@ async function fetchPosts(count = 20) {
         pageCount++;
         addLog(`Đang cào Trang ${pageCount} (Đã có ${allPosts.length}/${targetCount} bài)...`);
 
+        // Dùng template bắt được thật từ Facebook nếu có (luôn đúng theo phiên bản hiện tại
+        // của Facebook), nếu chưa bắt được lần nào thì rơi về giá trị dự phòng cố định.
+        const templateVariables = capturedQueryTemplate ? capturedQueryTemplate.variables : FALLBACK_VARIABLES;
+        const docId = capturedQueryTemplate ? capturedQueryTemplate.docId : FALLBACK_DOC_ID;
+
         const variables = {
-            UFI2CommentsProvider_commentsKey: "GroupsCometFeedRegularStoriesPaginationQuery",
+            ...templateVariables,
             count: 15, // Tăng lên 15 để cào 100 bài nhanh hơn
             cursor: cursor,
-            displayCommentsContextEnableComment: null,
-            displayCommentsContextIsAdPreview: null,
-            displayCommentsContextIsAggregatedShare: null,
-            displayCommentsContextIsStorySet: null,
-            displayCommentsFeedbackContext: null,
-            feedLocation: "GROUP",
-            feedType: "DISCUSSION",
-            feedbackSource: 0,
-            focusCommentID: null,
-            hashtag: null,
             id: tokens.groupId,
-            privacySelectorRenderLocation: "COMET_STREAM",
-            renderLocation: "group",
-            scale: 1.5,
-            sortingSetting: "RECENT_ACTIVITY",
             stream_initial_count: 15,
-            useDefaultActor: false,
         };
 
         const body = new URLSearchParams({
@@ -120,7 +214,7 @@ async function fetchPosts(count = 20) {
             fb_api_caller_class: "RelayModern",
             fb_api_req_friendly_name: "GroupsCometFeedRegularStoriesPaginationQuery",
             variables: JSON.stringify(variables),
-            doc_id: "27224875563850383",
+            doc_id: docId,
             server_timestamps: "true",
         });
 
@@ -131,7 +225,7 @@ async function fetchPosts(count = 20) {
 
         while (retryCount <= MAX_RETRIES) {
             try {
-                response = await fetch("https://www.facebook.com/api/graphql/", {
+                response = await fetch(`${window.location.origin}/api/graphql/`, {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/x-www-form-urlencoded"
