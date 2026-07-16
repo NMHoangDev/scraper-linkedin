@@ -207,13 +207,52 @@ export const STAGE_REQUIREMENTS: Partial<
     }
   >
 > = {
-  qualified: { requireDecisionMaker: true, requireBudget: true },
+  contacted: { requireNote: true },
+  qualified: { requireDecisionMaker: true, requireBudget: true, requireNote: true },
   requirement: { requireNote: true },
   proposal_sent: { requireBudget: true },
   negotiation: { requireNote: true },
+  on_hold: { requireNote: true },
   won: { requireWonReason: true },
-  lost: { requireRejectReason: true },
+  lost: { requireRejectReason: true, requireNote: true },
 };
+
+// Nhãn tiếng Việt cho field key mà backend dùng trong message lỗi thô (vd
+// "Thiếu thông tin bắt buộc cho stage 'contacted': note") — để humanizeCrmError
+// dịch lại thành chữ người đọc được thay vì lộ tên cột DB.
+const FIELD_LABELS: Record<string, string> = {
+  note: 'Ghi chú',
+  attachment_url: 'Link báo giá / hợp đồng',
+  decision_maker: 'Người ra quyết định',
+  estimated_budget: 'Ngân sách dự kiến',
+  follow_up_date: 'Ngày follow-up',
+  reject_reason_type: 'Lý do từ chối',
+};
+
+/**
+ * Backend đôi khi trả message thô kèm stage key / field key (vd
+ * `Thiếu thông tin bắt buộc cho stage 'contacted': note`) khi validate
+ * client-side có khoảng trống chưa bắt kịp — dịch lại thành câu người đọc
+ * được thay vì hiện thẳng key nội bộ cho user. Không match được thì trả
+ * nguyên message gốc.
+ */
+export function humanizeCrmError(message: string): string {
+  const missingMatch = message.match(/^Thiếu thông tin bắt buộc cho stage '([^']+)':\s*(.+)$/);
+  if (missingMatch) {
+    const [, stage, fieldsRaw] = missingMatch;
+    const stageLabel = DEAL_STAGE_META[stage as DealStage]?.label || stage;
+    const fields = fieldsRaw
+      .split(',')
+      .map(f => FIELD_LABELS[f.trim()] || f.trim())
+      .join(', ');
+    return `Thiếu thông tin bắt buộc để chuyển sang "${stageLabel}": ${fields}.`;
+  }
+  // Fallback chung: thay mọi 'stage_key' còn sót trong message bằng nhãn tiếng Việt.
+  return message.replace(/'([a-z_]+)'/g, (match, key) => {
+    const label = DEAL_STAGE_META[key as DealStage]?.label;
+    return label ? `"${label}"` : match;
+  });
+}
 
 export function getCurrentStage(deal?: Pick<Deal, 'stage'> | null): DealStage {
   return deal?.stage && DEAL_STAGES.includes(deal.stage) ? deal.stage : 'new_lead';

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ContractDetailModal } from './ContractDetailModal';
 import { CrmKanbanBoard } from './CrmKanbanBoard';
 import { CrmTableView } from './CrmTableView';
@@ -17,6 +17,7 @@ import {
   INDUSTRY_OPTIONS,
   SOURCE_OPTIONS,
   formatVND,
+  humanizeCrmError,
 } from '../constants/crmConfig';
 import { useCrm } from '../hooks/useCrm';
 import type { ContractStatus, CreateDealInput, Deal, DealStage, StageTransitionInput, UpdateDealInput } from '../types';
@@ -41,6 +42,19 @@ export function CrmShell() {
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [stageData, setStageData] = useState<{ deal: Deal; toStage: DealStage } | null>(null);
   const [reviewData, setReviewData] = useState<{ deal: Deal; toStage: DealStage } | null>(null);
+
+  // Khoá scroll của trang nền khi có modal/drawer nào đang mở — nếu không, cuộn
+  // chuột bên trong popup (vd DetailDrawer) vẫn kéo theo cuộn cả trang phía sau.
+  const anyOverlayOpen =
+    detailOpen || Boolean(contractDeal) || createOpen || Boolean(editingDeal) || Boolean(stageData) || Boolean(reviewData);
+  useEffect(() => {
+    if (!anyOverlayOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [anyOverlayOpen]);
 
   const sourceOptions = useMemo(() => {
     const fromData = deals.map(deal => deal.sourcePlatform || 'Manual').filter(Boolean);
@@ -111,7 +125,7 @@ export function CrmShell() {
       setSelectedDeal(deal);
       setDetailOpen(true);
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Không tạo được deal. Vui lòng kiểm tra lại thông tin.');
+      window.alert(err instanceof Error ? humanizeCrmError(err.message) : 'Không tạo được deal. Vui lòng kiểm tra lại thông tin.');
     }
   }
 
@@ -127,7 +141,7 @@ export function CrmShell() {
       setEditingDeal(null);
       setSelectedDeal(deal);
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Không lưu được deal. Vui lòng kiểm tra lại thông tin.');
+      window.alert(err instanceof Error ? humanizeCrmError(err.message) : 'Không lưu được deal. Vui lòng kiểm tra lại thông tin.');
     }
   }
 
@@ -158,7 +172,7 @@ export function CrmShell() {
       setStageData(null);
       setSelectedDeal(deal);
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Không chuyển được giai đoạn. Vui lòng kiểm tra lại thông tin.');
+      window.alert(err instanceof Error ? humanizeCrmError(err.message) : 'Không chuyển được giai đoạn. Vui lòng kiểm tra lại thông tin.');
     }
   }
 
@@ -167,7 +181,7 @@ export function CrmShell() {
       const updated = await updateDeal(deal.id, { contract: { status } });
       setSelectedDeal(updated);
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Khong luu duoc trang thai hop dong.');
+      window.alert(err instanceof Error ? humanizeCrmError(err.message) : 'Không lưu được trạng thái hợp đồng.');
     }
   }
 
