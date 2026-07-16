@@ -316,6 +316,8 @@ export interface SocialAccount {
   session_cookie?: string;
   is_active: boolean;
   is_primary: boolean;
+  is_banned?: boolean;
+  ban_reason?: string;
   notes?: string;
   created_at?: string;
   updated_at?: string;
