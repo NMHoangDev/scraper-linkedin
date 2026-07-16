@@ -3,43 +3,23 @@
 import { useMemo, useState } from 'react';
 import { dealFormFromDeal, emptyDealForm } from '../../components/DealFormFields';
 import type { DealFormState } from '../../components/DealFormFields';
-import type { Deal, DealStage } from '../../types';
-
-const OPEN_STAGES: DealStage[] = ['new_lead', 'contacted', 'qualified', 'requirement', 'proposal_sent', 'negotiation', 'contract_sent', 'on_hold'];
+import type { Deal } from '../../types';
 
 function normalize(value: string) {
   return value.trim().toLowerCase();
 }
 
-/** Deal trùng khách (theo SĐT hoặc email) với thông tin khách đang chọn — dùng để
- * gợi ý danh sách deal cho ô "Gắn vào Deal (nếu có)". */
-function findDealsForCustomer(deals: Deal[], customer: DealFormState): Deal[] {
-  const phone = normalize(customer.phone);
-  const email = normalize(customer.email);
-  if (!phone && !email) return [];
-  return deals.filter(deal => {
-    if (!OPEN_STAGES.includes(deal.stage)) return false;
-    const dealPhone = normalize(deal.phone || '');
-    const dealEmail = normalize(deal.email || '');
-    return (phone && dealPhone === phone) || (email && dealEmail === email);
-  });
-}
-
 export function SelectCustomerStep({
   deals,
   customer,
-  linkedDealId,
   onChangeCustomer,
-  onChangeLinkedDeal,
   /** Mở từ "Tạo báo giá cho deal này" — khách hàng + deal đã cố định theo đúng
    * deal đó, không cho tìm/đổi sang khách khác hay gỡ deal ra nữa. */
   lockedDeal,
 }: {
   deals: Deal[];
   customer: DealFormState;
-  linkedDealId: string;
   onChangeCustomer: (next: DealFormState) => void;
-  onChangeLinkedDeal: (dealId: string) => void;
   lockedDeal?: Deal | null;
 }) {
   const [search, setSearch] = useState('');
@@ -55,22 +35,18 @@ export function SelectCustomerStep({
       .slice(0, 8);
   }, [deals, search]);
 
-  const candidateDeals = useMemo(() => findDealsForCustomer(deals, customer), [deals, customer]);
-
   function pickExistingCustomer(deal: Deal) {
+    // Chỉ lấy lại THÔNG TIN khách (tên/SĐT/email/công ty...) để đỡ gõ tay lại
+    // — KHÔNG gắn báo giá mới vào deal cũ đó. Deal cũ có thể đã ở giai đoạn
+    // khác, đã có báo giá riêng, gắn đại vào sẽ ghi đè/gây nhầm lẫn dữ liệu
+    // deal cũ. Báo giá mới luôn ra 1 deal mới riêng (tự tạo ở bước submit).
     onChangeCustomer(dealFormFromDeal(deal));
-    // Kết quả tìm kiếm vốn dĩ đã là 1 deal cụ thể (không có bảng khách hàng
-    // riêng) — chọn xong thì gắn thẳng vào đúng deal đó luôn, không bắt thêm
-    // bước "Gắn vào Deal" nữa, trừ khi deal đó đã đóng (won/lost) thì để trống
-    // cho ô "Gắn vào Deal" bên dưới xử lý.
-    onChangeLinkedDeal(OPEN_STAGES.includes(deal.stage) ? deal.id : '');
     setPickedExisting(true);
     setSearch('');
   }
 
   function startNewCustomer() {
     onChangeCustomer(emptyDealForm());
-    onChangeLinkedDeal('');
     setPickedExisting(false);
     setSearch('');
   }
@@ -165,29 +141,6 @@ export function SelectCustomerStep({
           <input value={customer.address} onChange={event => onChangeCustomer({ ...customer, address: event.target.value })} />
         </label>
       </div>
-
-      {lockedDeal ? null : (
-        <label className="crm-field" style={{ marginTop: '0.85rem' }}>
-          <span>Gắn vào Deal (nếu có)</span>
-          <select
-            disabled={!hasCustomer || candidateDeals.length === 0}
-            value={linkedDealId}
-            onChange={event => onChangeLinkedDeal(event.target.value)}
-          >
-            <option value="">-- Không gắn vào deal nào --</option>
-            {candidateDeals.map(deal => (
-              <option key={deal.id} value={deal.id}>
-                {deal.customerName} {deal.position ? `- ${deal.position}` : ''} ({deal.stage})
-              </option>
-            ))}
-          </select>
-          <p className="crm-help-text">
-            {hasCustomer && candidateDeals.length === 0
-              ? 'Chưa có deal mở nào của khách này — báo giá vẫn tạo được bình thường, không gắn deal cũng không sao.'
-              : 'Chọn deal đang mở của khách này nếu muốn báo giá gắn thẳng vào deal đó.'}
-          </p>
-        </label>
-      )}
     </section>
   );
 }

@@ -44,7 +44,6 @@ export function CreateQuoteModal({
 }) {
   const [step, setStep] = useState<CreateQuoteStep>(1);
   const [customer, setCustomer] = useState<DealFormState>(emptyDealForm);
-  const [linkedDealId, setLinkedDealId] = useState('');
   const [selectedForm, setSelectedForm] = useState<QuoteForm | null>(null);
   const [previewForm, setPreviewForm] = useState<QuoteForm | null>(null);
   const [quoteDraft, setQuoteDraft] = useState<QuoteDraft>(emptyQuoteDraft);
@@ -55,7 +54,6 @@ export function CreateQuoteModal({
     if (submitting) return;
     setStep(1);
     setCustomer(emptyDealForm());
-    setLinkedDealId('');
     setSelectedForm(null);
     setPreviewForm(null);
     setQuoteDraft(emptyQuoteDraft());
@@ -69,7 +67,10 @@ export function CreateQuoteModal({
     initialDeal && !customer.customerName.trim()
       ? { ...customer, customerName: initialDeal.customerName, companyName: initialDeal.companyName || '', phone: initialDeal.phone || '', email: initialDeal.email || '', address: initialDeal.address || '' }
       : customer;
-  const activeLinkedDealId = initialDeal ? initialDeal.id : linkedDealId;
+  // Chỉ gắn deal có sẵn khi mở từ "Tạo báo giá cho deal này" (initialDeal cố
+  // định). Luồng tự do (đứng nút "+ Tạo báo giá") không còn cách nào gắn tay
+  // vào deal cũ nữa — luôn tạo deal mới ở bước submit, tránh ghi đè deal cũ.
+  const activeLinkedDealId = initialDeal?.id || '';
 
   function handleCustomerNext() {
     if (!activeCustomer.customerName.trim()) {
@@ -165,9 +166,7 @@ export function CreateQuoteModal({
               <SelectCustomerStep
                 deals={deals}
                 customer={activeCustomer}
-                linkedDealId={activeLinkedDealId}
                 onChangeCustomer={setCustomer}
-                onChangeLinkedDeal={setLinkedDealId}
                 lockedDeal={initialDeal}
               />
             ) : null}
