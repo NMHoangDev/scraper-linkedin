@@ -33,6 +33,25 @@ function emptySchema(): QuoteSchema {
   return { version: 1, layoutType: 'cloudgate_standard_quote', sections: [] };
 }
 
+/** Ngày lưu dạng "YYYY-MM-DD" (hoặc ISO datetime) — hiện cho khách theo dd/mm/yyyy
+ * quen thuộc thay vì để nguyên định dạng máy đọc được. Parse thủ công phần
+ * YYYY-MM-DD thay vì qua `Date` để tránh lệch múi giờ (Date coi "YYYY-MM-DD" là UTC
+ * midnight, đọc lại bằng getDate() theo giờ local có thể lùi/tới 1 ngày). */
+function formatDateVN(value: unknown): string {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    return `${day}/${month}/${year}`;
+  }
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return raw;
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  return `${day}/${month}/${date.getFullYear()}`;
+}
+
 export function QuoteDocumentRenderer({
   schemaSnapshot,
   quoteData = {},
@@ -74,7 +93,13 @@ export function QuoteDocumentRenderer({
     return String(value || '');
   };
 
-  const notes = String(fieldValue('notes') || '');
+  const notesValue = fieldValue('notes');
+  const notesRows = Array.isArray(notesValue)
+    ? notesValue.map(item => String(item))
+    : String(notesValue || '')
+        .split('\n')
+        .map(item => item.trim())
+        .filter(Boolean);
   const commitments = fieldValue('commitments');
   const commitmentRows = Array.isArray(commitments)
     ? commitments
@@ -89,6 +114,17 @@ export function QuoteDocumentRenderer({
         ? quoteData.solutionItems
         : [];
 
+  const solutionColumns = (
+    findField('solutionItems').config?.columns?.filter(column => column.visible !== false) || []
+  ) as QuoteField[];
+
+  const renderSolutionCell = (item: VillaSolutionItem, column: QuoteField, index: number) => {
+    if (column.type === 'auto-number') return String(index + 1);
+    const value = (item as unknown as Record<string, unknown>)[column.key];
+    if (column.type === 'currency') return formatVnd(Number(value || 0));
+    return String(value ?? '');
+  };
+
   if (layoutType === 'villa_solution_package') {
     const setupTotal = activeSolutionItems.reduce(
       (sum, item) => sum + Number(item.offerPrice || 0),
@@ -102,7 +138,7 @@ export function QuoteDocumentRenderer({
           <header className="villa-header">
             <div className="villa-brand">{String(fieldValue('sellerBrandName') || 'MARKEE')}</div>
             <div className="villa-meta">
-              <p>Ngày: {String(fieldValue('quoteDate') || '[Ngày]')}</p>
+              <p>Ngày: {formatDateVN(fieldValue('quoteDate')) || '[Ngày]'}</p>
               <p>Số báo giá: {String(fieldValue('quoteNumber') || '[Số]')}</p>
             </div>
           </header>
@@ -118,25 +154,34 @@ export function QuoteDocumentRenderer({
             <table className="villa-table">
               <thead>
                 <tr>
-                  <th>Giải pháp</th>
-                  <th>Mô tả</th>
-                  <th>Giá gốc</th>
-                  <th>Giá đề xuất</th>
-                  <th>Ghi chú</th>
+                  {solutionColumns.map(column => (
+                    <th key={column.key}>{column.label}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {activeSolutionItems.map((item, index) => (
-                  <tr key={`${item.name}-${index}`}>
-                    <td>{item.name}</td>
-                    <td>{item.description}</td>
-                    <td className="villa-price-original">
-                      <span>{formatVnd(item.originalPrice || 0)}</span>
-                    </td>
-                    <td className="villa-price-offer">
-                      <strong>{formatVnd(item.offerPrice)}</strong>
-                    </td>
-                    <td>{item.note}</td>
+                  <tr key={index}>
+                    {solutionColumns.map(column => (
+                      <td
+                        key={column.key}
+                        className={
+                          column.key === 'originalPrice'
+                            ? 'villa-price-original'
+                            : column.key === 'offerPrice'
+                              ? 'villa-price-offer'
+                              : undefined
+                        }
+                      >
+                        {column.key === 'offerPrice' ? (
+                          <strong>{renderSolutionCell(item, column, index)}</strong>
+                        ) : column.key === 'originalPrice' ? (
+                          <span>{renderSolutionCell(item, column, index)}</span>
+                        ) : (
+                          renderSolutionCell(item, column, index)
+                        )}
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
@@ -187,7 +232,7 @@ export function QuoteDocumentRenderer({
             <div className="villa-footer-col">
               <h4>Hiệu lực</h4>
               <p>{String(fieldValue('offerExpiryText'))}</p>
-              <strong>{String(fieldValue('offerExpiryDate') || '[Ngày]')}</strong>
+              <strong>{formatDateVN(fieldValue('offerExpiryDate')) || '[Ngày]'}</strong>
             </div>
           </section>
         </section>
@@ -208,7 +253,6 @@ export function QuoteDocumentRenderer({
               {fieldValue('sellerWebsite') ? ` · ${String(fieldValue('sellerWebsite'))}` : ''}
             </p>
           </div>
-          <div className="sheet-company-stamp">CRM</div>
         </header>
 
         <section className="sheet-parties">
@@ -236,7 +280,7 @@ export function QuoteDocumentRenderer({
           <div className="sheet-quote-meta">
             <span>{findField('customerCompanyName').label}: {String(fieldValue('customerCompanyName') || '[Tên khách hàng]')}</span>
             <span>{findField('quoteNumber').label}: {String(fieldValue('quoteNumber') || '[Số báo giá]')}</span>
-            <span>{findField('quoteDate').label}: {String(fieldValue('quoteDate') || '[Ngày báo giá]')}</span>
+            <span>{findField('quoteDate').label}: {formatDateVN(fieldValue('quoteDate')) || '[Ngày báo giá]'}</span>
           </div>
         </section>
 
@@ -297,7 +341,13 @@ export function QuoteDocumentRenderer({
           </div>
         </section>
 
-        {notes ? <section className="sheet-note">{notes}</section> : null}
+        {notesRows.length ? (
+          <section className="sheet-note">
+            {notesRows.map((line, index) => (
+              <p key={index}>{line}</p>
+            ))}
+          </section>
+        ) : null}
 
         <footer className="sheet-signatures">
           <div>

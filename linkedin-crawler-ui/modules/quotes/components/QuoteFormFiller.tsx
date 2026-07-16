@@ -5,6 +5,7 @@ import {
   calculateQuoteTotals,
   calculateVillaTotals,
   formatVnd,
+  sanitizeMoneyInput,
 } from '../utils/quoteCalculations';
 
 export interface QuoteFillValue {
@@ -79,6 +80,7 @@ export function QuoteFormFiller({ schema, value, onChange }: Props) {
                   key={field.key}
                   field={field}
                   value={value.data[field.key]}
+                  data={value.data}
                   totals={totals}
                   onChange={fieldValue => setData(field.key, fieldValue)}
                 />
@@ -88,20 +90,22 @@ export function QuoteFormFiller({ schema, value, onChange }: Props) {
         );
       })}
 
-      <section className="quote-section-card quote-totals-card">
-        <div className="quote-total-row">
-          <span>Tạm tính</span>
-          <strong>{formatVnd(totals.subtotalAmount)}</strong>
-        </div>
-        <div className="quote-total-row">
-          <span>VAT</span>
-          <strong>{formatVnd(totals.totalVatAmount)}</strong>
-        </div>
-        <div className="quote-total-row quote-total-row--grand">
-          <span>Tổng cộng</span>
-          <strong>{formatVnd(totals.totalAmount)}</strong>
-        </div>
-      </section>
+      {layoutType === 'villa_solution_package' ? null : (
+        <section className="quote-section-card quote-totals-card">
+          <div className="quote-total-row">
+            <span>Tạm tính</span>
+            <strong>{formatVnd(totals.subtotalAmount)}</strong>
+          </div>
+          <div className="quote-total-row">
+            <span>VAT</span>
+            <strong>{formatVnd(totals.totalVatAmount)}</strong>
+          </div>
+          <div className="quote-total-row quote-total-row--grand">
+            <span>Tổng cộng</span>
+            <strong>{formatVnd(totals.totalAmount)}</strong>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
@@ -109,11 +113,13 @@ export function QuoteFormFiller({ schema, value, onChange }: Props) {
 function FieldInput({
   field,
   value,
+  data,
   totals,
   onChange,
 }: {
   field: QuoteField;
   value: unknown;
+  data: QuoteData;
   totals: { subtotalAmount: number; totalVatAmount: number; totalAmount: number };
   onChange: (value: unknown) => void;
 }) {
@@ -129,14 +135,18 @@ function FieldInput({
   );
 
   if (field.type === 'calculated') {
-    const computed =
-      field.key === 'subtotalAmount'
-        ? totals.subtotalAmount
-        : field.key === 'totalVatAmount'
-          ? totals.totalVatAmount
-          : field.key === 'totalAmount'
-            ? totals.totalAmount
-            : 0;
+    let computed = 0;
+    if (field.key === 'subtotalAmount') computed = totals.subtotalAmount;
+    else if (field.key === 'totalVatAmount') computed = totals.totalVatAmount;
+    else if (field.key === 'totalAmount') computed = totals.totalAmount;
+    // Villa layout: "Chi phí setup một lần" / "Thanh toán đợt 1-2" — không có trong
+    // `totals` chung (chỉ có subtotal/vat/total) nên phải tính riêng từ % đợt thanh
+    // toán (field cùng section, đọc qua `data`) nhân với tổng tiền giải pháp.
+    else if (field.key === 'setupTotalAmount') computed = totals.totalAmount;
+    else if (field.key === 'paymentPhaseOneAmount')
+      computed = (totals.totalAmount * sanitizeMoneyInput(data.paymentPhaseOnePercent)) / 100;
+    else if (field.key === 'paymentPhaseTwoAmount')
+      computed = (totals.totalAmount * sanitizeMoneyInput(data.paymentPhaseTwoPercent)) / 100;
     return (
       <label className="crm-field">
         {label}
@@ -145,7 +155,7 @@ function FieldInput({
     );
   }
 
-  if (field.type === 'auto-number') {
+  if (field.type === 'auto-number' || field.config?.generatedWhenCreatingQuote) {
     return (
       <label className="crm-field">
         {label}
@@ -306,20 +316,24 @@ function RepeaterTable({
               <tr key={index}>
                 {visibleColumns.map(column => (
                   <td key={column.key}>
-                    <input
-                      type={column.type === 'number' || column.type === 'currency' ? 'number' : 'text'}
-                      value={String(row[column.key] ?? '')}
-                      placeholder={column.placeholder}
-                      onChange={event =>
-                        updateRow(
-                          index,
-                          column.key,
-                          column.type === 'number' || column.type === 'currency'
-                            ? Number(event.target.value) || 0
-                            : event.target.value
-                        )
-                      }
-                    />
+                    {column.type === 'auto-number' ? (
+                      <input value={index + 1} disabled readOnly />
+                    ) : (
+                      <input
+                        type={column.type === 'number' || column.type === 'currency' ? 'number' : 'text'}
+                        value={String(row[column.key] ?? '')}
+                        placeholder={column.placeholder}
+                        onChange={event =>
+                          updateRow(
+                            index,
+                            column.key,
+                            column.type === 'number' || column.type === 'currency'
+                              ? Number(event.target.value) || 0
+                              : event.target.value
+                          )
+                        }
+                      />
+                    )}
                   </td>
                 ))}
                 <td className="quote-row-actions">
