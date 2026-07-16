@@ -316,20 +316,24 @@ function RepeaterTable({
               <tr key={index}>
                 {visibleColumns.map(column => (
                   <td key={column.key}>
-                    <input
-                      type={column.type === 'number' || column.type === 'currency' ? 'number' : 'text'}
-                      value={String(row[column.key] ?? '')}
-                      placeholder={column.placeholder}
-                      onChange={event =>
-                        updateRow(
-                          index,
-                          column.key,
-                          column.type === 'number' || column.type === 'currency'
-                            ? Number(event.target.value) || 0
-                            : event.target.value
-                        )
-                      }
-                    />
+                    {column.type === 'auto-number' ? (
+                      <input value={index + 1} disabled readOnly />
+                    ) : (
+                      <input
+                        type={column.type === 'number' || column.type === 'currency' ? 'number' : 'text'}
+                        value={String(row[column.key] ?? '')}
+                        placeholder={column.placeholder}
+                        onChange={event =>
+                          updateRow(
+                            index,
+                            column.key,
+                            column.type === 'number' || column.type === 'currency'
+                              ? Number(event.target.value) || 0
+                              : event.target.value
+                          )
+                        }
+                      />
+                    )}
                   </td>
                 ))}
                 <td className="quote-row-actions">
