@@ -433,7 +433,12 @@ async def process_and_save_posts(payload: ExtensionCrawlRequest, event_name: str
 
     if payload.job_id:
         try:
-            queue_service.complete_job(payload.job_id, success=True, result_count=inserted_count)
+            queue_service.complete_job(
+                payload.job_id,
+                success=True,
+                worker_id=payload.worker_id,
+                result_count=inserted_count,
+            )
         except Exception as e:
             logger.warning(f"[CRAWL-QUEUE] Không đóng được job {payload.job_id}: {e}")
 

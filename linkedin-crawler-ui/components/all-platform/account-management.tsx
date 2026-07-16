@@ -5,6 +5,7 @@ import { FaLinkedin, FaPlus, FaLock } from "react-icons/fa";
 import { MaterialIcon } from "@/components/ui";
 import { SocialAccountsManager } from "@/components/all-platform/social-accounts-manager";
 import { FbInboxAccountsTab } from "@/components/all-platform/accounts/FbInboxAccountsTab";
+import { FbCrawlAccountsTab } from "@/components/all-platform/accounts/FbCrawlAccountsTab";
 import { cn } from "@/lib/utils";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import {
@@ -13,7 +14,7 @@ import {
   type LinkedInAccount,
 } from "@/services/all-platform.service";
 
-type Tab = "crawl" | "social" | "fb_inbox";
+type Tab = "crawl" | "social" | "fb_inbox" | "fb_crawl_queue";
 
 export function AccountManagementContent() {
   const { user } = useAppAuth();
@@ -194,13 +195,16 @@ export function AccountManagementContent() {
 
       {/* Tabs */}
       <div className="inline-flex w-full max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-outline-variant bg-surface-container-low p-1.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] sm:w-fit">
-        {(["crawl", "social", "fb_inbox"] as Tab[]).map((tab) => (
+        {(["crawl", "social", "fb_inbox", "fb_crawl_queue"] as Tab[]).map((tab) => (
           <button key={tab} type="button" onClick={() => setActiveTab(tab)}
             className={cn("whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-bold uppercase tracking-wide transition-all duration-200 ease-out cursor-pointer",
               activeTab === tab
                 ? "bg-primary text-white shadow-[0_2px_8px_-1px_rgba(217,55,55,0.4)]"
                 : "text-on-surface-variant hover:bg-surface hover:text-primary")}>
-            {tab === "crawl" ? "Tài khoản cào dữ liệu" : tab === "social" ? "Tài khoản mạng xã hội" : "Tài khoản FB & KPI"}
+            {tab === "crawl" ? "Tài khoản cào dữ liệu"
+              : tab === "social" ? "Tài khoản mạng xã hội"
+              : tab === "fb_inbox" ? "Tài khoản FB & KPI"
+              : "Acc FB cào tự động (VPS)"}
           </button>))}
       </div>
 
@@ -286,9 +290,13 @@ export function AccountManagementContent() {
           <div className="rounded-2xl border border-outline-variant bg-surface p-6 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_10px_-2px_rgba(16,24,40,0.06)]">
             <SocialAccountsManager />
           </div>
-        ) : (
+        ) : activeTab === "fb_inbox" ? (
           <div className="rounded-2xl border border-outline-variant bg-surface p-6 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_10px_-2px_rgba(16,24,40,0.06)]">
             <FbInboxAccountsTab />
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-outline-variant bg-surface p-6 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_4px_10px_-2px_rgba(16,24,40,0.06)]">
+            <FbCrawlAccountsTab />
           </div>
         )}
       </div>

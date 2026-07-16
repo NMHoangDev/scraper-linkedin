@@ -36,11 +36,16 @@ def _check_api_key(x_api_key: Optional[str]) -> None:
 async def next_job(
     worker_id: str,
     worker_name: Optional[str] = None,
+    current_id_member: Optional[str] = None,
     x_api_key: Optional[str] = Header(None),
 ):
-    """Worker gọi định kỳ (poll) để xin job cào tiếp theo."""
+    """Worker gọi định kỳ (poll) để xin job cào tiếp theo.
+
+    `current_id_member`: chủ acc FB worker đang cầm sẵn (nếu có) -- giúp backend ưu tiên
+    trả job cùng chủ trước, tránh worker phải đổi acc liên tục.
+    """
     _check_api_key(x_api_key)
-    job = queue_service.claim_next_job(worker_id, worker_name)
+    job = queue_service.claim_next_job(worker_id, worker_name, current_id_member)
     if not job:
         return {"job": None}
     return {"job": job}
@@ -79,6 +84,7 @@ async def job_result(payload: JobResultRequest, x_api_key: Optional[str] = Heade
     queue_service.complete_job(
         payload.job_id,
         success=payload.success,
+        worker_id=payload.worker_id,
         result_count=payload.result_count,
         error_message=payload.error_message,
     )

@@ -108,15 +108,25 @@ class FacebookAuth:
         finally:
             otp_cache_file.unlink(missing_ok=True)
 
-    def standalone_login(self, custom_email: str, custom_pass: str, session_id: str, custom_2fa: Optional[str] = None) -> Dict[str, str]:
+    def standalone_login(
+        self,
+        custom_email: str,
+        custom_pass: str,
+        session_id: str,
+        custom_2fa: Optional[str] = None,
+        id_member: Optional[str] = None,
+    ) -> Dict[str, str]:
         """
         Main entry point cho quá trình đăng nhập ngầm từ FE.
         Sử dụng session_id để định danh chính xác phiên làm việc.
+
+        `id_member`: nhân viên sở hữu acc này -- gắn vào pool crawl_fb_accounts để VPS
+        worker claim đúng acc theo đúng chủ nhóm (xem supabase_fb_account_pool_service).
         """
         cookie_file = self.get_cookie_path(custom_email)
         # Sử dụng session_id làm tên file giao tiếp trạng thái
         otp_cache_file = self.otp_dir / f"session_{session_id}.json"
-        
+
         self._reset_otp_cache(otp_cache_file)
         #logger.info(f"🚀 [Standalone Auth] Bắt đầu đăng nhập: {custom_email} | Session: {session_id}")
 
@@ -127,7 +137,7 @@ class FacebookAuth:
 
                 # 1. Thử đăng nhập bằng Cookie
                 if self._try_login_with_cookie(context, page, cookie_file):
-                    self._push_cookie_to_pool(custom_email, cookie_file)
+                    self._push_cookie_to_pool(custom_email, cookie_file, id_member)
                     self._update_cache_status(otp_cache_file, "SUCCESS", "Đăng nhập sẵn qua cookie.")
                     return {"status": "success", "message": "Đăng nhập sẵn qua cookie."}
 
@@ -139,7 +149,7 @@ class FacebookAuth:
 
                 if is_success:
                     self._save_session(context, page, cookie_file)
-                    self._push_cookie_to_pool(custom_email, cookie_file)
+                    self._push_cookie_to_pool(custom_email, cookie_file, id_member)
                     self._update_cache_status(otp_cache_file, "SUCCESS", "Đăng nhập thành công.")
                     return {"status": "success", "message": "Đăng nhập thành công."}
                 else:
@@ -507,13 +517,13 @@ class FacebookAuth:
         context.storage_state(path=str(cookie_file))
         #logger.info("✅ Đã lưu phiên đăng nhập (Storage State) thành công!")
 
-    def _push_cookie_to_pool(self, email: str, cookie_file: Path) -> None:
+    def _push_cookie_to_pool(self, email: str, cookie_file: Path, id_member: Optional[str] = None) -> None:
         """Đẩy cookie vừa login/refresh vào pool cho VPS worker "xin" dùng.
         Không phá luồng login nếu lỗi -- chỉ log cảnh báo."""
         try:
             state = json.loads(cookie_file.read_text(encoding="utf-8"))
             from app.modules.all_platform.services import supabase_fb_account_pool_service as pool_service
-            pool_service.upsert_account_cookie(email, state)
+            pool_service.upsert_account_cookie(email, state, id_member)
         except Exception as e:
             logger.warning(f"[FB-ACCOUNT-POOL] Không đẩy được cookie {email} vào pool: {e}")
 

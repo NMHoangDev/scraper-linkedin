@@ -31,9 +31,16 @@ Cách copy: zip thư mục lại, tải lên VPS qua RDP clipboard/file transfer
 3. Bấm **Load unpacked**, chọn đúng thư mục `api-facebook-get-extension` vừa copy.
 4. Extension "FB API Auto Crawler" sẽ xuất hiện trong danh sách.
 
-## 4. Đăng nhập Facebook trên Chrome của VPS
-Đăng nhập 1 tài khoản Facebook có quyền xem group sẽ cào (mỗi VPS có thể dùng
-tài khoản khác nhau để tránh bị Facebook đánh dấu spam khi chạy song song).
+## 4. Đăng nhập Facebook trên Chrome của VPS — KHÔNG CÒN CẦN LÀM TAY NỮA
+Từ bản vá "acc theo đúng nhân viên", worker tự động xin đúng acc của đúng nhân
+viên sở hữu nhóm từ pool (`crawl_fb_accounts`) và tự set cookie — không cần RDP
+vào VPS đăng nhập tay nữa.
+
+Điều kiện: acc FB của nhân viên đó phải đã được **đăng ký vào pool 1 lần**
+(gắn `id_member`), qua API `POST /auth/login` (kèm field `id_member`) — việc
+này làm 1 lần/nhân viên, không phải mỗi lần setup VPS. Nếu acc chưa có trong
+pool hoặc chưa gắn đúng `id_member`, job của nhân viên đó sẽ tự quay về
+`pending` chờ (xem "Hành vi mới" bên dưới), không cào nhầm acc khác.
 
 ## 5. Trỏ worker về backend qua tunnel
 1. Vào `chrome://extensions`, tìm extension, bấm **"service worker"** để mở
@@ -66,6 +73,21 @@ Tôi (Claude) sẽ enqueue nhiều job liên tiếp qua backend local, rồi ki�
   `FOR UPDATE SKIP LOCKED` trong migration `028_crawl_worker_queue.sql`).
 - Cả 2 VPS đều poll và crawl được, không riêng 1 con làm hết.
 - Kết quả (bài viết) được lưu đúng vào Supabase dev.
+
+### Hành vi mới sau bản vá lỗi (đáng chú ý khi test)
+- Worker giờ gửi heartbeat thêm vài lần **trong lúc đang cào** (không chỉ lúc
+  vừa nhận job) — nhìn console sẽ không thấy log gì thêm (heartbeat chạy im,
+  không `sendLog`), nhưng nếu tò mò có thể xem tab Network của DevTools service
+  worker để thấy vài request `POST .../queue/heartbeat` xen giữa lúc cào.
+- Job fail (network lỗi, content script lỗi...) giờ **tự thả về `pending` để
+  thử lại tối đa 2 lần** (`retry_count`) trước khi bị đánh `failed` hẳn — nếu
+  test cố tình làm 1 job fail (VD tắt tunnel giữa lúc cào), đừng ngạc nhiên khi
+  thấy job đó quay lại `pending` thay vì `failed` ngay ở lần đầu.
+- Worker giờ tự đổi acc theo đúng `id_member` của từng job (xem mục 4) — nếu
+  test với nhiều nhân viên/nhiều acc, xem log console sẽ thấy "Đã đổi acc ..."
+  mỗi khi job kế tiếp thuộc về nhân viên khác với acc đang cầm. Nếu 2 job liên
+  tiếp cùng 1 nhân viên, worker giữ nguyên acc, không đổi lại (tránh đăng nhập
+  lại liên tục).
 
 ## Bước tiếp theo (sau khi test 2 VPS pass)
 Khi luồng này ổn định, sẽ chuyển sang giai đoạn tích hợp với VPS "main" thật

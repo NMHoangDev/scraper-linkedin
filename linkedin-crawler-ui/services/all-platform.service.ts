@@ -1820,6 +1820,102 @@ export const fbInboxAccountService = {
   },
 };
 
+// ── Hàng đợi cào Facebook đa VPS (crawl_jobs/crawl_fb_accounts) ─────────────────
+// Khác với FbInboxAccountsTab (KPI inbox, dùng extension "Markee" riêng) -- đây là
+// pool acc cho hệ thống hàng đợi VPS worker (extension api-facebook-get-extension).
+
+// standalone_login_api/check-phone-approval/submit-otp trả về JSON thô {status, message,
+// session_id}, KHÔNG theo khuôn {success, message, data} như các endpoint all-platform
+// khác -- nên dùng fetch riêng, không qua requestJson (tránh khai báo sai kiểu ApiResponse).
+const FB_LOGIN_BASE = `${API_BASE_URL}/facebook/api/v1`;
+
+export interface FbCrawlLoginResult {
+  status: "success" | "need_otp" | "need_phone_approval" | "processing" | "error" | "error_bot_blocked";
+  message?: string;
+  session_id?: string;
+}
+
+async function fbLoginFetch(path: string, body: unknown): Promise<FbCrawlLoginResult> {
+  try {
+    const res = await fetch(`${FB_LOGIN_BASE}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    return await res.json();
+  } catch {
+    return { status: "error", message: "Lỗi kết nối đến máy chủ." };
+  }
+}
+
+export const crawlFbLoginService = {
+  /** Đăng nhập 1 acc Facebook vào pool, kèm id_member = chủ sở hữu (nhân viên hiện tại). */
+  login: (payload: { email: string; password: string; secret_2fa?: string; id_member?: string }) =>
+    fbLoginFetch("/auth/login", payload),
+  /** Gọi khi status="need_phone_approval"/"processing" -- backend tự poll tới 60s. */
+  checkPhoneApproval: (session_id: string) =>
+    fbLoginFetch("/auth/check-phone-approval", { session_id }),
+  /** Gọi khi status="need_otp". */
+  submitOtp: (session_id: string, otp_code: string) =>
+    fbLoginFetch("/auth/submit-otp", { session_id, otp_code }),
+};
+
+export interface CrawlFbAccount {
+  id: string;
+  email: string;
+  status: "available" | "assigned" | "invalid";
+  last_used_at: string | null;
+  error_message: string | null;
+  updated_at: string;
+}
+
+export const crawlFbAccountService = {
+  /** Danh sách acc trong pool thuộc về chính nhân viên đang đăng nhập. */
+  list: (): Promise<ApiResponse<{ accounts: CrawlFbAccount[] }>> => {
+    return requestJson(`${BASE}/facebook/crawl-accounts`);
+  },
+  /** Ngắt kết nối 1 acc của chính mình. */
+  disconnect: (accountId: string): Promise<ApiResponse<null>> => {
+    return requestJson(`${BASE}/facebook/crawl-accounts/${encodeURIComponent(accountId)}`, {
+      method: "DELETE",
+    });
+  },
+};
+
+export interface CrawlQueueWorker {
+  worker_id: string;
+  name: string | null;
+  status: "idle" | "busy" | "offline";
+  last_heartbeat: string | null;
+  current_job_id: string | null;
+}
+
+export interface CrawlQueueRecentJob {
+  id: string;
+  group_name: string | null;
+  group_url: string;
+  status: "pending" | "assigned" | "processing" | "done" | "failed";
+  assigned_worker_id: string | null;
+  retry_count: number;
+  error_message: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface CrawlQueueOverview {
+  job_counts: Record<string, number>;
+  account_counts: Record<string, number>;
+  workers: CrawlQueueWorker[];
+  recent_jobs: CrawlQueueRecentJob[];
+}
+
+export const crawlQueueService = {
+  /** Tổng quan sức khoẻ hàng đợi cào đa VPS -- dùng cho trang giám sát. */
+  overview: (): Promise<ApiResponse<CrawlQueueOverview>> => {
+    return requestJson(`${BASE}/facebook/crawl-queue/overview`);
+  },
+};
+
 export const customerLeadsService = {
   async getLeads() {
     return requestJson<import('@/types/unified.types').CustomerLead[]>('/customer-leads');

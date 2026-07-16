@@ -67,7 +67,18 @@ async def lifespan(_: FastAPI):
                 logger.info("Scheduled comment job started")
             except Exception:
                 logger.exception("Failed to start scheduled comment job")
-        logger.warning("24h crawl scheduler DISABLED - comment this block to re-enable")
+        try:
+            # setup_all_platform_jobs() tự đọc DISABLE_ALL_PLATFORM_CRAWL_24H để BỎ QUA riêng
+            # job cào 24h Playwright (job từng làm nghẽn API login -- xem commit 6556153,
+            # "fix: disable 24h crawler scheduler ... to prevent blocking login API"). Bật lại
+            # ở đây chỉ để khôi phục 3 cron bảo trì hàng đợi/pool còn lại (requeue job/acc FB
+            # bị treo khi worker VPS crash, backup điểm tuần) -- các cron này chỉ query Supabase
+            # qua thread riêng, không đụng Playwright, không phải nguyên nhân gây nghẽn login.
+            from app.modules.all_platform.jobs.crawl_24h_job import setup_all_platform_jobs
+            setup_all_platform_jobs()
+            logger.info("All-platform maintenance scheduler started (24h Facebook crawl stays gated by DISABLE_ALL_PLATFORM_CRAWL_24H)")
+        except Exception:
+            logger.exception("Failed to start all-platform maintenance scheduler")
     async def _warmup_background() -> None:
         try:
             await asyncio.to_thread(warmup_playwright_pool)

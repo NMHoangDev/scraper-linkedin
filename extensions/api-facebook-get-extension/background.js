@@ -251,18 +251,17 @@ async function hasFacebookLoginCookie() {
     return !!cookie;
 }
 
-async function claimFbAccount(apiBase) {
+async function claimFbAccount(apiBase, idMember) {
     const workerId = await getOrCreateWorkerId();
-    const res = await fetch(
-        `${apiBase}/api/all-platform/extension/accounts/claim?worker_id=${encodeURIComponent(workerId)}&worker_name=${encodeURIComponent('vps-' + workerId.slice(0, 8))}`,
-        { headers: { 'x-api-key': 'markee-extension-key-2024' } }
-    );
+    let url = `${apiBase}/api/all-platform/extension/accounts/claim?worker_id=${encodeURIComponent(workerId)}&worker_name=${encodeURIComponent('vps-' + workerId.slice(0, 8))}`;
+    if (idMember) url += `&id_member=${encodeURIComponent(idMember)}`;
+    const res = await fetch(url, { headers: { 'x-api-key': 'markee-extension-key-2024' } });
     if (!res.ok) return null;
     const data = await res.json();
     return data.account || null;
 }
 
-async function applyFbAccountCookies(account) {
+async function applyFbAccountCookies(account, idMember) {
     for (const cookie of account.cookies) {
         try {
             await chrome.cookies.set(cookie);
@@ -270,7 +269,11 @@ async function applyFbAccountCookies(account) {
             sendLog(`⚠️ Lỗi set cookie ${cookie.name}: ${e.message}`, false, 'warn');
         }
     }
-    await chrome.storage.local.set({ fb_account_id: account.id, fb_account_email: account.email });
+    await chrome.storage.local.set({
+        fb_account_id: account.id,
+        fb_account_email: account.email,
+        fb_account_member_id: idMember || account.id_member || null
+    });
 }
 
 async function ensureFbAccountReady(apiBase) {
@@ -285,6 +288,28 @@ async function ensureFbAccountReady(apiBase) {
 
     await applyFbAccountCookies(account);
     sendLog(`✅ [FB Account Pool] Đã nhận acc ${account.email}.`, false, 'success');
+    return true;
+}
+
+// Khác với ensureFbAccountReady (chỉ cần "có acc bất kỳ", dùng cho luồng cào thủ công
+// startAutoCrawl() từ popup) -- hàm này đảm bảo acc đang cầm ĐÚNG CHỦ (id_member) của
+// job worker-queue sắp cào (nhóm Facebook là nhóm kín, chỉ acc đúng thành viên mới xem
+// được bài). Tự đổi acc (đăng nhập lại cookie) nếu acc hiện tại không đúng chủ.
+async function ensureFbAccountForJob(apiBase, idMember) {
+    const stored = await chrome.storage.local.get(['fb_account_id', 'fb_account_member_id']);
+    if (stored.fb_account_id && stored.fb_account_member_id === idMember && await hasFacebookLoginCookie()) {
+        return true; // đã đúng acc rồi, khỏi đổi (case phổ biến nhờ sticky-preference lúc claim job)
+    }
+
+    sendLog('🔑 [FB Account Pool] Cần đổi acc cho đúng nhân viên sở hữu nhóm, đang xin acc...');
+    const account = await claimFbAccount(apiBase, idMember);
+    if (!account) {
+        sendLog('⚠️ [FB Account Pool] Không có acc khả dụng cho nhân viên này, chờ lượt poll kế tiếp.', false, 'warn');
+        return false;
+    }
+
+    await applyFbAccountCookies(account, idMember);
+    sendLog(`✅ [FB Account Pool] Đã đổi acc ${account.email}.`, false, 'success');
     return true;
 }
 
@@ -309,7 +334,33 @@ async function reportAccountInvalid(apiBase, reason) {
     }
 }
 
+// Backend đã có sẵn endpoint /heartbeat (upsert_worker_heartbeat) nhưng trước đây không
+// bên nào gọi tới -- heartbeat chỉ được set 1 lần lúc claim job (GET /next-job), không
+// refresh trong lúc đang cào (16-30s+, có thể lâu hơn nếu FB chậm). Nếu 1 job cào lâu hơn
+// WORKER_STALE_SECONDS (90s) mà không có heartbeat mới, backend sẽ coi worker "chết" và
+// giao job đang cào thật cho VPS khác -> cào trùng. Gọi hàm này ở vài checkpoint xuyên suốt
+// crawlSingleGroupJob để tránh khoảng trống heartbeat nào vượt quá ngưỡng đó.
+async function sendWorkerHeartbeat(apiBase, workerId) {
+    try {
+        await fetch(`${apiBase}/api/all-platform/extension/queue/heartbeat`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': 'markee-extension-key-2024'
+            },
+            body: JSON.stringify({
+                worker_id: workerId,
+                worker_name: 'vps-' + workerId.slice(0, 8),
+                status: 'busy' // phải gửi rõ 'busy' -- HeartbeatRequest.status mặc định 'idle' nếu bỏ trống
+            })
+        });
+    } catch (e) {
+        // Bỏ qua lỗi heartbeat giữa lúc cào -- không làm gián đoạn job, heartbeat kế tiếp tự bù.
+    }
+}
+
 async function crawlSingleGroupJob(job, apiBase) {
+    const workerId = await getOrCreateWorkerId();
     const tab = await chrome.tabs.create({ url: 'https://www.facebook.com/', active: false });
     const tabId = tab.id;
     try {
@@ -317,6 +368,7 @@ async function crawlSingleGroupJob(job, apiBase) {
         await sleep(5000);
         await chrome.tabs.reload(tabId);
         await sleep(5000);
+        await sendWorkerHeartbeat(apiBase, workerId);
         await chrome.tabs.reload(tabId);
         await sleep(6000);
 
@@ -337,6 +389,7 @@ async function crawlSingleGroupJob(job, apiBase) {
             throw new Error('Không thể tiêm content script vào group này.');
         }
 
+        await sendWorkerHeartbeat(apiBase, workerId);
         await sleep(1000);
         const response = await chrome.tabs.sendMessage(tabId, { action: 'FETCH_API_POSTS', count: 100 });
         if (!response || !response.success || !response.data) {
@@ -344,6 +397,7 @@ async function crawlSingleGroupJob(job, apiBase) {
             throw new Error(`Không nhận được dữ liệu bài viết từ content script: ${detail}`);
         }
 
+        await sendWorkerHeartbeat(apiBase, workerId);
         const pushRes = await fetch(`${apiBase}/api/all-platform/extension/save-posts`, {
             method: 'POST',
             headers: {
@@ -360,7 +414,7 @@ async function crawlSingleGroupJob(job, apiBase) {
                 keywords: job.keywords || null,
                 post_limit: job.post_limit ?? null,
                 job_id: job.id,
-                worker_id: await getOrCreateWorkerId()
+                worker_id: workerId
             })
         });
 
@@ -400,17 +454,25 @@ async function pollNextJob() {
         const workerId = await getOrCreateWorkerId();
         const apiBase = await getWorkerApiBase();
 
-        const ready = await ensureFbAccountReady(apiBase);
-        if (!ready) return; // hết acc, đợi lượt poll kế (1 phút sau)
+        // Poll job TRƯỚC (kèm acc đang cầm sẵn, nếu có, để backend ưu tiên job cùng chủ) --
+        // chỉ sau khi biết job.id_member mới xác định cần acc nào, tránh xin acc mù trước
+        // khi biết job kế tiếp thuộc về ai.
+        const currentMember = (await chrome.storage.local.get('fb_account_member_id')).fb_account_member_id || '';
+        let url = `${apiBase}/api/all-platform/extension/queue/next-job?worker_id=${encodeURIComponent(workerId)}&worker_name=${encodeURIComponent('vps-' + workerId.slice(0, 8))}`;
+        if (currentMember) url += `&current_id_member=${encodeURIComponent(currentMember)}`;
 
-        const res = await fetch(
-            `${apiBase}/api/all-platform/extension/queue/next-job?worker_id=${encodeURIComponent(workerId)}&worker_name=${encodeURIComponent('vps-' + workerId.slice(0, 8))}`,
-            { headers: { 'x-api-key': 'markee-extension-key-2024' } }
-        );
+        const res = await fetch(url, { headers: { 'x-api-key': 'markee-extension-key-2024' } });
         if (!res.ok) return;
         const data = await res.json();
         const job = data.job;
         if (!job) return; // không có job -> đã tự cập nhật heartbeat "idle" phía server
+
+        const ready = await ensureFbAccountForJob(apiBase, job.id_member || null);
+        if (!ready) {
+            sendLog(`⚠️ [Worker Queue] Không có acc FB khả dụng cho nhân viên sở hữu nhóm này, báo job lỗi để thử lại sau...`, false, 'warn');
+            await reportJobFailure(job, apiBase, 'NO_FB_ACCOUNT_FOR_MEMBER');
+            return;
+        }
 
         sendLog(`📥 [Worker Queue] Nhận job cào: ${job.group_name || job.group_url}`);
         try {

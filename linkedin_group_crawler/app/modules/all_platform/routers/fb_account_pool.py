@@ -28,11 +28,13 @@ def _check_api_key(x_api_key: Optional[str]) -> None:
 async def claim_account(
     worker_id: str,
     worker_name: Optional[str] = None,
+    id_member: Optional[str] = None,
     x_api_key: Optional[str] = Header(None),
 ):
-    """Worker gọi khi VM chưa có cookie login hợp lệ (mới cấp máy / bị logout)."""
+    """Worker gọi khi VM chưa có cookie login hợp lệ (mới cấp máy / bị logout), hoặc khi
+    cần đổi acc cho đúng chủ (`id_member`) của job kế tiếp sắp cào."""
     _check_api_key(x_api_key)
-    account = pool_service.claim_next_account(worker_id)
+    account = pool_service.claim_next_account(worker_id, id_member)
     if not account:
         return {"account": None}
     return {"account": account}
