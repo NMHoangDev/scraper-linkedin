@@ -366,20 +366,12 @@ export function getPaymentStatusText(value?: PaymentStatus | string) {
   return PAYMENT_STATUS_OPTIONS.find(option => option.value === raw)?.label || raw;
 }
 
+/** Không ép thứ tự pipeline — cho chuyển tới bất kỳ giai đoạn nào khác giai đoạn
+ * hiện tại (khớp với DEAL_STAGE_TRANSITIONS bên backend, cũng đã bỏ ràng buộc
+ * thứ tự tương tự). Deal ở won/lost thì DetailDrawer tự ẩn cả khối này rồi
+ * (xem `isTerminal`), nên không cần lọc riêng ở đây. */
 export function allowedNextStages(currentStage: DealStage): DealStage[] {
-  const transitions: Record<DealStage, DealStage[]> = {
-    new_lead: ['contacted', 'lost'],
-    contacted: ['qualified', 'proposal_sent', 'on_hold', 'lost'],
-    qualified: ['requirement', 'proposal_sent', 'on_hold', 'lost'],
-    requirement: ['proposal_sent', 'on_hold', 'lost'],
-    proposal_sent: ['negotiation', 'on_hold', 'lost'],
-    negotiation: ['contract_sent', 'on_hold', 'lost'],
-    contract_sent: ['won', 'lost'],
-    on_hold: ['contacted', 'qualified', 'requirement', 'proposal_sent', 'negotiation', 'contract_sent', 'won', 'lost'],
-    won: [],
-    lost: [],
-  };
-  return transitions[currentStage] || [];
+  return DEAL_STAGES.filter(stage => stage !== currentStage);
 }
 
 export function parseMoney(value: string | number | undefined) {
