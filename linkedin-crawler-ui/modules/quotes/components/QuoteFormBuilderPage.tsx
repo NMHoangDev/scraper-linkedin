@@ -34,17 +34,23 @@ function validateSchema(form: QuoteForm | null, schema: QuoteSchema) {
   if (!form?.name?.trim()) return 'Tên mẫu bắt buộc.';
   let sellerEmail = '';
   let sellerCompanyName = '';
+  // Mẫu Villa dùng "sellerBrandName" (Thương hiệu) thay cho "sellerCompanyName" —
+  // schema Cloudgate mới có field này, không phải mọi layout đều có.
+  let sellerBrandName = '';
   let defaultVatRate = 0;
   let validityDays = 0;
   for (const section of schema.sections) {
     for (const field of section.fields) {
       if (field.key === 'sellerCompanyName') sellerCompanyName = String(field.defaultValue || '');
+      if (field.key === 'sellerBrandName') sellerBrandName = String(field.defaultValue || '');
       if (field.key === 'sellerEmail') sellerEmail = String(field.defaultValue || '');
       if (field.key === 'defaultVatRate') defaultVatRate = Number(field.defaultValue || 0);
       if (field.key === 'validityDays') validityDays = Number(field.defaultValue || 0);
     }
   }
-  if (schema.layoutType !== 'blank_quote' && !sellerCompanyName.trim()) return 'Tên công ty bắt buộc.';
+  if (schema.layoutType !== 'blank_quote' && !sellerCompanyName.trim() && !sellerBrandName.trim()) {
+    return 'Tên công ty / thương hiệu bắt buộc.';
+  }
   if (sellerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sellerEmail)) {
     return 'Email công ty không đúng định dạng.';
   }
