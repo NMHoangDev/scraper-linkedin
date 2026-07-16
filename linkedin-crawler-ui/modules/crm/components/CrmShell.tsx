@@ -42,6 +42,15 @@ export function CrmShell() {
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [stageData, setStageData] = useState<{ deal: Deal; toStage: DealStage } | null>(null);
   const [reviewData, setReviewData] = useState<{ deal: Deal; toStage: DealStage } | null>(null);
+  const [toast, setToast] = useState('');
+
+  // Toast tự ẩn sau vài giây — không dùng window.alert() cho việc báo thành công
+  // vì alert chặn thao tác tiếp theo, gây khó chịu cho hành động vốn đã ổn.
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(''), 3200);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   // Khoá scroll của trang nền khi có modal/drawer nào đang mở — nếu không, cuộn
   // chuột bên trong popup (vd DetailDrawer) vẫn kéo theo cuộn cả trang phía sau.
@@ -169,8 +178,22 @@ export function CrmShell() {
             },
           })
         : await moveDeal(stageData.deal.id, stageData.toStage, payload);
+      const toStage = stageData.toStage;
       setStageData(null);
+      // Đóng luôn drawer chi tiết — nó vẫn phủ kín màn hình phía sau StageModal,
+      // để mở thì cuộn board bên dưới xong cũng không thấy được gì (đã bị che).
+      setDetailOpen(false);
       setSelectedDeal(deal);
+      setToast(`Đã chuyển "${deal.customerName}" sang "${DEAL_STAGE_META[toStage].label}".`);
+      // Cuộn tới đúng cột/ô mà deal vừa "hạ cánh" trên board — cột pipeline bình
+      // thường hay ô trạng thái cuối (Thắng/Thua/Tạm dừng) nằm tuốt dưới cùng
+      // trang. Đợi 1 nhịp cho drawer/modal đóng animation + body scroll-lock gỡ
+      // ra rồi mới cuộn, không thì scrollIntoView chạy giữa lúc overflow:hidden.
+      window.setTimeout(() => {
+        document
+          .querySelector(`[data-crm-stage-column="${toStage}"], [data-crm-terminal-stage="${toStage}"]`)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 120);
     } catch (err) {
       window.alert(err instanceof Error ? humanizeCrmError(err.message) : 'Không chuyển được giai đoạn. Vui lòng kiểm tra lại thông tin.');
     }
@@ -308,6 +331,8 @@ export function CrmShell() {
           )}
         </section>
       </section>
+
+      {toast ? <div className="crm-toast">{toast}</div> : null}
 
       <DetailDrawer
         deal={selectedDeal}

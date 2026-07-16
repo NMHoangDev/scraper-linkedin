@@ -2193,6 +2193,34 @@
   padding: 0.75rem;
 }
 
+.crm-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 1.5rem;
+  transform: translateX(-50%);
+  z-index: 100050;
+  max-width: min(28rem, calc(100vw - 2rem));
+  border-radius: 0.7rem;
+  background: #0f172a;
+  color: #ffffff;
+  font-size: 0.86rem;
+  font-weight: 700;
+  padding: 0.85rem 1.15rem;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.35);
+  animation: crm-toast-in 0.18s ease-out;
+}
+
+@keyframes crm-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
 .crm-timeline {
   border-left: 2px solid #e2e8f0;
   display: grid;
