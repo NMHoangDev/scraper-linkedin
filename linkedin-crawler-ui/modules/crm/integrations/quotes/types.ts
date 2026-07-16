@@ -25,6 +25,10 @@ export function quoteDraftFromForm(form: QuoteForm, dealDraft?: DealFormState): 
     ? (solutionField?.defaultValue as VillaSolutionItem[])
     : [];
 
+  if (fields.some(field => field.key === 'quoteDate') && !data.quoteDate) {
+    data.quoteDate = new Date().toISOString().slice(0, 10);
+  }
+
   if (dealDraft) {
     Object.assign(data, {
       customerRecipient: dealDraft.customerName || dealDraft.companyName,

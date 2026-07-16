@@ -89,6 +89,18 @@ export function QuoteDocumentRenderer({
         ? quoteData.solutionItems
         : [];
 
+  const solutionColumns = (
+    findField('solutionItems').config?.columns?.filter(
+      column => column.visible !== false && column.type !== 'auto-number'
+    ) || []
+  ) as QuoteField[];
+
+  const renderSolutionCell = (item: VillaSolutionItem, column: QuoteField) => {
+    const value = (item as unknown as Record<string, unknown>)[column.key];
+    if (column.type === 'currency') return formatVnd(Number(value || 0));
+    return String(value ?? '');
+  };
+
   if (layoutType === 'villa_solution_package') {
     const setupTotal = activeSolutionItems.reduce(
       (sum, item) => sum + Number(item.offerPrice || 0),
@@ -118,25 +130,34 @@ export function QuoteDocumentRenderer({
             <table className="villa-table">
               <thead>
                 <tr>
-                  <th>Giải pháp</th>
-                  <th>Mô tả</th>
-                  <th>Giá gốc</th>
-                  <th>Giá đề xuất</th>
-                  <th>Ghi chú</th>
+                  {solutionColumns.map(column => (
+                    <th key={column.key}>{column.label}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {activeSolutionItems.map((item, index) => (
-                  <tr key={`${item.name}-${index}`}>
-                    <td>{item.name}</td>
-                    <td>{item.description}</td>
-                    <td className="villa-price-original">
-                      <span>{formatVnd(item.originalPrice || 0)}</span>
-                    </td>
-                    <td className="villa-price-offer">
-                      <strong>{formatVnd(item.offerPrice)}</strong>
-                    </td>
-                    <td>{item.note}</td>
+                  <tr key={index}>
+                    {solutionColumns.map(column => (
+                      <td
+                        key={column.key}
+                        className={
+                          column.key === 'originalPrice'
+                            ? 'villa-price-original'
+                            : column.key === 'offerPrice'
+                              ? 'villa-price-offer'
+                              : undefined
+                        }
+                      >
+                        {column.key === 'offerPrice' ? (
+                          <strong>{renderSolutionCell(item, column)}</strong>
+                        ) : column.key === 'originalPrice' ? (
+                          <span>{renderSolutionCell(item, column)}</span>
+                        ) : (
+                          renderSolutionCell(item, column)
+                        )}
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>

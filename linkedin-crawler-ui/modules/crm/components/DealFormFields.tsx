@@ -362,7 +362,7 @@ export function DealFormFields({
                 <input value={form.contractTitle} onChange={event => setValue('contractTitle', event.target.value)} placeholder="Bao_gia_ABC.pdf hoặc tên hợp đồng" />
               </Field>
               <Field full label="Link hợp đồng / file PDF">
-                <input value={form.contractUrl} onChange={event => setValue('contractUrl', event.target.value)} type="url" placeholder="https://..." />
+                <input value={form.contractUrl} onChange={event => setValue('contractUrl', event.target.value)} placeholder="https://... hoặc /public/quotes/..." />
               </Field>
             </>
           ) : null}
@@ -406,7 +406,7 @@ export function DealFormFields({
               <input value={form.quoteTotalAmount} onChange={event => setValue('quoteTotalAmount', event.target.value)} inputMode="decimal" placeholder="0" />
             </Field>
             <Field full label="Link báo giá / hợp đồng">
-              <input value={form.quoteUrl} onChange={event => setValue('quoteUrl', event.target.value)} type="url" placeholder="https://..." />
+              <input value={form.quoteUrl} onChange={event => setValue('quoteUrl', event.target.value)} placeholder="https://... hoặc /public/quotes/..." />
             </Field>
           </div>
         </section>

@@ -301,7 +301,6 @@ export function CrmShell() {
         onClose={() => setDetailOpen(false)}
         onRequestTransition={(deal, toStage) => setStageData({ deal, toStage })}
         onViewReview={deal => setReviewData({ deal, toStage: deal.stage })}
-        onContractClick={setContractDeal}
         onEdit={setEditingDeal}
         onDelete={handleDelete}
         onUpdateContractStatus={updateContractStatus}
