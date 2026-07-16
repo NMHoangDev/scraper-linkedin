@@ -99,7 +99,11 @@ type ActivityLogRow = {
   created_at: string;
 };
 
-const SUPPORTED_SOURCE_PLATFORMS = new Set(['Manual', 'FB_Inbox', 'FB_Group', 'Zalo']);
+// Khớp với constraint source_platform ở migration 032_expand_source_platform.sql —
+// đủ 7 giá trị mà dropdown "Nguồn" (SOURCE_OPTIONS trong crmConfig.ts) cho chọn.
+const SUPPORTED_SOURCE_PLATFORMS = new Set([
+  'Manual', 'FB_Inbox', 'FB_Group', 'Zalo', 'Website', 'Referral', 'MarkeeChat',
+]);
 const CRM_CONTRACT_STATUSES = new Set([
   'moi_tiep_nhan',
   'dang_xu_ly',

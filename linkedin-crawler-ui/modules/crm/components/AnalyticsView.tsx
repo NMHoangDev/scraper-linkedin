@@ -222,7 +222,7 @@ export function AnalyticsView() {
               </header>
               <div className="crm-region-layout">
                 <div className="crm-donut" style={{ '--donut-color': analytics.regionRows[0]?.color || '#22c55e' } as React.CSSProperties}>
-                  <span>{formatVND(analytics.wonValue) || '0 đ'}</span>
+                  <span title={formatVND(analytics.wonValue) || '0 đ'}>{formatCompactVND(analytics.wonValue)}</span>
                 </div>
                 <div className="crm-region-list">
                   {analytics.regionRows.map(row => (
