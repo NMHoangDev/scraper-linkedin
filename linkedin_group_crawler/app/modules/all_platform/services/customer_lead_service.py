@@ -31,6 +31,19 @@ def _serialize_datetimes(payload: Dict[str, Any]) -> Dict[str, Any]:
             out[k] = v
     return out
 
+
+# Cột UUID nullable trên customer_leads — frontend (vd wizard "Thêm deal và báo giá"
+# khi chưa chọn Leader/SDR) có thể gửi "" thay vì null, Postgres reject với
+# "invalid input syntax for type uuid" nếu insert/update thẳng chuỗi rỗng.
+_NULLABLE_UUID_COLUMNS = ("leaded_by", "sdr_id", "quote_id")
+
+
+def _normalize_uuid_fields(payload: Dict[str, Any]) -> Dict[str, Any]:
+    for col in _NULLABLE_UUID_COLUMNS:
+        if payload.get(col) == "":
+            payload[col] = None
+    return payload
+
 # Cột lấy về — chỉ các cột có thật trên table customer_leads.
 # `days_in_stage` KHÔNG có trên table — nó được tính ở `_normalize_row()`
 # dựa vào `stage_entered_at`. Đừng select nó từ table.
@@ -222,6 +235,7 @@ def create_customer_lead(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         # Serialize datetime → ISO string trước khi INSERT (supabase-py không
         # tự handle datetime/date → JSON serialize error).
         data = _serialize_datetimes(data)
+        data = _normalize_uuid_fields(data)
         res = supabase.table("customer_leads").insert(data).execute()
         if res.data:
             new_row = _normalize_row(res.data[0])
@@ -249,6 +263,7 @@ def update_customer_lead(lead_id: str, data: Dict[str, Any]) -> Optional[Dict[st
         supabase = get_supabase_client()
         # Serialize datetime/date → ISO string (supabase-py không tự JSON hóa)
         safe_data = _serialize_datetimes(dict(data))
+        safe_data = _normalize_uuid_fields(safe_data)
         res = (
             supabase.table("customer_leads")
             .update(safe_data)

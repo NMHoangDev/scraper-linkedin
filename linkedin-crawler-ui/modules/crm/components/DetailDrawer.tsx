@@ -39,7 +39,6 @@ type Props = {
   onClose: () => void;
   onRequestTransition: (deal: Deal, stage: DealStage) => void;
   onViewReview: (deal: Deal) => void;
-  onContractClick: (deal: Deal) => void;
   onEdit: (deal: Deal) => void;
   onDelete: (deal: Deal) => void;
   onUpdateContractStatus: (deal: Deal, status: ContractStatus) => void;
@@ -55,7 +54,6 @@ export function DetailDrawer({
   onClose,
   onRequestTransition,
   onViewReview,
-  onContractClick,
   onEdit,
   onDelete,
   onUpdateContractStatus,
@@ -155,10 +153,6 @@ export function DetailDrawer({
           <section className="crm-contract-section">
             <h3 className="crm-section-title">Hợp đồng & ngày tháng</h3>
             <div className="crm-contract-action-row">
-              <button type="button" className="crm-contract-detail-button" onClick={() => onContractClick(deal)}>
-                <FileText className="crm-line-icon" />
-                Xem chi tiết hợp đồng
-              </button>
               {contractUrl ? (
                 <a href={contractUrl} className="crm-contract-detail-button" target="_blank" rel="noopener noreferrer">
                   <FileText className="crm-line-icon" />

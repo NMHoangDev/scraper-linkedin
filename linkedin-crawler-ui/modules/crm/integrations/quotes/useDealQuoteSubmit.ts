@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { seedingQuoteRepository } from '@/modules/quotes';
 import type { QuoteForm } from '@/modules/quotes';
 import { seedingCrmRepository } from '../../repositories/SeedingCrmRepository';
+import { humanizeCrmError } from '../../constants/crmConfig';
 import { buildDealPayload } from '../../components/DealFormFields';
 import type { DealFormState } from '../../components/DealFormFields';
 import type { CreateDealInput, CrmUserOption, Deal } from '../../types';
@@ -46,7 +47,7 @@ export function useDealQuoteSubmit() {
       if (createdQuoteId) await seedingQuoteRepository.deleteQuote(createdQuoteId).catch(() => {});
       if (createdDealId) await seedingCrmRepository.deleteDeal(createdDealId).catch(() => {});
       setSubmitError(
-        err instanceof Error ? err.message : 'Không thể tạo deal và báo giá. Đã hoàn tác các thay đổi.'
+        err instanceof Error ? humanizeCrmError(err.message) : 'Không thể tạo deal và báo giá. Đã hoàn tác các thay đổi.'
       );
       return null;
     } finally {
