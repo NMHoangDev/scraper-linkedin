@@ -17,26 +17,15 @@ TERMINAL_STAGES = ["won", "lost"]
 PAYMENT_STATUSES = ["unpaid", "partial", "paid"]
 
 # ---------------------------------------------------------------------------
-# Transition graph — mirror 1:1 DEAL_STAGE_TRANSITIONS trong
-# linkedin-crawler-ui/services/customer-lead.service.ts. Backend có API riêng
-# gọi trực tiếp được (bypass UI) nên phải enforce lại ở đây, không chỉ ở client.
+# Transition graph — không ép thứ tự pipeline nữa, cho chuyển tới bất kỳ stage
+# nào khác (mirror 1:1 allowedNextStages() trong
+# linkedin-crawler-ui/modules/crm/constants/crmConfig.ts). Deal ở won/lost vẫn
+# bị chặn "from" ngay ở transition_stage() (terminal, xem check phía dưới) nên
+# không cần liệt kê gì ở đây cho 2 stage đó. Backend có API riêng gọi trực tiếp
+# được (bypass UI) nên phải enforce lại ở đây, không chỉ ở client.
 # ---------------------------------------------------------------------------
 DEAL_STAGE_TRANSITIONS: dict[str, list[str]] = {
-    "new_lead":      ["contacted", "lost"],
-    "contacted":     ["qualified", "proposal_sent", "on_hold", "lost"],
-    "qualified":     ["requirement", "proposal_sent", "on_hold", "lost"],
-    "requirement":   ["proposal_sent", "on_hold", "lost"],
-    "proposal_sent": ["negotiation", "on_hold", "lost"],
-    "negotiation":   ["contract_sent", "on_hold", "lost"],
-    "contract_sent": ["won", "lost"],
-    # on_hold có thể resume về bất kỳ stage pipeline nào (quay lại prev_stage,
-    # xử lý ở transition_stage()) hoặc đóng deal won/lost.
-    "on_hold": [
-        "contacted", "qualified", "requirement", "proposal_sent",
-        "negotiation", "contract_sent", "won", "lost",
-    ],
-    "won":           [],
-    "lost":          [],
+    stage: [s for s in DEAL_STAGES if s != stage] for stage in DEAL_STAGES
 }
 
 

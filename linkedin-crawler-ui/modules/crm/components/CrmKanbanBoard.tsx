@@ -101,6 +101,7 @@ export function CrmKanbanBoard({ deals, loading, onCardClick, onContractClick, o
             {PIPELINE_COLUMNS.map(stage => (
               <div
                 key={stage}
+                data-crm-stage-column={stage}
                 className={`crm-stage-column ${dragOverStage === stage ? 'crm-stage-column--active' : ''}`}
                 onDragOver={event => {
                   event.preventDefault();
