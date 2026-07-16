@@ -203,7 +203,10 @@ function contractStatusFromRow(row: CustomerLeadRow, stage: DealStage): Contract
   return getContractStatusForStage(stage);
 }
 
-function paymentStatusFromRow(row: CustomerLeadRow): PaymentStatus {
+function paymentStatusFromRow(row: CustomerLeadRow, stage: DealStage): PaymentStatus {
+  // Deal đã ở "Hoàn thành" (won) thì ngầm hiểu là đã thanh toán — không hiện lại
+  // cảnh báo "Chưa thanh toán/Tới hạn thanh toán" cho deal đã chốt xong nữa.
+  if (stage === 'won') return 'da_thanh_toan';
   const raw = asText(row.payment_status);
   const due = row.payment_due_date ? new Date(row.payment_due_date) : null;
   const overdue =
@@ -365,7 +368,7 @@ function rowToDeal(row: CustomerLeadRow, history: StageHistory[] = []): Deal {
     followUpDate: asText(row.follow_up_date),
     contract: {
       status: contractStatusFromRow(row, stage),
-      paymentStatus: paymentStatusFromRow(row),
+      paymentStatus: paymentStatusFromRow(row, stage),
       paymentDueDate: asText(row.payment_due_date),
       signedAt: asText(row.contract_signed_at),
       warrantyExpiresAt: asText(row.warranty_expires_at),
