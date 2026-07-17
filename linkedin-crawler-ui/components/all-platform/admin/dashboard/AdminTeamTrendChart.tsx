@@ -21,7 +21,7 @@ import type {
 type MetricKey = "posts" | "comments" | "inbox";
 
 const METRIC_OPTIONS: Array<{ key: MetricKey; label: string }> = [
-  { key: "posts", label: "Tong bai" },
+  { key: "posts", label: "Tổng bài" },
   { key: "comments", label: "Comment" },
   { key: "inbox", label: "Inbox" },
 ];
@@ -108,9 +108,9 @@ export function AdminTeamTrendChart({ data, isLoading }: Props) {
     <div className="rounded-xl border border-outline-variant bg-surface overflow-hidden">
       <div className="flex flex-col gap-4 border-b border-outline-variant px-5 py-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-on-surface">Xu huong 14 ngay theo team</h2>
+          <h2 className="text-lg font-semibold text-on-surface">Xu hướng 14 ngày theo team</h2>
           <p className="mt-1 text-sm text-on-surface-variant">
-            So sanh theo tung ngay giua cac team de thay team nao dang len xuong ro nhat.
+            So sánh theo từng ngày giữa các team để thấy team nào đang lên xuống rõ nhất.
           </p>
         </div>
 
@@ -149,13 +149,13 @@ export function AdminTeamTrendChart({ data, isLoading }: Props) {
 
       {isLoading ? (
         <div className="flex min-h-[320px] items-center justify-center text-sm text-on-surface-variant">
-          Dang tai bieu do team...
+          Đang tải biểu đồ team...
         </div>
       ) : null}
 
       {empty ? (
         <div className="flex min-h-[320px] items-center justify-center text-sm text-on-surface-variant">
-          Chua co du lieu xu huong theo team.
+          Chưa có dữ liệu xu hướng theo team.
         </div>
       ) : null}
 
@@ -182,7 +182,7 @@ export function AdminTeamTrendChart({ data, isLoading }: Props) {
                   formatMetricValue(value),
                   String(name ?? ""),
                 ]}
-                labelFormatter={(value) => `Ngay ${formatDayLabel(String(value ?? ""))}`}
+                labelFormatter={(value) => `Ngày ${formatDayLabel(String(value ?? ""))}`}
                 contentStyle={{
                   borderRadius: 12,
                   border: "1px solid #e5e7eb",

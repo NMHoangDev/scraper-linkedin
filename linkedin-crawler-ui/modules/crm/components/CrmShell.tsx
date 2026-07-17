@@ -248,6 +248,7 @@ export function CrmShell() {
               type="text"
               className="crm-input"
               placeholder="Tìm tên, SĐT, email..."
+              autoComplete="off"
             />
             {(['source', 'city', 'industry'] as const).map(key => (
               <div key={key} className="crm-filter-select">
