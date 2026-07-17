@@ -32,9 +32,38 @@ FIELD_LABELS = {
     "max_rate": "Max Rate (%)",
 }
 
-# Cung 1 trong so voi trang Teams overview (Lead 45% > Inbox 40% > Post 10% > Comment 5%)
-# de %KPI Total o day va o Teams overview luon khop nhau, khong lech 2 cong thuc.
-KPI_PERCENT_WEIGHTS = {"lead": 0.45, "inbox": 0.40, "post": 0.10, "comment": 0.05}
+# Khop 1-1 voi RULE_GROUPS mac dinh o frontend (KpiRewardSections.tsx) - dung khi
+# team chua tung cai rule tuan nao ca (khong co ca tuan truoc de sao chep). Neu
+# khong co bang nay, cac tuan "default" se tinh thuong = 0 cho toan bo thanh vien
+# du ho da dat KPI that, vi khong co rule nao de ap dung ca.
+DEFAULT_RULE_VALUES: dict[str, dict[str, Any]] = {
+    "total_bonus": {"weight": 100, "threshold_value": 75, "reward_per_unit": 100000, "max_reward": None, "max_rate": 200},
+    "lead": {"weight": 40, "threshold_value": 80, "reward_per_unit": 10000, "max_reward": None, "max_rate": 200},
+    "inbox": {"weight": 30, "threshold_value": 80, "reward_per_unit": 3000, "max_reward": None, "max_rate": 200},
+    "post": {"weight": 20, "threshold_value": 80, "reward_per_unit": 2000, "max_reward": None, "max_rate": 200},
+    "comment": {"weight": 10, "threshold_value": 80, "reward_per_unit": 1000, "max_reward": None, "max_rate": 200},
+}
+
+
+def _default_rules(team_id: str, start: str, end: str) -> list[dict[str, Any]]:
+    return [
+        _normalize_rule({
+            "id": None,
+            "team_id": team_id,
+            "start_date": start,
+            "end_date": end,
+            "metric": metric,
+            "status": "draft",
+            **values,
+        })
+        for metric, values in DEFAULT_RULE_VALUES.items()
+    ]
+
+# Khop dung trong so hien thi ngay tren bang "Cai dat Bonus KPI" (LEAD 40% / INBOX
+# 30% / POST 20% / COMMENT 10%, xem RULE_GROUPS.weightLabel o frontend) - KHONG
+# phai bo trong so cua trang Teams overview (Lead 45/Inbox 40/Post 10/Comment 5),
+# do la 2 cong thuc khac nhau cho 2 muc dich khac nhau, tung bi nham lan chung 1.
+KPI_PERCENT_WEIGHTS = {"lead": 0.40, "inbox": 0.30, "post": 0.20, "comment": 0.10}
 
 
 def _metric_percent(actual: int, target: int) -> float:
@@ -54,16 +83,19 @@ def _kpi_status(percent: float, has_target: bool = True) -> str:
 
 
 def _weighted_percent(actuals: dict[str, int], targets: dict[str, int]) -> tuple[float, bool]:
+    # Chia cho TONG trong so co dinh (100%), khong chi chia cho trong so cua cac
+    # metric co giao target - neu khong, metric chua giao target (target=0) se bi
+    # LOAI hoan toan khoi mau so thay vi tinh la 0%, lam %KPI tong bi thoi phong
+    # ao (vd chi dat Inbox+Comment ma bao 100% du Lead/Post con "Chua dat").
+    has_target = any(targets.get(metric, 0) > 0 for metric in KPI_PERCENT_WEIGHTS)
+    if not has_target:
+        return 0.0, False
     weighted_sum = 0.0
-    weight_total = 0.0
     for metric, weight in KPI_PERCENT_WEIGHTS.items():
         target = targets.get(metric, 0)
         if target > 0:
             weighted_sum += weight * min(actuals.get(metric, 0) / target, 1.0)
-            weight_total += weight
-    if weight_total <= 0:
-        return 0.0, False
-    return round((weighted_sum / weight_total) * 100, 1), True
+    return round(weighted_sum * 100, 1), True
 
 
 def _now_iso() -> str:
@@ -222,7 +254,7 @@ def get_effective_reward_rules(
         ]
         return {"rules": copied, "source": "copied", "sourceWeek": {"start": prev_start, "end": prev_end}}
 
-    return {"rules": [], "source": "default", "sourceWeek": None}
+    return {"rules": _default_rules(team_id, start, end), "source": "default", "sourceWeek": None}
 
 
 def _diff_rule_changes(
@@ -520,7 +552,16 @@ def get_reward_summary(
         for team in (teams_payload.get("teams") or [])
         if str(team.get("id")) in allowed_team_ids
     }
-    rules = list_reward_rules(user=user, start_date=start, end_date=end, team_id=team_id)
+
+    # QUAN TRONG: phai dung rule "dang co hieu luc" (uu tien tuan nay, sao chep tu
+    # tuan truoc neu chua luu) giong het nhung gi bang Cai dat Bonus KPI dang hien
+    # thi - neu chi lay rule da luu dung tuan (list_reward_rules) thi tuan nao chua
+    # bam Luu se tinh thuong = 0 cho toan bo thanh vien du ho da dat KPI thuc te,
+    # trong khi UI van hien thi nhu dang co rule (gay hieu lam "dat ma khong duoc tinh").
+    rules: list[dict[str, Any]] = []
+    for tid in teams:
+        effective = get_effective_reward_rules(user=user, team_id=tid, start_date=start, end_date=end)
+        rules.extend(effective["rules"])
     rules_by_team: dict[str, dict[str, dict[str, Any]]] = {}
     for rule in rules:
         rules_by_team.setdefault(str(rule["teamId"]), {})[str(rule["metric"])] = rule

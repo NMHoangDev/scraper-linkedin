@@ -198,6 +198,33 @@ function getRule(rules: KpiRewardRule[], metric: KpiRewardMetric): KpiRewardRule
   return rules.find((rule) => rule.metric === metric)!;
 }
 
+// Total Bonus = Bonus/don vi x KPI (target) duoc giao cho metric do - la muc thuong
+// DU KIEN neu team hoan thanh dung target, KHONG phai tien thuong thuc nhan (tien
+// thuc nhan tinh tu so luong THAT, o bang Ket qua KPI & tien thuong rieng). Rieng
+// nhom BONUS TOTAL la tong: Bonus co dinh + Total Bonus cua ca 4 metric con lai.
+// Khong duoc de nguoi dung nhap tay 2 truong nay - luon tinh lai theo cong thuc.
+function computeTotalBonusByMetric(
+  rules: KpiRewardRule[],
+  targetsByMetric: Record<"lead" | "inbox" | "post" | "comment", number>,
+): Record<KpiRewardMetric, number> {
+  const perMetric = { lead: 0, inbox: 0, post: 0, comment: 0 } as Record<"lead" | "inbox" | "post" | "comment", number>;
+  (["lead", "inbox", "post", "comment"] as const).forEach((metric) => {
+    const rule = getRule(rules, metric);
+    perMetric[metric] = (rule.rewardPerUnit || 0) * (targetsByMetric[metric] || 0);
+  });
+  const flatBonus = getRule(rules, "total_bonus").rewardPerUnit || 0;
+  return {
+    ...perMetric,
+    total_bonus: flatBonus + perMetric.lead + perMetric.inbox + perMetric.post + perMetric.comment,
+  };
+}
+
+// Max Bonus = Total Bonus (metric) x Max Rate (vd 200% -> he so 2). Chi ap dung
+// cho Inbox/Post/Comment (khop dung sheet goc, Lead va Bonus Total khong co cot Max).
+function computeMaxBonus(totalBonus: number, maxRatePercent: number): number {
+  return totalBonus * ((maxRatePercent || 200) / 100);
+}
+
 function StatusBadge({ status }: { status: KpiRewardStatus }) {
   return (
     <span className={cn("inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold", STATUS_TONE[status])}>
@@ -288,23 +315,25 @@ export function KpiRewardRuleTable({
 
   const status = (rules.find((rule) => rule.id)?.status || "approved") as KpiRewardStatus;
 
-  // Total Bonus / Max Bonus hien thi ngay trong bang rule la so that tinh tu du lieu
-  // thuc te cua team tuan nay - gop rewards/targets cua tung thanh vien lai theo metric.
-  const aggregates = useMemo(() => {
-    const agg = {
-      targets: { lead: 0, inbox: 0, post: 0, comment: 0 },
-      rewards: { lead: 0, inbox: 0, post: 0, comment: 0, total_bonus: 0 } as Record<KpiRewardMetric, number>,
-    };
+  // Target cua ca team (gop tung thanh vien lai theo metric) - dung de tinh Total
+  // Bonus/Max Bonus DU KIEN trong bang rule (khong phai tien thuong thuc nhan).
+  const teamTargets = useMemo(() => {
+    const targets = { lead: 0, inbox: 0, post: 0, comment: 0 };
     for (const member of summary?.memberSummaries || []) {
       if (member.teamId !== teamId) continue;
       (["lead", "inbox", "post", "comment"] as const).forEach((metric) => {
-        agg.targets[metric] += member.targets[metric] || 0;
-        agg.rewards[metric] += member.rewards[metric] || 0;
+        targets[metric] += member.targets[metric] || 0;
       });
-      agg.rewards.total_bonus += member.rewards.total_bonus || 0;
     }
-    return agg;
+    return targets;
   }, [summary, teamId]);
+
+  // Total Bonus = Bonus/don vi x target duoc giao; Max Bonus = Total Bonus x Max
+  // Rate - luon tinh lai tu rules + teamTargets, KHONG cho nhap tay 2 truong nay.
+  const totalBonusByMetric = useMemo(
+    () => computeTotalBonusByMetric(rules, teamTargets),
+    [rules, teamTargets],
+  );
 
   const loadLogs = useCallback(async () => {
     if (!teamId) return;
@@ -485,9 +514,8 @@ export function KpiRewardRuleTable({
             <tr>
               {RULE_GROUPS.map((group) => {
                 const rule = getRule(rules, group.key);
-                const totalBonus = aggregates.rewards[group.key] ?? 0;
-                const targetSum = group.key === "total_bonus" ? 0 : aggregates.targets[group.key as "lead" | "inbox" | "post" | "comment"];
-                const maxBonus = targetSum * (rule.rewardPerUnit || 0) * ((rule.maxRate || 200) / 100);
+                const totalBonus = totalBonusByMetric[group.key];
+                const maxBonus = computeMaxBonus(totalBonus, rule.maxRate);
                 return (
                   <Fragment key={group.key}>
                     {METRIC_HAS_THRESHOLD[group.key] ? (
@@ -898,21 +926,16 @@ function AdminAllTeamsKpiRuleTable({
 
   const teamIdsKey = teams.map((team) => team.id).join(",");
 
-  // Total Bonus / Max Bonus hien thi trong bang la so that tinh tu du lieu that cua tuan -
-  // gop rewards/targets cua tung thanh vien trong team lai theo tung metric.
-  const teamAggregates = useMemo(() => {
-    const map: Record<string, { targets: Record<"lead" | "inbox" | "post" | "comment", number>; rewards: Record<KpiRewardMetric, number> }> = {};
+  // Target cua tung team (gop tung thanh vien lai theo metric) - dung de tinh Total
+  // Bonus/Max Bonus DU KIEN trong bang rule (khong phai tien thuong thuc nhan).
+  const teamTargets = useMemo(() => {
+    const map: Record<string, Record<"lead" | "inbox" | "post" | "comment", number>> = {};
     for (const member of summary?.memberSummaries || []) {
-      const agg = map[member.teamId] || {
-        targets: { lead: 0, inbox: 0, post: 0, comment: 0 },
-        rewards: { lead: 0, inbox: 0, post: 0, comment: 0, total_bonus: 0 },
-      };
+      const targets = map[member.teamId] || { lead: 0, inbox: 0, post: 0, comment: 0 };
       (["lead", "inbox", "post", "comment"] as const).forEach((metric) => {
-        agg.targets[metric] += member.targets[metric] || 0;
-        agg.rewards[metric] += member.rewards[metric] || 0;
+        targets[metric] += member.targets[metric] || 0;
       });
-      agg.rewards.total_bonus += member.rewards.total_bonus || 0;
-      map[member.teamId] = agg;
+      map[member.teamId] = targets;
     }
     return map;
   }, [summary]);
@@ -1103,7 +1126,8 @@ function AdminAllTeamsKpiRuleTable({
                 const rules = rulesByTeam[team.id] || defaultRules(team.id, startDate, endDate);
                 const isEditing = editingTeamIds.has(team.id);
                 const isSaving = savingTeamIds.has(team.id);
-                const aggregates = teamAggregates[team.id];
+                const targets = teamTargets[team.id] || { lead: 0, inbox: 0, post: 0, comment: 0 };
+                const totalBonusByMetric = computeTotalBonusByMetric(rules, targets);
 
                 const mainRow = (
                   <tr key={team.id}>
@@ -1112,9 +1136,8 @@ function AdminAllTeamsKpiRuleTable({
                     </td>
                     {RULE_GROUPS.map((group) => {
                       const rule = getRule(rules, group.key);
-                      const totalBonus = aggregates?.rewards[group.key] ?? 0;
-                      const targetSum = group.key === "total_bonus" ? 0 : (aggregates?.targets[group.key as "lead" | "inbox" | "post" | "comment"] ?? 0);
-                      const maxBonus = targetSum * (rule.rewardPerUnit || 0) * ((rule.maxRate || 200) / 100);
+                      const totalBonus = totalBonusByMetric[group.key];
+                      const maxBonus = computeMaxBonus(totalBonus, rule.maxRate);
                       return (
                         <Fragment key={group.key}>
                           {METRIC_HAS_THRESHOLD[group.key] ? (
