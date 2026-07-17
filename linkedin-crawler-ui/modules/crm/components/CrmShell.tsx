@@ -1,15 +1,14 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { ContractDetailModal } from './ContractDetailModal';
 import { CrmKanbanBoard } from './CrmKanbanBoard';
 import { CrmTableView } from './CrmTableView';
 import { DealFormModal } from './DealFormModal';
 import { DetailDrawer } from './DetailDrawer';
-import { LayoutGrid, Loader2, Plus, RotateCcw, TableIcon, Trophy } from './icons';
+import { FileText, LayoutGrid, Loader2, Plus, RotateCcw, TableIcon, Trophy } from './icons';
 import { StageModal } from './StageModal';
-import { DealQuoteWizard } from '../integrations/quotes';
+import { CreateQuoteModal } from '../integrations/quotes';
 import {
   CITY_OPTIONS,
   DEAL_STAGE_META,
@@ -39,6 +38,7 @@ export function CrmShell() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [contractDeal, setContractDeal] = useState<Deal | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [quoteModal, setQuoteModal] = useState<{ open: boolean; deal: Deal | null }>({ open: false, deal: null });
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [stageData, setStageData] = useState<{ deal: Deal; toStage: DealStage } | null>(null);
   const [reviewData, setReviewData] = useState<{ deal: Deal; toStage: DealStage } | null>(null);
@@ -55,7 +55,7 @@ export function CrmShell() {
   // Khoá scroll của trang nền khi có modal/drawer nào đang mở — nếu không, cuộn
   // chuột bên trong popup (vd DetailDrawer) vẫn kéo theo cuộn cả trang phía sau.
   const anyOverlayOpen =
-    detailOpen || Boolean(contractDeal) || createOpen || Boolean(editingDeal) || Boolean(stageData) || Boolean(reviewData);
+    detailOpen || Boolean(contractDeal) || createOpen || quoteModal.open || Boolean(editingDeal) || Boolean(stageData) || Boolean(reviewData);
   useEffect(() => {
     if (!anyOverlayOpen) return;
     const previousOverflow = document.body.style.overflow;
@@ -138,12 +138,6 @@ export function CrmShell() {
     }
   }
 
-  async function handleWizardCreated(deal: Deal) {
-    await loadDeals();
-    setSelectedDeal(deal);
-    setDetailOpen(true);
-  }
-
   async function handleUpdate(id: string, input: UpdateDealInput) {
     try {
       const deal = await updateDeal(id, input);
@@ -217,7 +211,6 @@ export function CrmShell() {
             {error ? <p className="crm-error">{error}</p> : null}
           </div>
           <div className="crm-header-actions">
-            <Link href="/all-platform/crm/analytics" className="crm-secondary-button">Phân tích CRM</Link>
             <div className="crm-segment">
               <button type="button" className={`crm-segment-button ${viewMode === 'kanban' ? 'crm-segment-button--active' : ''}`} onClick={() => setViewMode('kanban')}>
                 <LayoutGrid className="crm-button-icon" /> Kanban
@@ -226,6 +219,14 @@ export function CrmShell() {
                 <TableIcon className="crm-button-icon" /> Bảng
               </button>
             </div>
+            <button
+              type="button"
+              className="crm-secondary-button"
+              disabled={loading || saving}
+              onClick={() => setQuoteModal({ open: true, deal: null })}
+            >
+              <FileText className="crm-button-icon" /> Tạo báo giá
+            </button>
             <button type="button" className="crm-primary-button" disabled={loading || saving} onClick={() => setCreateOpen(true)}>
               <Plus className="crm-button-icon" /> Thêm deal
             </button>
@@ -324,6 +325,7 @@ export function CrmShell() {
               loading={loading}
               onCardClick={openDetail}
               onContractClick={setContractDeal}
+              onCreateQuote={deal => setQuoteModal({ open: true, deal })}
               onRequestMove={(deal, toStage) => setStageData({ deal, toStage })}
             />
           ) : (
@@ -343,6 +345,7 @@ export function CrmShell() {
         onEdit={setEditingDeal}
         onDelete={handleDelete}
         onUpdateContractStatus={updateContractStatus}
+        onCreateQuote={deal => setQuoteModal({ open: true, deal })}
       />
       <StageModal
         open={Boolean(stageData)}
@@ -360,8 +363,32 @@ export function CrmShell() {
         onClose={() => setReviewData(null)}
         onSubmit={() => undefined}
       />
-      <DealQuoteWizard open={createOpen} agents={agents} onClose={() => setCreateOpen(false)} onCreated={handleWizardCreated} />
-      <DealFormModal open={Boolean(editingDeal)} deal={editingDeal} loading={saving} agents={agents} onClose={() => setEditingDeal(null)} onCreate={handleCreate} onUpdate={handleUpdate} />
+      <CreateQuoteModal
+        open={quoteModal.open}
+        deals={deals}
+        agents={agents}
+        initialDeal={quoteModal.deal}
+        onClose={() => setQuoteModal({ open: false, deal: null })}
+        onCreated={async quote => {
+          // Quote tạo xong đã gắn deal_id (nếu có) ở backend rồi, nhưng danh sách
+          // deal trên board vẫn là bản cũ trong state — phải load lại thì card mới
+          // thấy quote vừa tạo (deal.quote), không thì cứ tưởng chưa tạo được gì.
+          await loadDeals();
+          setToast(`Đã tạo báo giá ${quote.quoteNumber}.`);
+        }}
+      />
+      <DealFormModal
+        open={createOpen || Boolean(editingDeal)}
+        deal={editingDeal}
+        loading={saving}
+        agents={agents}
+        onClose={() => {
+          setCreateOpen(false);
+          setEditingDeal(null);
+        }}
+        onCreate={handleCreate}
+        onUpdate={handleUpdate}
+      />
       <ContractDetailModal deal={contractDeal} open={Boolean(contractDeal)} onClose={() => setContractDeal(null)} />
     </div>
   );

@@ -30,6 +30,7 @@ type DealCardProps = {
   terminal?: boolean;
   onClick: (deal: Deal) => void;
   onContractClick: (deal: Deal) => void;
+  onCreateQuote?: (deal: Deal) => void;
   onDragStart?: (event: React.DragEvent, deal: Deal) => void;
 };
 
@@ -69,7 +70,7 @@ function isPaymentDueWarning(deal: Deal) {
   return due.getTime() <= Date.now();
 }
 
-export function DealCard({ deal, terminal, onClick, onDragStart }: DealCardProps) {
+export function DealCard({ deal, terminal, onClick, onCreateQuote, onDragStart }: DealCardProps) {
   const value = Number(deal.quote?.totalAmount || deal.estimatedBudget || deal.lifetimeValue || 0);
   const contractUrl = getContractUrl(deal);
   const contractLabel = getContractLabel(deal) || (contractUrl ? 'Mở link' : '');
@@ -131,7 +132,7 @@ export function DealCard({ deal, terminal, onClick, onDragStart }: DealCardProps
         ) : null}
       </div>
 
-      {contactActions.length ? (
+      {contactActions.length || (onCreateQuote && !deal.quote) ? (
         <div className="crm-contact-actions">
           {contactActions.map(action => {
             const Icon = action.icon;
@@ -149,6 +150,19 @@ export function DealCard({ deal, terminal, onClick, onDragStart }: DealCardProps
               </a>
             );
           })}
+          {onCreateQuote && !deal.quote ? (
+            <button
+              type="button"
+              title="Tạo báo giá cho deal này"
+              className="crm-contact-action crm-contact-action--quote"
+              onClick={event => {
+                event.stopPropagation();
+                onCreateQuote(deal);
+              }}
+            >
+              <FileText className="crm-line-icon" />
+            </button>
+          ) : null}
         </div>
       ) : null}
 

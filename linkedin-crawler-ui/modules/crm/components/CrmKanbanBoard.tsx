@@ -11,6 +11,7 @@ type Props = {
   loading?: boolean;
   onCardClick: (deal: Deal) => void;
   onContractClick: (deal: Deal) => void;
+  onCreateQuote?: (deal: Deal) => void;
   onRequestMove: (deal: Deal, toStage: DealStage) => void;
 };
 
@@ -39,7 +40,7 @@ const terminalPalette = {
   },
 } satisfies Record<TerminalStage, { className: string; icon: typeof CheckCircle2; resultLabel: string; helper: string }>;
 
-export function CrmKanbanBoard({ deals, loading, onCardClick, onContractClick, onRequestMove }: Props) {
+export function CrmKanbanBoard({ deals, loading, onCardClick, onContractClick, onCreateQuote, onRequestMove }: Props) {
   const [dragOverStage, setDragOverStage] = useState<DealStage | null>(null);
   const grouped = useMemo(() => {
     const out = Object.fromEntries(
@@ -120,7 +121,7 @@ export function CrmKanbanBoard({ deals, loading, onCardClick, onContractClick, o
                 <div className="crm-stage-body">
                   {!grouped[stage].length ? <div className="crm-empty-dropzone">Kéo deal vào đây</div> : null}
                   {grouped[stage].map(deal => (
-                    <DealCard key={deal.id} deal={deal} onClick={onCardClick} onContractClick={onContractClick} onDragStart={onDragStart} />
+                    <DealCard key={deal.id} deal={deal} onClick={onCardClick} onContractClick={onContractClick} onCreateQuote={onCreateQuote} onDragStart={onDragStart} />
                   ))}
                 </div>
               </div>
@@ -195,7 +196,7 @@ export function CrmKanbanBoard({ deals, loading, onCardClick, onContractClick, o
               <div className="crm-terminal-card-list">
                 {!grouped[stage].length ? <div className="crm-terminal-empty">Kéo deal vào đây</div> : null}
                 {grouped[stage].map(deal => (
-                  <DealCard key={deal.id} deal={deal} terminal onClick={onCardClick} onContractClick={onContractClick} onDragStart={onDragStart} />
+                  <DealCard key={deal.id} deal={deal} terminal onClick={onCardClick} onContractClick={onContractClick} onCreateQuote={onCreateQuote} onDragStart={onDragStart} />
                 ))}
               </div>
             </div>

@@ -155,6 +155,14 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
     },
     {
       type: "item",
+      id: "crm-analytics",
+      href: "/all-platform/crm/analytics",
+      icon: "monitoring",
+      label: "Phân tích CRM",
+      matchStartsWith: ["/all-platform/crm/analytics"],
+    },
+    {
+      type: "item",
       id: "quotes",
       href: "/all-platform/quotes",
       icon: "request_quote",

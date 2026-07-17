@@ -42,6 +42,7 @@ type Props = {
   onEdit: (deal: Deal) => void;
   onDelete: (deal: Deal) => void;
   onUpdateContractStatus: (deal: Deal, status: ContractStatus) => void;
+  onCreateQuote: (deal: Deal) => void;
 };
 
 function tel(value?: string) {
@@ -57,6 +58,7 @@ export function DetailDrawer({
   onEdit,
   onDelete,
   onUpdateContractStatus,
+  onCreateQuote,
 }: Props) {
   if (!open || !deal) return null;
   const stageMeta = DEAL_STAGE_META[deal.stage];
@@ -189,7 +191,14 @@ export function DetailDrawer({
           </section>
 
           <section className="crm-quotes-section">
-            <h3 className="crm-section-title">BÁO GIÁ KHÁCH HÀNG</h3>
+            <div className="crm-section-head-row">
+              <h3 className="crm-section-title">BÁO GIÁ KHÁCH HÀNG</h3>
+              {!deal.quote ? (
+                <button type="button" className="crm-secondary-inline" onClick={() => onCreateQuote(deal)}>
+                  Tạo báo giá cho deal này
+                </button>
+              ) : null}
+            </div>
             {deal.quote ? (
               <article className="crm-quote-row">
                 <div className="crm-quote-row-main">
