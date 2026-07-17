@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { MaterialIcon } from "@/components/ui";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { adminDashboardService } from "@/services/all-platform.service";
@@ -152,12 +153,28 @@ export default function AdminDashboardPage() {
       <div className="flex items-start gap-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-primary">
         <MaterialIcon name="warning" className="text-xl shrink-0" />
 
-        <div className="text-sm">
-          Cảnh báo hệ thống:
-          <span className="ml-1 font-bold">
-            Đã phát hiện 3 nhóm bị khóa và 1 tài khoản seed bị hạn chế tương
-            tác. Cần rà soát và khắc phục ngay!
-          </span>
+        <div className="flex flex-1 flex-wrap items-center justify-between gap-3 text-sm">
+          <div>
+            Cảnh báo hệ thống:
+            <span className="ml-1 font-bold">
+              Đã phát hiện 3 nhóm bị khóa và 1 tài khoản seed bị hạn chế tương
+              tác. Cần rà soát và khắc phục ngay!
+            </span>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <Link
+              href="/all-platform/quan-ly-nhom"
+              className="rounded-lg border border-primary/30 bg-white px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/5"
+            >
+              Xem nhóm bị khóa
+            </Link>
+            <Link
+              href="/all-platform/quan-ly-tai-khoan"
+              className="rounded-lg border border-primary/30 bg-white px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/5"
+            >
+              Xem tài khoản hạn chế
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -176,7 +193,6 @@ export default function AdminDashboardPage() {
             data={teamDailyTrend}
             isLoading={loadingTeamTrend}
           />
-          <AdminKpiHistoryTable />
           <AdminUnassignedPosts />
         </div>
 
@@ -187,6 +203,8 @@ export default function AdminDashboardPage() {
           />
         </div>
       </div>
+
+      <AdminKpiHistoryTable />
 
       <AdminKpiPerformanceChart
         data={kpiPerformance}

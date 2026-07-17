@@ -683,6 +683,14 @@ export function AllPlatformSidebar({
                 <MaterialIcon name="notifications" className="text-[18px]" />
               </button>
             ) : null}
+            <button
+              type="button"
+              onClick={() => void handleLogout()}
+              title="Đăng xuất"
+              className="relative rounded-lg p-1.5 text-on-surface-variant outline-none transition hover:bg-red-50 hover:text-red-600 focus-visible:ring-2 focus-visible:ring-[var(--color-markee-primary)]/40"
+            >
+              <MaterialIcon name="logout" className="text-[18px]" />
+            </button>
           </div>
         </div>
       </aside>

@@ -9,6 +9,23 @@ function normalize(value: string) {
   return value.trim().toLowerCase();
 }
 
+/** 1 khách có thể đứng tên nhiều deal (mỗi lần tạo báo giá độc lập lại ra 1 deal
+ * mới) — không có bảng khách hàng riêng nên phải tự gộp lại theo SĐT/email/tên,
+ * không thì search ra cùng 1 khách lặp lại N lần (N = số deal của khách đó). */
+function dedupeByCustomer(matches: Deal[]): Array<Deal & { dealCount: number }> {
+  const byKey = new Map<string, Deal & { dealCount: number }>();
+  for (const deal of matches) {
+    const key = normalize(deal.phone || '') || normalize(deal.email || '') || normalize(deal.customerName);
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, { ...deal, dealCount: 1 });
+    } else {
+      existing.dealCount += 1;
+    }
+  }
+  return [...byKey.values()];
+}
+
 export function SelectCustomerStep({
   deals,
   customer,
@@ -28,11 +45,10 @@ export function SelectCustomerStep({
   const searchResults = useMemo(() => {
     const q = normalize(search);
     if (!q) return [];
-    return deals
-      .filter(deal =>
-        [deal.customerName, deal.companyName, deal.phone, deal.email].some(value => normalize(String(value || '')).includes(q))
-      )
-      .slice(0, 8);
+    const matches = deals.filter(deal =>
+      [deal.customerName, deal.companyName, deal.phone, deal.email].some(value => normalize(String(value || '')).includes(q))
+    );
+    return dedupeByCustomer(matches).slice(0, 8);
   }, [deals, search]);
 
   function pickExistingCustomer(deal: Deal) {
@@ -79,6 +95,7 @@ export function SelectCustomerStep({
                 placeholder="Tìm theo tên, SĐT, email, công ty..."
                 value={search}
                 onChange={event => setSearch(event.target.value)}
+                autoComplete="off"
               />
               {search.trim() ? (
                 <div className="crm-quote-customer-results">
@@ -92,6 +109,7 @@ export function SelectCustomerStep({
                           <b>{deal.customerName}</b>
                           {deal.companyName ? ` · ${deal.companyName}` : ''}
                           {deal.phone ? ` · ${deal.phone}` : ''}
+                          {deal.dealCount > 1 ? ` · ${deal.dealCount} deal` : ''}
                         </span>
                       </button>
                     ))
