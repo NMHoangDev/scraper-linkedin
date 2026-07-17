@@ -202,6 +202,11 @@ def kpi_get_all(payload: GetAllKpiRequest, user: dict = Depends(get_current_user
         return BaseResponse(success=False, message=str(e))
 
 
+class TeamKpiHistoryRequest(BaseModel):
+    leader_email: Optional[str] = Field(None, description="Lọc theo leader. Bỏ trống = admin (tất cả team).")
+    weeks: int = Field(4, ge=1, le=12, description="Số tuần gần nhất cần lấy (mặc định 4).")
+
+
 @router.post("/team-history-v2")
 def team_kpi_history_v2(payload: TeamKpiHistoryRequest, user: dict = Depends(get_current_user)) -> BaseResponse:
     """Phase 4 (admin perf) — phiên bản tối ưu của /team-history.
@@ -953,11 +958,6 @@ def get_verified_fb_inbox_ids(payload: GetVerifiedConvIdsRequest, user: dict = D
     except Exception as e:
         logger.error(f"fb-inbox-verified-ids error: {e}")
         return BaseResponse(success=False, message=str(e))
-
-
-class TeamKpiHistoryRequest(BaseModel):
-    leader_email: Optional[str] = Field(None, description="Lọc theo leader. Bỏ trống = admin (tất cả team).")
-    weeks: int = Field(4, ge=1, le=12, description="Số tuần gần nhất cần lấy (mặc định 4).")
 
 
 @router.post("/team-history")

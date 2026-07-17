@@ -92,6 +92,14 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
     },
     {
       type: "item",
+      id: "crawl-queue-monitor",
+      href: "/all-platform/giam-sat-hang-doi",
+      icon: "monitoring",
+      label: "Giám sát hàng đợi cào",
+      matchStartsWith: ["/all-platform/giam-sat-hang-doi"],
+    },
+    {
+      type: "item",
       id: "groups",
       href: "/all-platform/quan-ly-nhom",
       icon: "folder",

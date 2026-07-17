@@ -16,6 +16,7 @@ from pydantic import BaseModel, model_validator
 from app.core.supabase_client import get_supabase_client
 from app.modules.all_platform.websocket import manager
 from app.modules.all_platform.services.supabase_facebook_crawl_service import parse_facebook_time
+from app.modules.all_platform.services import supabase_crawl_queue_service as queue_service
 
 # Reuse facebook keyword picker logic
 from app.modules.facebook.src.modules.facebook.services.facebook_scraper import (
@@ -57,6 +58,11 @@ class ExtensionCrawlRequest(BaseModel):
     # Optional keyword-based picking (sent by extension)
     keywords: Optional[List[str]] = None
     post_limit: Optional[int] = None
+
+    # Định danh job/worker khi bài viết đến từ hàng đợi multi-VPS (không bắt buộc,
+    # extension cũ/luồng thủ công không gửi field này vẫn hoạt động bình thường).
+    job_id: Optional[str] = None
+    worker_id: Optional[str] = None
 
     @model_validator(mode="before")
     @classmethod
@@ -424,6 +430,17 @@ def sync_process_and_save_posts_db(payload: ExtensionCrawlRequest, legacy: bool)
 async def process_and_save_posts(payload: ExtensionCrawlRequest, event_name: str, legacy: bool = False):
     # Offload sync Supabase DB calls to a separate thread to prevent blocking Uvicorn Asyncio EventLoop
     inserted_count, inserted_post_urls = await asyncio.to_thread(sync_process_and_save_posts_db, payload, legacy)
+
+    if payload.job_id:
+        try:
+            queue_service.complete_job(
+                payload.job_id,
+                success=True,
+                worker_id=payload.worker_id,
+                result_count=inserted_count,
+            )
+        except Exception as e:
+            logger.warning(f"[CRAWL-QUEUE] Không đóng được job {payload.job_id}: {e}")
 
     # Realtime WebSocket Broadcast
     msg_prefix = "Legacy: " if legacy else ""

@@ -26,9 +26,12 @@ from app.modules.all_platform.routers.crawl_linkedin import crawl_linkedin_route
 from app.modules.all_platform.routers.linkedin_legacy import router as linkedin_legacy_router
 from app.modules.all_platform.routers.crawl_facebook import crawl_facebook_router
 from app.modules.all_platform.routers.extension_crawl import router as extension_crawl_router
+from app.modules.all_platform.routers.crawl_queue import router as crawl_queue_router
+from app.modules.all_platform.routers.fb_account_pool import router as fb_account_pool_router
 from app.modules.all_platform.routers.fb import router as fb_automation_router
 from app.modules.all_platform.routers.websocket import router as websocket_router
 from app.modules.all_platform.routers.fb_inbox_accounts import router as fb_inbox_accounts_router
+from app.modules.all_platform.routers.crawl_fb_dashboard import router as crawl_fb_dashboard_router
 from app.modules.all_platform.routers.customer_lead import router as customer_lead_router
 from app.modules.all_platform.routers.quote import quote_forms_router, quotes_router
 from app.modules.all_platform.routers.scheduled_comments import router as scheduled_comments_router
@@ -67,9 +70,24 @@ all_platform_router.include_router(
     tags=["All-Platform Facebook Crawl"],
 )
 all_platform_router.include_router(
+    crawl_fb_dashboard_router,
+    prefix="/facebook",
+    tags=["All-Platform Facebook Crawl Queue Dashboard"],
+)
+all_platform_router.include_router(
     extension_crawl_router,
     prefix="/extension",
     tags=["All-Platform Extension Crawl"],
+)
+all_platform_router.include_router(
+    crawl_queue_router,
+    prefix="/extension/queue",
+    tags=["All-Platform Extension Crawl Queue"],
+)
+all_platform_router.include_router(
+    fb_account_pool_router,
+    prefix="/extension/accounts",
+    tags=["All-Platform Extension FB Account Pool"],
 )
 all_platform_router.include_router(
     fb_automation_router,
