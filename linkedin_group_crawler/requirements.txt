@@ -25,5 +25,6 @@ bcrypt
 python-jose[cryptography]
 loguru
 asyncssh
-google-generativeai
+google-genai
+
 

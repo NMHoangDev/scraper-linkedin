@@ -117,7 +117,17 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       label: "Post feed",
       matchStartsWith: ["/all-platform/post-feed"],
     },
+    {
+      type: "item",
+      id: "internal-engagement",
+      href: "/all-platform/internal-engagement",
+      icon: "chat_bubble",
+
+      label: "Tương tác nội bộ",
+      matchStartsWith: ["/all-platform/internal-engagement"],
+    },
   ];
+
 
   const channelItems: NavLeafItem[] = [
     {
@@ -347,11 +357,8 @@ function SidebarGroup({
   const hasActiveChild = entry.items.some((item) => item.href !== homeHref && isLeafActive(pathname, item));
   const [isOpen, setIsOpen] = useState(hasActiveChild);
 
-  useEffect(() => {
-    if (hasActiveChild) setIsOpen(true);
-  }, [hasActiveChild]);
-
   if (collapsed) {
+
     return (
       <SidebarLink
         item={{
