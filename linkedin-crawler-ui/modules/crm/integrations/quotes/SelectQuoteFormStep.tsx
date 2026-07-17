@@ -11,13 +11,15 @@ export function SelectQuoteFormStep({
   onSelect,
   onSkip,
   skipping,
+  hideSkip,
 }: {
   selectedFormId?: string;
   previewForm?: QuoteForm | null;
   onPreview: (form: QuoteForm) => void;
   onSelect: (form: QuoteForm) => void;
-  onSkip: () => void;
+  onSkip?: () => void;
   skipping?: boolean;
+  hideSkip?: boolean;
 }) {
   const [forms, setForms] = useState<QuoteForm[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,9 +50,11 @@ export function SelectQuoteFormStep({
           <h3 className="crm-wizard-form-title">Chọn mẫu báo giá</h3>
           <p className="crm-wizard-form-description">Hãy chọn một mẫu thiết kế báo giá để áp dụng.</p>
         </div>
-        <button type="button" className="crm-secondary-inline" disabled={skipping} onClick={onSkip}>
-          Bỏ qua báo giá và chỉ tạo deal
-        </button>
+        {hideSkip ? null : (
+          <button type="button" className="crm-secondary-inline" disabled={skipping} onClick={onSkip}>
+            Bỏ qua báo giá và chỉ tạo deal
+          </button>
+        )}
       </div>
 
       {error ? <p className="crm-error">{error}</p> : null}
