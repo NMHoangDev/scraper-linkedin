@@ -14,7 +14,7 @@ export default function KpiLeaderboardPage() {
   useEffect(() => {
     if (isLoading) return;
 
-    if (user?.role === "admin" || user?.role === "leader") {
+    if (user?.role === "admin") {
       setAuthorized(true);
     } else {
       router.replace("/all-platform/post-feed");

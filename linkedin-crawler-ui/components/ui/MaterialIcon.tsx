@@ -117,7 +117,13 @@ export type MaterialSymbolName =
   | "warning_amber"
   | "navigate_next"
   | "keyboard_arrow_down"
-  | "request_quote";
+  | "request_quote"
+  | "account_balance_wallet"
+  | "military_tech"
+  | "card_giftcard"
+  | "shield"
+  | "paid"
+  | "track_changes";
 
 export interface MaterialIconProps {
   name: MaterialSymbolName;

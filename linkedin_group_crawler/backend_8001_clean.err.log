@@ -1,0 +1,81 @@
+INFO:     Will watch for changes in these directories: ['C:\\Code\\scraper-linkedin\\linkedin_group_crawler']
+C:\Code\scraper-linkedin\linkedin_group_crawler\app\modules\all_platform\schemas\quote.py:10: UserWarning: Field name "schema_json" in "QuoteFormCreateRequest" shadows an attribute in parent "BaseModel"
+  class QuoteFormCreateRequest(BaseModel):
+C:\Code\scraper-linkedin\linkedin_group_crawler\app\modules\all_platform\schemas\quote.py:19: UserWarning: Field name "schema_json" in "QuoteFormUpdateRequest" shadows an attribute in parent "BaseModel"
+  class QuoteFormUpdateRequest(BaseModel):
+INFO:     Uvicorn running on http://127.0.0.1:8001 (Press CTRL+C to quit)
+INFO:     Started reloader process [28872] using WatchFiles
+C:\Code\scraper-linkedin\linkedin_group_crawler\app\modules\all_platform\schemas\quote.py:10: UserWarning: Field name "schema_json" in "QuoteFormCreateRequest" shadows an attribute in parent "BaseModel"
+  class QuoteFormCreateRequest(BaseModel):
+C:\Code\scraper-linkedin\linkedin_group_crawler\app\modules\all_platform\schemas\quote.py:19: UserWarning: Field name "schema_json" in "QuoteFormUpdateRequest" shadows an attribute in parent "BaseModel"
+  class QuoteFormUpdateRequest(BaseModel):
+INFO:     Started server process [22368]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:64808 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:53337 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:62519 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:61974 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:65112 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:57078 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:52380 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:61649 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+WARNING:  WatchFiles detected changes in 'app\modules\all_platform\services\supabase_kpi_reward_service.py'. Reloading...
+INFO:     connection closed
+INFO:     127.0.0.1:62894 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:50777 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:61119 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:58074 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:63194 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:61200 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:61900 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:64661 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:61241 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:49667 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:62563 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+C:\Users\Asus\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:252: UserWarning: Duplicate Operation ID mark_seeding_api_all_platform_linkedin_seeding_mark_save_post for function mark_seeding at C:\Code\scraper-linkedin\linkedin_group_crawler\app\modules\linkedin\router.py
+  warnings.warn(message, stacklevel=1)
+C:\Users\Asus\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:252: UserWarning: Duplicate Operation ID proxy_zalo_api_all_platform_zalo__path__get for function proxy_zalo at C:\Code\scraper-linkedin\linkedin_group_crawler\app\modules\all_platform\zalo\api\proxy.py
+  warnings.warn(message, stacklevel=1)
+INFO:     127.0.0.1:54582 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:61542 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open

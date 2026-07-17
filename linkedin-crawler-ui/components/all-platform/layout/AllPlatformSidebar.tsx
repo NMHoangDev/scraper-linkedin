@@ -17,6 +17,10 @@ export interface NavLeafItem {
   label: string;
   matchStartsWith?: string[];
   badge?: number;
+  // Chi active dung khi pathname == href, khong prefix-match sang cac trang con
+  // (vd "Teams" va "Rule KPI & Thuong" cung nam duoi /admin/teams-management/... -
+  // neu khong co co nay, ca 2 muc sidebar se sang mau cung luc).
+  exactMatch?: boolean;
 }
 
 export interface NavGroupItem {
@@ -45,6 +49,7 @@ function pathMatchesPrefix(pathname: string, prefix: string): boolean {
 }
 
 export function isLeafActive(pathname: string, item: NavLeafItem) {
+  if (item.exactMatch) return pathname === item.href;
   if (pathname === item.href) return true;
   if (item.matchStartsWith?.some((prefix) => pathMatchesPrefix(pathname, prefix))) return true;
   return pathMatchesPrefix(pathname, item.href) && item.href !== "/all-platform/post-feed";
@@ -80,16 +85,36 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       href: teamHref,
       icon: "groups",
       label: "Teams",
-      matchStartsWith: [teamHref],
+      exactMatch: true,
     },
-    {
-      type: "item",
-      id: "kpi-leaderboard",
-      href: "/all-platform/kpi-leaderboard",
-      icon: "trending_up",
-      label: "KPI & Leaderboard",
-      matchStartsWith: ["/all-platform/kpi-leaderboard"],
-    },
+    ...(isAdmin
+      ? ([
+          {
+            type: "item",
+            id: "kpi-rules",
+            href: "/all-platform/admin/teams-management/kpi-rules",
+            icon: "tune",
+            label: "Rule KPI & Thưởng",
+            matchStartsWith: ["/all-platform/admin/teams-management/kpi-rules"],
+          },
+          {
+            type: "item",
+            id: "kpi-summary",
+            href: "/all-platform/admin/teams-management/kpi-summary",
+            icon: "monitoring",
+            label: "Tổng hợp KPI & Thưởng",
+            matchStartsWith: ["/all-platform/admin/teams-management/kpi-summary"],
+          },
+          {
+            type: "item",
+            id: "kpi-leaderboard",
+            href: "/all-platform/kpi-leaderboard",
+            icon: "trending_up",
+            label: "KPI & Leaderboard",
+            matchStartsWith: ["/all-platform/kpi-leaderboard"],
+          },
+        ] as NavLeafItem[])
+      : []),
     {
       type: "item",
       id: "accounts",
@@ -173,9 +198,17 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       type: "item",
       id: "quotes",
       href: "/all-platform/quotes",
-      icon: "request_quote",
+      icon: "star",
       label: "Mẫu báo giá",
       matchStartsWith: ["/all-platform/quotes"],
+    },
+    {
+      type: "item",
+      id: "sales-assets",
+      href: "/all-platform/sales-assets",
+      icon: "campaign",
+      label: "Tài liệu bán hàng",
+      matchStartsWith: ["/all-platform/sales-assets"],
     },
   ];
 

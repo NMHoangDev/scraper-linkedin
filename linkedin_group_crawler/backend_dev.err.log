@@ -1,0 +1,149 @@
+INFO:     Will watch for changes in these directories: ['C:\\Code\\scraper-linkedin\\linkedin_group_crawler']
+C:\Code\scraper-linkedin\linkedin_group_crawler\app\modules\all_platform\schemas\quote.py:10: UserWarning: Field name "schema_json" in "QuoteFormCreateRequest" shadows an attribute in parent "BaseModel"
+  class QuoteFormCreateRequest(BaseModel):
+C:\Code\scraper-linkedin\linkedin_group_crawler\app\modules\all_platform\schemas\quote.py:19: UserWarning: Field name "schema_json" in "QuoteFormUpdateRequest" shadows an attribute in parent "BaseModel"
+  class QuoteFormUpdateRequest(BaseModel):
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+INFO:     Started reloader process [7004] using WatchFiles
+C:\Code\scraper-linkedin\linkedin_group_crawler\app\modules\all_platform\schemas\quote.py:10: UserWarning: Field name "schema_json" in "QuoteFormCreateRequest" shadows an attribute in parent "BaseModel"
+  class QuoteFormCreateRequest(BaseModel):
+C:\Code\scraper-linkedin\linkedin_group_crawler\app\modules\all_platform\schemas\quote.py:19: UserWarning: Field name "schema_json" in "QuoteFormUpdateRequest" shadows an attribute in parent "BaseModel"
+  class QuoteFormUpdateRequest(BaseModel):
+INFO:     Started server process [6380]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:50916 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:64319 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:56395 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:57289 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:60757 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:61706 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:58096 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:51624 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:63304 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:54398 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:59394 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:55642 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:64072 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:50586 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:50060 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:60967 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:55142 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:56263 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:52081 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:59632 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:52370 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:50369 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:63527 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:63836 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:58926 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:58661 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+WARNING:  WatchFiles detected changes in 'scripts\create_leader_account.py'. Reloading...
+INFO:     connection closed
+INFO:     127.0.0.1:59649 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:59039 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:49666 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:49759 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:63648 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:57086 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:55643 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:51810 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:63620 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:58671 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:58584 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:58577 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:52408 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:51604 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+[32m2026-07-17 22:25:38.213[0m | [1mINFO    [0m | [36mapp.modules.all_platform.routers.kpi[0m:[36mget_verified_fb_inbox_ids[0m:[36m943[0m - [1mfb-inbox-verified-ids: leader=admin.demo@markeeai.com, members=1, confirmed=0, pending=0[0m
+[32m2026-07-17 22:25:38.372[0m | [1mINFO    [0m | [36mapp.modules.all_platform.routers.kpi[0m:[36mget_verified_fb_inbox_ids[0m:[36m943[0m - [1mfb-inbox-verified-ids: leader=admin.demo@markeeai.com, members=1, confirmed=0, pending=0[0m
+INFO:     connection closed
+INFO:     127.0.0.1:57683 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+[32m2026-07-17 22:56:39.711[0m | [1mINFO    [0m | [36mapp.modules.all_platform.routers.kpi[0m:[36mget_verified_fb_inbox_ids[0m:[36m943[0m - [1mfb-inbox-verified-ids: leader=admin.demo@markeeai.com, members=1, confirmed=0, pending=0[0m
+[32m2026-07-17 22:56:39.760[0m | [1mINFO    [0m | [36mapp.modules.all_platform.routers.kpi[0m:[36mget_verified_fb_inbox_ids[0m:[36m943[0m - [1mfb-inbox-verified-ids: leader=admin.demo@markeeai.com, members=1, confirmed=0, pending=0[0m
+INFO:     connection closed
+INFO:     127.0.0.1:52661 - "WebSocket /api/all-platform/ws/crawl-status" [accepted]
+INFO:     connection open
+C:\Users\Asus\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:252: UserWarning: Duplicate Operation ID mark_seeding_api_all_platform_linkedin_seeding_mark_save_post for function mark_seeding at C:\Code\scraper-linkedin\linkedin_group_crawler\app\modules\linkedin\router.py
+  warnings.warn(message, stacklevel=1)
+C:\Users\Asus\AppData\Roaming\Python\Python314\site-packages\fastapi\openapi\utils.py:252: UserWarning: Duplicate Operation ID proxy_zalo_api_all_platform_zalo__path__options for function proxy_zalo at C:\Code\scraper-linkedin\linkedin_group_crawler\app\modules\all_platform\zalo\api\proxy.py
+  warnings.warn(message, stacklevel=1)
+INFO:     connection closed

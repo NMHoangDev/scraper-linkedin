@@ -17,6 +17,7 @@ import {
   Activity,
   Settings,
   ShieldCheck,
+  ClipboardList,
   type LucideIcon,
 } from "lucide-react";
 import type { MaterialSymbolName } from "@/components/ui";
@@ -44,6 +45,7 @@ const MAP: Partial<Record<MaterialSymbolName, LucideIcon>> = {
   monitoring: Activity,
   settings: Settings,
   verified_user: ShieldCheck,
+  assignment: ClipboardList,
 };
 
 export function materialToLucideIcon(name: MaterialSymbolName): LucideIcon {

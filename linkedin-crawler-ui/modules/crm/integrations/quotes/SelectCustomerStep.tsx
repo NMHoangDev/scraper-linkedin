@@ -74,7 +74,7 @@ export function SelectCustomerStep({
       <div className="crm-wizard-section-head">
         <div>
           <h3 className="crm-wizard-form-title">Khách hàng</h3>
-          <p className="crm-wizard-form-description">Chọn khách hàng đã có trên hệ thống hoặc thêm khách mới.</p>
+          <p className="crm-wizard-form-description">Chọn khách hàng đã có trên hệ thống.</p>
         </div>
       </div>
 
@@ -114,9 +114,6 @@ export function SelectCustomerStep({
                       </button>
                     ))
                   )}
-                  <button type="button" className="crm-quote-customer-option crm-quote-customer-option--new" onClick={startNewCustomer}>
-                    + Thêm khách hàng mới
-                  </button>
                 </div>
               ) : null}
             </div>

@@ -14,6 +14,7 @@ import { allPlatformPostsDeleteService } from "@/services/all-platform-posts-del
 import { PostDetailModal } from "@/components/all-platform/components/post-detail-modal";
 import { VerifyAccountModal } from "@/components/all-platform/components/verify-account-modal";
 import { KpiProgressCard } from "@/components/all-platform/components/kpi-progress-card";
+import { MemberKpiRewardOverview } from "@/components/all-platform/kpi-rewards/KpiRewardSections";
 import { BulkCommentLauncher } from "@/components/all-platform/components/bulk-comment-launcher";
 import { SeedingActivityPanel } from "@/components/all-platform/feed/SeedingActivityPanel";
 import { ScheduleCommentModal } from "@/components/all-platform/feed/ScheduleCommentModal";
@@ -741,6 +742,9 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
           email={CURRENT_USER_EMAIL}
           type="comment"
         />
+      )}
+      {CURRENT_USER_EMAIL && user?.role === "member" && (
+        <MemberKpiRewardOverview />
       )}
       {/* Phase 6: "Da seeding ai" - panel cho admin/leader.
           Dat sau KpiProgressCard, truoc FilterBar de leader/admin
