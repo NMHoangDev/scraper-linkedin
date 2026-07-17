@@ -31,7 +31,7 @@ export default function LeaderDashboardPage() {
   }
 
   return (
-    <div className="p-3 sm:p-6">
+    <div className="p-2 sm:p-3">
       <LeaderDashboardContent />
     </div>
   );
