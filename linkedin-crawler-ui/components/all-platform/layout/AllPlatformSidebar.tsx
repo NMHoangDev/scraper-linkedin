@@ -84,6 +84,14 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
     },
     {
       type: "item",
+      id: "kpi-leaderboard",
+      href: "/all-platform/kpi-leaderboard",
+      icon: "trending_up",
+      label: "KPI & Leaderboard",
+      matchStartsWith: ["/all-platform/kpi-leaderboard"],
+    },
+    {
+      type: "item",
       id: "accounts",
       href: "/all-platform/quan-ly-tai-khoan",
       icon: "manage_accounts",
