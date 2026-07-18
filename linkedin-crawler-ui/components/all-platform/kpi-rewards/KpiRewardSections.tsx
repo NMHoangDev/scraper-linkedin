@@ -8,11 +8,12 @@ import {
   kpiRewardsService,
   teamsService,
   type KpiGoalStatus,
+  type KpiRewardMemberSummary,
   type KpiRewardMetric,
   type KpiRewardRule,
   type KpiRewardRuleLog,
-  type KpiRewardStatus,
   type KpiRewardSummary,
+  type KpiRuleSource,
   type TeamRow,
 } from "@/services/all-platform.service";
 import { cn } from "@/lib/utils";
@@ -26,9 +27,10 @@ type RuleGroup = {
   defaultReward: number;
   defaultMaxRate: number;
   icon: MaterialSymbolName;
-  // 1 tong mau pastel duy nhat dung cho ca header lan subheader cua group (khong
-  // con lech mau giua 2 hang nhu truoc), chu dam cung tong de doc ro tren nen nhat.
-  sectionClass: string;
+  // Mau badge icon rieng cho tung metric - giup quet mat nhanh khi nhin ca bang
+  // (Leader ngay tra luong hay nhin luot qua nhieu dong), khong to nen ca dong/cot
+  // de tranh loe loet nhu ban thiet ke truoc.
+  badgeClass: string;
 };
 
 const RULE_GROUPS: RuleGroup[] = [
@@ -41,7 +43,7 @@ const RULE_GROUPS: RuleGroup[] = [
     defaultReward: 100000,
     defaultMaxRate: 200,
     icon: "account_balance_wallet",
-    sectionClass: "bg-emerald-50 text-emerald-800",
+    badgeClass: "bg-emerald-50 text-emerald-700",
   },
   {
     key: "lead",
@@ -52,7 +54,7 @@ const RULE_GROUPS: RuleGroup[] = [
     defaultReward: 10000,
     defaultMaxRate: 200,
     icon: "person",
-    sectionClass: "bg-violet-50 text-violet-800",
+    badgeClass: "bg-violet-50 text-violet-700",
   },
   {
     key: "inbox",
@@ -63,7 +65,7 @@ const RULE_GROUPS: RuleGroup[] = [
     defaultReward: 3000,
     defaultMaxRate: 200,
     icon: "mail",
-    sectionClass: "bg-amber-50 text-amber-800",
+    badgeClass: "bg-amber-50 text-amber-700",
   },
   {
     key: "post",
@@ -74,7 +76,7 @@ const RULE_GROUPS: RuleGroup[] = [
     defaultReward: 2000,
     defaultMaxRate: 200,
     icon: "send",
-    sectionClass: "bg-blue-50 text-blue-800",
+    badgeClass: "bg-blue-50 text-blue-700",
   },
   {
     key: "comment",
@@ -85,56 +87,15 @@ const RULE_GROUPS: RuleGroup[] = [
     defaultReward: 1000,
     defaultMaxRate: 200,
     icon: "chat_bubble",
-    sectionClass: "bg-sky-50 text-sky-800",
+    badgeClass: "bg-sky-50 text-sky-700",
   },
 ];
-
-// Chi BONUS TOTAL va LEAD co cot Nguong (%) - khop dung nghiep vu sheet goc.
-const METRIC_HAS_THRESHOLD: Record<KpiRewardMetric, boolean> = {
-  total_bonus: true,
-  lead: true,
-  inbox: false,
-  post: false,
-  comment: false,
-};
-
-function RuleGroupHeader({ group }: { group: RuleGroup }) {
-  return (
-    <div className="flex items-center justify-center gap-1.5">
-      <MaterialIcon name={group.icon} className="text-base" />
-      <span>{group.label} {group.weightLabel ? `(${group.weightLabel})` : ""}</span>
-    </div>
-  );
-}
-
-function RuleSubHeader({ icon, label }: { icon: MaterialSymbolName; label: string }) {
-  return (
-    <div className="flex flex-col items-center gap-0.5">
-      <MaterialIcon name={icon} className="text-sm opacity-70" />
-      <span>{label}</span>
-    </div>
-  );
-}
 
 function formatLogValue(field: string, value: number | null): string {
   if (value === null) return "—";
   if (field === "threshold_value" || field === "max_rate") return `${formatNumber(value)}%`;
   return formatVnd(value);
 }
-
-const STATUS_LABEL: Record<KpiRewardStatus, string> = {
-  draft: "Nháp",
-  pending: "Chờ duyệt",
-  approved: "Đang dùng",
-  rejected: "Trả lại",
-};
-
-const STATUS_TONE: Record<KpiRewardStatus, string> = {
-  draft: "bg-slate-100 text-slate-700",
-  pending: "bg-amber-50 text-amber-700",
-  approved: "bg-emerald-50 text-emerald-700",
-  rejected: "bg-rose-50 text-rose-700",
-};
 
 function splitWeek(value: string): { startDate: string; endDate: string } {
   const [startDate, endDate] = value.split("_");
@@ -198,39 +159,37 @@ function getRule(rules: KpiRewardRule[], metric: KpiRewardMetric): KpiRewardRule
   return rules.find((rule) => rule.metric === metric)!;
 }
 
-// Total Bonus = Bonus/don vi x KPI (target) duoc giao cho metric do - la muc thuong
-// DU KIEN neu team hoan thanh dung target, KHONG phai tien thuong thuc nhan (tien
-// thuc nhan tinh tu so luong THAT, o bang Ket qua KPI & tien thuong rieng). Rieng
-// nhom BONUS TOTAL la tong: Bonus co dinh + Total Bonus cua ca 4 metric con lai.
-// Khong duoc de nguoi dung nhap tay 2 truong nay - luon tinh lai theo cong thuc.
-function computeTotalBonusByMetric(
+// Cong thuc dung THU TU: tinh Max Bonus (tran) TRUOC tu rewardPerUnit x target x
+// maxRate/100, roi Total Bonus (du kien o dung target) MOI tinh SAU = min(raw, Max
+// Bonus) - dam bao Total khong bao gio vuot Max khi maxRate < 100%. Ap dung cho ca
+// Lead/Inbox/Post/Comment (truoc day Lead bi thieu cot Max Bonus). Rieng BONUS TOTAL
+// la 1 khoan thuong CO DINH (khong theo cong thuc don vi x target) nen khong co Max
+// rieng - Total Bonus cua no = Bonus co dinh + tong Total Bonus (da gioi han) cua 4
+// metric con lai. Khong duoc de nguoi dung nhap tay may truong nay - luon tinh lai.
+function computeMetricBonuses(
   rules: KpiRewardRule[],
   targetsByMetric: Record<"lead" | "inbox" | "post" | "comment", number>,
-): Record<KpiRewardMetric, number> {
-  const perMetric = { lead: 0, inbox: 0, post: 0, comment: 0 } as Record<"lead" | "inbox" | "post" | "comment", number>;
+): {
+  totalByMetric: Record<KpiRewardMetric, number>;
+  maxByMetric: Record<"lead" | "inbox" | "post" | "comment", number>;
+} {
+  const maxByMetric = {} as Record<"lead" | "inbox" | "post" | "comment", number>;
+  const totalByMetric = { lead: 0, inbox: 0, post: 0, comment: 0 } as Record<"lead" | "inbox" | "post" | "comment", number>;
   (["lead", "inbox", "post", "comment"] as const).forEach((metric) => {
     const rule = getRule(rules, metric);
-    perMetric[metric] = (rule.rewardPerUnit || 0) * (targetsByMetric[metric] || 0);
+    const raw = (rule.rewardPerUnit || 0) * (targetsByMetric[metric] || 0);
+    const maxBonus = raw * ((rule.maxRate || 200) / 100);
+    maxByMetric[metric] = maxBonus;
+    totalByMetric[metric] = Math.min(raw, maxBonus);
   });
   const flatBonus = getRule(rules, "total_bonus").rewardPerUnit || 0;
   return {
-    ...perMetric,
-    total_bonus: flatBonus + perMetric.lead + perMetric.inbox + perMetric.post + perMetric.comment,
+    totalByMetric: {
+      ...totalByMetric,
+      total_bonus: flatBonus + totalByMetric.lead + totalByMetric.inbox + totalByMetric.post + totalByMetric.comment,
+    },
+    maxByMetric,
   };
-}
-
-// Max Bonus = Total Bonus (metric) x Max Rate (vd 200% -> he so 2). Chi ap dung
-// cho Inbox/Post/Comment (khop dung sheet goc, Lead va Bonus Total khong co cot Max).
-function computeMaxBonus(totalBonus: number, maxRatePercent: number): number {
-  return totalBonus * ((maxRatePercent || 200) / 100);
-}
-
-function StatusBadge({ status }: { status: KpiRewardStatus }) {
-  return (
-    <span className={cn("inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold", STATUS_TONE[status])}>
-      {STATUS_LABEL[status]}
-    </span>
-  );
 }
 
 // Chi mau chu phan biet % / max, khong to nen o - giu giao dien tho gion nhu
@@ -242,6 +201,14 @@ const RULE_INPUT_TONES: Record<"plain" | "percent" | "max", string> = {
   max: "text-rose-700",
 };
 
+// Bo het ky tu khong phai so (giu dau "-" o dau neu co) - dung khi nguoi dung go
+// vao o tien te da co dau cham ngan cach hang nghin (vd "1.000.000" -> 1000000).
+function parseDigits(raw: string): number | null {
+  const cleaned = raw.replace(/[^\d]/g, "");
+  if (!cleaned) return null;
+  return Math.max(0, Number(cleaned) || 0);
+}
+
 function RuleInput({
   value,
   onChange,
@@ -249,6 +216,7 @@ function RuleInput({
   suffix,
   tone = "plain",
   editable = false,
+  money = false,
 }: {
   value: number | null;
   onChange: (value: number | null) => void;
@@ -256,6 +224,7 @@ function RuleInput({
   suffix?: string;
   tone?: "plain" | "percent" | "max";
   editable?: boolean;
+  money?: boolean;
 }) {
   const textClass = RULE_INPUT_TONES[tone];
   return (
@@ -265,21 +234,37 @@ function RuleInput({
         editable && !disabled ? "border-b border-slate-400" : "",
       )}
     >
-      <input
-        type="number"
-        min={0}
-        value={value ?? ""}
-        disabled={disabled}
-        onChange={(event) => {
-          const raw = event.target.value;
-          onChange(raw === "" ? null : Math.max(0, Number(raw) || 0));
-        }}
-        className={cn(
-          "min-w-0 flex-1 appearance-none bg-transparent text-right text-[11px] font-semibold outline-none disabled:cursor-default xl:text-[12px]",
-          "[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
-          textClass,
-        )}
-      />
+      {money ? (
+        <input
+          type="text"
+          inputMode="numeric"
+          maxLength={15}
+          title={value === null || value === undefined ? undefined : formatNumber(value)}
+          value={value === null || value === undefined ? "" : formatNumber(value)}
+          disabled={disabled}
+          onChange={(event) => onChange(parseDigits(event.target.value))}
+          className={cn(
+            "min-w-0 flex-1 overflow-hidden text-ellipsis appearance-none bg-transparent text-right text-[11px] font-semibold outline-none disabled:cursor-default xl:text-[12px]",
+            textClass,
+          )}
+        />
+      ) : (
+        <input
+          type="number"
+          min={0}
+          value={value ?? ""}
+          disabled={disabled}
+          onChange={(event) => {
+            const raw = event.target.value;
+            onChange(raw === "" ? null : Math.max(0, Number(raw) || 0));
+          }}
+          className={cn(
+            "min-w-0 flex-1 appearance-none bg-transparent text-right text-[11px] font-semibold outline-none disabled:cursor-default xl:text-[12px]",
+            "[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+            textClass,
+          )}
+        />
+      )}
       {suffix ? <span className={cn("ml-0.5 text-[10px] font-semibold", textClass)}>{suffix}</span> : null}
     </div>
   );
@@ -290,11 +275,15 @@ export function KpiRewardRuleTable({
   selectedWeek,
   readOnly = false,
   onChanged,
+  autoEdit = false,
 }: {
   teamId: string;
   selectedWeek: string;
   readOnly?: boolean;
   onChanged?: () => void;
+  // Bam thang vao che do sua ngay khi mo (vd tu nut but trong bang accordion cua
+  // Admin) - khong bat nguoi dung phai bam them 1 lan "Chinh sua" nua.
+  autoEdit?: boolean;
 }) {
   const { startDate, endDate } = splitWeek(selectedWeek);
   const [rules, setRules] = useState<KpiRewardRule[]>(() => defaultRules(teamId, startDate, endDate));
@@ -305,6 +294,10 @@ export function KpiRewardRuleTable({
   // vao rule dang dung cho ca team khi chi dinh xem qua.
   const [isEditing, setIsEditing] = useState(false);
   const canEdit = !readOnly && isEditing;
+  // Snapshot rules+note luc bat dau sua - bam "Huy" thi phuc hoi lai dung snapshot
+  // nay (khong goi lai API), tranh truong hop bam tat che do sua ma gia tri da go
+  // van con nguyen trong state (nhu truoc day khi chi co 1 nut toggle).
+  const [editSnapshot, setEditSnapshot] = useState<{ rules: KpiRewardRule[]; note: string } | null>(null);
   const [logs, setLogs] = useState<KpiRewardRuleLog[]>([]);
   // Nguon cua rule dang hien thi: "current" = da luu dung tuan nay, "copied" = tu dong
   // sao chep tu tuan gan nhat truoc do (chua luu cho tuan nay), "default" = chua tung
@@ -312,8 +305,6 @@ export function KpiRewardRuleTable({
   const [ruleSource, setRuleSource] = useState<"current" | "copied" | "default">("current");
   const [sourceWeek, setSourceWeek] = useState<{ start: string; end: string } | null>(null);
   const [summary, setSummary] = useState<KpiRewardSummary | null>(null);
-
-  const status = (rules.find((rule) => rule.id)?.status || "approved") as KpiRewardStatus;
 
   // Target cua ca team (gop tung thanh vien lai theo metric) - dung de tinh Total
   // Bonus/Max Bonus DU KIEN trong bang rule (khong phai tien thuong thuc nhan).
@@ -328,10 +319,10 @@ export function KpiRewardRuleTable({
     return targets;
   }, [summary, teamId]);
 
-  // Total Bonus = Bonus/don vi x target duoc giao; Max Bonus = Total Bonus x Max
-  // Rate - luon tinh lai tu rules + teamTargets, KHONG cho nhap tay 2 truong nay.
-  const totalBonusByMetric = useMemo(
-    () => computeTotalBonusByMetric(rules, teamTargets),
+  // Max Bonus (tran) tinh truoc, Total Bonus (du kien) tinh sau = min(raw, Max) -
+  // luon tinh lai tu rules + teamTargets, KHONG cho nhap tay may truong nay.
+  const { totalByMetric: totalBonusByMetric, maxByMetric } = useMemo(
+    () => computeMetricBonuses(rules, teamTargets),
     [rules, teamTargets],
   );
 
@@ -377,6 +368,29 @@ export function KpiRewardRuleTable({
     setRules((current) => current.map((rule) => (rule.metric === metric ? { ...rule, ...patch } : rule)));
   };
 
+  const startEditing = () => {
+    setEditSnapshot({ rules, note });
+    setIsEditing(true);
+  };
+
+  useEffect(() => {
+    if (!autoEdit || readOnly || isLoading || isEditing) return;
+    const timer = window.setTimeout(() => {
+      startEditing();
+    }, 0);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoEdit, isLoading]);
+
+  const cancelEditing = () => {
+    if (editSnapshot) {
+      setRules(editSnapshot.rules);
+      setNote(editSnapshot.note);
+    }
+    setEditSnapshot(null);
+    setIsEditing(false);
+  };
+
   const payloadRules = rules.map((rule) => ({
     metric: rule.metric,
     weight: Number(rule.weight || 0),
@@ -399,6 +413,7 @@ export function KpiRewardRuleTable({
       });
       if (!res.success) throw new Error(res.message || "Lưu rule thất bại");
       toast.success("Đã lưu rule KPI & thưởng đang dùng");
+      setEditSnapshot(null);
       await loadRules();
       await loadLogs();
       await loadSummary();
@@ -412,15 +427,12 @@ export function KpiRewardRuleTable({
 
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
-      <div className="flex flex-col gap-3 border-b border-border px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+      {/* Man THIET LAP - khong hien du lieu ket qua/thuc te cua thanh vien, khong
+          progress, khong trang thai dat/chua dat. Chi cau hinh + luu. */}
+      <div className="flex flex-col gap-3 border-b border-border px-5 py-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-base font-bold text-foreground">Cài đặt Bonus KPI</h2>
-            <StatusBadge status={status} />
-          </div>
-          <p className="mt-1 text-[12px] text-muted-foreground">
-            Rule hiện tại đang được dùng để tính thưởng cho team và tuần đang chọn.
-          </p>
+          <h2 className="text-base font-bold text-foreground">Rule KPI & Thưởng</h2>
+          <p className="mt-1 text-[12px] text-muted-foreground">Thiết lập quy tắc thưởng theo team và tuần</p>
           {ruleSource === "copied" && sourceWeek ? (
             <p className="mt-1 flex items-center gap-1 text-[12px] font-medium text-amber-700">
               <MaterialIcon name="content_copy" className="text-sm" />
@@ -437,21 +449,17 @@ export function KpiRewardRuleTable({
         <div className="flex items-center gap-2">
           {isLoading ? <span className="text-[12px] text-muted-foreground">Đang tải...</span> : null}
           {!readOnly ? (
-            <>
-              <button
-                type="button"
-                onClick={() => setIsEditing((current) => !current)}
-                className={cn(
-                  "flex h-9 items-center gap-1.5 rounded-lg px-3 text-[12px] font-semibold transition",
-                  isEditing
-                    ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                    : "bg-zinc-100 text-foreground hover:bg-zinc-200",
-                )}
-              >
-                <MaterialIcon name={isEditing ? "lock_reset" : "edit"} className="text-base" />
-                {isEditing ? "Đang chỉnh sửa" : "Chỉnh sửa"}
-              </button>
-              {isEditing ? (
+            isEditing ? (
+              <>
+                <button
+                  type="button"
+                  disabled={isSaving}
+                  onClick={cancelEditing}
+                  className="flex h-9 items-center gap-1.5 rounded-lg bg-zinc-100 px-3 text-[12px] font-semibold text-foreground transition hover:bg-zinc-200 disabled:opacity-50"
+                >
+                  <MaterialIcon name="close" className="text-base" />
+                  Hủy
+                </button>
                 <button
                   type="button"
                   disabled={isSaving}
@@ -459,157 +467,170 @@ export function KpiRewardRuleTable({
                   className="flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-[12px] font-semibold text-white transition disabled:opacity-50"
                 >
                   <MaterialIcon name="check" className="text-base" />
-                  {isSaving ? "Đang lưu..." : "Lưu rule đang dùng"}
+                  {isSaving ? "Đang lưu..." : `Lưu rule tuần`}
                 </button>
-              ) : null}
-            </>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={startEditing}
+                className="flex h-9 items-center gap-1.5 rounded-lg bg-zinc-100 px-3 text-[12px] font-semibold text-foreground transition hover:bg-zinc-200"
+              >
+                <MaterialIcon name="edit" className="text-base" />
+                Chỉnh sửa
+              </button>
+            )
           ) : null}
         </div>
       </div>
 
-      {/* Rule dang ap dung - CHI 1 dong duy nhat, tranh nham tuong 30 dong ben duoi
-          la 30 rule doc lap (chung deu doc/ghi chung 1 rule per metric). */}
-      <div className="bg-white p-3">
-        <table className="w-full table-fixed border-collapse text-center text-[10px] xl:text-[11px]">
+      {/* Bang chi so day du - moi metric 1 dong (ke ca BONUS TOTAL), 4 cot: Nguong (%),
+          Bonus/don vi, Total Bonus, Max Bonus. Max Bonus tinh TRUOC (tran = rewardPerUnit
+          x target x maxRate/100), Total Bonus tinh SAU = min(raw, Max Bonus) - dam bao
+          Total khong bao gio vuot Max. BONUS TOTAL la khoan co dinh (khong theo don vi)
+          nen khong co Max rieng. */}
+      <div className="p-5">
+        <table className="w-full border-collapse text-[13px]">
           <thead>
-            <tr>
-              {RULE_GROUPS.map((group) => (
-                <th
-                  key={group.key}
-                  colSpan={3}
-                  className={cn("border border-slate-300 px-1 py-2 text-[10px] font-black xl:text-xs", group.sectionClass)}
-                >
-                  <RuleGroupHeader group={group} />
-                </th>
-              ))}
-              <th className="border border-slate-300 bg-white px-1 py-2 text-[10px] font-black text-black xl:text-xs">
-                <RuleSubHeader icon="military_tech" label="MAX" />
-              </th>
-            </tr>
-            <tr>
-              {RULE_GROUPS.map((group) => (
-                <Fragment key={group.key}>
-                  {METRIC_HAS_THRESHOLD[group.key] ? (
-                    <th className={cn("border border-slate-300 px-1 py-2", group.sectionClass)}>
-                      <RuleSubHeader icon="track_changes" label="Ngưỡng (%)" />
-                    </th>
-                  ) : null}
-                  <th className={cn("border border-slate-300 px-1 py-2", group.sectionClass)}>
-                    <RuleSubHeader icon="paid" label="Bonus" />
-                  </th>
-                  <th className={cn("border border-slate-300 px-1 py-2", group.sectionClass)}>
-                    <RuleSubHeader icon="card_giftcard" label="Total Bonus" />
-                  </th>
-                  {!METRIC_HAS_THRESHOLD[group.key] ? (
-                    <th className={cn("border border-slate-300 px-1 py-2", group.sectionClass)}>
-                      <RuleSubHeader icon="shield" label="Max Bonus" />
-                    </th>
-                  ) : null}
-                </Fragment>
-              ))}
-              <th className="border border-slate-300 bg-white px-1 py-2 font-black text-black">Max Rate</th>
+            <tr className="border-b-2 border-border text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+              <th className="px-3 py-2.5 text-left">Chỉ số</th>
+              <th className="w-[100px] px-2 py-2.5 text-right">Ngưỡng (%)</th>
+              <th className="w-[130px] px-2 py-2.5 text-right">Bonus / đơn vị</th>
+              <th className="w-[140px] px-2 py-2.5 text-right">Total Bonus</th>
+              <th className="w-[130px] px-2 py-2.5 text-right">Max Bonus</th>
             </tr>
           </thead>
           <tbody>
-            <tr>
-              {RULE_GROUPS.map((group) => {
-                const rule = getRule(rules, group.key);
-                const totalBonus = totalBonusByMetric[group.key];
-                const maxBonus = computeMaxBonus(totalBonus, rule.maxRate);
-                return (
-                  <Fragment key={group.key}>
-                    {METRIC_HAS_THRESHOLD[group.key] ? (
-                      <td className="border border-slate-300 bg-white p-1">
-                        <RuleInput
-                          value={rule.thresholdValue}
-                          suffix="%"
-                          tone="percent"
-                          editable={canEdit}
-                          disabled={!canEdit}
-                          onChange={(value) => updateRule(group.key, { thresholdValue: value ?? 0 })}
-                        />
-                      </td>
-                    ) : null}
-                    <td className="border border-slate-300 bg-white p-1">
+            {RULE_GROUPS.map((group, idx) => {
+              const rule = getRule(rules, group.key);
+              const totalBonus = totalBonusByMetric[group.key];
+              const hasThreshold = group.key === "total_bonus" || group.key === "lead";
+              const maxBonus = group.key === "total_bonus" ? null : maxByMetric[group.key as "lead" | "inbox" | "post" | "comment"];
+              return (
+                <tr
+                  key={group.key}
+                  className={cn("border-b border-border last:border-b-0", idx % 2 === 1 && "bg-slate-50/60")}
+                >
+                  <td className="px-3 py-2.5">
+                    <div className="flex items-center gap-2.5 font-bold text-foreground">
+                      <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg", group.badgeClass)}>
+                        <MaterialIcon name={group.icon} className="text-sm" />
+                      </span>
+                      {group.label}
+                      {group.weightLabel ? (
+                        <span className="font-normal text-muted-foreground">({group.weightLabel})</span>
+                      ) : null}
+                    </div>
+                  </td>
+                  <td className="px-2 py-1">
+                    {hasThreshold ? (
                       <RuleInput
-                        value={rule.rewardPerUnit}
+                        value={rule.thresholdValue}
+                        suffix="%"
+                        tone="percent"
                         editable={canEdit}
                         disabled={!canEdit}
-                        onChange={(value) => updateRule(group.key, { rewardPerUnit: value ?? 0 })}
+                        onChange={(value) => updateRule(group.key, { thresholdValue: value ?? 0 })}
                       />
-                    </td>
-                    <td className="border border-slate-300 bg-emerald-200 px-1 py-2 text-right font-bold text-emerald-900 tabular-nums">
-                      {formatVnd(totalBonus)}
-                    </td>
-                    {!METRIC_HAS_THRESHOLD[group.key] ? (
-                      <td className="border border-slate-300 bg-white px-1 py-2 text-right font-semibold text-rose-700 tabular-nums">
-                        {formatVnd(maxBonus)}
-                      </td>
-                    ) : null}
-                  </Fragment>
-                );
-              })}
-              <td className="border border-slate-300 bg-white p-1">
-                <RuleInput
-                  value={getRule(rules, "lead").maxRate}
-                  suffix="%"
-                  tone="max"
-                  editable={canEdit}
-                  disabled={!canEdit}
-                  onChange={(value) => {
-                    const maxRate = value ?? 0;
-                    RULE_GROUPS.forEach((group) => updateRule(group.key, { maxRate }));
-                  }}
-                />
-              </td>
-            </tr>
+                    ) : (
+                      <span className="block text-center text-muted-foreground">—</span>
+                    )}
+                  </td>
+                  <td className="px-2 py-1">
+                    <RuleInput
+                      value={rule.rewardPerUnit}
+                      editable={canEdit}
+                      disabled={!canEdit}
+                      money
+                      onChange={(value) => updateRule(group.key, { rewardPerUnit: value ?? 0 })}
+                    />
+                  </td>
+                  <td className="overflow-hidden text-ellipsis whitespace-nowrap px-2 py-2 text-right font-black tabular-nums text-emerald-800" title={formatVnd(totalBonus)}>
+                    {formatVnd(totalBonus)}
+                  </td>
+                  <td className="overflow-hidden text-ellipsis whitespace-nowrap px-2 py-1.5 text-right font-semibold text-rose-700 tabular-nums" title={maxBonus === null ? undefined : formatVnd(maxBonus)}>
+                    {maxBonus === null ? <span className="block text-center text-muted-foreground">—</span> : formatVnd(maxBonus)}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
+
+        <div className="mt-3 flex items-center gap-3 rounded-lg border border-border bg-slate-50 px-3 py-2">
+          <MaterialIcon name="military_tech" className="text-base text-muted-foreground" />
+          <span className="text-[12px] font-semibold text-muted-foreground">
+            Max Rate <span className="font-normal">(áp dụng cho Lead / Inbox / Post / Comment)</span>
+          </span>
+          <div className="ml-auto w-[100px]">
+            <RuleInput
+              value={getRule(rules, "lead").maxRate}
+              suffix="%"
+              tone="max"
+              editable={canEdit}
+              disabled={!canEdit}
+              onChange={(value) => {
+                const maxRate = value ?? 0;
+                RULE_GROUPS.forEach((group) => updateRule(group.key, { maxRate }));
+              }}
+            />
+          </div>
+        </div>
       </div>
 
       {!readOnly ? (
         <div className="space-y-3 border-t border-border px-5 py-4">
+          <label className="block text-[12px] font-semibold text-muted-foreground">Ghi chú áp dụng cho tuần này</label>
           <textarea
             value={note}
             onChange={(event) => setNote(event.target.value)}
             disabled={!isEditing}
-            placeholder="Ghi chú rule..."
-            className="min-h-[72px] w-full rounded-xl border border-border px-3 py-2 text-[13px] outline-none focus:border-primary disabled:bg-muted/40 disabled:text-muted-foreground"
+            placeholder="Nhập ghi chú áp dụng cho tuần này (không bắt buộc)..."
+            className="min-h-[64px] w-full rounded-xl border border-border px-3 py-2 text-[13px] outline-none focus:border-primary disabled:bg-muted/40 disabled:text-muted-foreground"
           />
         </div>
       ) : null}
 
-      {/* Nhat ky chinh sua - ai sua, sua o nao, gia tri cu -> moi. */}
-      <div className="border-t border-border px-5 py-4">
-        <p className="mb-2 text-[12px] font-semibold text-muted-foreground">Nhật ký chỉnh sửa</p>
-        {logs.length === 0 ? (
-          <p className="text-[12px] text-muted-foreground">Chưa có thay đổi nào cho team và tuần này.</p>
-        ) : (
-          <ul className="space-y-2">
-            {logs.map((log) => (
-              <li key={log.id} className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-[12px]">
-                <div className="flex flex-wrap items-center gap-1.5 font-semibold text-foreground">
-                  <MaterialIcon name="person" className="text-sm text-muted-foreground" />
-                  {log.changedByName}
-                  <span className="font-normal text-muted-foreground">
-                    · {new Date(log.createdAt).toLocaleString("vi-VN")}
-                  </span>
-                </div>
-                <ul className="mt-1 space-y-0.5 pl-5 text-muted-foreground">
-                  {log.changes.map((change, idx) => (
-                    <li key={`${log.id}-${idx}`}>
-                      {change.metricLabel} · {change.fieldLabel}:{" "}
-                      <span className="font-semibold text-rose-700">{formatLogValue(change.field, change.oldValue)}</span>
-                      {" → "}
-                      <span className="font-semibold text-emerald-700">{formatLogValue(change.field, change.newValue)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ))}
-          </ul>
-        )}
+      <div className="flex items-center gap-1.5 border-t border-border bg-slate-50 px-5 py-3 text-[12px] text-muted-foreground">
+        <MaterialIcon name="info" className="text-sm shrink-0" />
+        Rule này sẽ được dùng để tính KPI và thưởng cho team này trong tuần {startDate} - {endDate}.
       </div>
+
+      {/* Nhat ky chinh sua - thu gon mac dinh, bam moi xem, tranh lam man Rule roi mat. */}
+      <details className="border-t border-border px-5 py-3 text-[12px]">
+        <summary className="cursor-pointer select-none font-semibold text-muted-foreground">
+          Nhật ký chỉnh sửa {logs.length > 0 ? `(${logs.length})` : ""}
+        </summary>
+        <div className="mt-2">
+          {logs.length === 0 ? (
+            <p className="text-muted-foreground">Chưa có thay đổi nào cho team và tuần này.</p>
+          ) : (
+            <ul className="space-y-2">
+              {logs.map((log) => (
+                <li key={log.id} className="rounded-lg border border-border bg-muted/30 px-3 py-2">
+                  <div className="flex flex-wrap items-center gap-1.5 font-semibold text-foreground">
+                    <MaterialIcon name="person" className="text-sm text-muted-foreground" />
+                    {log.changedByName}
+                    <span className="font-normal text-muted-foreground">
+                      · {new Date(log.createdAt).toLocaleString("vi-VN")}
+                    </span>
+                  </div>
+                  <ul className="mt-1 space-y-0.5 pl-5 text-muted-foreground">
+                    {log.changes.map((change, idx) => (
+                      <li key={`${log.id}-${idx}`}>
+                        {change.metricLabel} · {change.fieldLabel}:{" "}
+                        <span className="font-semibold text-rose-700">{formatLogValue(change.field, change.oldValue)}</span>
+                        {" → "}
+                        <span className="font-semibold text-emerald-700">{formatLogValue(change.field, change.newValue)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </details>
     </section>
   );
 }
@@ -628,9 +649,15 @@ const TEAM_COLORS = [
   "#e34948", // red
 ];
 
-// Vai mau sang (magenta, yellow) can chu toi de du tuong phan khi to nguyen o -
-// cac mau con lai du dam de dung chu trang.
-const TEAM_COLORS_DARK_TEXT = new Set(["#e87ba4", "#eda100"]);
+// Cung 1 tong mau pastel voi badgeClass cua RULE_GROUPS (Lead tim, Inbox vang,
+// Post xanh duong, Comment xanh da troi) - dong bo ngon ngu thiet ke giua bang
+// Rule va bang Ket qua, nhat thay vi to nguyen header dam mau nhu truoc.
+const METRIC_HEADER_CLASS: Record<"lead" | "inbox" | "post" | "comment", string> = {
+  lead: "bg-violet-50 text-violet-800",
+  inbox: "bg-amber-50 text-amber-800",
+  post: "bg-blue-50 text-blue-800",
+  comment: "bg-sky-50 text-sky-800",
+};
 
 const KPI_GOAL_LABEL: Record<KpiGoalStatus, string> = {
   dat: "Đạt",
@@ -638,15 +665,33 @@ const KPI_GOAL_LABEL: Record<KpiGoalStatus, string> = {
   chua_dat: "Chưa đạt",
 };
 
-const KPI_GOAL_TONE: Record<KpiGoalStatus, string> = {
-  dat: "bg-emerald-50 text-emerald-700",
-  gan_dat: "bg-amber-50 text-amber-700",
-  chua_dat: "bg-rose-50 text-rose-700",
+// Mau thanh progress mong (khong dung nen o to nguyen dong/cot) theo trang thai
+// dat/gan_dat/chua_dat - dung chung cho ca bang team va bang chi tiet thanh vien.
+const KPI_GOAL_BAR: Record<KpiGoalStatus, string> = {
+  dat: "bg-emerald-500",
+  gan_dat: "bg-amber-500",
+  chua_dat: "bg-slate-300",
+};
+
+// Dot mau + chu (khong to nen ca badge) - "Chua dat" la trang thai PHO BIEN nhat
+// trong du lieu that (nhieu thanh vien chua dat KPI tuan), to nen do dam khap bang
+// se rat "moi mat". Dot nho + chu mau nhe van du de phan biet ma khong nang mat.
+const KPI_GOAL_DOT: Record<KpiGoalStatus, string> = {
+  dat: "bg-emerald-500",
+  gan_dat: "bg-amber-500",
+  chua_dat: "bg-slate-300",
+};
+
+const KPI_GOAL_TEXT: Record<KpiGoalStatus, string> = {
+  dat: "text-emerald-700",
+  gan_dat: "text-amber-700",
+  chua_dat: "text-muted-foreground",
 };
 
 function KpiGoalBadge({ status, percent }: { status: KpiGoalStatus; percent?: number }) {
   return (
-    <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap", KPI_GOAL_TONE[status])}>
+    <span className={cn("inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-semibold", KPI_GOAL_TEXT[status])}>
+      <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", KPI_GOAL_DOT[status])} />
       {percent !== undefined ? `${formatNumber(percent)}% · ` : ""}
       {KPI_GOAL_LABEL[status]}
     </span>
@@ -682,109 +727,194 @@ export function KpiRewardResultsTable({
     return order.map((id) => map.get(id)!);
   }, [rows]);
 
+  // Xem 1 team (Leader/Member): 1 box duy nhat, khong can tach, luon mo san. Xem
+  // "Tat ca team" (Admin): moi team la 1 box rieng co the thu gon - tach bach ro
+  // rang giua cac team thay vi don chung vao 1 bang to voi dong header mau xen giua.
+  if (teamId) {
+    const group = groupedByTeam[0];
+    return (
+      <MemberResultsBox
+        title="Kết quả KPI & tiền thưởng"
+        subtitle="Tính từ dữ liệu Lead, Inbox, Post, Comment thật của tuần đang chọn."
+        rows={group?.rows || []}
+        color={TEAM_COLORS[0]}
+        defaultExpanded
+      />
+    );
+  }
+
+  // Khong doi vi tri team o day (giu dung thu tu xuat hien) - sap xep theo hang
+  // CHI co o bang "Tong thuong theo team" thoi, tranh roi vi trong 2 cho khac nhau.
+  // Van tinh hang/huan chuong theo tong thuong de gan badge, nhung KHONG dung de
+  // sap xep lai danh sach hien thi.
+  const RANK_MEDAL = ["🥇", "🥈", "🥉"];
+  const rankByTeamId = new Map(
+    [...groupedByTeam]
+      .sort((a, b) => b.rows.reduce((sum, r) => sum + r.totalReward, 0) - a.rows.reduce((sum, r) => sum + r.totalReward, 0))
+      .map((group, idx) => [group.teamId, idx + 1]),
+  );
+
   return (
-    <section className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
-      <div className="flex flex-col gap-2 border-b border-border px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h2 className="text-base font-bold text-foreground">Kết quả KPI & tiền thưởng</h2>
-          <p className="mt-1 text-[12px] text-muted-foreground">
-            Tính từ dữ liệu Lead, Inbox, Post, Comment thật của tuần đang chọn.
-          </p>
-        </div>
-        <div className="text-right">
-          <div className="text-[11px] uppercase text-muted-foreground">Tổng thưởng</div>
-          <div className="text-lg font-bold text-foreground">
-            {formatVnd(rows.reduce((sum, row) => sum + row.totalReward, 0))}
-          </div>
-        </div>
+    <div className="space-y-3">
+      <div>
+        <h2 className="text-base font-bold text-foreground">Kết quả KPI & tiền thưởng</h2>
+        <p className="mt-1 text-[12px] text-muted-foreground">
+          Tính từ dữ liệu Lead, Inbox, Post, Comment thật của tuần đang chọn. Mỗi team 1 khối riêng.
+        </p>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[980px] table-fixed border-collapse text-left text-[10px] xl:text-[11px]">
-          <thead>
+      {groupedByTeam.length === 0 ? (
+        <div className="rounded-xl border border-border bg-white px-4 py-12 text-center text-muted-foreground shadow-sm">
+          Chưa có dữ liệu thưởng cho tuần này.
+        </div>
+      ) : (
+        groupedByTeam.map((group, groupIndex) => {
+          const rank = rankByTeamId.get(group.teamId) || 0;
+          return (
+            <MemberResultsBox
+              key={group.teamId}
+              title={group.teamName}
+              rows={group.rows}
+              color={TEAM_COLORS[groupIndex % TEAM_COLORS.length]}
+              rankBadge={RANK_MEDAL[rank - 1]}
+              defaultExpanded={groupIndex === 0}
+            />
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+// 1 box = 1 team: header kieu Notion (avatar tron + ten team + so thanh vien +
+// tong thuong cua rieng team do) + bang chi tiet thanh vien - co the thu gon de
+// trang khong bi qua dai khi xem nhieu team cung luc.
+function MemberResultsBox({
+  title,
+  subtitle,
+  rows,
+  color,
+  rankBadge,
+  defaultExpanded = true,
+}: {
+  title: string;
+  subtitle?: string;
+  rows: KpiRewardMemberSummary[];
+  color: string;
+  rankBadge?: string;
+  defaultExpanded?: boolean;
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  const sortedRows = [...rows].sort((a, b) => b.totalReward - a.totalReward);
+  const teamTotal = rows.reduce((sum, row) => sum + row.totalReward, 0);
+  const topMember = sortedRows[0];
+
+  return (
+    <section className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
+      <button
+        type="button"
+        onClick={() => setExpanded((current) => !current)}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50"
+        style={{ backgroundColor: `${color}0d` }}
+      >
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-black text-white"
+            style={{ backgroundColor: color }}
+          >
+            {(title || "?").trim().charAt(0).toUpperCase()}
+          </span>
+          <div className="min-w-0">
+            <h3 className="flex items-center gap-1.5 truncate text-[13px] font-bold text-foreground">
+              {title}
+              {rankBadge ? <span className="shrink-0 text-base leading-none">{rankBadge}</span> : null}
+            </h3>
+            <p className="truncate text-[11px] text-muted-foreground">
+              {subtitle || `${rows.length} thành viên${topMember ? ` · Dẫn đầu: ${topMember.memberName}` : ""}`}
+            </p>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-3 text-right">
+          <span className="text-[11px] text-muted-foreground">{rows.length} thành viên</span>
+          <span className="text-[13px] font-black tabular-nums text-emerald-800">{formatVnd(teamTotal)}</span>
+        </div>
+      </button>
+
+      {!expanded ? null : (
+      <div className="max-h-[60vh] overflow-auto border-t border-border">
+        <table className="w-full min-w-[760px] table-fixed border-collapse text-left text-[11px]">
+          <thead className="sticky top-0 z-10">
             <tr>
-              <th rowSpan={2} className="w-[18%] border border-border bg-slate-50 px-2 py-1.5">Thành viên</th>
-              <th rowSpan={2} className="w-[7%] border border-border bg-slate-50 px-1 py-1.5 text-right">%KPI</th>
-              <th rowSpan={2} className="w-[8%] border border-border bg-slate-50 px-1 py-1.5 text-right">Bonus</th>
-              <th colSpan={2} className="border border-border bg-violet-700 px-1 py-1.5 text-center font-black text-white">LEAD</th>
-              <th colSpan={2} className="border border-border bg-amber-600 px-1 py-1.5 text-center font-black text-white">INBOX</th>
-              <th colSpan={2} className="border border-border bg-blue-700 px-1 py-1.5 text-center font-black text-white">POST</th>
-              <th colSpan={2} className="border border-border bg-sky-700 px-1 py-1.5 text-center font-black text-white">COMMENT</th>
-            </tr>
-            <tr>
-              {(["lead", "inbox", "post", "comment"] as const).flatMap((metric) => [
-                <th key={`${metric}-actual`} className="border border-border bg-slate-50 px-1 py-1.5 text-right">SL/KPI</th>,
-                <th key={`${metric}-status`} className="border border-border bg-slate-50 px-1 py-1.5 text-center">Trạng thái</th>,
-              ])}
+              <th className="w-[22%] border border-border bg-slate-100 px-2 py-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Thành viên</th>
+              <th className="w-[10%] border border-border bg-slate-100 px-1 py-2 text-right text-[11px] font-bold uppercase tracking-wide text-muted-foreground">KPI tổng</th>
+              {(["lead", "inbox", "post", "comment"] as const).map((metric) => (
+                <th key={metric} className={cn("border border-border px-1 py-2 text-right font-black", METRIC_HEADER_CLASS[metric])}>
+                  {metric.toUpperCase()}
+                </th>
+              ))}
+              <th className="w-[10%] border border-border bg-slate-100 px-1 py-2 text-right text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Thưởng</th>
             </tr>
           </thead>
           <tbody>
-            {groupedByTeam.length === 0 ? (
+            {sortedRows.length === 0 ? (
               <tr>
-                <td colSpan={11} className="border border-border px-4 py-12 text-center text-muted-foreground">
+                <td colSpan={7} className="border border-border px-4 py-10 text-center text-muted-foreground">
                   Chưa có dữ liệu thưởng cho team và tuần này.
                 </td>
               </tr>
             ) : (
-              groupedByTeam.flatMap((group, groupIndex) => {
-                const color = TEAM_COLORS[groupIndex % TEAM_COLORS.length];
-                const memberRows = group.rows.map((row) => (
-                  <tr key={`${row.teamId}-${row.memberId}`} className="bg-white">
-                    <td
-                      className="border border-border px-2 py-1.5"
-                      style={{ borderLeftWidth: 4, borderLeftColor: color }}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className="h-2 w-2 shrink-0 rounded-full"
-                          style={{ backgroundColor: color }}
-                        />
-                        <div className="min-w-0 truncate font-semibold text-foreground">{row.memberName}</div>
-                      </div>
-                      <div className="truncate text-[10px] text-muted-foreground">{row.memberEmail}</div>
-                    </td>
-                    <td className="border border-border px-1 py-1.5 text-right font-bold text-foreground tabular-nums">
-                      {formatNumber(row.kpiPercent ?? 0)}%
-                    </td>
-                    <td className="border border-border bg-emerald-200 px-1 py-1.5 text-right font-bold text-emerald-900 tabular-nums">
-                      {formatVnd(row.totalReward)}
-                    </td>
-                    {(["lead", "inbox", "post", "comment"] as const).map((metric) => (
-                      <Fragment key={metric}>
-                        <td key={`${metric}-actual-${row.memberId}`} className="border border-border px-1 py-1.5 text-right tabular-nums whitespace-nowrap">
-                          {formatNumber(row.actuals[metric])}/{formatNumber(row.targets[metric])}
-                        </td>
-                        <td key={`${metric}-status-${row.memberId}`} className="border border-border px-1 py-1.5 text-center">
-                          <KpiGoalBadge status={row.metricStatuses?.[metric] ?? "chua_dat"} percent={row.metricPercents?.[metric] ?? 0} />
-                        </td>
-                      </Fragment>
-                    ))}
-                  </tr>
-                ));
-
-                if (teamId) return memberRows;
-
-                const headerTextClass = TEAM_COLORS_DARK_TEXT.has(color) ? "text-black" : "text-white";
-                return [
-                  <tr key={`team-header-${group.teamId}`}>
-                    <td
-                      colSpan={11}
-                      className={cn("border border-border px-3 py-2 text-[12px] font-bold", headerTextClass)}
-                      style={{ backgroundColor: color }}
-                    >
-                      {group.teamName}
-                      <span className="ml-1.5 font-normal opacity-80">
-                        ({group.rows.length} thành viên)
+              sortedRows.map((row, rowIdx) => (
+                <tr
+                  key={`${row.teamId}-${row.memberId}`}
+                  className={cn("transition-colors hover:bg-slate-50", rowIdx % 2 === 1 && "bg-slate-50/60")}
+                >
+                  <td className="border border-border px-2 py-2">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black text-white"
+                        style={{ backgroundColor: color }}
+                      >
+                        {(row.memberName || "?").trim().charAt(0).toUpperCase()}
                       </span>
-                    </td>
-                  </tr>,
-                  ...memberRows,
-                ];
-              })
+                      <div className="min-w-0">
+                        <div className="truncate font-semibold text-foreground">{row.memberName}</div>
+                        <div className="truncate text-[10px] text-muted-foreground">{row.memberEmail}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="border border-border px-1 py-2 text-right">
+                    <KpiGoalBadge status={row.kpiStatus} percent={row.kpiPercent ?? 0} />
+                  </td>
+                  {(["lead", "inbox", "post", "comment"] as const).map((metric) => {
+                    const metricStatus = row.metricStatuses?.[metric] ?? "chua_dat";
+                    const metricPercent = row.metricPercents?.[metric] ?? 0;
+                    return (
+                      <td key={metric} className="border border-border px-1 py-2 text-right tabular-nums">
+                        <div className="whitespace-nowrap font-semibold text-foreground">
+                          {formatNumber(row.actuals[metric])}/{formatNumber(row.targets[metric])}
+                        </div>
+                        <div className="mt-0.5 flex items-center justify-end gap-1.5">
+                          <span className={cn("text-[10px] font-semibold", KPI_GOAL_TEXT[metricStatus])}>{formatNumber(metricPercent)}%</span>
+                          <div className="h-1.5 w-full max-w-[56px] overflow-hidden rounded-full bg-slate-100">
+                            <div
+                              className={cn("h-full rounded-full", KPI_GOAL_BAR[metricStatus])}
+                              style={{ width: `${Math.min(100, metricPercent)}%` }}
+                            />
+                          </div>
+                        </div>
+                      </td>
+                    );
+                  })}
+                  <td className="overflow-hidden text-ellipsis whitespace-nowrap border border-border bg-emerald-100 px-1 py-2 text-right text-[13px] font-black tabular-nums text-emerald-900" title={formatVnd(row.totalReward)}>
+                    {formatVnd(row.totalReward)}
+                  </td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>
       </div>
+      )}
     </section>
   );
 }
@@ -902,11 +1032,11 @@ export function MemberKpiRewardOverview() {
   );
 }
 
-// Bang tong Cai dat Bonus KPI cho Admin - 1 bang duy nhat, moi team 1 dong tu tren
-// xuong duoi (khong phai bam chon tung team roi xem rieng nhu Leader/Member).
-// Admin bam "Sua" tren dung dong cua team nao thi khoa nhap mo ra cho dong do,
-// bam "Lich su" de xem nhat ky chinh sua rieng cua team do.
-function AdminAllTeamsKpiRuleTable({
+// Trang Rule KPI cua Admin - liet ke TAT CA team that (khong hardcode), moi team 1
+// dong tom tat, bam vao dong hoac nut but chi de MO RONG xem/sua chi tiet (tai su
+// dung nguyen KpiRewardRuleTable cho phan mo rong - giu dung 1 noi duy nhat chua
+// logic sua/luu/huy/cong thuc, tranh viet trung code va lech cong thuc giua 2 noi).
+function AdminTeamRuleAccordion({
   teams,
   selectedWeek,
   onChanged,
@@ -916,62 +1046,44 @@ function AdminAllTeamsKpiRuleTable({
   onChanged?: () => void;
 }) {
   const { startDate, endDate } = splitWeek(selectedWeek);
-  const [rulesByTeam, setRulesByTeam] = useState<Record<string, KpiRewardRule[]>>({});
+  const [rows, setRows] = useState<Array<{ team: TeamRow; rules: KpiRewardRule[]; source: KpiRuleSource }>>([]);
+  const [memberSummary, setMemberSummary] = useState<KpiRewardSummary | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [editingTeamIds, setEditingTeamIds] = useState<Set<string>>(new Set());
-  const [savingTeamIds, setSavingTeamIds] = useState<Set<string>>(new Set());
-  const [logsTeamId, setLogsTeamId] = useState<string | null>(null);
-  const [logsByTeam, setLogsByTeam] = useState<Record<string, KpiRewardRuleLog[]>>({});
-  const [summary, setSummary] = useState<KpiRewardSummary | null>(null);
+  const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
+  // Bam nut but (Thao tac) thi mo rong VA vao thang che do sua, khong bat bam them
+  // 1 lan "Chinh sua" nua. Bam vao dong (ngoai nut but) chi mo rong xem, khong sua.
+  const [autoEditTeamId, setAutoEditTeamId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "configured" | "unconfigured">("all");
 
   const teamIdsKey = teams.map((team) => team.id).join(",");
 
-  // Target cua tung team (gop tung thanh vien lai theo metric) - dung de tinh Total
-  // Bonus/Max Bonus DU KIEN trong bang rule (khong phai tien thuong thuc nhan).
-  const teamTargets = useMemo(() => {
-    const map: Record<string, Record<"lead" | "inbox" | "post" | "comment", number>> = {};
-    for (const member of summary?.memberSummaries || []) {
-      const targets = map[member.teamId] || { lead: 0, inbox: 0, post: 0, comment: 0 };
-      (["lead", "inbox", "post", "comment"] as const).forEach((metric) => {
-        targets[metric] += member.targets[metric] || 0;
-      });
-      map[member.teamId] = targets;
-    }
-    return map;
-  }, [summary]);
-
   const loadAll = useCallback(async () => {
-    if (teams.length === 0) return;
+    if (teams.length === 0) {
+      setRows([]);
+      return;
+    }
     setIsLoading(true);
     try {
-      const results = await Promise.all(
-        teams.map((team) => kpiRewardsService.effectiveRules({ teamId: team.id, startDate, endDate })),
-      );
-      const nextRules: Record<string, KpiRewardRule[]> = {};
-      teams.forEach((team, idx) => {
-        const res = results[idx];
+      const [ruleResults, summaryRes] = await Promise.all([
+        Promise.all(teams.map((team) => kpiRewardsService.effectiveRules({ teamId: team.id, startDate, endDate }))),
+        kpiRewardsService.summary({ startDate, endDate }),
+      ]);
+      setRows(teams.map((team, idx) => {
+        const res = ruleResults[idx];
         const effective = res.success && res.data ? res.data : { rules: [], source: "default" as const, sourceWeek: null };
-        nextRules[team.id] = normalizeRules(team.id, startDate, endDate, effective.rules);
-      });
-      setRulesByTeam(nextRules);
-      setEditingTeamIds(new Set());
+        return {
+          team,
+          rules: normalizeRules(team.id, startDate, endDate, effective.rules),
+          source: effective.source,
+        };
+      }));
+      setMemberSummary(summaryRes.success && summaryRes.data ? summaryRes.data : null);
     } finally {
       setIsLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamIdsKey, startDate, endDate]);
-
-  const loadSummary = useCallback(async () => {
-    const res = await kpiRewardsService.summary({ startDate, endDate });
-    setSummary(res.success && res.data ? res.data : null);
-  }, [startDate, endDate]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void loadSummary();
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [loadSummary]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -980,292 +1092,203 @@ function AdminAllTeamsKpiRuleTable({
     return () => window.clearTimeout(timer);
   }, [loadAll]);
 
-  const updateTeamRule = (teamId: string, metric: KpiRewardMetric, patch: Partial<KpiRewardRule>) => {
-    setRulesByTeam((current) => ({
-      ...current,
-      [teamId]: (current[teamId] || []).map((rule) => (rule.metric === metric ? { ...rule, ...patch } : rule)),
-    }));
-  };
-
-  const toggleEdit = (teamId: string) => {
-    setEditingTeamIds((current) => {
-      const next = new Set(current);
-      if (next.has(teamId)) next.delete(teamId);
-      else next.add(teamId);
-      return next;
-    });
-  };
-
-  const toggleLogs = async (teamId: string) => {
-    if (logsTeamId === teamId) {
-      setLogsTeamId(null);
-      return;
-    }
-    setLogsTeamId(teamId);
-    if (!logsByTeam[teamId]) {
-      const res = await kpiRewardsService.logs({ teamId, startDate, endDate });
-      setLogsByTeam((current) => ({ ...current, [teamId]: res.success && res.data ? res.data : [] }));
-    }
-  };
-
-  const saveTeam = async (teamId: string) => {
-    const rules = rulesByTeam[teamId] || [];
-    setSavingTeamIds((current) => new Set(current).add(teamId));
-    try {
-      const payloadRules = rules.map((rule) => ({
-        metric: rule.metric,
-        weight: Number(rule.weight || 0),
-        threshold_value: Number(rule.thresholdValue || 0),
-        reward_per_unit: Number(rule.rewardPerUnit || 0),
-        max_reward: rule.maxReward === null ? null : Number(rule.maxReward || 0),
-        max_rate: Number(rule.maxRate || 200),
-      }));
-      const res = await kpiRewardsService.saveActive({
-        team_id: teamId,
-        start_date: startDate,
-        end_date: endDate,
-        rules: payloadRules,
+  // Target that cua tung team (gop tu member that) - dung de uoc tinh Total Bonus
+  // tom tat tren dong, cung 1 nguon du lieu voi KpiRewardRuleTable khi mo rong.
+  const teamTargetsById = useMemo(() => {
+    const map: Record<string, Record<"lead" | "inbox" | "post" | "comment", number>> = {};
+    for (const member of memberSummary?.memberSummaries || []) {
+      const targets = map[member.teamId] || { lead: 0, inbox: 0, post: 0, comment: 0 };
+      (["lead", "inbox", "post", "comment"] as const).forEach((metric) => {
+        targets[metric] += member.targets[metric] || 0;
       });
-      if (!res.success) throw new Error(res.message || "Lưu rule thất bại");
-      toast.success("Đã lưu rule KPI & thưởng đang dùng");
-      await loadAll();
-      await loadSummary();
-      if (logsByTeam[teamId] !== undefined) {
-        const logRes = await kpiRewardsService.logs({ teamId, startDate, endDate });
-        setLogsByTeam((current) => ({ ...current, [teamId]: logRes.success && logRes.data ? logRes.data : [] }));
-      }
-      onChanged?.();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Lưu rule thất bại");
-    } finally {
-      setEditingTeamIds((current) => {
-        const next = new Set(current);
-        next.delete(teamId);
-        return next;
-      });
-      setSavingTeamIds((current) => {
-        const next = new Set(current);
-        next.delete(teamId);
-        return next;
-      });
+      map[member.teamId] = targets;
     }
-  };
+    return map;
+  }, [memberSummary]);
 
-  // Moi group luon co 3 cot: co Nguong thi Nguong+Bonus+Total Bonus, khong thi
-  // Bonus+Total Bonus+Max Bonus - khop dung cau truc sheet goc.
-  const totalCols = RULE_GROUPS.length * 3 + 3;
+  const configuredCount = rows.filter((row) => row.source !== "default").length;
+  const totalCount = teams.length;
+
+  const filteredRows = rows.filter((row) => {
+    if (search.trim() && !row.team.name_team.toLowerCase().includes(search.trim().toLowerCase())) return false;
+    if (statusFilter === "configured" && row.source === "default") return false;
+    if (statusFilter === "unconfigured" && row.source !== "default") return false;
+    return true;
+  });
 
   return (
-    <section className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
-      <div className="flex flex-col gap-2 border-b border-border px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h2 className="text-base font-bold text-foreground">Cài đặt Bonus KPI - Tất cả team</h2>
-          <p className="mt-1 text-[12px] text-muted-foreground">
-            Mỗi team 1 dòng - bấm &quot;Sửa&quot; đúng dòng của team nào thì chỉnh rule của team đó.
-          </p>
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-white p-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+            <MaterialIcon name="groups" className="text-lg" />
+          </div>
+          <div>
+            <p className="text-[10px] font-semibold uppercase leading-none text-muted-foreground">Tổng số team</p>
+            <p className="mt-1 text-xl font-black tabular-nums text-foreground">{totalCount}</p>
+          </div>
         </div>
-        {isLoading ? <span className="text-[12px] text-muted-foreground">Đang tải...</span> : null}
+        <div className="flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white">
+            <MaterialIcon name="verified" className="text-lg" />
+          </div>
+          <div>
+            <p className="text-[10px] font-semibold uppercase leading-none text-emerald-700">Đã cấu hình rule</p>
+            <p className="mt-1 text-xl font-black tabular-nums text-emerald-900">{configuredCount}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-600 text-white">
+            <MaterialIcon name="warning" className="text-lg" />
+          </div>
+          <div>
+            <p className="text-[10px] font-semibold uppercase leading-none text-amber-700">Chưa cấu hình</p>
+            <p className="mt-1 text-xl font-black tabular-nums text-amber-900">{totalCount - configuredCount}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2.5 rounded-xl border border-blue-200 bg-blue-50 p-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white">
+            <MaterialIcon name="dashboard" className="text-lg" />
+          </div>
+          <div>
+            <p className="text-[10px] font-semibold uppercase leading-none text-blue-700">Đang áp dụng</p>
+            <p className="mt-1 text-xl font-black tabular-nums text-blue-900">{configuredCount}</p>
+          </div>
+        </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[1100px] table-fixed border-collapse text-center text-[10px] xl:text-[11px]">
-          <thead>
-            <tr>
-              <th rowSpan={2} className="w-[13%] border border-slate-300 bg-slate-50 px-2 py-2 text-left font-black text-slate-700">
-                Team
-              </th>
-              {RULE_GROUPS.map((group) => (
-                <th
-                  key={group.key}
-                  colSpan={3}
-                  className={cn("border border-slate-300 px-1 py-2 text-[10px] font-black xl:text-xs", group.sectionClass)}
-                >
-                  <RuleGroupHeader group={group} />
-                </th>
-              ))}
-              <th className="border border-slate-300 bg-white px-1 py-2 text-[10px] font-black text-black xl:text-xs">
-                <RuleSubHeader icon="military_tech" label="MAX" />
-              </th>
-              <th rowSpan={2} className="w-[9%] border border-slate-300 bg-slate-50 px-1 py-2 text-slate-700">
-                <RuleSubHeader icon="settings" label="Thao tác" />
-              </th>
-            </tr>
-            <tr>
-              {RULE_GROUPS.map((group) => (
-                <Fragment key={group.key}>
-                  {METRIC_HAS_THRESHOLD[group.key] ? (
-                    <th className={cn("border border-slate-300 px-1 py-2", group.sectionClass)}>
-                      <RuleSubHeader icon="track_changes" label="Ngưỡng (%)" />
-                    </th>
-                  ) : null}
-                  <th className={cn("border border-slate-300 px-1 py-2", group.sectionClass)}>
-                    <RuleSubHeader icon="paid" label="Bonus" />
-                  </th>
-                  <th className={cn("border border-slate-300 px-1 py-2", group.sectionClass)}>
-                    <RuleSubHeader icon="card_giftcard" label="Total Bonus" />
-                  </th>
-                  {!METRIC_HAS_THRESHOLD[group.key] ? (
-                    <th className={cn("border border-slate-300 px-1 py-2", group.sectionClass)}>
-                      <RuleSubHeader icon="shield" label="Max Bonus" />
-                    </th>
-                  ) : null}
-                </Fragment>
-              ))}
-              <th className="border border-slate-300 bg-white px-1 py-2 font-black text-black">Max Rate</th>
-            </tr>
-          </thead>
-          <tbody>
-            {teams.length === 0 ? (
-              <tr>
-                <td colSpan={totalCols} className="border border-border px-4 py-10 text-center text-muted-foreground">
-                  Chưa có team nào.
-                </td>
-              </tr>
-            ) : (
-              teams.flatMap((team) => {
-                const rules = rulesByTeam[team.id] || defaultRules(team.id, startDate, endDate);
-                const isEditing = editingTeamIds.has(team.id);
-                const isSaving = savingTeamIds.has(team.id);
-                const targets = teamTargets[team.id] || { lead: 0, inbox: 0, post: 0, comment: 0 };
-                const totalBonusByMetric = computeTotalBonusByMetric(rules, targets);
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[220px] flex-1">
+          <MaterialIcon name="search" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base text-muted-foreground" />
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Tìm team..."
+            className="h-9 w-full rounded-lg border border-border bg-white pl-9 pr-3 text-[12px] outline-none focus:border-primary"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
+          className="h-9 rounded-lg border border-border bg-white px-3 text-[12px] font-semibold text-foreground outline-none"
+        >
+          <option value="all">Tất cả trạng thái</option>
+          <option value="configured">Đang áp dụng</option>
+          <option value="unconfigured">Chưa cấu hình</option>
+        </select>
+      </div>
 
-                const mainRow = (
-                  <tr key={team.id}>
-                    <td className="border border-border bg-slate-50 px-2 py-2 text-left align-top">
-                      <div className="font-bold text-foreground">{team.name_team}</div>
-                    </td>
-                    {RULE_GROUPS.map((group) => {
-                      const rule = getRule(rules, group.key);
-                      const totalBonus = totalBonusByMetric[group.key];
-                      const maxBonus = computeMaxBonus(totalBonus, rule.maxRate);
-                      return (
-                        <Fragment key={group.key}>
-                          {METRIC_HAS_THRESHOLD[group.key] ? (
-                            <td className="border border-slate-300 bg-white p-1">
-                              <RuleInput
-                                value={rule.thresholdValue}
-                                suffix="%"
-                                tone="percent"
-                                editable={isEditing}
-                                disabled={!isEditing}
-                                onChange={(value) => updateTeamRule(team.id, group.key, { thresholdValue: value ?? 0 })}
-                              />
-                            </td>
-                          ) : null}
-                          <td className="border border-slate-300 bg-white p-1">
-                            <RuleInput
-                              value={rule.rewardPerUnit}
-                              editable={isEditing}
-                              disabled={!isEditing}
-                              onChange={(value) => updateTeamRule(team.id, group.key, { rewardPerUnit: value ?? 0 })}
-                            />
-                          </td>
-                          <td className="border border-slate-300 bg-emerald-200 px-1 py-2 text-right font-bold text-emerald-900 tabular-nums">
-                            {formatVnd(totalBonus)}
-                          </td>
-                          {!METRIC_HAS_THRESHOLD[group.key] ? (
-                            <td className="border border-slate-300 bg-white px-1 py-2 text-right font-semibold text-rose-700 tabular-nums">
-                              {formatVnd(maxBonus)}
-                            </td>
-                          ) : null}
-                        </Fragment>
-                      );
-                    })}
-                    <td className="border border-slate-300 bg-white p-1">
-                      <RuleInput
-                        value={getRule(rules, "lead").maxRate}
-                        suffix="%"
-                        tone="max"
-                        editable={isEditing}
-                        disabled={!isEditing}
-                        onChange={(value) => {
-                          const maxRate = value ?? 0;
-                          RULE_GROUPS.forEach((group) => updateTeamRule(team.id, group.key, { maxRate }));
+      <section className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px] table-fixed border-collapse text-left text-[12px]">
+            <thead className="bg-slate-50 text-[11px] uppercase text-muted-foreground">
+              <tr>
+                <th className="w-[220px] px-3 py-3">Team</th>
+                <th className="w-[80px] px-2 py-3 text-right">Thành viên</th>
+                <th className="w-[110px] px-2 py-3">Trạng thái</th>
+                <th className="w-[90px] px-2 py-3 text-right">Ngưỡng (%)</th>
+                <th className="w-[110px] px-2 py-3 text-right">Bonus/đơn vị</th>
+                <th className="w-[120px] px-2 py-3 text-right">Total Bonus</th>
+                <th className="w-[90px] px-2 py-3 text-right">Max Rate</th>
+                <th className="w-[140px] px-2 py-3">Cập nhật lần cuối</th>
+                <th className="w-[60px] px-2 py-3 text-center">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">Đang tải...</td>
+                </tr>
+              ) : filteredRows.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">Không tìm thấy team nào.</td>
+                </tr>
+              ) : (
+                filteredRows.map((row) => {
+                  const isExpanded = expandedTeamId === row.team.id;
+                  const targets = teamTargetsById[row.team.id] || { lead: 0, inbox: 0, post: 0, comment: 0 };
+                  const { totalByMetric } = computeMetricBonuses(row.rules, targets);
+                  const baseRule = getRule(row.rules, "total_bonus");
+                  const leadRule = getRule(row.rules, "lead");
+                  const configured = row.source !== "default";
+                  return (
+                    <Fragment key={row.team.id}>
+                      <tr
+                        className="cursor-pointer border-t border-border hover:bg-slate-50"
+                        onClick={() => {
+                          setExpandedTeamId(isExpanded ? null : row.team.id);
+                          if (isExpanded) setAutoEditTeamId(null);
                         }}
-                      />
-                    </td>
-                    <td className="border border-border bg-slate-50 px-1 py-2 align-top">
-                      <div className="flex flex-col items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => toggleEdit(team.id)}
-                          className={cn(
-                            "flex h-7 w-full items-center justify-center gap-1 rounded px-2 text-[10px] font-semibold transition",
-                            isEditing ? "bg-emerald-600 text-white" : "bg-zinc-100 text-foreground hover:bg-zinc-200",
-                          )}
-                        >
-                          <MaterialIcon name={isEditing ? "lock_reset" : "edit"} className="text-sm" />
-                          {isEditing ? "Đang sửa" : "Sửa"}
-                        </button>
-                        {isEditing ? (
+                      >
+                        <td className="px-3 py-3">
+                          <div className="min-w-0">
+                            <div className="truncate font-bold text-foreground">{row.team.name_team}</div>
+                            <div className="truncate text-[10px] text-muted-foreground">
+                              Leader: {row.team.leader_name || row.team.leader_email || "—"}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-2 py-3 text-right tabular-nums">{row.team.number_of_member}</td>
+                        <td className="px-2 py-3">
+                          <span
+                            className={cn(
+                              "inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap",
+                              configured ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700",
+                            )}
+                          >
+                            {configured ? "Đang áp dụng" : "Chưa cấu hình"}
+                          </span>
+                        </td>
+                        <td className="px-2 py-3 text-right font-semibold text-amber-700 tabular-nums">
+                          {configured ? `${formatNumber(baseRule.thresholdValue)} %` : "—"}
+                        </td>
+                        <td className="px-2 py-3 text-right tabular-nums">{configured ? formatVnd(baseRule.rewardPerUnit) : "—"}</td>
+                        <td className="px-2 py-3 text-right font-bold text-emerald-800 tabular-nums">
+                          {configured ? formatVnd(totalByMetric.total_bonus) : "—"}
+                        </td>
+                        <td className="px-2 py-3 text-right tabular-nums">{configured ? `${formatNumber(leadRule.maxRate)} %` : "—"}</td>
+                        <td className="px-2 py-3 text-[11px] text-muted-foreground">
+                          {baseRule.updatedAt ? new Date(baseRule.updatedAt).toLocaleString("vi-VN") : "—"}
+                        </td>
+                        <td className="px-2 py-3 text-center">
                           <button
                             type="button"
-                            disabled={isSaving}
-                            onClick={() => saveTeam(team.id)}
-                            className="flex h-7 w-full items-center justify-center gap-1 rounded bg-primary px-2 text-[10px] font-semibold text-white disabled:opacity-50"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setExpandedTeamId(row.team.id);
+                              setAutoEditTeamId(row.team.id);
+                            }}
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-slate-100 hover:text-foreground"
+                            title="Sửa rule"
                           >
-                            {isSaving ? "..." : "Lưu"}
+                            <MaterialIcon name="edit" className="text-base" />
                           </button>
-                        ) : null}
-                        <button
-                          type="button"
-                          onClick={() => void toggleLogs(team.id)}
-                          className="flex h-7 w-full items-center justify-center gap-1 rounded bg-zinc-100 px-2 text-[10px] font-semibold text-foreground hover:bg-zinc-200"
-                        >
-                          <MaterialIcon name="history" className="text-sm" />
-                          Log
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-
-                if (logsTeamId !== team.id) return [mainRow];
-
-                const logs = logsByTeam[team.id] || [];
-                const logRow = (
-                  <tr key={`${team.id}-logs`}>
-                    <td colSpan={totalCols} className="border border-border bg-muted/20 px-4 py-3 text-left">
-                      <p className="mb-2 text-[11px] font-semibold text-muted-foreground">
-                        Nhật ký chỉnh sửa - {team.name_team}
-                      </p>
-                      {logs.length === 0 ? (
-                        <p className="text-[12px] text-muted-foreground">Chưa có thay đổi nào cho team và tuần này.</p>
-                      ) : (
-                        <ul className="space-y-2">
-                          {logs.map((log) => (
-                            <li key={log.id} className="rounded-lg border border-border bg-white px-3 py-2 text-[12px]">
-                              <div className="flex flex-wrap items-center gap-1.5 font-semibold text-foreground">
-                                <MaterialIcon name="person" className="text-sm text-muted-foreground" />
-                                {log.changedByName}
-                                <span className="font-normal text-muted-foreground">
-                                  · {new Date(log.createdAt).toLocaleString("vi-VN")}
-                                </span>
-                              </div>
-                              <ul className="mt-1 space-y-0.5 pl-5 text-muted-foreground">
-                                {log.changes.map((change, idx) => (
-                                  <li key={`${log.id}-${idx}`}>
-                                    {change.metricLabel} · {change.fieldLabel}:{" "}
-                                    <span className="font-semibold text-rose-700">{formatLogValue(change.field, change.oldValue)}</span>
-                                    {" → "}
-                                    <span className="font-semibold text-emerald-700">{formatLogValue(change.field, change.newValue)}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </td>
-                  </tr>
-                );
-                return [mainRow, logRow];
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-    </section>
+                        </td>
+                      </tr>
+                      {isExpanded ? (
+                        <tr>
+                          <td colSpan={9} className="border-t border-border bg-slate-50/60 p-3">
+                            <KpiRewardRuleTable
+                              teamId={row.team.id}
+                              selectedWeek={selectedWeek}
+                              autoEdit={autoEditTeamId === row.team.id}
+                              onChanged={() => {
+                                onChanged?.();
+                                void loadAll();
+                              }}
+                            />
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -1329,12 +1352,11 @@ export function AdminKpiRewardsPanel({
     const isAdmin = role === "admin" || role === "superadmin";
     const isReadOnly = role === "member";
 
-    // Admin quan ly nhieu team cung luc -> 1 bang to, moi team 1 dong (khong bam chon
-    // tung team). Leader/member chi co dung 1 team lien quan -> giu bang rule don nhu cu.
+    // Admin quan ly nhieu team - liet ke TAT CA team that (khong hardcode mau), moi
+    // team 1 dong tom tat kem thong ke tong quan, bam vao dong de mo rong sua rule
+    // chi tiet (thay vi phai chon tung team qua 1 o select).
     if (isAdmin) {
-      return (
-        <AdminAllTeamsKpiRuleTable teams={teams} selectedWeek={selectedWeek} onChanged={loadData} />
-      );
+      return <AdminTeamRuleAccordion teams={teams} selectedWeek={selectedWeek} onChanged={loadData} />;
     }
 
     const activeTeamId = teams[0]?.id || "";
@@ -1356,55 +1378,142 @@ export function AdminKpiRewardsPanel({
     );
   }
 
+  const teamSummaries = summary?.teamSummaries || [];
+  const memberSummaries = summary?.memberSummaries || [];
+  const teamsHitTarget = teamSummaries.filter((team) => team.kpiStatus === "dat").length;
+  const membersHitTarget = memberSummaries.filter((member) => member.kpiStatus === "dat").length;
+  const teamPctHit = teamSummaries.length ? Math.round((teamsHitTarget / teamSummaries.length) * 100) : 0;
+  const memberPctHit = memberSummaries.length ? Math.round((membersHitTarget / memberSummaries.length) * 100) : 0;
+  const approvedPct = summary?.totals.totalReward
+    ? Math.round(((summary.totals.approvedReward || 0) / summary.totals.totalReward) * 100)
+    : 0;
+
+  // Thanh vien dan dau tung team (theo tien thuong cao nhat) - giup Admin biet ngay
+  // team dang duoc "keo" boi ai, khong phai mo tung team ra moi thay.
+  const topMemberByTeam = new Map<string, KpiRewardMemberSummary>();
+  for (const member of memberSummaries) {
+    const current = topMemberByTeam.get(member.teamId);
+    if (!current || member.totalReward > current.totalReward) topMemberByTeam.set(member.teamId, member);
+  }
+
+  // Xep hang theo tien thuong cao nhat - tao cam giac canh tranh, dong bo voi bang
+  // Ket qua KPI & tien thuong ben duoi (cung xep theo tong thuong).
+  const rankedTeamSummaries = [...teamSummaries].sort((a, b) => b.totalReward - a.totalReward);
+  const RANK_MEDAL = ["🥇", "🥈", "🥉"];
+
   return (
     <div className="space-y-5">
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-xl border border-border bg-white p-4">
-          <div className="text-[11px] font-semibold uppercase text-muted-foreground">Tổng thưởng hệ thống</div>
-          <div className="mt-2 text-2xl font-bold">{formatVnd(summary?.totals.totalReward || 0)}</div>
+      {/* Man THEO DOI - 4 con so nguoi dung hieu ngay, khong dung thuat ngu quy trinh
+          noi bo ("Dang dung") gay kho hieu. Moi card co 1 dong phu de "day" hon,
+          chi dung so THAT tinh duoc tu du lieu hien co (khong bia so sanh tuan truoc
+          vi chua co endpoint tra du lieu tuan truoc). */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white">
+            <MaterialIcon name="account_balance_wallet" className="text-lg" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase leading-none text-emerald-700">Tổng thưởng dự kiến</p>
+            <p className="mt-1 text-xl font-black tabular-nums text-emerald-900">{formatVnd(summary?.totals.totalReward || 0)}</p>
+            <p className="mt-0.5 text-[10px] text-emerald-700/80">{teamSummaries.length} team · {memberSummaries.length} thành viên</p>
+          </div>
         </div>
-        <div className="rounded-xl border border-border bg-white p-4">
-          <div className="text-[11px] font-semibold uppercase text-muted-foreground">Đang dùng</div>
-          <div className="mt-2 text-2xl font-bold">{formatVnd(summary?.totals.approvedReward || 0)}</div>
+        <div className="flex items-center gap-2.5 rounded-xl border border-blue-200 bg-blue-50 p-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white">
+            <MaterialIcon name="verified" className="text-lg" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase leading-none text-blue-700">Thưởng đã chốt</p>
+            <p className="mt-1 text-xl font-black tabular-nums text-blue-900">{formatVnd(summary?.totals.approvedReward || 0)}</p>
+            <p className="mt-0.5 text-[10px] text-blue-700/80">{approvedPct}% so với tổng dự kiến</p>
+          </div>
         </div>
-        <div className="rounded-xl border border-border bg-white p-4">
-          <div className="text-[11px] font-semibold uppercase text-muted-foreground">Dự kiến</div>
-          <div className="mt-2 text-2xl font-bold">{formatVnd(summary?.totals.estimatedReward || 0)}</div>
+        <div className="flex items-center gap-2.5 rounded-xl border border-violet-200 bg-violet-50 p-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-600 text-white">
+            <MaterialIcon name="track_changes" className="text-lg" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase leading-none text-violet-700">Team đạt KPI</p>
+            <p className="mt-1 text-xl font-black tabular-nums text-violet-900">{teamsHitTarget} / {teamSummaries.length}</p>
+            <p className="mt-0.5 text-[10px] text-violet-700/80">{teamPctHit}% team đạt KPI</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-600 text-white">
+            <MaterialIcon name="groups" className="text-lg" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase leading-none text-amber-700">Thành viên đạt KPI</p>
+            <p className="mt-1 text-xl font-black tabular-nums text-amber-900">{membersHitTarget} / {memberSummaries.length}</p>
+            <p className="mt-0.5 text-[10px] text-amber-700/80">{memberPctHit}% thành viên đạt KPI</p>
+          </div>
         </div>
       </div>
 
       <section className="rounded-xl border border-border bg-white shadow-sm">
         <div className="border-b border-border px-5 py-4">
-          <h3 className="text-base font-bold text-foreground">Tổng thưởng từng team</h3>
+          <h3 className="text-base font-bold text-foreground">Tổng thưởng theo team</h3>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">Xếp hạng theo tiền thưởng dự kiến cao nhất.</p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[680px] text-left text-[12px]">
+          <table className="w-full min-w-[840px] text-left text-[12px]">
             <thead className="bg-slate-50 text-[11px] uppercase text-muted-foreground">
               <tr>
+                <th className="w-[48px] px-4 py-3">Hạng</th>
                 <th className="px-4 py-3">Team</th>
-                <th className="px-4 py-3">Leader</th>
                 <th className="px-4 py-3 text-right">Thành viên</th>
+                <th className="w-[170px] px-4 py-3">KPI trung bình</th>
                 <th className="px-4 py-3">Trạng thái</th>
-                <th className="px-4 py-3 text-right">Tổng thưởng</th>
+                <th className="px-4 py-3">Top member</th>
+                <th className="px-4 py-3 text-right">Thưởng dự kiến</th>
               </tr>
             </thead>
             <tbody>
-              {(summary?.teamSummaries || []).length === 0 ? (
+              {rankedTeamSummaries.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
+                  <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
                     Chưa có dữ liệu tổng hợp cho tuần này.
                   </td>
                 </tr>
               ) : (
-                summary!.teamSummaries.map((team) => (
-                  <tr key={team.teamId} className="border-t border-border">
-                    <td className="px-4 py-3 font-semibold">{team.teamName}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{team.leaderEmail}</td>
-                    <td className="px-4 py-3 text-right">{team.memberCount}</td>
-                    <td className="px-4 py-3"><StatusBadge status={team.status} /></td>
-                    <td className="px-4 py-3 text-right font-bold">{formatVnd(team.totalReward)}</td>
-                  </tr>
-                ))
+                rankedTeamSummaries.map((team, idx) => {
+                  const topMember = topMemberByTeam.get(team.teamId);
+                  return (
+                    <tr key={team.teamId} className="border-t border-border hover:bg-slate-50">
+                      <td className="px-4 py-3 text-muted-foreground">{RANK_MEDAL[idx] || idx + 1}</td>
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-foreground">{team.teamName}</div>
+                        <div className="text-[10px] text-muted-foreground">{team.leaderEmail}</div>
+                      </td>
+                      <td className="px-4 py-3 text-right">{team.memberCount}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className="w-9 shrink-0 text-right font-semibold tabular-nums">{formatNumber(team.kpiPercent)}%</span>
+                          <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                            <div
+                              className={cn("h-full rounded-full", KPI_GOAL_BAR[team.kpiStatus])}
+                              style={{ width: `${Math.min(100, team.kpiPercent)}%` }}
+                            />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3"><KpiGoalBadge status={team.kpiStatus} /></td>
+                      <td className="px-4 py-3">
+                        {topMember ? (
+                          <div>
+                            <div className="font-semibold text-foreground">{topMember.memberName}</div>
+                            <div className={cn("text-[10px] font-semibold", KPI_GOAL_TEXT[topMember.kpiStatus])}>
+                              {formatNumber(topMember.kpiPercent ?? 0)}%
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold">{formatVnd(team.totalReward)}</td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

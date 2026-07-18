@@ -2200,6 +2200,44 @@ export const crawlQueueService = {
   },
 };
 
+export interface PlatformOnlineAccount {
+  label: string;
+  online: boolean;
+}
+
+export interface PlatformOnlineTotal {
+  platform: "facebook" | "zalo";
+  online: number;
+  total: number;
+  available: boolean;
+  error: string | null;
+  accounts: PlatformOnlineAccount[];
+}
+
+export interface AccountOnlineSummary {
+  facebook: PlatformOnlineTotal;
+  zalo: PlatformOnlineTotal;
+  total: { online: number; total: number };
+}
+
+export const accountOnlineSummaryService = {
+  /**
+   * Tổng hợp Online/Total theo từng nền tảng (Facebook + Zalo).
+   * Admin thấy toàn hệ thống, Leader thấy theo team, Member thấy tài khoản của mình.
+   * Co timeout rieng (10s): Markee proxy o backend co the retry toi 45s x3 khi
+   * cham/loi - widget nay chi hien 1 con so, khong duoc de nguoi dung cho lau,
+   * timeout thi coi nhu "khong kha dung" thay vi treo "Dang tai..." vo han.
+   */
+  get: (): Promise<ApiResponse<AccountOnlineSummary>> => {
+    return requestJsonWithTimeout(
+      `${BASE}/accounts/online-summary`,
+      undefined,
+      10000,
+      "Không tải được dữ liệu online, thử lại sau.",
+    );
+  },
+};
+
 export const customerLeadsService = {
   async getLeads() {
     return requestJson<import('@/types/unified.types').CustomerLead[]>('/customer-leads');
