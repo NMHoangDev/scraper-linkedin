@@ -17,6 +17,7 @@ import { AdminKpiHistoryTable } from "@/components/all-platform/admin/dashboard/
 import { AdminKpiPerformanceChart } from "@/components/all-platform/admin/dashboard/AdminKpiPerformanceChart";
 import { AdminTeamTrendChart } from "@/components/all-platform/admin/dashboard/AdminTeamTrendChart";
 import { AdminUnassignedPosts } from "@/components/all-platform/admin/dashboard/AdminUnassignedPosts";
+import { OnlineTotalWidget } from "@/components/all-platform/accounts/OnlineTotalWidget";
 import { FaSyncAlt } from "react-icons/fa";
 
 export default function AdminDashboardPage() {
@@ -186,6 +187,8 @@ export default function AdminDashboardPage() {
       )}
 
       <AdminDashboardSummary data={summaryData} isLoading={loadingSummary} />
+
+      <OnlineTotalWidget />
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-6 xl:col-span-2">

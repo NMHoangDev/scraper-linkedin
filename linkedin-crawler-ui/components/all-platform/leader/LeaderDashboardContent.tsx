@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { MaterialIcon } from "@/components/ui";
+import { OnlineTotalWidget } from "@/components/all-platform/accounts/OnlineTotalWidget";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import {
   allPlatformGroupsService,
@@ -443,6 +444,8 @@ export function LeaderDashboardContent() {
         </div>
       ) : null}
 
+      <OnlineTotalWidget />
+
       <div className="grid grid-cols-3 gap-2 lg:grid-cols-6">
         <MetricCard label="Tổng groups" value={loading ? "..." : totalGroups} />
         <MetricCard label="Comment tuần này" value={loading ? "..." : totalComments} />
@@ -597,7 +600,7 @@ export function LeaderDashboardContent() {
           </SideInfoCard>
 
           <SideInfoCard
-            title="Account Safety"
+            title="Sức khỏe KPI thành viên"
             icon="shield"
             href="/all-platform/quan-ly-tai-khoan"
             actionLabel="Xem chi tiết"

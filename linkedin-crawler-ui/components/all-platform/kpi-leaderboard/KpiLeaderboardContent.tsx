@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
-import { MaterialIcon, type MaterialSymbolName } from "@/components/ui";
+import { MaterialIcon } from "@/components/ui";
+import { cn } from "@/lib/utils";
 import {
   allPlatformKpiService,
   teamsService,
@@ -60,6 +62,14 @@ interface TeamAggregate {
   members: MemberRow[];
 }
 
+interface AlertData {
+  teamName: string;
+  leaderName: string;
+  metric: MetricKey | null;
+  deficit: number;
+  noTarget: boolean;
+}
+
 const METRIC_KEYS: MetricKey[] = ["lead", "inbox", "post", "comment"];
 
 const METRIC_LABELS: Record<MetricKey, string> = {
@@ -67,13 +77,6 @@ const METRIC_LABELS: Record<MetricKey, string> = {
   inbox: "Inbox",
   post: "Post",
   comment: "Comment",
-};
-
-const METRIC_ICONS: Record<MetricKey, MaterialSymbolName> = {
-  lead: "assignment",
-  inbox: "forum",
-  post: "article",
-  comment: "comment",
 };
 
 const METRIC_COLORS: Record<MetricKey, string> = {
@@ -181,62 +184,105 @@ function shortTeamLabel(index: number, leaderName?: string) {
   return `T${index + 1}${last ? ` · ${last}` : ""}`;
 }
 
-function ProgressBar({ actual, target, color }: { actual: number; target: number; color: string }) {
+function ProgressBar({ actual, target, color, thick = false }: { actual: number; target: number; color: string; thick?: boolean }) {
   const pct = target > 0 ? Math.min(100, Math.round((actual / target) * 100)) : 0;
   return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-container-low">
+    <div className={cn("w-full overflow-hidden rounded-full bg-slate-100", thick ? "h-2" : "h-1.5")}>
       <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
     </div>
   );
 }
 
-function MetricIconBadge({ metricKey }: { metricKey: MetricKey }) {
-  const color = METRIC_COLORS[metricKey];
+// Segmented-control pill (Linear/Notion style): 1 track nen xam nhat chua het cac
+// lua chon, lua chon active la 1 pill trang noi bat + shadow nhe - thay cho kieu
+// "chip roi rac" truoc day.
+function SegmentedControl<T extends string>({
+  value,
+  onChange,
+  options,
+}: {
+  value: T;
+  onChange: (value: T) => void;
+  options: Array<{ value: T; label: string }>;
+}) {
   return (
-    <span
-      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg"
-      style={{ backgroundColor: `${color}1a`, color }}
-    >
-      <MaterialIcon name={METRIC_ICONS[metricKey]} className="text-[13px]" />
-    </span>
+    <div className="inline-flex flex-wrap items-center gap-0.5 rounded-full bg-slate-100 p-1">
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          onClick={() => onChange(opt.value)}
+          className={cn(
+            "rounded-full px-3 py-1.5 text-xs font-semibold transition",
+            value === opt.value
+              ? "bg-white text-on-surface shadow-sm"
+              : "text-on-surface-variant hover:text-on-surface",
+          )}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
-function DeltaBadge({ actual, target }: { actual: number; target: number }) {
-  if (target <= 0) {
-    return (
-      <span className="rounded-full bg-surface-container-low px-1.5 py-0.5 text-[10px] font-semibold text-on-surface-variant/70">
-        —
-      </span>
-    );
-  }
-  const gap = Math.max(0, target - actual);
-  if (gap === 0) {
-    return (
-      <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-600">OK</span>
-    );
-  }
-  const pct = Math.round((actual / target) * 100);
-  const tone = pct >= 40 ? "bg-amber-50 text-amber-600" : "bg-red-50 text-primary";
-  return <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${tone}`}>-{gap}</span>;
-}
-
-function Donut({ score }: { score: number }) {
+function Donut({ score, size = "md" }: { score: number; size?: "md" | "lg" }) {
   const tier = scoreTier(score);
   const tone = toneClasses(tier.tone);
   const pct = Math.max(0, Math.min(100, score));
   const color =
     tier.tone === "ok" ? "#059669" : tier.tone === "warn" ? "#d97706" : tier.tone === "idle" ? "#94a3b8" : "#dc2626";
+  const outer = size === "lg" ? "h-20 w-20" : "h-14 w-14";
+  const inner = size === "lg" ? "h-16 w-16" : "h-11 w-11";
+  const textSize = size === "lg" ? "text-base" : "text-xs";
   return (
     <div
-      className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full"
+      className={cn("flex shrink-0 items-center justify-center rounded-full", outer)}
       style={{
         background: `conic-gradient(${color} ${pct}%, #e5e7eb ${pct}% 100%)`,
       }}
     >
-      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-surface">
-        <span className={`text-xs font-black ${tone.text}`}>{score}%</span>
+      <div className={cn("flex items-center justify-center rounded-full bg-surface", inner)}>
+        <span className={cn("font-black", textSize, tone.text)}>{score}%</span>
       </div>
+    </div>
+  );
+}
+
+const ALERT_SEVERITY_META = {
+  high: { label: "Cao", chip: "bg-red-50 text-red-600", icon: "bg-red-50 text-red-600" },
+  medium: { label: "Trung bình", chip: "bg-amber-50 text-amber-600", icon: "bg-amber-50 text-amber-600" },
+  low: { label: "Thấp", chip: "bg-slate-100 text-on-surface-variant", icon: "bg-slate-100 text-on-surface-variant" },
+} as const;
+
+// Team chua co target (noTarget) luon la muc "Cao" - can giao KPI ngay, khong de
+// bi lan vao thang hang theo deficit voi cac team da co target that. `rank` la thu
+// hang trong so cac alert co target that (tinh o ngoai, truyen vao).
+function AlertItem({ alert, rank }: { alert: AlertData; rank: number }) {
+  const severity = alert.noTarget ? "high" : rank === 0 ? "high" : rank <= 2 ? "medium" : "low";
+  const meta = ALERT_SEVERITY_META[severity];
+  return (
+    <div className="flex items-start gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-slate-50">
+      <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full", meta.icon)}>
+        <MaterialIcon name={alert.noTarget ? "error_outline" : "warning_amber"} className="text-base" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-bold text-on-surface">{alert.teamName}</p>
+        <p className="mt-0.5 text-xs leading-snug text-on-surface-variant">
+          {alert.noTarget ? (
+            <>
+              Chưa có mục tiêu KPI tuần này · Cần giao KPI cho leader{" "}
+              <span className="font-semibold text-on-surface">{alert.leaderName}</span>.
+            </>
+          ) : (
+            <>
+              Thiếu {alert.deficit} {METRIC_LABELS[alert.metric as MetricKey]} · Ưu tiên leader{" "}
+              <span className="font-semibold text-on-surface">{alert.leaderName}</span> đẩy hôm nay.
+            </>
+          )}
+        </p>
+      </div>
+      <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold", meta.chip)}>{meta.label}</span>
     </div>
   );
 }
@@ -252,6 +298,28 @@ export function KpiLeaderboardContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [showAllAlerts, setShowAllAlerts] = useState(false);
+  // Portal modal ra <body> - trang nay nam trong layout co sidebar/card dung CSS
+  // transform (hover, animation...), neu render "fixed inset-0" ngay tai cho thi
+  // se bi "neo" vao ancestor co transform thay vi viewport, bop modal thanh 1 cot
+  // moi vai chuc px (xem giai thich chi tiet o StageTransitionModal.tsx). Chi
+  // portal sau khi mount tren client de tranh hydration mismatch.
+  const [mountedModal, setMountedModal] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setMountedModal(true), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (showAllAlerts) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [showAllAlerts]);
 
   useEffect(() => {
     const loadTeams = async () => {
@@ -288,9 +356,21 @@ export function KpiLeaderboardContent() {
 
           const teamMembersList: LooseTeamMember[] = team.members || [];
           const hasLeaderAlready = teamMembersList.some((m) => m.id === team.id_leader);
-          const allMembers = hasLeaderAlready
+          const allMembersRaw = hasLeaderAlready
             ? teamMembersList
             : [...teamMembersList, { id: team.id_leader, email: team.leader_email, name: team.leader_name }];
+          // De-dupe theo id (fallback email) - team.members tu API doi khi chua
+          // dong bo (vd id kieu khac nhau giua team.members va id_leader lam
+          // hasLeaderAlready so sanh sai), gay trung dong React key ("Encountered
+          // two children with the same key"). Loc lai o day de chac chan moi
+          // thanh vien chi xuat hien 1 lan trong 1 team, bat ke nguyen nhan trung.
+          const seenMemberIds = new Set<string>();
+          const allMembers = allMembersRaw.filter((member) => {
+            const identity = String(member.id || member.email || "").trim();
+            if (!identity || seenMemberIds.has(identity)) return false;
+            seenMemberIds.add(identity);
+            return true;
+          });
 
           const teamMetrics = emptyMetrics();
           const members: MemberRow[] = allMembers.map((member) => {
@@ -352,28 +432,33 @@ export function KpiLeaderboardContent() {
   const overallTone = toneClasses(overallTier.tone);
 
   const alerts = useMemo(() => {
-    const items: Array<{ teamName: string; leaderName: string; metric: MetricKey; deficit: number }> = [];
+    const items: AlertData[] = [];
     teamAggregates.forEach((agg) => {
       let worstMetric: MetricKey | null = null;
       let worstDeficit = 0;
+      let hasAnyTarget = false;
       METRIC_KEYS.forEach((key) => {
         const { actual, target } = agg.metrics[key];
+        if (target > 0) hasAnyTarget = true;
         const deficit = target - actual;
         if (target > 0 && deficit > worstDeficit) {
           worstDeficit = deficit;
           worstMetric = key;
         }
       });
-      if (worstMetric) {
-        items.push({
-          teamName: agg.team.name_team,
-          leaderName: agg.team.leader_name,
-          metric: worstMetric,
-          deficit: worstDeficit,
-        });
+      // Team CHUA CO muc tieu KPI nao (target=0 het) truoc day bi bo qua hoan toan
+      // khoi danh sach canh bao - trong khi day moi la truong hop can xu ly gap
+      // nhat (team chua duoc giao KPI tuan nay), khong phai team dang lam do da co
+      // target that chi con thieu mot phan.
+      if (!hasAnyTarget) {
+        items.push({ teamName: agg.team.name_team, leaderName: agg.team.leader_name, metric: null, deficit: Infinity, noTarget: true });
+      } else if (worstMetric) {
+        items.push({ teamName: agg.team.name_team, leaderName: agg.team.leader_name, metric: worstMetric, deficit: worstDeficit, noTarget: false });
       }
     });
-    return items.sort((a, b) => b.deficit - a.deficit).slice(0, 5);
+    // Khong gioi han o day nua - danh sach day du de trong Modal "Xem tat ca", chi
+    // rut gon o UI chinh (2 dong dau) qua showAllAlerts.
+    return items.sort((a, b) => b.deficit - a.deficit);
   }, [teamAggregates]);
 
   const visibleTeamAggregates = useMemo(
@@ -443,8 +528,8 @@ export function KpiLeaderboardContent() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 bg-surface font-sans">
-      <div className="flex flex-col gap-2 rounded-xl border border-outline-variant bg-surface px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 bg-slate-50 font-sans">
+      <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white px-6 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-lg font-bold leading-tight text-on-surface">KPI Dashboard — Leaderboard</h1>
           <p className="text-xs leading-tight text-on-surface-variant">
@@ -466,7 +551,7 @@ export function KpiLeaderboardContent() {
           <select
             value={selectedWeek}
             onChange={(event) => setSelectedWeek(event.target.value)}
-            className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm font-semibold text-on-surface outline-none transition focus:border-primary focus:ring-1 focus:ring-primary/20"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-on-surface outline-none transition focus:border-primary focus:ring-1 focus:ring-primary/20"
           >
             {recentWeeks.map((week) => (
               <option key={week.value} value={week.value}>
@@ -483,24 +568,31 @@ export function KpiLeaderboardContent() {
         </div>
       ) : null}
 
-      {/* Overview + alerts */}
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-        <div className={`relative overflow-hidden rounded-xl px-5 py-4 text-white ${overallTier.tone === "ok" ? "bg-emerald-900" : overallTier.tone === "warn" ? "bg-amber-900" : "bg-slate-900"}`}>
-          <p className="text-xs font-semibold uppercase tracking-wide text-white/70">KPI tuần hiện tại</p>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-4xl font-black">{loading ? "…" : `${overallScore}%`}</span>
-            <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${overallTone.chip}`}>{overallTier.label}</span>
-          </div>
-          <p className="mt-1 text-xs text-white/70">Tổng hợp toàn bộ team seeding</p>
+      {/* Overview + alerts - nen trang/nhat thay cho khoi xanh den truoc day, 2 card
+          cao bang nhau, bo goc lon + shadow nhe kieu SaaS hien dai. */}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+          <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant">KPI tuần hiện tại</p>
 
-          <div className="mt-4 grid grid-cols-4 gap-2">
+          <div className="mt-3 flex items-center gap-4">
+            <Donut score={overallScore} size="lg" />
+            <div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-black text-on-surface">{loading ? "…" : `${overallScore}%`}</span>
+                <span className={cn("rounded-full px-2 py-0.5 text-xs font-bold", overallTone.chip)}>{overallTier.label}</span>
+              </div>
+              <p className="mt-1 text-xs text-on-surface-variant">Tổng hợp toàn bộ team seeding</p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
             {METRIC_KEYS.map((key) => (
-              <div key={key} className="rounded-lg bg-white/10 px-2 py-1.5">
-                <p className="flex items-center gap-1 text-[10px] font-semibold uppercase text-white/60">
+              <div key={key} className="rounded-xl bg-slate-50 px-3 py-2.5">
+                <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase text-on-surface-variant">
                   <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: METRIC_COLORS[key] }} />
                   {METRIC_LABELS[key]}
                 </p>
-                <p className="text-sm font-bold">
+                <p className="mt-1 text-sm font-bold text-on-surface">
                   {overallMetrics[key].actual}/{overallMetrics[key].target}
                 </p>
               </div>
@@ -508,85 +600,110 @@ export function KpiLeaderboardContent() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-outline-variant bg-surface p-3">
-          <h3 className="flex items-center gap-1.5 text-sm font-bold text-on-surface">
-            <MaterialIcon name="warning" className="text-base text-amber-600" />
-            Việc cần xử lý hôm nay
-          </h3>
-          <div className="mt-2 space-y-1.5">
+        {/* Notification-center style: icon tron + noi dung + badge muc do, khong
+            con khung xam to bao ngoai tung item. Chi hien 2 dong dau, con lai xem
+            qua popup "Xem tat ca" de khong lam day card. */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="flex items-center gap-1.5 text-sm font-bold text-on-surface">
+              <MaterialIcon name="warning" className="text-base text-amber-600" />
+              Việc cần xử lý hôm nay
+            </h3>
+            {alerts.length > 2 ? (
+              <button
+                type="button"
+                onClick={() => setShowAllAlerts(true)}
+                className="text-[11px] font-semibold text-primary hover:underline"
+              >
+                Xem tất cả ({alerts.length})
+              </button>
+            ) : null}
+          </div>
+          <div className="mt-3 space-y-1">
             {loading ? (
               <p className="text-xs text-on-surface-variant">Đang tải...</p>
             ) : alerts.length === 0 ? (
               <p className="text-xs text-on-surface-variant">Không có cảnh báo — tất cả team đang bám sát KPI.</p>
             ) : (
-              alerts.map((alert, index) => (
-                <div key={`${alert.teamName}-${alert.metric}`} className="flex items-start gap-2 rounded-lg bg-surface-container-low px-2.5 py-1.5">
-                  <MaterialIcon
-                    name={index === 0 ? "warning_amber" : "warning"}
-                    className={`mt-0.5 text-sm ${index === 0 ? "text-red-600" : "text-amber-600"}`}
-                  />
-                  <p className="text-xs leading-snug text-on-surface">
-                    <span className="font-bold">{alert.teamName}</span>: thiếu {alert.deficit} {METRIC_LABELS[alert.metric]}.
-                    Ưu tiên leader <span className="font-semibold">{alert.leaderName}</span> đẩy trong hôm nay.
-                  </p>
-                </div>
-              ))
+              alerts.slice(0, 2).map((alert, index) => {
+                const rank = alerts.slice(0, index).filter((a) => !a.noTarget).length;
+                return <AlertItem key={`${alert.teamName}-${alert.metric ?? "no-target"}`} alert={alert} rank={rank} />;
+              })
             )}
           </div>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col flex-wrap gap-2 rounded-xl border border-outline-variant bg-surface px-3 py-2.5 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold text-on-surface-variant">Bộ lọc nhanh TEAM</span>
-          <button
-            type="button"
-            onClick={() => setSelectedTeamId("all")}
-            className={`rounded-full px-2.5 py-1 text-xs font-semibold transition ${
-              selectedTeamId === "all" ? "bg-primary text-white" : "bg-surface-container-low text-on-surface-variant hover:text-on-surface"
-            }`}
-          >
-            Tất cả
-          </button>
-          {teamAggregates.map((agg) => (
-            <button
-              key={agg.team.id}
-              type="button"
-              onClick={() => setSelectedTeamId(agg.team.id)}
-              className={`rounded-full px-2.5 py-1 text-xs font-semibold transition ${
-                selectedTeamId === agg.team.id ? "bg-primary text-white" : "bg-surface-container-low text-on-surface-variant hover:text-on-surface"
-              }`}
+      {showAllAlerts && mountedModal && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[99999] isolate flex items-center justify-center bg-slate-950/40 p-4"
+              onClick={() => setShowAllAlerts(false)}
             >
-              {agg.shortLabel}
-            </button>
-          ))}
+              <div
+                className="flex max-h-[80vh] w-[500px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+                  <h3 className="flex items-center gap-1.5 text-sm font-bold text-on-surface">
+                    <MaterialIcon name="warning" className="text-base text-amber-600" />
+                    Việc cần xử lý hôm nay ({alerts.length})
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowAllAlerts(false)}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg text-on-surface-variant hover:bg-slate-100"
+                  >
+                    <MaterialIcon name="close" className="text-base" />
+                  </button>
+                </div>
+                <div className="space-y-1 overflow-y-auto px-3 py-3">
+                  {alerts.map((alert, index) => {
+                    const rank = alerts.slice(0, index).filter((a) => !a.noTarget).length;
+                    return <AlertItem key={`${alert.teamName}-${alert.metric ?? "no-target"}`} alert={alert} rank={rank} />;
+                  })}
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+
+      {/* Filters - segmented control kieu Linear/Notion thay vi chip roi rac */}
+      <div className="flex flex-col flex-wrap gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <span className="text-xs font-semibold text-on-surface-variant">Team</span>
+          <SegmentedControl
+            value={selectedTeamId}
+            onChange={setSelectedTeamId}
+            options={[
+              { value: "all", label: "Tất cả" },
+              ...teamAggregates.map((agg) => ({ value: agg.team.id, label: agg.shortLabel })),
+            ]}
+          />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold text-on-surface-variant">CHẾ ĐỘ XEM</span>
-          {(["overall", ...METRIC_KEYS] as ViewMode[]).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setViewMode(mode)}
-              className={`rounded-full px-2.5 py-1 text-xs font-semibold transition ${
-                viewMode === mode ? "bg-primary text-white" : "bg-surface-container-low text-on-surface-variant hover:text-on-surface"
-              }`}
-            >
-              {mode === "overall" ? "Tổng hợp" : METRIC_LABELS[mode]}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <span className="text-xs font-semibold text-on-surface-variant">Chế độ xem</span>
+          <SegmentedControl
+            value={viewMode}
+            onChange={setViewMode}
+            options={(["overall", ...METRIC_KEYS] as ViewMode[]).map((mode) => ({
+              value: mode,
+              label: mode === "overall" ? "Tổng hợp" : METRIC_LABELS[mode],
+            }))}
+          />
         </div>
       </div>
 
-      <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+      <div className="rounded-2xl border border-amber-100 bg-amber-50 px-5 py-3 text-xs text-amber-800">
         KPI được tính theo trọng số: Lead 40% · Inbox 30% · Comment 20% · Post 10%. Team nào không có KPI cho 1 chỉ số
         sẽ tự bỏ trọng số chỉ số đó để tránh méo điểm.
       </div>
 
-      {/* Team cards */}
-      <div className="grid gap-2.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
+      {/* Team cards - vien mong dong nhat + shadow nhe, mau nhan dien chi con o
+          avatar (khong con vien mau to phia tren nhu truoc). */}
+      <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(270px, 1fr))" }}>
         {(loading && teamAggregates.length === 0
           ? teams
           : visibleTeamAggregates.length > 0
@@ -596,24 +713,32 @@ export function KpiLeaderboardContent() {
           const index = teamAggregates.findIndex((a) => a.team.id === team.id);
           const agg = teamAggregates.find((a) => a.team.id === team.id);
           const color = agg?.color || TEAM_COLORS[(index < 0 ? 0 : index) % TEAM_COLORS.length];
+          // Chi tinh la "can bu" khi deficit THAT SU duong (con thieu) - truoc day
+          // khong loc nen team da lam VUOT target (deficit am) van bi hien nham
+          // thanh "Can bu -1 Comment", vo ly.
           const worstMetric = agg
             ? visibleMetricKeys.reduce<{ key: MetricKey; deficit: number } | null>((worst, key) => {
                 const deficit = agg.metrics[key].target - agg.metrics[key].actual;
-                if (agg.metrics[key].target > 0 && deficit > (worst?.deficit ?? -Infinity)) {
+                if (agg.metrics[key].target > 0 && deficit > 0 && deficit > (worst?.deficit ?? 0)) {
                   return { key, deficit };
                 }
                 return worst;
               }, null)
             : null;
+          // "Vuot KPI" CHI khi co it nhat 1 chi so actual > target that su (deficit
+          // am). Neu actual == target dung boc (deficit = 0) thi la "Dat KPI", KHONG
+          // phai "Vuot" - truoc day khong phan biet 2 truong hop nay.
+          const exceededAny = agg
+            ? METRIC_KEYS.some((key) => agg.metrics[key].target > 0 && agg.metrics[key].actual > agg.metrics[key].target)
+            : false;
 
           return (
             <div
               key={team.id}
-              className="min-w-0 overflow-hidden rounded-xl border border-outline-variant bg-surface p-3 shadow-sm transition-shadow hover:shadow-md"
-              style={{ borderTopWidth: 3, borderTopColor: color }}
+              className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition-shadow hover:shadow-[0_12px_28px_rgba(15,23,42,0.09)]"
             >
               <div className="flex items-start justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2.5">
                   <span
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold text-white shadow-sm"
                     style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}
@@ -623,39 +748,40 @@ export function KpiLeaderboardContent() {
                   <div className="min-w-0">
                     <p className="truncate text-sm font-bold text-on-surface">{team.name_team}</p>
                     <p className="truncate text-[11px] text-on-surface-variant">
-                      Leader: {team.leader_name} · {team.number_of_member ?? agg?.memberCount ?? 0} members
+                      Leader: {team.leader_name} · {team.number_of_member ?? agg?.memberCount ?? 0} thành viên
                     </p>
                   </div>
                 </div>
                 {agg ? <Donut score={agg.score} /> : null}
               </div>
 
-              <div className="mt-2.5 space-y-1.5">
+              <div className="mt-4 space-y-2.5">
                 {visibleMetricKeys.map((key) => (
-                  <div key={key} className="flex items-center gap-2">
-                    <MetricIconBadge metricKey={key} />
-                    <span className="w-16 shrink-0 text-[11px] font-medium text-on-surface-variant">{METRIC_LABELS[key]}</span>
-                    <div className="min-w-0 flex-1">
-                      <ProgressBar
-                        actual={agg?.metrics[key].actual ?? 0}
-                        target={agg?.metrics[key].target ?? 0}
-                        color={METRIC_COLORS[key]}
-                      />
+                  <div key={key} className="space-y-1">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="flex items-center gap-1.5 font-medium text-on-surface-variant">
+                        <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: METRIC_COLORS[key] }} />
+                        {METRIC_LABELS[key]}
+                      </span>
+                      <span className="font-semibold text-on-surface tabular-nums">
+                        {agg ? `${agg.metrics[key].actual} / ${agg.metrics[key].target}` : "…"}
+                      </span>
                     </div>
-                    <span className="w-12 shrink-0 text-right text-[11px] font-semibold text-on-surface">
-                      {agg ? `${agg.metrics[key].actual}/${agg.metrics[key].target}` : "…"}
-                    </span>
-                    {agg ? <DeltaBadge actual={agg.metrics[key].actual} target={agg.metrics[key].target} /> : null}
+                    <ProgressBar actual={agg?.metrics[key].actual ?? 0} target={agg?.metrics[key].target ?? 0} color={METRIC_COLORS[key]} />
                   </div>
                 ))}
               </div>
 
-              <div className="mt-2.5 flex items-center justify-between gap-2">
+              <div className="mt-4 flex items-center justify-between gap-2 border-t border-slate-100 pt-3">
                 <span className="text-[11px] text-on-surface-variant">
                   {worstMetric ? (
                     <>
                       Cần bù <span className="font-semibold text-on-surface">{worstMetric.deficit} {METRIC_LABELS[worstMetric.key]}</span>
                     </>
+                  ) : exceededAny ? (
+                    <span className="font-semibold text-emerald-600">Vượt KPI 🎉</span>
+                  ) : agg && METRIC_KEYS.some((key) => agg.metrics[key].target > 0) ? (
+                    <span className="font-semibold text-emerald-600">Đạt KPI</span>
                   ) : (
                     "Đang bám KPI"
                   )}
@@ -663,7 +789,7 @@ export function KpiLeaderboardContent() {
                 <button
                   type="button"
                   onClick={() => goToTeamMembers(team.id)}
-                  className="inline-flex items-center justify-center rounded-lg border border-outline-variant px-2.5 py-1 text-[11px] font-semibold text-on-surface-variant transition hover:bg-surface-container-low"
+                  className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-on-surface-variant transition hover:bg-slate-50"
                 >
                   Members →
                 </button>
@@ -673,9 +799,10 @@ export function KpiLeaderboardContent() {
         })}
       </div>
 
-      {/* Member table */}
-      <div ref={memberTableRef} className="overflow-hidden rounded-xl border border-outline-variant bg-surface">
-        <div className="flex flex-col gap-2 border-b border-outline-variant px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+      {/* Member table - header sticky, zebra row, badge Team pastel, progress bar
+          thay khoang trang o cot KPI. */}
+      <div ref={memberTableRef} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+        <div className="flex flex-col gap-2 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <h3 className="flex items-center gap-1.5 text-sm font-bold text-on-surface">
             <MaterialIcon name="groups" className="text-base text-primary" />
             Member cần follow — {recentWeeks.find((w) => w.value === selectedWeek)?.label.split(" (")[0] || ""}
@@ -684,7 +811,7 @@ export function KpiLeaderboardContent() {
             <select
               value={selectedTeamId}
               onChange={(event) => setSelectedTeamId(event.target.value)}
-              className="rounded-lg border border-outline-variant bg-surface px-2.5 py-1.5 text-xs font-semibold text-on-surface outline-none"
+              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-on-surface outline-none"
             >
               <option value="all">Tất cả team</option>
               {teamAggregates.map((agg) => (
@@ -705,52 +832,65 @@ export function KpiLeaderboardContent() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="max-h-[560px] overflow-auto">
           <table className="w-full text-xs">
-            <thead className="border-b border-outline-variant bg-surface-container-low">
+            <thead className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50">
               <tr>
-                <th className="px-3 py-1.5 text-left text-[10px] font-semibold uppercase text-on-surface-variant">Member</th>
-                <th className="px-3 py-1.5 text-left text-[10px] font-semibold uppercase text-on-surface-variant">Team</th>
+                <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase text-on-surface-variant">Member</th>
+                <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase text-on-surface-variant">Team</th>
                 {visibleMetricKeys.map((key) => (
-                  <th key={key} className="px-3 py-1.5 text-left text-[10px] font-semibold uppercase text-on-surface-variant">
+                  <th key={key} className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase text-on-surface-variant">
                     <span className="inline-flex items-center gap-1.5">
                       <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: METRIC_COLORS[key] }} />
                       {METRIC_LABELS[key]}
                     </span>
                   </th>
                 ))}
-                <th className="px-3 py-1.5 text-left text-[10px] font-semibold uppercase text-on-surface-variant">Score</th>
-                <th className="px-3 py-1.5 text-left text-[10px] font-semibold uppercase text-on-surface-variant">Ưu tiên xử lý</th>
+                <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase text-on-surface-variant">Score</th>
+                <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase text-on-surface-variant">Ưu tiên xử lý</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={visibleMetricKeys.length + 4} className="px-3 py-4 text-center text-xs text-on-surface-variant">
+                  <td colSpan={visibleMetricKeys.length + 4} className="px-4 py-6 text-center text-xs text-on-surface-variant">
                     Đang tải dữ liệu...
                   </td>
                 </tr>
               ) : memberRows.length === 0 ? (
                 <tr>
-                  <td colSpan={visibleMetricKeys.length + 4} className="px-3 py-4 text-center text-xs text-on-surface-variant">
+                  <td colSpan={visibleMetricKeys.length + 4} className="px-4 py-6 text-center text-xs text-on-surface-variant">
                     Không có dữ liệu.
                   </td>
                 </tr>
               ) : (
-                memberRows.map((member) => {
+                memberRows.map((member, rowIdx) => {
                   const tier = scoreTier(member.score);
                   const tone = toneClasses(tier.tone);
+                  // Chi tinh la "Thieu" khi deficit THAT SU duong - truoc day khong
+                  // loc nen member lam VUOT target (deficit am) bi hien nham thanh
+                  // "Thieu -1 Comment" (vo ly, dang le phai la "Vuot KPI").
                   const worst = METRIC_KEYS.reduce<{ key: MetricKey; deficit: number } | null>((acc, key) => {
                     const deficit = member.metrics[key].target - member.metrics[key].actual;
-                    if (member.metrics[key].target > 0 && deficit > (acc?.deficit ?? -Infinity)) {
+                    if (member.metrics[key].target > 0 && deficit > 0 && deficit > (acc?.deficit ?? 0)) {
                       return { key, deficit };
                     }
                     return acc;
                   }, null);
+                  const hasAnyTarget = METRIC_KEYS.some((key) => member.metrics[key].target > 0);
+                  // "Vuot KPI" CHI khi actual > target that su o it nhat 1 chi so -
+                  // actual == target dung boc thi la "Dat KPI", khong phai "Vuot".
+                  const exceededAny = METRIC_KEYS.some((key) => member.metrics[key].target > 0 && member.metrics[key].actual > member.metrics[key].target);
 
                   return (
-                    <tr key={member.id} className="border-b border-outline-variant last:border-b-0 hover:bg-surface-container-low/50">
-                      <td className="px-3 py-1.5">
+                    <tr
+                      key={`${member.teamId}-${member.id}`}
+                      className={cn(
+                        "border-b border-slate-100 transition-colors last:border-b-0 hover:bg-slate-50",
+                        rowIdx % 2 === 1 && "bg-slate-50/50",
+                      )}
+                    >
+                      <td className="px-4 py-2.5">
                         <div className="flex items-center gap-2">
                           <span
                             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white shadow-sm"
@@ -761,7 +901,7 @@ export function KpiLeaderboardContent() {
                           <span className="truncate font-semibold text-on-surface">{member.name}</span>
                         </div>
                       </td>
-                      <td className="px-3 py-1.5">
+                      <td className="px-4 py-2.5">
                         <span
                           className="rounded-full px-2 py-0.5 text-[10px] font-bold"
                           style={{ backgroundColor: `${member.teamColor}1a`, color: member.teamColor }}
@@ -770,24 +910,32 @@ export function KpiLeaderboardContent() {
                         </span>
                       </td>
                       {visibleMetricKeys.map((key) => (
-                        <td key={key} className="px-3 py-1.5">
-                          <div className="flex min-w-[90px] items-center gap-1.5">
-                            <div className="w-14 shrink-0">
-                              <ProgressBar actual={member.metrics[key].actual} target={member.metrics[key].target} color={METRIC_COLORS[key]} />
-                            </div>
+                        <td key={key} className="px-4 py-2.5">
+                          <div className="flex min-w-[100px] flex-col gap-1">
                             <span className="text-[11px] font-medium text-on-surface-variant">
                               {member.metrics[key].actual}/{member.metrics[key].target}
                             </span>
+                            <div className="w-20">
+                              <ProgressBar actual={member.metrics[key].actual} target={member.metrics[key].target} color={METRIC_COLORS[key]} />
+                            </div>
                           </div>
                         </td>
                       ))}
-                      <td className="px-3 py-1.5">
+                      <td className="px-4 py-2.5">
                         <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${tone.chip}`}>
                           {member.score}% · {tier.label}
                         </span>
                       </td>
-                      <td className="px-3 py-1.5 text-[11px] font-medium text-on-surface-variant">
-                        {worst ? `Thiếu ${worst.deficit} ${METRIC_LABELS[worst.key]}` : "Đang bám KPI"}
+                      <td className="px-4 py-2.5 text-[11px] font-medium">
+                        {worst ? (
+                          <span className="text-on-surface-variant">Thiếu {worst.deficit} {METRIC_LABELS[worst.key]}</span>
+                        ) : exceededAny ? (
+                          <span className="font-semibold text-emerald-600">Vượt KPI 🎉</span>
+                        ) : hasAnyTarget ? (
+                          <span className="font-semibold text-emerald-600">Đạt KPI</span>
+                        ) : (
+                          <span className="text-on-surface-variant">Đang bám KPI</span>
+                        )}
                       </td>
                     </tr>
                   );
