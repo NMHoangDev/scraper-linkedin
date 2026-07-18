@@ -1,0 +1,350 @@
+⨯ ./components/all-platform/customers/CrmKanbanBoard.tsx:502:15
+Expected ',', got 'ident'
+  [90m500 |[0m           </h3>
+  [90m501 |[0m         </div>
+[31m[1m>[0m [90m502 |[0m         <span className=[32m"rounded-full bg-slate-100 px-2.5 py-1 text-[12px] font-bold text...[0m
+  [90m    |[0m               [31m[1m^^^^^^^^^[0m
+  [90m503 |[0m           {items.length}
+  [90m504 |[0m         </span>
+  [90m505 |[0m       </div>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./components/all-platform/customers/CrmKanbanBoard.tsx [Client Component Browser]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Client Component Browser]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Server Component]
+    ./app/(all-platform)/all-platform/crm/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/all-platform/customers/CrmKanbanBoard.tsx [Client Component SSR]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Client Component SSR]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Server Component]
+    ./app/(all-platform)/all-platform/crm/page.tsx [Server Component]
+
+
+⨯ ./components/all-platform/customers/CrmKanbanBoard.tsx:502:15
+Expected ',', got 'ident'
+  [90m500 |[0m           </h3>
+  [90m501 |[0m         </div>
+[31m[1m>[0m [90m502 |[0m         <span className=[32m"rounded-full bg-slate-100 px-2.5 py-1 text-[12px] font-bold text...[0m
+  [90m    |[0m               [31m[1m^^^^^^^^^[0m
+  [90m503 |[0m           {items.length}
+  [90m504 |[0m         </span>
+  [90m505 |[0m       </div>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./components/all-platform/customers/CrmKanbanBoard.tsx [Client Component Browser]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Client Component Browser]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Server Component]
+    ./app/(all-platform)/all-platform/crm/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/all-platform/customers/CrmKanbanBoard.tsx [Client Component SSR]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Client Component SSR]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Server Component]
+    ./app/(all-platform)/all-platform/crm/page.tsx [Server Component]
+
+
+[browser] Uncaught Error: ./components/all-platform/customers/CrmKanbanBoard.tsx:502:15
+Expected ',', got 'ident'
+  500 |           </h3>
+  501 |         </div>
+> 502 |         <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[12px] font-bold text...
+      |               ^^^^^^^^^
+  503 |           {items.length}
+  504 |         </span>
+  505 |       </div>
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./components/all-platform/customers/CrmKanbanBoard.tsx [Client Component Browser]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Client Component Browser]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Server Component]
+    ./app/(all-platform)/all-platform/crm/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/all-platform/customers/CrmKanbanBoard.tsx [Client Component SSR]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Client Component SSR]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Server Component]
+    ./app/(all-platform)/all-platform/crm/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./components/all-platform/customers/CrmKanbanBoard.tsx:502:15)
+    at <unknown> (Error: (./components/all-platform/customers/CrmKanbanBoard.tsx:502:15)
+⨯ ./components/all-platform/customers/CrmKanbanBoard.tsx:389:7
+Expected corresponding JSX closing tag for <article>
+  [90m387 |[0m         </div>
+  [90m388 |[0m       </div>
+[31m[1m>[0m [90m389 |[0m     </div>
+  [90m    |[0m       [31m[1m^^^[0m
+  [90m390 |[0m   );
+  [90m391 |[0m }
+  [90m392 |[0m
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./components/all-platform/customers/CrmKanbanBoard.tsx [Client Component Browser]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Client Component Browser]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Server Component]
+    ./app/(all-platform)/all-platform/crm/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/all-platform/customers/CrmKanbanBoard.tsx [Client Component SSR]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Client Component SSR]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Server Component]
+    ./app/(all-platform)/all-platform/crm/page.tsx [Server Component]
+
+
+⨯ ./components/all-platform/customers/CrmKanbanBoard.tsx:389:7
+Expected corresponding JSX closing tag for <article>
+  [90m387 |[0m         </div>
+  [90m388 |[0m       </div>
+[31m[1m>[0m [90m389 |[0m     </div>
+  [90m    |[0m       [31m[1m^^^[0m
+  [90m390 |[0m   );
+  [90m391 |[0m }
+  [90m392 |[0m
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./components/all-platform/customers/CrmKanbanBoard.tsx [Client Component Browser]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Client Component Browser]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Server Component]
+    ./app/(all-platform)/all-platform/crm/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/all-platform/customers/CrmKanbanBoard.tsx [Client Component SSR]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Client Component SSR]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Server Component]
+    ./app/(all-platform)/all-platform/crm/page.tsx [Server Component]
+
+
+[browser] Uncaught Error: ./components/all-platform/customers/CrmKanbanBoard.tsx:389:7
+Expected corresponding JSX closing tag for <article>
+  387 |         </div>
+  388 |       </div>
+> 389 |     </div>
+      |       ^^^
+  390 |   );
+  391 | }
+  392 |
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./components/all-platform/customers/CrmKanbanBoard.tsx [Client Component Browser]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Client Component Browser]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Server Component]
+    ./app/(all-platform)/all-platform/crm/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/all-platform/customers/CrmKanbanBoard.tsx [Client Component SSR]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Client Component SSR]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Server Component]
+    ./app/(all-platform)/all-platform/crm/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./components/all-platform/customers/CrmKanbanBoard.tsx:389:7)
+    at <unknown> (Error: (./components/all-platform/customers/CrmKanbanBoard.tsx:389:7)
+⨯ ./components/all-platform/customers/CrmKanbanBoard.tsx:181:3
+Expected ':', got 'if'
+  [90m179 |[0m           ? [32m"Chưa đạt điều kiện chốt"[0m
+  [90m180 |[0m
+[31m[1m>[0m [90m181 |[0m   [36mif[0m (customer.note) {
+  [90m    |[0m   [31m[1m^^[0m
+  [90m182 |[0m     [36mreturn[0m [32m`Ghi chú: [0m${customer.note[32m}`[0m;
+  [90m183 |[0m   }
+  [90m184 |[0m
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./components/all-platform/customers/CrmKanbanBoard.tsx [Client Component Browser]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Client Component Browser]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Server Component]
+    ./app/(all-platform)/all-platform/crm/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/all-platform/customers/CrmKanbanBoard.tsx [Client Component SSR]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Client Component SSR]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Server Component]
+    ./app/(all-platform)/all-platform/crm/page.tsx [Server Component]
+
+
+⨯ ./components/all-platform/customers/CrmKanbanBoard.tsx:181:3
+Expected ':', got 'if'
+  [90m179 |[0m           ? [32m"Chưa đạt điều kiện chốt"[0m
+  [90m180 |[0m
+[31m[1m>[0m [90m181 |[0m   [36mif[0m (customer.note) {
+  [90m    |[0m   [31m[1m^^[0m
+  [90m182 |[0m     [36mreturn[0m [32m`Ghi chú: [0m${customer.note[32m}`[0m;
+  [90m183 |[0m   }
+  [90m184 |[0m
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./components/all-platform/customers/CrmKanbanBoard.tsx [Client Component Browser]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Client Component Browser]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Server Component]
+    ./app/(all-platform)/all-platform/crm/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/all-platform/customers/CrmKanbanBoard.tsx [Client Component SSR]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Client Component SSR]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Server Component]
+    ./app/(all-platform)/all-platform/crm/page.tsx [Server Component]
+
+
+[browser] Uncaught Error: ./components/all-platform/customers/CrmKanbanBoard.tsx:181:3
+Expected ':', got 'if'
+  179 |           ? "Chưa đạt điều kiện chốt"
+  180 |
+> 181 |   if (customer.note) {
+      |   ^^
+  182 |     return `Ghi chú: ${customer.note}`;
+  183 |   }
+  184 |
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./components/all-platform/customers/CrmKanbanBoard.tsx [Client Component Browser]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Client Component Browser]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Server Component]
+    ./app/(all-platform)/all-platform/crm/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/all-platform/customers/CrmKanbanBoard.tsx [Client Component SSR]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Client Component SSR]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Server Component]
+    ./app/(all-platform)/all-platform/crm/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./components/all-platform/customers/CrmKanbanBoard.tsx:181:3)
+    at <unknown> (Error: (./components/all-platform/customers/CrmKanbanBoard.tsx:181:3)
+[browser] ./components/all-platform/customers/CrmKanbanBoard.tsx:181:3
+Expected ':', got 'if'
+  179 |           ? "Chưa đạt điều kiện chốt"
+  180 |
+> 181 |   if (customer.note) {
+      |   ^^
+  182 |     return `Ghi chú: ${customer.note}`;
+  183 |   }
+  184 |
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./components/all-platform/customers/CrmKanbanBoard.tsx [Client Component Browser]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Client Component Browser]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Server Component]
+    ./app/(all-platform)/all-platform/crm/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/all-platform/customers/CrmKanbanBoard.tsx [Client Component SSR]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Client Component SSR]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Server Component]
+    ./app/(all-platform)/all-platform/crm/page.tsx [Server Component] 
+[browser] ./components/all-platform/customers/CrmKanbanBoard.tsx:181:3
+Expected ':', got 'if'
+  179 |           ? "Chưa đạt điều kiện chốt"
+  180 |
+> 181 |   if (customer.note) {
+      |   ^^
+  182 |     return `Ghi chú: ${customer.note}`;
+  183 |   }
+  184 |
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./components/all-platform/customers/CrmKanbanBoard.tsx [Client Component Browser]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Client Component Browser]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Server Component]
+    ./app/(all-platform)/all-platform/crm/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/all-platform/customers/CrmKanbanBoard.tsx [Client Component SSR]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Client Component SSR]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Server Component]
+    ./app/(all-platform)/all-platform/crm/page.tsx [Server Component] 
+[browser] ./components/all-platform/customers/CrmKanbanBoard.tsx:181:3
+Expected ':', got 'if'
+  179 |           ? "Chưa đạt điều kiện chốt"
+  180 |
+> 181 |   if (customer.note) {
+      |   ^^
+  182 |     return `Ghi chú: ${customer.note}`;
+  183 |   }
+  184 |
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./components/all-platform/customers/CrmKanbanBoard.tsx [Client Component Browser]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Client Component Browser]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Server Component]
+    ./app/(all-platform)/all-platform/crm/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./components/all-platform/customers/CrmKanbanBoard.tsx [Client Component SSR]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Client Component SSR]
+    ./components/all-platform/customers/CrmCustomersPage.tsx [Server Component]
+    ./app/(all-platform)/all-platform/crm/page.tsx [Server Component] 
+[browser] Uncaught ReferenceError: AlertTriangle is not defined
+    at TerminalReviewForm (components/all-platform/customers/TerminalReviewForm.tsx:375:14)
+    at StageTransitionModal (components/all-platform/customers/StageTransitionModal.tsx:594:11)
+    at CrmCustomersPage (file://C:/Code/scraper-linkedin/linkedin-crawler-ui/.next/dev/static/chunks/_12lrrfn._.js:8421:235)
+    at CrmRoute (app\(all-platform)\all-platform\crm\page.tsx:10:10)
+  373 |
+  374 |           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text...
+> 375 |             <AlertTriangle className="mr-2 inline-block size-4 text-amber-500" />
+      |              ^
+  376 |             Trạng thái kết thúc. Sau khi lưu, deal sẽ đóng vòng pipeline.
+  377 |           </div>
+  378 |
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[browser] Uncaught ReferenceError: AlertTriangle is not defined
+    at TerminalReviewForm (components/all-platform/customers/TerminalReviewForm.tsx:374:14)
+    at StageTransitionModal (components/all-platform/customers/StageTransitionModal.tsx:594:11)
+    at CrmCustomersPage (components/all-platform/customers/CrmCustomersPage.tsx:561:9)
+    at CrmRoute (app\(all-platform)\all-platform\crm\page.tsx:10:10)
+  372 |
+  373 |           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text...
+> 374 |             <AlertTriangle className="mr-2 inline-block size-4 text-amber-500" />
+      |              ^
+  375 |             Trạng thái kết thúc. Sau khi lưu, deal sẽ đóng vòng pipeline.
+  376 |           </div>
+  377 |
+[browser] Uncaught ReferenceError: AlertTriangle is not defined
+    at TerminalReviewForm (components/all-platform/customers/TerminalReviewForm.tsx:374:14)
+    at StageTransitionModal (components/all-platform/customers/StageTransitionModal.tsx:594:11)
+    at CrmCustomersPage (components/all-platform/customers/CrmCustomersPage.tsx:561:9)
+    at CrmRoute (app\(all-platform)\all-platform\crm\page.tsx:10:10)
+  372 |
+  373 |           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text...
+> 374 |             <AlertTriangle className="mr-2 inline-block size-4 text-amber-500" />
+      |              ^
+  375 |             Trạng thái kết thúc. Sau khi lưu, deal sẽ đóng vòng pipeline.
+  376 |           </div>
+  377 |
+⚠ Fast Refresh had to perform a full reload due to a runtime error.

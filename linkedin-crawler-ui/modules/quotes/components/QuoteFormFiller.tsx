@@ -22,6 +22,17 @@ interface Props {
 
 type RowRecord = Record<string, unknown>;
 
+const WIDE_FIELD_KEYS = new Set([
+  'quoteTitle',
+  'quoteSubtitle',
+  'quoteBenefitLine',
+  'customerNeed',
+  'customerRequirement',
+  'proposedSolution',
+  'solutionOverview',
+  'projectScope',
+]);
+
 function emptyItemRow(): QuoteItem {
   return { description: '', serviceDescription: '', unit: '', quantity: 1, unitPrice: 0, vatRate: 10 };
 }
@@ -125,6 +136,7 @@ function FieldInput({
 }) {
   if (field.visible === false) return null;
   const disabled = field.editable === false;
+  const fieldClass = `crm-field ${field.type === 'textarea' || field.type === 'repeatable-textarea' || WIDE_FIELD_KEYS.has(field.key) ? 'crm-field--full' : ''}`;
   const label = (
     <>
       <span>
@@ -148,7 +160,7 @@ function FieldInput({
     else if (field.key === 'paymentPhaseTwoAmount')
       computed = (totals.totalAmount * sanitizeMoneyInput(data.paymentPhaseTwoPercent)) / 100;
     return (
-      <label className="crm-field">
+      <label className={fieldClass}>
         {label}
         <input value={formatVnd(computed)} disabled readOnly />
       </label>
@@ -157,7 +169,7 @@ function FieldInput({
 
   if (field.type === 'auto-number' || field.config?.generatedWhenCreatingQuote) {
     return (
-      <label className="crm-field">
+      <label className={fieldClass}>
         {label}
         <input value="Sẽ sinh khi lưu" disabled readOnly />
       </label>
@@ -166,7 +178,7 @@ function FieldInput({
 
   if (field.type === 'checkbox') {
     return (
-      <label className="crm-field quote-switch">
+      <label className={`${fieldClass} quote-switch`}>
         <input
           type="checkbox"
           checked={Boolean(value)}
@@ -180,7 +192,7 @@ function FieldInput({
 
   if (field.type === 'select') {
     return (
-      <label className="crm-field">
+      <label className={fieldClass}>
         {label}
         <select
           value={String(value ?? field.defaultValue ?? '')}
@@ -200,7 +212,7 @@ function FieldInput({
 
   if (field.type === 'textarea') {
     return (
-      <label className="crm-field crm-field--full">
+      <label className={fieldClass}>
         {label}
         <textarea
           value={String(value ?? field.defaultValue ?? '')}
@@ -215,7 +227,7 @@ function FieldInput({
   if (field.type === 'repeatable-textarea') {
     const rows = Array.isArray(value) ? value : Array.isArray(field.defaultValue) ? field.defaultValue : [];
     return (
-      <label className="crm-field crm-field--full">
+      <label className={fieldClass}>
         {label}
         <textarea
           value={(rows as string[]).join('\n')}
@@ -239,7 +251,7 @@ function FieldInput({
             : 'text';
 
   return (
-    <label className="crm-field">
+    <label className={fieldClass}>
       {label}
       <input
         type={inputType}

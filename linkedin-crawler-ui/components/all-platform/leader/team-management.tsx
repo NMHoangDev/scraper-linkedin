@@ -8,6 +8,7 @@ import { teamsService, allPlatformKpiService } from "@/services/all-platform.ser
 import { cn } from "@/lib/utils";
 import type { TeamRow } from "@/services/all-platform.service";
 import { PlatformStatsRow, PlatformStatCard } from "@/components/features/shared/PlatformStatCard";
+import { KpiRewardRuleTable, LeaderKpiRewardSections } from "@/components/all-platform/kpi-rewards/KpiRewardSections";
 import { AssignKpiModal } from "./AssignKpiModal";
 import { BulkAssignKpiModal } from "./BulkAssignKpiModal";
 import { TeamModal } from "./TeamModal";
@@ -873,6 +874,19 @@ export function TeamManagement() {
           </table>
         </div>
       </div>
+
+      {selectedTeamId && (
+        <div className="mt-5 space-y-5">
+          <KpiRewardRuleTable teamId={selectedTeamId} selectedWeek={selectedWeek} />
+        </div>
+      )}
+
+      {selectedTeamId && (
+        <LeaderKpiRewardSections
+          teamId={selectedTeamId}
+          selectedWeek={selectedWeek}
+        />
+      )}
 
       {assignModalOpen && selectedMember && (
         <AssignKpiModal
