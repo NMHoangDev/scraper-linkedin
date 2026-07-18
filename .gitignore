@@ -21,6 +21,9 @@ linkedin-crawler-ui/npm-debug.log*
 linkedin-crawler-ui/yarn-debug.log*
 linkedin-crawler-ui/yarn-error.log*
 linkedin-crawler-ui/.pnpm-debug.log*
+linkedin-crawler-ui/dev-*.log
+linkedin-crawler-ui/dev-*.err.log
+linkedin-crawler-ui/frontend_dev*.log
 
 # FE env/local secrets
 linkedin-crawler-ui/.env*
@@ -32,6 +35,9 @@ linkedin_group_crawler/venv/
 linkedin_group_crawler/.pytest_cache/
 linkedin_group_crawler/.env
 linkedin_group_crawler/*.env.dev
+linkedin_group_crawler/backend_*.log
+linkedin_group_crawler/backend_*.err.log
+linkedin_group_crawler/backend_*.out.log
 
 # BE runtime/session/state
 linkedin_group_crawler/storage/session/**
