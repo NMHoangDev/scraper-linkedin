@@ -150,9 +150,13 @@ export function CrmShell() {
 
   async function handleDelete(deal: Deal) {
     if (!window.confirm(`Xóa deal "${deal.customerName}"?`)) return;
-    await deleteDeal(deal.id);
-    setDetailOpen(false);
-    setSelectedDeal(null);
+    try {
+      await deleteDeal(deal.id);
+      setDetailOpen(false);
+      setSelectedDeal(null);
+    } catch (err) {
+      window.alert(err instanceof Error ? humanizeCrmError(err.message) : 'Không xóa được deal. Vui lòng thử lại.');
+    }
   }
 
   async function handleMove(payload: StageTransitionInput) {
