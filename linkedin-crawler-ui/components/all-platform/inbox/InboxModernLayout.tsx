@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import type { RefObject } from "react";
 import {
   Inbox as InboxIcon,
@@ -17,13 +17,16 @@ import {
   Star,
   UserPlus,
   Send,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import TeamAccountTree from "@/components/all-platform/inbox/TeamAccountTree";
 import { KpiProgressCard } from "@/components/all-platform/components/kpi-progress-card";
 import { CrmCustomerModal } from "@/components/all-platform/components/CrmCustomerModal";
-import { useAppAuth } from "@/contexts/AppAuthContext";
+import { SalesAssetPickerModal } from "@/components/all-platform/sales-assets/SalesAssetPickerModal";
+import { customerLeadService, type Customer } from "@/services/customer-lead.service";
+import type { SalesAsset } from "@/services/sales-asset.service";
 
 interface Session { user_id: string; fb_user_id?: string; label?: string; owner?: string; online?: boolean; inbox_enabled?: boolean; status?: string; }
 interface Conv { conv_id: string; name: string; preview: string; unread: boolean; time: string; is_customer: boolean; pushed_to_zalo: boolean; deleted: boolean; archived?: boolean; archived_at?: string; }
@@ -228,12 +231,12 @@ export default function InboxModernLayout(props: Props) {
   const [isBulkVerifying, setIsBulkVerifying] = useState(false);
   const [showLeadModal, setShowLeadModal] = useState(false);
   const [showAddAccountPicker, setShowAddAccountPicker] = useState(false);
+  const [showSalesAssetPicker, setShowSalesAssetPicker] = useState(false);
+  const [currentLead, setCurrentLead] = useState<Customer | null>(null);
   const [accountBarOpen, setAccountBarOpen] = useState(true);
   const [trackSearchOpen, setTrackSearchOpen] = useState(false);
   const [trackSearchQuery, setTrackSearchQuery] = useState("");
   const [trackSelectedIds, setTrackSelectedIds] = useState<Set<string>>(new Set());
-  const { user } = useAppAuth();
-
   const selectedSession = sessions.find(s => s.user_id === acc);
   const selectedConv = activeConvs.find(c => c.conv_id === openConv) || filtered.find(c => c.conv_id === openConv);
   const selectedArchive = archives.find(a => a.conv_id === openConv);
@@ -267,6 +270,33 @@ export default function InboxModernLayout(props: Props) {
 
   const canSend = !!openConv && !archiveReading && accOnline && !accPaused && !needRelogin;
   const appendTemplate = (text: string) => setReply(reply.trim() ? `${reply.trim()}\n${text}` : text);
+  const appendSalesAsset = (asset: SalesAsset) => {
+    const link = asset.sourceUrl || asset.shareUrl;
+    const meta = [asset.projectName, asset.version].filter(Boolean).join(" - ");
+    const text = `${asset.title}${meta ? ` (${meta})` : ""}\n${link}`;
+    setReply(reply.trim() ? `${reply.trim()}\n${text}` : text);
+    setShowSalesAssetPicker(false);
+    showToastKpi("Đã chèn tài liệu vào ô trả lời.", true);
+  };
+
+  useEffect(() => {
+    if (!openConv) {
+      void Promise.resolve().then(() => setCurrentLead(null));
+      return;
+    }
+    let cancelled = false;
+    void Promise.resolve().then(async () => {
+      try {
+        const lead = await customerLeadService.getByConvId(openConv);
+        if (!cancelled) setCurrentLead(lead);
+      } catch {
+        if (!cancelled) setCurrentLead(null);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [openConv]);
 
   const showToastKpi = (msg: string, ok: boolean) => {
     setKpiToast({ msg, ok });
@@ -764,6 +794,15 @@ export default function InboxModernLayout(props: Props) {
 
           <div className="border-t border-border bg-card p-3">
             <div className="mb-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setShowSalesAssetPicker(true)}
+                disabled={!openConv || archiveReading}
+                className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-700 transition hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <FileText size={13} />
+                Gửi tài liệu
+              </button>
               {activeTemplateGroup.items.slice(0, 3).map(item => (
                 <button key={item} onClick={() => appendTemplate(item)} disabled={!openConv || archiveReading}
                   className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary transition hover:bg-primary/20 disabled:opacity-40 disabled:cursor-not-allowed">
@@ -1004,6 +1043,14 @@ export default function InboxModernLayout(props: Props) {
           </div>
         </aside>
       </div>
+
+      <SalesAssetPickerModal
+        open={showSalesAssetPicker}
+        onClose={() => setShowSalesAssetPicker(false)}
+        onSend={appendSalesAsset}
+        customerLeadId={currentLead?.id || null}
+        dealId={currentLead?.id || null}
+      />
 
       {toast && <div className={cn("fixed bottom-6 right-6 z-50 rounded-xl px-5 py-3.5 font-semibold text-white shadow-lg", toast.ok ? "bg-green-600" : "bg-red-600")}>{toast.msg}</div>}
       {kpiToast && <div className={cn("fixed bottom-6 right-6 z-50 rounded-xl px-5 py-3.5 font-semibold text-white shadow-lg", kpiToast.ok ? "bg-green-600" : "bg-red-600")}>{kpiToast.msg}</div>}

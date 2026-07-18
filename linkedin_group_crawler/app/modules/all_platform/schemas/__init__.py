@@ -47,6 +47,17 @@ from app.modules.all_platform.schemas.quote import (
     QuoteCreateRequest,
     QuoteUpdateRequest,
 )
+from app.modules.all_platform.schemas.sales_asset import (
+    SalesAssetCreateRequest,
+    SalesAssetUpdateRequest,
+    SalesAssetSendRequest,
+)
+from app.modules.all_platform.schemas.kpi_reward import (
+    KpiRewardRulesSaveRequest,
+    KpiRewardSubmitRequest,
+    KpiRewardReviewRequest,
+    KpiRewardSummaryRequest,
+)
 from app.modules.all_platform.schemas.auth import (
     RegisterRequest,
     LoginRequest,

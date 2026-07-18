@@ -52,6 +52,26 @@ function formatDateVN(value: unknown): string {
   return `${day}/${month}/${date.getFullYear()}`;
 }
 
+function textValue(value: unknown): string {
+  return String(value ?? '').trim();
+}
+
+function splitLines(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(item => textValue(item)).filter(Boolean);
+  return textValue(value)
+    .split('\n')
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+
+function cleanDocumentText(value: unknown): string {
+  return textValue(value)
+    .replace(/[✅⭐★☆✔✓☑️]/g, '')
+    .replace(/^\s*\d+\.\s*/, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 export function QuoteDocumentRenderer({
   schemaSnapshot,
   quoteData = {},
@@ -84,29 +104,22 @@ export function QuoteDocumentRenderer({
   const visibleColumns =
     findField('quoteItems').config?.columns?.filter(column => column.visible !== false) || [];
 
-  const renderCell = (item: QuoteItem, column: QuoteField) => {
+  const renderCell = (item: QuoteItem, column: QuoteField, index: number) => {
+    if (column.type === 'auto-number' || column.key === 'order') return String(index + 1);
     if (column.key === 'subtotal') return formatVnd(calculateItemSubtotal(item));
     if (column.key === 'vatAmount') return formatVnd(calculateItemVat(item));
     if (column.key === 'total') return formatVnd(calculateItemTotal(item));
     if (column.key === 'unitPrice') return formatVnd(item.unitPrice);
+    if (column.key === 'quantity') return String(item.quantity || '');
+    if (column.key === 'vatRate') return item.vatRate ? `${item.vatRate}%` : '';
     const value = item[column.key] ?? item.description ?? '';
     return String(value || '');
   };
 
   const notesValue = fieldValue('notes');
-  const notesRows = Array.isArray(notesValue)
-    ? notesValue.map(item => String(item))
-    : String(notesValue || '')
-        .split('\n')
-        .map(item => item.trim())
-        .filter(Boolean);
+  const notesRows = splitLines(notesValue).map(cleanDocumentText).filter(Boolean);
   const commitments = fieldValue('commitments');
-  const commitmentRows = Array.isArray(commitments)
-    ? commitments
-    : String(commitments || '')
-        .split('\n')
-        .map(item => item.trim())
-        .filter(Boolean);
+  const commitmentRows = splitLines(commitments).map(cleanDocumentText).filter(Boolean);
   const activeSolutionItems =
     solutionItems.length > 0
       ? solutionItems
@@ -124,6 +137,39 @@ export function QuoteDocumentRenderer({
     if (column.type === 'currency') return formatVnd(Number(value || 0));
     return String(value ?? '');
   };
+
+  const customerRows = findSection('customer')
+    .fields.filter(field => field.visible !== false)
+    .map(field => ({
+      key: field.key,
+      label: field.label,
+      value: textValue(fieldValue(field.key)),
+      placeholder: `[${field.label}]`,
+    }));
+  const validUntil = textValue(fieldValue('offerExpiryDate'))
+    ? formatDateVN(fieldValue('offerExpiryDate'))
+    : textValue(fieldValue('validityDays'))
+      ? `${textValue(fieldValue('validityDays'))} ngày kể từ ngày báo giá`
+      : '';
+  const insightRows = [
+    ['customerNeed', 'Nhu cầu khách hàng'],
+    ['customerRequirement', 'Yêu cầu chính'],
+    ['proposedSolution', 'Giải pháp đề xuất'],
+    ['solutionOverview', 'Tóm tắt giải pháp'],
+    ['projectScope', 'Phạm vi triển khai'],
+  ]
+    .map(([key, label]) => ({ key, label, value: textValue(fieldValue(key)) }))
+    .filter(row => row.value);
+  const defaultColumns: QuoteField[] = [
+    { key: 'order', label: 'STT', type: 'auto-number' as const },
+    { key: 'serviceDescription', label: 'Hạng mục', type: 'text' as const },
+    { key: 'unit', label: 'ĐVT', type: 'text' as const },
+    { key: 'quantity', label: 'SL', type: 'number' as const },
+    { key: 'unitPrice', label: 'Đơn giá', type: 'currency' as const },
+    { key: 'vatRate', label: 'VAT', type: 'number' as const },
+    { key: 'total', label: 'Thành tiền', type: 'currency' as const },
+  ];
+  const standardColumns = visibleColumns.length ? visibleColumns : defaultColumns;
 
   if (layoutType === 'villa_solution_package') {
     const setupTotal = activeSolutionItems.reduce(
@@ -146,8 +192,10 @@ export function QuoteDocumentRenderer({
           <section className="villa-hero">
             <p className="villa-to">Kính gửi: {String(fieldValue('customerRecipient') || '[Tên khách hàng]')}</p>
             <h1 className="villa-title">{String(fieldValue('quoteTitle'))}</h1>
-            <p className="villa-subtitle">{String(fieldValue('quoteSubtitle'))}</p>
-            <div className="villa-benefit">{String(fieldValue('quoteBenefitLine'))}</div>
+            <p className="villa-subtitle">{cleanDocumentText(fieldValue('quoteSubtitle'))}</p>
+            {cleanDocumentText(fieldValue('quoteBenefitLine')) ? (
+              <div className="villa-benefit">{cleanDocumentText(fieldValue('quoteBenefitLine'))}</div>
+            ) : null}
           </section>
 
           <section className="villa-table-wrap">
@@ -242,10 +290,10 @@ export function QuoteDocumentRenderer({
 
   return (
     <div className="quote-document-renderer" data-mode={mode}>
-      <section className="quote-sheet">
-        <header className="sheet-company">
-          <div>
-            <h2>{String(fieldValue('sellerCompanyName') || '[Tên công ty]')}</h2>
+      <section className="quote-sheet quote-sheet--standard">
+        <header className="sheet-company sheet-company--standard">
+          <div className="sheet-brand-block">
+            <div className="sheet-brand-mark">{String(fieldValue('sellerCompanyName') || 'MARKEE')}</div>
             <p>{String(fieldValue('sellerAddress'))}</p>
             <p>
               {String(fieldValue('sellerPhone'))}
@@ -253,19 +301,30 @@ export function QuoteDocumentRenderer({
               {fieldValue('sellerWebsite') ? ` · ${String(fieldValue('sellerWebsite'))}` : ''}
             </p>
           </div>
+          <div className="sheet-doc-code">
+            <span>BÁO GIÁ</span>
+            <strong>{String(fieldValue('quoteNumber') || '[Số báo giá]')}</strong>
+          </div>
         </header>
 
-        <section className="sheet-parties">
+        <section className="sheet-title-block sheet-title-block--standard">
+          <p className="sheet-eyebrow">Đề xuất thương mại</p>
+          <h1>{String(fieldValue('quoteTitle') || 'Bảng báo giá')}</h1>
+          <div className="sheet-quote-meta sheet-quote-meta--cards">
+            <span><b>Ngày báo giá</b>{formatDateVN(fieldValue('quoteDate')) || '[Ngày báo giá]'}</span>
+            <span><b>Hiệu lực</b>{validUntil || '[Thời hạn hiệu lực]'}</span>
+            <span><b>Tiền tệ</b>{String(fieldValue('currency') || 'VND')}</span>
+          </div>
+        </section>
+
+        <section className="sheet-parties sheet-parties--standard">
           <div>
             <h3>{findSection('customer').title || 'Thông tin khách hàng'}</h3>
-            {findSection('customer')
-              .fields.filter(field => field.visible !== false)
-              .map(field => (
-                <p key={field.key} className={!fieldValue(field.key) && mode === 'preview' ? 'placeholder' : ''}>
-                  <strong>{field.label}:</strong>{' '}
-                  {String(fieldValue(field.key) || `[${field.label}]`)}
-                </p>
-              ))}
+            {customerRows.map(row => (
+              <p key={row.key} className={!row.value && mode === 'preview' ? 'placeholder' : ''}>
+                <strong>{row.label}:</strong> {row.value || row.placeholder}
+              </p>
+            ))}
           </div>
           <div>
             <h3>Người phụ trách</h3>
@@ -275,27 +334,29 @@ export function QuoteDocumentRenderer({
           </div>
         </section>
 
-        <section className="sheet-title-block">
-          <h1>{String(fieldValue('quoteTitle') || 'Bảng báo giá')}</h1>
-          <div className="sheet-quote-meta">
-            <span>{findField('customerCompanyName').label}: {String(fieldValue('customerCompanyName') || '[Tên khách hàng]')}</span>
-            <span>{findField('quoteNumber').label}: {String(fieldValue('quoteNumber') || '[Số báo giá]')}</span>
-            <span>{findField('quoteDate').label}: {formatDateVN(fieldValue('quoteDate')) || '[Ngày báo giá]'}</span>
-          </div>
-        </section>
+        {insightRows.length ? (
+          <section className="sheet-insights">
+            <h3>Nhu cầu & giải pháp đề xuất</h3>
+            <div className="sheet-insight-grid">
+              {insightRows.map(row => (
+                <div key={row.key} className="sheet-insight-item">
+                  <span>{row.label}</span>
+                  <p>{row.value}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <section className="sheet-items">
-          <h3>{findSection('quoteItems').title || 'Bảng dịch vụ'}</h3>
+          <div className="sheet-section-heading">
+            <span>Chi phí đề xuất</span>
+            <h3>{findSection('quoteItems').title || 'Bảng dịch vụ'}</h3>
+          </div>
           <table className="sheet-items-table">
             <thead>
               <tr>
-                {(visibleColumns.length ? visibleColumns : [
-                  { key: 'serviceDescription', label: 'Tên dịch vụ', type: 'text' as const },
-                  { key: 'unit', label: 'ĐVT', type: 'text' as const },
-                  { key: 'quantity', label: 'SL', type: 'number' as const },
-                  { key: 'unitPrice', label: 'Đơn giá', type: 'currency' as const },
-                  { key: 'vatRate', label: 'VAT', type: 'number' as const },
-                ]).map(column => (
+                {standardColumns.map(column => (
                   <th key={column.key}>{column.label}</th>
                 ))}
               </tr>
@@ -303,21 +364,25 @@ export function QuoteDocumentRenderer({
             <tbody>
               {quoteItems.length === 0 ? (
                 <tr>
-                  <td colSpan={Math.max(visibleColumns.length, 5)} className="empty-row">
-                    Chưa có dòng dịch vụ.
+                  <td colSpan={Math.max(standardColumns.length, 1)} className="empty-row">
+                    Chưa có hạng mục báo giá.
                   </td>
                 </tr>
               ) : (
                 quoteItems.map((item, index) => (
                   <tr key={item.id || index}>
-                    {(visibleColumns.length ? visibleColumns : [
-                      { key: 'serviceDescription', label: 'Tên dịch vụ', type: 'text' as const },
-                      { key: 'unit', label: 'ĐVT', type: 'text' as const },
-                      { key: 'quantity', label: 'SL', type: 'number' as const },
-                      { key: 'unitPrice', label: 'Đơn giá', type: 'currency' as const },
-                      { key: 'vatRate', label: 'VAT', type: 'number' as const },
-                    ]).map(column => (
-                      <td key={column.key}>{renderCell(item, column)}</td>
+                    {standardColumns.map(column => (
+                      <td
+                        key={column.key}
+                        className={
+                          column.type === 'currency' ||
+                          ['unitPrice', 'subtotal', 'vatAmount', 'total'].includes(column.key)
+                            ? 'money-cell'
+                            : undefined
+                        }
+                      >
+                        {renderCell(item, column, index)}
+                      </td>
                     ))}
                   </tr>
                 ))
@@ -326,7 +391,7 @@ export function QuoteDocumentRenderer({
           </table>
         </section>
 
-        <section className="sheet-total-block">
+        <section className="sheet-total-block sheet-total-block--standard">
           <div className="sheet-total-row">
             <span>{findField('subtotalAmount').label || 'Tổng trước VAT'}</span>
             <strong>{formatVnd(totals.subtotalAmount)}</strong>
@@ -342,10 +407,13 @@ export function QuoteDocumentRenderer({
         </section>
 
         {notesRows.length ? (
-          <section className="sheet-note">
-            {notesRows.map((line, index) => (
-              <p key={index}>{line}</p>
-            ))}
+          <section className="sheet-note sheet-note--terms">
+            <h3>Điều khoản & ghi chú</h3>
+            <ul>
+              {notesRows.map((line, index) => (
+                <li key={index}>{line}</li>
+              ))}
+            </ul>
           </section>
         ) : null}
 

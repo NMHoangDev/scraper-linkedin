@@ -1,0 +1,575 @@
+[browser] Uncaught ReferenceError: useRef is not defined
+    at DetailDrawer (modules/crm/components/DetailDrawer.tsx:65:22)
+    at CrmShell (modules/crm/components/CrmShell.tsx:328:15)
+    at CrmRoute (app\(all-platform)\all-platform\crm\page.tsx:10:10)
+  63 |   onUpdateContractStatus,
+  64 | }: Props) {
+> 65 |   const historyRef = useRef<HTMLElement | null>(null);
+     |                      ^
+  66 |
+  67 |   useEffect(() => {
+  68 |     if (!historySignal) return;
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[browser] Uncaught ReferenceError: useRef is not defined
+    at DetailDrawer (modules/crm/components/DetailDrawer.tsx:62:22)
+    at CrmShell (modules/crm/components/CrmShell.tsx:326:7)
+    at CrmRoute (app\(all-platform)\all-platform\crm\page.tsx:10:10)
+  60 |   onUpdateContractStatus,
+  61 | }: Props) {
+> 62 |   const historyRef = useRef<HTMLElement | null>(null);
+     |                      ^
+  63 |
+  64 |   useEffect(() => {
+  65 |     if (!historySignal) return;
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[browser] Uncaught ReferenceError: historySignal is not defined
+    at CrmShell (modules/crm/components/CrmShell.tsx:328:24)
+    at CrmRoute (app\(all-platform)\all-platform\crm\page.tsx:10:10)
+  326 |         deal={selectedDeal}
+  327 |         open={detailOpen}
+> 328 |         historySignal={historySignal}
+      |                        ^
+  329 |         onClose={() => setDetailOpen(false)}
+  330 |         onRequestTransition={(deal, toStage) => setStageData({ deal, toStage })}
+  331 |         onViewReview={deal => setReviewData({ deal, toStage: deal.stage })}
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[browser] Uncaught ReferenceError: historySignal is not defined
+    at CrmShell (modules/crm/components/CrmShell.tsx:337:24)
+    at CrmRoute (app\(all-platform)\all-platform\crm\page.tsx:10:10)
+  335 |         deal={selectedDeal}
+  336 |         open={detailOpen}
+> 337 |         historySignal={historySignal}
+      |                        ^
+  338 |         onClose={() => setDetailOpen(false)}
+  339 |         onRequestTransition={(deal, toStage) => setStageData({ deal, toStage })}
+  340 |         onViewReview={deal => setReviewData({ deal, toStage: deal.stage })}
+[browser] Uncaught ReferenceError: historySignal is not defined
+    at CrmShell (modules/crm/components/CrmShell.tsx:337:24)
+    at CrmRoute (app\(all-platform)\all-platform\crm\page.tsx:10:10)
+  335 |         deal={selectedDeal}
+  336 |         open={detailOpen}
+> 337 |         historySignal={historySignal}
+      |                        ^
+  338 |         onClose={() => setDetailOpen(false)}
+  339 |         onRequestTransition={(deal, toStage) => setStageData({ deal, toStage })}
+  340 |         onViewReview={deal => setReviewData({ deal, toStage: deal.stage })}
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[browser] ⨯ unhandledRejection: Error: Delete failed
+    at apiFetch (modules/crm/repositories/SeedingCrmRepository.ts:147:11)
+    at async SeedingCrmRepository.deleteDeal (modules/crm/repositories/SeedingCrmRepository.ts:582:5)
+    at async useCrm.useCallback[deleteDeal] (modules/crm/hooks/useCrm.ts:95:9)
+    at async handleDelete (modules/crm/components/CrmShell.tsx:153:5)
+  145 |   }
+  146 |   if (body.success === false) {
+> 147 |     throw new Error(body.message || 'Khong thuc hien duoc yeu cau CRM.');
+      |           ^
+  148 |   }
+  149 |   return body.data as T;
+  150 | }
+[browser] ⨯ unhandledRejection: Error: Delete failed
+    at apiFetch (modules/crm/repositories/SeedingCrmRepository.ts:147:11)
+    at async SeedingCrmRepository.deleteDeal (modules/crm/repositories/SeedingCrmRepository.ts:582:5)
+    at async useCrm.useCallback[deleteDeal] (modules/crm/hooks/useCrm.ts:95:9)
+    at async handleDelete (modules/crm/components/CrmShell.tsx:153:5)
+  145 |   }
+  146 |   if (body.success === false) {
+> 147 |     throw new Error(body.message || 'Khong thuc hien duoc yeu cau CRM.');
+      |           ^
+  148 |   }
+  149 |   return body.data as T;
+  150 | }
+[browser] ⨯ unhandledRejection: Error: Delete failed
+    at apiFetch (modules/crm/repositories/SeedingCrmRepository.ts:147:11)
+    at async SeedingCrmRepository.deleteDeal (modules/crm/repositories/SeedingCrmRepository.ts:582:5)
+    at async useCrm.useCallback[deleteDeal] (modules/crm/hooks/useCrm.ts:95:9)
+    at async handleDelete (modules/crm/components/CrmShell.tsx:153:5)
+  145 |   }
+  146 |   if (body.success === false) {
+> 147 |     throw new Error(body.message || 'Khong thuc hien duoc yeu cau CRM.');
+      |           ^
+  148 |   }
+  149 |   return body.data as T;
+  150 | }
+[browser] Uncaught TypeError: Failed to execute 'measure' on 'Performance': '​AdminTeamsManagementRoute' cannot have a negative time stamp.
+⚠ Fast Refresh had to perform a full reload when ./services/all-platform.service.ts changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+⚠ Fast Refresh had to perform a full reload when ./services/all-platform.service.ts changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+[browser] The final argument passed to useEffect changed size between renders. The order and size of this array must remain constant.
+
+Previous: [async ()=>{
+            if (!teamId) return;
+            setIsLoading(true);
+            try {
+                const res = await __TURBOPACK__imported__module__$5b$project$5d2f$services$2f$all$2d$platform$2e$service$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["kpiRewardsService"].listRules({
+                    teamId,
+                    startDate,
+                    endDate
+                });
+                const next = normalizeRules(teamId, startDate, endDate, res.success && res.data ? res.data : []);
+                setRules(next);
+                setNote(next.find({
+                    "KpiRewardRuleTable.useCallback[loadRules]": (rule)=>rule.leaderNote
+                }["KpiRewardRuleTable.useCallback[loadRules]"])?.leaderNote || next.find({
+                    "KpiRewardRuleTable.useCallback[loadRules]": (rule)=>rule.adminNote
+                }["KpiRewardRuleTable.useCallback[loadRules]"])?.adminNote || "");
+                setIsEditing(false);
+            } finally{
+                setIsLoading(false);
+            }
+        }]
+Incoming: [async ()=>{
+            if (!teamId) return;
+            setIsLoading(true);
+            try {
+                const res = await __TURBOPACK__imported__module__$5b$project$5d2f$services$2f$all$2d$platform$2e$service$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["kpiRewardsService"].listRules({
+                    teamId,
+                    startDate,
+                    endDate
+                });
+                const next = normalizeRules(teamId, startDate, endDate, res.success && res.data ? res.data : []);
+                setRules(next);
+                setNote(next.find({
+                    "KpiRewardRuleTable.useCallback[loadRules]": (rule)=>rule.leaderNote
+                }["KpiRewardRuleTable.useCallback[loadRules]"])?.leaderNote || next.find({
+                    "KpiRewardRuleTable.useCallback[loadRules]": (rule)=>rule.adminNote
+                }["KpiRewardRuleTable.useCallback[loadRules]"])?.adminNote || "");
+                setIsEditing(false);
+            } finally{
+                setIsLoading(false);
+            }
+        }, async ()=>{
+            if (!teamId) return;
+            const res = await __TURBOPACK__imported__module__$5b$project$5d2f$services$2f$all$2d$platform$2e$service$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["kpiRewardsService"].logs({
+                teamId,
+                startDate,
+                endDate
+            });
+            setLogs(res.success && res.data ? res.data : []);
+        }] 
+    at KpiRewardRuleTable (components/all-platform/kpi-rewards/KpiRewardSections.tsx:330:12)
+    at Set.forEach (<anonymous>)
+  328 |   }, [teamId, startDate, endDate]);
+  329 |
+> 330 |   useEffect(() => {
+      |            ^
+  331 |     const timer = window.setTimeout(() => {
+  332 |       void loadRules();
+  333 |       void loadLogs(); (components/all-platform/kpi-rewards/KpiRewardSections.tsx:330:12)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+⚠ Fast Refresh had to perform a full reload when ./services/all-platform.service.ts changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload when ./services/all-platform.service.ts changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[browser] Uncaught TypeError: Cannot read properties of undefined (reading 'lead')
+    at <unknown> (components/all-platform/kpi-rewards/KpiRewardSections.tsx:779:59)
+    at Array.map (<anonymous>)
+    at <unknown> (components/all-platform/kpi-rewards/KpiRewardSections.tsx:770:70)
+    at Array.map (<anonymous>)
+    at <unknown> (components/all-platform/kpi-rewards/KpiRewardSections.tsx:746:47)
+    at Array.flatMap (<anonymous>)
+    at KpiRewardResultsTable (components/all-platform/kpi-rewards/KpiRewardSections.tsx:744:29)
+    at AdminKpiRewardsPanel (components/all-platform/kpi-rewards/KpiRewardSections.tsx:1062:7)
+    at AdminTeamsManagementShell (components/all-platform/admin/teams/AdminTeamsManagementShell.tsx:855:11)
+    at AdminKpiSummaryRoute (app\(all-platform)\all-platform\admin\teams-management\kpi-summary\page.tsx:4:10)
+  777 | ...         </td>
+  778 | ...         <td key={`${metric}-percent-${row.memberId}`} className="border border-border...
+> 779 | ...           {formatNumber(row.metricPercents[metric])}%
+      |                                               ^
+  780 | ...         </td>
+  781 | ...         <td key={`${metric}-status-${row.memberId}`} className="border border-border ...
+  782 | ...           <KpiGoalBadge status={row.metricStatuses[metric]} />
+[browser] Uncaught TypeError: Cannot read properties of undefined (reading 'lead')
+    at <unknown> (components/all-platform/kpi-rewards/KpiRewardSections.tsx:779:59)
+    at Array.map (<anonymous>)
+    at <unknown> (components/all-platform/kpi-rewards/KpiRewardSections.tsx:770:70)
+    at Array.map (<anonymous>)
+    at <unknown> (components/all-platform/kpi-rewards/KpiRewardSections.tsx:746:47)
+    at Array.flatMap (<anonymous>)
+    at KpiRewardResultsTable (components/all-platform/kpi-rewards/KpiRewardSections.tsx:744:29)
+    at LeaderKpiRewardSections (components/all-platform/kpi-rewards/KpiRewardSections.tsx:854:9)
+    at TeamManagement (components/all-platform/leader/team-management.tsx:885:9)
+    at TeamManagementPage (app/(all-platform)/all-platform/leader/team/page.tsx:34:7)
+  777 | ...         </td>
+  778 | ...         <td key={`${metric}-percent-${row.memberId}`} className="border border-border...
+> 779 | ...           {formatNumber(row.metricPercents[metric])}%
+      |                                               ^
+  780 | ...         </td>
+  781 | ...         <td key={`${metric}-status-${row.memberId}`} className="border border-border ...
+  782 | ...           <KpiGoalBadge status={row.metricStatuses[metric]} />
+[browser] Uncaught TypeError: Cannot read properties of undefined (reading 'lead')
+    at <unknown> (components/all-platform/kpi-rewards/KpiRewardSections.tsx:779:59)
+    at Array.map (<anonymous>)
+    at <unknown> (components/all-platform/kpi-rewards/KpiRewardSections.tsx:770:70)
+    at Array.map (<anonymous>)
+    at <unknown> (components/all-platform/kpi-rewards/KpiRewardSections.tsx:746:47)
+    at Array.flatMap (<anonymous>)
+    at KpiRewardResultsTable (components/all-platform/kpi-rewards/KpiRewardSections.tsx:744:29)
+    at AdminKpiRewardsPanel (components/all-platform/kpi-rewards/KpiRewardSections.tsx:1062:7)
+    at AdminTeamsManagementShell (components/all-platform/admin/teams/AdminTeamsManagementShell.tsx:855:11)
+    at AdminKpiSummaryRoute (app\(all-platform)\all-platform\admin\teams-management\kpi-summary\page.tsx:4:10)
+  777 | ...         </td>
+  778 | ...         <td key={`${metric}-percent-${row.memberId}`} className="border border-border...
+> 779 | ...           {formatNumber(row.metricPercents[metric])}%
+      |                                               ^
+  780 | ...         </td>
+  781 | ...         <td key={`${metric}-status-${row.memberId}`} className="border border-border ...
+  782 | ...           <KpiGoalBadge status={row.metricStatuses[metric]} />
+[browser] Uncaught TypeError: Cannot read properties of undefined (reading 'lead')
+    at <unknown> (components/all-platform/kpi-rewards/KpiRewardSections.tsx:779:59)
+    at Array.map (<anonymous>)
+    at <unknown> (components/all-platform/kpi-rewards/KpiRewardSections.tsx:770:70)
+    at Array.map (<anonymous>)
+    at <unknown> (components/all-platform/kpi-rewards/KpiRewardSections.tsx:746:47)
+    at Array.flatMap (<anonymous>)
+    at KpiRewardResultsTable (components/all-platform/kpi-rewards/KpiRewardSections.tsx:744:29)
+    at AdminKpiRewardsPanel (components/all-platform/kpi-rewards/KpiRewardSections.tsx:1062:7)
+    at AdminTeamsManagementShell (components/all-platform/admin/teams/AdminTeamsManagementShell.tsx:855:11)
+    at AdminKpiSummaryRoute (app\(all-platform)\all-platform\admin\teams-management\kpi-summary\page.tsx:4:10)
+  777 | ...         </td>
+  778 | ...         <td key={`${metric}-percent-${row.memberId}`} className="border border-border...
+> 779 | ...           {formatNumber(row.metricPercents[metric])}%
+      |                                               ^
+  780 | ...         </td>
+  781 | ...         <td key={`${metric}-status-${row.memberId}`} className="border border-border ...
+  782 | ...           <KpiGoalBadge status={row.metricStatuses[metric]} />
+[browser] Uncaught TypeError: Cannot read properties of undefined (reading 'lead')
+    at <unknown> (components/all-platform/kpi-rewards/KpiRewardSections.tsx:779:59)
+    at Array.map (<anonymous>)
+    at <unknown> (components/all-platform/kpi-rewards/KpiRewardSections.tsx:770:70)
+    at Array.map (<anonymous>)
+    at <unknown> (components/all-platform/kpi-rewards/KpiRewardSections.tsx:746:47)
+    at Array.flatMap (<anonymous>)
+    at KpiRewardResultsTable (components/all-platform/kpi-rewards/KpiRewardSections.tsx:744:29)
+    at AdminKpiRewardsPanel (components/all-platform/kpi-rewards/KpiRewardSections.tsx:1062:7)
+    at AdminTeamsManagementShell (components/all-platform/admin/teams/AdminTeamsManagementShell.tsx:855:11)
+    at AdminKpiSummaryRoute (app\(all-platform)\all-platform\admin\teams-management\kpi-summary\page.tsx:4:10)
+  777 | ...         </td>
+  778 | ...         <td key={`${metric}-percent-${row.memberId}`} className="border border-border...
+> 779 | ...           {formatNumber(row.metricPercents[metric])}%
+      |                                               ^
+  780 | ...         </td>
+  781 | ...         <td key={`${metric}-status-${row.memberId}`} className="border border-border ...
+  782 | ...           <KpiGoalBadge status={row.metricStatuses[metric]} />
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[browser] Uncaught ReferenceError: ruleTeamId is not defined
+    at AdminKpiRewardsPanel (components/all-platform/kpi-rewards/KpiRewardSections.tsx:887:26)
+    at AdminTeamsManagementShell (components/all-platform/admin/teams/AdminTeamsManagementShell.tsx:855:11)
+    at AdminTeamsKpiRulesRoute (app\(all-platform)\all-platform\admin\teams-management\kpi-rules\page.tsx:4:10)
+  885 |
+  886 |   if (view === "kpi-rules") {
+> 887 |     const activeTeamId = ruleTeamId || teams[0]?.id || "";
+      |                          ^
+  888 |     const isReadOnly = role === "member";
+  889 |     return (
+  890 |       <div className="space-y-5 lg:grid lg:grid-cols-[220px_1fr] lg:items-start lg:gap-5 ...
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] The final argument passed to useEffect changed size between renders. The order and size of this array must remain constant.
+
+Previous: [async ()=>{
+            if (!teamId) return;
+            setIsLoading(true);
+            try {
+                const res = await __TURBOPACK__imported__module__$5b$project$5d2f$services$2f$all$2d$platform$2e$service$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["kpiRewardsService"].effectiveRules({
+                    teamId,
+                    startDate,
+                    endDate
+                });
+                const effective = res.success && res.data ? res.data : {
+                    rules: [],
+                    source: "default",
+                    sourceWeek: null
+                };
+                const next = normalizeRules(teamId, startDate, endDate, effective.rules);
+                setRules(next);
+                setNote(next.find({
+                    "KpiRewardRuleTable.useCallback[loadRules]": (rule)=>rule.leaderNote
+                }["KpiRewardRuleTable.useCallback[loadRules]"])?.leaderNote || next.find({
+                    "KpiRewardRuleTable.useCallback[loadRules]": (rule)=>rule.adminNote
+                }["KpiRewardRuleTable.useCallback[loadRules]"])?.adminNote || "");
+                setRuleSource(effective.source);
+                setSourceWeek(effective.sourceWeek);
+                setIsEditing(false);
+            } finally{
+                setIsLoading(false);
+            }
+        }, async ()=>{
+            if (!teamId) return;
+            const res = await __TURBOPACK__imported__module__$5b$project$5d2f$services$2f$all$2d$platform$2e$service$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["kpiRewardsService"].logs({
+                teamId,
+                startDate,
+                endDate
+            });
+            setLogs(res.success && res.data ? res.data : []);
+        }]
+Incoming: [async ()=>{
+            if (!teamId) return;
+            setIsLoading(true);
+            try {
+                const res = await __TURBOPACK__imported__module__$5b$project$5d2f$services$2f$all$2d$platform$2e$service$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["kpiRewardsService"].effectiveRules({
+                    teamId,
+                    startDate,
+                    endDate
+                });
+                const effective = res.success && res.data ? res.data : {
+                    rules: [],
+                    source: "default",
+                    sourceWeek: null
+                };
+                const next = normalizeRules(teamId, startDate, endDate, effective.rules);
+                setRules(next);
+                setNote(next.find({
+                    "KpiRewardRuleTable.useCallback[loadRules]": (rule)=>rule.leaderNote
+                }["KpiRewardRuleTable.useCallback[loadRules]"])?.leaderNote || next.find({
+                    "KpiRewardRuleTable.useCallback[loadRules]": (rule)=>rule.adminNote
+                }["KpiRewardRuleTable.useCallback[loadRules]"])?.adminNote || "");
+                setRuleSource(effective.source);
+                setSourceWeek(effective.sourceWeek);
+                setIsEditing(false);
+            } finally{
+                setIsLoading(false);
+            }
+        }, async ()=>{
+            if (!teamId) return;
+            const res = await __TURBOPACK__imported__module__$5b$project$5d2f$services$2f$all$2d$platform$2e$service$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["kpiRewardsService"].logs({
+                teamId,
+                startDate,
+                endDate
+            });
+            setLogs(res.success && res.data ? res.data : []);
+        }, async ()=>{
+            if (!teamId) return;
+            const res = await __TURBOPACK__imported__module__$5b$project$5d2f$services$2f$all$2d$platform$2e$service$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["kpiRewardsService"].summary({
+                teamId,
+                startDate,
+                endDate
+            });
+            setSummary(res.success && res.data ? res.data : null);
+        }] 
+    at KpiRewardRuleTable (components/all-platform/kpi-rewards/KpiRewardSections.tsx:318:12)
+    at Set.forEach (<anonymous>)
+  316 |   }, [teamId, startDate, endDate]);
+  317 |
+> 318 |   useEffect(() => {
+      |            ^
+  319 |     const timer = window.setTimeout(() => {
+  320 |       void loadRules();
+  321 |       void loadLogs(); (components/all-platform/kpi-rewards/KpiRewardSections.tsx:318:12)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+    at Set.forEach (<anonymous>) (<anonymous>)
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+[browser] Encountered two children with the same key, `450fb4ea-1873-4566-8ed9-32a034dde858-613877fc-c12a-4fc6-837d-10f1aa80a29a`. Keys should be unique so that components maintain their identity across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and could change in a future version. 
+npm notice
+npm notice New major version of npm available! 11.13.0 -> 12.0.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.1
+npm notice To update run: npm install -g npm@12.0.1
+npm notice
