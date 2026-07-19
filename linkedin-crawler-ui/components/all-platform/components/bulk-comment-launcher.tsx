@@ -267,7 +267,18 @@ export function BulkCommentLauncher({ posts, onComplete }: BulkCommentLauncherPr
             <span className="material-symbols-outlined text-red-600 text-[22px]">forum</span>
           </div>
           <div>
-            <h3 className="font-bold text-slate-800 text-sm leading-tight">Seeding Comment Hàng Loạt</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-slate-800 text-sm leading-tight">Seeding Comment Hàng Loạt</h3>
+              <a
+                href="https://www.youtube.com/watch?v=EWdw2-70vFY"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+              >
+                <span className="material-symbols-outlined text-[15px]">videocam</span>
+                Video hướng dẫn
+              </a>
+            </div>
             <p className="text-xs text-slate-500 leading-tight mt-0.5">
               Tự động comment chạy ngầm trên trình duyệt. Không làm gián đoạn công việc của bạn.
             </p>
