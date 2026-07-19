@@ -87,7 +87,7 @@ export default function InternalEngagementPage() {
   const loadPosts = async () => {
     setIsLoading(true);
     setLoadError(null);
-    const res = await internalEngagementService.listPosts(1, 50);
+    const res = await internalEngagementService.listPosts(1, 50, user?.email);
     if (!res.success || !res.data) {
       setLoadError(res.message || "Không tải được danh sách bài viết từ MarkeeAI.");
       setIsLoading(false);

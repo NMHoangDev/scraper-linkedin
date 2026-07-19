@@ -16,6 +16,7 @@ from app.modules.all_platform.schemas import (
     TeamTrendRequest,
 )
 from app.modules.all_platform.services import markeeai_client
+from app.modules.all_platform.services.markeeai_account_links_service import resolve_markeeai_credentials
 from app.modules.all_platform.services.supabase_internal_engagement_kpi_service import (
     get_action_summary,
     get_marks_by_links,
@@ -30,9 +31,13 @@ router = APIRouter()
 
 
 @router.get("/posts", response_model=BaseResponse)
-async def list_posts(page: int = 1, page_size: int = 20) -> BaseResponse:
+async def list_posts(page: int = 1, page_size: int = 20, email: str | None = None) -> BaseResponse:
     try:
-        all_posts = await markeeai_client.get_all_company_posts()
+        # Nếu người gọi có tài khoản MarkeeAI riêng (markeeai_account_links),
+        # lấy bài bằng đúng danh tính đó (đúng campaign họ thực sự tham gia).
+        # Không có thì rơi về 1 service account dùng chung như trước.
+        creds = resolve_markeeai_credentials(email) if email else None
+        all_posts = await markeeai_client.get_all_company_posts(creds)
         total = len(all_posts)
         start = max(page - 1, 0) * page_size
         page_items = all_posts[start : start + page_size]

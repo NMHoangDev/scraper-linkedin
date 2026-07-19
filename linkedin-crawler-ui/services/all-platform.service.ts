@@ -309,8 +309,11 @@ export const internalEngagementService = {
   listPosts: (
     page: number = 1,
     pageSize: number = 20,
+    email?: string,
   ): Promise<ApiResponse<{ items: InternalEngagementPost[]; total: number; page: number; page_size: number }>> => {
-    return requestJson(`${BASE}/internal-engagement/posts?page=${page}&page_size=${pageSize}`);
+    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+    if (email) params.set("email", email);
+    return requestJson(`${BASE}/internal-engagement/posts?${params.toString()}`);
   },
 
   getMyMarks: (
