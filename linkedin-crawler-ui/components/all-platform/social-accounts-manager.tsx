@@ -170,7 +170,18 @@ export function SocialAccountsManager({ onAccountChange }: SocialAccountsProps) 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold text-on-surface">Tài khoản mạng xã hội</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-bold text-on-surface">Tài khoản mạng xã hội</h2>
+            <a
+              href="https://www.youtube.com/watch?v=qA5U5IbOq7w"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+            >
+              <MaterialIcon name="videocam" className="text-[15px]" />
+              Video hướng dẫn
+            </a>
+          </div>
           <p className="text-xs text-on-surface-variant">Quản lý danh sách tài khoản Facebook/LinkedIn phục vụ crawl dữ liệu</p>
         </div>
         <button type="button" onClick={openAdd}
