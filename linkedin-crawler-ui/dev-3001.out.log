@@ -17,3 +17,96 @@ Creating turbopack project {
  GET /all-platform/post-feed 200 in 251ms (next.js: 107ms, application-code: 144ms)
  GET /all-platform/crm 200 in 145ms (next.js: 72ms, application-code: 74ms)
  GET /auth/login 200 in 66ms (next.js: 4ms, application-code: 62ms)
+✓ Compiled in 2.2s
+ GET /all-platform/crm 200 in 340ms (next.js: 216ms, application-code: 124ms)
+ GET /all-platform/crm 200 in 1705ms (next.js: 20ms, application-code: 1685ms)
+✓ Compiled in 794ms
+ GET /all-platform/crm 500 in 793ms (next.js: 383ms, application-code: 411ms)
+ GET /all-platform/crm 500 in 50ms (next.js: 23ms, application-code: 28ms)
+ GET /all-platform/crm 200 in 856ms (next.js: 289ms, application-code: 567ms)
+ GET /all-platform/crm 200 in 321ms (next.js: 186ms, application-code: 135ms)
+✓ Compiled in 228ms
+ GET /all-platform/crm 500 in 91ms (next.js: 65ms, application-code: 26ms)
+ GET /all-platform/crm 500 in 32ms (next.js: 14ms, application-code: 18ms)
+✓ Compiled in 238ms
+ GET /all-platform/crm 200 in 558ms (next.js: 178ms, application-code: 380ms)
+✓ Compiled in 414ms
+ GET /all-platform/crm 200 in 205ms (next.js: 115ms, application-code: 89ms)
+✓ Compiled in 244ms
+ GET /all-platform/crm 200 in 269ms (next.js: 159ms, application-code: 111ms)
+ GET /all-platform/crm 200 in 221ms (next.js: 8ms, application-code: 213ms)
+✓ Compiled in 283ms
+ GET /all-platform/crm 200 in 459ms (next.js: 193ms, application-code: 266ms)
+ GET /all-platform/crm 200 in 177ms (next.js: 10ms, application-code: 168ms)
+ GET /all-platform/crm 200 in 99ms (next.js: 8ms, application-code: 91ms)
+✓ Compiled in 307ms
+ GET /all-platform/crm 200 in 204ms (next.js: 125ms, application-code: 79ms)
+✓ Compiled in 242ms
+ GET /all-platform/crm 200 in 188ms (next.js: 100ms, application-code: 88ms)
+✓ Compiled in 465ms
+ GET /all-platform/crm 200 in 181ms (next.js: 106ms, application-code: 75ms)
+ GET /all-platform/crm 200 in 299ms (next.js: 8ms, application-code: 291ms)
+✓ Compiled in 471ms
+ GET /all-platform/crm 200 in 244ms (next.js: 169ms, application-code: 75ms)
+✓ Compiled in 361ms
+ GET /all-platform/crm 200 in 243ms (next.js: 120ms, application-code: 123ms)
+✓ Compiled in 300ms
+ GET /all-platform/crm 200 in 150ms (next.js: 88ms, application-code: 63ms)
+ GET /all-platform/crm 200 in 390ms (next.js: 8ms, application-code: 381ms)
+✓ Compiled in 383ms
+ GET /all-platform/crm 200 in 194ms (next.js: 134ms, application-code: 61ms)
+✓ Compiled in 572ms
+ GET /all-platform/crm 200 in 201ms (next.js: 120ms, application-code: 81ms)
+ GET /all-platform/crm 200 in 310ms (next.js: 7ms, application-code: 303ms)
+✓ Compiled in 323ms
+ GET /all-platform/crm 200 in 319ms (next.js: 160ms, application-code: 159ms)
+✓ Compiled in 261ms
+ GET /all-platform/crm 200 in 217ms (next.js: 102ms, application-code: 115ms)
+✓ Compiled in 274ms
+ GET /all-platform/crm 200 in 252ms (next.js: 134ms, application-code: 118ms)
+ GET /all-platform/crm 200 in 395ms (next.js: 8ms, application-code: 387ms)
+✓ Compiled in 287ms
+ GET /all-platform/crm 200 in 182ms (next.js: 112ms, application-code: 70ms)
+✓ Compiled in 302ms
+ GET /all-platform/crm 200 in 237ms (next.js: 131ms, application-code: 106ms)
+✓ Compiled in 281ms
+ GET /all-platform/crm 200 in 180ms (next.js: 125ms, application-code: 55ms)
+✓ Compiled in 264ms
+ GET /all-platform/crm 200 in 139ms (next.js: 84ms, application-code: 55ms)
+✓ Compiled in 332ms
+ GET /all-platform/crm 200 in 252ms (next.js: 156ms, application-code: 96ms)
+ GET /all-platform/crm 200 in 385ms (next.js: 13ms, application-code: 372ms)
+ GET /all-platform/crm 200 in 204ms (next.js: 12ms, application-code: 191ms)
+✓ Compiled in 286ms
+ GET /all-platform/crm 200 in 326ms (next.js: 189ms, application-code: 137ms)
+ GET /all-platform/crm 200 in 323ms (next.js: 12ms, application-code: 311ms)
+✓ Compiled in 311ms
+ GET /all-platform/crm 200 in 285ms (next.js: 177ms, application-code: 109ms)
+ GET /all-platform/crm 200 in 401ms (next.js: 12ms, application-code: 388ms)
+✓ Compiled in 301ms
+ GET /all-platform/crm 200 in 294ms (next.js: 160ms, application-code: 134ms)
+✓ Compiled in 392ms
+ GET /all-platform/crm 200 in 454ms (next.js: 270ms, application-code: 184ms)
+ GET /all-platform/crm 200 in 397ms (next.js: 11ms, application-code: 385ms)
+✓ Compiled in 299ms
+ GET /all-platform/crm 200 in 404ms (next.js: 192ms, application-code: 212ms)
+✓ Compiled in 311ms
+ GET /all-platform/crm 200 in 425ms (next.js: 248ms, application-code: 177ms)
+✓ Compiled in 284ms
+ GET /all-platform/crm 200 in 291ms (next.js: 144ms, application-code: 147ms)
+✓ Compiled in 285ms
+ GET /all-platform/crm 200 in 290ms (next.js: 173ms, application-code: 117ms)
+✓ Compiled in 373ms
+ GET /all-platform/crm 500 in 109ms (next.js: 69ms, application-code: 39ms)
+ GET /all-platform/crm 500 in 36ms (next.js: 13ms, application-code: 23ms)
+✓ Compiled in 337ms
+ GET /all-platform/crm 200 in 726ms (next.js: 313ms, application-code: 413ms)
+✓ Compiled in 494ms
+✓ Compiled in 848ms
+ GET /all-platform/crm 200 in 586ms (next.js: 240ms, application-code: 346ms)
+ GET /all-platform/crm 200 in 240ms (next.js: 41ms, application-code: 199ms)
+✓ Compiled in 280ms
+ GET /all-platform/crm 200 in 984ms (next.js: 293ms, application-code: 691ms)
+ GET /all-platform/crm 200 in 146ms (next.js: 7ms, application-code: 139ms)
+✓ Compiled in 292ms
+ GET /all-platform/crm 200 in 684ms (next.js: 236ms, application-code: 448ms)

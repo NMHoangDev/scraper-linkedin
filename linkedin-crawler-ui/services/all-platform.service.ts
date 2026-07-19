@@ -643,6 +643,236 @@ export const allPlatformKpiService = {
 
 // ── Zalo Inbox Share (Tin nhắn KPI verification) ─────────────────────────────
 
+export type KpiRewardMetric = "lead" | "inbox" | "post" | "comment" | "total_bonus";
+export type KpiRewardStatus = "draft" | "pending" | "approved" | "rejected";
+export type KpiGoalStatus = "dat" | "gan_dat" | "chua_dat";
+export type KpiRuleSource = "current" | "copied" | "default";
+
+export interface KpiRewardRule {
+  id?: string;
+  teamId: string;
+  teamName?: string;
+  leaderEmail?: string;
+  leaderName?: string;
+  startDate: string;
+  endDate: string;
+  metric: KpiRewardMetric;
+  weight: number;
+  thresholdValue: number;
+  rewardPerUnit: number;
+  maxReward: number | null;
+  maxRate: number;
+  status: KpiRewardStatus;
+  leaderNote?: string;
+  adminNote?: string;
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface KpiRewardMemberSummary {
+  teamId: string;
+  teamName: string;
+  leaderEmail: string;
+  memberId: string;
+  memberEmail: string;
+  memberName: string;
+  actuals: Record<"lead" | "inbox" | "post" | "comment", number>;
+  targets: Record<"lead" | "inbox" | "post" | "comment", number>;
+  metricPercents: Record<"lead" | "inbox" | "post" | "comment", number>;
+  metricStatuses: Record<"lead" | "inbox" | "post" | "comment", KpiGoalStatus>;
+  kpiPercent: number;
+  kpiStatus: KpiGoalStatus;
+  rewards: Record<KpiRewardMetric, number>;
+  totalReward: number;
+  status: KpiRewardStatus;
+  isEstimate: boolean;
+}
+
+export interface KpiRewardTeamSummary {
+  teamId: string;
+  teamName: string;
+  leaderEmail: string;
+  totalReward: number;
+  memberCount: number;
+  status: KpiRewardStatus;
+  isEstimate: boolean;
+  kpiPercent: number;
+  kpiStatus: KpiGoalStatus;
+}
+
+export interface KpiRewardSummary {
+  rules: KpiRewardRule[];
+  teamSummaries: KpiRewardTeamSummary[];
+  memberSummaries: KpiRewardMemberSummary[];
+  totals: {
+    totalReward: number;
+    teamCount: number;
+    memberCount: number;
+    approvedReward: number;
+    estimatedReward: number;
+  };
+  range: { start: string; end: string };
+}
+
+export interface KpiRewardRuleLogChange {
+  metric: KpiRewardMetric;
+  metricLabel: string;
+  field: string;
+  fieldLabel: string;
+  oldValue: number | null;
+  newValue: number | null;
+}
+
+export interface KpiRewardRuleLog {
+  id: string;
+  changedByName: string;
+  changedByEmail?: string;
+  changes: KpiRewardRuleLogChange[];
+  createdAt: string;
+}
+
+export interface KpiRewardEffectiveRules {
+  rules: KpiRewardRule[];
+  source: KpiRuleSource;
+  sourceWeek: { start: string; end: string } | null;
+}
+
+export const kpiRewardsService = {
+  listRules: (params: {
+    startDate?: string;
+    endDate?: string;
+    teamId?: string;
+    status?: KpiRewardStatus;
+  } = {}): Promise<ApiResponse<KpiRewardRule[]>> => {
+    const qs = new URLSearchParams();
+    if (params.startDate) qs.set("start_date", params.startDate);
+    if (params.endDate) qs.set("end_date", params.endDate);
+    if (params.teamId) qs.set("team_id", params.teamId);
+    if (params.status) qs.set("status", params.status);
+    const query = qs.toString();
+    return requestJson(`${BASE}/kpi-rewards/rules${query ? `?${query}` : ""}`);
+  },
+
+  // Rule "dang co hieu luc" cho tuan: uu tien rule da luu dung tuan, neu chua co
+  // thi tu dong sao chep tu tuan gan nhat truoc do (leader khong phai tao lai tu dau).
+  effectiveRules: (params: {
+    teamId: string;
+    startDate: string;
+    endDate: string;
+  }): Promise<ApiResponse<KpiRewardEffectiveRules>> => {
+    const qs = new URLSearchParams({
+      team_id: params.teamId,
+      start_date: params.startDate,
+      end_date: params.endDate,
+    });
+    return requestJson(`${BASE}/kpi-rewards/rules/effective?${qs.toString()}`);
+  },
+
+  saveDraft: (payload: {
+    team_id: string;
+    start_date: string;
+    end_date: string;
+    leader_note?: string;
+    rules: Array<{
+      metric: KpiRewardMetric;
+      weight: number;
+      threshold_value: number;
+        reward_per_unit: number;
+        max_reward?: number | null;
+        max_rate?: number;
+      }>;
+  }): Promise<ApiResponse<KpiRewardRule[]>> => {
+    return requestJson(`${BASE}/kpi-rewards/rules/save-draft`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+      });
+    },
+
+    saveActive: (payload: {
+      team_id: string;
+      start_date: string;
+      end_date: string;
+      leader_note?: string;
+      admin_note?: string;
+      rules: Array<{
+        metric: KpiRewardMetric;
+        weight: number;
+        threshold_value: number;
+        reward_per_unit: number;
+        max_reward?: number | null;
+        max_rate?: number;
+      }>;
+    }): Promise<ApiResponse<KpiRewardRule[]>> => {
+      return requestJson(`${BASE}/kpi-rewards/rules/save-active`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+    },
+
+  submit: (payload: {
+    team_id: string;
+    start_date: string;
+    end_date: string;
+    leader_note?: string;
+  }): Promise<ApiResponse<KpiRewardRule[]>> => {
+    return requestJson(`${BASE}/kpi-rewards/rules/submit`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  approve: (payload: {
+    team_id: string;
+    start_date: string;
+    end_date: string;
+    admin_note?: string;
+  }): Promise<ApiResponse<KpiRewardRule[]>> => {
+    return requestJson(`${BASE}/kpi-rewards/rules/approve`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  reject: (payload: {
+    team_id: string;
+    start_date: string;
+    end_date: string;
+    admin_note?: string;
+  }): Promise<ApiResponse<KpiRewardRule[]>> => {
+    return requestJson(`${BASE}/kpi-rewards/rules/reject`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  summary: (params: {
+    startDate: string;
+    endDate: string;
+    teamId?: string;
+  }): Promise<ApiResponse<KpiRewardSummary>> => {
+    const qs = new URLSearchParams({
+      start_date: params.startDate,
+      end_date: params.endDate,
+    });
+    if (params.teamId) qs.set("team_id", params.teamId);
+    return requestJson(`${BASE}/kpi-rewards/summary?${qs.toString()}`);
+  },
+
+  logs: (params: {
+    teamId: string;
+    startDate: string;
+    endDate: string;
+  }): Promise<ApiResponse<KpiRewardRuleLog[]>> => {
+    const qs = new URLSearchParams({
+      team_id: params.teamId,
+      start_date: params.startDate,
+      end_date: params.endDate,
+    });
+    return requestJson(`${BASE}/kpi-rewards/rules/logs?${qs.toString()}`);
+  },
+};
+
 export const zaloInboxShareService = {
   /**
    * Member bật/tắt share cho 1 conversation.

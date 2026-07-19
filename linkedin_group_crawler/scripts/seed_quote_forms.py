@@ -164,7 +164,7 @@ def villa_schema():
                       default_value="Khách nhắn ngoài giờ mà không ai trả lời? → Markee phản hồi tức thì 24/7.",
                       help_text="Nhập đoạn mô tả ngắn về vấn đề của khách và giá trị giải pháp."),
                 field("quoteBenefitLine", "Dòng lợi ích", "textarea", required=False,
-                      default_value="⭐ Kế toán, tư vấn, giáo dục, sửa chữa, dịch vụ chuyên môn",
+                      default_value="Kế toán, tư vấn, giáo dục, sửa chữa, dịch vụ chuyên môn",
                       help_text="Nhập một dòng nêu nhóm ngành hoặc lợi ích chính của gói."),
             ]),
             section("solutions", "DANH SÁCH GIẢI PHÁP", [
@@ -197,10 +197,10 @@ def villa_schema():
             ]),
             section("commitments", "CAM KẾT", [
                 field("commitments", "Cam kết", "repeatable-textarea", default_value=[
-                    "1. ✅ Setup hoàn chỉnh",
-                    "2. ✅ Hướng dẫn tận tay",
-                    "3. ✅ Đồng hành 90 ngày đầu",
-                    "4. ✅ Hoàn tiền nếu không triển khai được",
+                    "Setup hoàn chỉnh",
+                    "Hướng dẫn tận tay",
+                    "Đồng hành 90 ngày đầu",
+                    "Hoàn tiền nếu không triển khai được",
                 ]),
             ]),
             section("totals", "CHI PHÍ VÀ THANH TOÁN", [

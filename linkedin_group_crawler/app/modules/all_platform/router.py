@@ -34,6 +34,8 @@ from app.modules.all_platform.routers.fb_inbox_accounts import router as fb_inbo
 from app.modules.all_platform.routers.crawl_fb_dashboard import router as crawl_fb_dashboard_router
 from app.modules.all_platform.routers.customer_lead import router as customer_lead_router
 from app.modules.all_platform.routers.quote import quote_forms_router, quotes_router
+from app.modules.all_platform.routers.sales_asset import router as sales_asset_router
+from app.modules.all_platform.routers.kpi_reward import router as kpi_reward_router
 from app.modules.all_platform.routers.scheduled_comments import router as scheduled_comments_router
 from app.modules.all_platform.routers.posts_delete import router as posts_delete_router
 
@@ -150,6 +152,11 @@ all_platform_router.include_router(
     prefix="/kpi",
     tags=["All-Platform KPI"],
 )
+all_platform_router.include_router(
+    kpi_reward_router,
+    prefix="/kpi-rewards",
+    tags=["All-Platform KPI Rewards"],
+)
 
 # ── Categories (platform-agnostic) ────────────────────────────────────────────
 all_platform_router.include_router(
@@ -243,6 +250,12 @@ all_platform_router.include_router(
     quotes_router,
     prefix="/quotes",
     tags=["All-Platform Quotes"],
+)
+
+all_platform_router.include_router(
+    sales_asset_router,
+    prefix="/sales-assets",
+    tags=["All-Platform Sales Assets"],
 )
 
 # ── WebSocket ────────────────────────────────────────────────────────────────

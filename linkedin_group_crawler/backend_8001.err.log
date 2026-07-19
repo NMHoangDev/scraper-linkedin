@@ -1,0 +1,10 @@
+C:\Code\scraper-linkedin\linkedin_group_crawler\app\modules\all_platform\schemas\quote.py:10: UserWarning: Field name "schema_json" in "QuoteFormCreateRequest" shadows an attribute in parent "BaseModel"
+  class QuoteFormCreateRequest(BaseModel):
+C:\Code\scraper-linkedin\linkedin_group_crawler\app\modules\all_platform\schemas\quote.py:19: UserWarning: Field name "schema_json" in "QuoteFormUpdateRequest" shadows an attribute in parent "BaseModel"
+  class QuoteFormUpdateRequest(BaseModel):
+INFO:     Started server process [18544]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+ERROR:    [Errno 10048] error while attempting to bind on address ('0.0.0.0', 8001): [winerror 10048] only one usage of each socket address (protocol/network address/port) is normally permitted
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.

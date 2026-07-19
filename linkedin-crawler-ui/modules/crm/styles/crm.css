@@ -3179,3 +3179,94 @@
   align-items: center;
   gap: 0.75rem;
 }
+
+/* Quote wizard polish: make the form-entry step feel like a sales document editor,
+   not a dense admin settings panel. Scoped to avoid changing the rest of CRM. */
+.crm-wizard-modal {
+  width: min(76rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2.5rem);
+  border-radius: 1.15rem;
+}
+
+.crm-wizard-modal .crm-modal-header {
+  background: #ffffff;
+  padding: 1.15rem 1.45rem;
+}
+
+.crm-wizard-modal .crm-modal-title {
+  font-size: 1.18rem;
+  letter-spacing: 0;
+}
+
+.crm-wizard-modal .crm-modal-subtitle {
+  color: #667085;
+  font-size: 0.82rem;
+}
+
+.crm-wizard-modal .crm-modal-close {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.6rem;
+  color: #334155;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.crm-wizard-modal .crm-modal-close:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.crm-wizard-modal .crm-wizard-stepper-container {
+  background: #fbfcfe;
+  padding: 0.85rem 1.5rem;
+}
+
+.crm-wizard-modal .crm-wizard-stepper-inner {
+  max-width: 42rem;
+}
+
+.crm-wizard-modal .crm-wizard-step-circle {
+  width: 1.4rem;
+  height: 1.4rem;
+  font-size: 0.72rem;
+}
+
+.crm-wizard-modal .crm-wizard-step-label {
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.crm-wizard-modal .crm-wizard-body {
+  background:
+    radial-gradient(circle at 14% 0%, rgba(190, 30, 75, 0.06), transparent 22rem),
+    #f6f8fb;
+  padding: 1rem 1.25rem 1.4rem;
+}
+
+.crm-wizard-modal .crm-wizard-content {
+  max-width: 66rem;
+  border: 1px solid #e6ebf2;
+  border-radius: 0.95rem;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+  padding: 1rem;
+}
+
+.crm-wizard-modal .crm-modal-footer {
+  background: rgba(255, 255, 255, 0.96);
+  padding: 0.9rem 1.45rem;
+}
+
+.crm-wizard-modal .crm-cancel-button,
+.crm-wizard-modal .crm-save-button {
+  min-height: 2.5rem;
+  border-radius: 0.65rem;
+  font-size: 0.84rem;
+  padding: 0.55rem 1.15rem;
+}
+
+.crm-wizard-modal .crm-save-button--large {
+  min-width: 11rem;
+}

@@ -61,6 +61,21 @@ from app.modules.all_platform.services.supabase_quote_service import (
     publish_quote,
     link_quote_to_deal,
 )
+from app.modules.all_platform.services.supabase_sales_asset_service import (
+    list_sales_assets,
+    get_sales_asset,
+    create_sales_asset,
+    update_sales_asset,
+    archive_sales_asset,
+    send_sales_asset,
+)
+from app.modules.all_platform.services.supabase_kpi_reward_service import (
+    list_reward_rules,
+    save_reward_rules,
+    submit_reward_rules,
+    review_reward_rules,
+    get_reward_summary,
+)
 from app.modules.all_platform.services.supabase_quick_inbox_service import (
     get_all_quick_inbox,
     add_quick_inbox,

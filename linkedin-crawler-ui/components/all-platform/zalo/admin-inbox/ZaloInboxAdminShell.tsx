@@ -6,6 +6,7 @@ import { useZaloAdminInbox, type ZaloConv } from "@/hooks/useZaloAdminInbox";
 import ZaloTeamAccountTree from "./ZaloTeamAccountTree";
 import ZaloAccountAuthView from "./ZaloAccountAuthView";
 import { CrmCustomerModal } from "@/components/all-platform/components/CrmCustomerModal";
+import { SalesAssetPickerModal } from "@/components/all-platform/sales-assets/SalesAssetPickerModal";
 import { useSearchParams } from "next/navigation";
 import { resolveZaloConversationAccount } from "@/services/zaloCrawlerService";
 import { KpiProgressCard } from "@/components/all-platform/components/kpi-progress-card";
@@ -22,6 +23,8 @@ import {
   updateZaloLibraryMessage,
 } from "@/services/zaloCrawlerService";
 import type { ZaloBroadcastTarget } from "@/types/zalo-api";
+import { customerLeadService, type Customer } from "@/services/customer-lead.service";
+import type { SalesAsset } from "@/services/sales-asset.service";
 
 // ─── Constants & Templates ──────────────────────────────────────────────────
 
@@ -65,6 +68,8 @@ const QUICK_REPLY_GROUPS = [
 ];
 
 type PanelTab = "templates" | "customer" | "kpi" | "account" | "campaign";
+type ZaloInboxFilter = "all" | "unread" | "customer" | "need_reply" | "need_verify";
+type CampaignMode = "both" | "text" | "image";
 
 function formatTime(value: string | null | undefined): string {
   if (!value) return "";
@@ -107,7 +112,7 @@ export function ZaloInboxAdminShell() {
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
-    setMounted(true);
+    void Promise.resolve().then(() => setMounted(true));
   }, []);
 
   const [panelTab, setPanelTab] = useState<PanelTab>("templates");
@@ -133,7 +138,7 @@ export function ZaloInboxAdminShell() {
   const [autoSendTargetIds, setAutoSendTargetIds] = useState<string[]>([]);
   const [autoSendSearchQuery, setAutoSendSearchQuery] = useState("");
   const [manualRecipients, setManualRecipients] = useState("");
-  const [campaignMode, setCampaignMode] = useState<"both" | "text" | "image">("both");
+  const [campaignMode, setCampaignMode] = useState<CampaignMode>("both");
   const [isSendingCampaign, setIsSendingCampaign] = useState(false);
   const [campaignSuccess, setCampaignSuccess] = useState<string | null>(null);
   const [campaignError, setCampaignError] = useState<string | null>(null);
@@ -172,6 +177,8 @@ export function ZaloInboxAdminShell() {
     }
   }, [inbox.selectedAccountId, inbox.filtered, inbox]);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [showSalesAssetPicker, setShowSalesAssetPicker] = useState(false);
+  const [currentLead, setCurrentLead] = useState<Customer | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -280,18 +287,16 @@ export function ZaloInboxAdminShell() {
 
   // Sync edit account values & switch forms automatically
   useEffect(() => {
-    if (inbox.selectedAccountId) {
-      setIsCreatingAccount(false);
-    } else {
-      setIsCreatingAccount(true);
-    }
+    void Promise.resolve().then(() => setIsCreatingAccount(!inbox.selectedAccountId));
   }, [inbox.selectedAccountId]);
 
   // Reset selected campaign messages and target recipients when conversation or account changes
   useEffect(() => {
-    setSelectedMessageIds([]);
-    setEditedMessagesText({});
-    setAutoSendTargetIds([]);
+    void Promise.resolve().then(() => {
+      setSelectedMessageIds([]);
+      setEditedMessagesText({});
+      setAutoSendTargetIds([]);
+    });
   }, [inbox.openConv, inbox.selectedAccountId]);
 
   // Selected conversation objects mapped
@@ -330,8 +335,10 @@ export function ZaloInboxAdminShell() {
   // Sync edit account values
   useEffect(() => {
     if (inbox.selectedAccountInfo) {
-      setEditLabel(inbox.selectedAccountInfo.label || "");
-      setEditPhone(inbox.selectedAccountInfo.phone || "");
+      void Promise.resolve().then(() => {
+        setEditLabel(inbox.selectedAccountInfo?.label || "");
+        setEditPhone(inbox.selectedAccountInfo?.phone || "");
+      });
     }
   }, [inbox.selectedAccountId, inbox.selectedAccountInfo]);
 
@@ -350,6 +357,34 @@ export function ZaloInboxAdminShell() {
   const appendTemplate = (text: string) => {
     inbox.setReply((prev) => (prev.trim() ? `${prev.trim()}\n${text}` : text));
   };
+
+  const appendSalesAsset = (asset: SalesAsset) => {
+    const link = asset.sourceUrl || asset.shareUrl;
+    const meta = [asset.projectName, asset.version].filter(Boolean).join(" - ");
+    const text = `${asset.title}${meta ? ` (${meta})` : ""}\n${link}`;
+    inbox.setReply((prev) => (prev.trim() ? `${prev.trim()}\n${text}` : text));
+    setShowSalesAssetPicker(false);
+    inbox.showToast("Đã chèn tài liệu vào ô trả lời.", true);
+  };
+
+  useEffect(() => {
+    if (!inbox.openConv) {
+      void Promise.resolve().then(() => setCurrentLead(null));
+      return;
+    }
+    let cancelled = false;
+    void Promise.resolve().then(async () => {
+      try {
+        const lead = await customerLeadService.getByConvId(inbox.openConv);
+        if (!cancelled) setCurrentLead(lead);
+      } catch {
+        if (!cancelled) setCurrentLead(null);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [inbox.openConv]);
 
   const handleSuggestKpi = async () => {
     if (!inbox.selectedAccountId || !ownerEmail) return;
@@ -634,7 +669,7 @@ export function ZaloInboxAdminShell() {
             <div>
               <select
                 value={inbox.filter}
-                onChange={(e) => inbox.setFilter(e.target.value as any)}
+                onChange={(e) => inbox.setFilter(e.target.value as ZaloInboxFilter)}
                 className="h-8 w-full rounded-lg border border-[#E5E5E5] bg-white px-2 text-xs font-semibold outline-none focus:border-[#E3000F]"
               >
                 <option value="all">Tất cả (Lọc)</option>
@@ -1039,6 +1074,15 @@ export function ZaloInboxAdminShell() {
                 className="hidden"
                 onChange={handleFileChange}
               />
+              <button
+                type="button"
+                onClick={() => setShowSalesAssetPicker(true)}
+                className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition flex-shrink-0"
+                title="Gửi tài liệu"
+                disabled={!inbox.openConv || inbox.archiveReading}
+              >
+                <MaterialIcon name="description" className="text-slate-500 text-[18px]" />
+              </button>
               <textarea
                 value={inbox.reply}
                 onChange={(e) => inbox.setReply(e.target.value)}
@@ -1247,7 +1291,7 @@ export function ZaloInboxAdminShell() {
                       <label className="text-[10px] text-slate-500 font-bold block mb-1">Phương thức nội dung</label>
                       <select
                         value={campaignMode}
-                        onChange={(e) => setCampaignMode(e.target.value as any)}
+                        onChange={(e) => setCampaignMode(e.target.value as CampaignMode)}
                         className="w-full border border-slate-200 rounded px-2 py-1 outline-none focus:border-[#E3000F] text-xs bg-white"
                       >
                         <option value="both">Gửi cả chữ & ảnh</option>
@@ -1709,6 +1753,14 @@ export function ZaloInboxAdminShell() {
         </div>,
         document.body
       )}
+
+      <SalesAssetPickerModal
+        open={showSalesAssetPicker}
+        onClose={() => setShowSalesAssetPicker(false)}
+        onSend={appendSalesAsset}
+        customerLeadId={currentLead?.id || null}
+        dealId={currentLead?.id || null}
+      />
 
       <CrmCustomerModal
         isOpen={showCrmModal}
