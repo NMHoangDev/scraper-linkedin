@@ -1,7 +1,0 @@
-▲ Next.js 16.2.4 (Turbopack)
-- Local:         http://localhost:3002
-- Network:       http://192.168.2.10:3002
-- Environments: .env.local
-✓ Ready in 468ms
-
- GET /all-platform/leader/team 200 in 2.7s (next.js: 2.4s, application-code: 222ms)

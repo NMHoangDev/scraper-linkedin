@@ -291,9 +291,7 @@ def update_customer_lead(
 @router.delete("/{lead_id}", response_model=BaseResponse)
 def delete_customer_lead(lead_id: str, _: Any = Depends(get_current_user)):
     try:
-        success = customer_lead_service.delete_customer_lead(lead_id)
-        if success:
-            return BaseResponse(success=True, message="Deleted successfully")
-        return BaseResponse(success=False, message="Delete failed")
+        customer_lead_service.delete_customer_lead(lead_id)
+        return BaseResponse(success=True, message="Deleted successfully")
     except Exception as e:
         return BaseResponse(success=False, message=str(e))

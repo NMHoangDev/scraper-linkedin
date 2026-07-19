@@ -509,13 +509,9 @@ def get_activity_log(
 
 
 def delete_customer_lead(lead_id: str) -> bool:
-    try:
-        supabase = get_supabase_client()
-        supabase.table("customer_leads").delete().eq("id", lead_id).execute()
-        return True
-    except Exception as e:
-        logger.error(f"Error deleting customer lead {lead_id}: {e}")
-        return False
+    supabase = get_supabase_client()
+    supabase.table("customer_leads").delete().eq("id", lead_id).execute()
+    return True
 
 
 def get_all_sdrs() -> List[Dict[str, Any]]:

@@ -211,6 +211,14 @@ all_platform_router.include_router(
     tags=["All-Platform FB Inbox Accounts"],
 )
 
+# ── Account Online Summary (Facebook + Zalo online/total, cross-platform) ──────
+from app.modules.all_platform.routers.account_online_summary import router as account_online_summary_router
+all_platform_router.include_router(
+    account_online_summary_router,
+    prefix="/accounts",
+    tags=["All-Platform Account Online Summary"],
+)
+
 # ── FB Post KPI ────────────────────────────────────────────────────────────────
 from app.modules.all_platform.routers.fb_post_kpi import router as fb_post_kpi_router
 all_platform_router.include_router(
