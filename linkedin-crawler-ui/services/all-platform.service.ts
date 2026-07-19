@@ -17,6 +17,12 @@ import type {
   AuthLoginResponse,
   SocialAccount,
   SocialAccountSummary,
+  InternalEngagementPost,
+  InternalEngagementMarkStatus,
+  InternalEngagementPostTeamCountsData,
+  InternalEngagementPostInteractionsData,
+  InternalEngagementTeamTrendData,
+  InternalEngagementTeamTotalsData,
 } from "@/types/unified.types";
 import { API_BASE_URL, API_KEY } from "@/lib/env";
 
@@ -294,6 +300,71 @@ export const allPlatformSeedingService = {
       `${BASE}/${payload.platform}/seeding-mark/get-kpi-target`,
       { method: "POST", body: JSON.stringify(payload) },
     );
+  },
+};
+
+// ── Internal Engagement (Tương tác nội bộ — MarkeeAI FB Page posts) ─────────────
+
+export const internalEngagementService = {
+  listPosts: (
+    page: number = 1,
+    pageSize: number = 20,
+  ): Promise<ApiResponse<{ items: InternalEngagementPost[]; total: number; page: number; page_size: number }>> => {
+    return requestJson(`${BASE}/internal-engagement/posts?page=${page}&page_size=${pageSize}`);
+  },
+
+  getMyMarks: (
+    emailMember: string,
+    linkPosts: string[],
+  ): Promise<ApiResponse<{ marks: Record<string, InternalEngagementMarkStatus> }>> => {
+    return requestJson(`${BASE}/internal-engagement/my-marks`, {
+      method: "POST",
+      body: JSON.stringify({ email_member: emailMember, link_posts: linkPosts }),
+    });
+  },
+
+  getPostTeamCounts: (
+    linkPost: string,
+    email: string,
+    teamId?: string,
+  ): Promise<ApiResponse<InternalEngagementPostTeamCountsData>> => {
+    const params = new URLSearchParams({ link_post: linkPost, email });
+    if (teamId) params.set("team_id", teamId);
+    return requestJson(`${BASE}/internal-engagement/kpi/post-team-counts?${params.toString()}`);
+  },
+
+  getPostInteractions: (
+    linkPost: string,
+    email: string,
+    teamId?: string,
+  ): Promise<ApiResponse<InternalEngagementPostInteractionsData>> => {
+    return requestJson(`${BASE}/internal-engagement/kpi/post-interactions`, {
+      method: "POST",
+      body: JSON.stringify({ link_post: linkPost, email, team_id: teamId }),
+    });
+  },
+
+  getTeamTrend: (
+    email: string,
+    days: number = 14,
+    teamId?: string,
+  ): Promise<ApiResponse<InternalEngagementTeamTrendData>> => {
+    return requestJson(`${BASE}/internal-engagement/kpi/team-trend`, {
+      method: "POST",
+      body: JSON.stringify({ email, days, team_id: teamId }),
+    });
+  },
+
+  getTeamTotals: (
+    email: string,
+    dateFrom?: string,
+    dateTo?: string,
+    teamId?: string,
+  ): Promise<ApiResponse<InternalEngagementTeamTotalsData>> => {
+    return requestJson(`${BASE}/internal-engagement/kpi/team-totals`, {
+      method: "POST",
+      body: JSON.stringify({ email, date_from: dateFrom, date_to: dateTo, team_id: teamId }),
+    });
   },
 };
 

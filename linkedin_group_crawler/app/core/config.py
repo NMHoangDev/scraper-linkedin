@@ -411,6 +411,16 @@ class Settings:
     openai_base_url: str = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
     ai_model: str = os.getenv("AI_MODEL", "gpt-4o")
 
+    markeeai_base_url: str = os.getenv("MARKEEAI_BASE_URL", "https://api.markeeai.com").rstrip("/")
+    markeeai_service_email: str = os.getenv("MARKEEAI_SERVICE_EMAIL", "")
+    markeeai_service_password: str = os.getenv("MARKEEAI_SERVICE_PASSWORD", "")
+    # Comma-separated campaign IDs the service account is a member of — each
+    # one scopes visibility to that campaign's own fanpages (MarkeeAI is
+    # multi-tenant; there is no "list every fanpage" mode by design).
+    markeeai_campaign_ids: list[str] = field(
+        default_factory=lambda: _parse_csv(os.getenv("MARKEEAI_CAMPAIGN_IDS"), default=()),
+    )
+
     def __post_init__(self) -> None:
         if self.cors_origins is None:
             self.cors_origins = _parse_csv(

@@ -161,6 +161,93 @@ export interface QuickCommentTemplate {
   updated_at?: string;
 }
 
+// ── Internal Engagement (Tương tác nội bộ — MarkeeAI FB Page posts) ─────────────
+
+export interface InternalEngagementPost {
+  id: string;
+  fanpage_id: string;
+  fanpage_name?: string;
+  facebook_post_id?: string;
+  content: string;
+  media_urls: string[];
+  permalink_url?: string;
+  status?: string;
+  created_at?: string;
+}
+
+export type InternalEngagementMarkStatus = "need" | "received" | "completed";
+
+export interface InternalEngagementTeamRef {
+  id: string;
+  name_team?: string;
+}
+
+export interface InternalEngagementInteraction {
+  id: string;
+  id_member: string;
+  member_email?: string;
+  member_name?: string;
+  action_type: string;
+  content?: string | null;
+  reaction_id?: string | null;
+  account_name?: string | null;
+  profile_id?: string | null;
+  team_id?: string;
+  team_name?: string;
+  is_caller?: boolean;
+  summary: string;
+  created_at: string;
+}
+
+export interface InternalEngagementPostInteractionsData {
+  role: string;
+  teams: InternalEngagementTeamRef[];
+  items: InternalEngagementInteraction[];
+}
+
+export interface InternalEngagementPostTeamCount {
+  team_id: string;
+  team_name: string;
+  count: number;
+}
+
+export interface InternalEngagementPostTeamCountsData {
+  role: string;
+  teams: InternalEngagementPostTeamCount[];
+}
+
+export interface InternalEngagementTeamTrendPoint {
+  date: string;
+  total: number;
+}
+
+export interface InternalEngagementTeamTrendSeries {
+  team_id: string;
+  team_name: string;
+  series: InternalEngagementTeamTrendPoint[];
+}
+
+export interface InternalEngagementTeamTrendData {
+  role: string;
+  teams: InternalEngagementTeamTrendSeries[];
+}
+
+export interface InternalEngagementTeamTotal {
+  team_id: string;
+  team_name: string;
+  number_of_member: number;
+  total: number;
+  active_days: number;
+  range_days: number;
+  stability_score: number;
+  by_action_type: Record<string, number>;
+}
+
+export interface InternalEngagementTeamTotalsData {
+  role: string;
+  teams: InternalEngagementTeamTotal[];
+}
+
 export interface QuickInboxTemplate {
   id: string;
   title: string;

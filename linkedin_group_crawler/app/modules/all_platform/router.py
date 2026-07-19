@@ -38,6 +38,7 @@ from app.modules.all_platform.routers.sales_asset import router as sales_asset_r
 from app.modules.all_platform.routers.kpi_reward import router as kpi_reward_router
 from app.modules.all_platform.routers.scheduled_comments import router as scheduled_comments_router
 from app.modules.all_platform.routers.posts_delete import router as posts_delete_router
+from app.modules.all_platform.routers.internal_engagement import router as internal_engagement_router
 
 all_platform_router = APIRouter()
 
@@ -209,6 +210,13 @@ all_platform_router.include_router(
 all_platform_router.include_router(
     fb_inbox_accounts_router,
     tags=["All-Platform FB Inbox Accounts"],
+)
+
+# ── Internal Engagement (Tương tác nội bộ — MarkeeAI FB Page posts) ────────────
+all_platform_router.include_router(
+    internal_engagement_router,
+    prefix="/internal-engagement",
+    tags=["All-Platform Internal Engagement"],
 )
 
 # ── Account Online Summary (Facebook + Zalo online/total, cross-platform) ──────
