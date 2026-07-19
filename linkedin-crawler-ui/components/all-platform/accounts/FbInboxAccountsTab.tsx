@@ -269,7 +269,18 @@ export function FbInboxAccountsTab({ onChange }: FbInboxAccountsTabProps) {
       <div className="bg-surface rounded-xl border border-outline-variant p-5">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <div className="text-base font-bold text-on-surface">Thêm tài khoản mới</div>
+            <div className="flex items-center gap-2">
+              <div className="text-base font-bold text-on-surface">Thêm tài khoản mới</div>
+              <a
+                href="https://www.youtube.com/watch?v=EbmV5aGJyys"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+              >
+                <MaterialIcon name="videocam" className="text-[15px]" />
+                Video hướng dẫn
+              </a>
+            </div>
             <div className="text-xs text-on-surface-variant mt-0.5">Bấm nút bên phải, đăng nhập Facebook như bình thường — hệ thống tự ghi nhớ.</div>
           </div>
           <div className="flex items-center gap-2">

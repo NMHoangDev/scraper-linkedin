@@ -423,7 +423,18 @@ export function ApiExtensionLauncher({ className, onComplete, onCrawlSaved }: Ex
             <span className="material-symbols-outlined text-violet-600 text-[22px]">auto_awesome</span>
           </div>
           <div>
-            <h3 className="font-bold text-foreground text-sm leading-tight">Siêu Tốc Cào Dữ Liệu (API Extension)</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-foreground text-sm leading-tight">Siêu Tốc Cào Dữ Liệu (API Extension)</h3>
+              <a
+                href="https://www.youtube.com/watch?v=IL3uP0Rb-54"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+              >
+                <span className="material-symbols-outlined text-[15px]">videocam</span>
+                Video hướng dẫn
+              </a>
+            </div>
             <p className="text-xs text-muted-foreground leading-tight mt-0.5">
               {isLaunching
                 ? `Đang xử lý ${crawlProgress.totalGroups} groups...`
