@@ -3,9 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/build-extension-zips.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/build-extension-zips.mjs",
     "build": "next build",
     "postbuild": "node scripts/copy-standalone-assets.mjs",
+    "build:extensions": "node scripts/build-extension-zips.mjs",
     "build:prod": "npm run build",
     "start:standalone": "node .next/standalone/server.js",
     "start": "next start",

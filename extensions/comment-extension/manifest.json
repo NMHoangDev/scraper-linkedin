@@ -25,6 +25,12 @@
   "content_scripts": [
     {
       "matches": ["*://*.facebook.com/*"],
+      "js": ["graphql-sniffer.js"],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["*://*.facebook.com/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
     },

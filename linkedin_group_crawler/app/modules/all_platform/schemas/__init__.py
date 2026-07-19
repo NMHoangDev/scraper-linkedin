@@ -58,6 +58,15 @@ from app.modules.all_platform.schemas.kpi_reward import (
     KpiRewardReviewRequest,
     KpiRewardSummaryRequest,
 )
+from app.modules.all_platform.schemas.internal_engagement import (
+    InternalEngagementActionRecordRequest,
+    InternalEngagementPost,
+    InternalEngagementSummaryRequest,
+    MyMarksRequest,
+    PostInteractionsRequest,
+    TeamTotalsRequest,
+    TeamTrendRequest,
+)
 from app.modules.all_platform.schemas.auth import (
     RegisterRequest,
     LoginRequest,

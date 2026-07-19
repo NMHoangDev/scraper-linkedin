@@ -166,25 +166,73 @@ async function runBulkComment(payload, uiTabId, postsToRun) {
             if (result && verifyConfig && verifyConfig.email_member) {
                 try {
                     const apiBase = verifyConfig.apiBase || "https://seeding.markeeai.com";
-                    const verifyBody = {
-                        email_member: verifyConfig.email_member,
-                        link_post: url,
-                        platform: "facebook",
-                        content: text,
-                        link_comment: result.url || `Bị từ chối / Không lấy được link - ${Date.now()}-${Math.random().toString(36).substring(7)}`,
-                        profile_id: result.uid || "Unknown",
-                        id_post: currentPost.id_post,
-                        id_social_account: verifyConfig.id_social_account || undefined,
-                        id_platform: 1
-                    };
 
-                    await fetch(`${apiBase}/api/all-platform/facebook/seeding-mark/verify`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(verifyBody)
-                    });
+                    if (verifyConfig.mode === "internal_engagement") {
+                        // Trang Tương tác nội bộ — lưu vào bảng KPI riêng, không đụng
+                        // vào bảng seeding_content_kpi của tính năng seeding nhóm cũ.
+                        const kpiResp = await fetch(`${apiBase}/api/all-platform/internal-engagement/kpi/record`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                email_member: verifyConfig.email_member,
+                                link_post: url,
+                                fanpage_id: currentPost.fanpage_id,
+                                fanpage_name: currentPost.fanpage_name,
+                                facebook_post_id: currentPost.id_post,
+                                action_type: "comment",
+                                content: text,
+                                status: result.success ? "success" : "failed",
+                                error_message: result.success ? undefined : result.error,
+                            }),
+                        });
+                        if (!kpiResp.ok) {
+                            const errBody = await kpiResp.text().catch(() => "");
+                            console.error("[Comment Extension] Lưu KPI thất bại, HTTP", kpiResp.status, errBody);
+                            result.kpiSaveError = `HTTP ${kpiResp.status}`;
+                        } else {
+                            const kpiJson = await kpiResp.json().catch(() => null);
+                            if (kpiJson && kpiJson.success === false) {
+                                console.error("[Comment Extension] Lưu KPI thất bại:", kpiJson.message);
+                                result.kpiSaveError = kpiJson.message;
+                            }
+                        }
+                    } else {
+                        const verifyBody = {
+                            email_member: verifyConfig.email_member,
+                            link_post: url,
+                            platform: "facebook",
+                            content: text,
+                            link_comment: result.url || `Bị từ chối / Không lấy được link - ${Date.now()}-${Math.random().toString(36).substring(7)}`,
+                            profile_id: result.uid || "Unknown",
+                            id_post: currentPost.id_post,
+                            id_social_account: verifyConfig.id_social_account || undefined,
+                            id_platform: 1
+                        };
+
+                        await fetch(`${apiBase}/api/all-platform/facebook/seeding-mark/verify`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(verifyBody)
+                        });
+                    }
                 } catch(e) {
                     console.error("Lỗi lưu KPI:", e);
+                    result.kpiSaveError = e.message;
+                }
+
+                if (result.kpiSaveError) {
+                    currentProgress = {
+                        current: i + 1, total: postsToRun.length, url,
+                        status: `Comment ${result.success ? "OK" : "lỗi"} nhưng lưu KPI thất bại: ${result.kpiSaveError}`,
+                        result,
+                    };
+                    persistState();
+                    if (uiTabId) {
+                        chrome.tabs.sendMessage(uiTabId, {
+                            action: "BULK_COMMENT_PROGRESS",
+                            payload: currentProgress
+                        }).catch(() => {});
+                    }
                 }
             }
 
@@ -229,3 +277,4 @@ async function runBulkComment(payload, uiTabId, postsToRun) {
         }).catch(() => {});
     }
 }
+

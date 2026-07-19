@@ -158,6 +158,14 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       label: "Post feed",
       matchStartsWith: ["/all-platform/post-feed"],
     },
+    {
+      type: "item",
+      id: "internal-engagement",
+      href: "/all-platform/internal-engagement",
+      icon: "chat_bubble",
+      label: "Tương tác nội bộ",
+      matchStartsWith: ["/all-platform/internal-engagement"],
+    },
   ];
 
   const channelItems: NavLeafItem[] = [

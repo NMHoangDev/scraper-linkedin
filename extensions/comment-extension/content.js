@@ -8,6 +8,38 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 });
 
+// Facebook đổi doc_id của useCometUFICreateCommentMutation theo từng bản deploy —
+// hardcode 1 giá trị sẽ hỏng dần. graphql-sniffer.js (chạy ở MAIN world) bắt trực
+// tiếp doc_id thật mỗi khi CÓ AI đăng comment thật trên Facebook (kể cả tab khác),
+// lưu vào chrome.storage.local để dùng lại. Lần đầu cài extension, hãy tự tay đăng
+// 1 comment thật bất kỳ trên Facebook để "hiệu chỉnh" giá trị này trước khi seeding.
+const FALLBACK_DOC_ID = "36574905442124839";
+const CAPTURE_STORAGE_KEY = "fbGraphqlCapture_useCometUFICreateCommentMutation";
+const CAPTURE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // quá 7 ngày thì không tin tưởng nữa, quay lại giá trị dự phòng
+
+let capturedDocId = null;
+
+chrome.storage.local.get(CAPTURE_STORAGE_KEY, (result) => {
+    const cached = result?.[CAPTURE_STORAGE_KEY];
+    if (cached && Date.now() - cached.capturedAt < CAPTURE_MAX_AGE_MS) {
+        capturedDocId = cached.docId;
+    }
+});
+
+document.addEventListener("fb-graphql-docid-captured", (evt) => {
+    try {
+        const { friendlyName, docId } = evt.detail || {};
+        if (friendlyName !== "useCometUFICreateCommentMutation" || !docId) return;
+        capturedDocId = docId;
+        chrome.storage.local.set({
+            [CAPTURE_STORAGE_KEY]: { docId, capturedAt: Date.now() },
+        });
+        console.log("[Comment Extension] Đã bắt được doc_id comment mới nhất từ Facebook:", docId);
+    } catch (e) {
+        // Bỏ qua nếu payload bắt được không hợp lệ
+    }
+});
+
 function getTokensFromPage() {
     return new Promise((resolve, reject) => {
         try {
@@ -58,7 +90,7 @@ function getTokensFromPage() {
 
 async function executeComment(payload) {
     const { url, text } = payload;
-    
+
     // Tách Post ID
     const match = url.match(/\/posts\/(\d+)/) || url.match(/\/permalink\/(\d+)/) || url.match(/fbid=(\d+)/);
     if (!match) throw new Error("Không thể trích xuất Post ID từ URL: " + url);
@@ -88,7 +120,7 @@ async function executeComment(payload) {
         av: tokens.uid,
         __user: tokens.uid,
         fb_api_req_friendly_name: "useCometUFICreateCommentMutation",
-        doc_id: "36574905442124839",
+        doc_id: capturedDocId || FALLBACK_DOC_ID,
         fb_dtsg: tokens.fb_dtsg,
         lsd: tokens.lsd || '',
         jazoest: tokens.jazoest,
@@ -114,10 +146,10 @@ async function executeComment(payload) {
     const resText = await response.text();
     // Facebook often prepends for (;;); to JSON responses
     const cleanText = resText.replace(/^for\s*\(\s*;\s*;\s*\)\s*;/g, "").trim();
-    
+
     let success = false;
     let commentUrl = "";
-    
+
     let parsedItems = [];
     try {
         parsedItems = [JSON.parse(cleanText)];
@@ -131,11 +163,11 @@ async function executeComment(payload) {
         const commentCreate = data?.data?.comment_create;
         if (commentCreate) {
             success = true;
-            
+
             // Theo hướng dẫn chuẩn
             const edge = commentCreate?.feedback_comment_edge;
             const node = edge?.node;
-            
+
             if (node) {
                 const commentId = node.legacy_fbid;
                 commentUrl = node.url || (commentId ? `${url}?comment_id=${commentId}` : url);
