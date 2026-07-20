@@ -974,44 +974,6 @@ function InboxPageContent() {
     }
   }
 
-  async function suggestFbInboxKpi(payload: {
-    member_email: string;
-    conv_ids: string[];
-    user_id: string;
-  }) {
-    // Optimistic update
-    setSuggestedConvIds(prev => new Set([...prev, ...payload.conv_ids]));
-
-    try {
-      await allPlatformKpiService.suggestFbInbox(payload);
-      await fetchVerifiedConvIds();
-      showToast(payload.conv_ids.length > 1 ? `Đã đề xuất ${payload.conv_ids.length} inbox cho KPI` : `Đã đề xuất inbox cho KPI`, true);
-    } catch {
-      // Revert optimistic update on error
-      setSuggestedConvIds(prev => {
-        const next = new Set(prev);
-        payload.conv_ids.forEach(id => next.delete(id));
-        return next;
-      });
-      showToast("Lỗi đề xuất KPI inbox", false);
-      throw new Error("Suggest KPI failed");
-    }
-  }
-
-  async function bulkVerifyFbInboxKpi(payload: {
-    leader_email: string;
-    target_date: string;
-  }) {
-    try {
-      await allPlatformKpiService.bulkVerifyFbInbox(payload);
-      await fetchVerifiedConvIds();
-      showToast(`Đã tính KPI hàng loạt thành công!`, true);
-    } catch {
-      showToast("Lỗi tính KPI hàng loạt", false);
-      throw new Error("Bulk verify KPI failed");
-    }
-  }
-
   async function openArchive(conv_id: string) {
     const accountId = selectedAccRef.current || acc;
     const requestSeq = ++threadRequestSeqRef.current;
@@ -1404,13 +1366,10 @@ function InboxPageContent() {
         needsReply={needsReply}
         accLabel={accLabel}
         syncFbInbox={syncFbInboxKpi}
-        onSuggestKpi={suggestFbInboxKpi}
         verifiedConvIds={verifiedConvIds}
-        suggestedConvIds={suggestedConvIds}
         userEmail={user?.email || ""}
         ownerEmail={user?.email || ""}
         accountOwnerEmail={selectedAccountOwnerEmail}
-        onBulkVerifyKpi={bulkVerifyFbInboxKpi}
       />
     );
   }

@@ -924,11 +924,16 @@ def get_verified_fb_inbox_ids(payload: GetVerifiedConvIdsRequest, user: dict = D
         # Dùng created_at cho khớp với get_fb_inbox_kpi_summary / overview v2
         # (synced_at bị ghi đè mỗi lần xác nhận lại -> hội thoại cũ trôi tuần).
         start_utc, end_utc = _vn_week_range_to_utc(start, end)
+        # "Da xac nhan" o day nghia la da xac nhan LEAD (is_lead=True), khong
+        # phai da tinh KPI Inbox - vi Inbox gio tu dong tinh cho hau het reply,
+        # neu chi loc theo is_confirmed se hien "Da xac nhan Lead" sai cho ca
+        # hoi thoai chi tra loi binh thuong, chua he duoc danh dau la khach.
         confirmed_rows = (
             supabase.table("fb_inbox_kpi")
             .select("conv_id")
             .in_("id_member", member_ids)
             .eq("is_confirmed", True)
+            .eq("is_lead", True)
             .gte("created_at", start_utc)
             .lte("created_at", end_utc)
             .execute()
