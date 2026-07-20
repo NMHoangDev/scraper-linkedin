@@ -274,7 +274,7 @@ def assign_kpi(payload: dict) -> dict:
         "end_date": end_date,
         "status": "active",
         "is_failed": latest.is_failed,
-        "failure_reason": (
+        "reason_not_met": (
         latest.reason_not_met if latest.is_failed else None),
     }
 
