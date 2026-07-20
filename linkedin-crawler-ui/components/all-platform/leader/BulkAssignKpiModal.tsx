@@ -333,7 +333,7 @@ export function BulkAssignKpiModal({
                   <thead className="bg-slate-50 sticky top-0">
                     <tr>
                       <th className="text-left px-3 py-2 font-bold text-slate-600">Thành viên</th>
-                      <th className="text-center px-3 py-2 font-bold text-slate-600 w-[60px]">
+                      <th className="text-left px-3 py-2 font-bold text-slate-600">
                         Trạng thái
                       </th>
                     </tr>
@@ -344,12 +344,12 @@ export function BulkAssignKpiModal({
                         <td className="px-3 py-2 text-slate-700 truncate max-w-[200px]">
                           {r.email}
                         </td>
-                        <td className="px-3 py-2 text-center">
+                        <td className="px-3 py-2">
                           {r.success ? (
                             <span className="text-emerald-600 font-bold">✓</span>
                           ) : (
-                            <span className="text-red-600 font-bold" title={r.message}>
-                              ✗
+                            <span className="text-red-600">
+                              <span className="font-bold">✗</span> {r.message}
                             </span>
                           )}
                         </td>

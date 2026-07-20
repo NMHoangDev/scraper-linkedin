@@ -102,6 +102,12 @@ function splitWeek(value: string): { startDate: string; endDate: string } {
   return { startDate, endDate };
 }
 
+function formatDateVN(value: string): string {
+  const [y, m, d] = value.split("-");
+  if (!y || !m || !d) return value;
+  return `${d}/${m}/${y}`;
+}
+
 function getCurrentWeekValue(): string {
   const now = new Date();
   const dayOfWeek = now.getDay();
@@ -593,7 +599,7 @@ export function KpiRewardRuleTable({
 
       <div className="flex items-center gap-1.5 border-t border-border bg-slate-50 px-5 py-3 text-[12px] text-muted-foreground">
         <MaterialIcon name="info" className="text-sm shrink-0" />
-        Rule này sẽ được dùng để tính KPI và thưởng cho team này trong tuần {startDate} - {endDate}.
+        Rule này sẽ được dùng để tính KPI và thưởng cho team này trong tuần {formatDateVN(startDate)} - {formatDateVN(endDate)}.
       </div>
 
       {/* Nhat ky chinh sua - thu gon mac dinh, bam moi xem, tranh lam man Rule roi mat. */}
@@ -818,12 +824,6 @@ function MemberResultsBox({
         style={{ backgroundColor: `${color}0d` }}
       >
         <div className="flex min-w-0 items-center gap-3">
-          <span
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-black text-white"
-            style={{ backgroundColor: color }}
-          >
-            {(title || "?").trim().charAt(0).toUpperCase()}
-          </span>
           <div className="min-w-0">
             <h3 className="flex items-center gap-1.5 truncate text-[13px] font-bold text-foreground">
               {title}
@@ -1003,7 +1003,7 @@ export function MemberKpiRewardOverview() {
             </p>
           </div>
           <span className="rounded-full bg-slate-100 px-3 py-1 text-[12px] font-semibold text-slate-700">
-            {startDate} - {endDate}
+            {formatDateVN(startDate)} - {formatDateVN(endDate)}
           </span>
         </div>
       </div>

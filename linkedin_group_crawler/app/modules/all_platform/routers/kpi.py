@@ -160,6 +160,7 @@ def kpi_bulk_assign(payload: BulkAssignKpiRequest, user: dict = Depends(get_curr
                     "message": "KPI assigned",
                 })
             except Exception as exc:
+                logger.error(f"kpi_bulk_assign: failed for {member.email}: {exc}")
                 results.append({
                     "email": member.email,
                     "success": False,

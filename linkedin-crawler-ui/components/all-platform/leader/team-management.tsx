@@ -326,6 +326,23 @@ export function TeamManagement() {
   const selectedTeam = teams.find(t => t.id === selectedTeamId);
   const teamMembers = selectedTeam?.members || [];
 
+  // teamMembers (roster) khong bao gio chua leader (xem comment o membersWithKpi
+  // ben duoi) - dung chung logic nay cho danh sach "Giao KPI hang loat" de leader
+  // khong bi thieu khoi modal.
+  const teamMembersWithLeader = useMemo(() => {
+    if (!selectedTeam) return teamMembers;
+    const hasLeaderAlready = teamMembers.some(m => m.id === selectedTeam.id_leader);
+    if (hasLeaderAlready) return teamMembers;
+    return [
+      ...teamMembers,
+      {
+        id: selectedTeam.id_leader,
+        email: selectedTeam.leader_email,
+        name: selectedTeam.leader_name,
+      },
+    ];
+  }, [teamMembers, selectedTeam]);
+
   // Map KPI data to members
   // Them chinh leader vao danh sach hien thi: teamMembers (roster) khong bao gio
   // chua leader, nhung RPC get_team_kpi_overview (migration 012) da tra ve KPI
@@ -903,7 +920,7 @@ export function TeamManagement() {
         <BulkAssignKpiModal
           isOpen={bulkAssignModalOpen}
           onClose={() => setBulkAssignModalOpen(false)}
-          members={selectedTeam.members || []}
+          members={teamMembersWithLeader}
           teamId={selectedTeamId}
           selectedWeekValue={selectedWeek}
           onSuccess={handleKpiAssigned}
