@@ -108,6 +108,23 @@ function formatDateVN(value: string): string {
   return `${d}/${m}/${y}`;
 }
 
+// So thu tu tuan trong nam theo cung quy uoc voi AssignKpiModal.generateWeeks:
+// tuan 1 bat dau tu thu Hai cua/truoc ngay 1/1.
+function getWeekNumber(dateStr: string): number {
+  const date = new Date(`${dateStr}T00:00:00`);
+  const year = date.getFullYear();
+  const firstDay = new Date(year, 0, 1);
+  const dayOfWeek = firstDay.getDay() || 7;
+  const startMonday = new Date(firstDay);
+  startMonday.setDate(firstDay.getDate() - dayOfWeek + 1);
+  const diffDays = Math.round((date.getTime() - startMonday.getTime()) / 86400000);
+  return Math.floor(diffDays / 7) + 1;
+}
+
+function formatWeekLabel(startDate: string, endDate: string): string {
+  return `Tuần ${getWeekNumber(startDate)} (${formatDateVN(startDate)} - ${formatDateVN(endDate)})`;
+}
+
 function getCurrentWeekValue(): string {
   const now = new Date();
   const dayOfWeek = now.getDay();
@@ -442,7 +459,7 @@ export function KpiRewardRuleTable({
           {ruleSource === "copied" && sourceWeek ? (
             <p className="mt-1 flex items-center gap-1 text-[12px] font-medium text-amber-700">
               <MaterialIcon name="content_copy" className="text-sm" />
-              Đang dùng cấu hình sao chép từ tuần {sourceWeek.start} - {sourceWeek.end} (chưa lưu cho tuần này).
+              Đang dùng cấu hình của {formatWeekLabel(sourceWeek.start, sourceWeek.end)}. Vui lòng kiểm tra và lưu lại để áp dụng cho tuần này.
             </p>
           ) : null}
           {ruleSource === "default" ? (
@@ -453,6 +470,9 @@ export function KpiRewardRuleTable({
           ) : null}
         </div>
         <div className="flex items-center gap-2">
+          <span className="flex h-9 items-center rounded-lg bg-primary/10 px-3 text-[12px] font-bold text-primary">
+            Tuần {getWeekNumber(startDate)}
+          </span>
           {isLoading ? <span className="text-[12px] text-muted-foreground">Đang tải...</span> : null}
           {!readOnly ? (
             isEditing ? (
