@@ -320,7 +320,7 @@ def list_shared_conversations_for_leader(
         .select(
             "id, account_id, conversation_id, shared_role, is_active, is_verify, is_lead, note, "
             "id_member, id_leader, verified_at, verified_by, created_at, updated_at, "
-            "zalo_accounts!left(label, phone)"
+            "zalo_accounts!fk_zalo_conv_perm_account(label, phone)"
         )
         .eq("is_active", True)
         .eq("shared_role", "leader")
@@ -500,7 +500,7 @@ def count_verified_inbox_shares(
             supabase.table("zalo_conversation_permissions")
             .select(
                 "id, account_id, conversation_id, is_verify, verified_at, updated_at, note, "
-                "zalo_accounts!left(label, phone)"
+                "zalo_accounts!fk_zalo_conv_perm_account(label, phone)"
             )
             .eq("id_member", member_id)
             .eq("shared_role", "leader")

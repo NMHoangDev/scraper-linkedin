@@ -28,6 +28,13 @@ def _retry_supabase(func):
 # Vietnam timezone (+07:00) — used consistently in all date comparisons
 vn_tz = VN_TZ = timezone(timedelta(hours=7))
 
+# So ngay 1 hoi thoai FB duoc "khoa" sau khi da tinh 1 diem KPI Inbox - trong
+# khoang thoi gian nay, tin nhan moi tu cung khach hang (cung conv_id) se KHONG
+# duoc tinh them diem, tranh spam qua lai cung 1 deal de bao KPI. Qua moc nay,
+# khach nhan tin lai duoc xem la 1 luot cham soc moi -> cong them 1 diem KPI moi.
+# Chinh sua duy nhat o day, khong hardcode rai rac noi khac.
+INBOX_KPI_LOCK_DAYS = 30
+
 # ─────────────────────────────────────────────────────────────────────────────
 # In-memory TTL cache for team overview v2 (Phase 1 optimization)
 # Pattern lấy cảm hứng từ admin_dashboard_service.py + auth_service.py
@@ -1187,13 +1194,24 @@ def count_fb_inbox_kpi(
 
 
 def auto_count_fb_inbox_reply(
-    user_id: str, conv_id: str, raise_on_error: bool = False
+    user_id: str, conv_id: str, raise_on_error: bool = False,
 ) -> Optional[dict]:
     """Tự động tính +1 KPI inbox khi nhân viên trả lời khách qua FB Messenger.
 
-    Gọi sau khi POST /inbox/reply gửi thành công. Idempotent theo
-    (id_member, conv_id, user_id) — mỗi hội thoại chỉ tính 1 lần — và ghi thẳng
-    is_confirmed=True nên không cần leader bấm xác nhận.
+    Gọi sau khi POST /inbox/reply gửi thành công. Ghi thẳng is_confirmed=True
+    nên không cần leader bấm xác nhận.
+
+    KHÔNG backdate theo thời điểm tin nhắn thật — bấm quét/phát hiện ở tuần nào
+    thì tính điểm vào đúng tuần đó (created_at = now() tại thời điểm xử lý), kể
+    cả khi tin nhắn thực tế đã tồn đọng từ trước (vd acc vừa đăng nhập lại sau
+    nhiều tuần offline).
+
+    Khóa 30 ngày theo hội thoại (INBOX_KPI_LOCK_DAYS): 1 conv_id chỉ được tính
+    điểm KPI Inbox mới nếu lần tính gần nhất đã cách đây >= 30 ngày (hoặc chưa
+    từng tính). Trong vòng 30 ngày kể từ lần tính gần nhất, tin nhắn mới từ cùng
+    hội thoại bị bỏ qua — tránh spam qua lại cùng 1 deal để bào KPI. Mỗi lần đủ
+    điều kiện tính điểm sẽ INSERT 1 dòng MỚI (không update đè dòng cũ), để mỗi
+    dòng giữ đúng created_at của riêng nó (thời điểm quét/phát hiện).
 
     Trả None (không raise) nếu FB account chưa được link với member nào, để
     không làm hỏng luồng gửi tin.
@@ -1236,14 +1254,16 @@ def auto_count_fb_inbox_reply(
             if team_res.data and team_res.data[0].get("id_leader"):
                 id_leader = team_res.data[0]["id_leader"]
 
-        now = datetime.now(timezone.utc).isoformat()
+        now_dt = datetime.now(timezone.utc)
+        now = now_dt.isoformat()
 
         existing = (
             supabase.table("fb_inbox_kpi")
-            .select("id, is_confirmed")
+            .select("id, is_confirmed, created_at")
             .eq("id_member", id_member)
             .eq("conv_id", conv_id)
             .eq("user_id", user_id)
+            .order("created_at", desc=True)
             .limit(1)
             .execute()
         )
@@ -1251,10 +1271,25 @@ def auto_count_fb_inbox_reply(
         if existing.data:
             row = existing.data[0]
             if row.get("is_confirmed"):
-                return None  # đã tính rồi, không làm gì thêm
-            supabase.table("fb_inbox_kpi").update(
-                {"is_confirmed": True, "synced_at": now}
-            ).eq("id", row["id"]).execute()
+                last_counted = datetime.fromisoformat(str(row["created_at"]).replace("Z", "+00:00"))
+                if now_dt - last_counted < timedelta(days=INBOX_KPI_LOCK_DAYS):
+                    return None  # trong thoi gian khoa, khong tinh them
+                # Qua moc khoa -> coi la 1 luot cham soc moi, cong 1 diem KPI moi
+                supabase.table("fb_inbox_kpi").insert({
+                    "id_member": id_member,
+                    "id_leader": id_leader,
+                    "conv_id": conv_id,
+                    "user_id": user_id,
+                    "message_count": 1,
+                    "is_lead": False,
+                    "is_confirmed": True,
+                    "synced_at": now,
+                }).execute()
+            else:
+                # Dong cu chua tung duoc confirm (tao boi luong de xuat cu) -> xac nhan luon
+                supabase.table("fb_inbox_kpi").update(
+                    {"is_confirmed": True, "synced_at": now}
+                ).eq("id", row["id"]).execute()
         else:
             supabase.table("fb_inbox_kpi").insert({
                 "id_member": id_member,
