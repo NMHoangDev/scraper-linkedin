@@ -529,12 +529,21 @@ def delete_customer_lead(lead_id: str) -> bool:
     return True
 
 
+# Acc admin/leader co that ngoai doi nhung chua duoc gan vao team nao trong DB
+# (vd "Thuong" - chu du an, phu trach chung, khong nam trong 1 team cu the) ->
+# van phai hien trong dropdown Quan ly/Phu trach du khong pass duoc dieu kien
+# "thuoc 1 team that" cua get_all_sdrs. Sua tan goc (gan ho vao team dung) thi
+# tot hon, nhung truoc mat allowlist thang de khong lam mat nguoi dung that.
+REAL_ACCOUNTS_WITHOUT_TEAM = {"thuowngnguyen@gmail.com", "tientien.qt1110@gmail.com"}
+
+
 def get_all_sdrs() -> List[Dict[str, Any]]:
     """Danh sach nguoi co the gan lam Quan ly / Phu trach deal CRM.
 
-    Chi lay nguoi thuc su thuoc mot team that (leader hoac member cua
-    teams co ten khong chua "test") - loai tru cac acc admin/leader
-    tao de test/demo tren local (vd devadmin@markee.vn, admin123@gmail.com).
+    Lay nguoi thuc su thuoc mot team that (leader hoac member cua teams co
+    ten khong chua "test") - loai tru cac acc admin/leader tao de test/demo
+    tren local (vd devadmin@markee.vn, admin123@gmail.com) - cong them
+    REAL_ACCOUNTS_WITHOUT_TEAM cho nguoi that nhung chua co du lieu team.
     """
     try:
         supabase = get_supabase_client()
@@ -552,6 +561,15 @@ def get_all_sdrs() -> List[Dict[str, Any]]:
                 .execute()
             )
             valid_ids.update(row["id_member"] for row in (members_res.data or []) if row.get("id_member"))
+
+        if REAL_ACCOUNTS_WITHOUT_TEAM:
+            allowlist_res = (
+                supabase.table("app_users")
+                .select("id")
+                .in_("email", list(REAL_ACCOUNTS_WITHOUT_TEAM))
+                .execute()
+            )
+            valid_ids.update(row["id"] for row in (allowlist_res.data or []) if row.get("id"))
 
         if not valid_ids:
             return []
