@@ -230,6 +230,12 @@ function InboxPageContent() {
   const [viewMode, setViewMode] = useState<"inbox" | "archive">("inbox");
   const [loadingArchives, setLoadingArchives] = useState(false);
   const [verifiedConvIds, setVerifiedConvIds] = useState<Set<string>>(new Set());
+  // conv_id -> thoi diem xac nhan Lead (ISO string) - de hien "Da xac nhan KPI
+  // tuan X" dung tuan LUC XAC NHAN, khong phai tuan dang xem lai hoi thoai.
+  const [verifiedConvDates, setVerifiedConvDates] = useState<Record<string, string>>({});
+  // conv_id -> created_at cua dong KPI Inbox tuong ung - de hien "KPI Inbox
+  // tinh vao tuan X" cho BAT KY hoi thoai nao da duoc tinh (khong chi Lead).
+  const [inboxKpiWeekDates, setInboxKpiWeekDates] = useState<Record<string, string>>({});
   const [suggestedConvIds, setSuggestedConvIds] = useState<Set<string>>(new Set()); // local state for optimistic updates
   const [archiveReading, setArchiveReading] = useState(false);
   const [openConv, setOpenConv] = useState(() => searchParams.get("conv") || "");
@@ -951,8 +957,20 @@ function InboxPageContent() {
   }) {
     try {
       await allPlatformKpiService.syncFbInbox(payload);
-      // Refresh verified conv_ids after sync
-      await fetchVerifiedConvIds();
+      // Cap nhat UI ngay (khong doi refetch) - nut "Xac nhan Lead" phai doi
+      // trang thai tuc thi sau khi bam, khong bat nguoi dung phai F5 moi thay.
+      if (payload.is_lead) {
+        setVerifiedConvIds(prev => new Set([...prev, ...payload.conv_ids]));
+        const now = new Date().toISOString();
+        setVerifiedConvDates(prev => {
+          const next = { ...prev };
+          payload.conv_ids.forEach(id => { next[id] = now; });
+          return next;
+        });
+      }
+      // Van refetch nen (best-effort) de dong bo lai voi server, phong khi co
+      // sai lech (vd nguoi khac cung xac nhan) - khong chan UI, khong throw.
+      void fetchVerifiedConvIds();
     } catch {
       showToast("Lỗi xác nhận KPI inbox", false);
       throw new Error("KPI sync failed");
@@ -966,6 +984,8 @@ function InboxPageContent() {
       if (res.success) {
         // confirmed = đã được leader duyệt
         setVerifiedConvIds(new Set(res.data?.confirmed_conv_ids || []));
+        setVerifiedConvDates(res.data?.confirmed_at_by_conv || {});
+        setInboxKpiWeekDates(res.data?.inbox_confirmed_at_by_conv || {});
         // pending = đã đề xuất nhưng chưa được duyệt
         setSuggestedConvIds(new Set(res.data?.pending_conv_ids || []));
       }
@@ -1367,6 +1387,8 @@ function InboxPageContent() {
         accLabel={accLabel}
         syncFbInbox={syncFbInboxKpi}
         verifiedConvIds={verifiedConvIds}
+        verifiedConvDates={verifiedConvDates}
+        inboxKpiWeekDates={inboxKpiWeekDates}
         userEmail={user?.email || ""}
         ownerEmail={user?.email || ""}
         accountOwnerEmail={selectedAccountOwnerEmail}

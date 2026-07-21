@@ -680,6 +680,8 @@ export const allPlatformKpiService = {
     endDate?: string,
   ): Promise<ApiResponse<{
     confirmed_conv_ids: string[];
+    confirmed_at_by_conv?: Record<string, string>;
+    inbox_confirmed_at_by_conv?: Record<string, string>;
     pending_conv_ids: string[];
     range: { start: string; end: string };
     member_count: number;

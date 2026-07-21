@@ -576,6 +576,11 @@ def fb_inbox_sync(payload: SyncFbInboxRequest, user: dict = Depends(get_current_
                 if payload.is_lead:
                     lead += 1
 
+        # Invalidate cache 30s cua get_team_kpi_overview_v2_rpc - thieu dong nay
+        # khien bang KPI team (vd trang quan ly team) van hien so cu toi 30s sau
+        # khi leader vua bam "Xac nhan Lead" o Inbox, du da chuyen trang/F5.
+        invalidate_overview_cache(leader_email)
+
         return BaseResponse(success=True, data={
             "synced": synced,
             "lead": lead,
@@ -928,14 +933,19 @@ def get_verified_fb_inbox_ids(payload: GetVerifiedConvIdsRequest, user: dict = D
         # phai da tinh KPI Inbox - vi Inbox gio tu dong tinh cho hau het reply,
         # neu chi loc theo is_confirmed se hien "Da xac nhan Lead" sai cho ca
         # hoi thoai chi tra loi binh thuong, chua he duoc danh dau la khach.
+        #
+        # KHONG loc theo created_at o day: is_lead la trang thai vinh vien cua
+        # 1 hoi thoai (khong phai KPI theo tuan), con created_at la thoi diem
+        # tin nhan DAU TIEN duoc auto-detect - co the tu nhieu tuan truoc, du
+        # nguoi dung vua bam "Xac nhan Lead" HOM NAY. Loc theo created_at khien
+        # nut hien lai "Chua xac nhan" ngay sau khi bam cho hoi thoai cu (UI
+        # optimistic-update bi ghi de boi ket qua refetch thieu dong nay).
         confirmed_rows = (
             supabase.table("fb_inbox_kpi")
-            .select("conv_id")
+            .select("conv_id, synced_at")
             .in_("id_member", member_ids)
             .eq("is_confirmed", True)
             .eq("is_lead", True)
-            .gte("created_at", start_utc)
-            .lte("created_at", end_utc)
             .execute()
         )
         pending_rows = (
@@ -950,11 +960,38 @@ def get_verified_fb_inbox_ids(payload: GetVerifiedConvIdsRequest, user: dict = D
 
         confirmed_ids = list(set(row["conv_id"] for row in (confirmed_rows.data or []) if row.get("conv_id")))
         pending_ids = list(set(row["conv_id"] for row in (pending_rows.data or []) if row.get("conv_id")))
+        # conv_id -> thoi diem xac nhan Lead (synced_at) - de FE hien "Da xac
+        # nhan KPI tuan X" dung tuan LUC XAC NHAN, khong phai tuan dang xem.
+        confirmed_at_by_conv = {
+            row["conv_id"]: row["synced_at"]
+            for row in (confirmed_rows.data or [])
+            if row.get("conv_id") and row.get("synced_at")
+        }
+
+        # conv_id -> created_at cua TAT CA hoi thoai da tinh KPI Inbox (khong
+        # phan biet co Lead hay khong) - dung created_at (khong phai synced_at)
+        # vi day chinh la cot RPC get_team_kpi_overview dung de xac dinh hoi
+        # thoai do thuoc tuan nao (xem migration 012). Cho leader biet dung 1
+        # hoi thoai cu duoc tinh KPI Inbox vao tuan nao khi xem lai chat.
+        inbox_week_rows = (
+            supabase.table("fb_inbox_kpi")
+            .select("conv_id, created_at")
+            .in_("id_member", member_ids)
+            .eq("is_confirmed", True)
+            .execute()
+        )
+        inbox_confirmed_at_by_conv = {
+            row["conv_id"]: row["created_at"]
+            for row in (inbox_week_rows.data or [])
+            if row.get("conv_id") and row.get("created_at")
+        }
 
         logger.info(f"fb-inbox-verified-ids: leader={leader_email}, members={len(member_ids)}, confirmed={len(confirmed_ids)}, pending={len(pending_ids)}")
 
         return BaseResponse(success=True, data={
             "confirmed_conv_ids": confirmed_ids,
+            "confirmed_at_by_conv": confirmed_at_by_conv,
+            "inbox_confirmed_at_by_conv": inbox_confirmed_at_by_conv,
             "pending_conv_ids": pending_ids,  # đã đề xuất nhưng chưa confirmed
             "range": {"start": start, "end": end},
             "member_count": len(member_ids)

@@ -100,6 +100,12 @@ interface Props {
     is_lead: boolean;
   }) => Promise<void>;
   verifiedConvIds: Set<string>;
+  /** conv_id -> thoi diem xac nhan Lead (ISO string), de hien "Da xac nhan
+   * KPI tuan X" dung tuan LUC XAC NHAN, khong phai tuan dang xem lai. */
+  verifiedConvDates?: Record<string, string>;
+  /** conv_id -> created_at cua dong KPI Inbox (BAT KY hoi thoai nao da tinh,
+   * khong chi rieng Lead) - de hien "KPI Inbox tinh vao tuan X". */
+  inboxKpiWeekDates?: Record<string, string>;
   userEmail: string;
   ownerEmail: string;
   /** Email cua CHU tai khoan FB dang duoc xem (khac userEmail khi leader/admin
@@ -169,17 +175,20 @@ function statusLabel(status?: string): string {
 }
 
 // So thu tu tuan trong nam - cung quy uoc voi AssignKpiModal/KpiRewardSections:
-// tuan 1 bat dau tu thu Hai cua/truoc ngay 1/1. KPI Inbox tinh theo now() nen
-// luon la tuan hien tai.
-function getCurrentWeekNumber(): number {
-  const now = new Date();
-  const year = now.getFullYear();
+// tuan 1 bat dau tu thu Hai cua/truoc ngay 1/1. Khong truyen date = tuan hien tai
+// (dung cho badge "Da dong bo KPI Inbox tu dong" - luon la tuan dang o).
+function getWeekNumber(date: Date): number {
+  const year = date.getFullYear();
   const firstDay = new Date(year, 0, 1);
   const dayOfWeek = firstDay.getDay() || 7;
   const startMonday = new Date(firstDay);
   startMonday.setDate(firstDay.getDate() - dayOfWeek + 1);
-  const diffDays = Math.round((now.getTime() - startMonday.getTime()) / 86400000);
+  const diffDays = Math.round((date.getTime() - startMonday.getTime()) / 86400000);
   return Math.floor(diffDays / 7) + 1;
+}
+
+function getCurrentWeekNumber(): number {
+  return getWeekNumber(new Date());
 }
 
 // StatCard — mini the thong ke tren dau trang, dung lai dung pattern da chuan hoa
@@ -223,7 +232,7 @@ export default function InboxModernLayout(props: Props) {
     archives, openConv, msgs, reply, customerNotes, savingNoteConv, toast,
     chatScrollRef, selectAcc, scan, setViewMode, setArchiveReading, setFilter,
     setReply, openChat, hoverConv, openArchive, mark, saveArchive, saveCustomerNote, sendReply,
-    needsReply, accLabel, syncFbInbox, verifiedConvIds,
+    needsReply, accLabel, syncFbInbox, verifiedConvIds, verifiedConvDates = {}, inboxKpiWeekDates = {},
     userEmail, ownerEmail, accountOwnerEmail,
   } = props;
 
@@ -882,16 +891,22 @@ export default function InboxModernLayout(props: Props) {
             {panelTab === "kpi" && (
               <div>
                 {/* Admin / Leader: Xac nhan KPI */}
-                {(role === "admin" || role === "leader") && (
+                {(role === "admin" || role === "leader") && (() => {
+                  const isConfirmed = verifiedConvIds?.has(openConv);
+                  const confirmedAt = verifiedConvDates[openConv];
+                  // Hoi thoai da xac nhan roi thi hien dung TUAN LUC XAC NHAN
+                  // (co the la tuan truoc), khong phai tuan dang xem lai hom nay.
+                  const confirmedWeekNumber = confirmedAt ? getWeekNumber(new Date(confirmedAt)) : getCurrentWeekNumber();
+                  return (
                   <div className={cn("mb-5 rounded-xl border p-4 transition-colors",
-                    verifiedConvIds?.has(openConv) ? "border-emerald-200 bg-emerald-50" : "border-primary/20 bg-card")}>
+                    isConfirmed ? "border-emerald-200 bg-emerald-50" : "border-primary/20 bg-card")}>
 
-                    <div className="mb-1 flex items-center justify-between">
-                      <div className={cn("flex items-center gap-1.5 text-xs font-bold uppercase", verifiedConvIds?.has(openConv) ? "text-emerald-700" : "text-foreground")}>
-                        {verifiedConvIds?.has(openConv) ? "Đã xác nhận Lead" : "Xác nhận Lead"}
-                        <span className="rounded-full bg-black/5 px-1.5 py-0.5 text-[10px] font-semibold normal-case text-muted-foreground">Tuần {getCurrentWeekNumber()}</span>
+                    <div className="mb-1 flex flex-wrap items-center justify-between gap-1.5">
+                      <div className={cn("flex min-w-0 flex-wrap items-center gap-1.5 text-xs font-bold uppercase", isConfirmed ? "text-emerald-700" : "text-foreground")}>
+                        <span className="whitespace-nowrap">{isConfirmed ? "Đã xác nhận Lead" : "Xác nhận Lead"}</span>
+                        <span className="shrink-0 whitespace-nowrap rounded-full bg-black/5 px-1.5 py-0.5 text-[10px] font-semibold normal-case text-muted-foreground">Tuần {confirmedWeekNumber}</span>
                       </div>
-                      {verifiedConvIds?.has(openConv) && <CheckCircle2 size={18} className="text-emerald-500" />}
+                      {verifiedConvIds?.has(openConv) && <CheckCircle2 size={18} className="shrink-0 text-emerald-500" />}
                     </div>
 
                     {/* KPI Inbox tinh tu dong khi extension quet duoc tin nhan moi -
@@ -922,6 +937,22 @@ export default function InboxModernLayout(props: Props) {
                       </div>
                     )}
 
+                    {/* KPI Inbox tinh theo created_at cua dong fb_inbox_kpi (thoi diem
+                        tin nhan dau tien duoc auto-detect) - co the khac tuan voi luc
+                        Lead duoc xac nhan (vd hoi thoai cu, Lead moi danh dau hom nay).
+                        Hien ro cho leader biet dang xem lai 1 chat da tinh vao tuan nao. */}
+                    {openConv && (
+                      inboxKpiWeekDates[openConv] ? (
+                        <div className="mb-3 rounded-lg bg-violet-50 px-2.5 py-1.5 text-[11px] font-semibold text-violet-700">
+                          📊 KPI Inbox của hội thoại này tính vào Tuần {getWeekNumber(new Date(inboxKpiWeekDates[openConv]))}
+                        </div>
+                      ) : (
+                        <div className="mb-3 text-[11px] font-medium text-muted-foreground">
+                          Hội thoại này chưa được tính KPI Inbox.
+                        </div>
+                      )
+                    )}
+
                     {!verifiedConvIds?.has(openConv) && (
                       <div className="mb-3 text-xs text-muted-foreground">Chọn hội thoại bên trái rồi bấm xác nhận nếu đây là khách hàng tiềm năng (Lead).</div>
                     )}
@@ -946,7 +977,7 @@ export default function InboxModernLayout(props: Props) {
                     {openConv && selectedConv && (
                       verifiedConvIds?.has(openConv) ? (
                         <div className="whitespace-nowrap rounded-xl border border-emerald-200/50 bg-emerald-100/50 p-3 text-center text-xs font-semibold text-emerald-700">
-                          Bạn đã đánh dấu Lead cho hội thoại này.
+                          Bạn đã đánh dấu Lead cho hội thoại này (Tuần {confirmedWeekNumber}).
                         </div>
                       ) : (
                         <button onClick={async () => {
@@ -963,7 +994,8 @@ export default function InboxModernLayout(props: Props) {
                       )
                     )}
                   </div>
-                )}
+                  );
+                })()}
 
                 {/* Tong quan */}
                 <div className="mb-3 text-sm font-bold text-foreground">Tổng quan inbox</div>
