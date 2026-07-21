@@ -529,40 +529,37 @@ def delete_customer_lead(lead_id: str) -> bool:
     return True
 
 
+_TEST_ACCOUNT_EMAIL_DOMAINS = {"markee.vn", "markee.test", "markeeai.com"}
+_TEST_ACCOUNT_EMAILS = {"admin123@gmail.com"}
+
+
+def _is_test_account(email: str, name: str) -> bool:
+    email = (email or "").lower()
+    name = (name or "").lower()
+    if email in _TEST_ACCOUNT_EMAILS:
+        return True
+    domain = email.rsplit("@", 1)[-1] if "@" in email else ""
+    if domain in _TEST_ACCOUNT_EMAIL_DOMAINS:
+        return True
+    return "test" in name or "demo" in name
+
+
 def get_all_sdrs() -> List[Dict[str, Any]]:
     """Danh sach nguoi co the gan lam Quan ly / Phu trach deal CRM.
 
-    Chi lay nguoi thuc su thuoc mot team that (leader hoac member cua
-    teams co ten khong chua "test") - loai tru cac acc admin/leader
-    tao de test/demo tren local (vd devadmin@markee.vn, admin123@gmail.com).
+    Lay tat ca admin/leader that, loai tru cac acc test/dev/demo tao rieng
+    de test local (vd devadmin@markee.vn, leader@markee.test, admin123@gmail.com).
     """
     try:
         supabase = get_supabase_client()
-
-        teams_res = supabase.table("teams").select("id, id_leader, name_team").execute()
-        real_teams = [t for t in (teams_res.data or []) if "test" not in (t.get("name_team") or "").lower()]
-        real_team_ids = [t["id"] for t in real_teams]
-
-        valid_ids = {t["id_leader"] for t in real_teams if t.get("id_leader")}
-        if real_team_ids:
-            members_res = (
-                supabase.table("member_of_teams")
-                .select("id_member")
-                .in_("id_teams", real_team_ids)
-                .execute()
-            )
-            valid_ids.update(row["id_member"] for row in (members_res.data or []) if row.get("id_member"))
-
-        if not valid_ids:
-            return []
-
-        users_res = (
+        res = (
             supabase.table("app_users")
-            .select("id, name, role")
-            .in_("id", list(valid_ids))
+            .select("id, name, email, role")
+            .in_("role", ["admin", "leader"])
             .execute()
         )
-        return users_res.data or []
+        users = [u for u in (res.data or []) if not _is_test_account(u.get("email"), u.get("name"))]
+        return [{"id": u["id"], "name": u["name"], "role": u["role"]} for u in users]
     except Exception as e:
         logger.error(f"Error getting SDRs: {e}")
         return []
