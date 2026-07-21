@@ -16,6 +16,7 @@ from app.modules.all_platform.schemas import (
 from app.modules.all_platform.services import (
     archive_sales_asset,
     create_sales_asset,
+    delete_sales_asset,
     get_sales_asset,
     list_sales_assets,
     send_sales_asset,
@@ -128,6 +129,15 @@ def sales_assets_update(
 def sales_assets_archive(asset_id: str, _user: dict[str, Any] = Depends(get_current_user)) -> BaseResponse:
     try:
         return BaseResponse(success=True, message="Da luu tru tai lieu", data=archive_sales_asset(asset_id))
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@router.delete("/{asset_id}")
+def sales_assets_delete(asset_id: str, _user: dict[str, Any] = Depends(get_current_user)) -> BaseResponse:
+    try:
+        delete_sales_asset(asset_id)
+        return BaseResponse(success=True, message="Da xoa tai lieu ban hang")
     except Exception as e:
         return BaseResponse(success=False, message=str(e))
 

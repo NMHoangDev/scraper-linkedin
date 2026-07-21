@@ -46,8 +46,10 @@ type CustomerLeadRow = {
   industry?: string | null;
   tax_code?: string | null;
   leaded_by?: string | null;
+  leaded_by_name_hint?: string | null;
   source_platform?: string | null;
   sdr_id?: string | null;
+  sdr_name_hint?: string | null;
   status?: 'pending' | 'closed' | 'rejected' | string | null;
   activity_status?: string | null;
   deal_stage?: DealStage | null;
@@ -389,8 +391,10 @@ function rowToDeal(row: CustomerLeadRow, history: StageHistory[] = []): Deal {
     assignment: {
       sdrId: asText(row.sdr_id),
       sdrName: asText(row.sdr_name),
+      sdrNameHint: asText(row.sdr_name_hint),
       leadedById: asText(row.leaded_by),
       leadName: asText(row.leader_name),
+      leadedByNameHint: asText(row.leaded_by_name_hint),
       ownerUserId: asText(row.leaded_by),
       ownerName: asText(row.leader_name),
       assignedUserId: asText(row.sdr_id),
@@ -439,7 +443,9 @@ function toCustomerPayload(input: CreateDealInput | UpdateDealInput): Partial<Cu
 
   if (input.assignment) {
     if ('leadedById' in input.assignment) payload.leaded_by = input.assignment.leadedById;
+    if ('leadedByNameHint' in input.assignment) payload.leaded_by_name_hint = input.assignment.leadedByNameHint;
     if ('sdrId' in input.assignment) payload.sdr_id = input.assignment.sdrId;
+    if ('sdrNameHint' in input.assignment) payload.sdr_name_hint = input.assignment.sdrNameHint;
   }
 
   if (input.contract) {

@@ -234,6 +234,15 @@ def archive_sales_asset(asset_id: str) -> dict[str, Any]:
     return _row_to_asset(_hydrate_asset_rows([result.data[0]])[0])
 
 
+def delete_sales_asset(asset_id: str) -> bool:
+    """Xoa han (hard delete) 1 tai lieu ban hang khoi sales_assets."""
+    supabase: Client = get_supabase_client()
+    result = supabase.table(SALES_ASSETS_TABLE).delete().eq("id", asset_id).execute()
+    if not result.data:
+        raise ValueError("Tai lieu ban hang khong ton tai.")
+    return True
+
+
 def _find_lead(payload: dict[str, Any]) -> dict[str, Any] | None:
     supabase: Client = get_supabase_client()
     deal_id = payload.get("deal_id")

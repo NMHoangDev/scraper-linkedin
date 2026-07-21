@@ -36,6 +36,20 @@ from app.modules.all_platform.services.supabase_categories_service import (
     update_category,
     delete_category,
 )
+from app.modules.all_platform.services.supabase_members_service import (
+    get_all_members,
+    get_member,
+    create_member,
+    update_member,
+    delete_member,
+    get_all_skills,
+    create_skill,
+    update_skill,
+    delete_skill,
+    parse_excel_rows,
+    import_members_from_rows,
+    sync_members_from_list,
+)
 from app.modules.all_platform.services.supabase_quick_comment_service import (
     get_all_quick_comments,
     add_quick_comment,
@@ -67,6 +81,7 @@ from app.modules.all_platform.services.supabase_sales_asset_service import (
     create_sales_asset,
     update_sales_asset,
     archive_sales_asset,
+    delete_sales_asset,
     send_sales_asset,
 )
 from app.modules.all_platform.services.supabase_kpi_reward_service import (

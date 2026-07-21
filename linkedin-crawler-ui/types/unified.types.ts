@@ -5,7 +5,7 @@
    These types mirror the Supabase database schema. */
 
 export type FeedPlatform = "facebook" | "linkedin";
-export type CategoryType = "intent" | "industry" | "tier" | "team" | "icp" | "content_type" | "product_seeding";
+export type CategoryType = "intent" | "industry" | "tier" | "team" | "icp" | "content_type" | "product_seeding" | "crm_source" | "crm_service_package" | "crm_package" | "crm_industry";
 export type VerifyStatus = "pending" | "yes" | "no";
 export type UserRole = "member" | "leader" | "admin";
 
@@ -147,6 +147,36 @@ export interface Category {
   description?: string;
   platform: string;
   created_at?: string;
+}
+
+// ── Members (HR roster, độc lập với app_users) ────────────────────────────────
+
+export interface Skill {
+  id: string;
+  name: string;
+  category?: string | null;
+  created_at?: string;
+}
+
+export interface MemberProfile {
+  id: string;
+  display_name: string;
+  full_name: string;
+  email?: string | null;
+  telegram_username?: string | null;
+  phone?: string | null;
+  birth_date?: string | null;
+  gender?: string | null;
+  team?: string | null;
+  position?: string | null;
+  department?: string | null;
+  experience_year?: number | null;
+  linked_user_id?: string | null;
+  linked_user_id_2?: string | null;
+  skill_ids?: string[];
+  skills?: Skill[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface QuickCommentTemplate {

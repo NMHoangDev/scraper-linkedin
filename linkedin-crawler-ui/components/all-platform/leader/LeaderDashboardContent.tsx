@@ -394,7 +394,7 @@ export function LeaderDashboardContent() {
   ).length;
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 bg-surface font-sans">
+    <div className="mx-auto flex w-full max-w-none flex-col gap-3 bg-surface font-sans">
       <div className="flex flex-col gap-2 rounded-xl border border-outline-variant bg-surface px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">

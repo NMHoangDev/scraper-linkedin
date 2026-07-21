@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { MaterialIcon } from "@/components/ui";
 import { useAppPlatform } from "@/components/providers/AppPlatformProvider";
+import { useMembers } from "@/hooks/useMembers";
 import {
   allPlatformCategoriesService,
   teamsService,
@@ -22,43 +23,87 @@ import {
 // ── TEAM MODAL (Multi-select members, Leader dropdown) ──────────────────────
 function TeamModal({ isOpen, onClose, onSave, editing }: { isOpen: boolean; onClose: () => void; onSave: (p: any) => Promise<void>; editing?: any }) {
   const [nameTeam, setNameTeam] = useState("");
-  const [leaderEmail, setLeaderEmail] = useState("");
-  const [memberEmails, setMemberEmails] = useState<string[]>([]);
+  // leaderKey lưu selection key của roster (email nếu đã liên kết, else memberId)
+  // — LUÔN duy nhất kể cả người chưa liên kết, để dropdown hiện đủ 140 người và
+  // chọn tự do, không chặn ai (chỉ chặn ở bước submit vì backend cần email/id thật).
+  const [leaderKey, setLeaderKey] = useState("");
+  // Lưu theo memberId (roster) thay vì email trực tiếp — cho phép tích cả người
+  // chưa liên kết tài khoản, chỉ resolve sang email thật lúc submit.
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
 
-  const [leaders, setLeaders] = useState<AppUserProfile[]>([]);
   const [allUsers, setAllUsers] = useState<AppUserProfile[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Hiện ĐẦY ĐỦ toàn bộ danh bạ (140 người) — GET /api/all-platform/members —
+  // tích tự do không chặn ai. Người chưa liên kết tài khoản vẫn tích được bình
+  // thường; lúc lưu sẽ tự lọc ra ai có email thật để gửi lên, phần còn lại chờ
+  // họ tự liên kết sau.
+  const { members } = useMembers();
+
   useEffect(() => {
     if (isOpen) {
-      usersService.getByRole("leader").then(r => r.success && setLeaders(r.data || []));
-      usersService.getByRole("member").then(r => r.success && setAllUsers(r.data || []));
+      // getAllProfiles (không lọc role) — roster cần map linked_user_id sang
+      // email bất kể người đó đang là member hay leader trong app_users.
+      usersService.getAllProfiles().then(r => r.success && setAllUsers(r.data || []));
     }
   }, [isOpen]);
+
+  const memberRosterEntries = useMemo(() => {
+    return members
+      .map(m => {
+        const linkedUserId = m.linked_user_id || m.linked_user_id_2 || null;
+        const user = linkedUserId ? allUsers.find(u => u.id === linkedUserId) : undefined;
+        return { memberId: m.id, displayName: m.display_name, email: user?.email || null };
+      })
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
+  }, [members, allUsers]);
+
+  const leaderKeyOf = (e: (typeof memberRosterEntries)[number]) => e.email || e.memberId;
+  const selectedLeaderEntry = memberRosterEntries.find(e => leaderKeyOf(e) === leaderKey);
 
   useEffect(() => {
     if (editing) {
       setNameTeam(editing.name_team || "");
-      setLeaderEmail(editing.leader_email || "");
-      setMemberEmails(editing.members || []);
+      // editing.leader_email là email thật đã lưu trong DB — map ngược sang
+      // selection key tương ứng trong roster; nếu không tìm thấy (leader không
+      // nằm trong 140 người) fallback dùng thẳng email để không mất lựa chọn.
+      const leaderEntry = memberRosterEntries.find(e => e.email === editing.leader_email);
+      setLeaderKey(leaderEntry ? leaderKeyOf(leaderEntry) : (editing.leader_email || ""));
+      // editing.members là email thật đã lưu trong DB — map ngược sang memberId
+      // tương ứng trong roster để tích đúng checkbox.
+      const existingEmails = new Set<string>(editing.members || []);
+      const matched = memberRosterEntries.filter(e => e.email && existingEmails.has(e.email)).map(e => e.memberId);
+      setSelectedMemberIds(matched);
     } else {
       setNameTeam("");
-      setLeaderEmail("");
-      setMemberEmails([]);
+      setLeaderKey("");
+      setSelectedMemberIds([]);
     }
-  }, [editing, isOpen]);
+  }, [editing, isOpen, memberRosterEntries]);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nameTeam.trim() || !leaderEmail) return;
+    if (!nameTeam.trim() || !leaderKey) return;
+    if (!selectedLeaderEntry?.email) {
+      window.alert(
+        `"${selectedLeaderEntry?.displayName || "Người này"}" chưa liên kết tài khoản đăng nhập — vào Quản lý thành viên để liên kết trước khi chọn làm Leader.`
+      );
+      return;
+    }
     setIsSubmitting(true);
     try {
+      // Chỉ người ĐÃ liên kết tài khoản mới có email thật để lưu — lọc ra, tạo
+      // team vẫn chạy bình thường, phần còn lại chờ họ tự liên kết sau.
+      const resolvedEmails = selectedMemberIds
+        .map(mid => memberRosterEntries.find(m => m.memberId === mid)?.email)
+        .filter((email): email is string => Boolean(email));
+
       await onSave({
         name_team: nameTeam.trim(),
-        leader_email: leaderEmail,
-        member_emails: memberEmails,
+        leader_email: selectedLeaderEntry.email,
+        member_emails: resolvedEmails,
         isEdit: !!editing
       });
       onClose();
@@ -67,9 +112,9 @@ function TeamModal({ isOpen, onClose, onSave, editing }: { isOpen: boolean; onCl
     }
   };
 
-  const toggleMember = (email: string) => {
-    setMemberEmails(prev =>
-      prev.includes(email) ? prev.filter(e => e !== email) : [...prev, email]
+  const toggleMember = (memberId: string) => {
+    setSelectedMemberIds(prev =>
+      prev.includes(memberId) ? prev.filter(id => id !== memberId) : [...prev, memberId]
     );
   };
 
@@ -104,53 +149,52 @@ function TeamModal({ isOpen, onClose, onSave, editing }: { isOpen: boolean; onCl
               Trưởng nhóm (Leader) {editing ? "(không đổi)" : "*"}
             </label>
             <select
-              value={leaderEmail}
-              onChange={(e) => setLeaderEmail(e.target.value)}
+              value={leaderKey}
+              onChange={(e) => setLeaderKey(e.target.value)}
               disabled={!!editing}
               className="w-full px-4 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-xs text-on-surface outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary transition cursor-pointer disabled:opacity-50"
             >
               <option value="">-- Chọn Leader --</option>
-              {leaders.map(l => (
-                <option key={l.email} value={l.email}>{l.name || l.email} ({l.email})</option>
+              {memberRosterEntries.map(e => (
+                <option key={leaderKeyOf(e)} value={leaderKeyOf(e)}>
+                  {e.email ? `${e.displayName} (${e.email})` : e.displayName}
+                </option>
               ))}
-              {editing && leaderEmail && !leaders.find(l => l.email === leaderEmail) && (
-                <option value={leaderEmail}>{leaderEmail}</option>
-              )}
             </select>
           </div>
 
           <div>
             <label className="block text-[10px] font-bold text-on-surface-variant uppercase mb-1">Thành viên (Members)</label>
             <div className="border border-outline-variant rounded-xl max-h-48 overflow-y-auto bg-surface-container-low p-2 space-y-1">
-              {allUsers.length === 0 ? (
+              {memberRosterEntries.length === 0 ? (
                 <div className="text-xs text-center p-2 text-on-surface-variant">Đang tải tài khoản...</div>
               ) : (
-                allUsers.map(u => {
-                  const selected = memberEmails.includes(u.email);
+                memberRosterEntries.map(e => {
+                  const selected = selectedMemberIds.includes(e.memberId);
                   return (
                     <div
-                      key={u.email}
-                      onClick={() => toggleMember(u.email)}
+                      key={e.memberId}
+                      onClick={() => toggleMember(e.memberId)}
                       className={cn("flex items-center gap-2 p-2 rounded-lg cursor-pointer text-xs transition border", selected ? "bg-primary/10 border-primary/30" : "bg-surface border-transparent hover:border-outline-variant")}
                     >
                       <input type="checkbox" checked={selected} readOnly className="cursor-pointer accent-primary" />
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-on-surface truncate">{u.name || u.email.split("@")[0]}</div>
-                        <div className="text-on-surface-variant text-[10px] truncate">{u.email}</div>
+                        <div className="font-semibold text-on-surface truncate">{e.displayName}</div>
+                        <div className="text-on-surface-variant text-[10px] truncate">{e.email || "Chưa liên kết tài khoản"}</div>
                       </div>
                     </div>
                   )
                 })
               )}
             </div>
-            <div className="text-[10px] text-on-surface-variant mt-1 text-right font-medium">Đã chọn: {memberEmails.length} người</div>
+            <div className="text-[10px] text-on-surface-variant mt-1 text-right font-medium">Đã chọn: {selectedMemberIds.length} người</div>
           </div>
 
           <div className="flex gap-3 pt-3 border-t border-outline-variant shrink-0">
             <button type="button" onClick={onClose} className="flex-1 border border-outline-variant hover:bg-surface-container-low text-on-surface font-bold py-2 rounded-xl text-xs transition">
               Hủy bỏ
             </button>
-            <button type="submit" disabled={isSubmitting || !nameTeam.trim() || !leaderEmail} className="flex-1 bg-primary hover:bg-on-primary-fixed-variant text-white font-bold py-2 rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50">
+            <button type="submit" disabled={isSubmitting || !nameTeam.trim() || !leaderKey} className="flex-1 bg-primary hover:bg-on-primary-fixed-variant text-white font-bold py-2 rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50">
               {isSubmitting ? "Đang lưu..." : (editing ? "Lưu thay đổi" : "Thêm mới")}
             </button>
           </div>
@@ -258,7 +302,302 @@ const CATEGORIES_METADATA: CategoryMeta[] = [
     valueLabel: "Mã sản phẩm (code)",
     nameLabel: "Tên sản phẩm (name)",
   },
+  {
+    // Tab gộp 3 danh mục dùng trong form "Thêm deal" CRM (Nguồn, Danh mục sản
+    // phẩm, Gói) — cho leader tự thêm/sửa/xóa thay vì hardcode cứng trong code.
+    // Dùng "crm_source" làm key đại diện cho cả tab (xem CrmCategorySections).
+    key: "crm_source",
+    label: "Danh mục CRM",
+    emoji: "🧾",
+    description: "Nguồn, Danh mục sản phẩm và Gói dùng trong form Thêm deal CRM.",
+    placeholderValue: "",
+    placeholderName: "",
+    valueKey: "code",
+    nameKey: "name",
+    valueLabel: "",
+    nameLabel: "",
+  },
 ];
+
+const CRM_TAB_KEY: CategoryType = "crm_source";
+const CRM_SECTIONS: Array<{ key: CategoryType; label: string; description: string; placeholderCode: string; placeholderName: string }> = [
+  {
+    key: "crm_industry",
+    label: "Lĩnh vực",
+    description: "Lĩnh vực kinh doanh của khách hàng trong deal (vd: Bất động sản, Thời trang...).",
+    placeholderCode: "Vd: Bat_dong_san",
+    placeholderName: "Vd: Kinh doanh bất động sản",
+  },
+  {
+    key: "crm_source",
+    label: "Nguồn",
+    description: "Nguồn phát sinh deal (vd: FB Inbox, Zalo, Giới thiệu...).",
+    placeholderCode: "Vd: Zalo_Ads",
+    placeholderName: "Vd: Zalo Ads",
+  },
+  {
+    key: "crm_service_package",
+    label: "Danh mục sản phẩm",
+    description: "Sản phẩm / dịch vụ chào bán trong deal (vd: Làm Web, Markee CRM...).",
+    placeholderCode: "Vd: Landing_Page",
+    placeholderName: "Vd: Landing Page",
+  },
+  {
+    key: "crm_package",
+    label: "Gói",
+    description: "Gói dịch vụ CRM bán cho khách (vd: Gói cơ bản, Gói nâng cao...).",
+    placeholderCode: "Vd: Goi_vip",
+    placeholderName: "Vd: Gói VIP",
+  },
+];
+
+function CrmCategorySections({
+  categories,
+  onChanged,
+}: {
+  categories: Record<string, Category[]>;
+  onChanged: () => Promise<void>;
+}) {
+  const [modal, setModal] = useState<{
+    sectionKey: CategoryType;
+    mode: "add" | "edit";
+    id?: string;
+    code: string;
+    name: string;
+  } | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ sectionKey: CategoryType; item: Category } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!modal) return;
+    const code = modal.code.trim();
+    const name = modal.name.trim();
+    if (!code || !name) {
+      setModalError("Vui lòng nhập đầy đủ Mã và Tên hiển thị.");
+      return;
+    }
+    setIsSubmitting(true);
+    setModalError(null);
+    try {
+      const res =
+        modal.mode === "add"
+          ? await allPlatformCategoriesService.add({ category_type: modal.sectionKey, code, name, platform: "all" })
+          : await allPlatformCategoriesService.update({ id: modal.id!, category_type: modal.sectionKey, code, name });
+      if (!res.success) {
+        setModalError(res.message || "Lưu thất bại. Vui lòng thử lại.");
+        return;
+      }
+      setModal(null);
+      await onChanged();
+    } catch {
+      setModalError("Lỗi hệ thống khi gửi yêu cầu.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      const res = await allPlatformCategoriesService.delete(deleteTarget.item.id);
+      if (res.success) {
+        setDeleteTarget(null);
+        await onChanged();
+      } else {
+        alert(res.message || "Lỗi khi xóa");
+      }
+    } catch {
+      alert("Lỗi kết nối khi xóa");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      {CRM_SECTIONS.map(section => {
+        const items = categories[section.key] || [];
+        return (
+          <div key={section.key} className="rounded-xl border border-outline-variant bg-surface p-5 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-on-surface">{section.label}</h3>
+                <p className="text-[11px] text-on-surface-variant">{section.description}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setModal({ sectionKey: section.key, mode: "add", code: "", name: "" });
+                  setModalError(null);
+                }}
+                className="flex shrink-0 items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white transition hover:bg-on-primary-fixed-variant"
+              >
+                <MaterialIcon name="add" className="text-sm" /> Thêm
+              </button>
+            </div>
+
+            {items.length === 0 ? (
+              <p className="rounded-lg bg-surface-container-low px-3 py-4 text-center text-xs italic text-on-surface-variant">
+                Chưa có tùy chọn nào.
+              </p>
+            ) : (
+              <div className="divide-y divide-outline-variant rounded-lg border border-outline-variant">
+                {items.map(item => (
+                  <div key={item.id} className="flex items-center justify-between gap-2 px-3 py-2 text-xs">
+                    <div className="min-w-0 truncate">
+                      <span className="font-mono font-semibold text-on-surface">{item.code}</span>
+                      <span className="ml-2 text-on-surface-variant">— {item.name}</span>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setModal({ sectionKey: section.key, mode: "edit", id: item.id, code: item.code, name: item.name || "" });
+                          setModalError(null);
+                        }}
+                        className="rounded p-1 text-on-surface-variant transition hover:bg-surface-container-low"
+                        title="Sửa"
+                      >
+                        <MaterialIcon name="edit" className="text-base" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteTarget({ sectionKey: section.key, item })}
+                        className="rounded p-1 text-red-600 transition hover:bg-red-50"
+                        title="Xóa"
+                      >
+                        <MaterialIcon name="delete" className="text-base" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[1px] animate-in fade-in duration-200">
+          <div
+            style={{ width: "100%", maxWidth: "420px" }}
+            className="overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-2xl animate-in zoom-in-95 duration-200"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="flex items-center justify-between border-b border-outline-variant bg-surface-container-low px-6 py-4">
+              <h3 className="font-bold text-on-surface">
+                {modal.mode === "add" ? "Thêm" : "Sửa"} {CRM_SECTIONS.find(s => s.key === modal.sectionKey)?.label}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setModal(null)}
+                className="rounded-lg p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container-low"
+                aria-label="Đóng"
+              >
+                <MaterialIcon name="close" className="text-xl" />
+              </button>
+            </div>
+            <form onSubmit={e => void handleSave(e)} className="space-y-4 p-6">
+              <div className="space-y-1">
+                <label className="block text-[10px] font-bold uppercase text-on-surface-variant">
+                  Mã (code) <span className="text-error">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder={CRM_SECTIONS.find(s => s.key === modal.sectionKey)?.placeholderCode}
+                  value={modal.code}
+                  onChange={e => setModal({ ...modal, code: e.target.value })}
+                  disabled={modal.mode === "edit"}
+                  className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-4 py-2 text-xs text-on-surface outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  autoFocus
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-[10px] font-bold uppercase text-on-surface-variant">
+                  Tên hiển thị (name) <span className="text-error">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder={CRM_SECTIONS.find(s => s.key === modal.sectionKey)?.placeholderName}
+                  value={modal.name}
+                  onChange={e => setModal({ ...modal, name: e.target.value })}
+                  className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-4 py-2 text-xs text-on-surface outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                />
+              </div>
+              {modalError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs font-medium text-red-600">{modalError}</div>
+              )}
+              <div className="flex gap-3 border-t border-outline-variant pt-3">
+                <button
+                  type="button"
+                  onClick={() => setModal(null)}
+                  className="flex-1 rounded-xl border border-outline-variant py-2 text-xs font-bold text-on-surface transition hover:bg-surface-container-low"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-primary py-2 text-xs font-bold text-white shadow-sm transition hover:bg-on-primary-fixed-variant"
+                >
+                  {isSubmitting && <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />}
+                  {modal.mode === "add" ? "Thêm mới" : "Lưu thay đổi"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[1px] animate-in fade-in duration-200">
+          <div style={{ width: "100%", maxWidth: "420px" }} className="overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-outline-variant bg-surface-container-low px-6 py-4">
+              <h3 className="flex items-center gap-2 font-bold text-on-surface">
+                <span className="text-xl">⚠️</span> Xác nhận xóa
+              </h3>
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="rounded-lg p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container-low"
+                disabled={isDeleting}
+              >
+                <MaterialIcon name="close" className="text-xl" />
+              </button>
+            </div>
+            <div className="space-y-4 p-6">
+              <p className="text-xs leading-relaxed text-on-surface">
+                Bạn có chắc chắn muốn xóa <span className="font-semibold">{deleteTarget.item.name}</span> không?
+              </p>
+            </div>
+            <div className="flex justify-end gap-3 border-t border-outline-variant bg-surface-container-low px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                className="rounded-xl border border-outline-variant px-4 py-2 text-xs font-semibold text-on-surface transition hover:bg-surface-container-low"
+                disabled={isDeleting}
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDelete()}
+                disabled={isDeleting}
+                className="flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700"
+              >
+                {isDeleting ? "Đang xóa..." : "Xác nhận xóa"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function CategoryManagementContent() {
   const { platform } = useAppPlatform();
@@ -274,6 +613,10 @@ export function CategoryManagementContent() {
     icp: [],
     content_type: [],
     product_seeding: [],
+    crm_source: [],
+    crm_service_package: [],
+    crm_package: [],
+    crm_industry: [],
   });
 
   const [selectedTab, setSelectedTab] = useState<CategoryType>("intent");
@@ -329,6 +672,10 @@ export function CategoryManagementContent() {
         icp: [],
         content_type: [],
         product_seeding: [],
+        crm_source: [],
+        crm_service_package: [],
+        crm_package: [],
+        crm_industry: [],
       };
 
       list.forEach((item) => {
@@ -582,7 +929,10 @@ export function CategoryManagementContent() {
         <div className="flex gap-8 px-2">
           {CATEGORIES_METADATA.map((meta) => {
             const isActive = selectedTab === meta.key;
-            const count = categories[meta.key]?.length || 0;
+            const count =
+              meta.key === CRM_TAB_KEY
+                ? CRM_SECTIONS.reduce((sum, section) => sum + (categories[section.key]?.length || 0), 0)
+                : categories[meta.key]?.length || 0;
             return (
               <button
                 key={meta.key}
@@ -613,6 +963,9 @@ export function CategoryManagementContent() {
       </div>
 
       {/* ── MAIN CRUD CARD ──────────────────────────────────── */}
+      {selectedTab === CRM_TAB_KEY ? (
+        <CrmCategorySections categories={categories} onChanged={fetchCategories} />
+      ) : (
       <div className="rounded-xl border border-outline-variant bg-surface p-6 shadow-sm space-y-6">
         {/* Description box */}
         <div className="bg-surface-container-low border border-outline-variant rounded-xl px-4 py-2.5 flex items-center gap-2">
@@ -733,6 +1086,7 @@ export function CategoryManagementContent() {
           </table>
         </div>
       </div>
+      )}
 
       {/* ── DIALOG / MODAL FORM ──────────────────────────────── */}
       {isModalOpen && selectedTab === "team" && (

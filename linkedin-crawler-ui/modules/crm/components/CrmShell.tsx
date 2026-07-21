@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ContractDetailModal } from './ContractDetailModal';
 import { CrmKanbanBoard } from './CrmKanbanBoard';
 import { CrmTableView } from './CrmTableView';
-import { DealFormModal } from './DealFormModal';
+import { DealFormModal, clearDealDraft } from './DealFormModal';
 import { DetailDrawer } from './DetailDrawer';
 import { FileText, LayoutGrid, Loader2, Plus, RotateCcw, TableIcon, Trophy } from './icons';
 import { StageModal } from './StageModal';
@@ -29,7 +29,24 @@ type FilterState = {
 };
 
 export function CrmShell() {
-  const { deals, agents, loading, saving, error, stats, loadDeals, getDeal, createDeal, updateDeal, deleteDeal, moveDeal } = useCrm();
+  const {
+    deals,
+    agents,
+    sourceOptions: dealFormSourceOptions,
+    servicePackageOptions: dealFormServicePackageOptions,
+    packageOptions: dealFormPackageOptions,
+    industryOptions: dealFormIndustryOptions,
+    loading,
+    saving,
+    error,
+    stats,
+    loadDeals,
+    getDeal,
+    createDeal,
+    updateDeal,
+    deleteDeal,
+    moveDeal,
+  } = useCrm();
   const [viewMode, setViewMode] = useState<'kanban' | 'table'>('kanban');
   const [filters, setFilters] = useState<FilterState>({ search: '', source: '', city: '', industry: '' });
   const [activeStageFilters, setActiveStageFilters] = useState<DealStage[]>([]);
@@ -130,6 +147,7 @@ export function CrmShell() {
   async function handleCreate(input: CreateDealInput) {
     try {
       const deal = await createDeal(input);
+      clearDealDraft();
       setCreateOpen(false);
       setSelectedDeal(deal);
       setDetailOpen(true);
@@ -387,6 +405,10 @@ export function CrmShell() {
         deal={editingDeal}
         loading={saving}
         agents={agents}
+        sourceOptions={dealFormSourceOptions}
+        servicePackageOptions={dealFormServicePackageOptions}
+        packageOptions={dealFormPackageOptions}
+        industryOptions={dealFormIndustryOptions}
         onClose={() => {
           setCreateOpen(false);
           setEditingDeal(null);

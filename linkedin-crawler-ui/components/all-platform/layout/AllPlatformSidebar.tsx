@@ -147,6 +147,14 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       label: "Danh mục",
       matchStartsWith: ["/all-platform/quan-ly-danh-muc"],
     },
+    {
+      type: "item",
+      id: "members",
+      href: "/all-platform/admin/quan-ly-thanh-vien",
+      icon: "manage_accounts",
+      label: "Quản lý thành viên",
+      matchStartsWith: ["/all-platform/admin/quan-ly-thanh-vien"],
+    },
   ];
 
   const contentItems: NavLeafItem[] = [

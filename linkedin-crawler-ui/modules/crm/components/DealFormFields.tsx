@@ -1,5 +1,7 @@
 'use client';
 
+import { useMembers } from '@/hooks/useMembers';
+import type { MemberProfile } from '@/types/unified.types';
 import {
   CITY_OPTIONS,
   CONTRACT_STATUS_OPTIONS,
@@ -13,6 +15,8 @@ import {
   parseMoney,
 } from '../constants/crmConfig';
 import type { CreateDealInput, CrmUserOption, Deal, UpdateDealInput } from '../types';
+
+const DEFAULT_INDUSTRY_OPTIONS = INDUSTRY_OPTIONS.map(value => ({ value, label: value }));
 
 export type DealFormState = {
   customerName: string;
@@ -53,7 +57,9 @@ export type DealFormState = {
   pauseReason: string;
   note: string;
   leadedBy: string;
+  leadedByNameHint: string;
   sdrId: string;
+  sdrNameHint: string;
 };
 
 export function emptyDealForm(): DealFormState {
@@ -96,7 +102,9 @@ export function emptyDealForm(): DealFormState {
     pauseReason: '',
     note: '',
     leadedBy: '',
+    leadedByNameHint: '',
     sdrId: '',
+    sdrNameHint: '',
   };
 }
 
@@ -149,7 +157,9 @@ export function dealFormFromDeal(deal: Deal): DealFormState {
     pauseReason: deal.pauseReason || '',
     note: deal.note || '',
     leadedBy: deal.assignment.leadedById || '',
+    leadedByNameHint: deal.assignment.leadedByNameHint || deal.assignment.leadName || '',
     sdrId: deal.assignment.sdrId || '',
+    sdrNameHint: deal.assignment.sdrNameHint || deal.assignment.sdrName || '',
   };
 }
 
@@ -163,9 +173,7 @@ export function validateDealForm(form: DealFormState): string | null {
   return null;
 }
 
-export function buildDealPayload(form: DealFormState, agents: CrmUserOption[] = []): CreateDealInput | UpdateDealInput {
-  const lead = agents.find(agent => agent.id === form.leadedBy);
-  const sdr = agents.find(agent => agent.id === form.sdrId);
+export function buildDealPayload(form: DealFormState, _agents: CrmUserOption[] = []): CreateDealInput | UpdateDealInput {
   const quote =
     form.quoteUrl || form.quoteNumber || form.quoteTotalAmount
       ? {
@@ -217,9 +225,11 @@ export function buildDealPayload(form: DealFormState, agents: CrmUserOption[] = 
       createdById: form.leadedBy,
       assignedUserId: form.sdrId,
       sdrId: form.sdrId,
-      sdrName: sdr?.name || '',
+      sdrName: form.sdrNameHint,
+      sdrNameHint: form.sdrNameHint,
       leadedById: form.leadedBy,
-      leadName: lead?.name || '',
+      leadName: form.leadedByNameHint,
+      leadedByNameHint: form.leadedByNameHint,
     },
   };
 }
@@ -229,13 +239,57 @@ export function DealFormFields({
   setValue,
   agents = [],
   variant = 'edit',
+  sourceOptions = SOURCE_OPTIONS,
+  servicePackageOptions = SERVICE_PACKAGE_OPTIONS,
+  packageOptions = CRM_PACKAGE_OPTIONS,
+  industryOptions = DEFAULT_INDUSTRY_OPTIONS,
 }: {
   form: DealFormState;
   setValue: <K extends keyof DealFormState>(key: K, value: DealFormState[K]) => void;
+  sourceOptions?: Array<{ value: string; label: string }>;
+  servicePackageOptions?: Array<{ value: string; label: string }>;
+  packageOptions?: Array<{ value: string; label: string }>;
+  industryOptions?: Array<{ value: string; label: string }>;
   agents?: CrmUserOption[];
   /** 'wizard' hides manual contract/quote link fields — the deal+quote wizard generates the quote link automatically. */
   variant?: 'edit' | 'wizard';
 }) {
+  // Nguồn dữ liệu DUY NHẤT cho dropdown Quản lý/Phụ trách — GET /members,
+  // không hard-code / không tự tạo danh sách riêng. Chọn tự do trên toàn bộ
+  // 140 người, kể cả người CHƯA liên kết tài khoản đăng nhập — leaded_by/
+  // sdr_id (FK tới app_users.id) sẽ NULL cho tới khi người đó liên kết, nhưng
+  // tên vẫn luôn hiển thị nhờ leaded_by_name_hint/sdr_name_hint.
+  const { members } = useMembers();
+  const assignableMembers = [...members].sort((a, b) => a.display_name.localeCompare(b.display_name));
+
+  // Value trên <option> phải LUÔN duy nhất (kể cả người chưa liên kết) —
+  // dùng linked_user_id nếu có, else fallback về member.id của danh bạ.
+  const selectionKeyOf = (m: MemberProfile) => m.linked_user_id || m.linked_user_id_2 || m.id;
+
+  // form.leadedBy/sdrId chỉ lưu app_users.id THẬT (rỗng nếu chưa liên kết),
+  // nên suy ngược lại "đang chọn ai" để control <select> phải dò qua tên hint
+  // khi id thật rỗng.
+  const findSelectionKey = (realId: string, nameHint: string) => {
+    if (realId) return realId;
+    if (!nameHint) return '';
+    const match = assignableMembers.find(m => !(m.linked_user_id || m.linked_user_id_2) && m.display_name === nameHint);
+    return match ? match.id : '';
+  };
+
+  const handlePick = (value: string, idKey: 'leadedBy' | 'sdrId', hintKey: 'leadedByNameHint' | 'sdrNameHint') => {
+    if (!value) {
+      setValue(idKey, '');
+      setValue(hintKey, '');
+      return;
+    }
+    const member = assignableMembers.find(m => selectionKeyOf(m) === value);
+    setValue(idKey, member ? (member.linked_user_id || member.linked_user_id_2 || '') : '');
+    setValue(hintKey, member ? member.display_name : '');
+  };
+
+  const leadedBySelectionKey = findSelectionKey(form.leadedBy, form.leadedByNameHint);
+  const sdrSelectionKey = findSelectionKey(form.sdrId, form.sdrNameHint);
+
   return (
     <>
       <section className="crm-form-section">
@@ -289,7 +343,7 @@ export function DealFormFields({
           <Field label="Lĩnh vực">
             <select value={form.industry} onChange={event => setValue('industry', event.target.value)}>
               <option value="">-- Chọn --</option>
-              {INDUSTRY_OPTIONS.map(industry => <option key={industry}>{industry}</option>)}
+              {industryOptions.map(industry => <option key={industry.value} value={industry.value}>{industry.label}</option>)}
             </select>
           </Field>
         </div>
@@ -300,19 +354,19 @@ export function DealFormFields({
         <div className="crm-form-grid">
           <Field label="Nguồn">
             <select value={form.sourcePlatform} onChange={event => setValue('sourcePlatform', event.target.value)}>
-              {SOURCE_OPTIONS.map(source => <option key={source.value} value={source.value}>{source.label}</option>)}
+              {sourceOptions.map(source => <option key={source.value} value={source.value}>{source.label}</option>)}
             </select>
           </Field>
           <Field label="Danh mục sản phẩm" hint="tùy chọn">
             <select value={form.servicePackage} onChange={event => setValue('servicePackage', event.target.value)}>
               <option value="">-- Chưa chọn --</option>
-              {SERVICE_PACKAGE_OPTIONS.map(pkg => <option key={pkg.value} value={pkg.value}>{pkg.label}</option>)}
+              {servicePackageOptions.map(pkg => <option key={pkg.value} value={pkg.value}>{pkg.label}</option>)}
             </select>
           </Field>
           <Field label="Gói" hint="tùy chọn">
             <select value={form.package} onChange={event => setValue('package', event.target.value)}>
               <option value="">-- Chưa chọn --</option>
-              {CRM_PACKAGE_OPTIONS.map(pkg => <option key={pkg.value} value={pkg.value}>{pkg.label}</option>)}
+              {packageOptions.map(pkg => <option key={pkg.value} value={pkg.value}>{pkg.label}</option>)}
             </select>
           </Field>
         </div>
@@ -423,15 +477,33 @@ export function DealFormFields({
         <h3 className="crm-form-title">Phân công</h3>
         <div className="crm-form-grid">
           <Field label="Quản lý">
-            <select value={form.leadedBy} onChange={event => setValue('leadedBy', event.target.value)}>
+            <select value={leadedBySelectionKey} onChange={event => handlePick(event.target.value, 'leadedBy', 'leadedByNameHint')}>
               <option value="">-- Chưa gán --</option>
-              {agents.map(agent => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
+              {assignableMembers
+                .filter(m => selectionKeyOf(m) === leadedBySelectionKey || selectionKeyOf(m) !== sdrSelectionKey)
+                .map(m => {
+                  const linked = !!(m.linked_user_id || m.linked_user_id_2);
+                  return (
+                    <option key={m.id} value={selectionKeyOf(m)}>
+                      {linked ? `${m.display_name}${m.email ? ` (${m.email})` : ''}` : m.display_name}
+                    </option>
+                  );
+                })}
             </select>
           </Field>
           <Field label="Phụ trách">
-            <select value={form.sdrId} onChange={event => setValue('sdrId', event.target.value)}>
+            <select value={sdrSelectionKey} onChange={event => handlePick(event.target.value, 'sdrId', 'sdrNameHint')}>
               <option value="">-- Chưa giao --</option>
-              {agents.map(agent => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
+              {assignableMembers
+                .filter(m => selectionKeyOf(m) === sdrSelectionKey || selectionKeyOf(m) !== leadedBySelectionKey)
+                .map(m => {
+                  const linked = !!(m.linked_user_id || m.linked_user_id_2);
+                  return (
+                    <option key={m.id} value={selectionKeyOf(m)}>
+                      {linked ? `${m.display_name}${m.email ? ` (${m.email})` : ''}` : m.display_name}
+                    </option>
+                  );
+                })}
             </select>
           </Field>
         </div>

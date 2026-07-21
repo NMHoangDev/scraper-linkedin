@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { FaFacebook, FaLinkedin, FaPlus, FaEdit, FaTrash, FaSearch } from "react-icons/fa";
 import { MaterialIcon } from "@/components/ui";
 import { useAppAuth } from "@/contexts/AppAuthContext";
+import { useMembers } from "@/hooks/useMembers";
 import {
   allPlatformGroupsService,
   allPlatformCategoriesService,
@@ -186,6 +187,9 @@ interface FbGroupFormData {
   risk_note: string;
   assignee_id: string;
   co_assignee_id: string;
+  assignee_name_hint: string;
+  co_assignee_name_hint: string;
+  id_member_name_hint: string;
 }
 
 const FB_EMPTY_FORM: FbGroupFormData = {
@@ -215,6 +219,9 @@ const FB_EMPTY_FORM: FbGroupFormData = {
   risk_note: "",
   assignee_id: "",
   co_assignee_id: "",
+  assignee_name_hint: "",
+  co_assignee_name_hint: "",
+  id_member_name_hint: "",
 };
 
 function FacebookGroupForm({
@@ -229,6 +236,8 @@ function FacebookGroupForm({
   contentTypeOptions,
   productSeedingOptions,
   userOptions,
+  validUserIds,
+  nameHintById,
 }: {
   initial?: Partial<FbGroupFormData>;
   onSubmit: (data: Partial<FbGroupFormData>) => Promise<void>;
@@ -241,6 +250,8 @@ function FacebookGroupForm({
   contentTypeOptions: Category[];
   productSeedingOptions: Category[];
   userOptions: Category[];
+  validUserIds: Set<string>;
+  nameHintById: Record<string, string>;
 }) {
   const { user } = useAppAuth();
   const isAdmin = user?.role === "admin";
@@ -249,6 +260,13 @@ function FacebookGroupForm({
 
   const set = (key: keyof FbGroupFormData, value: string | boolean) =>
     setForm((f) => ({ ...f, [key]: value }));
+
+  // Chọn 1 người phụ trách/thành viên sở hữu thì lưu kèm luôn tên hiển thị
+  // "sạch" (không kèm email) — dùng làm fallback hiển thị nếu người đó chưa
+  // liên kết tài khoản đăng nhập nên field FK id bị bỏ trống lúc lưu.
+  const setPerson = (idKey: keyof FbGroupFormData, hintKey: keyof FbGroupFormData, value: string) => {
+    setForm((f) => ({ ...f, [idKey]: value, [hintKey]: nameHintById[value] || "" }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -301,7 +319,17 @@ function FacebookGroupForm({
           return;
         }
       }
-      await onSubmit(form);
+      // assignee_id/co_assignee_id/id_member là FK thật tới app_users — người
+      // được chọn trong danh bạ nhưng chưa liên kết tài khoản đăng nhập thì
+      // không có id hợp lệ để lưu, bỏ trống thay vì gửi giá trị sai (DB sẽ từ
+      // chối insert nếu gửi id không tồn tại trong app_users).
+      const submitData: Partial<FbGroupFormData> = {
+        ...form,
+        assignee_id: validUserIds.has(form.assignee_id) ? form.assignee_id : "",
+        co_assignee_id: validUserIds.has(form.co_assignee_id) ? form.co_assignee_id : "",
+        id_member: form.id_member && validUserIds.has(form.id_member) ? form.id_member : "",
+      };
+      await onSubmit(submitData);
     } finally {
       setBusy(false);
     }
@@ -384,7 +412,7 @@ function FacebookGroupForm({
           <SearchableDropdown
             label="Người phụ trách chính"
             value={form.assignee_id}
-            onChange={(val) => set("assignee_id", val)}
+            onChange={(val) => setPerson("assignee_id", "assignee_name_hint", val)}
             options={userOptions}
             placeholder="Tìm theo tên/email..."
             valueField="id"
@@ -394,7 +422,7 @@ function FacebookGroupForm({
           <SearchableDropdown
             label="Đồng phụ trách"
             value={form.co_assignee_id}
-            onChange={(val) => set("co_assignee_id", val)}
+            onChange={(val) => setPerson("co_assignee_id", "co_assignee_name_hint", val)}
             options={userOptions}
             placeholder="Tìm theo tên/email..."
             valueField="id"
@@ -405,7 +433,7 @@ function FacebookGroupForm({
             <SearchableDropdown
               label="Thành viên sở hữu *"
               value={form.id_member || ""}
-              onChange={(val) => set("id_member", val)}
+              onChange={(val) => setPerson("id_member", "id_member_name_hint", val)}
               options={userOptions}
               placeholder="Tìm theo tên/email..."
               valueField="id"
@@ -596,6 +624,9 @@ interface LiGroupFormData {
   risk_note: string;
   assignee_id: string;
   co_assignee_id: string;
+  assignee_name_hint: string;
+  co_assignee_name_hint: string;
+  id_member_name_hint: string;
 }
 
 const LI_EMPTY_FORM: LiGroupFormData = {
@@ -614,6 +645,9 @@ const LI_EMPTY_FORM: LiGroupFormData = {
   risk_note: "",
   assignee_id: "",
   co_assignee_id: "",
+  assignee_name_hint: "",
+  co_assignee_name_hint: "",
+  id_member_name_hint: "",
 };
 
 function LinkedInGroupForm({
@@ -628,6 +662,8 @@ function LinkedInGroupForm({
   contentTypeOptions,
   productSeedingOptions,
   userOptions,
+  validUserIds,
+  nameHintById,
 }: {
   initial?: Partial<LiGroupFormData>;
   onSubmit: (data: Partial<LiGroupFormData>) => Promise<void>;
@@ -640,6 +676,8 @@ function LinkedInGroupForm({
   contentTypeOptions: Category[];
   productSeedingOptions: Category[];
   userOptions: Category[];
+  validUserIds: Set<string>;
+  nameHintById: Record<string, string>;
 }) {
   const { user } = useAppAuth();
   const isAdmin = user?.role === "admin";
@@ -648,6 +686,13 @@ function LinkedInGroupForm({
 
   const set = (key: keyof LiGroupFormData, value: string | boolean) =>
     setForm((f) => ({ ...f, [key]: value }));
+
+  // Chọn 1 người phụ trách/thành viên sở hữu thì lưu kèm luôn tên hiển thị
+  // "sạch" (không kèm email) — dùng làm fallback hiển thị nếu người đó chưa
+  // liên kết tài khoản đăng nhập nên field FK id bị bỏ trống lúc lưu.
+  const setPerson = (idKey: keyof LiGroupFormData, hintKey: keyof LiGroupFormData, value: string) => {
+    setForm((f) => ({ ...f, [idKey]: value, [hintKey]: nameHintById[value] || "" }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -676,7 +721,17 @@ function LinkedInGroupForm({
 
     setBusy(true);
     try {
-      await onSubmit(form);
+      // assignee_id/co_assignee_id/id_member là FK thật tới app_users — người
+      // được chọn trong danh bạ nhưng chưa liên kết tài khoản đăng nhập thì
+      // không có id hợp lệ để lưu, bỏ trống thay vì gửi giá trị sai (DB sẽ từ
+      // chối insert nếu gửi id không tồn tại trong app_users).
+      const submitData: Partial<LiGroupFormData> = {
+        ...form,
+        assignee_id: validUserIds.has(form.assignee_id) ? form.assignee_id : "",
+        co_assignee_id: validUserIds.has(form.co_assignee_id) ? form.co_assignee_id : "",
+        id_member: form.id_member && validUserIds.has(form.id_member) ? form.id_member : "",
+      };
+      await onSubmit(submitData);
     } finally {
       setBusy(false);
     }
@@ -779,7 +834,7 @@ function LinkedInGroupForm({
           <SearchableDropdown
             label="Người phụ trách chính"
             value={form.assignee_id}
-            onChange={(val) => set("assignee_id", val)}
+            onChange={(val) => setPerson("assignee_id", "assignee_name_hint", val)}
             options={userOptions}
             placeholder="Tìm theo tên/email..."
             valueField="id"
@@ -789,7 +844,7 @@ function LinkedInGroupForm({
           <SearchableDropdown
             label="Đồng phụ trách"
             value={form.co_assignee_id}
-            onChange={(val) => set("co_assignee_id", val)}
+            onChange={(val) => setPerson("co_assignee_id", "co_assignee_name_hint", val)}
             options={userOptions}
             placeholder="Tìm theo tên/email..."
             valueField="id"
@@ -800,7 +855,7 @@ function LinkedInGroupForm({
             <SearchableDropdown
               label="Thành viên sở hữu *"
               value={form.id_member || ""}
-              onChange={(val) => set("id_member", val)}
+              onChange={(val) => setPerson("id_member", "id_member_name_hint", val)}
               options={userOptions}
               placeholder="Tìm theo tên/email..."
               valueField="id"
@@ -859,7 +914,6 @@ export function GroupManagementContent() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [teamsData, setTeamsData] = useState<TeamRow[]>([]);
   const [allUsers, setAllUsers] = useState<AppUserProfile[]>([]);
-
   const myTeams = useMemo(() => {
     if (!user || user.role !== "leader") return [];
     return teamsData.filter(t => String(t.id_leader) === String(user.id));
@@ -875,15 +929,40 @@ export function GroupManagementContent() {
     return ids;
   }, [myTeams]);
 
+  // Hiện ĐẦY ĐỦ toàn bộ danh bạ (140 người) — GET /api/all-platform/members —
+  // chọn tự do không chặn ai. Người chưa liên kết tài khoản đăng nhập vẫn chọn
+  // được bình thường; lúc lưu group sẽ tự bỏ trống field đó nếu người được chọn
+  // chưa có app_users.id thật (assignee_id/co_assignee_id/id_member có FK, xem
+  // validUserIds truyền xuống 2 form bên dưới).
+  const { members } = useMembers();
   const userOptions: Category[] = useMemo(() => {
-    return allUsers.map(u => ({
-      id: u.id,
-      name: (u as any).full_name || (u as any).name || u.email,
-      code: u.email,
-      category_type: "user",
-      platform: "all"
-    } as unknown as Category));
-  }, [allUsers]);
+    return members
+      .map(m => {
+        const linkedUserId = m.linked_user_id || m.linked_user_id_2 || null;
+        const linkedUser = linkedUserId ? allUsers.find(u => u.id === linkedUserId) : undefined;
+        return {
+          id: linkedUserId || m.id,
+          name: linkedUser ? `${m.display_name} (${linkedUser.email})` : `${m.display_name} (chưa liên kết tài khoản)`,
+          code: linkedUser?.email || "",
+          category_type: "user",
+          platform: "all"
+        } as unknown as Category;
+      })
+      .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  }, [members, allUsers]);
+
+  const validUserIds = useMemo(() => new Set(allUsers.map(u => u.id)), [allUsers]);
+
+  // Tên hiển thị "sạch" (không kèm email/ghi chú) theo option id — dùng để lưu
+  // kèm name-hint khi người được chọn chưa liên kết tài khoản (xem migration 045).
+  const nameHintById = useMemo(() => {
+    const map: Record<string, string> = {};
+    members.forEach(m => {
+      const linkedUserId = m.linked_user_id || m.linked_user_id_2 || null;
+      map[linkedUserId || m.id] = m.display_name;
+    });
+    return map;
+  }, [members]);
 
   const teamCategories: Category[] = useMemo(() => {
     const uniqueTeams: TeamRow[] = [];
@@ -970,10 +1049,13 @@ export function GroupManagementContent() {
   }, [fetchGroups, fetchCategories]);
 
   // Local filtering...
-  const getUserName = useCallback((id: string | null | undefined) => {
-    if (!id) return "—";
+  // fallbackHint: tên đã chọn tại thời điểm lưu (name-hint, xem migration 045) —
+  // dùng khi id là NULL vì người được chọn lúc đó chưa liên kết tài khoản đăng
+  // nhập, để không hiện trống trơn/mất dấu vết đã chọn ai.
+  const getUserName = useCallback((id: string | null | undefined, fallbackHint?: string | null) => {
+    if (!id) return fallbackHint ? `${fallbackHint} (chưa liên kết tài khoản)` : "—";
     const user = allUsers.find(u => String(u.id) === String(id));
-    if (!user) return "—";
+    if (!user) return fallbackHint ? `${fallbackHint} (chưa liên kết tài khoản)` : "—";
     return (user as any).full_name || (user as any).name || user.email;
   }, [allUsers]);
 
@@ -1501,6 +1583,8 @@ export function GroupManagementContent() {
                   contentTypeOptions={categories.filter((c) => c.category_type === "content_type")}
                   productSeedingOptions={categories.filter((c) => c.category_type === "product_seeding")}
                   userOptions={userOptions}
+                  validUserIds={validUserIds}
+                  nameHintById={nameHintById}
                   initial={
                     editingGroup
                       ? {
@@ -1569,6 +1653,8 @@ export function GroupManagementContent() {
                       : undefined
                   }
                   userOptions={userOptions}
+                  validUserIds={validUserIds}
+                  nameHintById={nameHintById}
                   onSubmit={handleLiSubmit}
                   onCancel={() => {
                     setShowAddForm(false);
@@ -1706,22 +1792,22 @@ export function GroupManagementContent() {
                     {isLeader ? (
                       <>
                         <td className="px-4 py-3 text-xs font-medium text-on-surface">
-                          {getUserName((g as any).assignee_id)}
+                          {getUserName((g as any).assignee_id, (g as any).assignee_name_hint)}
                         </td>
                         <td className="px-4 py-3 text-xs font-medium text-on-surface">
-                          {getUserName((g as any).co_assignee_id)}
+                          {getUserName((g as any).co_assignee_id, (g as any).co_assignee_name_hint)}
                         </td>
                         <td className="px-4 py-3 text-xs font-medium text-on-surface">
-                          {getUserName((g as any).id_member)}
+                          {getUserName((g as any).id_member, (g as any).id_member_name_hint)}
                         </td>
                       </>
                     ) : (
                       <>
                         <td className="px-4 py-3 text-xs font-medium text-on-surface">
-                          {isAdmin ? getUserName((g as any).id_member) : getUserName((g as any).assignee_id)}
+                          {isAdmin ? getUserName((g as any).id_member, (g as any).id_member_name_hint) : getUserName((g as any).assignee_id, (g as any).assignee_name_hint)}
                         </td>
                         <td className="px-4 py-3 text-xs font-medium text-on-surface">
-                          {isAdmin ? getUserTeamName((g as any).id_member) : getUserName((g as any).co_assignee_id)}
+                          {isAdmin ? getUserTeamName((g as any).id_member) : getUserName((g as any).co_assignee_id, (g as any).co_assignee_name_hint)}
                         </td>
                       </>
                     )}

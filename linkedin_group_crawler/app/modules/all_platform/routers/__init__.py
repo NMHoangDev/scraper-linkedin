@@ -3,6 +3,7 @@ from app.modules.all_platform.routers.kpi import router as kpi_router
 from app.modules.all_platform.routers.posts import router as facebook_posts_router
 from app.modules.all_platform.routers.posts_linkedin import router as linkedin_posts_router
 from app.modules.all_platform.routers.categories import router as categories_router
+from app.modules.all_platform.routers.members import router as members_router
 from app.modules.all_platform.routers.quick_comment import router as quick_comment_router
 from app.modules.all_platform.routers.quick_inbox import router as quick_inbox_router
 from app.modules.all_platform.routers.groups import router as facebook_groups_router

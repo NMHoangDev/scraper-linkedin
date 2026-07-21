@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { MaterialIcon } from "@/components/ui";
 import { teamsService, usersService } from "@/services/all-platform.service";
 import type { AppUserProfile, TeamRow } from "@/services/all-platform.service";
+import { useMembers } from "@/hooks/useMembers";
 
 interface TeamModalProps {
   isOpen: boolean;
@@ -23,6 +24,26 @@ export function TeamModal({ isOpen, onClose, team, leaderId, onSuccess }: TeamMo
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+
+  // Hiện ĐẦY ĐỦ toàn bộ danh bạ (140 người) — GET /api/all-platform/members —
+  // tích tự do không chặn ai. Người chưa liên kết tài khoản đăng nhập vẫn tích
+  // được bình thường; lúc lưu sẽ tự lọc ra ai có tài khoản thật để gửi lên (vì
+  // member_of_teams cần app_users.id thật), phần còn lại chờ họ tự liên kết sau.
+  const { members } = useMembers();
+  const rosterEntries = useMemo(() => {
+    return members
+      .map(m => {
+        const linkedUserId = m.linked_user_id || m.linked_user_id_2 || null;
+        const user = linkedUserId ? allMembers.find(u => u.id === linkedUserId) : undefined;
+        return {
+          memberId: m.id,
+          displayName: m.display_name,
+          linkedUserId,
+          email: user?.email || null,
+        };
+      })
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
+  }, [members, allMembers]);
 
   // Load all members (role === "member")
   useEffect(() => {
@@ -49,23 +70,28 @@ export function TeamModal({ isOpen, onClose, team, leaderId, onSuccess }: TeamMo
     if (isOpen) {
       if (team) {
         setNameTeam(team.name_team);
-        setSelectedMemberIds(team.members?.map(m => m.id) || []);
+        // team.members chứa app_users.id thật đã lưu trong DB — map ngược sang
+        // memberId tương ứng trong roster để tích đúng checkbox (selectedMemberIds
+        // giờ lưu theo memberId, chỉ resolve sang app_users.id lúc submit).
+        const existingUserIds = new Set(team.members?.map(m => m.id) || []);
+        const matched = rosterEntries
+          .filter(e => e.linkedUserId && existingUserIds.has(e.linkedUserId))
+          .map(e => e.memberId);
+        setSelectedMemberIds(matched);
       } else {
         setNameTeam("");
         setSelectedMemberIds([]);
       }
       setError(null);
     }
-  }, [isOpen, team]);
+  }, [isOpen, team, rosterEntries]);
 
   if (!isOpen) return null;
 
-  // Filter member list by search query (name or email)
-  const filteredMembers = allMembers.filter(m => {
+  // Hiện toàn bộ danh bạ, lọc theo search query (tên hoặc email).
+  const filteredMembers = rosterEntries.filter(e => {
     const query = searchQuery.toLowerCase();
-    const nameMatch = m.name?.toLowerCase().includes(query) || false;
-    const emailMatch = m.email.toLowerCase().includes(query);
-    return nameMatch || emailMatch;
+    return e.displayName.toLowerCase().includes(query) || (e.email || "").toLowerCase().includes(query);
   });
 
   const handleToggleMember = (memberId: string) => {
@@ -87,10 +113,17 @@ export function TeamModal({ isOpen, onClose, team, leaderId, onSuccess }: TeamMo
     setError(null);
 
     try {
+      // Chỉ người ĐÃ liên kết tài khoản mới có app_users.id thật để lưu vào
+      // member_of_teams (cột có FK, người chưa liên kết sẽ bị DB từ chối) — lọc
+      // ra, tạo team vẫn chạy bình thường, phần còn lại chờ họ tự liên kết sau.
+      const resolvedMemberIds = selectedMemberIds
+        .map(mid => rosterEntries.find(e => e.memberId === mid)?.linkedUserId)
+        .filter((id): id is string => Boolean(id));
+
       const payload = {
         name_team: nameTeam.trim(),
         leader_id: leaderId,
-        member_ids: selectedMemberIds
+        member_ids: resolvedMemberIds
       };
 
       let res;
@@ -203,7 +236,7 @@ export function TeamModal({ isOpen, onClose, team, leaderId, onSuccess }: TeamMo
                 Chọn thành viên ({selectedMemberIds.length})
               </label>
               <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">
-                Role Member Only
+                Toàn bộ danh bạ ({rosterEntries.length})
               </span>
             </div>
 
@@ -233,17 +266,17 @@ export function TeamModal({ isOpen, onClose, team, leaderId, onSuccess }: TeamMo
                   Không tìm thấy thành viên phù hợp
                 </div>
               ) : (
-                filteredMembers.map(m => {
-                  const isSelected = selectedMemberIds.includes(m.id);
+                filteredMembers.map(e => {
+                  const isSelected = selectedMemberIds.includes(e.memberId);
                   return (
                     <div
-                      key={m.id}
-                      onClick={() => handleToggleMember(m.id)}
+                      key={e.memberId}
+                      onClick={() => handleToggleMember(e.memberId)}
                       className="flex items-center justify-between px-3 py-2.5 hover:bg-surface transition cursor-pointer select-none"
                     >
                       <div className="min-w-0 pr-2">
-                        <div className="text-xs font-bold text-on-surface truncate">{m.name || "Chưa thiết lập tên"}</div>
-                        <div className="text-[10px] text-on-surface-variant font-medium truncate">{m.email}</div>
+                        <div className="text-xs font-bold text-on-surface truncate">{e.displayName}</div>
+                        <div className="text-[10px] text-on-surface-variant font-medium truncate">{e.email || "Chưa liên kết tài khoản"}</div>
                       </div>
                       <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition shrink-0 ${
                         isSelected
