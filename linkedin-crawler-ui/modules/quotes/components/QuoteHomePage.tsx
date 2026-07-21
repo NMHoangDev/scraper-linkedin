@@ -66,7 +66,6 @@ export function QuoteHomePage() {
     <main className="quote-page">
       <header className="quote-head">
         <div>
-          <h1>Mẫu báo giá</h1>
           <p>Quản lý form, preview, public link, quote detail và renderer độc lập.</p>
         </div>
         <div className="quote-head-actions">

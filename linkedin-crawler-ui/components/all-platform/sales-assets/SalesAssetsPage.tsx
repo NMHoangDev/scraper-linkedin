@@ -290,18 +290,17 @@ export function SalesAssetsPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-5 text-slate-950 md:px-6">
-      <div className="mx-auto max-w-7xl space-y-5">
-        <header className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:flex-row md:items-center md:justify-between">
+    <main className="min-h-screen bg-white px-4 py-5 text-slate-950 md:px-6">
+      <div className="mx-auto w-full max-w-none space-y-5">
+        <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-2xl font-black tracking-tight">Tài liệu bán hàng</h1>
-            <p className="mt-1 text-sm text-slate-500">Lưu link Proposal, Sale Kit theo khách hàng, dự án và phiên bản.</p>
+            <p className="text-sm text-slate-500">Lưu link Proposal, Sale Kit theo khách hàng, dự án và phiên bản.</p>
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => openCreate("upload")}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 hover:bg-slate-50"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"
             >
               <Upload size={17} />
               Tải lên
@@ -309,7 +308,7 @@ export function SalesAssetsPage() {
             <button
               type="button"
               onClick={() => openCreate("link")}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-rose-600/20 hover:bg-rose-700"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-rose-600/20 hover:bg-rose-700"
             >
               <Plus size={17} />
               Thêm link
@@ -386,7 +385,7 @@ export function SalesAssetsPage() {
                       </td>
                       <td className="px-4 py-4 text-slate-700">{asset.projectName || "-"}</td>
                       <td className="px-4 py-4">
-                        <div className="flex items-center gap-2 font-black text-slate-950">
+                        <div className="flex items-center gap-2 font-bold text-slate-950">
                           <FileText size={16} className="text-slate-400" />
                           {asset.title}
                         </div>
@@ -396,7 +395,7 @@ export function SalesAssetsPage() {
                       <td className="px-4 py-4 font-semibold text-slate-700">{asset.version || "-"}</td>
                       <td className="px-4 py-4 text-slate-600">{getSalesAssetSourceLabel(asset.sourceType)}</td>
                       <td className="px-4 py-4">
-                        <span className={cn("rounded-full px-2.5 py-1 text-xs font-black", asset.status === "active" ? "bg-emerald-100 text-emerald-700" : asset.status === "inactive" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-500")}>
+                        <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold", asset.status === "active" ? "bg-emerald-100 text-emerald-700" : asset.status === "inactive" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-500")}>
                           {getSalesAssetStatusLabel(asset.status)}
                         </span>
                       </td>
@@ -431,7 +430,7 @@ export function SalesAssetsPage() {
           <form onSubmit={submit} className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
               <div>
-                <h2 className="text-lg font-black">
+                <h2 className="text-lg font-bold">
                   {mode === "upload"
                     ? editing ? "Chỉnh sửa tài liệu tải lên" : "Tải lên tài liệu"
                     : editing ? "Chỉnh sửa link tài liệu" : "Thêm link tài liệu"}
@@ -540,7 +539,7 @@ export function SalesAssetsPage() {
               <button
                 type="submit"
                 disabled={saving || uploading || !form.title.trim() || (mode === "link" ? !form.sourceUrl?.trim() : !uploadFile && !form.fileUrl)}
-                className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-black text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {uploading ? "Đang tải file..." : saving ? "Đang lưu..." : mode === "upload" ? "Lưu tài liệu" : "Lưu link"}
               </button>

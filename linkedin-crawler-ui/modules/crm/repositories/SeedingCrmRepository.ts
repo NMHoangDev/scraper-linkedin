@@ -79,6 +79,18 @@ type CustomerLeadRow = {
   updated_at?: string | null;
   leader_name?: string | null;
   sdr_name?: string | null;
+  position?: string | null;
+  crm_package?: string | null;
+  zalo?: string | null;
+  facebook?: string | null;
+  telegram?: string | null;
+  pause_reason?: string | null;
+  closed_at?: string | null;
+  outcome_detail?: Record<string, unknown> | null;
+  quote_id?: string | null;
+  quote_number?: string | null;
+  quote_total_amount?: number | string | null;
+  quote_public_url?: string | null;
 };
 
 type CustomerLeadList = {
@@ -104,6 +116,9 @@ type ActivityLogRow = {
 const SUPPORTED_SOURCE_PLATFORMS = new Set([
   'Manual', 'FB_Inbox', 'FB_Group', 'Zalo', 'Website', 'Referral', 'MarkeeChat',
 ]);
+// Migration 041 mo rong CHECK constraint contract_status ho tro du 7 gia tri
+// cua crm-next (truoc day DB chi nhan 3 gia tri legacy active/completed/
+// maintenance, cac gia tri con lai bi contractStatusToDb() am tham bo qua).
 const CRM_CONTRACT_STATUSES = new Set([
   'moi_tiep_nhan',
   'dang_xu_ly',
@@ -112,14 +127,12 @@ const CRM_CONTRACT_STATUSES = new Set([
   'da_chot',
   'tam_dung',
   'khong_hoat_dong',
-  '',
+  'active',
+  'completed',
+  'maintenance',
 ]);
-const DB_CONTRACT_STATUSES = new Set(['active', 'completed', 'maintenance']);
-const PACKAGE_TAG_PREFIX = 'crm_package:';
-const POSITION_TAG_PREFIX = 'crm_position:';
 const INTERNAL_HIDDEN_TAG = 'crm_internal_hidden';
 const CRM_PACKAGE_VALUES = new Set(CRM_PACKAGE_OPTIONS.map(option => option.value));
-const OUTCOME_MARKER = 'CRM_OUTCOME_V1:';
 
 function getDefaultHeaders(): Record<string, string> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -201,7 +214,7 @@ function normalizeStage(value?: string | null): DealStage {
 
 function contractStatusFromRow(row: CustomerLeadRow, stage: DealStage): ContractStatus {
   const raw = asText(row.contract_status);
-  if (CRM_CONTRACT_STATUSES.has(raw) && !DB_CONTRACT_STATUSES.has(raw)) {
+  if (CRM_CONTRACT_STATUSES.has(raw)) {
     return raw as ContractStatus;
   }
   return getContractStatusForStage(stage);
@@ -239,7 +252,7 @@ function assertSupportedSource(value?: string) {
 }
 
 function contractStatusToDb(value?: string): string | undefined {
-  if (value && DB_CONTRACT_STATUSES.has(value)) return value;
+  if (value && CRM_CONTRACT_STATUSES.has(value)) return value;
   return undefined;
 }
 
@@ -247,18 +260,9 @@ function normalizeTags(value?: string[] | null) {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 }
 
-function extractPrefixedTag(value: string[] | null | undefined, prefix: string) {
-  const tag = normalizeTags(value).find(item => item.startsWith(prefix));
-  return tag ? tag.slice(prefix.length) : '';
-}
-
-function extractPackageFromTags(value?: string[] | null) {
-  return extractPrefixedTag(value, PACKAGE_TAG_PREFIX);
-}
-
 function getDealPackage(row: CustomerLeadRow) {
-  const fromTags = extractPackageFromTags(row.tags);
-  if (fromTags) return fromTags;
+  const crmPackage = asText(row.crm_package);
+  if (crmPackage) return crmPackage;
   const servicePackage = asText(row.service_package);
   return CRM_PACKAGE_VALUES.has(servicePackage) ? servicePackage : '';
 }
@@ -268,53 +272,41 @@ function getDealServicePackage(row: CustomerLeadRow) {
   return CRM_PACKAGE_VALUES.has(servicePackage) ? '' : servicePackage;
 }
 
-function getDealPosition(row: CustomerLeadRow) {
-  return extractPrefixedTag(row.tags, POSITION_TAG_PREFIX);
-}
-
-function buildCrmTags(input: CreateDealInput | UpdateDealInput) {
-  const tags: string[] = [];
-  if ('package' in input && input.package) tags.push(`${PACKAGE_TAG_PREFIX}${input.package}`);
-  if ('position' in input && input.position) tags.push(`${POSITION_TAG_PREFIX}${input.position}`);
-  return tags;
-}
-
 function reviewResultForOutcome(outcome?: Partial<OutcomeInfo>): string | undefined {
   if (outcome?.reviewType === 'won') return 'Qualify';
   if (outcome?.reviewType === 'lost') return 'Disqualify';
   return undefined;
 }
 
-function serializeOutcome(outcome?: Partial<OutcomeInfo>): string | undefined {
+// Migration 041 them cot outcome_detail (JSONB) luu nguyen OutcomeInfo (25
+// truong: confidence, reasons, rootCause, evidence, cac diem so, cac truong
+// knowledge-base...) - thay cho cach cu nhet JSON string co prefix
+// "CRM_OUTCOME_V1:" vao closed_reason (closed_reason gio chi con la text ly
+// do ngan, dung dung nghia cot).
+function serializeOutcome(outcome?: Partial<OutcomeInfo>): Record<string, unknown> | undefined {
   if (!outcome) return undefined;
-  return `${OUTCOME_MARKER}${JSON.stringify({
+  return {
     ...outcome,
     reviewedAt: outcome.reviewedAt || new Date().toISOString(),
-  })}`;
+  };
 }
 
 function parseOutcomeFromRow(row: CustomerLeadRow, stage: DealStage): OutcomeInfo {
-  const rawClosedReason = asText(row.closed_reason);
-  if (rawClosedReason.startsWith(OUTCOME_MARKER)) {
-    try {
-      const parsed = JSON.parse(rawClosedReason.slice(OUTCOME_MARKER.length));
-      if (parsed && typeof parsed === 'object') {
-        return {
-          ...(parsed as OutcomeInfo),
-          reviewType: ((parsed as OutcomeInfo).reviewType || (stage === 'won' || stage === 'lost' ? stage : '')) as OutcomeInfo['reviewType'],
-          reasonText: (parsed as OutcomeInfo).reasonText || asText(row.reject_reason),
-        };
-      }
-    } catch {
-      // Fall back to legacy text fields below.
-    }
+  if (row.outcome_detail && typeof row.outcome_detail === 'object') {
+    const parsed = row.outcome_detail as OutcomeInfo;
+    return {
+      ...parsed,
+      reviewType: (parsed.reviewType || (stage === 'won' || stage === 'lost' ? stage : '')) as OutcomeInfo['reviewType'],
+      reasonText: parsed.reasonText || asText(row.reject_reason),
+    };
   }
 
   const reviewType = stage === 'won' || stage === 'lost' ? stage : '';
+  const legacyClosedReason = asText(row.closed_reason);
   const legacyResult = asText(row.review_result);
   return {
-    reasonText: asText(row.reject_reason) || rawClosedReason,
-    rootCause: asText(row.reject_reason) || rawClosedReason,
+    reasonText: asText(row.reject_reason) || legacyClosedReason,
+    rootCause: asText(row.reject_reason) || legacyClosedReason,
     result: legacyResult === 'Qualify' || legacyResult === 'Disqualify' || legacyResult === 'Chua_xem_xet'
       ? ''
       : legacyResult,
@@ -342,17 +334,20 @@ function rowToDeal(row: CustomerLeadRow, history: StageHistory[] = []): Deal {
   const attachmentName = asText(row.last_attachment_name);
   const createdAt = fallbackDate(row.created_at, row.updated_at);
   const updatedAt = fallbackDate(row.updated_at, row.created_at);
-  const quoteTotal = estimatedBudget || lifetimeValue || undefined;
+  const quoteTotal = asNumber(row.quote_total_amount) || estimatedBudget || lifetimeValue || undefined;
 
   return {
     id: row.id,
     contactId: row.id,
     dealId: row.id,
-    position: getDealPosition(row),
+    position: asText(row.position),
     customerName: asText(row.customer_name) || 'Khách hàng chưa tên',
     companyName: asText(row.company_name),
     phone: asText(row.phone),
     email: asText(row.email),
+    zalo: asText(row.zalo),
+    facebook: asText(row.facebook),
+    telegram: asText(row.telegram),
     website: asText(row.website),
     taxCode: asText(row.tax_code),
     address: asText(row.address),
@@ -383,10 +378,11 @@ function rowToDeal(row: CustomerLeadRow, history: StageHistory[] = []): Deal {
       note: asText(row.care_note),
     },
     outcome: parseOutcomeFromRow(row, stage),
-    quote: attachmentUrl || quoteTotal
+    quote: row.quote_id || attachmentUrl || quoteTotal
       ? {
-          url: attachmentUrl || undefined,
-          number: attachmentName || undefined,
+          id: row.quote_id || undefined,
+          url: asText(row.quote_public_url) || attachmentUrl || undefined,
+          number: asText(row.quote_number) || attachmentName || undefined,
           totalAmount: quoteTotal,
         }
       : undefined,
@@ -400,8 +396,8 @@ function rowToDeal(row: CustomerLeadRow, history: StageHistory[] = []): Deal {
       assignedUserId: asText(row.sdr_id),
     },
     note: asText(row.note),
-    pauseReason: stage === 'on_hold' ? asText(row.note) : '',
-    closedAt: stage === 'won' || stage === 'lost' ? fallbackDate(row.customer_since, row.updated_at) : '',
+    pauseReason: asText(row.pause_reason) || (stage === 'on_hold' ? asText(row.note) : ''),
+    closedAt: asText(row.closed_at) || (stage === 'won' || stage === 'lost' ? fallbackDate(row.customer_since, row.updated_at) : ''),
     closedReason: asText(row.closed_reason),
     crmStatus: stage === 'won' || stage === 'lost' ? stage : 'open',
     createdAt,
@@ -420,6 +416,9 @@ function toCustomerPayload(input: CreateDealInput | UpdateDealInput): Partial<Cu
   if ('companyName' in input) payload.company_name = input.companyName;
   if ('phone' in input) payload.phone = input.phone;
   if ('email' in input) payload.email = input.email;
+  if ('zalo' in input) payload.zalo = input.zalo;
+  if ('facebook' in input) payload.facebook = input.facebook;
+  if ('telegram' in input) payload.telegram = input.telegram;
   if ('address' in input) payload.address = input.address;
   if ('city' in input) payload.city = input.city;
   if ('website' in input) payload.website = input.website;
@@ -427,13 +426,16 @@ function toCustomerPayload(input: CreateDealInput | UpdateDealInput): Partial<Cu
   if ('taxCode' in input) payload.tax_code = input.taxCode;
   if ('sourcePlatform' in input) payload.source_platform = input.sourcePlatform;
   if ('servicePackage' in input) payload.service_package = input.servicePackage;
-  if ('package' in input || 'position' in input) payload.tags = buildCrmTags(input);
+  if ('package' in input) payload.crm_package = input.package;
+  if ('position' in input) payload.position = input.position;
   if ('stage' in input) payload.deal_stage = input.stage;
   if ('decisionMaker' in input) payload.decision_maker = input.decisionMaker;
   if ('estimatedBudget' in input) payload.estimated_budget = input.estimatedBudget;
   if ('lifetimeValue' in input) payload.lifetime_value = input.lifetimeValue;
   if ('followUpDate' in input) payload.follow_up_date = cleanDateValue(input.followUpDate);
   if ('note' in input) payload.note = input.note;
+  if ('pauseReason' in input) payload.pause_reason = input.pauseReason;
+  if ('closedAt' in input) payload.closed_at = cleanDateValue(input.closedAt);
 
   if (input.assignment) {
     if ('leadedById' in input.assignment) payload.leaded_by = input.assignment.leadedById;
@@ -454,8 +456,16 @@ function toCustomerPayload(input: CreateDealInput | UpdateDealInput): Partial<Cu
   }
 
   if (input.quote) {
-    if (input.quote.url) payload.last_attachment_url = asDocumentUrl(input.quote.url);
-    if (input.quote.number) payload.last_attachment_name = input.quote.number;
+    // quote.id that = deal da lien ket 1 ban ghi quotes that (tao qua wizard
+    // bao gia) - uu tien gan quote_id that thay vi nhet url/so vao
+    // last_attachment_*. Van giu fallback last_attachment_* cho truong hop
+    // nhap tay 1 link ngoai (khong qua module Quote).
+    if (input.quote.id) {
+      payload.quote_id = input.quote.id;
+    } else {
+      if (input.quote.url) payload.last_attachment_url = asDocumentUrl(input.quote.url);
+      if (input.quote.number) payload.last_attachment_name = input.quote.number;
+    }
     if (input.quote.totalAmount && !payload.estimated_budget) {
       payload.estimated_budget = input.quote.totalAmount;
     }
@@ -470,7 +480,8 @@ function toCustomerPayload(input: CreateDealInput | UpdateDealInput): Partial<Cu
     };
     const reviewResult = reviewResultForOutcome(normalizedOutcome);
     if (reviewResult) payload.review_result = reviewResult;
-    payload.closed_reason = serializeOutcome(normalizedOutcome);
+    payload.outcome_detail = serializeOutcome(normalizedOutcome);
+    payload.closed_reason = normalizedOutcome.reasonText || normalizedOutcome.rootCause || undefined;
     if (reviewType === 'lost' && (normalizedOutcome.reasonText || normalizedOutcome.rootCause)) {
       payload.reject_reason = normalizedOutcome.reasonText || normalizedOutcome.rootCause;
     }
@@ -599,7 +610,9 @@ export class SeedingCrmRepository implements CrmRepository {
       follow_up_date: payload.followUpDate || undefined,
       decision_maker: payload.decisionMaker || undefined,
       estimated_budget: payload.estimatedBudget,
-      closed_reason: isOutcomeStage ? serializeOutcome(outcome) : undefined,
+      closed_reason: isOutcomeStage ? (outcome?.reasonText || outcome?.rootCause || undefined) : undefined,
+      outcome_detail: isOutcomeStage ? serializeOutcome(outcome) : undefined,
+      pause_reason: stage === 'on_hold' ? payload.pauseReason || undefined : undefined,
       reject_reason_type: stage === 'lost'
         ? rejectReasonToDb(outcome?.result || outcome?.reasons?.[0])
         : undefined,

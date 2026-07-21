@@ -37,7 +37,7 @@
 .crm-header h1 {
   color: #0f172a;
   font-size: 1.55rem;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0;
 }
 
@@ -58,7 +58,7 @@
   color: #334155;
   cursor: pointer;
   font-size: 0.83rem;
-  font-weight: 850;
+  font-weight: 700;
   padding: 0 0.85rem;
   transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
 }
@@ -97,7 +97,7 @@
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-  font-weight: 800;
+  font-weight: 700;
   text-decoration: none;
 }
 
@@ -171,7 +171,7 @@
   align-items: center;
   gap: 0.25rem;
   font-size: 0.68rem;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -179,7 +179,7 @@
 .crm-stat-value {
   margin-top: 0.25rem;
   font-size: 1.25rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .crm-stat-card--total .crm-stat-label { color: #64748b; }
@@ -250,7 +250,7 @@
   align-items: center;
   justify-content: flex-start;
   color: #0f172a;
-  font-weight: 800;
+  font-weight: 700;
   padding-right: 2.35rem;
   text-align: left;
 }
@@ -339,7 +339,7 @@
 .crm-stage-badge {
   display: inline-flex;
   border: 1px solid;
-  font-weight: 800;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -394,7 +394,7 @@
   border-radius: 0.85rem;
   background: #ffffff;
   color: #64748b;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .crm-empty {
@@ -404,7 +404,7 @@
 .crm-empty h3 {
   color: #0f172a;
   font-size: 1rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .crm-empty p {
@@ -451,7 +451,7 @@
 .crm-section-heading h2 {
   color: #0f172a;
   font-size: 1.15rem;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1.2;
 }
 
@@ -518,7 +518,7 @@
   overflow: hidden;
   color: #0f172a;
   font-size: 0.7rem;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.04em;
   text-overflow: ellipsis;
   text-transform: uppercase;
@@ -528,7 +528,7 @@
 .crm-terminal-row-head h4 {
   color: #0f172a;
   font-size: 0.82rem;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -540,7 +540,7 @@
   background: #f1f5f9;
   color: #64748b;
   font-size: 0.7rem;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.35rem;
   text-align: center;
 }
@@ -612,7 +612,7 @@
 .crm-card-title h4 {
   color: #0f172a;
   font-size: 0.86rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .crm-card-title p {
@@ -651,7 +651,7 @@
   gap: 0.3rem;
   border-radius: 0.38rem;
   font-size: 0.66rem;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.25;
   padding: 0.22rem 0.45rem;
 }
@@ -682,7 +682,7 @@
   background: #ffffff;
   color: #334155;
   font-size: 0.72rem;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1;
   text-decoration: none;
   padding: 0;
@@ -734,7 +734,7 @@
   background: #f5f3ff;
   color: #6d28d9;
   font-size: 0.68rem;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.25;
   padding: 0.28rem 0.35rem;
 }
@@ -757,7 +757,7 @@
   margin-bottom: 0.55rem;
   border-radius: 0.48rem;
   font-size: 0.68rem;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.25;
   padding: 0.34rem 0.42rem;
 }
@@ -811,7 +811,7 @@
 
 .crm-deal-contract-link {
   color: #1d4ed8 !important;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .crm-budget-row {
@@ -836,14 +836,14 @@
 .crm-budget-row span {
   min-width: 0;
   font-size: 0.82rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .crm-budget-row b,
 .crm-payment-warning-row b {
   margin-left: 1.15rem;
   font-size: 0.58rem;
-  font-weight: 900;
+  font-weight: 700;
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -891,7 +891,7 @@
   justify-content: center;
   border-radius: 999px;
   font-size: 0.7rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .crm-owner-avatar { background: #ffe4ec; color: #be1e4b; }
@@ -913,7 +913,7 @@
 .crm-terminal-divider b {
   color: #a3aab7;
   font-size: 0.72rem;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.25em;
 }
 
@@ -964,7 +964,7 @@
   margin-top: 0.9rem;
   color: currentColor;
   font-size: 1rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .crm-terminal-zone p {
@@ -1093,7 +1093,7 @@
   padding: 0.68rem 0.46rem;
   color: #64748b;
   font-size: 0.64rem;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.04em;
   text-align: left;
   text-overflow: ellipsis;
@@ -1139,7 +1139,7 @@
 
 .crm-customer-name {
   color: #0f172a;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .crm-customer-name,
@@ -1165,7 +1165,7 @@
   max-width: 100%;
   overflow: hidden;
   color: #1d4ed8;
-  font-weight: 800;
+  font-weight: 700;
   text-overflow: ellipsis;
   text-decoration: none;
   white-space: nowrap;
@@ -1217,7 +1217,7 @@
 
 .crm-budget {
   color: #047857;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .crm-follow-up {
@@ -1252,7 +1252,7 @@
   background: transparent;
   color: #1d4ed8;
   font: inherit;
-  font-weight: 800;
+  font-weight: 700;
   padding: 0;
   text-align: left;
   text-overflow: ellipsis;
@@ -1322,7 +1322,7 @@
 .crm-modal-title {
   color: #0f172a;
   font-size: 1.05rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .crm-modal-subtitle {
@@ -1375,7 +1375,7 @@
   margin-bottom: 0.75rem;
   color: #94a3b8;
   font-size: 0.75rem;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -1405,7 +1405,7 @@
 .crm-review-field span {
   color: #475569;
   font-size: 0.75rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .crm-field span b,
@@ -1446,7 +1446,7 @@
 .crm-pipeline-head h3 {
   color: #4f46e5;
   font-size: 0.76rem;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -1456,7 +1456,7 @@
   background: #3b82f6;
   color: #ffffff;
   font-size: 0.65rem;
-  font-weight: 900;
+  font-weight: 700;
   padding: 0.22rem 0.55rem;
   text-transform: uppercase;
 }
@@ -1480,7 +1480,7 @@
   gap: 0.4rem;
   border-radius: 0.75rem;
   font-size: 0.85rem;
-  font-weight: 800;
+  font-weight: 700;
   padding: 0.65rem 1.25rem;
 }
 
@@ -1513,7 +1513,7 @@
 
 .crm-stage-modal-kicker {
   font-size: 0.72rem;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   opacity: 0.84;
@@ -1522,7 +1522,7 @@
 .crm-stage-modal-header h3 {
   margin-top: 0.25rem;
   font-size: 1rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .crm-stage-modal-header p {
@@ -1573,7 +1573,7 @@
 .crm-review-header h4 {
   color: #1e3a8a;
   font-size: 1.05rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .crm-review-header p {
@@ -1586,7 +1586,7 @@
   border-radius: 999px;
   color: #ffffff;
   font-size: 0.72rem;
-  font-weight: 900;
+  font-weight: 700;
   padding: 0.4rem 0.75rem;
 }
 
@@ -1605,7 +1605,7 @@
   margin-bottom: 0.85rem;
   color: #94a3b8;
   font-size: 0.86rem;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
@@ -1624,7 +1624,7 @@
   color: #94a3b8;
   font-size: 0.72rem;
   font-style: normal;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .crm-review-checkbox-grid {
@@ -1643,7 +1643,7 @@
   background: #ffffff;
   color: #334155;
   font-size: 0.82rem;
-  font-weight: 800;
+  font-weight: 700;
   padding: 0.75rem;
 }
 
@@ -1671,7 +1671,7 @@
   border-bottom: 1px dashed #dbeafe;
   color: #475569;
   font-size: 0.82rem;
-  font-weight: 800;
+  font-weight: 700;
   padding: 0.55rem 0;
 }
 
@@ -1708,7 +1708,7 @@
 .crm-stage-quote-card p {
   color: #64748b;
   font-size: 0.76rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .crm-stage-quote-card b {
@@ -1724,7 +1724,7 @@
   border-radius: 0.45rem;
   color: #475569;
   font-size: 0.76rem;
-  font-weight: 800;
+  font-weight: 700;
   padding: 0.42rem 0.72rem;
   text-decoration: none;
 }
@@ -1756,7 +1756,7 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.72rem;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -1771,7 +1771,7 @@
 .crm-drawer-header h2 {
   margin-top: 0.25rem;
   font-size: 1.2rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .crm-drawer-header p {
@@ -1816,7 +1816,7 @@
   background: #eff6ff;
   color: #1d4ed8;
   font-size: 0.78rem;
-  font-weight: 800;
+  font-weight: 700;
   padding: 0.45rem 0.6rem;
   text-decoration: none;
 }
@@ -1831,7 +1831,7 @@
 
 .crm-info-line--strong {
   color: #0f172a;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .crm-terminal-note {
@@ -1865,7 +1865,7 @@
   gap: 0.35rem;
   color: #64748b;
   font-size: 0.68rem;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
@@ -1902,7 +1902,7 @@
 .crm-contract-status-edit label {
   color: #64748b;
   font-size: 0.68rem;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
@@ -1929,7 +1929,7 @@
   border: 1px solid #cbd5e1;
   border-radius: 999px;
   font-size: 0.7rem;
-  font-weight: 900;
+  font-weight: 700;
   padding: 0.36rem 0.62rem;
   white-space: nowrap;
 }
@@ -1950,7 +1950,7 @@
   background: #eff6ff;
   color: #1d4ed8;
   font-size: 0.76rem;
-  font-weight: 800;
+  font-weight: 700;
   padding: 0.45rem 0.65rem;
   text-decoration: none;
 }
@@ -2083,7 +2083,7 @@
 
 .crm-quote-customer-option--new {
   color: #be1e4b;
-  font-weight: 800;
+  font-weight: 700;
   justify-content: center;
 }
 
@@ -2094,7 +2094,7 @@
   background: #dcfce7;
   color: #166534;
   font-size: 0.68rem;
-  font-weight: 800;
+  font-weight: 700;
   padding: 0.1rem 0.5rem;
   flex-shrink: 0;
 }
@@ -2152,7 +2152,7 @@
 .crm-contract-detail-header span {
   color: #1d4ed8;
   font-size: 0.72rem;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -2160,7 +2160,7 @@
 .crm-contract-detail-header h2 {
   margin-top: 0.3rem;
   font-size: 1.2rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .crm-contract-detail-header p {
@@ -2211,7 +2211,7 @@
   gap: 0.35rem;
   color: #64748b;
   font-size: 0.68rem;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
@@ -2233,7 +2233,7 @@
   background: #eff6ff;
   color: #1d4ed8;
   font-size: 0.8rem;
-  font-weight: 800;
+  font-weight: 700;
   padding: 0.55rem 0.75rem;
   text-decoration: none;
 }
@@ -2253,7 +2253,7 @@
   gap: 0.55rem;
   color: #64748b;
   font-size: 0.74rem;
-  font-weight: 800;
+  font-weight: 700;
   margin-bottom: 0.65rem;
 }
 
@@ -2279,7 +2279,7 @@
   border: 1px solid;
   border-radius: 0.55rem;
   font-size: 0.78rem;
-  font-weight: 900;
+  font-weight: 700;
   padding: 0.58rem 0.8rem;
 }
 
@@ -2357,7 +2357,7 @@
   border: 1px solid #cbd5e1;
   border-radius: 0.35rem;
   font-size: 0.74rem;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1;
   padding: 0.28rem 0.5rem;
 }
@@ -2396,7 +2396,7 @@
   background: #ffffff;
   color: #475569;
   font-size: 0.76rem;
-  font-weight: 800;
+  font-weight: 700;
   padding: 0.45rem 0.75rem;
 }
 
@@ -2440,7 +2440,7 @@
   display: block;
   color: #64748b;
   font-size: 0.68rem;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
@@ -2463,7 +2463,7 @@
   background: #1e293b;
   color: #ffffff;
   font-size: 0.76rem;
-  font-weight: 800;
+  font-weight: 700;
   padding: 0.5rem 0.85rem;
 }
 
@@ -2476,13 +2476,13 @@
 .crm-backbar a {
   color: #be1e4b;
   font-size: 0.86rem;
-  font-weight: 900;
+  font-weight: 700;
   text-decoration: none;
 }
 
 .crm-analytics-source {
   color: #0f766e !important;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .crm-analytics-header {
@@ -2496,7 +2496,7 @@
 .crm-analytics-header h1 {
   color: #0f172a;
   font-size: 1.65rem;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0;
 }
 
@@ -2527,7 +2527,7 @@
   background: #ffffff;
   color: #0f172a;
   font-size: 0.9rem;
-  font-weight: 800;
+  font-weight: 700;
   padding: 0 2.15rem 0 1rem;
   text-align: left;
 }
@@ -2576,7 +2576,7 @@
 .crm-kpi-card p {
   color: #64748b;
   font-size: 0.78rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .crm-kpi-card strong {
@@ -2585,7 +2585,7 @@
   color: #0f172a;
   overflow: hidden;
   font-size: clamp(1.05rem, 1.3vw, 1.45rem);
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1.1;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2634,13 +2634,13 @@
 .crm-analytics-card h2 {
   color: #0f172a;
   font-size: 1rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .crm-analytics-card header span {
   color: #64748b;
   font-size: 0.76rem;
-  font-weight: 800;
+  font-weight: 700;
   text-align: right;
 }
 
@@ -2683,7 +2683,7 @@
   min-width: 0;
   color: #0f172a;
   font-size: 0.86rem;
-  font-weight: 900;
+  font-weight: 700;
   text-align: right;
   overflow-wrap: anywhere;
 }
@@ -2692,7 +2692,7 @@
 .crm-region-list em {
   font-style: normal;
   font-size: 0.86rem;
-  font-weight: 900;
+  font-weight: 700;
   text-align: right;
 }
 
@@ -2719,7 +2719,7 @@
   max-width: 6.5rem;
   color: #0f172a;
   font-size: 1.1rem;
-  font-weight: 900;
+  font-weight: 700;
   text-align: center;
 }
 
@@ -2784,7 +2784,7 @@
   display: block;
   color: #64748b;
   font-size: 0.76rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .crm-growth-card b {
@@ -2972,7 +2972,7 @@
 
 .crm-wizard-step-item--active .crm-wizard-step-label {
   color: #be1e4b;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .crm-wizard-step-item--done .crm-wizard-step-circle {
@@ -3088,7 +3088,7 @@
 .crm-wizard-form-card h4 {
   color: #0f172a;
   font-size: 0.96rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .crm-wizard-form-card p {
@@ -3108,14 +3108,14 @@
 .crm-wizard-form-card dt {
   color: #94a3b8;
   font-size: 0.68rem;
-  font-weight: 900;
+  font-weight: 700;
   text-transform: uppercase;
 }
 
 .crm-wizard-form-card dd {
   color: #334155;
   font-size: 0.82rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .crm-wizard-form-card-actions {
@@ -3136,7 +3136,7 @@
 .crm-wizard-template-preview h4 {
   color: #0f172a;
   font-size: 0.86rem;
-  font-weight: 900;
+  font-weight: 700;
   margin-bottom: 0.65rem;
 }
 
@@ -3155,7 +3155,7 @@
   background: #ffffff;
   color: #475569;
   font-size: 0.76rem;
-  font-weight: 800;
+  font-weight: 700;
   padding: 0.35rem 0.6rem;
 }
 
@@ -3236,7 +3236,7 @@
 
 .crm-wizard-modal .crm-wizard-step-label {
   font-size: 0.8rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .crm-wizard-modal .crm-wizard-body {

@@ -39,7 +39,7 @@
   margin: 0;
   color: #0f172a;
   font-size: 1.45rem;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0;
 }
 
@@ -70,7 +70,7 @@
   min-height: 2.35rem;
   border-radius: 0.55rem;
   font-size: 0.86rem;
-  font-weight: 800;
+  font-weight: 700;
   text-decoration: none;
   padding: 0 0.9rem;
 }
@@ -172,7 +172,7 @@
   margin: 0;
   color: #0f172a;
   font-size: 1rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .quote-card p {
@@ -189,7 +189,7 @@
 .quote-meta dt {
   color: #64748b;
   font-size: 0.72rem;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -197,7 +197,7 @@
 .quote-meta dd {
   margin: 0.15rem 0 0;
   color: #0f172a;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .quote-badge {
@@ -209,7 +209,7 @@
   background: #f8fafc;
   color: #64748b;
   font-size: 0.75rem;
-  font-weight: 900;
+  font-weight: 700;
   padding: 0 0.55rem;
 }
 
@@ -257,14 +257,14 @@
 .quote-table th {
   color: #64748b;
   font-size: 0.76rem;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
 .quote-table a {
   color: #0f4fd8;
-  font-weight: 900;
+  font-weight: 700;
   text-decoration: none;
 }
 
@@ -308,7 +308,7 @@
 
 .quote-total-row--grand {
   font-size: 1.05rem;
-  font-weight: 900;
+  font-weight: 700;
   color: #0f172a;
   border-top: 1px dashed #cbd5e1;
   padding-top: 0.5rem;
@@ -335,7 +335,7 @@
   background: #ffffff;
   color: #475569;
   padding: 0.3rem 0.5rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .quote-row-actions button:disabled {
@@ -365,7 +365,7 @@
   gap: 0.3rem;
   color: #475569;
   font-size: 0.78rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .quote-builder input,
@@ -427,7 +427,7 @@
   border: 0;
   background: transparent;
   color: #0f4fd8;
-  font-weight: 800;
+  font-weight: 700;
   font-size: 0.82rem;
   white-space: nowrap;
 }
@@ -499,7 +499,7 @@
   border: 0;
   color: #0f172a;
   font-size: 1rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .quote-section-head button,
@@ -509,7 +509,7 @@
   border-radius: 0.45rem;
   background: #ffffff;
   color: #475569;
-  font-weight: 800;
+  font-weight: 700;
   padding: 0.4rem 0.55rem;
 }
 
@@ -554,7 +554,7 @@
   margin: 0 0 0.7rem;
   color: #334155;
   font-size: 0.85rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .quote-column-row {
@@ -583,7 +583,7 @@
   margin: 0;
   color: #111827;
   font-size: 0.86rem;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
@@ -598,13 +598,13 @@
   gap: 0.35rem;
   color: #344054;
   font-size: 0.78rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .crm-wizard-fill-step .crm-field span {
   color: #344054;
   font-size: 0.78rem;
-  font-weight: 850;
+  font-weight: 700;
 }
 
 .crm-wizard-fill-step .crm-help-text {
@@ -624,7 +624,7 @@
   background: #ffffff;
   color: #101828;
   font-size: 0.9rem;
-  font-weight: 650;
+  font-weight: 600;
   outline: none;
   padding: 0.62rem 0.85rem;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -677,7 +677,7 @@
 .crm-wizard-fill-step .quote-table--editable td select {
   min-width: 6.5rem;
   border-radius: 0.55rem;
-  font-weight: 650;
+  font-weight: 600;
   padding: 0.45rem 0.55rem;
 }
 
@@ -716,7 +716,7 @@
   align-items: center;
   gap: 0.4rem;
   color: #475569;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .quote-switch input {
@@ -789,7 +789,7 @@
   margin: 0 0 0.35rem;
   color: #111827;
   font-size: 1.35rem;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1.05;
   text-transform: uppercase;
 }
@@ -810,7 +810,7 @@
   display: block;
   color: #6b7280;
   font-size: 0.68rem;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -820,14 +820,14 @@
   margin-top: 0.22rem;
   color: #111827;
   font-size: 1rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .sheet-company h2 {
   margin: 0;
   color: #0f172a;
   font-size: 1.35rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .sheet-company p,
@@ -859,7 +859,7 @@
   margin: 0 0 0.7rem;
   color: #0f172a;
   font-size: 0.98rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .placeholder {
@@ -885,7 +885,7 @@
   margin: 0;
   color: #0f172a;
   font-size: 1.75rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .sheet-quote-meta {
@@ -948,7 +948,7 @@
   margin: 0 0 0.75rem;
   color: #111827;
   font-size: 0.95rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .sheet-insight-grid {
@@ -1012,7 +1012,7 @@
   background: #ffffff;
   color: #111827;
   font-size: 0.75rem;
-  font-weight: 900;
+  font-weight: 700;
   text-transform: uppercase;
 }
 
@@ -1077,7 +1077,7 @@
   margin: 0 0 0.55rem;
   color: #111827;
   font-size: 0.9rem;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .sheet-note--terms ul {
@@ -1125,7 +1125,7 @@
 .villa-brand {
   color: #111827;
   font-size: 1.25rem;
-  font-weight: 900;
+  font-weight: 700;
   letter-spacing: 0.06em;
 }
 
@@ -1142,7 +1142,7 @@
 
 .villa-to {
   color: #64748b;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .villa-subtitle {
@@ -1158,7 +1158,7 @@
   border-radius: 0;
   background: #ffffff;
   color: #111827;
-  font-weight: 900;
+  font-weight: 700;
   padding: 0.6rem 1rem;
 }
 

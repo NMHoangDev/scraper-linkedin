@@ -200,7 +200,7 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       href: "/all-platform/crm",
       icon: "group",
       label: "CRM",
-      matchStartsWith: ["/all-platform/crm"],
+      exactMatch: true,
     },
     {
       type: "item",

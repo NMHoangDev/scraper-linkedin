@@ -112,6 +112,17 @@ class CustomerLeadCreate(BaseModel):
     last_attachment_name: Optional[str] = None
     closed_reason: Optional[str] = None
 
+    # crm-next fields (migration 041)
+    position: Optional[str] = None
+    crm_package: Optional[str] = None
+    zalo: Optional[str] = None
+    facebook: Optional[str] = None
+    telegram: Optional[str] = None
+    pause_reason: Optional[str] = None
+    closed_at: Optional[datetime] = None
+    outcome_detail: Optional[dict] = None
+    quote_id: Optional[str] = None
+
 
 class CustomerLeadUpdate(BaseModel):
     company_name: Optional[str] = None
@@ -168,6 +179,17 @@ class CustomerLeadUpdate(BaseModel):
     last_attachment_name: Optional[str] = None
     closed_reason: Optional[str] = None
 
+    # crm-next fields (migration 041)
+    position: Optional[str] = None
+    crm_package: Optional[str] = None
+    zalo: Optional[str] = None
+    facebook: Optional[str] = None
+    telegram: Optional[str] = None
+    pause_reason: Optional[str] = None
+    closed_at: Optional[datetime] = None
+    outcome_detail: Optional[dict] = None
+    quote_id: Optional[str] = None
+
 
 class CustomerLeadResponse(BaseModel):
     id: str
@@ -219,6 +241,17 @@ class CustomerLeadResponse(BaseModel):
     reject_reason_type: Optional[str] = None
     review_result: Optional[str] = None
 
+    # crm-next fields (migration 041)
+    position: Optional[str] = None
+    crm_package: Optional[str] = None
+    zalo: Optional[str] = None
+    facebook: Optional[str] = None
+    telegram: Optional[str] = None
+    pause_reason: Optional[str] = None
+    closed_at: Optional[datetime] = None
+    outcome_detail: Optional[dict] = None
+    quote_id: Optional[str] = None
+
     created_at: datetime
     updated_at: datetime
     leader_name: Optional[str] = None
@@ -241,6 +274,9 @@ class StageTransitionRequest(BaseModel):
     decision_maker: Optional[str] = None
     estimated_budget: Optional[float] = None
     closed_reason: Optional[str] = None
+    pause_reason: Optional[str] = None
+    closed_at: Optional[datetime] = None
+    outcome_detail: Optional[dict] = None
 
 
 class ActivityLogEntry(BaseModel):

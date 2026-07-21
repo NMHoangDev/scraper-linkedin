@@ -133,7 +133,6 @@ export function AnalyticsView() {
     <div className="crm-analytics-shell">
       <section className="crm-analytics-header">
         <div>
-          <h1>Phân tích CRM</h1>
           <p>Theo dõi KPI, doanh thu theo ngành/khu vực và insight giúp Marketing chạy chiến dịch đúng tệp khách hàng.</p>
         </div>
         <Link href="/all-platform/crm" className="crm-back-button">

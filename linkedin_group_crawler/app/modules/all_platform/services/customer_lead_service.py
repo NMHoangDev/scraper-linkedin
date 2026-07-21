@@ -56,7 +56,9 @@ BASE_COLUMNS = (
     "warranty_expires_at, care_note, last_care_at, "
     "payment_due_date, payment_status, "
     "tags, has_budget, note, reject_reason, reject_reason_type, review_result, "
-    "created_at, updated_at, leader:leaded_by(name), sdr:sdr_id(name)"
+    "position, crm_package, zalo, facebook, telegram, pause_reason, closed_at, outcome_detail, quote_id, "
+    "created_at, updated_at, leader:leaded_by(name), sdr:sdr_id(name), "
+    "quote:quote_id(quote_number, total_amount, public_token)"
 )
 
 
@@ -67,6 +69,12 @@ def _normalize_row(row: Dict[str, Any]) -> Dict[str, Any]:
     if row.get("sdr"):
         row["sdr_name"] = row["sdr"].get("name")
         row.pop("sdr", None)
+    if row.get("quote"):
+        row["quote_number"] = row["quote"].get("quote_number")
+        row["quote_total_amount"] = row["quote"].get("total_amount")
+        public_token = row["quote"].get("public_token")
+        row["quote_public_url"] = f"/public/quotes/{public_token}" if public_token else None
+        row.pop("quote", None)
     if row.get("tags") is None:
         row["tags"] = []
     if row.get("days_in_stage") is None and row.get("stage_entered_at"):
@@ -370,8 +378,12 @@ def transition_stage(
             update["status"] = "closed"
             if not current.get("customer_since"):
                 update["customer_since"] = now
+            if not current.get("closed_at"):
+                update["closed_at"] = now
         elif to_stage == "lost":
             update["status"] = "rejected"
+            if not current.get("closed_at"):
+                update["closed_at"] = now
         else:
             update["status"] = "pending"
 
@@ -392,6 +404,9 @@ def transition_stage(
             "last_attachment_name",
             "closed_reason",
             "reject_reason_type",
+            "pause_reason",
+            "closed_at",
+            "outcome_detail",
         ]:
             if k in payload and payload[k] is not None:
                 update[k] = payload[k]
