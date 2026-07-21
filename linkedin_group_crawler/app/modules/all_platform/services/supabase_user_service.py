@@ -47,13 +47,16 @@ def _is_transient_supabase_error(exc: Exception) -> bool:
     return any(part in msg for part in ("server disconnected", "remoteprotocolerror", "timed out", "timeout"))
 
 
+_SAFE_USER_COLUMNS = "id, email, name, role, is_active, created_at, updated_at"
+
+
 def get_user(email: str) -> dict:
-    """Get user by email."""
+    """Get user by email. Never returns the password hash."""
     supabase: Client = get_supabase_client()
 
     result = (
         supabase.table("app_users")
-        .select("*")
+        .select(_SAFE_USER_COLUMNS)
         .eq("email", email)
         .execute()
     )
@@ -144,7 +147,7 @@ def get_team_members(leader_id: str) -> list[dict]:
     users_result = execute_supabase_query(
         lambda: (
             get_supabase_client().table("app_users")
-            .select("*")
+            .select(_SAFE_USER_COLUMNS)
             .in_("id", member_ids)
             .execute()
         )
@@ -189,7 +192,7 @@ def get_all_users() -> list[dict]:
     if isinstance(cached, list) and cached and float(_ALL_USERS_CACHE.get("expires_at") or 0) > now:
         return _clone_rows(cached)
 
-    result = execute_supabase_query(lambda: get_supabase_client().table("app_users").select("*").execute())
+    result = execute_supabase_query(lambda: get_supabase_client().table("app_users").select(_SAFE_USER_COLUMNS).execute())
     rows = result.data or []
     _ALL_USERS_CACHE["data"] = _clone_rows(rows)
     _ALL_USERS_CACHE["expires_at"] = time.monotonic() + _USER_LIST_CACHE_TTL_SECONDS

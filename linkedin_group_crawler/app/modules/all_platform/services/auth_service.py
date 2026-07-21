@@ -183,6 +183,51 @@ def login_user(email: str, password: str) -> dict:
     }
 
 
+_VALID_ROLES = ("admin", "leader", "member")
+
+
+def admin_create_user(email: str, name: Optional[str], role: str) -> dict:
+    """Admin-only: provision a new app_users row for someone who will log in via
+    Google Sign-In. Google login never auto-creates accounts (see
+    login_with_google) — this is the explicit "add this email" step an admin
+    does instead. Sets a random password nobody knows (password column is
+    NOT NULL); the account is only ever meant to be used via Google.
+    """
+    email = email.lower().strip()
+    if not email or "@" not in email:
+        raise ValueError("Email không hợp lệ")
+    if role not in _VALID_ROLES:
+        raise ValueError(f"Role phải là một trong: {', '.join(_VALID_ROLES)}")
+
+    existing = execute_supabase_query(
+        lambda: get_supabase_client().table("app_users").select("id").eq("email", email).execute()
+    )
+    if existing.data:
+        raise ValueError("Email đã có tài khoản trong hệ thống")
+
+    random_password = secrets.token_urlsafe(32)
+    user_data = {
+        "email": email,
+        "password": _hash_password(random_password),
+        "name": (name or "").strip() or None,
+        "role": role,
+        "is_active": True,
+    }
+    result = execute_supabase_query(
+        lambda: get_supabase_client().table("app_users").insert(user_data).execute()
+    )
+    if not result.data:
+        raise ValueError("Không tạo được tài khoản")
+
+    user = result.data[0]
+    return {
+        "id": user["id"],
+        "email": user["email"],
+        "name": user.get("name"),
+        "role": user["role"],
+    }
+
+
 def login_with_google(id_token_str: str) -> dict:
     """Login via Google Sign-In. Verifies the ID token against our OAuth client,
     then maps the verified email to an EXISTING app_users row — never creates a

@@ -87,6 +87,15 @@ export function MemberManagementContent() {
   const [deleteTarget, setDeleteTarget] = useState<MemberProfile | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Tạo tài khoản đăng nhập mới (chưa từng có trong app_users) ngay trong modal
+  // thành viên — trước đây chỉ chọn được tài khoản CÓ SẴN, không có cách nào
+  // thêm mới từ đây, buộc phải nhờ dev thêm tay khi Google Sign-In báo "Email
+  // chưa được cấp tài khoản".
+  const [creatingAccount, setCreatingAccount] = useState(false);
+  const [newAccountRole, setNewAccountRole] = useState("member");
+  const [newAccountError, setNewAccountError] = useState<string | null>(null);
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
+
   const [importOpen, setImportOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importSummary, setImportSummary] = useState<{
@@ -155,6 +164,32 @@ export function MemberManagementContent() {
         ? current.skill_ids.filter(id => id !== skillId)
         : [...current.skill_ids, skillId],
     }));
+  }
+
+  async function handleCreateAccount() {
+    setNewAccountError(null);
+    if (!form.email.trim()) {
+      setNewAccountError("Nhập email ở phần \"Thông tin cá nhân\" trước.");
+      return;
+    }
+    setIsCreatingAccount(true);
+    try {
+      const res = await usersService.createAccount({
+        email: form.email.trim(),
+        name: form.full_name.trim() || undefined,
+        role: newAccountRole,
+      });
+      if (!res.success || !res.data) {
+        throw new Error(res.message || "Không tạo được tài khoản");
+      }
+      setAppUsers(prev => [...prev, res.data as AppUserProfile]);
+      setForm(current => ({ ...current, linked_user_id: (res.data as AppUserProfile).id }));
+      setCreatingAccount(false);
+    } catch (err) {
+      setNewAccountError(err instanceof Error ? err.message : "Không tạo được tài khoản");
+    } finally {
+      setIsCreatingAccount(false);
+    }
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -419,6 +454,44 @@ export function MemberManagementContent() {
                         <option key={u.id} value={u.id}>{u.name || u.email} ({u.email})</option>
                       ))}
                     </select>
+                    {!creatingAccount ? (
+                      <button
+                        type="button"
+                        onClick={() => { setCreatingAccount(true); setNewAccountError(null); }}
+                        className="text-[11px] text-primary hover:underline bg-transparent border-0 p-0 cursor-pointer text-left mt-1"
+                      >
+                        + Chưa có tài khoản? Tạo mới từ email ở trên (để đăng nhập Google)
+                      </button>
+                    ) : (
+                      <div className="mt-2 flex flex-col gap-1.5 rounded-lg border border-outline-variant bg-surface-container-low p-2">
+                        <p className="text-[11px] text-on-surface-variant">
+                          Tạo tài khoản đăng nhập cho <b>{form.email || "(chưa nhập email)"}</b> — chỉ đăng nhập được qua Google, không có mật khẩu.
+                        </p>
+                        <select value={newAccountRole} onChange={e => setNewAccountRole(e.target.value)}>
+                          <option value="member">member</option>
+                          <option value="leader">leader</option>
+                          <option value="admin">admin</option>
+                        </select>
+                        {newAccountError && <p className="text-[11px] text-error">{newAccountError}</p>}
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            disabled={isCreatingAccount}
+                            onClick={handleCreateAccount}
+                            className="text-[11px] font-semibold text-white bg-primary rounded px-2 py-1 border-0 cursor-pointer disabled:opacity-60"
+                          >
+                            {isCreatingAccount ? "Đang tạo..." : "Tạo tài khoản"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCreatingAccount(false)}
+                            className="text-[11px] text-on-surface-variant bg-transparent border-0 cursor-pointer"
+                          >
+                            Huỷ
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </Field>
                   <Field label="Liên kết tài khoản đăng nhập (phụ)" hint="tùy chọn — dùng khi 1 người có 2 email">
                     <select value={form.linked_user_id_2} onChange={e => setForm({ ...form, linked_user_id_2: e.target.value })}>

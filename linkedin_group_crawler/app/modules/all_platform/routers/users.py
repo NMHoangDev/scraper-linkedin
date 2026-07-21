@@ -6,11 +6,12 @@ from typing import List
 
 from fastapi import APIRouter, Depends, Query
 
-from app.modules.all_platform.auth_deps import require_admin
+from app.modules.all_platform.auth_deps import get_current_user, require_admin
 from app.modules.all_platform.schemas import BaseResponse
 from app.modules.all_platform.services import (
     get_user,
     upsert_user,
+    admin_create_user,
     update_user_slug,
     update_user_role,
     get_team_members,
@@ -28,7 +29,7 @@ router = APIRouter()
 
 
 @router.get("/me")
-def users_get_me(email: str = Query(...)) -> BaseResponse:
+def users_get_me(email: str = Query(...), user: dict = Depends(get_current_user)) -> BaseResponse:
     """Get current user profile."""
     try:
         data = get_user(email)
@@ -66,8 +67,28 @@ def users_update_role(payload: dict, _admin: dict = Depends(require_admin)) -> B
         return BaseResponse(success=False, message=str(e))
 
 
+@router.post("/create")
+def users_create(payload: dict, _admin: dict = Depends(require_admin)) -> BaseResponse:
+    """Admin-only: provision a new login account (app_users row) for someone,
+    so they can then sign in with Google using that email. Does not set a
+    usable password — Google Sign-In is the only intended login path for
+    accounts created this way."""
+    try:
+        email = payload.get("email")
+        role = payload.get("role") or "member"
+        name = payload.get("name")
+        if not email:
+            return BaseResponse(success=False, message="email is required")
+        data = admin_create_user(email=email, name=name, role=role)
+        return BaseResponse(success=True, message="Đã tạo tài khoản", data=data)
+    except ValueError as e:
+        return BaseResponse(success=False, message=str(e))
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
 @router.get("/all-profiles")
-def users_get_all() -> BaseResponse:
+def users_get_all(user: dict = Depends(get_current_user)) -> BaseResponse:
     """Get all user profiles."""
     try:
         data = get_all_users()
@@ -77,7 +98,7 @@ def users_get_all() -> BaseResponse:
 
 
 @router.get("/by-role")
-def users_get_by_role(role: str = Query(...)) -> BaseResponse:
+def users_get_by_role(role: str = Query(...), user: dict = Depends(get_current_user)) -> BaseResponse:
     """Get users filtered by role."""
     try:
         data = get_users_by_role(role)

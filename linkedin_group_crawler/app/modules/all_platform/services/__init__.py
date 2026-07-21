@@ -127,6 +127,7 @@ from app.modules.all_platform.services.auth_service import (
     register_user,
     login_user,
     login_with_google,
+    admin_create_user,
     logout_user,
     decode_token,
     get_user_by_id,

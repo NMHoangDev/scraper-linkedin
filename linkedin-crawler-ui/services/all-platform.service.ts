@@ -1914,6 +1914,14 @@ export const usersService = {
       body: JSON.stringify({ email, role }),
     });
   },
+  /** Admin-only: tạo tài khoản đăng nhập mới (chưa có mật khẩu dùng được — chỉ
+   * đăng nhập qua Google). Dùng khi thêm 1 email chưa từng có trong hệ thống. */
+  createAccount: (payload: { email: string; name?: string; role: string }): Promise<ApiResponse<AppUserProfile>> => {
+    return requestJson(`${BASE}/users/create`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
 };
 
 export const teamsService = {
