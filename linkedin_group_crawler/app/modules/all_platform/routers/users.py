@@ -14,6 +14,7 @@ from app.modules.all_platform.services import (
     admin_create_user,
     update_user_slug,
     update_user_role,
+    update_user_active_status,
     get_team_members,
     add_team_member,
     get_all_users,
@@ -63,6 +64,21 @@ def users_update_role(payload: dict, _admin: dict = Depends(require_admin)) -> B
             return BaseResponse(success=False, message="email and role are required")
         data = update_user_role(email, role)
         return BaseResponse(success=True, message="Role updated", data=data)
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@router.post("/set-active")
+def users_set_active(payload: dict, _admin: dict = Depends(require_admin)) -> BaseResponse:
+    """Admin-only: kích hoạt/vô hiệu hóa 1 tài khoản (khoá đăng nhập ngay,
+    is_active được check lại mỗi request qua get_current_user)."""
+    try:
+        email = payload.get("email")
+        is_active = payload.get("is_active")
+        if not email or is_active is None:
+            return BaseResponse(success=False, message="email and is_active are required")
+        data = update_user_active_status(email, bool(is_active))
+        return BaseResponse(success=True, message="Đã cập nhật trạng thái", data=data)
     except Exception as e:
         return BaseResponse(success=False, message=str(e))
 

@@ -113,6 +113,7 @@ from app.modules.all_platform.services.supabase_user_service import (
     upsert_user,
     update_user_slug,
     update_user_role,
+    update_user_active_status,
     get_team_members,
     add_team_member,
     get_all_users,

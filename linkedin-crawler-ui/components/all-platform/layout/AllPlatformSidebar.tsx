@@ -113,6 +113,14 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
             label: "KPI & Leaderboard",
             matchStartsWith: ["/all-platform/kpi-leaderboard"],
           },
+          {
+            type: "item",
+            id: "user-management",
+            href: "/all-platform/admin/quan-ly-nguoi-dung",
+            icon: "shield_person",
+            label: "Quản lý người dùng",
+            matchStartsWith: ["/all-platform/admin/quan-ly-nguoi-dung"],
+          },
         ] as NavLeafItem[])
       : []),
     {

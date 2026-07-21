@@ -1883,6 +1883,8 @@ export interface AppUserProfile {
   email: string;
   name?: string;
   role?: string;
+  is_active?: boolean;
+  created_at?: string;
 }
 
 export interface TeamMember {
@@ -1920,6 +1922,13 @@ export const usersService = {
     return requestJson(`${BASE}/users/create`, {
       method: "POST",
       body: JSON.stringify(payload),
+    });
+  },
+  /** Admin-only: kích hoạt/vô hiệu hóa tài khoản — khoá đăng nhập ngay lập tức. */
+  setActive: (email: string, is_active: boolean): Promise<ApiResponse<AppUserProfile>> => {
+    return requestJson(`${BASE}/users/set-active`, {
+      method: "POST",
+      body: JSON.stringify({ email, is_active }),
     });
   },
 };

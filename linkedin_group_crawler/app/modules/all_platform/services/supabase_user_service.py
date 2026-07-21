@@ -117,6 +117,23 @@ def update_user_role(email: str, role: str) -> dict:
     return result.data[0] if result.data else {}
 
 
+def update_user_active_status(email: str, is_active: bool) -> dict:
+    """Admin-only: kích hoạt/vô hiệu hóa tài khoản mà không cần biết mật khẩu
+    (khác với deactivate_account() ở auth_service.py — cái đó là tự người dùng
+    tắt tài khoản của chính mình, phải nhập đúng mật khẩu)."""
+    supabase: Client = get_supabase_client()
+
+    result = (
+        supabase.table("app_users")
+        .update({"is_active": is_active, "updated_at": "now()"})
+        .eq("email", email.lower().strip())
+        .execute()
+    )
+    _clear_people_caches()
+    _clear_auth_cache(email=email)
+    return result.data[0] if result.data else {}
+
+
 def get_team_members(leader_id: str) -> list[dict]:
     """Get all members of a leader's team by leader user id."""
     cache_key = str(leader_id)
