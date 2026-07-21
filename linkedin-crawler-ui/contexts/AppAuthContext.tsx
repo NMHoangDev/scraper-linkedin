@@ -17,6 +17,7 @@ interface AppAuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: (credential: string) => Promise<void>;
   register: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -122,6 +123,25 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const loginWithGoogle = useCallback(async (credential: string) => {
+    if (SKIP_AUTH) {
+      setUser(MOCK_USER);
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const res = await authService.loginWithGoogle(credential);
+      if (!res.success || !res.data) {
+        throw new Error(res.message || "Login failed");
+      }
+      // Cookie is set by backend; just take user.
+      const data = res.data as { user: AppUser };
+      setUser(data.user);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   const register = useCallback(
     async (email: string, password: string, name?: string) => {
       setIsLoading(true);
@@ -160,6 +180,7 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user,
         isLoading,
         login,
+        loginWithGoogle,
         register,
         logout,
         refreshUser,

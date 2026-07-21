@@ -75,6 +75,7 @@ from app.modules.all_platform.schemas.internal_engagement import (
 from app.modules.all_platform.schemas.auth import (
     RegisterRequest,
     LoginRequest,
+    GoogleLoginRequest,
     RefreshTokenRequest,
     UpdateProfileRequest,
     PromoteToLeaderRequest,

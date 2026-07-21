@@ -16,6 +16,10 @@ class LoginRequest(BaseModel):
     password: str = Field(..., max_length=128)
 
 
+class GoogleLoginRequest(BaseModel):
+    credential: str = Field(..., min_length=10, description="Google ID token (JWT) from Google Identity Services")
+
+
 class RefreshTokenRequest(BaseModel):
     token: str
 

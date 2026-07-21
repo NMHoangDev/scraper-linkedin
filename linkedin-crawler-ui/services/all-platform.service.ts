@@ -1613,6 +1613,18 @@ export const authService = {
     );
   },
 
+  loginWithGoogle: (credential: string): Promise<ApiResponse<AuthLoginResponse>> => {
+    return requestJsonWithTimeout(
+      `${BASE}/auth/google`,
+      {
+        method: "POST",
+        body: JSON.stringify({ credential }),
+      },
+      AUTH_SUBMIT_TIMEOUT_MS,
+      "Đăng nhập quá lâu, vui lòng thử lại.",
+    );
+  },
+
   logout: (): Promise<ApiResponse<void>> => {
     return requestJson(`${BASE}/auth/logout`, {
       method: "POST",

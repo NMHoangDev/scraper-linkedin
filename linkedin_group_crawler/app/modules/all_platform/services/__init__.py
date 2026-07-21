@@ -126,6 +126,7 @@ from app.modules.all_platform.services.supabase_user_service import (
 from app.modules.all_platform.services.auth_service import (
     register_user,
     login_user,
+    login_with_google,
     logout_user,
     decode_token,
     get_user_by_id,

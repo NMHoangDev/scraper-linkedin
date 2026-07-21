@@ -3,7 +3,9 @@
 import { useState, type FormEvent, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { GoogleOAuthProvider, GoogleLogin, type CredentialResponse } from "@react-oauth/google";
 import { useAppAuth } from "@/contexts/AppAuthContext";
+import { GOOGLE_OAUTH_CLIENT_ID } from "@/lib/env";
 
 /* -------------------------------------------------------------------------- */
 /*  Material Symbols — class already defined in globals.css                    */
@@ -38,8 +40,28 @@ export function AuthPage() {
   const [forgotError, setForgotError] = useState<string | null>(null);
   const [forgotLoading, setForgotLoading] = useState(false);
 
-  const { login, register, setLwuuSession } = useAppAuth();
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [googleError, setGoogleError] = useState<string | null>(null);
+
+  const { login, loginWithGoogle, register, setLwuuSession } = useAppAuth();
   const router = useRouter();
+
+  const handleGoogleSuccess = useCallback(
+    async (credentialResponse: CredentialResponse) => {
+      setGoogleError(null);
+      if (!credentialResponse.credential) {
+        setGoogleError("Không nhận được thông tin đăng nhập từ Google.");
+        return;
+      }
+      try {
+        await loginWithGoogle(credentialResponse.credential);
+        router.push("/all-platform/post-feed");
+      } catch (err) {
+        setGoogleError(err instanceof Error ? err.message : "Đăng nhập Google thất bại.");
+      }
+    },
+    [loginWithGoogle, router],
+  );
 
   const switchMode = useCallback((m: AuthMode) => {
     setMode(m);
@@ -132,6 +154,7 @@ export function AuthPage() {
   const isSuccess = submitStatus === "success";
 
   return (
+    <GoogleOAuthProvider clientId={GOOGLE_OAUTH_CLIENT_ID}>
     <div
       className="min-h-screen flex items-center justify-center relative overflow-hidden"
       style={{ background: "var(--color-background)" }}
@@ -242,7 +265,40 @@ export function AuthPage() {
             </h1>
           </div>
 
+          {/* ── Đăng nhập bằng Google (mặc định) ── */}
+          {!showPasswordForm && (
+            <div className="px-6 py-8 flex flex-col items-center gap-4">
+              <p className="text-sm text-on-surface-variant text-center">
+                Đăng nhập bằng tài khoản Google được cấp cho công việc tại Markee.
+              </p>
+              <div className="flex justify-center">
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={() => setGoogleError("Đăng nhập Google thất bại. Vui lòng thử lại.")}
+                  text="signin_with"
+                  shape="pill"
+                  width={280}
+                />
+              </div>
+              {googleError && (
+                <div className="w-full flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 text-sm text-red-600 font-medium">
+                  <Icon name="error" className="text-red-500 text-base" />
+                  {googleError}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowPasswordForm(true)}
+                className="text-xs text-on-surface-variant hover:underline bg-transparent border-0 p-0 cursor-pointer mt-2"
+              >
+                Đăng nhập bằng mật khẩu (dev/test)
+              </button>
+            </div>
+          )}
+
           {/* ── Tabs ── */}
+          {showPasswordForm && (
+          <>
           <div className="flex" style={{ borderBottom: "1px solid #e1e3e4" }}>
             <button
               type="button"
@@ -459,7 +515,16 @@ export function AuthPage() {
                 {mode === "login" ? "Đăng ký ngay" : "Đăng nhập"}
               </button>
             </p>
+            <button
+              type="button"
+              onClick={() => { setShowPasswordForm(false); setError(null); }}
+              className="text-xs text-on-surface-variant hover:underline bg-transparent border-0 p-0 cursor-pointer mt-2"
+            >
+              Quay lại đăng nhập bằng Google
+            </button>
           </div>
+          </>
+          )}
         </div>
 
         {/* ── System footer ── */}
@@ -566,5 +631,6 @@ export function AuthPage() {
         </div>
       )}
     </div>
+    </GoogleOAuthProvider>
   );
 }

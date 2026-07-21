@@ -10,6 +10,7 @@ from app.modules.all_platform.auth_deps import require_admin
 from app.modules.all_platform.schemas import (
     RegisterRequest,
     LoginRequest,
+    GoogleLoginRequest,
     ChangePasswordRequest,
     DeactivateAccountRequest,
     UpdateProfileRequest,
@@ -22,6 +23,7 @@ from pydantic import BaseModel
 from app.modules.all_platform.services import (
     register_user,
     login_user,
+    login_with_google,
     logout_user,
     decode_token,
     get_user_by_id,
@@ -106,6 +108,34 @@ def auth_login(payload: LoginRequest, response: Response) -> BaseResponse:
     """
     try:
         data = login_user(email=payload.email, password=payload.password)
+        token = (data or {}).get("access_token")
+        if token:
+            response.set_cookie(
+                key="crawlpro_access_token",
+                value=token,
+                httponly=True,
+                secure=False,
+                samesite="lax",
+                max_age=5 * 24 * 60 * 60,
+                path="/",
+            )
+        return BaseResponse(success=True, message="Login successful", data={"user": data.get("user")})
+    except ValueError as e:
+        return BaseResponse(success=False, message=str(e))
+    except Exception as e:
+        return BaseResponse(success=False, message=f"Login failed: {e}")
+
+
+@router.post("/google")
+def auth_google_login(payload: GoogleLoginRequest, response: Response) -> BaseResponse:
+    """Login via Google Sign-In (ID token from Google Identity Services).
+
+    Mirrors /login exactly on success — same cookie, same response shape — so
+    every downstream page/route keeps working unchanged regardless of which
+    login method was used.
+    """
+    try:
+        data = login_with_google(payload.credential)
         token = (data or {}).get("access_token")
         if token:
             response.set_cookie(

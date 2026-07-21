@@ -394,6 +394,7 @@ class Settings:
     jwt_access_token_expire_minutes: int = int(
         os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "10080"),
     )
+    google_oauth_client_id: str = os.getenv("GOOGLE_CLIENT_ID", "")
     google_service_account_json_path: Path = field(
         default_factory=_google_service_account_json_from_env,
     )

@@ -183,6 +183,64 @@ def login_user(email: str, password: str) -> dict:
     }
 
 
+def login_with_google(id_token_str: str) -> dict:
+    """Login via Google Sign-In. Verifies the ID token against our OAuth client,
+    then maps the verified email to an EXISTING app_users row — never creates a
+    new account here (admin stays the only one who provisions accounts).
+
+    Returns user + token or raises ValueError with the same messages as
+    login_user() so the frontend error handling is unchanged.
+    """
+    from google.auth.transport import requests as google_requests
+    from google.oauth2 import id_token as google_id_token
+
+    if not settings.google_oauth_client_id:
+        raise ValueError("Google Sign-In chưa được cấu hình trên server")
+
+    try:
+        claims = google_id_token.verify_oauth2_token(
+            id_token_str, google_requests.Request(), settings.google_oauth_client_id,
+        )
+    except Exception:
+        raise ValueError("Token Google không hợp lệ hoặc đã hết hạn")
+
+    if not claims.get("email_verified"):
+        raise ValueError("Email Google chưa được xác minh")
+
+    email = str(claims.get("email") or "").lower().strip()
+    if not email:
+        raise ValueError("Không lấy được email từ tài khoản Google")
+
+    result = execute_supabase_query(
+        lambda: get_supabase_client()
+        .table("app_users")
+        .select("id, email, name, role, is_active")
+        .eq("email", email)
+        .execute()
+    )
+    if not result.data:
+        raise ValueError("Email chưa được cấp tài khoản trong hệ thống. Liên hệ admin để được thêm.")
+
+    user = result.data[0]
+    if not user.get("is_active", True):
+        raise ValueError("Tài khoản đã bị vô hiệu hóa")
+
+    cached_user = _cache_user(user)
+    access_token = create_access_token(user["id"], user["email"], user["role"])
+
+    _store_session_async(user["id"], access_token)
+
+    return {
+        "user": {
+            "id": cached_user["id"],
+            "email": cached_user["email"],
+            "name": cached_user.get("name"),
+            "role": cached_user.get("role", "member"),
+        },
+        "access_token": access_token,
+    }
+
+
 def logout_user(token: str) -> dict:
     """Logout: remove session by token hash.
 
