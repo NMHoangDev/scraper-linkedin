@@ -218,14 +218,20 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       label: "CRM",
       exactMatch: true,
     },
-    {
-      type: "item",
-      id: "crm-analytics",
-      href: "/all-platform/crm/analytics",
-      icon: "monitoring",
-      label: "Phân tích CRM",
-      matchStartsWith: ["/all-platform/crm/analytics"],
-    },
+    // Phan tich CRM: theo yeu cau Mylife (22/07) chi leader/admin thay "full"
+    // CRM, member chi thay pipeline ban hang (muc "crm" o tren).
+    ...(isAdmin || isLeader
+      ? ([
+          {
+            type: "item",
+            id: "crm-analytics",
+            href: "/all-platform/crm/analytics",
+            icon: "monitoring",
+            label: "Phân tích CRM",
+            matchStartsWith: ["/all-platform/crm/analytics"],
+          },
+        ] as NavLeafItem[])
+      : []),
     {
       type: "item",
       id: "quotes",

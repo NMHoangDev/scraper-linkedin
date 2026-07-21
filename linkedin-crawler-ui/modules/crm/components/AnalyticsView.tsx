@@ -4,7 +4,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useAppAuth } from '@/contexts/AppAuthContext';
 import {
+  AlertTriangle,
   ArrowLeft,
   Building2,
   CalendarDays,
@@ -37,6 +39,12 @@ const emptyAnalytics: CrmAnalytics = {
 };
 
 export function AnalyticsView() {
+  const { user } = useAppAuth();
+  // Theo yeu cau Mylife (22/07): Phan tich CRM chi danh cho leader/admin -
+  // member chi thay pipeline ban hang (trang /all-platform/crm), khong thay
+  // duoc so lieu tong hop toan team/cong ty o day.
+  const canView = user?.role === 'admin' || user?.role === 'leader';
+
   const [analytics, setAnalytics] = useState<CrmAnalytics>(emptyAnalytics);
   const [agents, setAgents] = useState<CrmUserOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,6 +52,10 @@ export function AnalyticsView() {
   const [openFilter, setOpenFilter] = useState('');
 
   useEffect(() => {
+    if (!canView) {
+      setLoading(false);
+      return;
+    }
     let alive = true;
     setLoading(true);
     Promise.all([
@@ -61,7 +73,7 @@ export function AnalyticsView() {
     return () => {
       alive = false;
     };
-  }, [filters]);
+  }, [filters, canView]);
 
   const filterOptions = useMemo(
     () => ({
@@ -128,6 +140,23 @@ export function AnalyticsView() {
       tone: 'violet',
     },
   ];
+
+  if (!canView) {
+    return (
+      <div className="crm-analytics-shell">
+        <section className="crm-analytics-header" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 12 }}>
+          <AlertTriangle className="crm-button-icon" />
+          <div>
+            <p style={{ fontWeight: 700 }}>Không có quyền truy cập</p>
+            <p>Phân tích CRM chỉ dành cho leader/admin. Bạn có thể xem và làm việc trên pipeline bán hàng.</p>
+          </div>
+          <Link href="/all-platform/crm" className="crm-back-button">
+            <ArrowLeft className="crm-button-icon" /> Quay về CRM
+          </Link>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="crm-analytics-shell">
