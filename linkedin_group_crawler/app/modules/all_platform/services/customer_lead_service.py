@@ -530,15 +530,39 @@ def delete_customer_lead(lead_id: str) -> bool:
 
 
 def get_all_sdrs() -> List[Dict[str, Any]]:
+    """Danh sach nguoi co the gan lam Quan ly / Phu trach deal CRM.
+
+    Chi lay nguoi thuc su thuoc mot team that (leader hoac member cua
+    teams co ten khong chua "test") - loai tru cac acc admin/leader
+    tao de test/demo tren local (vd devadmin@markee.vn, admin123@gmail.com).
+    """
     try:
         supabase = get_supabase_client()
-        res = (
+
+        teams_res = supabase.table("teams").select("id, id_leader, name_team").execute()
+        real_teams = [t for t in (teams_res.data or []) if "test" not in (t.get("name_team") or "").lower()]
+        real_team_ids = [t["id"] for t in real_teams]
+
+        valid_ids = {t["id_leader"] for t in real_teams if t.get("id_leader")}
+        if real_team_ids:
+            members_res = (
+                supabase.table("member_of_teams")
+                .select("id_member")
+                .in_("id_teams", real_team_ids)
+                .execute()
+            )
+            valid_ids.update(row["id_member"] for row in (members_res.data or []) if row.get("id_member"))
+
+        if not valid_ids:
+            return []
+
+        users_res = (
             supabase.table("app_users")
             .select("id, name, role")
-            .in_("role", ["admin", "leader"])
+            .in_("id", list(valid_ids))
             .execute()
         )
-        return res.data or []
+        return users_res.data or []
     except Exception as e:
         logger.error(f"Error getting SDRs: {e}")
         return []
