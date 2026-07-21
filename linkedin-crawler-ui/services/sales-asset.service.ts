@@ -135,20 +135,20 @@ export const SALES_ASSET_TYPE_OPTIONS: Array<{ value: SalesAssetType; label: str
   { value: "proposal", label: "Proposal" },
   { value: "sale_kit", label: "Sale Kit" },
   { value: "portfolio", label: "Portfolio" },
-  { value: "other", label: "Khac" },
+  { value: "other", label: "Khác" },
 ];
 
 export const SALES_ASSET_STATUS_OPTIONS: Array<{ value: SalesAssetStatus; label: string }> = [
-  { value: "active", label: "Dang hoat dong" },
-  { value: "inactive", label: "Tam an" },
-  { value: "archived", label: "Luu tru" },
+  { value: "active", label: "Đang hoạt động" },
+  { value: "inactive", label: "Tạm ẩn" },
+  { value: "archived", label: "Lưu trữ" },
 ];
 
 export const SALES_ASSET_SOURCE_OPTIONS: Array<{ value: SalesAssetSourceType; label: string }> = [
   { value: "canva", label: "Canva" },
   { value: "google_docs", label: "Google Docs" },
   { value: "google_drive", label: "Google Drive" },
-  { value: "external", label: "Link khac" },
+  { value: "external", label: "Link khác" },
 ];
 
 export function getSalesAssetTypeLabel(type: SalesAssetType | string): string {
@@ -224,6 +224,15 @@ export const salesAssetService = {
       headers: jsonHeaders(),
     });
     return parseResponse<SalesAsset>(res);
+  },
+
+  async remove(id: string): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/api/all-platform/sales-assets/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      credentials: "include",
+      headers: jsonHeaders(),
+    });
+    await parseResponse<void>(res);
   },
 
   async send(id: string, input: SalesAssetSendInput): Promise<SalesAssetSendResult> {

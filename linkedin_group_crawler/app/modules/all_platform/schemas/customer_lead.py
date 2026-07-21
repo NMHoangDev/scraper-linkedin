@@ -67,11 +67,13 @@ class CustomerLeadCreate(BaseModel):
     tax_code: Optional[str] = None
 
     leaded_by: Optional[str] = None
+    leaded_by_name_hint: Optional[str] = None
     conv_id: Optional[str] = None
     source_platform: Optional[str] = "FB_Inbox"
 
     is_assigned: bool = False
     sdr_id: Optional[str] = None
+    sdr_name_hint: Optional[str] = None
 
     # Legacy status + activity
     status: str = "pending"
@@ -136,11 +138,13 @@ class CustomerLeadUpdate(BaseModel):
     tax_code: Optional[str] = None
 
     leaded_by: Optional[str] = None
+    leaded_by_name_hint: Optional[str] = None
     conv_id: Optional[str] = None
     source_platform: Optional[str] = None
 
     is_assigned: Optional[bool] = None
     sdr_id: Optional[str] = None
+    sdr_name_hint: Optional[str] = None
 
     status: Optional[str] = None
     activity_status: Optional[str] = None
@@ -203,10 +207,12 @@ class CustomerLeadResponse(BaseModel):
     industry: Optional[str] = None
     tax_code: Optional[str] = None
     leaded_by: Optional[str] = None
+    leaded_by_name_hint: Optional[str] = None
     conv_id: Optional[str] = None
     source_platform: Optional[str] = None
     is_assigned: bool = False
     sdr_id: Optional[str] = None
+    sdr_name_hint: Optional[str] = None
 
     # legacy
     status: str = "pending"

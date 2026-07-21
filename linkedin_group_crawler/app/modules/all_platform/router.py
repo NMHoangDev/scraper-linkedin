@@ -8,6 +8,7 @@ from app.modules.all_platform.routers import (
     seeding_router,
     kpi_router,
     categories_router,
+    members_router,
     quick_comment_router,
     quick_inbox_router,
     users_router,
@@ -164,6 +165,13 @@ all_platform_router.include_router(
     categories_router,
     prefix="/categories",
     tags=["All-Platform Categories"],
+)
+
+# ── Members (HR roster, platform-agnostic) ────────────────────────────────────
+all_platform_router.include_router(
+    members_router,
+    prefix="/members",
+    tags=["All-Platform Members"],
 )
 
 # ── Quick Comment Library (platform-agnostic) ─────────────────────────────────

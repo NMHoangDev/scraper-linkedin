@@ -57,18 +57,27 @@ BASE_COLUMNS = (
     "payment_due_date, payment_status, "
     "tags, has_budget, note, reject_reason, reject_reason_type, review_result, "
     "position, crm_package, zalo, facebook, telegram, pause_reason, closed_at, outcome_detail, quote_id, "
+    "leaded_by_name_hint, sdr_name_hint, "
     "created_at, updated_at, leader:leaded_by(name), sdr:sdr_id(name), "
     "quote:quote_id(quote_number, total_amount, public_token)"
 )
 
 
 def _normalize_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    # leader_name/sdr_name resolve qua JOIN leaded_by(name)/sdr_id(name) — nếu
+    # leaded_by/sdr_id là NULL (người được chọn chưa liên kết tài khoản đăng
+    # nhập), fallback về *_name_hint (tên đã chọn tại thời điểm lưu, xem
+    # migration 046) để không mất dấu vết đã gán ai.
     if row.get("leader"):
         row["leader_name"] = row["leader"].get("name")
         row.pop("leader", None)
+    elif row.get("leaded_by_name_hint"):
+        row["leader_name"] = f"{row['leaded_by_name_hint']} (chưa liên kết tài khoản)"
     if row.get("sdr"):
         row["sdr_name"] = row["sdr"].get("name")
         row.pop("sdr", None)
+    elif row.get("sdr_name_hint"):
+        row["sdr_name"] = f"{row['sdr_name_hint']} (chưa liên kết tài khoản)"
     if row.get("quote"):
         row["quote_number"] = row["quote"].get("quote_number")
         row["quote_total_amount"] = row["quote"].get("total_amount")

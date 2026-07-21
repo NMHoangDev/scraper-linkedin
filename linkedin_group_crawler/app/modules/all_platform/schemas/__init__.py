@@ -30,6 +30,11 @@ from app.modules.all_platform.schemas.categories import (
     CategoryUpdateRequest,
     CategoryDeleteRequest,
 )
+from app.modules.all_platform.schemas.members import (
+    MemberCreateRequest,
+    MemberUpdateRequest,
+    MemberDeleteRequest,
+)
 from app.modules.all_platform.schemas.quick_comment import (
     QuickCommentAddRequest,
     QuickCommentUpdateRequest,

@@ -8,6 +8,8 @@ import type {
   KpiMember,
   KpiAssignment,
   Category,
+  MemberProfile,
+  Skill,
   QuickCommentTemplate,
   QuickInboxTemplate,
   FacebookGroup,
@@ -1287,6 +1289,91 @@ export const allPlatformCategoriesService = {
 
   delete: (id: string): Promise<ApiResponse<{ deleted: number }>> => {
     return requestJson(`${BASE}/categories/delete?id=${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+  },
+};
+
+// ── MEMBERS (HR roster, nguồn dữ liệu DUY NHẤT cho mọi dropdown nhân sự) ──────
+
+export const allPlatformMembersService = {
+  getAll: (filters?: {
+    search?: string;
+    team?: string;
+    position?: string;
+    department?: string;
+    skill_id?: string;
+  }): Promise<ApiResponse<MemberProfile[]>> => {
+    const params = new URLSearchParams();
+    if (filters?.search) params.set("search", filters.search);
+    if (filters?.team) params.set("team", filters.team);
+    if (filters?.position) params.set("position", filters.position);
+    if (filters?.department) params.set("department", filters.department);
+    if (filters?.skill_id) params.set("skill_id", filters.skill_id);
+    const qs = params.toString();
+    return requestJson<MemberProfile[]>(`${BASE}/members${qs ? `?${qs}` : ""}`);
+  },
+
+  add: (payload: Partial<MemberProfile> & { display_name: string; full_name: string }): Promise<ApiResponse<MemberProfile>> => {
+    return requestJson(`${BASE}/members/add`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  update: (payload: Partial<MemberProfile> & { id: string }): Promise<ApiResponse<MemberProfile>> => {
+    return requestJson(`${BASE}/members/update`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  delete: (id: string): Promise<ApiResponse<{ deleted: number }>> => {
+    return requestJson(`${BASE}/members/delete?id=${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+  },
+
+  importExcel: async (file: File): Promise<{ created: number; updated: number; skipped: Array<{ row: number; reason: string }> }> => {
+    const fd = new FormData();
+    fd.append("file", file);
+
+    const headers: Record<string, string> = {};
+    if (API_KEY) headers["X-API-Key"] = API_KEY;
+    // KHÔNG set Content-Type thủ công cho FormData — browser tự thêm boundary.
+    const res = await fetch(`${BASE}/members/import-excel`, {
+      method: "POST",
+      credentials: "include",
+      headers,
+      body: fd,
+    });
+    const data = await res.json();
+    if (!data?.success) {
+      throw new Error(data?.message || "Import thất bại");
+    }
+    return data.data;
+  },
+
+  getSkills: (): Promise<ApiResponse<Skill[]>> => {
+    return requestJson<Skill[]>(`${BASE}/members/skills`);
+  },
+
+  addSkill: (name: string, category?: string): Promise<ApiResponse<Skill>> => {
+    return requestJson(`${BASE}/members/skills/add`, {
+      method: "POST",
+      body: JSON.stringify({ name, category }),
+    });
+  },
+
+  updateSkill: (id: string, name?: string, category?: string): Promise<ApiResponse<Skill>> => {
+    return requestJson(`${BASE}/members/skills/update`, {
+      method: "PUT",
+      body: JSON.stringify({ id, name, category }),
+    });
+  },
+
+  deleteSkill: (id: string): Promise<ApiResponse<{ deleted: number }>> => {
+    return requestJson(`${BASE}/members/skills/delete?id=${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
   },

@@ -141,6 +141,11 @@ def add_facebook_group(payload: dict) -> dict:
         "risk_note": cleaned.get("risk_note"),
         "assignee_id": cleaned.get("assignee_id"),
         "co_assignee_id": cleaned.get("co_assignee_id"),
+        # Ten hien thi tai thoi diem chon, dung khi id that o tren la NULL
+        # (nguoi duoc chon chua lien ket tai khoan dang nhap) - xem migration 045.
+        "assignee_name_hint": cleaned.get("assignee_name_hint"),
+        "co_assignee_name_hint": cleaned.get("co_assignee_name_hint"),
+        "id_member_name_hint": cleaned.get("id_member_name_hint"),
     }
 
     result = (
@@ -183,13 +188,16 @@ def update_facebook_group(group_id: str, payload: dict) -> dict:
         "risk_note",
         "assignee_id",
         "co_assignee_id",
+        "assignee_name_hint",
+        "co_assignee_name_hint",
+        "id_member_name_hint",
     }
 
     update_data = {k: v for k, v in cleaned.items() if k in allowed_fields}
     update_data["updated_at"] = "now()"
 
     # Note: we need to allow `None` to unset a crawl_time or frequency
-    # We remove keys that are completely missing from the payload? 
+    # We remove keys that are completely missing from the payload?
     # Actually, the payload is fully merged in update_data.
 
     result = (
@@ -320,6 +328,9 @@ def add_linkedin_group(payload: dict) -> dict:
         "risk_note": cleaned.get("risk_note"),
         "assignee_id": cleaned.get("assignee_id"),
         "co_assignee_id": cleaned.get("co_assignee_id"),
+        "assignee_name_hint": cleaned.get("assignee_name_hint"),
+        "co_assignee_name_hint": cleaned.get("co_assignee_name_hint"),
+        "id_member_name_hint": cleaned.get("id_member_name_hint"),
     }
 
     result = (
@@ -352,6 +363,9 @@ def update_linkedin_group(group_id: str, payload: dict) -> dict:
         "risk_note",
         "assignee_id",
         "co_assignee_id",
+        "assignee_name_hint",
+        "co_assignee_name_hint",
+        "id_member_name_hint",
     }
 
     update_data = {k: v for k, v in cleaned.items() if k in allowed_fields and v is not None}

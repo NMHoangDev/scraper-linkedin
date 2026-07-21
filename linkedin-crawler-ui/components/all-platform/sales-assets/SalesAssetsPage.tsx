@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Archive, Copy, Edit3, ExternalLink, FileText, Plus, Search, Upload, X } from "lucide-react";
+import { Archive, Copy, Edit3, ExternalLink, FileText, Plus, Search, Trash2, Upload, X } from "lucide-react";
 
 import {
   getSalesAssetSourceLabel,
@@ -264,6 +264,17 @@ export function SalesAssetsPage() {
     }
   };
 
+  const remove = async (asset: SalesAsset) => {
+    if (!window.confirm(`Xóa vĩnh viễn "${asset.title}"? Không thể hoàn tác.`)) return;
+    try {
+      await salesAssetService.remove(asset.id);
+      setNotice("Đã xóa tài liệu.");
+      await loadAssets();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   const copyLink = async (asset: SalesAsset) => {
     if (!asset.shareUrl) return;
     await navigator.clipboard.writeText(asset.shareUrl);
@@ -413,6 +424,9 @@ export function SalesAssetsPage() {
                           </button>
                           <button type="button" onClick={() => void archive(asset)} disabled={asset.status === "archived"} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-40" title="Lưu trữ">
                             <Archive size={16} />
+                          </button>
+                          <button type="button" onClick={() => void remove(asset)} className="rounded-lg p-2 text-red-500 hover:bg-red-50" title="Xóa">
+                            <Trash2 size={16} />
                           </button>
                         </div>
                       </td>

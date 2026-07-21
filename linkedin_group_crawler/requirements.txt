@@ -26,4 +26,6 @@ python-jose[cryptography]
 loguru
 asyncssh
 google-generativeai
+# Import Excel danh sách thành viên
+openpyxl
 

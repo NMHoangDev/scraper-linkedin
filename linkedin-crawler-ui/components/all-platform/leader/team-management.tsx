@@ -441,7 +441,7 @@ export function TeamManagement() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-7xl min-w-0 space-y-6 font-sans">
+    <div className="mx-auto w-full max-w-none min-w-0 space-y-6 font-sans">
       <div className="mb-6 flex items-start gap-3">
         <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#E3000F]/10">
           <MaterialIcon name="groups" className="text-[#E3000F] text-3xl" />

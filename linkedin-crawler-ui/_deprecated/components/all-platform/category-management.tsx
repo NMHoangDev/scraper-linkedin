@@ -30,6 +30,10 @@ const CATEGORY_TYPE_COLS: Record<CategoryType, string[]> = {
   team: ["name_team", "leader_email", "number_of_member"],
   content_type: ["code", "name", "description"],
   product_seeding: ["code", "name", "description"],
+  crm_source: ["code", "name", "platform"],
+  crm_service_package: ["code", "name", "platform"],
+  crm_package: ["code", "name", "platform"],
+  crm_industry: ["code", "name", "platform"],
 };
 
 // ── CATEGORY MODAL (Intent, Industry, Tier, ICP) ─────────────────────────────

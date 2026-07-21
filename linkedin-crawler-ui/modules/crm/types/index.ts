@@ -59,8 +59,10 @@ export interface Assignment {
   assignedUserId?: string;
   sdrId?: string;
   sdrName?: string;
+  sdrNameHint?: string;
   leadedById?: string;
   leadName?: string;
+  leadedByNameHint?: string;
   ownerName?: string;
 }
 
