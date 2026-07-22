@@ -15,6 +15,7 @@ import {
 } from "@/services/all-platform.service";
 import type { Category, CategoryType } from "@/types/unified.types";
 import { cn } from "@/lib/utils";
+import { TEAM_TYPE_OPTIONS, type TeamType } from "@/lib/teamTypes";
 import {
   PlatformStatCard,
   PlatformStatsRow,
@@ -30,6 +31,7 @@ function TeamModal({ isOpen, onClose, onSave, editing }: { isOpen: boolean; onCl
   // Lưu theo memberId (roster) thay vì email trực tiếp — cho phép tích cả người
   // chưa liên kết tài khoản, chỉ resolve sang email thật lúc submit.
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+  const [teamType, setTeamType] = useState<TeamType>("khac");
 
   const [allUsers, setAllUsers] = useState<AppUserProfile[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -64,6 +66,7 @@ function TeamModal({ isOpen, onClose, onSave, editing }: { isOpen: boolean; onCl
   useEffect(() => {
     if (editing) {
       setNameTeam(editing.name_team || "");
+      setTeamType((editing.team_type as TeamType) || "khac");
       // editing.leader_email là email thật đã lưu trong DB — map ngược sang
       // selection key tương ứng trong roster; nếu không tìm thấy (leader không
       // nằm trong 140 người) fallback dùng thẳng email để không mất lựa chọn.
@@ -76,6 +79,7 @@ function TeamModal({ isOpen, onClose, onSave, editing }: { isOpen: boolean; onCl
       setSelectedMemberIds(matched);
     } else {
       setNameTeam("");
+      setTeamType("khac");
       setLeaderKey("");
       setSelectedMemberIds([]);
     }
@@ -85,25 +89,22 @@ function TeamModal({ isOpen, onClose, onSave, editing }: { isOpen: boolean; onCl
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nameTeam.trim() || !leaderKey) return;
-    if (!selectedLeaderEntry?.email) {
-      window.alert(
-        `"${selectedLeaderEntry?.displayName || "Người này"}" chưa liên kết tài khoản đăng nhập — vào Quản lý thành viên để liên kết trước khi chọn làm Leader.`
-      );
-      return;
-    }
+    if (!nameTeam.trim() || !leaderKey || !selectedLeaderEntry) return;
     setIsSubmitting(true);
     try {
-      // Chỉ người ĐÃ liên kết tài khoản mới có email thật để lưu — lọc ra, tạo
-      // team vẫn chạy bình thường, phần còn lại chờ họ tự liên kết sau.
+      // members (danh bạ) và app_users (tài khoản đăng nhập) là 2 nghiệp vụ
+      // độc lập — Leader được chọn tự do từ danh bạ, không cần đã liên kết
+      // tài khoản đăng nhập mới lưu được (leader_member_id là nguồn thật).
       const resolvedEmails = selectedMemberIds
         .map(mid => memberRosterEntries.find(m => m.memberId === mid)?.email)
         .filter((email): email is string => Boolean(email));
 
       await onSave({
         name_team: nameTeam.trim(),
-        leader_email: selectedLeaderEntry.email,
+        leader_member_id: selectedLeaderEntry.memberId,
+        leader_email: selectedLeaderEntry.email || undefined,
         member_emails: resolvedEmails,
+        team_type: teamType,
         isEdit: !!editing
       });
       onClose();
@@ -143,6 +144,20 @@ function TeamModal({ isOpen, onClose, onSave, editing }: { isOpen: boolean; onCl
               placeholder="Vd: Growth Team"
               className="w-full px-4 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-xs text-on-surface outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary transition disabled:opacity-50"
             />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-on-surface-variant uppercase mb-1">
+              Loại team
+            </label>
+            <select
+              value={teamType}
+              onChange={(e) => setTeamType(e.target.value as TeamType)}
+              className="w-full px-4 py-2 bg-surface-container-low border border-outline-variant rounded-xl text-xs text-on-surface outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary transition cursor-pointer"
+            >
+              {TEAM_TYPE_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-[10px] font-bold text-on-surface-variant uppercase mb-1">
@@ -697,6 +712,7 @@ export function CategoryManagementContent() {
             platform: "general",
             members: Array.isArray(t.members) ? t.members.map((m: any) => typeof m === "string" ? m : m.email).filter(Boolean) : [],
             number_of_member: t.number_of_member || 0,
+            team_type: t.team_type || "khac",
           });
         }
       });
@@ -834,7 +850,7 @@ export function CategoryManagementContent() {
     setIsDeleting(true);
     try {
       if (selectedTab === "team") {
-        const res = await teamsService.delete(categoryToDelete.code, categoryToDelete.name || "");
+        const res = await teamsService.delete(categoryToDelete.code, categoryToDelete.name || "", categoryToDelete.id);
         if (res.success) {
           await fetchCategories();
           setDeleteModalOpen(false);
@@ -1094,7 +1110,7 @@ export function CategoryManagementContent() {
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           onSave={handleSaveTeam}
-          editing={modalMode === "edit" ? { name_team: modalValue, leader_email: modalName, members: (categories.team.find(t => t.id === modalId) as any)?.members } : undefined}
+          editing={modalMode === "edit" ? { name_team: modalValue, leader_email: modalName, members: (categories.team.find(t => t.id === modalId) as any)?.members, team_type: (categories.team.find(t => t.id === modalId) as any)?.team_type } : undefined}
         />
       )}
 

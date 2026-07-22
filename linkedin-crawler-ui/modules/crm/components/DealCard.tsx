@@ -24,6 +24,7 @@ import {
   getServicePackageText,
 } from '../constants/crmConfig';
 import type { Deal } from '../types';
+import { getTeamTypeLabel } from '@/lib/teamTypes';
 
 type DealCardProps = {
   deal: Deal;
@@ -107,6 +108,12 @@ export function DealCard({ deal, terminal, onClick, onCreateQuote, onDragStart }
       onDragStart={event => onDragStart?.(event, deal)}
       onClick={() => onClick(deal)}
     >
+      {deal.teamType ? (
+        <div className="crm-team-ribbon" title={deal.teamName ? `Team: ${deal.teamName}` : undefined}>
+          {getTeamTypeLabel(deal.teamType)}
+        </div>
+      ) : null}
+
       <div className="crm-card-header">
         <div className="crm-card-title">
           <h4 title={getDisplayName(deal)}>{getDisplayName(deal)}</h4>

@@ -161,7 +161,23 @@ async function requestJson<T = any>(
         throw new Error(`Lỗi máy chủ (${res.status})`);
       }
 
-      const body = (await res.json()) as ApiResponse<T>;
+      const rawBody = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+
+      // Endpoint không tự trả BaseResponse (vd 401/403/422 do FastAPI tự sinh từ
+      // HTTPException/Depends) có body dạng {"detail": "..."} chứ KHÔNG có
+      // success/message — nếu trả thẳng body này, mọi nơi gọi requestJson() sẽ
+      // thấy res.success/res.message đều undefined và rơi vào thông báo lỗi
+      // chung chung ("Không tạo được tài khoản"...), che mất lý do thật (vd
+      // "Forbidden: Admin role required", "Missing or invalid authorization
+      // header"). Chuẩn hoá detail -> message ở đây để lỗi thật luôn hiện ra.
+      if (!res.ok && rawBody.success === undefined) {
+        return {
+          success: false,
+          message: (rawBody.detail as string) || (rawBody.message as string) || `Lỗi máy chủ (${res.status})`,
+        } as ApiResponse<T>;
+      }
+
+      const body = rawBody as unknown as ApiResponse<T>;
 
       // 200 nhưng backend báo lỗi hạ tầng tạm thời -> thử lại như với 5xx.
       if (body && body.success === false && isTransientMessage(body.message)) {
@@ -1896,9 +1912,16 @@ export interface TeamMember {
 export interface TeamRow {
   id: string;
   name_team: string;
+  /** Loại team (migration 049) — dev/marketing/sale/presales/technical/back_office/intern/freelancer/khac. */
+  team_type?: string;
   id_leader: string;
+  /** members.id của người được chọn làm Leader — nguồn thật, luôn có dù
+   * chưa liên kết tài khoản đăng nhập (id_leader khi đó là ""). */
+  leader_member_id?: string;
   leader_email: string;
   leader_name: string;
+  /** true nếu Leader đã liên kết tài khoản đăng nhập (id_leader có giá trị thật). */
+  leader_linked?: boolean;
   members: TeamMember[];
   number_of_member: number;
 }
@@ -1965,8 +1988,16 @@ export const teamsService = {
   },
   create: (payload: {
     name_team: string;
-    leader_id: string;
+    // ID của member (danh bạ 140 người) được chọn làm Leader — nguồn thật,
+    // không phụ thuộc việc người đó đã có tài khoản đăng nhập. Bắt buộc phải
+    // có 1 trong 2 (leader_member_id hoặc leader_id) — backend validate.
+    leader_member_id?: string;
+    // app_users.id hoặc email — chỉ cần khi Leader ĐÃ liên kết tài khoản đăng
+    // nhập, hoặc khi gọi từ luồng cũ chưa biết leader_member_id (vd leader tự
+    // tạo team cho chính mình — luôn có tài khoản thật).
+    leader_id?: string;
     member_ids: string[];
+    team_type?: string;
   }): Promise<ApiResponse<TeamRow[]>> => {
     return requestJson(`${BASE}/teams`, {
       method: "POST",
@@ -1975,22 +2006,25 @@ export const teamsService = {
   },
   update: (payload: {
     name_team: string;
-    leader_id: string;
+    leader_member_id?: string;
+    leader_id?: string;
     member_ids: string[];
     // Truyen kem khi sua team da biet id, de backend tim theo id thay vi theo name_team -
     // cho phep doi ten team an toan (khong bi hieu nham la tao team moi).
     team_id?: string;
+    team_type?: string;
   }): Promise<ApiResponse<TeamRow[]>> => {
     return requestJson(`${BASE}/teams`, {
       method: "PUT",
       body: JSON.stringify(payload),
     });
   },
-  delete: (name_team: string, leader_id: string): Promise<ApiResponse<{ deleted: number }>> => {
-    return requestJson(
-      `${BASE}/teams?name_team=${encodeURIComponent(name_team)}&leader=${encodeURIComponent(leader_id)}`,
-      { method: "DELETE" }
-    );
+  /** team_id là cách xoá đáng tin cậy duy nhất khi Leader chưa liên kết tài
+   * khoản đăng nhập (không có id_leader thật để tra) — luôn truyền kèm khi có. */
+  delete: (name_team: string, leader_id: string, team_id?: string): Promise<ApiResponse<{ deleted: number }>> => {
+    const params = new URLSearchParams({ name_team, leader: leader_id || "" });
+    if (team_id) params.set("team_id", team_id);
+    return requestJson(`${BASE}/teams?${params.toString()}`, { method: "DELETE" });
   },
 };
 

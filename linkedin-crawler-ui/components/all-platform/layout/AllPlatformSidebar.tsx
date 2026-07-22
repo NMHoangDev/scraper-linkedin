@@ -68,12 +68,20 @@ export function getInitials(name?: string) {
   return parts[0]?.[0]?.toUpperCase() || "U";
 }
 
-export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: "personal" | "team"): SidebarEntry[] {
-  const dashboardHref = isAdmin
-    ? "/all-platform/admin/dashboard"
-    : isLeader
-      ? "/all-platform/leader/dashboard"
-      : "/all-platform/post-feed";
+/** Trang chủ đúng theo role — dùng chung cho sidebar (mục "Trang chủ") lẫn
+ * redirect ngay sau khi đăng nhập (AuthPage.tsx), để admin/leader không bị
+ * đưa nhầm về post-feed (trang chủ của member) sau khi đăng nhập. */
+export function getDashboardHrefForRole(role?: string | null): string {
+  if (role === "admin") return "/all-platform/admin/dashboard";
+  if (role === "leader") return "/all-platform/leader/dashboard";
+  // Member: trang chủ giờ là Dashboard Pipeline cá nhân (số liệu deal/phase/
+  // trễ hạn...) thay vì post-feed — post-feed vẫn còn, chỉ không còn là
+  // trang chủ mặc định (vẫn truy cập được qua mục "Sản xuất nội dung").
+  return "/all-platform/crm/my-dashboard";
+}
+
+export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: "personal" | "team", isSale: boolean = false): SidebarEntry[] {
+  const dashboardHref = getDashboardHrefForRole(isAdmin ? "admin" : isLeader ? "leader" : "member");
   const teamHref = isAdmin
     ? "/all-platform/admin/teams-management"
     : "/all-platform/leader/team";
@@ -219,8 +227,10 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       exactMatch: true,
     },
     // Phan tich CRM: theo yeu cau Mylife (22/07) chi leader/admin thay "full"
-    // CRM, member chi thay pipeline ban hang (muc "crm" o tren).
-    ...(isAdmin || isLeader
+    // CRM, member chi thay pipeline ban hang (muc "crm" o tren). Mo rong cho
+    // Sale (team_type='sale', migration 049) - duoc nang quyen ngang leader
+    // rieng cho Pipeline + Phan tich CRM.
+    ...(isAdmin || isLeader || isSale
       ? ([
           {
             type: "item",
@@ -534,7 +544,8 @@ export function AllPlatformSidebar({
 
   const isAdmin = user?.role === "admin";
   const isLeader = user?.role === "leader";
-  const entries = useMemo(() => buildEntries(isAdmin, isLeader, workspaceTab), [isAdmin, isLeader, workspaceTab]);
+  const isSale = Boolean(user?.is_sale);
+  const entries = useMemo(() => buildEntries(isAdmin, isLeader, workspaceTab, isSale), [isAdmin, isLeader, workspaceTab, isSale]);
 
   const handleLogout = async () => {
     await logout();

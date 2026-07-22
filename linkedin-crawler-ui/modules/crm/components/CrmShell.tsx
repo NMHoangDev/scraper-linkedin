@@ -20,12 +20,14 @@ import {
 } from '../constants/crmConfig';
 import { useCrm } from '../hooks/useCrm';
 import type { ContractStatus, CreateDealInput, Deal, DealStage, StageTransitionInput, UpdateDealInput } from '../types';
+import { teamsService, type TeamRow } from '@/services/all-platform.service';
 
 type FilterState = {
   search: string;
   source: string;
   city: string;
   industry: string;
+  team: string;
 };
 
 export function CrmShell() {
@@ -48,7 +50,17 @@ export function CrmShell() {
     moveDeal,
   } = useCrm();
   const [viewMode, setViewMode] = useState<'kanban' | 'table'>('kanban');
-  const [filters, setFilters] = useState<FilterState>({ search: '', source: '', city: '', industry: '' });
+  const [filters, setFilters] = useState<FilterState>({ search: '', source: '', city: '', industry: '', team: '' });
+  const [teams, setTeams] = useState<TeamRow[]>([]);
+
+  // Dropdown lọc team — DB-driven (GET /teams), không hard-code.
+  useEffect(() => {
+    let alive = true;
+    void teamsService.getAll().then(res => {
+      if (alive && res.success && res.data) setTeams(res.data);
+    });
+    return () => { alive = false; };
+  }, []);
   const [activeStageFilters, setActiveStageFilters] = useState<DealStage[]>([]);
   const [openFilter, setOpenFilter] = useState('');
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
@@ -98,6 +110,7 @@ export function CrmShell() {
     source: [{ value: '', label: 'Tất cả nguồn' }, ...sourceOptions],
     city: [{ value: '', label: 'Tất cả thành phố' }, ...cityOptions.map(city => ({ value: city, label: city }))],
     industry: [{ value: '', label: 'Tất cả lĩnh vực' }, ...industryOptions.map(industry => ({ value: industry, label: industry }))],
+    team: [{ value: '', label: 'Tất cả team' }, ...teams.map(t => ({ value: t.id, label: t.name_team }))],
   };
 
   const filteredDeals = useMemo(() => {
@@ -113,17 +126,18 @@ export function CrmShell() {
     if (filters.source) list = list.filter(deal => deal.sourcePlatform === filters.source);
     if (filters.city) list = list.filter(deal => deal.city === filters.city);
     if (filters.industry) list = list.filter(deal => deal.industry === filters.industry);
+    if (filters.team) list = list.filter(deal => deal.teamId === filters.team);
     if (activeStageFilters.length) list = list.filter(deal => activeStageFilters.includes(deal.stage));
     return list;
   }, [activeStageFilters, deals, filters]);
 
-  const hasFilters = filters.search || filters.source || filters.city || filters.industry || activeStageFilters.length;
+  const hasFilters = filters.search || filters.source || filters.city || filters.industry || filters.team || activeStageFilters.length;
 
-  function filterLabel(key: 'source' | 'city' | 'industry') {
+  function filterLabel(key: 'source' | 'city' | 'industry' | 'team') {
     return filterDropdownOptions[key].find(option => option.value === filters[key])?.label || 'Tất cả';
   }
 
-  function selectFilter(key: 'source' | 'city' | 'industry', value: string) {
+  function selectFilter(key: 'source' | 'city' | 'industry' | 'team', value: string) {
     setFilters(current => ({ ...current, [key]: value }));
     setOpenFilter('');
   }
@@ -272,7 +286,7 @@ export function CrmShell() {
               placeholder="Tìm tên, SĐT, email..."
               autoComplete="off"
             />
-            {(['source', 'city', 'industry'] as const).map(key => (
+            {(['source', 'city', 'industry', 'team'] as const).map(key => (
               <div key={key} className="crm-filter-select">
                 <button
                   type="button"
@@ -302,7 +316,7 @@ export function CrmShell() {
                 type="button"
                 className="crm-secondary-button crm-filter-reset"
                 onClick={() => {
-                  setFilters({ search: '', source: '', city: '', industry: '' });
+                  setFilters({ search: '', source: '', city: '', industry: '', team: '' });
                   setActiveStageFilters([]);
                 }}
               >

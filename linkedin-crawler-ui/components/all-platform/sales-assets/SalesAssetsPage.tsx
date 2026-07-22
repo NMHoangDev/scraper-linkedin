@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Archive, Copy, Edit3, ExternalLink, FileText, Plus, Search, Trash2, Upload, X } from "lucide-react";
+import { Archive, Copy, Edit3, FileText, Plus, Search, Trash2, Upload, X } from "lucide-react";
 
 import {
   getSalesAssetSourceLabel,
@@ -396,10 +396,24 @@ export function SalesAssetsPage() {
                       </td>
                       <td className="px-4 py-4 text-slate-700">{asset.projectName || "-"}</td>
                       <td className="px-4 py-4">
-                        <div className="flex items-center gap-2 font-bold text-slate-950">
-                          <FileText size={16} className="text-slate-400" />
-                          {asset.title}
-                        </div>
+                        {asset.shareUrl ? (
+                          <a
+                            href={asset.shareUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(event) => event.stopPropagation()}
+                            className="flex items-center gap-2 font-bold text-slate-950 hover:text-rose-600 hover:underline"
+                            title="Bấm để mở link tài liệu"
+                          >
+                            <FileText size={16} className="text-slate-400" />
+                            {asset.title}
+                          </a>
+                        ) : (
+                          <div className="flex items-center gap-2 font-bold text-slate-950">
+                            <FileText size={16} className="text-slate-400" />
+                            {asset.title}
+                          </div>
+                        )}
                         {asset.description ? <div className="mt-1 line-clamp-1 text-xs text-slate-500">{asset.description}</div> : null}
                       </td>
                       <td className="px-4 py-4 font-semibold">{getSalesAssetTypeLabel(asset.type)}</td>
@@ -413,9 +427,6 @@ export function SalesAssetsPage() {
                       <td className="px-4 py-4 text-slate-500">{formatDate(asset.updatedAt)}</td>
                       <td className="px-4 py-4">
                         <div className="flex justify-end gap-1.5">
-                          <button type="button" onClick={() => asset.shareUrl && window.open(asset.shareUrl, "_blank", "noopener,noreferrer")} disabled={!asset.shareUrl} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-40" title="Mở link">
-                            <ExternalLink size={16} />
-                          </button>
                           <button type="button" onClick={() => void copyLink(asset)} disabled={!asset.shareUrl} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-40" title="Copy link">
                             <Copy size={16} />
                           </button>

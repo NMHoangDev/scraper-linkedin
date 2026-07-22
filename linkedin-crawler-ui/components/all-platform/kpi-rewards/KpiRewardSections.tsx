@@ -17,6 +17,7 @@ import {
   type TeamRow,
 } from "@/services/all-platform.service";
 import { cn } from "@/lib/utils";
+import { getTeamTypeLabel } from "@/lib/teamTypes";
 
 type RuleGroup = {
   key: KpiRewardMetric;
@@ -727,10 +728,19 @@ function KpiGoalBadge({ status, percent }: { status: KpiGoalStatus; percent?: nu
 export function KpiRewardResultsTable({
   summary,
   teamId,
+  teams,
 }: {
   summary: KpiRewardSummary | null;
   teamId?: string;
+  /** Optional — dùng để hiện tag Loại team (Sale/Dev/...) kế bên tên team.
+   * Không truyền thì không hiện tag (vd view Leader/Member chỉ xem 1 team). */
+  teams?: TeamRow[];
 }) {
+  const teamTypeById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const t of teams || []) map.set(t.id, t.team_type || "khac");
+    return map;
+  }, [teams]);
   const rows = useMemo(() => {
     const items = summary?.memberSummaries || [];
     return teamId ? items.filter((item) => item.teamId === teamId) : items;
@@ -800,6 +810,7 @@ export function KpiRewardResultsTable({
             <MemberResultsBox
               key={group.teamId}
               title={group.teamName}
+              teamType={teamTypeById.get(group.teamId)}
               rows={group.rows}
               color={TEAM_COLORS[groupIndex % TEAM_COLORS.length]}
               rankBadge={RANK_MEDAL[rank - 1]}
@@ -817,6 +828,7 @@ export function KpiRewardResultsTable({
 // trang khong bi qua dai khi xem nhieu team cung luc.
 function MemberResultsBox({
   title,
+  teamType,
   subtitle,
   rows,
   color,
@@ -824,6 +836,7 @@ function MemberResultsBox({
   defaultExpanded = true,
 }: {
   title: string;
+  teamType?: string;
   subtitle?: string;
   rows: KpiRewardMemberSummary[];
   color: string;
@@ -847,6 +860,11 @@ function MemberResultsBox({
           <div className="min-w-0">
             <h3 className="flex items-center gap-1.5 truncate text-[13px] font-bold text-foreground">
               {title}
+              {teamType ? (
+                <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase text-primary">
+                  {getTeamTypeLabel(teamType)}
+                </span>
+              ) : null}
               {rankBadge ? <span className="shrink-0 text-base leading-none">{rankBadge}</span> : null}
             </h3>
             <p className="truncate text-[11px] text-muted-foreground">
@@ -1242,7 +1260,12 @@ function AdminTeamRuleAccordion({
                       >
                         <td className="px-3 py-3">
                           <div className="min-w-0">
-                            <div className="truncate font-bold text-foreground">{row.team.name_team}</div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="truncate font-bold text-foreground">{row.team.name_team}</span>
+                              <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase text-primary">
+                                {getTeamTypeLabel(row.team.team_type)}
+                              </span>
+                            </div>
                             <div className="truncate text-[10px] text-muted-foreground">
                               Leader: {row.team.leader_name || row.team.leader_email || "—"}
                             </div>
@@ -1420,6 +1443,7 @@ export function AdminKpiRewardsPanel({
   // Ket qua KPI & tien thuong ben duoi (cung xep theo tong thuong).
   const rankedTeamSummaries = [...teamSummaries].sort((a, b) => b.totalReward - a.totalReward);
   const RANK_MEDAL = ["🥇", "🥈", "🥉"];
+  const teamTypeById = new Map(teams.map((t) => [t.id, t.team_type || "khac"]));
 
   return (
     <div className="space-y-5">
@@ -1502,7 +1526,12 @@ export function AdminKpiRewardsPanel({
                     <tr key={team.teamId} className="border-t border-border hover:bg-slate-50">
                       <td className="px-4 py-3 text-muted-foreground">{RANK_MEDAL[idx] || idx + 1}</td>
                       <td className="px-4 py-3">
-                        <div className="font-semibold text-foreground">{team.teamName}</div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-semibold text-foreground">{team.teamName}</span>
+                          <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase text-primary">
+                            {getTeamTypeLabel(teamTypeById.get(team.teamId))}
+                          </span>
+                        </div>
                         <div className="text-[10px] text-muted-foreground">{team.leaderEmail}</div>
                       </td>
                       <td className="px-4 py-3 text-right">{team.memberCount}</td>
@@ -1540,7 +1569,7 @@ export function AdminKpiRewardsPanel({
         </div>
       </section>
 
-      <KpiRewardResultsTable summary={summary} teamId={selectedTeamId || undefined} />
+      <KpiRewardResultsTable summary={summary} teamId={selectedTeamId || undefined} teams={teams} />
     </div>
   );
 }

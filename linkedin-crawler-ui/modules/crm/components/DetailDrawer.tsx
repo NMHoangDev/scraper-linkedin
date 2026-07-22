@@ -21,6 +21,7 @@ import {
   CONTRACT_STATUS_OPTIONS,
   DEAL_STAGE_META,
   allowedNextStages,
+  canWriteDeal,
   formatDate,
   formatDateTime,
   formatVND,
@@ -32,6 +33,7 @@ import {
   getServicePackageText,
 } from '../constants/crmConfig';
 import type { ContractStatus, Deal, DealStage } from '../types';
+import { useAppAuth } from '@/contexts/AppAuthContext';
 
 type Props = {
   deal: Deal | null;
@@ -60,7 +62,11 @@ export function DetailDrawer({
   onUpdateContractStatus,
   onCreateQuote,
 }: Props) {
+  const { user } = useAppAuth();
   if (!open || !deal) return null;
+  // Deal khong phai cua minh/team minh phu trach VA minh khong phai admin/
+  // leader/sale -> chi xem, khong duoc chuyen giai doan / sua / xoa.
+  const canWrite = canWriteDeal(user, deal);
   const stageMeta = DEAL_STAGE_META[deal.stage];
   const contractLabel = getContractLabel(deal);
   const contractUrl = getContractUrl(deal);
@@ -258,7 +264,7 @@ export function DetailDrawer({
             </section>
           ) : null}
 
-          {!isTerminal ? (
+          {!isTerminal && canWrite ? (
             <section>
               <h3 className="crm-section-title">Chuyển giai đoạn tiếp theo</h3>
               <div className="crm-current-stage">
@@ -322,12 +328,16 @@ export function DetailDrawer({
                 {hasTerminalReview ? (deal.stage === 'won' ? 'Xem đánh giá thắng' : 'Xem đánh giá thua') : (deal.stage === 'won' ? 'Đánh giá thắng' : 'Đánh giá thua')}
               </button>
             ) : null}
-            <button type="button" className="crm-footer-button" onClick={() => onEdit(deal)}>
-              <UserCog className="crm-line-icon" /> Sửa thông tin
-            </button>
-            <button type="button" className="crm-footer-button crm-footer-button--delete" onClick={() => onDelete(deal)}>
-              <Trash2 className="crm-line-icon" /> Xóa
-            </button>
+            {canWrite ? (
+              <button type="button" className="crm-footer-button" onClick={() => onEdit(deal)}>
+                <UserCog className="crm-line-icon" /> Sửa thông tin
+              </button>
+            ) : null}
+            {canWrite ? (
+              <button type="button" className="crm-footer-button crm-footer-button--delete" onClick={() => onDelete(deal)}>
+                <Trash2 className="crm-line-icon" /> Xóa
+              </button>
+            ) : null}
           </div>
           <button type="button" className="crm-close-button" onClick={onClose}>Đóng</button>
         </footer>

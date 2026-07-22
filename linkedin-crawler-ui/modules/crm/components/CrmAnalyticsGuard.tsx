@@ -2,25 +2,29 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-
 import { useAppAuth } from "@/contexts/AppAuthContext";
-import { KpiLeaderboardContent } from "@/components/all-platform/kpi-leaderboard/KpiLeaderboardContent";
-import { getDashboardHrefForRole } from "@/components/all-platform/layout/AllPlatformSidebar";
+import { AnalyticsView } from "./AnalyticsView";
 
-export default function KpiLeaderboardPage() {
+/**
+ * Trang "/crm/analytics" ("Kết quả cuối cùng") trước đây KHÔNG có guard thật —
+ * chỉ ẩn link sidebar cho non-leader/admin, ai gõ thẳng URL vẫn xem được.
+ * Chỉ admin/leader/Sale (team_type='sale', migration 049) được xem — member
+ * thường bị đưa về Pipeline chính.
+ */
+export function CrmAnalyticsGuard() {
   const { user, isLoading } = useAppAuth();
   const router = useRouter();
   const [authorized, setAuthorized] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (isLoading) return;
-
-    if (user?.role === "admin") {
+    const allowed = user?.role === "admin" || user?.role === "leader" || Boolean(user?.is_sale);
+    if (allowed) {
       setAuthorized(true);
     } else {
-      router.replace(getDashboardHrefForRole(user?.role));
+      router.replace("/all-platform/crm");
     }
-  }, [isLoading, router, user?.role]);
+  }, [isLoading, user, router]);
 
   if (authorized === null) {
     return (
@@ -31,9 +35,5 @@ export default function KpiLeaderboardPage() {
     );
   }
 
-  return (
-    <div className="p-2 sm:p-3">
-      <KpiLeaderboardContent />
-    </div>
-  );
+  return <AnalyticsView />;
 }

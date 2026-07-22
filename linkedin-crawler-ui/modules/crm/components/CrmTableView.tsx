@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp } from './icons';
 import { DEAL_STAGE_META, formatDate, formatVND, getContractLabel } from '../constants/crmConfig';
 import type { Deal } from '../types';
+import { getTeamTypeLabel } from '@/lib/teamTypes';
 
 type SortKey = 'customerName' | 'sourcePlatform' | 'stage' | 'estimatedBudget' | 'createdAt';
 
@@ -96,6 +97,11 @@ export function CrmTableView({
                     {deal.position ? `${deal.customerName} - ${deal.position}` : deal.customerName}
                   </div>
                   <div className="crm-muted">{deal.companyName || 'Chưa có công ty'}</div>
+                  {deal.teamType ? (
+                    <div className="crm-service-tag crm-service-tag--team" style={{ marginTop: 4, display: 'inline-flex' }} title={deal.teamName ? `Team: ${deal.teamName}` : undefined}>
+                      <span>{getTeamTypeLabel(deal.teamType)}</span>
+                    </div>
+                  ) : null}
                 </td>
                 <td className="crm-td crm-contact-cell">
                   {deal.phone ? (

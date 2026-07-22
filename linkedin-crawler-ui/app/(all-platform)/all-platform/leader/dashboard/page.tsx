@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { LeaderDashboardContent } from "@/components/all-platform/leader/LeaderDashboardContent";
+import { getDashboardHrefForRole } from "@/components/all-platform/layout/AllPlatformSidebar";
 
 export default function LeaderDashboardPage() {
   const { user, isLoading } = useAppAuth();
@@ -17,7 +18,7 @@ export default function LeaderDashboardPage() {
     if (user?.role === "leader") {
       setAuthorized(true);
     } else {
-      router.replace("/all-platform/post-feed");
+      router.replace(getDashboardHrefForRole(user?.role));
     }
   }, [isLoading, router, user?.role]);
 

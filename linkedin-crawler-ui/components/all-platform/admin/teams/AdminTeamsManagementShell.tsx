@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { MaterialIcon } from "@/components/ui";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { cn } from "@/lib/utils";
+import { getTeamTypeLabel } from "@/lib/teamTypes";
 import { teamsService } from "@/services/all-platform.service";
 import type { TeamRow } from "@/services/all-platform.service";
 import { AdminTeamModal } from "@/components/all-platform/admin/AdminTeamModal";
@@ -387,7 +388,7 @@ export function AdminTeamsManagementShell({ view = "overview" }: { view?: AdminT
     }
 
     try {
-      const res = await teamsService.delete(team.name_team, team.id_leader);
+      const res = await teamsService.delete(team.name_team, team.id_leader, team.id);
       if (res.success) {
         setSuccess(`Đã xóa team "${team.name_team}" thành công`);
         fetchTeams();
@@ -702,16 +703,21 @@ export function AdminTeamsManagementShell({ view = "overview" }: { view?: AdminT
                             </div>
                           </div>
                         </div>
-                        <span
-                          className={cn(
-                            "shrink-0 rounded-full px-2.5 py-1 text-[11.5px] font-bold",
-                            hasTarget
-                              ? "bg-green-600/10 text-green-700"
-                              : "bg-muted text-muted-foreground",
-                          )}
-                        >
-                          {hasTarget ? `${percentage}%` : "Chưa giao KPI"}
-                        </span>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11.5px] font-bold text-primary">
+                            {getTeamTypeLabel(team.team_type)}
+                          </span>
+                          <span
+                            className={cn(
+                              "shrink-0 rounded-full px-2.5 py-1 text-[11.5px] font-bold",
+                              hasTarget
+                                ? "bg-green-600/10 text-green-700"
+                                : "bg-muted text-muted-foreground",
+                            )}
+                          >
+                            {hasTarget ? `${percentage}%` : "Chưa giao KPI"}
+                          </span>
+                        </div>
                       </div>
 
                       <div className="mt-1 h-2 w-full bg-zinc-200 rounded-full overflow-hidden">

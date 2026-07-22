@@ -50,6 +50,9 @@ type CustomerLeadRow = {
   source_platform?: string | null;
   sdr_id?: string | null;
   sdr_name_hint?: string | null;
+  team_id?: string | null;
+  team_name?: string | null;
+  team_type?: string | null;
   status?: 'pending' | 'closed' | 'rejected' | string | null;
   activity_status?: string | null;
   deal_stage?: DealStage | null;
@@ -404,6 +407,9 @@ function rowToDeal(row: CustomerLeadRow, history: StageHistory[] = []): Deal {
     closedAt: asText(row.closed_at) || (stage === 'won' || stage === 'lost' ? fallbackDate(row.customer_since, row.updated_at) : ''),
     closedReason: asText(row.closed_reason),
     crmStatus: stage === 'won' || stage === 'lost' ? stage : 'open',
+    teamId: asText(row.team_id),
+    teamName: asText(row.team_name),
+    teamType: asText(row.team_type),
     createdAt,
     updatedAt,
   };
@@ -440,6 +446,7 @@ function toCustomerPayload(input: CreateDealInput | UpdateDealInput): Partial<Cu
   if ('note' in input) payload.note = input.note;
   if ('pauseReason' in input) payload.pause_reason = input.pauseReason;
   if ('closedAt' in input) payload.closed_at = cleanDateValue(input.closedAt);
+  if ('teamId' in input) payload.team_id = input.teamId || null;
 
   if (input.assignment) {
     if ('leadedById' in input.assignment) payload.leaded_by = input.assignment.leadedById;

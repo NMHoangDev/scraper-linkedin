@@ -409,7 +409,7 @@ export function TeamManagement() {
     if (!confirmDelete) return;
 
     const deletePromise = async () => {
-      const res = await teamsService.delete(selectedTeam.name_team, user.id);
+      const res = await teamsService.delete(selectedTeam.name_team, user.id, selectedTeam.id);
       if (!res.success) {
         throw new Error(res.message || "Xóa thất bại");
       }

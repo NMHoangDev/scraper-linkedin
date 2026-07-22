@@ -196,7 +196,7 @@ export const SeedingActivityPanel = memo(function SeedingActivityPanel({ email, 
                     : 0;
                   return (
                     <div
-                      key={s.member_id}
+                      key={`${s.member_id}-${s.team_name}-${idx}`}
                       className="px-3 py-2 rounded-lg border border-slate-100 bg-slate-50/40 hover:bg-slate-50 transition flex items-center gap-2.5"
                     >
                       <span className="text-base shrink-0 w-6 text-center" aria-hidden>

@@ -94,6 +94,7 @@ export function MemberManagementContent() {
   const [creatingAccount, setCreatingAccount] = useState(false);
   const [newAccountRole, setNewAccountRole] = useState("member");
   const [newAccountError, setNewAccountError] = useState<string | null>(null);
+  const [newAccountNotice, setNewAccountNotice] = useState<string | null>(null);
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
 
   const [importOpen, setImportOpen] = useState(false);
@@ -168,6 +169,7 @@ export function MemberManagementContent() {
 
   async function handleCreateAccount() {
     setNewAccountError(null);
+    setNewAccountNotice(null);
     if (!form.email.trim()) {
       setNewAccountError("Nhập email ở phần \"Thông tin cá nhân\" trước.");
       return;
@@ -179,11 +181,30 @@ export function MemberManagementContent() {
         name: form.full_name.trim() || undefined,
         role: newAccountRole,
       });
+      // res.message giờ luôn phản ánh lỗi backend thật (403/401/422...) thay vì
+      // rơi vào thông báo chung — xem fix ở requestJson() trong all-platform.service.ts.
       if (!res.success || !res.data) {
         throw new Error(res.message || "Không tạo được tài khoản");
       }
-      setAppUsers(prev => [...prev, res.data as AppUserProfile]);
-      setForm(current => ({ ...current, linked_user_id: (res.data as AppUserProfile).id }));
+      const account = res.data as AppUserProfile & { already_existed?: boolean };
+      setAppUsers(prev => (prev.some(u => u.id === account.id) ? prev : [...prev, account]));
+      setForm(current => ({ ...current, linked_user_id: account.id }));
+
+      // Đang sửa 1 member đã tồn tại (có id) -> lưu liên kết ngay lập tức, không
+      // đợi admin bấm "Lưu thay đổi" ở form chính — tránh trường hợp tạo tài
+      // khoản xong nhưng quên lưu, mất liên kết vừa tạo.
+      if (form.id) {
+        const linkRes = await allPlatformMembersService.update({ id: form.id, linked_user_id: account.id });
+        if (!linkRes.success) {
+          throw new Error(linkRes.message || "Tạo tài khoản thành công nhưng lưu liên kết thất bại.");
+        }
+      }
+
+      setNewAccountNotice(
+        account.already_existed
+          ? `Email này đã có tài khoản (role: ${account.role}) — đã liên kết vào tài khoản đó.`
+          : "Đã tạo tài khoản và liên kết thành công."
+      );
       setCreatingAccount(false);
     } catch (err) {
       setNewAccountError(err instanceof Error ? err.message : "Không tạo được tài khoản");
@@ -454,44 +475,6 @@ export function MemberManagementContent() {
                         <option key={u.id} value={u.id}>{u.name || u.email} ({u.email})</option>
                       ))}
                     </select>
-                    {!creatingAccount ? (
-                      <button
-                        type="button"
-                        onClick={() => { setCreatingAccount(true); setNewAccountError(null); }}
-                        className="text-[11px] text-primary hover:underline bg-transparent border-0 p-0 cursor-pointer text-left mt-1"
-                      >
-                        + Chưa có tài khoản? Tạo mới từ email ở trên (để đăng nhập Google)
-                      </button>
-                    ) : (
-                      <div className="mt-2 flex flex-col gap-1.5 rounded-lg border border-outline-variant bg-surface-container-low p-2">
-                        <p className="text-[11px] text-on-surface-variant">
-                          Tạo tài khoản đăng nhập cho <b>{form.email || "(chưa nhập email)"}</b> — chỉ đăng nhập được qua Google, không có mật khẩu.
-                        </p>
-                        <select value={newAccountRole} onChange={e => setNewAccountRole(e.target.value)}>
-                          <option value="member">member</option>
-                          <option value="leader">leader</option>
-                          <option value="admin">admin</option>
-                        </select>
-                        {newAccountError && <p className="text-[11px] text-error">{newAccountError}</p>}
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            disabled={isCreatingAccount}
-                            onClick={handleCreateAccount}
-                            className="text-[11px] font-semibold text-white bg-primary rounded px-2 py-1 border-0 cursor-pointer disabled:opacity-60"
-                          >
-                            {isCreatingAccount ? "Đang tạo..." : "Tạo tài khoản"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setCreatingAccount(false)}
-                            className="text-[11px] text-on-surface-variant bg-transparent border-0 cursor-pointer"
-                          >
-                            Huỷ
-                          </button>
-                        </div>
-                      </div>
-                    )}
                   </Field>
                   <Field label="Liên kết tài khoản đăng nhập (phụ)" hint="tùy chọn — dùng khi 1 người có 2 email">
                     <select value={form.linked_user_id_2} onChange={e => setForm({ ...form, linked_user_id_2: e.target.value })}>
@@ -502,6 +485,50 @@ export function MemberManagementContent() {
                     </select>
                   </Field>
                 </div>
+
+                {/* Đặt ngoài grid 2 cột phía trên — để 2 ô "Liên kết tài khoản"
+                 * chính/phụ luôn cùng chiều cao, không bị lệch nhau khi khối
+                 * tạo tài khoản này mở rộng ra (trước đây nằm lồng trong ô
+                 * chính, làm 2 cột cao thấp không đều). */}
+                {!creatingAccount ? (
+                  <button
+                    type="button"
+                    onClick={() => { setCreatingAccount(true); setNewAccountError(null); setNewAccountNotice(null); }}
+                    className="text-[11px] text-primary hover:underline bg-transparent border-0 p-0 cursor-pointer text-left"
+                  >
+                    + Chưa có tài khoản? Tạo mới từ email ở trên (để đăng nhập Google)
+                  </button>
+                ) : (
+                  <div className="flex flex-col gap-1.5 rounded-lg border border-outline-variant bg-surface-container-low p-2">
+                    <p className="text-[11px] text-on-surface-variant">
+                      Tạo tài khoản đăng nhập cho <b>{form.email || "(chưa nhập email)"}</b> — chỉ đăng nhập được qua Google, không có mật khẩu.
+                    </p>
+                    <select value={newAccountRole} onChange={e => setNewAccountRole(e.target.value)}>
+                      <option value="member">member</option>
+                      <option value="leader">leader</option>
+                      <option value="admin">admin</option>
+                    </select>
+                    {newAccountError && <p className="text-[11px] text-error">{newAccountError}</p>}
+                    {newAccountNotice && <p className="text-[11px] text-emerald-600">{newAccountNotice}</p>}
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={isCreatingAccount}
+                        onClick={handleCreateAccount}
+                        className="text-[11px] font-semibold text-white bg-primary rounded px-2 py-1 border-0 cursor-pointer disabled:opacity-60"
+                      >
+                        {isCreatingAccount ? "Đang tạo..." : "Tạo tài khoản"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCreatingAccount(false)}
+                        className="text-[11px] text-on-surface-variant bg-transparent border-0 cursor-pointer"
+                      >
+                        Huỷ
+                      </button>
+                    </div>
+                  </div>
+                )}
               </section>
 
               <section className="space-y-3">
