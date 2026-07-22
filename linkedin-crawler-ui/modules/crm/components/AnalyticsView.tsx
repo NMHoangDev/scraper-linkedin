@@ -42,8 +42,10 @@ export function AnalyticsView() {
   const { user } = useAppAuth();
   // Theo yeu cau Mylife (22/07): Phan tich CRM chi danh cho leader/admin -
   // member chi thay pipeline ban hang (trang /all-platform/crm), khong thay
-  // duoc so lieu tong hop toan team/cong ty o day.
-  const canView = user?.role === 'admin' || user?.role === 'leader';
+  // duoc so lieu tong hop toan team/cong ty o day. Mo rong cho Sale
+  // (team_type='sale', migration 049) - phai khop voi CrmAnalyticsGuard,
+  // neu khong Sale se bi guard cho vao roi lai bi chan oan o day.
+  const canView = user?.role === 'admin' || user?.role === 'leader' || Boolean(user?.is_sale);
 
   const [analytics, setAnalytics] = useState<CrmAnalytics>(emptyAnalytics);
   const [agents, setAgents] = useState<CrmUserOption[]>([]);
