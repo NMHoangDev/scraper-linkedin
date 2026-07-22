@@ -1,4 +1,18 @@
 import type { ContractStatus, Deal, DealStage, PaymentStatus } from '../types';
+import type { AppUser } from '@/types/unified.types';
+
+/** Mirror của can_write_deal() bên backend (customer_lead_service.py) — chỉ
+ * dùng để ẨN/DISABLE nút sửa/xóa/chuyển giai đoạn cho đúng UX, KHÔNG phải lớp
+ * bảo mật (backend luôn tự kiểm tra lại, không tin client). admin/leader/sale
+ * sửa được mọi deal; member thường chỉ sửa deal do mình tạo (leadedById) hoặc
+ * được giao (sdrId) — không phải "cùng team" là sửa được hết.
+ */
+export function canWriteDeal(user: AppUser | null | undefined, deal: Deal | null | undefined): boolean {
+  if (!user) return false;
+  if (user.role === 'admin' || user.role === 'leader' || user.is_sale) return true;
+  if (!deal) return false;
+  return deal.assignment.leadedById === user.id || deal.assignment.sdrId === user.id;
+}
 
 export const PIPELINE_COLUMNS: DealStage[] = [
   'new_lead',
@@ -105,17 +119,71 @@ export const SOURCE_OPTIONS = [
   { value: 'MarkeeChat', label: 'Markee Chat' },
 ];
 
+// Đủ 63 tỉnh/thành Việt Nam — 5 thành phố trực thuộc trung ương trước, còn lại xếp theo bảng chữ cái.
 export const CITY_OPTIONS = [
   'Hà Nội',
   'Hồ Chí Minh',
-  'Đà Nẵng',
   'Hải Phòng',
+  'Đà Nẵng',
   'Cần Thơ',
+  'An Giang',
+  'Bà Rịa - Vũng Tàu',
+  'Bạc Liêu',
+  'Bắc Giang',
+  'Bắc Kạn',
+  'Bắc Ninh',
+  'Bến Tre',
+  'Bình Định',
   'Bình Dương',
+  'Bình Phước',
+  'Bình Thuận',
+  'Cà Mau',
+  'Cao Bằng',
+  'Đắk Lắk',
+  'Đắk Nông',
+  'Điện Biên',
   'Đồng Nai',
-  'Long An',
+  'Đồng Tháp',
+  'Gia Lai',
+  'Hà Giang',
+  'Hà Nam',
+  'Hà Tĩnh',
+  'Hải Dương',
+  'Hậu Giang',
+  'Hòa Bình',
+  'Hưng Yên',
   'Khánh Hòa',
+  'Kiên Giang',
+  'Kon Tum',
+  'Lai Châu',
   'Lâm Đồng',
+  'Lạng Sơn',
+  'Lào Cai',
+  'Long An',
+  'Nam Định',
+  'Nghệ An',
+  'Ninh Bình',
+  'Ninh Thuận',
+  'Phú Thọ',
+  'Phú Yên',
+  'Quảng Bình',
+  'Quảng Nam',
+  'Quảng Ngãi',
+  'Quảng Ninh',
+  'Quảng Trị',
+  'Sóc Trăng',
+  'Sơn La',
+  'Tây Ninh',
+  'Thái Bình',
+  'Thái Nguyên',
+  'Thanh Hóa',
+  'Thừa Thiên Huế',
+  'Tiền Giang',
+  'Trà Vinh',
+  'Tuyên Quang',
+  'Vĩnh Long',
+  'Vĩnh Phúc',
+  'Yên Bái',
 ];
 
 export const INDUSTRY_OPTIONS = [

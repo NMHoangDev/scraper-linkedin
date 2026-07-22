@@ -156,6 +156,10 @@ export interface Deal {
   crmStatus?: 'open' | 'won' | 'lost';
   createdAt: string;
   updatedAt: string;
+  /** Team gán cho deal này (chọn tay trong form deal, migration 050). */
+  teamId?: string;
+  teamName?: string;
+  teamType?: string;
 }
 
 export interface DealFilters {

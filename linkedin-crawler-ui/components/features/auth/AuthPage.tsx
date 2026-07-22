@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, type FormEvent, useCallback } from "react";
+import { useEffect, useState, type FormEvent, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { GoogleOAuthProvider, GoogleLogin, type CredentialResponse } from "@react-oauth/google";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { GOOGLE_OAUTH_CLIENT_ID } from "@/lib/env";
+import { getDashboardHrefForRole } from "@/components/all-platform/layout/AllPlatformSidebar";
 
 /* -------------------------------------------------------------------------- */
 /*  Material Symbols — class already defined in globals.css                    */
@@ -43,8 +44,21 @@ export function AuthPage() {
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [googleError, setGoogleError] = useState<string | null>(null);
 
-  const { login, loginWithGoogle, register, setLwuuSession } = useAppAuth();
+  const { user, isAuthenticated, isLoading: authLoading, login, loginWithGoogle, register, setLwuuSession } = useAppAuth();
   const router = useRouter();
+
+  // Nếu đã đăng nhập (vd bấm nút Back của trình duyệt quay lại /auth/login sau
+  // khi login xong, hoặc mở lại tab cũ còn cookie hợp lệ) thì đưa thẳng vào
+  // đúng dashboard theo role thay vì hiện lại form login. Phải đợi authLoading
+  // xong (AppAuthProvider gọi /auth/me lúc mount) rồi mới quyết định — nếu
+  // check ngay khi isLoading còn true sẽ luôn thấy isAuthenticated=false (state
+  // chưa kịp cập nhật) và không bao giờ redirect được.
+  useEffect(() => {
+    if (authLoading) return;
+    if (isAuthenticated && user) {
+      router.replace(getDashboardHrefForRole(user.role));
+    }
+  }, [authLoading, isAuthenticated, user, router]);
 
   const handleGoogleSuccess = useCallback(
     async (credentialResponse: CredentialResponse) => {
@@ -54,8 +68,8 @@ export function AuthPage() {
         return;
       }
       try {
-        await loginWithGoogle(credentialResponse.credential);
-        router.push("/all-platform/post-feed");
+        const user = await loginWithGoogle(credentialResponse.credential);
+        router.push(getDashboardHrefForRole(user.role));
       } catch (err) {
         setGoogleError(err instanceof Error ? err.message : "Đăng nhập Google thất bại.");
       }
@@ -75,16 +89,14 @@ export function AuthPage() {
     setSubmitStatus("loading");
 
     try {
-      if (mode === "login") {
-        await login(email.trim(), password);
-      } else {
-        await register(email.trim(), password, name.trim() || undefined);
-      }
+      const user = mode === "login"
+        ? await login(email.trim(), password)
+        : await register(email.trim(), password, name.trim() || undefined);
       localStorage.setItem("linkedin_crawler_email", email.trim());
       if (remember) {
         setLwuuSession(email.trim(), true);
       }
-      router.push("/all-platform/post-feed");
+      router.push(getDashboardHrefForRole(user.role));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Có lỗi xảy ra");
       setSubmitStatus("idle");

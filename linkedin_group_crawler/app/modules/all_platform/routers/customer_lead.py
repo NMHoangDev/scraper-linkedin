@@ -10,7 +10,7 @@ from app.modules.all_platform.schemas.customer_lead import (
     ActivityLogResponse,
     DEAL_STAGES,
 )
-from app.modules.all_platform.services import customer_lead_service, decode_token, get_user_by_id
+from app.modules.all_platform.services import customer_lead_service, decode_token, get_user_by_id, can_write_deal
 from app.modules.all_platform.services.customer_lead_service import TransitionError
 from app.modules.all_platform.services.crm_attachment_service import (
     upload_attachment,
@@ -131,6 +131,9 @@ def transition_stage(
                 success=False,
                 message=f"Giá trị 'to_stage' không hợp lệ: {payload.to_stage}",
             )
+        existing = customer_lead_service.get_customer_lead_by_id(lead_id)
+        if not can_write_deal(current_user, existing):
+            return BaseResponse(success=False, message="Bạn không có quyền chuyển giai đoạn deal này")
         data = payload.model_dump(exclude_unset=True)
         updated = customer_lead_service.transition_stage(
             lead_id=lead_id,
@@ -274,9 +277,12 @@ def create_customer_lead(
 def update_customer_lead(
     lead_id: str,
     payload: CustomerLeadUpdate,
-    _: Any = Depends(get_current_user),
+    current_user: Any = Depends(get_current_user),
 ):
     try:
+        existing = customer_lead_service.get_customer_lead_by_id(lead_id)
+        if not can_write_deal(current_user, existing):
+            return BaseResponse(success=False, message="Bạn không có quyền sửa deal này — chỉ deal do mình tạo hoặc được giao mới sửa được")
         updated = customer_lead_service.update_customer_lead(
             lead_id,
             payload.model_dump(exclude_unset=True),
@@ -289,8 +295,11 @@ def update_customer_lead(
 
 
 @router.delete("/{lead_id}", response_model=BaseResponse)
-def delete_customer_lead(lead_id: str, _: Any = Depends(get_current_user)):
+def delete_customer_lead(lead_id: str, current_user: Any = Depends(get_current_user)):
     try:
+        existing = customer_lead_service.get_customer_lead_by_id(lead_id)
+        if not can_write_deal(current_user, existing):
+            return BaseResponse(success=False, message="Bạn không có quyền xóa deal này — chỉ deal do mình tạo hoặc được giao mới xóa được")
         customer_lead_service.delete_customer_lead(lead_id)
         return BaseResponse(success=True, message="Deleted successfully")
     except Exception as e:

@@ -412,6 +412,9 @@ export interface AppUser {
   role: UserRole;
   is_active: boolean;
   created_at?: string;
+  /** true nếu user thuộc 1 team có team_type='sale' (migration 049) — được
+   * nâng quyền ngang leader cho riêng Pipeline + Phân tích CRM. */
+  is_sale?: boolean;
 }
 
 export interface AuthLoginResponse {

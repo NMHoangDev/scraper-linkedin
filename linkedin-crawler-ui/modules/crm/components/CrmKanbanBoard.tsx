@@ -5,6 +5,7 @@ import { CheckCircle2, Loader2, PauseCircle, XCircle } from './icons';
 import { DealCard } from './DealCard';
 import { DEAL_STAGE_META, PIPELINE_COLUMNS, formatVND } from '../constants/crmConfig';
 import type { Deal, DealStage } from '../types';
+import { useAppAuth } from '@/contexts/AppAuthContext';
 
 type Props = {
   deals: Deal[];
@@ -41,6 +42,11 @@ const terminalPalette = {
 } satisfies Record<TerminalStage, { className: string; icon: typeof CheckCircle2; resultLabel: string; helper: string }>;
 
 export function CrmKanbanBoard({ deals, loading, onCardClick, onContractClick, onCreateQuote, onRequestMove }: Props) {
+  const { user } = useAppAuth();
+  // "Kết quả cuối cùng" (khu kéo-thả đóng deal + tổng doanh thu) chỉ admin/
+  // leader/sale xem — member thường vẫn tự đóng deal của mình bình thường qua
+  // nút "Chuyển giai đoạn tiếp theo" trong DetailDrawer (không cần khu này).
+  const canSeeFinalResults = user?.role === 'admin' || user?.role === 'leader' || Boolean(user?.is_sale);
   const [dragOverStage, setDragOverStage] = useState<DealStage | null>(null);
   const grouped = useMemo(() => {
     const out = Object.fromEntries(
@@ -130,80 +136,84 @@ export function CrmKanbanBoard({ deals, loading, onCardClick, onContractClick, o
         </div>
       </section>
 
-      <div className="crm-terminal-divider">
-        <span />
-        <b>TRẠNG THÁI CUỐI</b>
-        <span />
-      </div>
-
-      <section className="crm-board-section">
-        <div className="crm-section-heading">
-          <div>
-            <h2>Kết quả cuối cùng</h2>
-            <p>Kéo deal vào các trạng thái cuối để đóng vòng pipeline.</p>
+      {canSeeFinalResults ? (
+        <>
+          <div className="crm-terminal-divider">
+            <span />
+            <b>TRẠNG THÁI CUỐI</b>
+            <span />
           </div>
-        </div>
 
-        <div className="crm-terminal-zones">
-          {terminalStages.map(stage => {
-            const { className, helper, icon: Icon, resultLabel } = terminalPalette[stage];
-            const stats = terminalStats[stage];
-            return (
-              <div
-                key={stage}
-                className={`crm-terminal-zone ${className} ${dragOverStage === stage ? 'crm-terminal-zone--active' : ''}`}
-                onDragOver={event => {
-                  event.preventDefault();
-                  setDragOverStage(stage);
-                }}
-                onDragLeave={() => setDragOverStage(null)}
-                onDrop={event => onDrop(event, stage)}
-              >
-                <div className="crm-terminal-icon">
-                  <Icon />
-                </div>
-                <h3>{resultLabel}</h3>
-                <p>{helper}</p>
-                <strong>
-                  {stats.count} deal{stats.value > 0 ? ` · ${formatVND(stats.value)}` : ''}
-                </strong>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="crm-terminal-rows">
-          {terminalStages.map(stage => {
-            const Icon = terminalPalette[stage].icon;
-            return (
-            <div
-              key={stage}
-              data-crm-terminal-stage={stage}
-              className="crm-terminal-row"
-              onDragOver={event => {
-                event.preventDefault();
-                setDragOverStage(stage);
-              }}
-              onDragLeave={() => setDragOverStage(null)}
-              onDrop={event => onDrop(event, stage)}
-            >
-              <div className="crm-terminal-row-head">
-                <span className="crm-terminal-row-dot" style={{ backgroundColor: DEAL_STAGE_META[stage].color }} />
-                <Icon className="crm-line-icon" />
-                <h4>{DEAL_STAGE_META[stage].label}</h4>
-                <span className="crm-terminal-row-count">{grouped[stage].length}</span>
-              </div>
-              <div className="crm-terminal-card-list">
-                {!grouped[stage].length ? <div className="crm-terminal-empty">Kéo deal vào đây</div> : null}
-                {grouped[stage].map(deal => (
-                  <DealCard key={deal.id} deal={deal} terminal onClick={onCardClick} onContractClick={onContractClick} onCreateQuote={onCreateQuote} onDragStart={onDragStart} />
-                ))}
+          <section className="crm-board-section">
+            <div className="crm-section-heading">
+              <div>
+                <h2>Kết quả cuối cùng</h2>
+                <p>Kéo deal vào các trạng thái cuối để đóng vòng pipeline.</p>
               </div>
             </div>
-            );
-          })}
-        </div>
-      </section>
+
+            <div className="crm-terminal-zones">
+              {terminalStages.map(stage => {
+                const { className, helper, icon: Icon, resultLabel } = terminalPalette[stage];
+                const stats = terminalStats[stage];
+                return (
+                  <div
+                    key={stage}
+                    className={`crm-terminal-zone ${className} ${dragOverStage === stage ? 'crm-terminal-zone--active' : ''}`}
+                    onDragOver={event => {
+                      event.preventDefault();
+                      setDragOverStage(stage);
+                    }}
+                    onDragLeave={() => setDragOverStage(null)}
+                    onDrop={event => onDrop(event, stage)}
+                  >
+                    <div className="crm-terminal-icon">
+                      <Icon />
+                    </div>
+                    <h3>{resultLabel}</h3>
+                    <p>{helper}</p>
+                    <strong>
+                      {stats.count} deal{stats.value > 0 ? ` · ${formatVND(stats.value)}` : ''}
+                    </strong>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="crm-terminal-rows">
+              {terminalStages.map(stage => {
+                const Icon = terminalPalette[stage].icon;
+                return (
+                <div
+                  key={stage}
+                  data-crm-terminal-stage={stage}
+                  className="crm-terminal-row"
+                  onDragOver={event => {
+                    event.preventDefault();
+                    setDragOverStage(stage);
+                  }}
+                  onDragLeave={() => setDragOverStage(null)}
+                  onDrop={event => onDrop(event, stage)}
+                >
+                  <div className="crm-terminal-row-head">
+                    <span className="crm-terminal-row-dot" style={{ backgroundColor: DEAL_STAGE_META[stage].color }} />
+                    <Icon className="crm-line-icon" />
+                    <h4>{DEAL_STAGE_META[stage].label}</h4>
+                    <span className="crm-terminal-row-count">{grouped[stage].length}</span>
+                  </div>
+                  <div className="crm-terminal-card-list">
+                    {!grouped[stage].length ? <div className="crm-terminal-empty">Kéo deal vào đây</div> : null}
+                    {grouped[stage].map(deal => (
+                      <DealCard key={deal.id} deal={deal} terminal onClick={onCardClick} onContractClick={onContractClick} onCreateQuote={onCreateQuote} onDragStart={onDragStart} />
+                    ))}
+                  </div>
+                </div>
+                );
+              })}
+            </div>
+          </section>
+        </>
+      ) : null}
     </div>
   );
 }

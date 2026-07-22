@@ -224,6 +224,16 @@
   padding: 0.65rem 0.8rem;
 }
 
+.crm-field select,
+.crm-review-field select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2364748b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.8rem center;
+  padding-right: 2.1rem;
+}
+
 .crm-input,
 .crm-filter-select-button {
   height: 2.8rem;
@@ -326,6 +336,91 @@
   min-width: 7rem;
   align-self: stretch;
   white-space: nowrap;
+}
+
+.crm-searchable-select {
+  position: relative;
+  width: 100%;
+}
+
+.crm-searchable-select-trigger {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.65rem;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 0.86rem;
+  padding: 0.65rem 0.8rem;
+  text-align: left;
+}
+
+.crm-searchable-select-trigger span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-searchable-select-menu {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  right: 0;
+  border: 1px solid #dbe3ee;
+  border-radius: 0.75rem;
+  background: #ffffff;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+  padding: 0.35rem;
+}
+
+.crm-searchable-select-input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.55rem;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.84rem;
+  outline: none;
+  margin-bottom: 0.35rem;
+}
+
+.crm-searchable-select-input:focus {
+  border-color: #be1e4b;
+  box-shadow: 0 0 0 3px rgba(190, 30, 75, 0.12);
+}
+
+.crm-searchable-select-list {
+  max-height: 14rem;
+  overflow-y: auto;
+}
+
+.crm-searchable-select-option {
+  display: flex;
+  width: 100%;
+  min-height: 2.1rem;
+  align-items: center;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: #0f172a;
+  font-size: 0.84rem;
+  padding: 0.45rem 0.65rem;
+  text-align: left;
+}
+
+.crm-searchable-select-option:hover,
+.crm-searchable-select-option.is-selected {
+  background: #fff1f2;
+  color: #be1e4b;
+}
+
+.crm-searchable-select-empty {
+  padding: 0.6rem 0.65rem;
+  font-size: 0.8rem;
+  color: #64748b;
 }
 
 .crm-stage-filter {
@@ -567,6 +662,7 @@
 }
 
 .crm-deal-card {
+  position: relative;
   display: flex;
   min-height: 9.7rem;
   cursor: grab;
@@ -578,6 +674,26 @@
   padding: 0.72rem;
   box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
   transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+/* Ribbon góc — kiểu tag mã giảm giá Shopee, không chiếm chỗ trong nội dung card. */
+.crm-team-ribbon {
+  position: absolute;
+  top: 0.6rem;
+  right: -2rem;
+  z-index: 5;
+  width: 7.5rem;
+  transform: rotate(45deg);
+  background: linear-gradient(135deg, #fb7185, #be1e4b);
+  color: #ffffff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-transform: uppercase;
+  padding: 0.16rem 0;
+  box-shadow: 0 2px 6px rgba(190, 30, 75, 0.35);
+  pointer-events: none;
 }
 
 .crm-deal-card:hover {
@@ -663,6 +779,7 @@
 
 .crm-service-tag--category { background: #ecfdf5; color: #047857; }
 .crm-service-tag--package { background: #eff6ff; color: #1d4ed8; }
+.crm-service-tag--team { background: #fdf2f8; color: #a21caf; }
 
 .crm-contact-actions {
   display: grid;

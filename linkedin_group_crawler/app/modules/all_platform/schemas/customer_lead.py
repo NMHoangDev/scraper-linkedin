@@ -125,6 +125,9 @@ class CustomerLeadCreate(BaseModel):
     outcome_detail: Optional[dict] = None
     quote_id: Optional[str] = None
 
+    # migration 050 — Team gan cho deal nay (chon tay trong form deal)
+    team_id: Optional[str] = None
+
 
 class CustomerLeadUpdate(BaseModel):
     company_name: Optional[str] = None
@@ -194,6 +197,9 @@ class CustomerLeadUpdate(BaseModel):
     outcome_detail: Optional[dict] = None
     quote_id: Optional[str] = None
 
+    # migration 050
+    team_id: Optional[str] = None
+
 
 class CustomerLeadResponse(BaseModel):
     id: str
@@ -262,6 +268,11 @@ class CustomerLeadResponse(BaseModel):
     updated_at: datetime
     leader_name: Optional[str] = None
     sdr_name: Optional[str] = None
+
+    # migration 050
+    team_id: Optional[str] = None
+    team_name: Optional[str] = None
+    team_type: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------

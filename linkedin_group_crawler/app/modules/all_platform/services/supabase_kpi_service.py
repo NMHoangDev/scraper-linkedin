@@ -416,9 +416,13 @@ def get_all_kpis_for_leader(
     if id_team:
         kpi_query = kpi_query.eq("id_team", id_team)
     if start_date and end_date:
-        # Match exact week if both are provided
-        kpi_query = kpi_query.eq("start_date", start_date).eq("end_date", end_date)
-        
+        # Range overlap (khong phai exact-match) - giong logic RPC get_team_kpi_overview
+        # (kt2.start_date <= v_end AND kt2.end_date >= v_start). Exact-match truoc day de
+        # target ve 0 khi tuan do FE tu tinh (getRecentWeeks(), theo gio local trinh duyet)
+        # lech 1 ngay so voi tuan luu trong kpi_tracker, du actual van hien dung vi actual
+        # tinh rieng theo range date, khong phu thuoc active_kpi co tim thay hay khong.
+        kpi_query = kpi_query.lte("start_date", end_date).gte("end_date", start_date)
+
     kpi_query = kpi_query.order("start_date", desc=False)
     kpi_result = kpi_query.execute()
     kpi_map = {}

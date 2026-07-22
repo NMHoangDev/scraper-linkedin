@@ -16,9 +16,9 @@ interface AppAuthContextType {
   user: AppUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  loginWithGoogle: (credential: string) => Promise<void>;
-  register: (email: string, password: string, name?: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<AppUser>;
+  loginWithGoogle: (credential: string) => Promise<AppUser>;
+  register: (email: string, password: string, name?: string) => Promise<AppUser>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   setLwuuSession: (email: string, remember: boolean) => void;
@@ -107,7 +107,7 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     if (SKIP_AUTH) {
       setUser(MOCK_USER);
-      return;
+      return MOCK_USER;
     }
     setIsLoading(true);
     try {
@@ -118,6 +118,7 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
       // Cookie is set by backend; just take user.
       const data = res.data as { user: AppUser };
       setUser(data.user);
+      return data.user;
     } finally {
       setIsLoading(false);
     }
@@ -126,7 +127,7 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
   const loginWithGoogle = useCallback(async (credential: string) => {
     if (SKIP_AUTH) {
       setUser(MOCK_USER);
-      return;
+      return MOCK_USER;
     }
     setIsLoading(true);
     try {
@@ -134,9 +135,12 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
       if (!res.success || !res.data) {
         throw new Error(res.message || "Login failed");
       }
-      // Cookie is set by backend; just take user.
+      // Cookie is set by backend; just take user — data.user.role phản ánh
+      // đúng role hiện tại trong app_users (backend resolve theo email Google
+      // ngay lúc login), dùng để AuthPage.tsx redirect đúng dashboard theo role.
       const data = res.data as { user: AppUser };
       setUser(data.user);
+      return data.user;
     } finally {
       setIsLoading(false);
     }
@@ -153,6 +157,7 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
         // Cookie is set by backend; just take user.
         const data = res.data as { user: AppUser };
         setUser(data.user);
+        return data.user;
       } finally {
         setIsLoading(false);
       }

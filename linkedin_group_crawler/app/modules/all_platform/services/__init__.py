@@ -165,3 +165,8 @@ from app.modules.all_platform.services.supabase_linkedin_account_service import 
 from app.modules.all_platform.services.platforms_service import (
     get_all_platforms,
 )
+from app.modules.all_platform.services.crm_permission_service import (
+    is_sale_member,
+    has_full_crm_access,
+    can_write_deal,
+)

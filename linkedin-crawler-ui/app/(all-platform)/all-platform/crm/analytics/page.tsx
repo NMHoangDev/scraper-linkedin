@@ -1,4 +1,4 @@
-import { AnalyticsView } from "@/modules/crm";
+import { CrmAnalyticsGuard } from "@/modules/crm/components/CrmAnalyticsGuard";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function CrmAnalyticsRoute() {
-  return <AnalyticsView />;
+  return <CrmAnalyticsGuard />;
 }

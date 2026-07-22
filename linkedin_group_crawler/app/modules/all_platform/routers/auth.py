@@ -37,6 +37,7 @@ from app.modules.all_platform.services import (
     deactivate_account,
     reset_password_without_old,
     get_user_by_email,
+    is_sale_member,
 )
 
 router = APIRouter()
@@ -205,6 +206,7 @@ def auth_me(request: Request, authorization: str | None = Header(None)) -> BaseR
             "role": user.get("role"),
             "is_active": user.get("is_active"),
             "created_at": user.get("created_at"),
+            "is_sale": is_sale_member(user.get("id")),
         })
     except HTTPException as e:
         return BaseResponse(success=False, message=e.detail)

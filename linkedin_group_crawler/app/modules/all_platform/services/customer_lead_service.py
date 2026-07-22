@@ -35,7 +35,7 @@ def _serialize_datetimes(payload: Dict[str, Any]) -> Dict[str, Any]:
 # Cột UUID nullable trên customer_leads — frontend (vd wizard "Thêm deal và báo giá"
 # khi chưa chọn Leader/SDR) có thể gửi "" thay vì null, Postgres reject với
 # "invalid input syntax for type uuid" nếu insert/update thẳng chuỗi rỗng.
-_NULLABLE_UUID_COLUMNS = ("leaded_by", "sdr_id", "quote_id")
+_NULLABLE_UUID_COLUMNS = ("leaded_by", "sdr_id", "quote_id", "team_id")
 
 
 def _normalize_uuid_fields(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -57,9 +57,10 @@ BASE_COLUMNS = (
     "payment_due_date, payment_status, "
     "tags, has_budget, note, reject_reason, reject_reason_type, review_result, "
     "position, crm_package, zalo, facebook, telegram, pause_reason, closed_at, outcome_detail, quote_id, "
-    "leaded_by_name_hint, sdr_name_hint, "
+    "leaded_by_name_hint, sdr_name_hint, team_id, "
     "created_at, updated_at, leader:leaded_by(name), sdr:sdr_id(name), "
-    "quote:quote_id(quote_number, total_amount, public_token)"
+    "quote:quote_id(quote_number, total_amount, public_token), "
+    "team:team_id(name_team, team_type)"
 )
 
 
@@ -84,6 +85,13 @@ def _normalize_row(row: Dict[str, Any]) -> Dict[str, Any]:
         public_token = row["quote"].get("public_token")
         row["quote_public_url"] = f"/public/quotes/{public_token}" if public_token else None
         row.pop("quote", None)
+    if row.get("team"):
+        row["team_name"] = row["team"].get("name_team")
+        row["team_type"] = row["team"].get("team_type")
+        row.pop("team", None)
+    else:
+        row["team_name"] = None
+        row["team_type"] = None
     if row.get("tags") is None:
         row["tags"] = []
     if row.get("days_in_stage") is None and row.get("stage_entered_at"):
@@ -140,11 +148,12 @@ def get_all_customer_leads(
         if source_platform:
             query = query.eq("source_platform", source_platform)
 
-        # Role-based access (SDR chỉ thấy deal của mình)
-        if current_user and current_user.get("role") not in ["admin", "leader"]:
-            uid = current_user.get("id")
-            if uid:
-                query = query.or_(f"leaded_by.eq.{uid},sdr_id.eq.{uid}")
+        # Doc Pipeline gio la UNIVERSAL cho moi user da dang nhap (admin/leader/
+        # sale-team/member deu thay toan bo deal, ke ca cua nguoi khac/team
+        # khac) - phan quyen chi con ap dung o buoc GHI (update/delete/
+        # transition), xem can_write_deal() trong crm_permission_service.py.
+        # (Truoc day co self-scope leaded_by/sdr_id==uid cho non-admin/leader,
+        # da bo theo yeu cau "Member duoc xem Pipeline cua minh va team khac".)
 
         # Sắp xếp theo stage_entered_at DESC — deal mới nhất lên đầu trong cột
         offset = (page - 1) * page_size
@@ -179,10 +188,7 @@ def get_stage_counts(current_user: Optional[Dict[str, Any]] = None) -> Dict[str,
     try:
         supabase = get_supabase_client()
         q = supabase.table("customer_leads").select("deal_stage", count="exact")
-        if current_user and current_user.get("role") not in ["admin", "leader"]:
-            uid = current_user.get("id")
-            if uid:
-                q = q.or_(f"leaded_by.eq.{uid},sdr_id.eq.{uid}")
+        # Universal read - xem get_all_customer_leads() ve ly do bo self-scope.
         res = q.execute()
         counts: Dict[str, int] = {}
         for row in res.data or []:

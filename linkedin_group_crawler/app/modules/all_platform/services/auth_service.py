@@ -14,6 +14,7 @@ from jose import JWTError, jwt
 
 from app.core.config import settings
 from app.core.supabase_client import execute_supabase_query, get_supabase_client
+from app.modules.all_platform.services.crm_permission_service import is_sale_member
 
 _USER_PUBLIC_FIELDS = "id, email, name, role, is_active, created_at, updated_at"
 _USER_CACHE_TTL_SECONDS = 30.0
@@ -178,6 +179,7 @@ def login_user(email: str, password: str) -> dict:
             "email": cached_user["email"],
             "name": cached_user.get("name"),
             "role": cached_user.get("role", "member"),
+            "is_sale": is_sale_member(cached_user["id"]),
         },
         "access_token": access_token,
     }
@@ -192,6 +194,12 @@ def admin_create_user(email: str, name: Optional[str], role: str) -> dict:
     login_with_google) — this is the explicit "add this email" step an admin
     does instead. Sets a random password nobody knows (password column is
     NOT NULL); the account is only ever meant to be used via Google.
+
+    Neu email nay DA co trong app_users (vd admin bam "Tao tai khoan" cho 1
+    member ma email do that ra da duoc cap tai khoan tu truoc, hoac 2 member
+    trong danh ba tinh co dung chung 1 email), KHONG bao loi trung - tra ve
+    thang tai khoan da co de FE lien ket (members.linked_user_id) vao do, dung
+    tinh than "chi lien ket, khong tao trung" thay vi chan thao tac.
     """
     email = email.lower().strip()
     if not email or "@" not in email:
@@ -200,10 +208,21 @@ def admin_create_user(email: str, name: Optional[str], role: str) -> dict:
         raise ValueError(f"Role phải là một trong: {', '.join(_VALID_ROLES)}")
 
     existing = execute_supabase_query(
-        lambda: get_supabase_client().table("app_users").select("id").eq("email", email).execute()
+        lambda: get_supabase_client()
+        .table("app_users")
+        .select("id, email, name, role")
+        .eq("email", email)
+        .execute()
     )
     if existing.data:
-        raise ValueError("Email đã có tài khoản trong hệ thống")
+        user = existing.data[0]
+        return {
+            "id": user["id"],
+            "email": user["email"],
+            "name": user.get("name"),
+            "role": user["role"],
+            "already_existed": True,
+        }
 
     random_password = secrets.token_urlsafe(32)
     user_data = {
@@ -281,6 +300,7 @@ def login_with_google(id_token_str: str) -> dict:
             "email": cached_user["email"],
             "name": cached_user.get("name"),
             "role": cached_user.get("role", "member"),
+            "is_sale": is_sale_member(cached_user["id"]),
         },
         "access_token": access_token,
     }

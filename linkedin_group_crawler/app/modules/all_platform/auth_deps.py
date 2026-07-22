@@ -53,6 +53,18 @@ def require_admin(request: Request, authorization: str | None = Header(default=N
     return resolved
 
 
+def require_admin_or_leader(request: Request, authorization: str | None = Header(default=None)) -> dict[str, Any]:
+    """403 nếu người gọi không phải admin/leader. Dùng cho endpoint quản lý thành
+    viên team (sửa hồ sơ, liên kết tài khoản đăng nhập...) mà leader cũng cần làm
+    được cho team mình, không chỉ riêng admin.
+    """
+    resolved = get_current_user(request, authorization)
+    role = str(resolved.get("role") or "member").strip().lower()
+    if role not in ("admin", "leader"):
+        raise HTTPException(status_code=403, detail="Forbidden: Admin or leader role required")
+    return resolved
+
+
 def get_authenticated_caller_email(request: Request, authorization: str | None = Header(default=None)) -> str | None:
     """Email người gọi THẬT, lấy từ JWT (cookie `crawlpro_access_token`) — dùng thay
     cho việc tin header `X-Caller-Email` client tự gửi (giá trị đó trước đây lấy

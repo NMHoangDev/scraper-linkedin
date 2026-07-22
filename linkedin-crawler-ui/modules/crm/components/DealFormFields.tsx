@@ -1,6 +1,9 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useMembers } from '@/hooks/useMembers';
+import { teamsService, type TeamRow } from '@/services/all-platform.service';
+import { SearchableSelect } from './SearchableSelect';
 import type { MemberProfile } from '@/types/unified.types';
 import {
   CITY_OPTIONS,
@@ -60,6 +63,7 @@ export type DealFormState = {
   leadedByNameHint: string;
   sdrId: string;
   sdrNameHint: string;
+  teamId: string;
 };
 
 export function emptyDealForm(): DealFormState {
@@ -105,6 +109,7 @@ export function emptyDealForm(): DealFormState {
     leadedByNameHint: '',
     sdrId: '',
     sdrNameHint: '',
+    teamId: '',
   };
 }
 
@@ -160,6 +165,7 @@ export function dealFormFromDeal(deal: Deal): DealFormState {
     leadedByNameHint: deal.assignment.leadedByNameHint || deal.assignment.leadName || '',
     sdrId: deal.assignment.sdrId || '',
     sdrNameHint: deal.assignment.sdrNameHint || deal.assignment.sdrName || '',
+    teamId: deal.teamId || '',
   };
 }
 
@@ -220,6 +226,7 @@ export function buildDealPayload(form: DealFormState, _agents: CrmUserOption[] =
     },
     pauseReason: form.pauseReason.trim(),
     note: form.note.trim(),
+    teamId: form.teamId || undefined,
     assignment: {
       ownerUserId: form.leadedBy,
       createdById: form.leadedBy,
@@ -260,6 +267,17 @@ export function DealFormFields({
   // sdr_id (FK tới app_users.id) sẽ NULL cho tới khi người đó liên kết, nhưng
   // tên vẫn luôn hiển thị nhờ leaded_by_name_hint/sdr_name_hint.
   const { members } = useMembers();
+
+  // Dropdown "Team" trên deal — lấy từ GET /teams (DB-driven), không hard-code.
+  // Team gán vào deal là CHỌN TAY, không tự suy ra từ người phụ trách.
+  const [teams, setTeams] = useState<TeamRow[]>([]);
+  useEffect(() => {
+    let alive = true;
+    void teamsService.getAll().then(res => {
+      if (alive && res.success && res.data) setTeams(res.data);
+    });
+    return () => { alive = false; };
+  }, []);
   const assignableMembers = [...members].sort((a, b) => a.display_name.localeCompare(b.display_name));
 
   // Value trên <option> phải LUÔN duy nhất (kể cả người chưa liên kết) —
@@ -276,15 +294,49 @@ export function DealFormFields({
     return match ? match.id : '';
   };
 
+  // Team của member này (nếu có) — dò qua team.members (member_of_teams, khớp
+  // theo app_users.id đã liên kết) hoặc team.leader_member_id (khớp trường hợp
+  // member này chính là Leader của team, kể cả khi chưa liên kết tài khoản).
+  const findTeamForMember = (member: MemberProfile | undefined) => {
+    if (!member) return undefined;
+    const linkedId = member.linked_user_id || member.linked_user_id_2;
+    return teams.find(t =>
+      (linkedId && t.members?.some(m => m.id === linkedId)) ||
+      t.leader_member_id === member.id
+    );
+  };
+
+  // Member hiện đang được chọn ở "Quản lý" — dò qua id thật hoặc name hint
+  // (deal cũ có thể chỉ có leadedByNameHint nếu người đó chưa liên kết).
+  const resolvedLeadedByMember = assignableMembers.find(
+    m => (m.linked_user_id || m.linked_user_id_2) === form.leadedBy
+  ) || assignableMembers.find(m => !(m.linked_user_id || m.linked_user_id_2) && m.display_name === form.leadedByNameHint);
+  const autoTeam = findTeamForMember(resolvedLeadedByMember);
+  const autoTeamName = autoTeam?.name_team || '';
+
+  // Đồng bộ teamId theo Quản lý mỗi khi dữ liệu đổi — kể cả khi mở sửa 1 deal
+  // cũ đã có leadedBy từ trước (không cần người dùng chọn lại Quản lý).
+  useEffect(() => {
+    if (autoTeam && autoTeam.id !== form.teamId) {
+      setValue('teamId', autoTeam.id);
+    }
+  }, [autoTeam?.id]);
+
   const handlePick = (value: string, idKey: 'leadedBy' | 'sdrId', hintKey: 'leadedByNameHint' | 'sdrNameHint') => {
     if (!value) {
       setValue(idKey, '');
       setValue(hintKey, '');
+      // Bỏ chọn Quản lý → không còn nguồn để suy team, xoá luôn teamId
+      // (useEffect autoTeam sẽ không tự set lại vì resolvedLeadedByMember rỗng).
+      if (idKey === 'leadedBy') setValue('teamId', '');
       return;
     }
     const member = assignableMembers.find(m => selectionKeyOf(m) === value);
     setValue(idKey, member ? (member.linked_user_id || member.linked_user_id_2 || '') : '');
     setValue(hintKey, member ? member.display_name : '');
+    // Team giờ HOÀN TOÀN tự động theo Quản lý (đã bỏ dropdown Team) —
+    // useEffect autoTeam ở trên sẽ tự đồng bộ form.teamId ngay sau khi state
+    // leadedBy/leadedByNameHint cập nhật.
   };
 
   const leadedBySelectionKey = findSelectionKey(form.leadedBy, form.leadedByNameHint);
@@ -335,16 +387,10 @@ export function DealFormFields({
             <input value={form.address} onChange={event => setValue('address', event.target.value)} placeholder="Số nhà, đường, phường/xã..." />
           </Field>
           <Field label="Thành phố">
-            <select value={form.city} onChange={event => setValue('city', event.target.value)}>
-              <option value="">-- Chọn --</option>
-              {CITY_OPTIONS.map(city => <option key={city}>{city}</option>)}
-            </select>
+            <SearchableSelect value={form.city} onChange={value => setValue('city', value)} options={CITY_OPTIONS} />
           </Field>
           <Field label="Lĩnh vực">
-            <select value={form.industry} onChange={event => setValue('industry', event.target.value)}>
-              <option value="">-- Chọn --</option>
-              {industryOptions.map(industry => <option key={industry.value} value={industry.value}>{industry.label}</option>)}
-            </select>
+            <SearchableSelect value={form.industry} onChange={value => setValue('industry', value)} options={industryOptions} />
           </Field>
         </div>
       </section>
@@ -353,21 +399,13 @@ export function DealFormFields({
         <h3 className="crm-form-title">Nguồn & danh mục sản phẩm</h3>
         <div className="crm-form-grid">
           <Field label="Nguồn">
-            <select value={form.sourcePlatform} onChange={event => setValue('sourcePlatform', event.target.value)}>
-              {sourceOptions.map(source => <option key={source.value} value={source.value}>{source.label}</option>)}
-            </select>
+            <SearchableSelect value={form.sourcePlatform} onChange={value => setValue('sourcePlatform', value)} options={sourceOptions} />
           </Field>
           <Field label="Danh mục sản phẩm" hint="tùy chọn">
-            <select value={form.servicePackage} onChange={event => setValue('servicePackage', event.target.value)}>
-              <option value="">-- Chưa chọn --</option>
-              {servicePackageOptions.map(pkg => <option key={pkg.value} value={pkg.value}>{pkg.label}</option>)}
-            </select>
+            <SearchableSelect value={form.servicePackage} onChange={value => setValue('servicePackage', value)} options={servicePackageOptions} placeholder="-- Chưa chọn --" />
           </Field>
           <Field label="Gói" hint="tùy chọn">
-            <select value={form.package} onChange={event => setValue('package', event.target.value)}>
-              <option value="">-- Chưa chọn --</option>
-              {packageOptions.map(pkg => <option key={pkg.value} value={pkg.value}>{pkg.label}</option>)}
-            </select>
+            <SearchableSelect value={form.package} onChange={value => setValue('package', value)} options={packageOptions} placeholder="-- Chưa chọn --" />
           </Field>
         </div>
       </section>
@@ -475,6 +513,12 @@ export function DealFormFields({
 
       <section className="crm-form-section">
         <h3 className="crm-form-title">Phân công</h3>
+        {autoTeamName ? (
+          <p className="mb-2 text-xs text-on-surface-variant">
+            Team: <span className="crm-service-tag crm-service-tag--team" style={{ display: 'inline-flex' }}>{autoTeamName}</span>
+            {' '}(tự động theo Quản lý)
+          </p>
+        ) : null}
         <div className="crm-form-grid">
           <Field label="Quản lý">
             <select value={leadedBySelectionKey} onChange={event => handlePick(event.target.value, 'leadedBy', 'leadedByNameHint')}>
