@@ -6,7 +6,7 @@ import io
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 
-from app.modules.all_platform.auth_deps import get_current_user, require_admin
+from app.modules.all_platform.auth_deps import get_current_user, require_admin, require_admin_or_leader
 from app.modules.all_platform.schemas import (
     BaseResponse,
     MemberCreateRequest,
@@ -58,7 +58,7 @@ def members_add(payload: MemberCreateRequest, _admin=Depends(require_admin)) -> 
 
 
 @router.put("/update")
-def members_update(payload: MemberUpdateRequest, _admin=Depends(require_admin)) -> BaseResponse:
+def members_update(payload: MemberUpdateRequest, _admin=Depends(require_admin_or_leader)) -> BaseResponse:
     try:
         data = update_member(payload.id, payload.model_dump(exclude={"id"}))
         return BaseResponse(success=True, message="Đã cập nhật thành viên", data=data)
