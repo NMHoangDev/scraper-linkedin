@@ -5,6 +5,7 @@ import { MaterialIcon } from "@/components/ui";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { useMembers } from "@/hooks/useMembers";
+import { useAppAuth } from "@/contexts/AppAuthContext";
 import {
   allPlatformMembersService,
   usersService,
@@ -74,6 +75,8 @@ function memberToForm(m: MemberProfile): MemberFormState {
 }
 
 export function MemberManagementContent() {
+  const { user: currentUser } = useAppAuth();
+  const isAdmin = currentUser?.role === "admin";
   const { members, loading, error: membersError, loadMembers } = useMembers();
   const [skills, setSkills] = useState<Skill[]>([]);
   const [appUsers, setAppUsers] = useState<AppUserProfile[]>([]);
@@ -156,6 +159,7 @@ export function MemberManagementContent() {
   }
 
   async function handleRowRoleChange(account: AppUserProfile, role: string) {
+    if (!isAdmin) return; // /update-role: chỉ admin
     setSavingUserId(account.id);
     try {
       const res = await usersService.updateRole(account.email, role);
@@ -456,9 +460,10 @@ export function MemberManagementContent() {
                         {account ? (
                           <select
                             value={account.role || "member"}
-                            disabled={savingUserId === account.id}
+                            disabled={!isAdmin || savingUserId === account.id}
                             onChange={e => handleRowRoleChange(account, e.target.value)}
-                            className="px-2 py-1 bg-surface-container-low border border-outline-variant rounded-lg text-xs cursor-pointer disabled:opacity-60"
+                            className="px-2 py-1 bg-surface-container-low border border-outline-variant rounded-lg text-xs cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                            title={isAdmin ? undefined : "Chỉ admin mới đổi role tài khoản có sẵn"}
                           >
                             <option value="member">member</option>
                             <option value="leader">leader</option>
@@ -558,7 +563,7 @@ export function MemberManagementContent() {
                       <select value={newAccountRole} onChange={e => setNewAccountRole(e.target.value)}>
                         <option value="member">member</option>
                         <option value="leader">leader</option>
-                        <option value="admin">admin</option>
+                        {isAdmin && <option value="admin">admin</option>}
                       </select>
                     </Field>
                   )}

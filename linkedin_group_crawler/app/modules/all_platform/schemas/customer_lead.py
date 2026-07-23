@@ -90,6 +90,7 @@ class CustomerLeadCreate(BaseModel):
     customer_since: Optional[datetime] = None
     service_package: Optional[str] = None
     lifetime_value: Optional[float] = 0
+    billing_type: str = "one_time"  # migration 052: don 1 lan / theo thang / theo nam
     contract_signed_at: Optional[datetime] = None
     contract_status: str = "active"
 
@@ -163,6 +164,7 @@ class CustomerLeadUpdate(BaseModel):
     customer_since: Optional[datetime] = None
     service_package: Optional[str] = None
     lifetime_value: Optional[float] = None
+    billing_type: Optional[str] = None
     contract_signed_at: Optional[datetime] = None
     contract_status: Optional[str] = None
 
@@ -239,6 +241,7 @@ class CustomerLeadResponse(BaseModel):
     customer_since: Optional[datetime] = None
     service_package: Optional[str] = None
     lifetime_value: Optional[float] = 0
+    billing_type: str = "one_time"
     contract_signed_at: Optional[datetime] = None
     contract_status: str = "active"
     warranty_expires_at: Optional[datetime] = None

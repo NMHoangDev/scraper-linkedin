@@ -1,4 +1,4 @@
-import type { ContractStatus, Deal, DealStage, PaymentStatus } from '../types';
+import type { BillingType, ContractStatus, Deal, DealStage, PaymentStatus } from '../types';
 import type { AppUser } from '@/types/unified.types';
 
 /** Mirror của can_write_deal() bên backend (customer_lead_service.py) — chỉ
@@ -233,6 +233,16 @@ export const PAYMENT_STATUS_OPTIONS: Array<{ value: PaymentStatus; label: string
   { value: 'da_thanh_toan', label: 'Đã thanh toán' },
   { value: 'qua_han', label: 'Quá hạn' },
 ];
+
+export const BILLING_TYPE_OPTIONS: Array<{ value: BillingType; label: string }> = [
+  { value: 'one_time', label: 'Một lần' },
+  { value: 'monthly', label: 'Theo tháng' },
+  { value: 'yearly', label: 'Theo năm' },
+];
+
+export function getBillingTypeLabel(value?: BillingType | string) {
+  return BILLING_TYPE_OPTIONS.find(o => o.value === value)?.label || 'Một lần';
+}
 
 export const STAGE_CONTRACT_STATUS: Record<DealStage, ContractStatus> = {
   new_lead: 'moi_tiep_nhan',

@@ -1,3 +1,5 @@
+export type BillingType = 'one_time' | 'monthly' | 'yearly';
+
 export type DealStage =
   | 'new_lead'
   | 'contacted'
@@ -144,6 +146,8 @@ export interface Deal {
   decisionMaker?: string;
   estimatedBudget?: number;
   lifetimeValue?: number;
+  /** Loại thanh toán: một lần / theo tháng / theo năm (migration 052). */
+  billingType?: BillingType;
   followUpDate?: string;
   contract: ContractInfo;
   outcome: OutcomeInfo;

@@ -13,6 +13,7 @@ import {
   DEAL_STAGES,
   INDUSTRY_OPTIONS,
   PAYMENT_STATUS_OPTIONS,
+  BILLING_TYPE_OPTIONS,
   SERVICE_PACKAGE_OPTIONS,
   SOURCE_OPTIONS,
   parseMoney,
@@ -52,6 +53,7 @@ export type DealFormState = {
   paymentStatus: string;
   paymentDueDate: string;
   lifetimeValue: string;
+  billingType: string;
   contractSignedAt: string;
   warrantyExpiresAt: string;
   customerSince: string;
@@ -98,6 +100,7 @@ export function emptyDealForm(): DealFormState {
     paymentStatus: 'chua_thanh_toan',
     paymentDueDate: '',
     lifetimeValue: '',
+    billingType: 'one_time',
     contractSignedAt: '',
     warrantyExpiresAt: '',
     customerSince: '',
@@ -154,6 +157,7 @@ export function dealFormFromDeal(deal: Deal): DealFormState {
     paymentStatus: deal.contract.paymentStatus || 'chua_thanh_toan',
     paymentDueDate: toDateInput(deal.contract.paymentDueDate),
     lifetimeValue: String(deal.lifetimeValue || ''),
+    billingType: deal.billingType || 'one_time',
     contractSignedAt: toDateInput(deal.contract.signedAt),
     warrantyExpiresAt: toDateInput(deal.contract.warrantyExpiresAt),
     customerSince: toDateInput(deal.contract.customerSince),
@@ -209,6 +213,7 @@ export function buildDealPayload(form: DealFormState, _agents: CrmUserOption[] =
     decisionMaker: form.decisionMaker.trim(),
     estimatedBudget: parseMoney(form.estimatedBudget),
     lifetimeValue: parseMoney(form.lifetimeValue),
+    billingType: form.billingType as Deal['billingType'],
     followUpDate: form.followUpDate ? new Date(form.followUpDate).toISOString() : '',
     quote,
     contract: {
@@ -466,7 +471,20 @@ export function DealFormFields({
           <Field label="Ngày cần thanh toán">
             <input value={form.paymentDueDate} onChange={event => setValue('paymentDueDate', event.target.value)} type="date" />
           </Field>
-          <Field label="Giá trị hợp đồng / LTV (VND)">
+          <Field label="Loại thanh toán">
+            <select value={form.billingType} onChange={event => setValue('billingType', event.target.value)}>
+              {BILLING_TYPE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </Field>
+          <Field
+            label={
+              form.billingType === 'monthly'
+                ? 'Giá trị hợp đồng / LTV (VND mỗi tháng)'
+                : form.billingType === 'yearly'
+                ? 'Giá trị hợp đồng / LTV (VND mỗi năm)'
+                : 'Giá trị hợp đồng / LTV (VND)'
+            }
+          >
             <input value={form.lifetimeValue} onChange={event => setValue('lifetimeValue', event.target.value)} inputMode="decimal" placeholder="0" />
           </Field>
           <Field label="Ngày ký hợp đồng">

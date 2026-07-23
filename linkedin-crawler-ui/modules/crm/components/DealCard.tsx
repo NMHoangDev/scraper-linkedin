@@ -22,6 +22,7 @@ import {
   getContractStatusText,
   getPackageText,
   getServicePackageText,
+  getBillingTypeLabel,
 } from '../constants/crmConfig';
 import type { Deal } from '../types';
 import { getTeamTypeLabel } from '@/lib/teamTypes';
@@ -218,34 +219,36 @@ export function DealCard({ deal, terminal, onClick, onCreateQuote, onDragStart }
         </div>
       ) : null}
 
-      {contractLabel || contractUrl || deal.contract.status ? (
-        <div className="crm-deal-meta-lines">
-          {contractLabel || contractUrl ? (
-            <button
-              type="button"
-              className="crm-deal-meta-link crm-deal-contract-link"
-              title={contractUrl ? `Mở link ${contractLabel}` : 'Deal này chưa có link HĐ/BG.'}
-              onClick={event => {
-                event.stopPropagation();
-                if (!contractUrl) {
-                  window.alert('Deal này chưa có link HĐ/BG.');
-                  return;
-                }
-                window.open(contractUrl, '_blank', 'noopener,noreferrer');
-              }}
-            >
-              <FileText className="crm-line-icon" />
-              <span>HĐ/BG: {contractLabel}</span>
-            </button>
-          ) : null}
-          {deal.contract.status ? (
-            <div className="crm-deal-meta-status">
-              <FileText className="crm-line-icon" />
-              <span>Hợp đồng: {getContractStatusText(deal.contract.status)}</span>
-            </div>
-          ) : null}
+      <div className="crm-deal-meta-lines">
+        {contractLabel || contractUrl ? (
+          <button
+            type="button"
+            className="crm-deal-meta-link crm-deal-contract-link"
+            title={contractUrl ? `Mở link ${contractLabel}` : 'Deal này chưa có link HĐ/BG.'}
+            onClick={event => {
+              event.stopPropagation();
+              if (!contractUrl) {
+                window.alert('Deal này chưa có link HĐ/BG.');
+                return;
+              }
+              window.open(contractUrl, '_blank', 'noopener,noreferrer');
+            }}
+          >
+            <FileText className="crm-line-icon" />
+            <span>HĐ/BG: {contractLabel}</span>
+          </button>
+        ) : null}
+        {deal.contract.status ? (
+          <div className="crm-deal-meta-status">
+            <FileText className="crm-line-icon" />
+            <span>Hợp đồng: {getContractStatusText(deal.contract.status)}</span>
+          </div>
+        ) : null}
+        <div className="crm-deal-meta-status">
+          <Wallet className="crm-line-icon" />
+          <span>Thanh toán: {getBillingTypeLabel(deal.billingType)}</span>
         </div>
-      ) : null}
+      </div>
 
       {value > 0 ? (
         <div className="crm-budget-row">
