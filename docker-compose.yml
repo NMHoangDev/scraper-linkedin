@@ -32,6 +32,8 @@ services:
     restart: unless-stopped
     env_file:
       - ./linkedin_group_crawler/.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       TZ: Asia/Ho_Chi_Minh
       DISABLE_ZCA_LISTENERS: "0"

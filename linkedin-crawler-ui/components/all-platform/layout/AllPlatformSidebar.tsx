@@ -296,6 +296,14 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
     label: "Trang chủ",
     matchStartsWith: [dashboardHref],
   };
+  const phoneBridgeEntry: NavLeafItem = {
+    type: "item",
+    id: "admin-phone-bridge",
+    href: "/all-platform/admin/phone-bridge",
+    icon: "settings_input_component",
+    label: "Phone Bridge",
+    matchStartsWith: ["/all-platform/admin/phone-bridge"],
+  };
   const contentGroup: SidebarEntry = {
     type: "group",
     id: "content",
@@ -323,6 +331,7 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
   if (workspaceTab === "personal") {
     return [
       homeEntry,
+      ...(isAdmin ? [phoneBridgeEntry] : []),
       contentGroup,
       channelGroup,
       {
@@ -346,6 +355,7 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
 
   return [
     homeEntry,
+    ...(isAdmin ? [phoneBridgeEntry] : []),
     {
       type: "group",
       id: "management",
