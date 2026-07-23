@@ -52,7 +52,7 @@ BASE_COLUMNS = (
     "leaded_by, conv_id, source_platform, is_assigned, sdr_id, status, activity_status, "
     "deal_stage, prev_stage, follow_up_date, decision_maker, estimated_budget, stage_entered_at, "
     "last_attachment_url, last_attachment_name, closed_reason, "
-    "customer_since, service_package, lifetime_value, contract_signed_at, contract_status, "
+    "customer_since, service_package, lifetime_value, billing_type, contract_signed_at, contract_status, "
     "warranty_expires_at, care_note, last_care_at, "
     "payment_due_date, payment_status, "
     "tags, has_budget, note, reject_reason, reject_reason_type, review_result, "

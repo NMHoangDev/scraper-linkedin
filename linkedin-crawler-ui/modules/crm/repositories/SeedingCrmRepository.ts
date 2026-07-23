@@ -65,6 +65,7 @@ type CustomerLeadRow = {
   customer_since?: string | null;
   service_package?: string | null;
   lifetime_value?: number | string | null;
+  billing_type?: string | null;
   contract_signed_at?: string | null;
   contract_status?: string | null;
   warranty_expires_at?: string | null;
@@ -369,6 +370,7 @@ function rowToDeal(row: CustomerLeadRow, history: StageHistory[] = []): Deal {
     decisionMaker: asText(row.decision_maker),
     estimatedBudget,
     lifetimeValue,
+    billingType: (row.billing_type as Deal['billingType']) || 'one_time',
     followUpDate: asText(row.follow_up_date),
     contract: {
       status: contractStatusFromRow(row, stage),
@@ -442,6 +444,7 @@ function toCustomerPayload(input: CreateDealInput | UpdateDealInput): Partial<Cu
   if ('decisionMaker' in input) payload.decision_maker = input.decisionMaker;
   if ('estimatedBudget' in input) payload.estimated_budget = input.estimatedBudget;
   if ('lifetimeValue' in input) payload.lifetime_value = input.lifetimeValue;
+  if ('billingType' in input) payload.billing_type = input.billingType;
   if ('followUpDate' in input) payload.follow_up_date = cleanDateValue(input.followUpDate);
   if ('note' in input) payload.note = input.note;
   if ('pauseReason' in input) payload.pause_reason = input.pauseReason;
