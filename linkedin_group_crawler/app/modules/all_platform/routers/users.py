@@ -75,9 +75,11 @@ def users_update_role(payload: dict, _admin: dict = Depends(require_admin)) -> B
 
 
 @router.post("/set-active")
-def users_set_active(payload: dict, _admin: dict = Depends(require_admin)) -> BaseResponse:
-    """Admin-only: kích hoạt/vô hiệu hóa 1 tài khoản (khoá đăng nhập ngay,
-    is_active được check lại mỗi request qua get_current_user)."""
+def users_set_active(payload: dict, _admin: dict = Depends(require_admin_or_leader)) -> BaseResponse:
+    """Admin/leader: kích hoạt/vô hiệu hóa 1 tài khoản (khoá đăng nhập ngay,
+    is_active được check lại mỗi request qua get_current_user). Nới cho leader
+    theo quyết định 2026-07-23 khi gộp trang Quản lý thành viên + Quản lý
+    người dùng thành 1 bảng duy nhất."""
     try:
         email = payload.get("email")
         is_active = payload.get("is_active")

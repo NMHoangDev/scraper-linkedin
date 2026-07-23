@@ -106,17 +106,88 @@ export function MemberManagementContent() {
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  async function loadAppUsers() {
+    const res = await usersService.getAllProfiles();
+    setAppUsers(res.data || []);
+  }
+
   // Load skills + app_users 1 lần khi mount (không phụ thuộc filter).
   useEffect(() => {
     void (async () => {
       const res = await allPlatformMembersService.getSkills();
       setSkills(res.data || []);
     })();
-    void (async () => {
-      const res = await usersService.getAllProfiles();
-      setAppUsers(res.data || []);
-    })();
+    void loadAppUsers();
   }, []);
+
+  const appUsersById = useMemo(() => {
+    const map = new Map<string, AppUserProfile>();
+    for (const u of appUsers) map.set(u.id, u);
+    return map;
+  }, [appUsers]);
+
+  // Gộp trang "Quản lý người dùng" vào đây theo quyết định 2026-07-23: 1 bảng
+  // 141 thành viên duy nhất, gán email = tự tạo + liên kết tài khoản, tắt
+  // Trạng thái = is_active=false (giữ tài khoản, chỉ khoá đăng nhập, không
+  // xoá liên kết). Admin và leader đều thao tác được (yêu cầu rõ, khác
+  // /users/set-active cũ vốn chỉ admin).
+  const [pendingEmailByMember, setPendingEmailByMember] = useState<Record<string, string>>({});
+  const [assigningMemberId, setAssigningMemberId] = useState<string | null>(null);
+  const [assignError, setAssignError] = useState<Record<string, string>>({});
+  const [savingUserId, setSavingUserId] = useState<string | null>(null);
+
+  async function handleAssignEmail(member: MemberProfile) {
+    const email = (pendingEmailByMember[member.id] || "").trim();
+    if (!email) {
+      setAssignError(prev => ({ ...prev, [member.id]: "Nhập email trước." }));
+      return;
+    }
+    setAssignError(prev => ({ ...prev, [member.id]: "" }));
+    setAssigningMemberId(member.id);
+    try {
+      const res = await usersService.createAccount({ email, name: member.display_name, role: "member" });
+      if (!res.success || !res.data) throw new Error(res.message || "Không tạo được tài khoản");
+      const account = res.data as AppUserProfile;
+      const linkRes = await allPlatformMembersService.update({ id: member.id, linked_user_id: account.id });
+      if (!linkRes.success) throw new Error(linkRes.message || "Tạo tài khoản thành công nhưng liên kết thất bại");
+      setPendingEmailByMember(prev => ({ ...prev, [member.id]: "" }));
+      await Promise.all([loadAppUsers(), loadMembers()]);
+    } catch (err) {
+      setAssignError(prev => ({ ...prev, [member.id]: err instanceof Error ? err.message : "Lỗi khi gán email" }));
+    } finally {
+      setAssigningMemberId(null);
+    }
+  }
+
+  async function handleRowRoleChange(account: AppUserProfile, role: string) {
+    setSavingUserId(account.id);
+    try {
+      const res = await usersService.updateRole(account.email, role);
+      if (!res.success) throw new Error(res.message || "Không đổi được role");
+      await loadAppUsers();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Không đổi được role");
+    } finally {
+      setSavingUserId(null);
+    }
+  }
+
+  async function handleRowToggleActive(account: AppUserProfile) {
+    const nextActive = !(account.is_active !== false);
+    if (!nextActive && !confirm(`Vô hiệu hóa tài khoản "${account.email}"? Người này sẽ bị đăng xuất và không đăng nhập lại được.`)) {
+      return;
+    }
+    setSavingUserId(account.id);
+    try {
+      const res = await usersService.setActive(account.email, nextActive);
+      if (!res.success) throw new Error(res.message || "Không cập nhật được trạng thái");
+      await loadAppUsers();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Không cập nhật được trạng thái");
+    } finally {
+      setSavingUserId(null);
+    }
+  }
 
   const teamOptions = useMemo(
     () => Array.from(new Set(members.map(m => m.team).filter(Boolean))) as string[],
@@ -354,52 +425,108 @@ export function MemberManagementContent() {
         </div>
 
         <div className="overflow-x-auto overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm">
-          <table className="w-full min-w-[900px] border-collapse text-left text-xs">
+          <table className="w-full min-w-[1180px] border-collapse text-left text-xs">
             <thead className="bg-surface-container-low border-b border-outline-variant text-[10px] font-bold text-on-surface-variant uppercase">
               <tr>
                 <th className="py-3 px-4">Display Name</th>
                 <th className="py-3 px-4">Họ và tên</th>
                 <th className="py-3 px-4">Team</th>
                 <th className="py-3 px-4">Chức vụ</th>
-                <th className="py-3 px-4">Telegram</th>
-                <th className="py-3 px-4">Tài khoản đăng nhập</th>
+                <th className="py-3 px-4">Email đăng nhập</th>
+                <th className="py-3 px-4">Role</th>
+                <th className="py-3 px-4">Trạng thái</th>
                 <th className="py-3 px-4 text-center">Hành động</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant text-on-surface-variant">
               {loading ? (
-                <tr><td colSpan={7} className="py-12 text-center">Đang tải danh sách thành viên...</td></tr>
+                <tr><td colSpan={8} className="py-12 text-center">Đang tải danh sách thành viên...</td></tr>
               ) : membersError ? (
-                <tr><td colSpan={7} className="py-12 text-center text-red-600 font-medium">{membersError}</td></tr>
+                <tr><td colSpan={8} className="py-12 text-center text-red-600 font-medium">{membersError}</td></tr>
               ) : filteredMembers.length === 0 ? (
-                <tr><td colSpan={7} className="py-12 text-center italic">Chưa có thành viên nào.</td></tr>
+                <tr><td colSpan={8} className="py-12 text-center italic">Chưa có thành viên nào.</td></tr>
               ) : (
-                filteredMembers.map(m => (
-                  <tr key={m.id} className="hover:bg-surface-container-low transition">
-                    <td className="py-3 px-4 font-semibold text-on-surface">{m.display_name}</td>
-                    <td className="py-3 px-4">{m.full_name}</td>
-                    <td className="py-3 px-4">{m.team || "—"}</td>
-                    <td className="py-3 px-4">{m.position || "—"}</td>
-                    <td className="py-3 px-4">{m.telegram_username || "—"}</td>
-                    <td className="py-3 px-4">
-                      {m.linked_user_id ? (
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold border border-emerald-100 bg-emerald-50 text-emerald-700">Đã liên kết</span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold border border-outline-variant bg-surface-container-low text-on-surface-variant">Chưa liên kết</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center justify-center gap-2">
-                        <button type="button" onClick={() => openEditModal(m)} className="p-1.5 hover:bg-surface-container-low rounded-lg transition" title="Sửa">
-                          <MaterialIcon name="edit" className="text-base" />
-                        </button>
-                        <button type="button" onClick={() => setDeleteTarget(m)} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition" title="Xóa">
-                          <MaterialIcon name="delete" className="text-base" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                filteredMembers.map(m => {
+                  const account = m.linked_user_id ? appUsersById.get(m.linked_user_id) : undefined;
+                  return (
+                    <tr key={m.id} className="hover:bg-surface-container-low transition">
+                      <td className="py-3 px-4 font-semibold text-on-surface">{m.display_name}</td>
+                      <td className="py-3 px-4">{m.full_name}</td>
+                      <td className="py-3 px-4">{m.team || "—"}</td>
+                      <td className="py-3 px-4">{m.position || "—"}</td>
+                      <td className="py-3 px-4">
+                        {account ? (
+                          <span className="text-on-surface-variant">{account.email}</span>
+                        ) : (
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="email"
+                                placeholder="name@gmail.com"
+                                value={pendingEmailByMember[m.id] || ""}
+                                onChange={e => setPendingEmailByMember(prev => ({ ...prev, [m.id]: e.target.value }))}
+                                className="w-40 px-2 py-1 bg-surface border border-outline-variant rounded-lg text-xs"
+                              />
+                              <button
+                                type="button"
+                                disabled={assigningMemberId === m.id}
+                                onClick={() => handleAssignEmail(m)}
+                                className="shrink-0 px-2 py-1 bg-primary text-white rounded-lg text-[10px] font-bold border-0 cursor-pointer disabled:opacity-60"
+                              >
+                                {assigningMemberId === m.id ? "..." : "Gán"}
+                              </button>
+                            </div>
+                            {assignError[m.id] && <p className="text-[10px] text-error">{assignError[m.id]}</p>}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3 px-4">
+                        {account ? (
+                          <select
+                            value={account.role || "member"}
+                            disabled={savingUserId === account.id}
+                            onChange={e => handleRowRoleChange(account, e.target.value)}
+                            className="px-2 py-1 bg-surface-container-low border border-outline-variant rounded-lg text-xs cursor-pointer disabled:opacity-60"
+                          >
+                            <option value="member">member</option>
+                            <option value="leader">leader</option>
+                            <option value="admin">admin</option>
+                          </select>
+                        ) : (
+                          <span className="text-on-surface-variant">—</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4">
+                        {account ? (
+                          <button
+                            type="button"
+                            disabled={savingUserId === account.id}
+                            onClick={() => handleRowToggleActive(account)}
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold border-0 cursor-pointer disabled:opacity-60 ${
+                              account.is_active !== false
+                                ? "bg-green-100 text-green-700 hover:bg-green-200"
+                                : "bg-red-100 text-red-700 hover:bg-red-200"
+                            }`}
+                          >
+                            {account.is_active !== false ? "Đang hoạt động" : "Đã vô hiệu hóa"}
+                          </button>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold border border-outline-variant bg-surface-container-low text-on-surface-variant">Chưa có tài khoản</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center justify-center gap-2">
+                          <button type="button" onClick={() => openEditModal(m)} className="p-1.5 hover:bg-surface-container-low rounded-lg transition" title="Sửa">
+                            <MaterialIcon name="edit" className="text-base" />
+                          </button>
+                          <button type="button" onClick={() => setDeleteTarget(m)} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition" title="Xóa">
+                            <MaterialIcon name="delete" className="text-base" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -503,11 +630,18 @@ export function MemberManagementContent() {
                     <p className="text-[11px] text-on-surface-variant">
                       Tạo tài khoản đăng nhập cho <b>{form.email || "(chưa nhập email)"}</b> — chỉ đăng nhập được qua Google, không có mật khẩu.
                     </p>
-                    <select value={newAccountRole} onChange={e => setNewAccountRole(e.target.value)}>
-                      <option value="member">member</option>
-                      <option value="leader">leader</option>
-                      <option value="admin">admin</option>
-                    </select>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-[10px] font-bold uppercase text-on-surface-variant">Role</span>
+                      <select
+                        value={newAccountRole}
+                        onChange={e => setNewAccountRole(e.target.value)}
+                        className="px-3 py-2 bg-surface border border-outline-variant rounded-xl text-sm cursor-pointer"
+                      >
+                        <option value="member">member</option>
+                        <option value="leader">leader</option>
+                        <option value="admin">admin</option>
+                      </select>
+                    </label>
                     {newAccountError && <p className="text-[11px] text-error">{newAccountError}</p>}
                     {newAccountNotice && <p className="text-[11px] text-emerald-600">{newAccountNotice}</p>}
                     <div className="flex gap-2">
