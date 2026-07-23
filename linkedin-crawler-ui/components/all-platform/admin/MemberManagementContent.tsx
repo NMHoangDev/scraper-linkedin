@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MaterialIcon } from "@/components/ui";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { useMembers } from "@/hooks/useMembers";
 import {
@@ -87,15 +88,10 @@ export function MemberManagementContent() {
   const [deleteTarget, setDeleteTarget] = useState<MemberProfile | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Tạo tài khoản đăng nhập mới (chưa từng có trong app_users) ngay trong modal
-  // thành viên — trước đây chỉ chọn được tài khoản CÓ SẴN, không có cách nào
-  // thêm mới từ đây, buộc phải nhờ dev thêm tay khi Google Sign-In báo "Email
-  // chưa được cấp tài khoản".
-  const [creatingAccount, setCreatingAccount] = useState(false);
+  // Role dùng khi Thêm/Lưu thành viên tự tạo tài khoản đăng nhập (email lấy
+  // từ ô Email ở "Thông tin cá nhân" — xem handleSave). Không còn nút "Tạo
+  // tài khoản" riêng: bấm Thêm/Lưu thành viên là đủ.
   const [newAccountRole, setNewAccountRole] = useState("member");
-  const [newAccountError, setNewAccountError] = useState<string | null>(null);
-  const [newAccountNotice, setNewAccountNotice] = useState<string | null>(null);
-  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
 
   const [importOpen, setImportOpen] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -106,17 +102,88 @@ export function MemberManagementContent() {
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  async function loadAppUsers() {
+    const res = await usersService.getAllProfiles();
+    setAppUsers(res.data || []);
+  }
+
   // Load skills + app_users 1 lần khi mount (không phụ thuộc filter).
   useEffect(() => {
     void (async () => {
       const res = await allPlatformMembersService.getSkills();
       setSkills(res.data || []);
     })();
-    void (async () => {
-      const res = await usersService.getAllProfiles();
-      setAppUsers(res.data || []);
-    })();
+    void loadAppUsers();
   }, []);
+
+  const appUsersById = useMemo(() => {
+    const map = new Map<string, AppUserProfile>();
+    for (const u of appUsers) map.set(u.id, u);
+    return map;
+  }, [appUsers]);
+
+  // Gộp trang "Quản lý người dùng" vào đây theo quyết định 2026-07-23: 1 bảng
+  // 141 thành viên duy nhất, gán email = tự tạo + liên kết tài khoản, tắt
+  // Trạng thái = is_active=false (giữ tài khoản, chỉ khoá đăng nhập, không
+  // xoá liên kết). Admin và leader đều thao tác được (yêu cầu rõ, khác
+  // /users/set-active cũ vốn chỉ admin).
+  const [pendingEmailByMember, setPendingEmailByMember] = useState<Record<string, string>>({});
+  const [assigningMemberId, setAssigningMemberId] = useState<string | null>(null);
+  const [assignError, setAssignError] = useState<Record<string, string>>({});
+  const [savingUserId, setSavingUserId] = useState<string | null>(null);
+
+  async function handleAssignEmail(member: MemberProfile) {
+    const email = (pendingEmailByMember[member.id] || "").trim();
+    if (!email) {
+      setAssignError(prev => ({ ...prev, [member.id]: "Nhập email trước." }));
+      return;
+    }
+    setAssignError(prev => ({ ...prev, [member.id]: "" }));
+    setAssigningMemberId(member.id);
+    try {
+      const res = await usersService.createAccount({ email, name: member.display_name, role: "member" });
+      if (!res.success || !res.data) throw new Error(res.message || "Không tạo được tài khoản");
+      const account = res.data as AppUserProfile;
+      const linkRes = await allPlatformMembersService.update({ id: member.id, linked_user_id: account.id });
+      if (!linkRes.success) throw new Error(linkRes.message || "Tạo tài khoản thành công nhưng liên kết thất bại");
+      setPendingEmailByMember(prev => ({ ...prev, [member.id]: "" }));
+      await Promise.all([loadAppUsers(), loadMembers()]);
+    } catch (err) {
+      setAssignError(prev => ({ ...prev, [member.id]: err instanceof Error ? err.message : "Lỗi khi gán email" }));
+    } finally {
+      setAssigningMemberId(null);
+    }
+  }
+
+  async function handleRowRoleChange(account: AppUserProfile, role: string) {
+    setSavingUserId(account.id);
+    try {
+      const res = await usersService.updateRole(account.email, role);
+      if (!res.success) throw new Error(res.message || "Không đổi được role");
+      await loadAppUsers();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Không đổi được role");
+    } finally {
+      setSavingUserId(null);
+    }
+  }
+
+  async function handleRowToggleActive(account: AppUserProfile) {
+    const nextActive = !(account.is_active !== false);
+    if (!nextActive && !confirm(`Vô hiệu hóa tài khoản "${account.email}"? Người này sẽ bị đăng xuất và không đăng nhập lại được.`)) {
+      return;
+    }
+    setSavingUserId(account.id);
+    try {
+      const res = await usersService.setActive(account.email, nextActive);
+      if (!res.success) throw new Error(res.message || "Không cập nhật được trạng thái");
+      await loadAppUsers();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Không cập nhật được trạng thái");
+    } finally {
+      setSavingUserId(null);
+    }
+  }
 
   const teamOptions = useMemo(
     () => Array.from(new Set(members.map(m => m.team).filter(Boolean))) as string[],
@@ -149,12 +216,14 @@ export function MemberManagementContent() {
   function openAddModal() {
     setForm(emptyMemberForm());
     setModalError(null);
+    setNewAccountRole("member");
     setModalMode("add");
   }
 
   function openEditModal(member: MemberProfile) {
     setForm(memberToForm(member));
     setModalError(null);
+    setNewAccountRole("member");
     setModalMode("edit");
   }
 
@@ -167,52 +236,6 @@ export function MemberManagementContent() {
     }));
   }
 
-  async function handleCreateAccount() {
-    setNewAccountError(null);
-    setNewAccountNotice(null);
-    if (!form.email.trim()) {
-      setNewAccountError("Nhập email ở phần \"Thông tin cá nhân\" trước.");
-      return;
-    }
-    setIsCreatingAccount(true);
-    try {
-      const res = await usersService.createAccount({
-        email: form.email.trim(),
-        name: form.full_name.trim() || undefined,
-        role: newAccountRole,
-      });
-      // res.message giờ luôn phản ánh lỗi backend thật (403/401/422...) thay vì
-      // rơi vào thông báo chung — xem fix ở requestJson() trong all-platform.service.ts.
-      if (!res.success || !res.data) {
-        throw new Error(res.message || "Không tạo được tài khoản");
-      }
-      const account = res.data as AppUserProfile & { already_existed?: boolean };
-      setAppUsers(prev => (prev.some(u => u.id === account.id) ? prev : [...prev, account]));
-      setForm(current => ({ ...current, linked_user_id: account.id }));
-
-      // Đang sửa 1 member đã tồn tại (có id) -> lưu liên kết ngay lập tức, không
-      // đợi admin bấm "Lưu thay đổi" ở form chính — tránh trường hợp tạo tài
-      // khoản xong nhưng quên lưu, mất liên kết vừa tạo.
-      if (form.id) {
-        const linkRes = await allPlatformMembersService.update({ id: form.id, linked_user_id: account.id });
-        if (!linkRes.success) {
-          throw new Error(linkRes.message || "Tạo tài khoản thành công nhưng lưu liên kết thất bại.");
-        }
-      }
-
-      setNewAccountNotice(
-        account.already_existed
-          ? `Email này đã có tài khoản (role: ${account.role}) — đã liên kết vào tài khoản đó.`
-          : "Đã tạo tài khoản và liên kết thành công."
-      );
-      setCreatingAccount(false);
-    } catch (err) {
-      setNewAccountError(err instanceof Error ? err.message : "Không tạo được tài khoản");
-    } finally {
-      setIsCreatingAccount(false);
-    }
-  }
-
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!form.display_name.trim() || !form.full_name.trim()) {
@@ -222,6 +245,26 @@ export function MemberManagementContent() {
     setIsSubmitting(true);
     setModalError(null);
     try {
+      // "Thêm thành viên" đồng nghĩa "tạo tài khoản" nếu có nhập email — tự
+      // tạo + liên kết tài khoản đăng nhập ngay trong bước lưu này, không
+      // còn nút "Tạo tài khoản" riêng nữa. Không nhập email thì chỉ lưu hồ
+      // sơ thành viên như bình thường.
+      let linkedUserId = form.linked_user_id || undefined;
+      if (!linkedUserId && form.email.trim()) {
+        const acctRes = await usersService.createAccount({
+          email: form.email.trim(),
+          name: form.full_name.trim() || undefined,
+          role: newAccountRole,
+        });
+        if (!acctRes.success || !acctRes.data) {
+          setModalError(acctRes.message || "Không tạo được tài khoản đăng nhập cho email này.");
+          return;
+        }
+        const account = acctRes.data as AppUserProfile;
+        setAppUsers(prev => (prev.some(u => u.id === account.id) ? prev : [...prev, account]));
+        linkedUserId = account.id;
+      }
+
       const payload = {
         display_name: form.display_name.trim(),
         full_name: form.full_name.trim(),
@@ -234,7 +277,7 @@ export function MemberManagementContent() {
         position: form.position.trim() || undefined,
         department: form.department.trim() || undefined,
         experience_year: Number(form.experience_year) || 0,
-        linked_user_id: form.linked_user_id || undefined,
+        linked_user_id: linkedUserId,
         linked_user_id_2: form.linked_user_id_2 || undefined,
         skill_ids: form.skill_ids,
       };
@@ -354,52 +397,114 @@ export function MemberManagementContent() {
         </div>
 
         <div className="overflow-x-auto overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm">
-          <table className="w-full min-w-[900px] border-collapse text-left text-xs">
+          <table className="w-full min-w-[1180px] border-collapse text-left text-xs">
             <thead className="bg-surface-container-low border-b border-outline-variant text-[10px] font-bold text-on-surface-variant uppercase">
               <tr>
                 <th className="py-3 px-4">Display Name</th>
                 <th className="py-3 px-4">Họ và tên</th>
                 <th className="py-3 px-4">Team</th>
                 <th className="py-3 px-4">Chức vụ</th>
-                <th className="py-3 px-4">Telegram</th>
-                <th className="py-3 px-4">Tài khoản đăng nhập</th>
+                <th className="py-3 px-4">Email đăng nhập</th>
+                <th className="py-3 px-4">Role</th>
+                <th className="py-3 px-4">Trạng thái</th>
                 <th className="py-3 px-4 text-center">Hành động</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant text-on-surface-variant">
               {loading ? (
-                <tr><td colSpan={7} className="py-12 text-center">Đang tải danh sách thành viên...</td></tr>
+                <tr><td colSpan={8} className="py-12 text-center">Đang tải danh sách thành viên...</td></tr>
               ) : membersError ? (
-                <tr><td colSpan={7} className="py-12 text-center text-red-600 font-medium">{membersError}</td></tr>
+                <tr><td colSpan={8} className="py-12 text-center text-red-600 font-medium">{membersError}</td></tr>
               ) : filteredMembers.length === 0 ? (
-                <tr><td colSpan={7} className="py-12 text-center italic">Chưa có thành viên nào.</td></tr>
+                <tr><td colSpan={8} className="py-12 text-center italic">Chưa có thành viên nào.</td></tr>
               ) : (
-                filteredMembers.map(m => (
-                  <tr key={m.id} className="hover:bg-surface-container-low transition">
-                    <td className="py-3 px-4 font-semibold text-on-surface">{m.display_name}</td>
-                    <td className="py-3 px-4">{m.full_name}</td>
-                    <td className="py-3 px-4">{m.team || "—"}</td>
-                    <td className="py-3 px-4">{m.position || "—"}</td>
-                    <td className="py-3 px-4">{m.telegram_username || "—"}</td>
-                    <td className="py-3 px-4">
-                      {m.linked_user_id ? (
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold border border-emerald-100 bg-emerald-50 text-emerald-700">Đã liên kết</span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold border border-outline-variant bg-surface-container-low text-on-surface-variant">Chưa liên kết</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center justify-center gap-2">
-                        <button type="button" onClick={() => openEditModal(m)} className="p-1.5 hover:bg-surface-container-low rounded-lg transition" title="Sửa">
-                          <MaterialIcon name="edit" className="text-base" />
-                        </button>
-                        <button type="button" onClick={() => setDeleteTarget(m)} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition" title="Xóa">
-                          <MaterialIcon name="delete" className="text-base" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                filteredMembers.map(m => {
+                  const account = m.linked_user_id ? appUsersById.get(m.linked_user_id) : undefined;
+                  return (
+                    <tr key={m.id} className="hover:bg-surface-container-low transition">
+                      <td className="py-3 px-4 font-semibold text-on-surface">{m.display_name}</td>
+                      <td className="py-3 px-4">{m.full_name}</td>
+                      <td className="py-3 px-4">{m.team || "—"}</td>
+                      <td className="py-3 px-4">{m.position || "—"}</td>
+                      <td className="py-3 px-4">
+                        {account ? (
+                          <span className="text-on-surface-variant">{account.email}</span>
+                        ) : (
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="email"
+                                placeholder="name@gmail.com"
+                                value={pendingEmailByMember[m.id] || ""}
+                                onChange={e => setPendingEmailByMember(prev => ({ ...prev, [m.id]: e.target.value }))}
+                                className="w-40 px-2 py-1 bg-surface border border-outline-variant rounded-lg text-xs"
+                              />
+                              <button
+                                type="button"
+                                disabled={assigningMemberId === m.id}
+                                onClick={() => handleAssignEmail(m)}
+                                className="shrink-0 px-2 py-1 bg-primary text-white rounded-lg text-[10px] font-bold border-0 cursor-pointer disabled:opacity-60"
+                              >
+                                {assigningMemberId === m.id ? "..." : "Gán"}
+                              </button>
+                            </div>
+                            {assignError[m.id] && <p className="text-[10px] text-error">{assignError[m.id]}</p>}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3 px-4">
+                        {account ? (
+                          <select
+                            value={account.role || "member"}
+                            disabled={savingUserId === account.id}
+                            onChange={e => handleRowRoleChange(account, e.target.value)}
+                            className="px-2 py-1 bg-surface-container-low border border-outline-variant rounded-lg text-xs cursor-pointer disabled:opacity-60"
+                          >
+                            <option value="member">member</option>
+                            <option value="leader">leader</option>
+                            <option value="admin">admin</option>
+                          </select>
+                        ) : (
+                          <span className="text-on-surface-variant">—</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4">
+                        {account ? (
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                              account.is_active !== false
+                                ? "bg-green-100 text-green-700"
+                                : "bg-red-100 text-red-700"
+                            }`}
+                          >
+                            {account.is_active !== false ? "Đang hoạt động" : "Đã vô hiệu hóa"}
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold border border-outline-variant bg-surface-container-low text-on-surface-variant">Chưa có tài khoản</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center justify-center gap-2">
+                          {account && (
+                            <Switch
+                              checked={account.is_active !== false}
+                              disabled={savingUserId === account.id}
+                              onCheckedChange={() => handleRowToggleActive(account)}
+                              className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-slate-300"
+                              title={account.is_active !== false ? "Bấm để vô hiệu hóa" : "Bấm để kích hoạt lại"}
+                            />
+                          )}
+                          <button type="button" onClick={() => openEditModal(m)} className="p-1.5 hover:bg-surface-container-low rounded-lg transition" title="Sửa">
+                            <MaterialIcon name="edit" className="text-base" />
+                          </button>
+                          <button type="button" onClick={() => setDeleteTarget(m)} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition" title="Xóa">
+                            <MaterialIcon name="delete" className="text-base" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -448,6 +553,15 @@ export function MemberManagementContent() {
                       <option value="other">Khác</option>
                     </select>
                   </Field>
+                  {!form.linked_user_id && (
+                    <Field label="Role" hint="tài khoản đăng nhập sẽ tạo">
+                      <select value={newAccountRole} onChange={e => setNewAccountRole(e.target.value)}>
+                        <option value="member">member</option>
+                        <option value="leader">leader</option>
+                        <option value="admin">admin</option>
+                      </select>
+                    </Field>
+                  )}
                 </div>
               </section>
 
@@ -476,58 +590,32 @@ export function MemberManagementContent() {
                       ))}
                     </select>
                   </Field>
-                  <Field label="Liên kết tài khoản đăng nhập (phụ)" hint="tùy chọn — dùng khi 1 người có 2 email">
+                  <Field label="Liên kết tài khoản đăng nhập (phụ)" hint="tùy chọn">
                     <select value={form.linked_user_id_2} onChange={e => setForm({ ...form, linked_user_id_2: e.target.value })}>
                       <option value="">-- Chưa liên kết --</option>
                       {appUsers.map(u => (
                         <option key={u.id} value={u.id}>{u.name || u.email} ({u.email})</option>
                       ))}
                     </select>
+                    {/* Hint dài để dưới select thay vì nhét vô label — nhét
+                     * vô label làm label 2 dòng, lệch hàng với ô bên cạnh. */}
+                    <p className="text-[10px] text-on-surface-variant font-normal normal-case mt-1">
+                      Dùng khi 1 người có 2 email
+                    </p>
                   </Field>
                 </div>
 
-                {/* Đặt ngoài grid 2 cột phía trên — để 2 ô "Liên kết tài khoản"
-                 * chính/phụ luôn cùng chiều cao, không bị lệch nhau khi khối
-                 * tạo tài khoản này mở rộng ra (trước đây nằm lồng trong ô
-                 * chính, làm 2 cột cao thấp không đều). */}
-                {!creatingAccount ? (
-                  <button
-                    type="button"
-                    onClick={() => { setCreatingAccount(true); setNewAccountError(null); setNewAccountNotice(null); }}
-                    className="text-[11px] text-primary hover:underline bg-transparent border-0 p-0 cursor-pointer text-left"
-                  >
-                    + Chưa có tài khoản? Tạo mới từ email ở trên (để đăng nhập Google)
-                  </button>
-                ) : (
-                  <div className="flex flex-col gap-1.5 rounded-lg border border-outline-variant bg-surface-container-low p-2">
-                    <p className="text-[11px] text-on-surface-variant">
-                      Tạo tài khoản đăng nhập cho <b>{form.email || "(chưa nhập email)"}</b> — chỉ đăng nhập được qua Google, không có mật khẩu.
-                    </p>
-                    <select value={newAccountRole} onChange={e => setNewAccountRole(e.target.value)}>
-                      <option value="member">member</option>
-                      <option value="leader">leader</option>
-                      <option value="admin">admin</option>
-                    </select>
-                    {newAccountError && <p className="text-[11px] text-error">{newAccountError}</p>}
-                    {newAccountNotice && <p className="text-[11px] text-emerald-600">{newAccountNotice}</p>}
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        disabled={isCreatingAccount}
-                        onClick={handleCreateAccount}
-                        className="text-[11px] font-semibold text-white bg-primary rounded px-2 py-1 border-0 cursor-pointer disabled:opacity-60"
-                      >
-                        {isCreatingAccount ? "Đang tạo..." : "Tạo tài khoản"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCreatingAccount(false)}
-                        className="text-[11px] text-on-surface-variant bg-transparent border-0 cursor-pointer"
-                      >
-                        Huỷ
-                      </button>
-                    </div>
-                  </div>
+                {/* Không còn nút "Tạo tài khoản" riêng — bấm Thêm/Lưu thành
+                 * viên ở cuối form sẽ tự tạo + liên kết tài khoản đăng nhập
+                 * luôn nếu Email ở trên có nhập, dùng Role chọn ở khối "Thông
+                 * tin cá nhân". Để trống Email thì chỉ lưu hồ sơ, không tạo
+                 * tài khoản gì cả. */}
+                {!form.linked_user_id && (
+                  <p className="text-[11px] text-on-surface-variant italic">
+                    {form.email.trim()
+                      ? "Sẽ tự tạo tài khoản đăng nhập (Google) cho email trên khi lưu."
+                      : "Chưa nhập email — sẽ chỉ lưu hồ sơ, không tạo tài khoản đăng nhập."}
+                  </p>
                 )}
               </section>
 
