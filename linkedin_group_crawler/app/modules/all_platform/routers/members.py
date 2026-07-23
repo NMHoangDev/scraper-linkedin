@@ -47,7 +47,7 @@ def members_get_all(
 
 
 @router.post("/add")
-def members_add(payload: MemberCreateRequest, _admin=Depends(require_admin)) -> BaseResponse:
+def members_add(payload: MemberCreateRequest, _admin=Depends(require_admin_or_leader)) -> BaseResponse:
     try:
         data = create_member(payload.model_dump(exclude_none=False))
         return BaseResponse(success=True, message="Đã thêm thành viên", data=data)
@@ -69,7 +69,7 @@ def members_update(payload: MemberUpdateRequest, _admin=Depends(require_admin_or
 
 
 @router.delete("/delete")
-def members_delete(id: str = Query(...), _admin=Depends(require_admin)) -> BaseResponse:
+def members_delete(id: str = Query(...), _admin=Depends(require_admin_or_leader)) -> BaseResponse:
     try:
         data = delete_member(id)
         return BaseResponse(success=True, message="Đã xóa thành viên", data=data)

@@ -6,7 +6,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends, Query
 
-from app.modules.all_platform.auth_deps import get_current_user, require_admin
+from app.modules.all_platform.auth_deps import get_current_user, require_admin, require_admin_or_leader
 from app.modules.all_platform.schemas import BaseResponse
 from app.modules.all_platform.services import (
     get_user,
@@ -90,11 +90,14 @@ def users_set_active(payload: dict, _admin: dict = Depends(require_admin)) -> Ba
 
 
 @router.post("/create")
-def users_create(payload: dict, _admin: dict = Depends(require_admin)) -> BaseResponse:
-    """Admin-only: provision a new login account (app_users row) for someone,
+def users_create(payload: dict, caller: dict = Depends(require_admin_or_leader)) -> BaseResponse:
+    """Admin/leader: provision a new login account (app_users row) for someone,
     so they can then sign in with Google using that email. Does not set a
     usable password — Google Sign-In is the only intended login path for
-    accounts created this way."""
+    accounts created this way.
+
+    Leader được tạo bất kỳ role nào, y hệt admin (theo yêu cầu — không giới
+    hạn), khác với /update-role (đổi role tài khoản CÓ SẴN) vẫn chỉ admin."""
     try:
         email = payload.get("email")
         role = payload.get("role") or "member"
