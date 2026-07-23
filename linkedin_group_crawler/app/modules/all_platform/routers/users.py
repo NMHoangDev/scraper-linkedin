@@ -6,7 +6,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends, Query
 
-from app.modules.all_platform.auth_deps import get_current_user, require_admin
+from app.modules.all_platform.auth_deps import get_current_user, require_admin, require_admin_or_leader
 from app.modules.all_platform.schemas import BaseResponse
 from app.modules.all_platform.services import (
     get_user,
@@ -90,17 +90,23 @@ def users_set_active(payload: dict, _admin: dict = Depends(require_admin)) -> Ba
 
 
 @router.post("/create")
-def users_create(payload: dict, _admin: dict = Depends(require_admin)) -> BaseResponse:
-    """Admin-only: provision a new login account (app_users row) for someone,
+def users_create(payload: dict, caller: dict = Depends(require_admin_or_leader)) -> BaseResponse:
+    """Admin/leader: provision a new login account (app_users row) for someone,
     so they can then sign in with Google using that email. Does not set a
     usable password — Google Sign-In is the only intended login path for
-    accounts created this way."""
+    accounts created this way.
+
+    Leader được tạo member/leader tự do, nhưng KHÔNG được tạo role=admin — nếu
+    không sẽ mở đường tự leo thang quyền qua 1 email mới (bypass /update-role,
+    vẫn chỉ admin mới đổi được role tài khoản có sẵn)."""
     try:
         email = payload.get("email")
         role = payload.get("role") or "member"
         name = payload.get("name")
         if not email:
             return BaseResponse(success=False, message="email is required")
+        if role == "admin" and str(caller.get("role") or "").strip().lower() != "admin":
+            return BaseResponse(success=False, message="Chỉ admin mới tạo được tài khoản role admin")
         data = admin_create_user(email=email, name=name, role=role)
         message = "Email đã có tài khoản, đã liên kết vào tài khoản hiện có" if data.get("already_existed") else "Đã tạo tài khoản"
         return BaseResponse(success=True, message=message, data=data)
