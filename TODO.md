@@ -1,32 +1,44 @@
-# TODO - AI LỌC NGẦM BÀI VIẾT KHÔNG LIÊN QUAN (POST FEED)
+# TODO: Hoàn thiện UI Seeding Accounts ✅
 
-## Phase 1: Prompt + classifier hardening (no delete)
-- [ ] Update `app/modules/all_platform/services/post_relevance_ai_service.py`
-  - [ ] Enforce strict output JSON schema: `{label, confidence, reason}`
-  - [ ] Input payload must be `{content, group_industry, group_intent}`
-  - [ ] Add confidence rule: if `confidence < 0.7` => force `seeding_ok`
-  - [ ] Fail-safe: timeout/JSON parse/invalid output => label=`seeding_ok`, confidence=0.0, ai_success=false
-- [ ] Add local prompt test runner script (5 test cases) to verify labels
+## Step 1: Install @radix-ui/react-alert-dialog + create AlertDialog component ✅
+- [x] Install package
+- [x] Create `components/ui/alert-dialog.tsx`
 
-## Phase 2: DRY-RUN classify over DB (log only)
-- [ ] Implement `post_feed_filter_service.py`
-  - [ ] Fetch all candidate `facebook_posts` rows (scoped by member where possible)
-  - [ ] For each post, build AI input using row fields (content + group intent/industry)
-  - [ ] Call AI in batches with delay
-  - [ ] Write classification results into `facebook_posts_deleted_log` (create usage assumes table exists)
-  - [ ] Compute stats + reject ratio > 50% => stop and log CRITICAL
-- [ ] Hook dry-run into extension crawl (`routers/extension_crawl.py`) after saving posts
-  - [ ] Ensure dry-run runs immediately after insert
-  - [ ] Never delete in this phase
+## Step 2: Update StatCard.tsx - Icon góc phải ✅
+- [x] Replace iconText prop with LucideIcon
+- [x] Add proper icon colors per card type
 
-## Phase 3: REAL delete (manual approval)
-- [ ] Add endpoint or env flag to enable real delete only after dry-run approval
-- [ ] Implement real delete using existing `DELETE /unified/posts/facebook` semantics
-  - [ ] Ensure member scoping is respected
-  - [ ] Log deletions fully into the same deleted_log table
+## Step 3: Update se清理ding-accounts.service.ts - Thêm API methods ✅
+- [x] Add createAccount, deleteAccount, triggerRelogin (calls real API, fallback to optimistic toast)
 
-## Phase 4: Verification
-- [ ] Dry-run on real group and review top 10-15 predicted rejects
-- [ ] Enable real delete, verify disappear behavior + logs
-- [ ] Final report with PASS/FAIL evidence for steps 0..3
+## Step 4: Create AddAccountDialog.tsx ✅
+- [x] Dialog form with platform select, name, email/phone, password, notes
+- [x] Submit calls service, refresh list, toast
+- [x] Supports edit mode (pre-fill data)
+
+## Step 5: Create BulkImportDialog.tsx ✅
+- [x] File upload UI with drag-drop area
+- [x] Instructions + placeholder download sample button
+- [x] Toast "Tính năng đang phát triển"
+
+## Step 6: Update SeedingAccountTable.tsx - DropdownMenu + AlertDialog ✅
+- [x] Replace raw "⋯" button with shadcn DropdownMenu + MoreHorizontal icon
+- [x] Menu items: Xem chi tiết, Chỉnh sửa, Đăng nhập lại (offline/warning only), Separator, Xóa
+- [x] Detail modal via AlertDialog showing full account info
+- [x] Delete confirmation via AlertDialog (shadcn)
+- [x] Edit dialog via AddAccountDialog (reused with pre-fill)
+
+## Step 7: Update SeedingAccountsManager.tsx - Wire dialogs ✅
+- [x] Import + render AddAccountDialog, BulkImportDialog
+- [x] onClick handlers for both buttons
+- [x] StatCard updated with proper lucide-react icons + colors
+
+## Step 8: TypeScript check ✅
+- [x] `npx tsc --noEmit --pretty` — no new errors
+
+## Summary
+All 3 requirements completed:
+1. ✅ Icon góc phải StatCard: dùng Users, CheckCircle2, PauseCircle, History, AlertTriangle
+2. ✅ "Nhập hàng loạt" / "+ Thêm tài khoản" → mở form modal (Dialog shadcn)
+3. ✅ Nút "..." → DropdownMenu với các mục đầy đủ + AlertDialog xác nhận xóa
 

@@ -79,7 +79,6 @@ export type MaterialSymbolName =
   | "lock_reset"
   | "calendar_today"
   | "key"
-  | "check_circle"
   | "check"
   | "arrow_forward"
   | "arrow_downward"
@@ -116,7 +115,8 @@ export type MaterialSymbolName =
   | "cookie"
   | "warning_amber"
   | "navigate_next"
-  | "keyboard_arrow_down";
+  | "keyboard_arrow_down"
+  | "badge";
 
 export interface MaterialIconProps {
   name: MaterialSymbolName;
@@ -146,3 +146,4 @@ export function MaterialIcon({
     </span>
   );
 }
+

@@ -17,6 +17,7 @@ import {
   Activity,
   Settings,
   ShieldCheck,
+  BadgeCheck,
   type LucideIcon,
 } from "lucide-react";
 import type { MaterialSymbolName } from "@/components/ui";
@@ -44,6 +45,8 @@ const MAP: Partial<Record<MaterialSymbolName, LucideIcon>> = {
   monitoring: Activity,
   settings: Settings,
   verified_user: ShieldCheck,
+  badge: BadgeCheck,
+  chat_bubble: MessageCircle,
 };
 
 export function materialToLucideIcon(name: MaterialSymbolName): LucideIcon {

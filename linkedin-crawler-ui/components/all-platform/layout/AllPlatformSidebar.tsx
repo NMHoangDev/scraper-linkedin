@@ -185,6 +185,15 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
   const resourceItems: NavLeafItem[] = [
     {
       type: "item",
+      id: "seeding-accounts",
+      href: "/all-platform/seeding-accounts",
+      icon: "badge",
+      label: "Quản lý TK Seeding",
+      matchStartsWith: ["/all-platform/seeding-accounts"],
+      badge: 12,
+    },
+    {
+      type: "item",
       id: "vps",
       href: "/all-platform/quan-ly-vps",
       icon: "database",

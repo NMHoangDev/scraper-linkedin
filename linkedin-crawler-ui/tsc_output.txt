@@ -1,0 +1,18 @@
+[96m.next/dev/types/routes.d.ts[0m:[93m74[0m:[93m6[0m - [91merror[0m[90m TS1005: [0m';' expected.
+
+[7m74[0m   "/": never
+[7m  [0m [91m     ~[0m
+
+[96m.next/dev/types/routes.d.ts[0m:[93m75[0m:[93m18[0m - [91merror[0m[90m TS1005: [0m';' expected.
+
+[7m75[0m   "/all-platform": never
+[7m  [0m [91m                 ~[0m
+
+[96m.next/dev/types/routes.d.ts[0m:[93m76[0m:[93m1[0m - [91merror[0m[90m TS1128: [0mDeclaration or statement expected.
+
+[7m76[0m }
+[7m  [0m [91m~[0m
+
+
+Found 3 errors in the same file, starting at: .next/dev/types/routes.d.ts[90m:74[0m
+
