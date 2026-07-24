@@ -40,7 +40,7 @@ from app.modules.all_platform.routers.kpi_reward import router as kpi_reward_rou
 from app.modules.all_platform.routers.scheduled_comments import router as scheduled_comments_router
 from app.modules.all_platform.routers.posts_delete import router as posts_delete_router
 from app.modules.all_platform.routers.internal_engagement import router as internal_engagement_router
-from app.modules.all_platform.phone_bridge import router as phone_bridge_router
+from app.modules.all_platform.phone_bridge.router import router as phone_bridge_router
 
 all_platform_router = APIRouter()
 
