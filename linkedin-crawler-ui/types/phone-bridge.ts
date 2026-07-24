@@ -59,6 +59,7 @@ export interface PhoneBridgeConversation {
   id?: string;
   conversationId?: string;
   conversation_id?: string;
+  conversationKey?: string;
   threadId?: string;
   thread_id?: string;
   name?: string;
@@ -78,6 +79,7 @@ export interface PhoneBridgeConversationsResponse {
   conversations?: PhoneBridgeConversation[];
   items?: PhoneBridgeConversation[];
   messages?: PhoneBridgeMessage[];
+  isChatListScreen?: boolean;
   [key: string]: unknown;
 }
 
@@ -88,6 +90,11 @@ export interface PhoneBridgeActionResponse {
   confirmationToken?: string;
   dryRun?: boolean;
   messages?: PhoneBridgeMessage[];
+  results?: PhoneBridgeConversation[];
+  snapshot?: {
+    messages?: PhoneBridgeMessage[];
+    [key: string]: unknown;
+  };
   [key: string]: unknown;
 }
 

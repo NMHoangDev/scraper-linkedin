@@ -26,6 +26,7 @@ function conversationId(conversation: PhoneBridgeConversation): string {
     conversation.conversation_id ??
     conversation.threadId ??
     conversation.thread_id ??
+    conversation.conversationKey ??
     ""
   );
 }
@@ -57,6 +58,30 @@ function resultSummary(result: PhoneBridgeActionResponse): string {
   return result.message ?? "Dry-run hợp lệ. Kiểm tra rồi xác nhận để gửi thật.";
 }
 
+function messagesFromAction(result: PhoneBridgeActionResponse): PhoneBridgeMessage[] | null {
+  if (Array.isArray(result.messages)) return result.messages;
+  if (result.snapshot && Array.isArray(result.snapshot.messages)) {
+    return result.snapshot.messages;
+  }
+  return null;
+}
+
+function conversationsFromScan(result: PhoneBridgeActionResponse): PhoneBridgeConversation[] {
+  if (!Array.isArray(result.results)) return [];
+  return result.results
+    .filter((conversation) => Boolean(conversationTitle(conversation)))
+    .map((conversation) => {
+      const lastMessage = conversation.messages?.at(-1);
+      return {
+        ...conversation,
+        snippet:
+          conversation.snippet ??
+          conversation.preview ??
+          (lastMessage ? messageText(lastMessage) : undefined),
+      };
+    });
+}
+
 export function PhoneBridgeChatPanel({
   serial,
   platform,
@@ -86,7 +111,14 @@ export function PhoneBridgeChatPanel({
         serial,
         platform,
       );
-      setConversations(response.conversations ?? []);
+      const next = response.conversations ?? [];
+      setConversations((current) =>
+        response.isChatListScreen === false &&
+        next.length === 0 &&
+        current.length > 0
+          ? current
+          : next,
+      );
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -109,8 +141,15 @@ export function PhoneBridgeChatPanel({
     setNotice(null);
     try {
       const result = await phoneBridgeService.scanAll(serial, platform);
-      setNotice(result.message ?? "Đã quét tất cả cuộc trò chuyện.");
-      await loadConversations();
+      const scanned = conversationsFromScan(result);
+      setConversations(scanned);
+      setSelectedId("");
+      setMessages([]);
+      setPreview(null);
+      setNotice(
+        result.message ??
+          `Đã quét ${scanned.length} cuộc trò chuyện. Chọn một cuộc trò chuyện để xem tin nhắn.`,
+      );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Quét thất bại.");
     } finally {
@@ -137,7 +176,8 @@ export function PhoneBridgeChatPanel({
         platform,
         title,
       );
-      if (result.messages) setMessages(result.messages);
+      const openedMessages = messagesFromAction(result);
+      if (openedMessages) setMessages(openedMessages);
       setNotice(result.message ?? `Đã mở ${conversationName(conversation)}.`);
     } catch (cause) {
       setError(
@@ -185,7 +225,6 @@ export function PhoneBridgeChatPanel({
       setNotice(result.message ?? "Đã gửi tin nhắn.");
       setText("");
       setPreview(null);
-      await loadConversations();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Gửi tin nhắn thất bại.");
     } finally {
@@ -300,7 +339,8 @@ export function PhoneBridgeChatPanel({
               const outgoing =
                 message.fromMe ||
                 message.from_me ||
-                message.direction === "outgoing";
+                message.direction === "outgoing" ||
+                message.direction === "outbound";
               return (
                 <div
                   key={message.id || index}
