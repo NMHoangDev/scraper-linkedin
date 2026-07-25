@@ -74,9 +74,6 @@ export function getInitials(name?: string) {
 export function getDashboardHrefForRole(role?: string | null): string {
   if (role === "admin") return "/all-platform/admin/dashboard";
   if (role === "leader") return "/all-platform/leader/dashboard";
-  // Member: trang chủ giờ là Dashboard Pipeline cá nhân (số liệu deal/phase/
-  // trễ hạn...) thay vì post-feed — post-feed vẫn còn, chỉ không còn là
-  // trang chủ mặc định (vẫn truy cập được qua mục "Sản xuất nội dung").
   return "/all-platform/crm/my-dashboard";
 }
 
@@ -218,10 +215,6 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       label: "CRM",
       exactMatch: true,
     },
-    // Phan tich CRM: theo yeu cau Mylife (22/07) chi leader/admin thay "full"
-    // CRM, member chi thay pipeline ban hang (muc "crm" o tren). Mo rong cho
-    // Sale (team_type='sale', migration 049) - duoc nang quyen ngang leader
-    // rieng cho Pipeline + Phan tich CRM.
     ...(isAdmin || isLeader || isSale
       ? ([
           {
@@ -252,11 +245,6 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
     },
   ];
 
-  // Inbox Zalo Admin (/all-platform/zalo-inbox): xem hoi thoai Zalo cua TOAN
-  // BO nhan su + duyet KPI - dung phong voi "Teams"/"quan ly" nen chi hien o
-  // tab Nhom, khong hien o tab Ca nhan (giong dung tinh than comment o duoi:
-  // "Nhom: full bo cong cu quan ly"). Truoc day file nay khong co entry nao
-  // tro toi trang do ca - nguoi dung chi vao duoc qua link truc tiep.
   const channelItemsTeam: NavLeafItem[] = [
     ...channelItems,
     {
@@ -269,7 +257,16 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
     },
   ];
 
+  // Danh sách các mục tài nguyên (bao gồm trang Tổng quan Quản lý tài nguyên ở đầu)
   const resourceItems: NavLeafItem[] = [
+    {
+      type: "item",
+      id: "resources-overview",
+      href: "/all-platform/quan-ly-tai-nguyen",
+      icon: "folder",
+      label: "Quản lý tài nguyên",
+      matchStartsWith: ["/all-platform/quan-ly-tai-nguyen"],
+    },
     {
       type: "item",
       id: "vps",
@@ -317,14 +314,21 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
     label: "Quản lý kênh & CSKH",
     items: channelItemsTeam,
   };
+  const resourceGroup: SidebarEntry = {
+    type: "group",
+    id: "resources",
+    icon: "database",
+    label: "Quản lý tài nguyên",
+    items: resourceItems,
+  };
 
-  // Ca nhan: chi viec hang ngay cua tung nguoi (dang bai, inbox, acc FB cua minh).
-  // Nhom: full bo cong cu quan ly - Teams, thu vien nhom, KPI acc seeding, ha tang VPS.
+  // Chế độ Cá nhân
   if (workspaceTab === "personal") {
     return [
       homeEntry,
       contentGroup,
       channelGroup,
+      resourceGroup,
       {
         type: "item",
         id: "fb-accounts-personal",
@@ -344,6 +348,7 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
     ];
   }
 
+  // Chế độ Nhóm
   return [
     homeEntry,
     {
@@ -355,13 +360,7 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
     },
     contentGroup,
     channelGroupTeam,
-    {
-      type: "group",
-      id: "resources",
-      icon: "database",
-      label: "Quản lý tài nguyên",
-      items: resourceItems,
-    },
+    resourceGroup,
     {
       type: "item",
       id: "settings",
@@ -373,8 +372,7 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
   ];
 }
 
-// Tra ten trang hien tai tu pathname, dung chung 1 nguon du lieu voi menu (entries) -
-// tranh phai duy tri rieng 1 bang ten trang khac de rendera thanh tieu de o dau khung noi dung.
+// Tra ten trang hien tai tu pathname, dung chung 1 nguon du lieu voi menu
 export function findCurrentPageLabel(entries: SidebarEntry[], pathname: string): string | undefined {
   for (const entry of entries) {
     if (entry.type === "item") {
@@ -689,7 +687,6 @@ export function AllPlatformSidebar({
               </li>
             ))}
           </ul>
-
         </nav>
 
         <div className={cn("relative mt-auto px-2 py-3", isCollapsed && "px-1")}>

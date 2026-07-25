@@ -1,0 +1,80 @@
+<!-- Dán toàn bộ code HTML + CSS bạn đã cung cấp ở trên vào đây -->
+
+<!-- Bổ sung đoạn Script xử lý chuyển Tab & Sidebar này vào cuối file HTML -->
+<script>
+  function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    sidebar.classList.toggle('collapsed');
+  }
+
+  function switchTab(tabName, el) {
+    // Active tab button
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+
+    // Show active panel
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    const targetPanel = document.getElementById('panel-' + tabName);
+    if (targetPanel) targetPanel.classList.add('active');
+  }
+
+  function filterPill(el, panelId, type, rowClass) {
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    
+    // Toggle active pill
+    panel.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+
+    // Filter rows
+    const rows = panel.querySelectorAll('.' + rowClass);
+    rows.forEach(row => {
+      if (type === 'all' || row.dataset.type === type) {
+        row.classList.remove('hidden-row');
+      } else {
+        row.classList.add('hidden-row');
+      }
+    });
+  }
+
+  function filterRows(panelId, query) {
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    const q = query.toLowerCase().trim();
+    const rows = panel.querySelectorAll('.dt-row');
+    rows.forEach(row => {
+      const name = (row.dataset.name || '').toLowerCase();
+      if (!q || name.includes(q)) {
+        row.classList.remove('hidden-row');
+      } else {
+        row.classList.add('hidden-row');
+      }
+    });
+  }
+
+  function filterCards(panelId, query) {
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    const q = query.toLowerCase().trim();
+    const cards = panel.querySelectorAll('.res-card');
+    cards.forEach(card => {
+      const name = (card.dataset.name || '').toLowerCase();
+      if (!q || name.includes(q)) {
+        card.classList.remove('hidden-row');
+      } else {
+        card.classList.add('hidden-row');
+      }
+    });
+  }
+
+  // Animation cho thanh Ledger bar khi mới load
+  window.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+      document.querySelectorAll('.ledger-seg').forEach(seg => {
+        seg.style.width = seg.dataset.w;
+      });
+    }, 100);
+  });
+</script>
+</body>
+</html>
