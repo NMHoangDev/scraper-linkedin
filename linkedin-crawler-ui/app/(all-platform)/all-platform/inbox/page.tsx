@@ -1044,6 +1044,10 @@ function InboxPageContent() {
     const requestSeq = ++threadRequestSeqRef.current;
     setArchiveReading(false);
     setOpenConv(conv_id); openConvRef.current = conv_id;
+    // Backend tinh KPI Inbox tu dong (background task) ngay khi tai thread -
+    // khong co tin hieu dong bo ve ket qua, nen refetch inboxKpiWeekDates sau
+    // 1 nhip de UI bat kip dong KPI moi vua duoc ghi (thay vi phai F5 tay).
+    setTimeout(() => { if (openConvRef.current === conv_id) void fetchVerifiedConvIds(); }, 1500);
     const currentConv = convs.find(c => c.conv_id === conv_id);
     openConvListSigRef.current = currentConv ? convListSignature(currentConv) : "";
 

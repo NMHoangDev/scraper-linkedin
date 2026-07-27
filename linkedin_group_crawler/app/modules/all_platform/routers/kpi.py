@@ -499,13 +499,23 @@ def fb_inbox_sync(payload: SyncFbInboxRequest, user: dict = Depends(get_current_
     Nếu is_lead=True -> đánh dấu là lead tiềm năng.
     """
     try:
-        _require_leader_or_admin(user)
-        from app.modules.all_platform.services.fb_inbox_account_service import resolve_id_member
-
         supabase: Client = get_supabase_client()
         leader_email = payload.leader_email.strip().lower()
         member_email = payload.member_email.strip().lower()
         user_id = payload.user_id.strip()
+
+        # Member tu dong/tu tay xac nhan KPI cho CHINH minh (vd bam "La khach"
+        # hoac "Xac nhan Lead" tren hoi thoai cua chinh acc FB minh dang lam) thi
+        # khong can leader/admin duyet - chi khi thao tac HO nguoi khac (leader
+        # xac nhan KPI thay cho 1 member khac) moi bat buoc leader/admin. Truoc
+        # day check nay chan CA truong hop tu xac nhan, khien acc role "user" bam
+        # "La khach" bi 403 im lang (frontend nuot loi) va KPI khong bao gio duoc
+        # ghi - xem CLAUDE.md 2026-07-27.
+        from app.modules.all_platform.services.fb_inbox_account_service import resolve_id_member
+
+        caller_email = str(user.get("email") or "").strip().lower()
+        if caller_email != member_email:
+            _require_leader_or_admin(user)
 
         # Get leader ID
         leader_res = supabase.table("app_users").select("id").eq("email", leader_email).limit(1).execute()

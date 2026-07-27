@@ -14,7 +14,7 @@ import copy
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 from fastapi.concurrency import run_in_threadpool
 from loguru import logger
@@ -550,11 +550,21 @@ async def fb_inbox_archive_thread_get(request: Request, authorization: str | Non
 
 
 @router.post("/inbox/thread")
-async def fb_inbox_thread_load(data: dict, request: Request, authorization: str | None = Header(None)) -> JSONResponse:
+async def fb_inbox_thread_load(
+    data: dict,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    authorization: str | None = Header(None),
+) -> JSONResponse:
     user = _current_user(request, authorization)
     uid = str(data.get("user_id") or "")
     conv_id = str(data.get("conv_id") or "")
     await _require_fb_account_scope(user, uid)
+    # Hoi thoai duoc tai (mo xem / quet ve) -> tinh KPI Inbox tu dong, khong can
+    # nhan vien phai tra loi hay bam "La khach". auto_count_fb_inbox_reply tu no
+    # da idempotent theo conv_id (khoa 30 ngay) nen goi lai nhieu lan la an toan.
+    if uid and conv_id:
+        background_tasks.add_task(auto_count_fb_inbox_reply, uid, conv_id)
     recent_key = f"{uid}:{conv_id}"
     now = time.monotonic()
     cached = _THREAD_LOAD_RECENT.get(recent_key)
@@ -575,22 +585,42 @@ async def fb_inbox_thread_load(data: dict, request: Request, authorization: str 
 
 
 @router.get("/inbox/thread")
-async def fb_inbox_thread_get(request: Request, authorization: str | None = Header(None)) -> JSONResponse:
+async def fb_inbox_thread_get(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    authorization: str | None = Header(None),
+) -> JSONResponse:
     user = _current_user(request, authorization)
     uid = str(request.query_params.get("user_id") or "")
     await _require_fb_account_scope(user, uid)
     params = dict(request.query_params)
+    conv_id = str(params.get("conv_id") or "")
+    if uid and conv_id:
+        background_tasks.add_task(auto_count_fb_inbox_reply, uid, conv_id)
     status, payload = await _markee_json("GET", "/inbox/thread", params=params, cache_ttl=2.0)
     return _json_response(status, payload)
 
 
 @router.post("/inbox/reply")
-async def fb_inbox_reply(data: dict, request: Request, authorization: str | None = Header(None)) -> JSONResponse:
+async def fb_inbox_reply(
+    data: dict,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    authorization: str | None = Header(None),
+) -> JSONResponse:
     user = _current_user(request, authorization)
     uid = str(data.get("user_id") or "")
+    conv_id = str(data.get("conv_id") or "")
     await _require_fb_account_scope(user, uid)
     status, payload = await _markee_json("POST", "/inbox/reply", json_body=data)
     _clear_markee_cache("/inbox/conversations", "/inbox/thread", "/inbox/reply_status")
+    # Nhân viên đã nhắn cho khách qua nút Trả lời trong tool → tự động tính +1
+    # KPI inbox cho hội thoại này (không cần leader xác nhận thủ công). Chạy nền
+    # để không làm chậm phản hồi gửi tin; idempotent theo conv_id (30-day lock
+    # trong auto_count_fb_inbox_reply). Tính năng này từng bị merge "khôi phục
+    # code cũ" (nhánh library, 2026-07-09) vô tình xoá mất — xem CLAUDE.md.
+    if status < 400 and uid and conv_id:
+        background_tasks.add_task(auto_count_fb_inbox_reply, uid, conv_id)
     return _json_response(status, payload)
 
 
