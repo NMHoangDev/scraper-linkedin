@@ -18,6 +18,7 @@ import {
   Settings,
   ShieldCheck,
   ClipboardList,
+  Cable,
   type LucideIcon,
 } from "lucide-react";
 import type { MaterialSymbolName } from "@/components/ui";
@@ -46,6 +47,7 @@ const MAP: Partial<Record<MaterialSymbolName, LucideIcon>> = {
   settings: Settings,
   verified_user: ShieldCheck,
   assignment: ClipboardList,
+  settings_input_component: Cable,
 };
 
 export function materialToLucideIcon(name: MaterialSymbolName): LucideIcon {
