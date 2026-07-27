@@ -575,6 +575,10 @@ function InboxPageContent() {
       setNeedsPinMessage(d.needs_pin_message || "");
       convsErrorStreakRef.current = 0;
       void idbSetConvs(requestAcc, list);
+      // Backend giờ tự tính KPI Inbox cho MỌI hội thoại ngay khi tải danh sách
+      // (không cần mở từng cái) - refetch trạng thái KPI sau 1 nhịp để UI cập
+      // nhật kịp các dòng KPI mới vừa được ghi ở lần load này.
+      setTimeout(() => { void fetchVerifiedConvIds(); }, 1500);
 
       // Background preload: tải trước thread cho 3 hội thoại chưa đọc đầu tiên
       // Không block UI, không hiện spinner — khi user bấm vào sẽ hiện ngay từ cache
@@ -1044,9 +1048,13 @@ function InboxPageContent() {
     const requestSeq = ++threadRequestSeqRef.current;
     setArchiveReading(false);
     setOpenConv(conv_id); openConvRef.current = conv_id;
-    // Backend tinh KPI Inbox tu dong (background task) ngay khi tai thread -
-    // khong co tin hieu dong bo ve ket qua, nen refetch inboxKpiWeekDates sau
-    // 1 nhip de UI bat kip dong KPI moi vua duoc ghi (thay vi phai F5 tay).
+    // Tinh KPI Inbox tu dong ngay khi MO hoi thoai - goi rieng, khong phu thuoc
+    // nhanh cache/scan ben duoi (hoi thoai da doc/da co cache se SKIP goi
+    // /inbox/thread POST, khien auto-count bi bo lo du user vua bam mo that).
+    void fbFetch("/inbox/mark-opened", { method: "POST", headers: fbHeaders(), body: JSON.stringify({ user_id: accountId, conv_id }) }).catch(() => {});
+    // Backend tinh KPI (background task) khong co tin hieu dong bo ve ket qua,
+    // nen refetch inboxKpiWeekDates sau 1 nhip de UI bat kip dong KPI moi vua
+    // duoc ghi (thay vi phai F5 tay).
     setTimeout(() => { if (openConvRef.current === conv_id) void fetchVerifiedConvIds(); }, 1500);
     const currentConv = convs.find(c => c.conv_id === conv_id);
     openConvListSigRef.current = currentConv ? convListSignature(currentConv) : "";
