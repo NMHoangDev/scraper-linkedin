@@ -44,7 +44,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
+          cache: pip
+          cache-dependency-path: linkedin_group_crawler/requirements.txt
 
       - name: Kiem tra cu phap Python (khong can cai full dependency)
         run: |
           python -m py_compile $(find linkedin_group_crawler/app -name "*.py")
+
+      - name: Cai dependency backend
+        run: python -m pip install -r linkedin_group_crawler/requirements.txt
+
+      - name: Test Phone Bridge adapter
+        env:
+          PYTHONPATH: linkedin_group_crawler
+        run: python -m pytest linkedin_group_crawler/tests/test_phone_bridge.py -q
