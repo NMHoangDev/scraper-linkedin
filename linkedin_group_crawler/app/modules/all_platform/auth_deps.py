@@ -48,8 +48,8 @@ def require_admin(request: Request, authorization: str | None = Header(default=N
     """
     resolved = get_current_user(request, authorization)
     role = str(resolved.get("role") or "member").strip().lower()
-    if role != "admin":
-        raise HTTPException(status_code=403, detail="Forbidden: Admin role required")
+    if role not in ("admin", "leader"):
+        raise HTTPException(status_code=403, detail="Forbidden: Admin or leader role required")
     return resolved
 
 
@@ -113,7 +113,7 @@ async def require_admin_ws(websocket, authorization: str | None = None) -> dict[
         return None
 
     role = str(user.get("role") or "member").strip().lower()
-    if role != "admin":
+    if role not in ("admin", "leader"):
         await websocket.close(code=4403)
         return None
 
