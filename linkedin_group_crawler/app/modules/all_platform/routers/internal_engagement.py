@@ -15,6 +15,7 @@ from app.modules.all_platform.schemas import (
     TeamTotalsRequest,
     TeamTrendRequest,
 )
+from app.modules.all_platform.schemas.internal_engagement import AddCustomPostRequest, DebugFetchMetaRequest
 from app.modules.all_platform.services import markeeai_client
 from app.modules.all_platform.services.markeeai_account_links_service import resolve_markeeai_credentials
 from app.modules.all_platform.services.supabase_internal_engagement_kpi_service import (
@@ -25,6 +26,9 @@ from app.modules.all_platform.services.supabase_internal_engagement_kpi_service 
     get_team_daily_trend,
     get_team_totals,
     record_action,
+    add_custom_post,       
+    get_custom_posts_db,
+    debug_fetch_facebook_post_metadata,
 )
 
 router = APIRouter()
@@ -63,6 +67,80 @@ async def list_posts(page: int = 1, page_size: int = 20, email: str | None = Non
     except Exception as e:
         return BaseResponse(success=False, message=str(e))
 
+
+@router.post("/add-custom-post", response_model=BaseResponse)
+@router.post("/social-posts/import", response_model=BaseResponse)
+def create_custom_post(payload: AddCustomPostRequest) -> BaseResponse:
+    """API để Frontend gọi lưu link thủ công (nhận url hoặc link_post)"""
+    try:
+        target_url = payload.url or payload.link_post
+        if not target_url or not target_url.strip():
+            return BaseResponse(success=False, message="Vui lòng cung cấp link bài viết (url hoặc link_post).")
+
+        fan_name = payload.fanpage_name or payload.page_name
+        data = add_custom_post(
+            email_member=payload.email,
+            link_post=target_url.strip(),
+            content=payload.content,
+            fanpage_name=fan_name,
+            media_urls=payload.media_urls,
+            cookie=payload.cookie,
+        )
+        return BaseResponse(success=True, data=data)
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@router.post("/custom-posts/debug-fetch", response_model=BaseResponse)
+def debug_fetch_meta(payload: DebugFetchMetaRequest) -> BaseResponse:
+    """Endpoint dùng cho Postman / Dev test cào OpenGraph metadata từ link Facebook"""
+    try:
+        data = debug_fetch_facebook_post_metadata(payload.url, cookie=payload.cookie)
+        return BaseResponse(success=True, data=data)
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@router.get("/custom-posts", response_model=BaseResponse)
+def list_custom_posts(page: int = 1, page_size: int = 20) -> BaseResponse:
+    """API lấy danh sách bài thủ công và format giống bài Fanpage để FE dễ dùng"""
+    try:
+        result = get_custom_posts_db(page, page_size)
+        
+        items = []
+        for p in result["items"]:
+            post_url = p.get("link_post") or p.get("post_url") or ""
+            fanpage_name = p.get("fanpage_name") or p.get("page_name") or "Markee AI Marketing"
+            content = p.get("content") or "Bài viết Facebook được nhân viên chia sẻ thủ công."
+            media_urls = p.get("media_urls") or p.get("media_url") or []
+            if isinstance(media_urls, str):
+                media_urls = [media_urls]
+            created_at = p.get("published_at") or p.get("created_at")
+
+            items.append({
+                "id": str(p["id"]),
+                "platform": p.get("platform", "facebook"),
+                "fanpage_id": "custom",
+                "fanpage_name": fanpage_name,
+                "page_name": fanpage_name,
+                "facebook_post_id": "",
+                "content": content,
+                "media_urls": media_urls,
+                "media_url": media_urls,
+                "permalink_url": post_url,
+                "post_url": post_url,
+                "link_post": post_url,
+                "status": "published",
+                "created_at": str(created_at) if created_at else None,
+                "published_at": str(created_at) if created_at else None,
+            })
+        
+        return BaseResponse(
+            success=True,
+            data={"items": items, "total": result["total"], "page": page, "page_size": page_size},
+        )
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
 
 @router.post("/my-marks", response_model=BaseResponse)
 def my_marks(payload: MyMarksRequest) -> BaseResponse:

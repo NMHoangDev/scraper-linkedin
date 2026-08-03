@@ -80,3 +80,19 @@ class TeamTrendRequest(TeamScopedRequest):
 class TeamTotalsRequest(TeamScopedRequest):
     date_from: str | None = None
     date_to: str | None = None
+
+
+class AddCustomPostRequest(BaseModel):
+    email: str
+    link_post: str | None = None
+    url: str | None = None
+    fanpage_name: str | None = None
+    page_name: str | None = None
+    content: str | None = None
+    media_urls: List[str] | None = None
+    cookie: str | None = None
+
+
+class DebugFetchMetaRequest(BaseModel):
+    url: str
+    cookie: str | None = None

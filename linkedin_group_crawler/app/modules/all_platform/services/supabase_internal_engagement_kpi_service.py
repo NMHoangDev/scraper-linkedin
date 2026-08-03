@@ -7,10 +7,13 @@ since posts here aren't crawled by us and reactions have no equivalent there.
 
 from __future__ import annotations
 
+import html
+import re
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import httpx
 from supabase import Client
 
 from app.core.supabase_client import get_supabase_client
@@ -392,3 +395,234 @@ def get_team_totals(
 
     result_teams.sort(key=lambda t: (t["stability_score"], t["total"]), reverse=True)
     return {"role": role, "teams": result_teams}
+
+
+def fetch_facebook_post_metadata(url: str, cookie: Optional[str] = None) -> dict[str, Optional[str]]:
+    """Tự động cào OpenGraph metadata (Tiêu đề, nội dung, hình ảnh, trang) từ link Facebook"""
+    debug_res = debug_fetch_facebook_post_metadata(url, cookie=cookie)
+    return debug_res.get("metadata", {})
+
+
+def debug_fetch_facebook_post_metadata(url: str, cookie: Optional[str] = None) -> dict:
+    """Hàm Debug kiểm tra xem Facebook trả về status gì và metadata bóc tách được những gì"""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Sec-Ch-Ua": '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"',
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Upgrade-Insecure-Requests": "1",
+    }
+    if cookie:
+        headers["Cookie"] = cookie.strip()
+
+    metadata: dict[str, Optional[str]] = {
+        "title": None,
+        "description": None,
+        "image": None,
+        "site_name": None,
+    }
+    debug_info = {
+        "target_url": url,
+        "has_cookie": bool(cookie),
+        "http_status": None,
+        "final_url": None,
+        "is_redirected_to_login": False,
+        "error": None,
+        "page_title": None,
+        "metadata": metadata,
+    }
+
+    urls_to_try = [url]
+    # Nếu là link Facebook, thử thêm domain mbasic.facebook.com hoặc m.facebook.com (rất thân thiện với cào HTML)
+    if "facebook.com" in url:
+        mbasic_url = url.replace("www.facebook.com", "mbasic.facebook.com").replace("web.facebook.com", "mbasic.facebook.com").replace("m.facebook.com", "mbasic.facebook.com")
+        if mbasic_url != url:
+            urls_to_try.append(mbasic_url)
+        m_url = url.replace("www.facebook.com", "m.facebook.com").replace("web.facebook.com", "m.facebook.com")
+        if m_url != url and m_url not in urls_to_try:
+            urls_to_try.append(m_url)
+
+    for target in urls_to_try:
+        try:
+            with httpx.Client(follow_redirects=True, timeout=8.0) as client:
+                res = client.get(target, headers=headers)
+                debug_info["http_status"] = res.status_code
+                debug_info["final_url"] = str(res.url)
+                debug_info["is_redirected_to_login"] = "/login" in str(res.url).lower() or "login.php" in str(res.url).lower()
+
+                res_text = res.text
+                if res.status_code != 200 and not debug_info["is_redirected_to_login"]:
+                    continue
+
+                # Extract HTML <title>
+                m_html_title = re.search(r'<title[^>]*>(.*?)</title>', res_text, re.IGNORECASE | re.DOTALL)
+                if m_html_title and not debug_info["page_title"]:
+                    debug_info["page_title"] = html.unescape(m_html_title.group(1).strip())
+
+                # Extract og:title
+                if not metadata["title"]:
+                    m_title = re.search(r'<meta\s+property=["\']og:title["\']\s+content=["\']([^"\']+)["\']', res_text, re.IGNORECASE) or \
+                              re.search(r'<meta\s+content=["\']([^"\']+)["\']\s+property=["\']og:title["\']', res_text, re.IGNORECASE)
+                    if m_title:
+                        metadata["title"] = html.unescape(m_title.group(1))
+
+                # Extract og:description
+                if not metadata["description"]:
+                    m_desc = re.search(r'<meta\s+property=["\']og:description["\']\s+content=["\']([^"\']+)["\']', res_text, re.IGNORECASE) or \
+                             re.search(r'<meta\s+content=["\']([^"\']+)["\']\s+property=["\']og:description["\']', res_text, re.IGNORECASE)
+                    if m_desc:
+                        metadata["description"] = html.unescape(m_desc.group(1))
+
+                # Extract og:image
+                if not metadata["image"]:
+                    m_img = re.search(r'<meta\s+property=["\']og:image["\']\s+content=["\']([^"\']+)["\']', res_text, re.IGNORECASE) or \
+                            re.search(r'<meta\s+content=["\']([^"\']+)["\']\s+property=["\']og:image["\']', res_text, re.IGNORECASE)
+                    if m_img:
+                        metadata["image"] = html.unescape(m_img.group(1))
+
+                # Extract og:site_name
+                if not metadata["site_name"]:
+                    m_site = re.search(r'<meta\s+property=["\']og:site_name["\']\s+content=["\']([^"\']+)["\']', res_text, re.IGNORECASE) or \
+                             re.search(r'<meta\s+content=["\']([^"\']+)["\']\s+property=["\']og:site_name["\']', res_text, re.IGNORECASE)
+                    if m_site:
+                        metadata["site_name"] = html.unescape(m_site.group(1))
+
+                if metadata["title"] or metadata["description"]:
+                    break
+
+        except Exception as e:
+            if not debug_info["error"]:
+                debug_info["error"] = str(e)
+
+    return debug_info
+
+
+def extract_fanpage_name_from_meta_or_url(link_post: str, meta: dict) -> str:
+    """Trích xuất tên trang hoặc nhóm từ title/meta hoặc từ URL Facebook"""
+    title = meta.get("title") or meta.get("page_title")
+    if title:
+        # Ví dụ: "Việc làm CNTT Đà Nẵng - New | 🚀 CMC Global Đà Nẵng..."
+        # Tên trang/nhóm nằm TRƯỚC ký tự '|' (pipe) hoặc '-' đầu tiên
+        if "|" in title:
+            candidate = title.split("|")[0].strip()
+            if candidate and candidate.lower() not in ["facebook", "share"]:
+                return candidate
+        elif " - " in title:
+            candidate = title.split(" - ")[0].strip()
+            if candidate and candidate.lower() not in ["facebook", "share"]:
+                return candidate
+        elif title.strip() and title.strip().lower() not in ["facebook", "share"]:
+            return title.strip()
+
+    site_name = meta.get("site_name")
+    if site_name and site_name.strip().lower() not in ["facebook", "share"]:
+        return site_name.strip()
+
+    # Fallback trích xuất từ URL nếu không có title
+    if "facebook.com/groups/" in link_post:
+        return "Nhóm Facebook"
+
+    invalid_subs = ["permalink.php", "story.php", "watch", "photo.php", "groups", "pfbid", "profile.php", "share", "p"]
+    parts = link_post.replace("https://", "").replace("http://", "").replace("www.", "").split("/")
+    if len(parts) > 1 and parts[0].startswith("facebook.com"):
+        sub = parts[1].split("?")[0].strip()
+        if sub and sub.lower() not in invalid_subs:
+            return sub
+
+    return "Markee AI Marketing"
+
+
+def clean_facebook_content(meta: dict, fanpage_name: str) -> Optional[str]:
+    """Làm sạch nội dung bài viết: loại bỏ tên trang bị lặp ở đầu và '| Facebook' ở cuối"""
+    raw_title = (meta.get("title") or meta.get("page_title") or "").strip()
+    raw_desc = (meta.get("description") or "").strip()
+
+    clean_title = raw_title
+    for suffix in ["| Facebook", "- Facebook", "| Meta", "- Meta"]:
+        if clean_title.endswith(suffix):
+            clean_title = clean_title[:-len(suffix)].strip()
+
+    if fanpage_name and clean_title.startswith(fanpage_name):
+        clean_title = clean_title[len(fanpage_name):].lstrip(" |-:")
+
+    parts = []
+    if clean_title and clean_title.lower() not in ["facebook", "share"]:
+        parts.append(clean_title)
+
+    if raw_desc:
+        if not clean_title or (clean_title not in raw_desc and raw_desc not in clean_title):
+            parts.append(raw_desc)
+        elif len(raw_desc) > len(clean_title):
+            parts = [raw_desc]
+
+    return "\n\n".join(parts) if parts else None
+
+
+def add_custom_post(
+    email_member: str,
+    link_post: str,
+    content: Optional[str] = None,
+    fanpage_name: Optional[str] = None,
+    media_urls: Optional[list] = None,
+    cookie: Optional[str] = None,
+) -> dict:
+    """Lưu link bài viết thủ công vào DB kèm dữ liệu bóc tách/gán mặc định"""
+    supabase: Client = get_supabase_client()
+    user_res = supabase.table("app_users").select("id").eq("email", email_member).execute()
+    user_id = user_res.data[0]["id"] if user_res.data else None
+
+    if not user_id:
+        raise Exception("Không tìm thấy thông tin user.")
+
+    meta = {}
+    if not content or not fanpage_name or not media_urls:
+        meta = fetch_facebook_post_metadata(link_post, cookie=cookie)
+
+    final_fanpage_name = fanpage_name or extract_fanpage_name_from_meta_or_url(link_post, meta)
+    auto_content = clean_facebook_content(meta, final_fanpage_name)
+    final_content = content or auto_content or "Bài viết Facebook được nhân viên chia sẻ thủ công."
+    final_media_urls = media_urls or ([meta["image"]] if meta.get("image") else [])
+
+    data = {
+        "link_post": link_post,
+        "id_member": user_id,
+        "fanpage_name": final_fanpage_name,
+        "content": final_content,
+        "media_urls": final_media_urls,
+        "published_at": datetime.now(timezone.utc).isoformat(),
+    }
+    
+    try:
+        res = supabase.table("internal_engagement_custom_posts").insert(data).execute()
+        item = res.data[0] if res.data else {}
+        item["platform"] = "facebook"
+        return item
+    except Exception as err:
+        logger.error(f"Lỗi khi insert full data vào internal_engagement_custom_posts: {err}")
+        fallback_data = {
+            "link_post": link_post,
+            "id_member": user_id,
+        }
+        res = supabase.table("internal_engagement_custom_posts").insert(fallback_data).execute()
+        item = res.data[0] if res.data else {}
+        item["platform"] = "facebook"
+        return item
+
+def get_custom_posts_db(page: int = 1, page_size: int = 20) -> dict:
+    """Lấy danh sách bài viết thủ công, sắp xếp thời gian mới nhất giảm dần"""
+    supabase: Client = get_supabase_client()
+    start = (page - 1) * page_size
+    end = start + page_size - 1
+    
+    res = supabase.table("internal_engagement_custom_posts").select("*").order("created_at", desc=True).range(start, end).execute()
+    
+    count_res = supabase.table("internal_engagement_custom_posts").select("id", count="exact").execute()
+    total = count_res.count if count_res.count else 0
+    
+    return {"items": res.data or [], "total": total}

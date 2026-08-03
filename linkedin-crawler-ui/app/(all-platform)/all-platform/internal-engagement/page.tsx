@@ -19,6 +19,7 @@ import { useQuickCommentLibrary } from "@/components/all-platform/components/use
 import { TeamPerformancePanel } from "@/components/all-platform/internal-engagement/TeamPerformancePanel";
 
 type TaskStatusTab = "all" | "need" | "received" | "completed";
+type SourceTab = "markee" | "custom";
 
 function fmtRelativeTime(iso?: string): string {
   if (!iso) return "";
@@ -35,11 +36,16 @@ export default function InternalEngagementPage() {
   const { user } = useAppAuth();
   const [toast, setToast] = useState<string | null>(null);
 
+  // Tabs
   const [tab, setTab] = useState<TaskStatusTab>("all");
+  const [sourceTab, setSourceTab] = useState<SourceTab>("markee");
   const [search, setSearch] = useState("");
 
+  // Data
   const [posts, setPosts] = useState<InternalEngagementPost[]>([]);
+  const [customPosts, setCustomPosts] = useState<InternalEngagementPost[]>([]);
   const [marks, setMarks] = useState<Record<string, InternalEngagementMarkStatus>>({});
+  
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -53,12 +59,16 @@ export default function InternalEngagementPage() {
   const [isRunning, setIsRunning] = useState(false);
   const [runProgress, setRunProgress] = useState<string | null>(null);
 
-  // Bulk multi-select — chỉ áp dụng trong trang này.
+  // Bulk multi-select
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkCommentText, setBulkCommentText] = useState("");
 
-  // Team visibility (admin/leader): badge counts under each post + "xem tương tác thành viên" modal.
+  // Link thủ công
+  const [customLink, setCustomLink] = useState("");
+  const [isSubmittingLink, setIsSubmittingLink] = useState(false);
+
+  // Team visibility
   const canSeeTeamInteractions = user?.role === "admin" || user?.role === "leader";
   const [teamCounts, setTeamCounts] = useState<Record<string, InternalEngagementPostTeamCount[]>>({});
   const [interactionsPost, setInteractionsPost] = useState<InternalEngagementPost | null>(null);
@@ -87,32 +97,110 @@ export default function InternalEngagementPage() {
   const loadPosts = async () => {
     setIsLoading(true);
     setLoadError(null);
-    const res = await internalEngagementService.listPosts(1, 50, user?.email);
-    if (!res.success || !res.data) {
-      setLoadError(res.message || "Không tải được danh sách bài viết từ MarkeeAI.");
-      setIsLoading(false);
-      return;
-    }
-    const items = res.data.items || [];
-    setPosts(items);
+    
+    try {
+      // Gọi song song 2 API
+      const [res, customRes] = await Promise.all([
+        internalEngagementService.listPosts(1, 50, user?.email),
+        internalEngagementService.listCustomPosts(1, 50),
+      ]);
 
-    if (user?.email && items.length > 0) {
-      const linkPosts = items.map((p) => p.permalink_url).filter(Boolean) as string[];
-      const marksRes = await internalEngagementService.getMyMarks(user.email, linkPosts);
-      if (marksRes.success && marksRes.data) {
-        setMarks(marksRes.data.marks || {});
+      const markeeItems = res.success && res.data ? res.data.items || [] : [];
+      
+      // Lấy data thủ công và chuẩn hóa dữ liệu
+      const customItemsRaw = customRes.success && customRes.data ? customRes.data.items || [] : [];
+      const customItems = customItemsRaw.map((item: any) => ({
+        ...item,
+        permalink_url: item.permalink_url || item.post_url || item.link_post,
+        fanpage_name: item.fanpage_name || item.page_name || "Markee AI Marketing",
+        content: item.content || "(Bài viết không có nội dung văn bản)",
+        media_urls: Array.isArray(item.media_urls)
+          ? item.media_urls
+          : item.media_url
+          ? [item.media_url]
+          : [],
+        created_at: item.created_at || item.published_at,
+      })) as InternalEngagementPost[];
+
+      setPosts(markeeItems);
+      setCustomPosts(customItems);
+
+      if (user?.email) {
+        // Gộp tất cả link từ cả 2 nguồn để check marks 1 lần
+        const allLinks = [
+          ...markeeItems.map((p) => p.permalink_url),
+          ...customItems.map((p) => p.permalink_url)
+        ].filter(Boolean) as string[];
+
+        if (allLinks.length > 0) {
+          const marksRes = await internalEngagementService.getMyMarks(user.email, allLinks);
+          if (marksRes.success && marksRes.data) {
+            setMarks(marksRes.data.marks || {});
+          }
+        }
       }
+    } catch (error) {
+      setLoadError("Lỗi khi tải danh sách bài viết.");
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
+
+  const handleSubmitCustomLink = async () => {
+    if (!customLink.trim()) return showToast("Vui lòng nhập link bài viết Facebook.");
+    if (!user?.email) return showToast("Chưa xác định được tài khoản đăng nhập.");
+
+    setIsSubmittingLink(true);
+    try {
+      const res = await internalEngagementService.addCustomPost(customLink.trim(), user.email);
+      if (res && res.success) {
+        showToast("Đã thêm bài viết thủ công thành công!");
+        setCustomLink("");
+        setSourceTab("custom"); // Tự động chuyển qua tab thủ công
+        loadPosts(); 
+      } else {
+        showToast(res?.message || "Lỗi khi thêm bài viết.");
+      }
+    } catch (error) {
+      showToast("Có lỗi xảy ra khi gửi yêu cầu.");
+    } finally {
+      setIsSubmittingLink(false);
+    }
+  };
+
+  // Xác định danh sách bài đang hoạt động dựa trên Tab Nguồn
+  const activeSourcePosts = useMemo(() => {
+    return sourceTab === "markee" ? posts : customPosts;
+  }, [sourceTab, posts, customPosts]);
+
+  // Bộ lọc tìm kiếm và trạng thái áp dụng lên danh sách đang hoạt động
+  const filteredPosts = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return activeSourcePosts.filter((p) => {
+      const link = p.permalink_url || "";
+      const status = marks[link] || "need";
+      if (tab !== "all" && tab !== status) return false;
+      if (!q) return true;
+      return `${p.content || ""} ${p.fanpage_name || ""}`.toLowerCase().includes(q);
+    });
+  }, [activeSourcePosts, marks, tab, search]);
+
+  const tabCounts = useMemo(() => {
+    const counts: Record<TaskStatusTab, number> = { all: activeSourcePosts.length, need: 0, received: 0, completed: 0 };
+    activeSourcePosts.forEach((p) => {
+      const status = marks[p.permalink_url || ""] || "need";
+      counts[status] += 1;
+    });
+    return counts;
+  }, [activeSourcePosts, marks]);
 
   // Admin/leader: badge "Team X: N tương tác" hiển thị dưới mỗi bài.
   useEffect(() => {
-    if (!user?.email || !canSeeTeamInteractions || posts.length === 0) return;
+    if (!user?.email || !canSeeTeamInteractions || activeSourcePosts.length === 0) return;
     let cancelled = false;
 
     Promise.all(
-      posts
+      activeSourcePosts
         .filter((p) => p.permalink_url)
         .map((p) =>
           internalEngagementService
@@ -132,7 +220,7 @@ export default function InternalEngagementPage() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [posts, user?.email, canSeeTeamInteractions]);
+  }, [activeSourcePosts, user?.email, canSeeTeamInteractions]);
 
   const openInteractionsModal = async (post: InternalEngagementPost, teamId?: string) => {
     if (!user?.email || !post.permalink_url) return;
@@ -180,13 +268,8 @@ export default function InternalEngagementPage() {
     });
   }, []);
 
-  // Theo dõi kết quả (thành công/lỗi) của lần comment gần nhất qua sự kiện
-  // BULK_COMMENT_PROGRESS, để lúc BULK_COMMENT_DONE biết chính xác nên báo
-  // thành công hay báo lỗi thật — trước đây luôn báo "Đã gửi..." dù extension
-  // thực ra bị lỗi (im lặng thất bại).
   const lastResultRef = useRef<{ success: boolean; error?: string } | null>(null);
 
-  // Comment-extension bridge (same postMessage handshake as bulk-comment-launcher)
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const action = event.data?.action;
@@ -228,24 +311,13 @@ export default function InternalEngagementPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isExtensionReady]);
 
-  const filteredPosts = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return posts.filter((p) => {
-      const link = p.permalink_url || "";
-      const status = marks[link] || "need";
-      if (tab !== "all" && tab !== status) return false;
-      if (!q) return true;
-      return `${p.content} ${p.fanpage_name || ""}`.toLowerCase().includes(q);
-    });
-  }, [posts, marks, tab, search]);
-
   const PAGE_SIZE = 10;
   const [currentPage, setCurrentPage] = useState(1);
   const totalPages = Math.max(1, Math.ceil(filteredPosts.length / PAGE_SIZE));
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [tab, search]);
+  }, [tab, search, sourceTab]);
 
   const pagedPosts = useMemo(() => {
     const start = (currentPage - 1) * PAGE_SIZE;
@@ -338,15 +410,6 @@ export default function InternalEngagementPage() {
     );
   };
 
-  const tabCounts = useMemo(() => {
-    const counts: Record<TaskStatusTab, number> = { all: posts.length, need: 0, received: 0, completed: 0 };
-    posts.forEach((p) => {
-      const status = marks[p.permalink_url || ""] || "need";
-      counts[status] += 1;
-    });
-    return counts;
-  }, [posts, marks]);
-
   return (
     <div className="w-full bg-[#f7f8fb] text-[#252733]">
       <div className="min-h-screen">
@@ -412,6 +475,28 @@ export default function InternalEngagementPage() {
 
           {canSeeTeamInteractions ? <TeamPerformancePanel email={user?.email} /> : null}
 
+          {/* KHU VỰC THÊM LINK BÀI VIẾT THỦ CÔNG */}
+          <div className="bg-white border border-[#e7e9ef] rounded-2xl p-4 mb-4 shadow-[0_1px_3px_rgba(20,25,40,.08)]">
+            <label className="text-[13px] font-bold block mb-2">Thêm bài viết Facebook thủ công:</label>
+            <div className="flex gap-2">
+              <input
+                value={customLink}
+                onChange={(e) => setCustomLink(e.target.value)}
+                disabled={isSubmittingLink}
+                className="flex-1 border border-[#dde0e7] rounded-xl px-3 py-2 text-[13px] outline-none focus:border-[#c71f4d]"
+                placeholder="Dán đường link bài viết Facebook (Group, Cá nhân, Fanpage...) vào đây..."
+              />
+              <button
+                type="button"
+                onClick={handleSubmitCustomLink}
+                disabled={isSubmittingLink || !customLink.trim()}
+                className="px-4 py-2 rounded-xl bg-[#c71f4d] text-white text-[13px] font-bold disabled:opacity-50 whitespace-nowrap"
+              >
+                {isSubmittingLink ? "Đang thêm..." : "+ Thêm bài viết"}
+              </button>
+            </div>
+          </div>
+
           {/* Bulk action bar */}
           {selectMode ? (
             <div className="bg-white border border-[#efb2c3] rounded-2xl p-4 mb-4 shadow-[0_1px_3px_rgba(20,25,40,.08)]">
@@ -451,9 +536,24 @@ export default function InternalEngagementPage() {
 
           {/* Main list */}
           <div className="bg-white border border-[#e7e9ef] rounded-2xl shadow-[0_1px_3px_rgba(20,25,40,.08),0_8px_24px_rgba(20,25,40,.04)] overflow-hidden">
-            <div className="p-[15px] px-4 border-b border-[#e7e9ef] flex items-center justify-between">
-              <h3 className="m-0 text-[15px] font-bold">Bài viết Fanpage công ty</h3>
-              <div className="flex gap-2">
+            {/* VÙNG BỘ LỌC TAB MỚI */}
+            <div className="p-[15px] px-4 border-b border-[#e7e9ef] flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+              <div className="flex bg-[#f1f3f7] p-1 rounded-xl w-fit">
+                <button
+                  className={`px-4 py-2 rounded-lg text-[13px] font-bold transition ${sourceTab === "markee" ? "bg-white shadow text-[#c71f4d]" : "text-[#737785] hover:text-[#252733]"}`}
+                  onClick={() => setSourceTab("markee")}
+                >
+                  Fanpage công ty
+                </button>
+                <button
+                  className={`px-4 py-2 rounded-lg text-[13px] font-bold transition ${sourceTab === "custom" ? "bg-white shadow text-[#c71f4d]" : "text-[#737785] hover:text-[#252733]"}`}
+                  onClick={() => setSourceTab("custom")}
+                >
+                  Nhân viên chia sẻ
+                </button>
+              </div>
+
+              <div className="flex gap-2 flex-wrap">
                 {(
                   [
                     { key: "all", label: "Tất cả" },
@@ -482,14 +582,14 @@ export default function InternalEngagementPage() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="border border-[#dde0e7] rounded-xl px-3 py-2 bg-white text-[#4b4f5a] w-full max-w-md"
+                className="border border-[#dde0e7] rounded-xl px-3 py-2 bg-white text-[#4b4f5a] w-full"
                 placeholder="🔎 Tìm nội dung bài viết, fanpage..."
               />
             </div>
 
             <div className="p-3">
               {isLoading ? (
-                <div className="p-6 text-center text-[#737785] text-sm">Đang tải bài viết từ MarkeeAI...</div>
+                <div className="p-6 text-center text-[#737785] text-sm">Đang tải dữ liệu...</div>
               ) : filteredPosts.length === 0 ? (
                 <div className="p-6 text-center text-[#737785] text-sm">Không có bài viết nào trong mục này.</div>
               ) : (
@@ -624,7 +724,7 @@ export default function InternalEngagementPage() {
           </div>
         </div>
 
-        {/* Comment modal — real comment via Chrome extension */}
+        {/* Comment modal */}
         {modalPost ? (
           <div
             className="fixed inset-0 bg-[rgba(25,27,35,.42)] flex items-center justify-center z-[30] p-5"
@@ -635,7 +735,7 @@ export default function InternalEngagementPage() {
             <div className="w-[min(700px,100%)] bg-white rounded-2xl shadow-[0_30px_80px_rgba(0,0,0,.25)] overflow-hidden">
               <div className="flex justify-between items-center p-4 border-b border-[#e7e9ef]">
                 <div>
-                  <b className="text-base">Comment vào bài viết Fanpage</b>
+                  <b className="text-base">Comment vào bài viết</b>
                   <div className="text-[12px] text-[#777] mt-1">Thực hiện qua Chrome Extension trên tài khoản Facebook đang đăng nhập</div>
                 </div>
                 <button type="button" className="border-0 bg-[#f2f3f6] rounded-lg px-[10px] py-[7px]" onClick={closeModal} aria-label="close">✕</button>
