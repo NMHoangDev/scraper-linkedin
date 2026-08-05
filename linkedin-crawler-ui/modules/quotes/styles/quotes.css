@@ -115,6 +115,26 @@
   color: #334155;
 }
 
+.quote-back--breadcrumb {
+  display: inline-flex;
+  margin-bottom: 0.85rem;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  min-height: 0;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.quote-back--breadcrumb:hover {
+  color: #334155;
+}
+
+.quote-detail-header p .quote-badge {
+  margin: 0 0.4rem;
+  vertical-align: middle;
+}
+
 .quote-state {
   border: 1px solid #e2e8f0;
   border-radius: 0.7rem;
@@ -141,12 +161,18 @@
 .quote-builder-sidebar,
 .quote-section-card,
 .quote-field-row,
-.public-toolbar,
-.quote-detail-header {
+.public-toolbar {
   border: 1px solid #e2e8f0;
   border-radius: 0.75rem;
   background: #ffffff;
   box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+}
+
+/* Header phẳng, không đóng khung trắng riêng nữa - chỉ 1 gạch chân nhẹ phân
+   cách với nội dung bên dưới, đỡ tạo thêm 1 lớp "box" thừa cạnh box body. */
+.quote-detail-header {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .quote-public-toolbar {
@@ -221,9 +247,15 @@
 }
 
 .status-draft {
-  border-color: #bfdbfe;
-  background: #eff6ff;
-  color: #1d4ed8;
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.status-approved {
+  border-color: #86efac;
+  background: #ecfdf5;
+  color: #047857;
 }
 
 .status-cancelled {
@@ -782,7 +814,7 @@
 }
 
 .sheet-brand-block {
-  max-width: 68%;
+  max-width: 80%;
 }
 
 .sheet-brand-mark {
@@ -1030,6 +1062,14 @@
 .money-cell {
   text-align: right !important;
   white-space: nowrap;
+}
+
+.quote-desc-line {
+  text-align: left;
+}
+
+.quote-desc-line + .quote-desc-line {
+  margin-top: 0.4rem;
 }
 
 .sheet-total-block {

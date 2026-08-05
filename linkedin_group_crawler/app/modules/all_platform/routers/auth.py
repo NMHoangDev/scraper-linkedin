@@ -207,6 +207,7 @@ def auth_me(request: Request, authorization: str | None = Header(None)) -> BaseR
             "is_active": user.get("is_active"),
             "created_at": user.get("created_at"),
             "is_sale": is_sale_member(user.get("id")),
+            "can_approve_quotes": bool(user.get("can_approve_quotes")),
         })
     except HTTPException as e:
         return BaseResponse(success=False, message=e.detail)

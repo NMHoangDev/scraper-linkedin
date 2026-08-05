@@ -3,7 +3,6 @@ import type {
   CreateQuoteInput,
   Quote,
   QuoteForm,
-  QuoteReference,
   UpdateQuoteFormInput,
   UpdateQuoteInput,
 } from '../types';
@@ -24,5 +23,8 @@ export interface QuoteRepository {
   createQuote(input: CreateQuoteInput): Promise<Quote>;
   updateQuote(id: string, input: UpdateQuoteInput): Promise<Quote>;
   deleteQuote(id: string): Promise<void>;
-  publishQuote(id: string): Promise<QuoteReference>;
+  /** Duyệt báo giá — khoá chỉnh sửa vĩnh viễn, sinh public link. */
+  approveQuote(id: string): Promise<Quote>;
+  /** Lưu thay đổi cuối + duyệt atomic (dùng khi bấm "Duyệt báo giá" trong modal đang sửa). */
+  updateAndApproveQuote(id: string, input: UpdateQuoteInput): Promise<Quote>;
 }

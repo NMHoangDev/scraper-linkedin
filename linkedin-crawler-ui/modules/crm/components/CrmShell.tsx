@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ContractDetailModal } from './ContractDetailModal';
 import { CrmKanbanBoard } from './CrmKanbanBoard';
 import { CrmTableView } from './CrmTableView';
@@ -15,12 +16,16 @@ import {
   DEAL_STAGES,
   INDUSTRY_OPTIONS,
   SOURCE_OPTIONS,
+  canApproveQuote,
   formatVND,
   humanizeCrmError,
 } from '../constants/crmConfig';
 import { useCrm } from '../hooks/useCrm';
 import type { ContractStatus, CreateDealInput, Deal, DealStage, StageTransitionInput, UpdateDealInput } from '../types';
 import { teamsService, type TeamRow } from '@/services/all-platform.service';
+import { seedingQuoteRepository } from '@/modules/quotes';
+import type { Quote } from '@/modules/quotes';
+import { useAppAuth } from '@/contexts/AppAuthContext';
 
 type FilterState = {
   search: string;
@@ -67,7 +72,8 @@ export function CrmShell() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [contractDeal, setContractDeal] = useState<Deal | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const [quoteModal, setQuoteModal] = useState<{ open: boolean; deal: Deal | null }>({ open: false, deal: null });
+  const [quoteModal, setQuoteModal] = useState<{ open: boolean; deal: Deal | null; editQuote: Quote | null }>({ open: false, deal: null, editQuote: null });
+  const { user } = useAppAuth();
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [stageData, setStageData] = useState<{ deal: Deal; toStage: DealStage } | null>(null);
   const [reviewData, setReviewData] = useState<{ deal: Deal; toStage: DealStage } | null>(null);
@@ -158,6 +164,32 @@ export function CrmShell() {
     }
   }
 
+  // Chỉ có id (chưa có object Deal đầy đủ) - dùng khi quay lại từ trang chi
+  // tiết báo giá (?openDeal=<id>), không có sẵn Deal để hiện tạm như openDetail.
+  async function openDetailById(id: string) {
+    setDetailOpen(true);
+    try {
+      setSelectedDeal(await getDeal(id));
+    } catch {
+      setDetailOpen(false);
+    }
+  }
+
+  // "Mở báo giá" (chưa duyệt) trong DetailDrawer điều hướng sang trang chi
+  // tiết báo giá kèm ?dealId=... ; nút "Quay lại" ở đó đưa về đây kèm
+  // ?openDeal=... để tự mở lại đúng drawer deal đang xem trước đó, thay vì về
+  // board trống trơn. Xoá query khỏi URL ngay sau khi xử lý (router.replace,
+  // không thêm history) để F5/back sau đó không mở lại lặp lại.
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const openDealId = searchParams.get('openDeal');
+    if (!openDealId) return;
+    void openDetailById(openDealId);
+    router.replace('/all-platform/crm', { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   async function handleCreate(input: CreateDealInput) {
     try {
       const deal = await createDeal(input);
@@ -238,6 +270,28 @@ export function CrmShell() {
     }
   }
 
+  async function handleEditQuote(deal: Deal) {
+    if (!deal.quote?.id) return;
+    try {
+      const quote = await seedingQuoteRepository.getQuote(deal.quote.id);
+      setQuoteModal({ open: true, deal, editQuote: quote });
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Không tải được báo giá để sửa.');
+    }
+  }
+
+  // Sau khi tạo/sửa/duyệt báo giá: refresh cả list board (card ngoài kanban)
+  // LẪN selectedDeal đang mở trong drawer (nếu trùng deal) - trước đây chỉ
+  // loadDeals() nên drawer đang mở vẫn hiện dữ liệu cũ cho tới khi đóng/mở lại.
+  async function refreshDealAfterQuoteChange(dealId?: string) {
+    await loadDeals();
+    if (dealId && selectedDeal?.id === dealId) {
+      try {
+        setSelectedDeal(await getDeal(dealId));
+      } catch { /* giữ nguyên bản cũ neu load loi */ }
+    }
+  }
+
   return (
     <div className="crm-shell">
       <section className="crm-page-card">
@@ -259,7 +313,7 @@ export function CrmShell() {
               type="button"
               className="crm-secondary-button"
               disabled={loading || saving}
-              onClick={() => setQuoteModal({ open: true, deal: null })}
+              onClick={() => setQuoteModal({ open: true, deal: null, editQuote: null })}
             >
               <FileText className="crm-button-icon" /> Tạo báo giá
             </button>
@@ -362,7 +416,7 @@ export function CrmShell() {
               loading={loading}
               onCardClick={openDetail}
               onContractClick={setContractDeal}
-              onCreateQuote={deal => setQuoteModal({ open: true, deal })}
+              onCreateQuote={deal => setQuoteModal({ open: true, deal, editQuote: null })}
               onRequestMove={(deal, toStage) => setStageData({ deal, toStage })}
             />
           ) : (
@@ -382,7 +436,8 @@ export function CrmShell() {
         onEdit={setEditingDeal}
         onDelete={handleDelete}
         onUpdateContractStatus={updateContractStatus}
-        onCreateQuote={deal => setQuoteModal({ open: true, deal })}
+        onCreateQuote={deal => setQuoteModal({ open: true, deal, editQuote: null })}
+        onEditQuote={handleEditQuote}
       />
       <StageModal
         open={Boolean(stageData)}
@@ -405,13 +460,19 @@ export function CrmShell() {
         deals={deals}
         agents={agents}
         initialDeal={quoteModal.deal}
-        onClose={() => setQuoteModal({ open: false, deal: null })}
+        editQuote={quoteModal.editQuote}
+        canApproveQuotes={canApproveQuote(user)}
+        onClose={() => setQuoteModal({ open: false, deal: null, editQuote: null })}
         onCreated={async quote => {
           // Quote tạo xong đã gắn deal_id (nếu có) ở backend rồi, nhưng danh sách
           // deal trên board vẫn là bản cũ trong state — phải load lại thì card mới
           // thấy quote vừa tạo (deal.quote), không thì cứ tưởng chưa tạo được gì.
-          await loadDeals();
-          setToast(`Đã tạo báo giá ${quote.quoteNumber}.`);
+          await refreshDealAfterQuoteChange(quote.dealId);
+          setToast(`Đã tạo báo giá ${quote.quoteNumber} — chưa duyệt.`);
+        }}
+        onUpdated={async quote => {
+          await refreshDealAfterQuoteChange(quote.dealId);
+          setToast(quote.status === 'approved' ? `Đã duyệt báo giá ${quote.quoteNumber}.` : `Đã cập nhật báo giá ${quote.quoteNumber}.`);
         }}
       />
       <DealFormModal

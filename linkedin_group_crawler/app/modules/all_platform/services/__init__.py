@@ -72,7 +72,8 @@ from app.modules.all_platform.services.supabase_quote_service import (
     create_quote,
     update_quote,
     delete_quote,
-    publish_quote,
+    approve_quote,
+    update_and_approve_quote,
     link_quote_to_deal,
 )
 from app.modules.all_platform.services.supabase_sales_asset_service import (
@@ -114,6 +115,7 @@ from app.modules.all_platform.services.supabase_user_service import (
     update_user_slug,
     update_user_role,
     update_user_active_status,
+    update_user_quote_approver,
     get_team_members,
     add_team_member,
     get_all_users,

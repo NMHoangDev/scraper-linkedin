@@ -17,6 +17,7 @@ from app.modules.all_platform.schemas import (
     QuoteUpdateRequest,
 )
 from app.modules.all_platform.services import (
+    approve_quote,
     create_quote,
     create_quote_form,
     delete_quote,
@@ -28,11 +29,13 @@ from app.modules.all_platform.services import (
     get_quote_form,
     list_quote_forms,
     list_quotes,
-    publish_quote,
     share_quote_form,
+    update_and_approve_quote,
     update_quote,
     update_quote_form,
 )
+from app.modules.all_platform.services.crm_permission_service import can_approve_quote, can_edit_quote
+from app.modules.all_platform.services.customer_lead_service import get_customer_lead_by_id
 
 quote_forms_router = APIRouter()
 quotes_router = APIRouter()
@@ -131,10 +134,22 @@ def quotes_get_public(token: str) -> BaseResponse:
         return BaseResponse(success=False, message=str(e))
 
 
+def _load_quote_and_lead(quote_id: str) -> tuple[dict, dict | None]:
+    quote = get_quote(quote_id)
+    lead = get_customer_lead_by_id(quote["dealId"]) if quote.get("dealId") else None
+    return quote, lead
+
+
 @quotes_router.get("/{quote_id}")
-def quotes_get(quote_id: str, _user: dict = Depends(get_current_user)) -> BaseResponse:
+def quotes_get(quote_id: str, user: dict = Depends(get_current_user)) -> BaseResponse:
     try:
-        return BaseResponse(success=True, data=get_quote(quote_id))
+        quote, lead = _load_quote_and_lead(quote_id)
+        # Bao gia da duyet/confirmed (da co link public) thi ai dang nhap cung
+        # xem noi bo duoc nhu truoc gio - chi bao gia CHUA duyet moi gioi han
+        # theo nhom quyen (nguoi tao/quan ly deal/phu trach deal/co quyen duyet/admin).
+        if quote["status"] not in ("approved", "confirmed") and not can_edit_quote(user, quote, lead):
+            return BaseResponse(success=False, message="Không có quyền xem báo giá này")
+        return BaseResponse(success=True, data=quote)
     except Exception as e:
         return BaseResponse(success=False, message=str(e))
 
@@ -153,10 +168,15 @@ def quotes_create(payload: QuoteCreateRequest, user: dict = Depends(get_current_
 
 
 @quotes_router.put("/{quote_id}")
-def quotes_update(quote_id: str, payload: QuoteUpdateRequest, _user: dict = Depends(get_current_user)) -> BaseResponse:
+def quotes_update(quote_id: str, payload: QuoteUpdateRequest, user: dict = Depends(get_current_user)) -> BaseResponse:
     try:
-        data = update_quote(quote_id, payload.model_dump(exclude_none=True))
+        quote, lead = _load_quote_and_lead(quote_id)
+        if not can_edit_quote(user, quote, lead):
+            return BaseResponse(success=False, message="Không có quyền chỉnh sửa báo giá này")
+        data = update_quote(quote_id, payload.model_dump(exclude_none=True), user.get("id"))
         return BaseResponse(success=True, data=data)
+    except ValueError as e:
+        return BaseResponse(success=False, message=str(e))
     except HTTPException:
         raise
     except Exception as e:
@@ -164,18 +184,46 @@ def quotes_update(quote_id: str, payload: QuoteUpdateRequest, _user: dict = Depe
 
 
 @quotes_router.delete("/{quote_id}")
-def quotes_delete(quote_id: str, _user: dict = Depends(get_current_user)) -> BaseResponse:
+def quotes_delete(quote_id: str, user: dict = Depends(get_current_user)) -> BaseResponse:
     try:
+        quote, lead = _load_quote_and_lead(quote_id)
+        if not can_edit_quote(user, quote, lead):
+            return BaseResponse(success=False, message="Không có quyền xoá báo giá này")
         delete_quote(quote_id)
         return BaseResponse(success=True)
+    except ValueError as e:
+        return BaseResponse(success=False, message=str(e))
     except Exception as e:
         return BaseResponse(success=False, message=str(e))
 
 
-@quotes_router.post("/{quote_id}/publish")
-def quotes_publish(quote_id: str, _user: dict = Depends(get_current_user)) -> BaseResponse:
+@quotes_router.post("/{quote_id}/approve")
+def quotes_approve(quote_id: str, user: dict = Depends(get_current_user)) -> BaseResponse:
+    """Duyệt báo giá - chặn quyền THẬT ở backend (không chỉ ẩn nút frontend)."""
     try:
-        data = publish_quote(quote_id)
-        return BaseResponse(success=True, message="Đã xác nhận báo giá", data=data)
+        if not can_approve_quote(user):
+            return BaseResponse(success=False, message="Bạn không có quyền duyệt báo giá")
+        data = approve_quote(quote_id, user.get("id"))
+        return BaseResponse(success=True, message="Đã duyệt báo giá", data=data)
+    except ValueError as e:
+        return BaseResponse(success=False, message=str(e))
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@quotes_router.post("/{quote_id}/update-and-approve")
+def quotes_update_and_approve(quote_id: str, payload: QuoteUpdateRequest, user: dict = Depends(get_current_user)) -> BaseResponse:
+    """Dùng khi bấm "Duyệt báo giá" ngay trong modal đang sửa - lưu thay đổi cuối
+    + duyệt atomic trong 1 transaction (xem quote_update_and_approve RPC)."""
+    try:
+        if not can_approve_quote(user):
+            return BaseResponse(success=False, message="Bạn không có quyền duyệt báo giá")
+        quote, lead = _load_quote_and_lead(quote_id)
+        if not can_edit_quote(user, quote, lead):
+            return BaseResponse(success=False, message="Không có quyền chỉnh sửa báo giá này")
+        data = update_and_approve_quote(quote_id, payload.model_dump(exclude_none=True), user.get("id"))
+        return BaseResponse(success=True, message="Đã duyệt báo giá", data=data)
+    except ValueError as e:
+        return BaseResponse(success=False, message=str(e))
     except Exception as e:
         return BaseResponse(success=False, message=str(e))

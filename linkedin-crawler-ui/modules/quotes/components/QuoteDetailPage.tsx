@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { QUOTE_STATUS_LABELS } from '../constants/quoteConfig';
+import { internalQuoteStatusClass, internalQuoteStatusLabel } from '../constants/quoteConfig';
 import { seedingQuoteRepository } from '../repositories/SeedingQuoteRepository';
 import type { Quote } from '../types';
 import { QuoteDocumentRenderer } from './QuoteDocumentRenderer';
@@ -15,6 +16,11 @@ export function QuoteDetailPage({ quoteId }: Props) {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Trang này thường mở từ nút "Mở báo giá" trong Drawer chi tiết deal (CRM) -
+  // giữ dealId trên URL để "Quay lại" mở đúng lại drawer deal đó, thay vì về
+  // trang danh sách báo giá chung chung (mất hết ngữ cảnh đang xem deal nào).
+  const dealId = useSearchParams().get('dealId');
+  const backHref = dealId ? `/all-platform/crm?openDeal=${encodeURIComponent(dealId)}` : '/all-platform/quotes';
 
   useEffect(() => {
     seedingQuoteRepository
@@ -23,14 +29,6 @@ export function QuoteDetailPage({ quoteId }: Props) {
       .catch(err => setError(err instanceof Error ? err.message : 'Không tải được chi tiết báo giá.'))
       .finally(() => setLoading(false));
   }, [quoteId]);
-
-  async function togglePublic() {
-    if (!quote) return;
-    const updated = await seedingQuoteRepository.updateQuote(quote.id, {
-      publicEnabled: !quote.publicEnabled,
-    });
-    setQuote(updated);
-  }
 
   async function copyLink() {
     if (!quote?.publicUrl) return;
@@ -50,19 +48,25 @@ export function QuoteDetailPage({ quoteId }: Props) {
 
   return (
     <main className="quote-detail-page">
+      <Link href={backHref} className="quote-back quote-back--breadcrumb no-print">← Quay lại</Link>
       <header className="quote-detail-header no-print">
         <div>
-          <Link href="/all-platform/quotes" className="quote-back">Quay lại</Link>
           <h1>{String(quote.data.quoteTitle || 'Chi tiết báo giá')}</h1>
-          <p>{quote.quoteNumber} · {QUOTE_STATUS_LABELS[quote.status]} · {new Date(quote.createdAt).toLocaleString('vi-VN')}</p>
+          <p>
+            {quote.quoteNumber}
+            <span className={`quote-badge ${internalQuoteStatusClass(quote.status)}`}>{internalQuoteStatusLabel(quote.status)}</span>
+            · {new Date(quote.createdAt).toLocaleString('vi-VN')}
+          </p>
         </div>
         <div className="quote-head-actions">
-          <label className="quote-switch">
-            Link công khai
-            <input type="checkbox" checked={Boolean(quote.publicEnabled)} onChange={() => void togglePublic()} />
-          </label>
-          <button type="button" className="quote-button quote-button--secondary" onClick={() => void copyLink()}>Copy Link</button>
-          <button type="button" className="quote-button quote-button--primary" onClick={downloadPDF}>Tải PDF</button>
+          {quote.status === 'approved' || quote.status === 'confirmed' ? (
+            <>
+              <button type="button" className="quote-button quote-button--secondary" onClick={() => void copyLink()}>Copy Link</button>
+              <button type="button" className="quote-button quote-button--primary" onClick={downloadPDF}>Tải PDF</button>
+            </>
+          ) : (
+            <span className="quote-badge status-draft">Chưa có link công khai gửi khách</span>
+          )}
         </div>
       </header>
       <div className="quote-print-root">

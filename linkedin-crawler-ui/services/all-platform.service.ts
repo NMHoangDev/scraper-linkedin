@@ -1707,6 +1707,7 @@ export interface AppUserProfile {
   role?: string;
   is_active?: boolean;
   created_at?: string;
+  can_approve_quotes?: boolean;
 }
 
 export interface TeamMember {
@@ -1758,6 +1759,13 @@ export const usersService = {
     return requestJson(`${BASE}/users/set-active`, {
       method: "POST",
       body: JSON.stringify({ email, is_active }),
+    });
+  },
+  /** Admin-only: bật/tắt quyền duyệt Báo giá (migration 053). */
+  updateQuoteApprover: (email: string, can_approve_quotes: boolean): Promise<ApiResponse<AppUserProfile>> => {
+    return requestJson(`${BASE}/users/update-quote-approver`, {
+      method: "POST",
+      body: JSON.stringify({ email, can_approve_quotes }),
     });
   },
 };

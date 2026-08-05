@@ -1,4 +1,4 @@
-import type { QuoteData, QuoteForm, QuoteItem, VillaSolutionItem } from '@/modules/quotes';
+import type { Quote, QuoteData, QuoteForm, QuoteItem, VillaSolutionItem } from '@/modules/quotes';
 import type { DealFormState } from '../../components/DealFormFields';
 
 export type WizardStep = 1 | 2 | 3 | 4;
@@ -42,4 +42,15 @@ export function quoteDraftFromForm(form: QuoteForm, dealDraft?: DealFormState): 
   }
 
   return { data, items: [], solutionItems };
+}
+
+/** Dựng lại QuoteDraft từ 1 báo giá đã tồn tại (chế độ sửa) - để prefill wizard
+ * đúng dữ liệu đã lưu, không phải giá trị mặc định của mẫu. */
+export function quoteDraftFromExistingQuote(quote: Quote): QuoteDraft {
+  const { solutionItems, ...data } = quote.data || {};
+  return {
+    data,
+    items: quote.items || [],
+    solutionItems: Array.isArray(solutionItems) ? solutionItems : [],
+  };
 }

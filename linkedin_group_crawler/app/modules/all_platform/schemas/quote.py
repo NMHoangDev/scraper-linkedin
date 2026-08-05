@@ -27,6 +27,7 @@ class QuoteFormUpdateRequest(BaseModel):
 
 class QuoteItemInput(BaseModel):
     description: str = ""
+    service_description: Optional[str] = None
     unit: Optional[str] = None
     quantity: float = 0
     unit_price: float = 0
@@ -41,7 +42,9 @@ class QuoteCreateRequest(BaseModel):
 
 
 class QuoteUpdateRequest(BaseModel):
-    status: Optional[str] = None
+    """status/public_token/public_enabled KHÔNG còn client-settable qua đây -
+    chỉ đổi được qua endpoint /approve (xem quote.py) sau khi qua kiểm tra
+    quyền duyệt riêng."""
+
     data: Optional[dict[str, Any]] = None
     items: Optional[list[QuoteItemInput]] = None
-    public_enabled: Optional[bool] = None

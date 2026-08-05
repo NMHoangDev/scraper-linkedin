@@ -14,6 +14,16 @@ export function canWriteDeal(user: AppUser | null | undefined, deal: Deal | null
   return deal.assignment.leadedById === user.id || deal.assignment.sdrId === user.id;
 }
 
+/** Mirror của crm_permission_service.can_approve_quote (backend) - chỉ dùng để
+ * ẩn/hiện nút "Duyệt báo giá" cho gọn UI, backend vẫn là nơi chặn thật.
+ * Admin luôn được duyệt. Leader mặc định được duyệt qua cờ can_approve_quotes
+ * (tự bật khi thăng role/backfill sẵn cho leader cũ) — admin vẫn tắt được cho
+ * từng leader cụ thể qua trang Quản lý thành viên nếu cần. */
+export function canApproveQuote(user: AppUser | null | undefined): boolean {
+  if (!user) return false;
+  return user.role === 'admin' || Boolean(user.can_approve_quotes);
+}
+
 export const PIPELINE_COLUMNS: DealStage[] = [
   'new_lead',
   'contacted',
