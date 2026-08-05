@@ -91,10 +91,49 @@ function getTokensFromPage() {
 async function executeComment(payload) {
     const { url, text } = payload;
 
-    // Tách Post ID
-    const match = url.match(/\/posts\/(\d+)/) || url.match(/\/permalink\/(\d+)/) || url.match(/fbid=(\d+)/);
-    if (!match) throw new Error("Không thể trích xuất Post ID từ URL: " + url);
-    const postId = match[1];
+    // Tách Post ID với cơ chế 3-Layer Fallback (Bao bọc mọi loại URL kể cả pfbid)
+    let postId = null;
+
+    // LỚP 1: Quét từ URL payload gửi lên (Hỗ trợ chữ, số, dấu gạch dưới của pfbid)
+    const urlMatch = url.match(/\/(?:posts|permalink|videos|story)\/([a-zA-Z0-9_]+)/i) || url.match(/fbid=([a-zA-Z0-9_]+)/i) || url.match(/story_fbid=([a-zA-Z0-9_]+)/i);
+    if (urlMatch && urlMatch[1]) {
+        postId = urlMatch[1];
+    }
+
+    // LỚP 2: Quét từ URL thực tế của tab đang mở (Phòng trường hợp link rút gọn đã redirect)
+    if (!postId) {
+        const currentUrl = window.location.href;
+        const currentMatch = currentUrl.match(/\/(?:posts|permalink|videos|story)\/([a-zA-Z0-9_]+)/i) || currentUrl.match(/fbid=([a-zA-Z0-9_]+)/i) || currentUrl.match(/story_fbid=([a-zA-Z0-9_]+)/i);
+        if (currentMatch && currentMatch[1]) {
+            postId = currentMatch[1];
+        }
+    }
+
+    // LỚP 3: Quét trực tiếp trong mã nguồn DOM của Facebook 
+    if (!postId) {
+        // Ưu tiên thẻ meta og:url
+        const ogUrlMeta = document.querySelector('meta[property="og:url"]');
+        if (ogUrlMeta && ogUrlMeta.content) {
+            const ogMatch = ogUrlMeta.content.match(/\/(?:posts|permalink|videos|story)\/([a-zA-Z0-9_]+)/i) || ogUrlMeta.content.match(/fbid=([a-zA-Z0-9_]+)/i);
+            if (ogMatch && ogMatch[1]) {
+                postId = ogMatch[1];
+            }
+        }
+        
+        // Đào sâu vào config ẩn của Facebook
+        if (!postId) {
+            const htmlContent = document.documentElement.innerHTML;
+            const fbIdMatch = htmlContent.match(/"target_fbid":"([a-zA-Z0-9_]+)"/) || htmlContent.match(/"ft_ent_identifier":"([a-zA-Z0-9_]+)"/);
+            if (fbIdMatch && fbIdMatch[1]) {
+                postId = fbIdMatch[1];
+            }
+        }
+    }
+
+    // Chốt chặn cuối cùng: Nếu qua 3 lớp vẫn không có thì mới cho bay màu
+    if (!postId) {
+        throw new Error("Không thể trích xuất Post ID từ URL: " + url + " | Current Tab URL: " + window.location.href);
+    }
 
     const tokens = await getTokensFromPage();
     if (!tokens.fb_dtsg || !tokens.uid) {
