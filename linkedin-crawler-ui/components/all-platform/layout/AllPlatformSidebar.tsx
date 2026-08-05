@@ -28,6 +28,8 @@ export interface NavGroupItem {
   id: string;
   icon: MaterialSymbolName;
   label: string;
+  /** Label section nhỏ phía trên (khác với label nav-item cha). Mặc định = label. */
+  sectionLabel?: string;
   items: NavLeafItem[];
 }
 
@@ -184,6 +186,25 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
     },
   ];
 
+  const libraryItems: NavLeafItem[] = [
+    {
+      type: "item",
+      id: "library-comment-templates",
+      href: "/all-platform/library",
+      icon: "chat_bubble",
+      label: "Thư viện mẫu câu",
+      exactMatch: true,
+    },
+    {
+      type: "item",
+      id: "library-extensions",
+      href: "/all-platform/library/extensions",
+      icon: "extension",
+      label: "Thư viện extension",
+      matchStartsWith: ["/all-platform/library/extensions"],
+    },
+  ];
+
   const channelItems: NavLeafItem[] = [
     {
       type: "item",
@@ -272,6 +293,15 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
   const resourceItems: NavLeafItem[] = [
     {
       type: "item",
+      id: "seeding-accounts",
+      href: "/all-platform/seeding-accounts",
+      icon: "badge",
+      label: "Quản lý TK Seeding",
+      matchStartsWith: ["/all-platform/seeding-accounts"],
+      badge: 12,
+    },
+    {
+      type: "item",
       id: "vps",
       href: "/all-platform/quan-ly-vps",
       icon: "database",
@@ -310,6 +340,14 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
     icon: "article",
     label: "Sản xuất nội dung",
     items: contentItems,
+  };
+  const libraryGroup: SidebarEntry = {
+    type: "group",
+    id: "library",
+    icon: "library_books",
+    label: "Thư viện",
+    sectionLabel: "Quản lý thư viện",
+    items: libraryItems,
   };
   const channelGroup: SidebarEntry = {
     type: "group",
@@ -364,6 +402,7 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       items: managementItems,
     },
     contentGroup,
+    libraryGroup,
     channelGroupTeam,
     ...(isAdmin || isLeader
       ? [
@@ -458,11 +497,8 @@ function SidebarGroup({
   const hasActiveChild = entry.items.some((item) => item.href !== homeHref && isLeafActive(pathname, item));
   const [isOpen, setIsOpen] = useState(hasActiveChild);
 
-  useEffect(() => {
-    if (hasActiveChild) setIsOpen(true);
-  }, [hasActiveChild]);
-
   if (collapsed) {
+
     return (
       <SidebarLink
         item={{

@@ -114,10 +114,11 @@ function GroupLinks({ entry }: { entry: NavGroupItem }) {
   const pathname = usePathname();
   const Icon = materialToLucideIcon(entry.icon);
   const hasActiveChild = entry.items.some((item) => isLeafActive(pathname, item));
+  const sectionLabel = entry.sectionLabel ?? entry.label;
 
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>{entry.label}</SidebarGroupLabel>
+      <SidebarGroupLabel>{sectionLabel}</SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu>
           <SidebarMenuItem>

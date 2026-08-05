@@ -849,18 +849,18 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
         <>
           <div className="flex flex-col gap-4">
             {visiblePosts.map((post) => (
-                <PostCard
-                  key={post.id || post.post_url}
-                  post={post}
-                  userRole={user?.role}
-                  seeded={!!post.verify_status && post.verify_status !== "no"}
-                  verifyStatus={post.verify_status as "pending" | "yes" | "no"}
-                  onSeeding={() => {}}
-                  onVerify={() => {}}
-                  onSchedule={(post) => setScheduleModalPost(post)}
-                  onViewDetail={(post) => setDetailModalPost(post)}
-                  onDelete={(p) => void handleDeletePost(p)}
-                />
+              <PostCard
+                key={post.id || post.post_url}
+                post={post}
+                userRole={user?.role}
+                seeded={!!post.verify_status && post.verify_status !== "no"}
+                verifyStatus={post.verify_status as "pending" | "yes" | "no"}
+                onSeeding={() => {}}
+                onVerify={() => {}}
+                onSchedule={(post) => setScheduleModalPost(post)}
+                onViewDetail={(post) => setDetailModalPost(post)}
+                onDelete={(p) => void handleDeletePost(p)}
+              />
             ))}
           </div>
 

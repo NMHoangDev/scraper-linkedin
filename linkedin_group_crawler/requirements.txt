@@ -25,7 +25,12 @@ bcrypt
 python-jose[cryptography]
 loguru
 asyncssh
+<<<<<<< HEAD
+google-genai
+
+=======
 google-generativeai
 # Import Excel danh sách thành viên
 openpyxl
+>>>>>>> 961099854cab42df4ea4717cb6d6f4d86f4742a1
 

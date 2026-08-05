@@ -9,6 +9,7 @@ storage/runtime/*.json
 storage/runtime/*.txt
 storage/permission/*.json
 .env
+.env.local
 data/raw/*.png
 data/raw/*.html
 .pytest_cache/

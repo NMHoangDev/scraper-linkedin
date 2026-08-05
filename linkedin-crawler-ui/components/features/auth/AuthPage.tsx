@@ -162,11 +162,17 @@ export function AuthPage() {
     }
   };
 
-  const isLoading = submitStatus === "loading";
+const isLoading = submitStatus === "loading";
   const isSuccess = submitStatus === "success";
 
+  // Google OAuth chỉ bật khi đã cấu hình real Client ID (tạo trên Google
+  // Cloud Console). Nếu thiếu (chuỗi rỗng/undefined), ta KHÔNG render
+  // GoogleOAuthProvider (tránh lỗi [GSI_LOGGER]/client_id rỗng văng lỗi 400
+  // khó hiểu) và thay nút Google bằng một nút disabled + tooltip rõ ràng.
+  // Luồng email/password và Facebook vẫn chạy độc lập, không phụ thuộc Google.
+  const googleConfigured = GOOGLE_OAUTH_CLIENT_ID.trim().length > 0;
+
   return (
-    <GoogleOAuthProvider clientId={GOOGLE_OAUTH_CLIENT_ID}>
     <div
       className="min-h-screen flex items-center justify-center relative overflow-hidden"
       style={{ background: "var(--color-background)" }}
@@ -283,15 +289,27 @@ export function AuthPage() {
               <p className="text-sm text-on-surface-variant text-center">
                 Đăng nhập bằng tài khoản Google được cấp cho công việc tại Markee.
               </p>
-              <div className="flex justify-center">
-                <GoogleLogin
-                  onSuccess={handleGoogleSuccess}
-                  onError={() => setGoogleError("Đăng nhập Google thất bại. Vui lòng thử lại.")}
-                  text="signin_with"
-                  shape="pill"
-                  width={280}
-                />
-              </div>
+{googleConfigured ? (
+                <div className="flex justify-center">
+                  <GoogleOAuthProvider clientId={GOOGLE_OAUTH_CLIENT_ID}>
+                    <GoogleLogin
+                      onSuccess={handleGoogleSuccess}
+                      onError={() => setGoogleError("Đăng nhập Google thất bại. Vui lòng thử lại.")}
+                      text="signin_with"
+                      shape="pill"
+                      width={280}
+                    />
+                  </GoogleOAuthProvider>
+                </div>
+              ) : (
+                <div
+                  className="flex items-center gap-2 rounded-xl border border-dashed border-outline-variant bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant"
+                  title="Chưa cấu hình đăng nhập Google"
+                >
+                  <Icon name="lock" className="text-base" />
+                  <span>Chưa cấu hình đăng nhập Google</span>
+                </div>
+              )}
               {googleError && (
                 <div className="w-full flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 text-sm text-red-600 font-medium">
                   <Icon name="error" className="text-red-500 text-base" />
@@ -641,8 +659,7 @@ export function AuthPage() {
             )}
           </div>
         </div>
-      )}
+)}
     </div>
-    </GoogleOAuthProvider>
   );
 }

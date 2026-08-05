@@ -132,7 +132,6 @@ def _pick_by_keywords_and_threshold(
             c_preview,
         )
 
-
     # No keywords => áp dụng NGƯỠNG CŨ theo yêu cầu:
 
     # - posts_in_day > 10  => lấy 3
