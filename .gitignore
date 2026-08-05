@@ -23,6 +23,7 @@ linkedin-crawler-ui/yarn-error.log*
 linkedin-crawler-ui/.pnpm-debug.log*
 linkedin-crawler-ui/dev-*.log
 linkedin-crawler-ui/dev-*.err.log
+linkedin-crawler-ui/dev_server.log
 linkedin-crawler-ui/frontend_dev*.log
 
 # FE env/local secrets
@@ -160,8 +161,10 @@ scratch/*.xlsx
 scratch/*.png
 scratch/*.html
 
-.env.local
 # Code review reports
 code-review-report-*.md
 
-scraper-linkedin
+# ---- Root env/local secrets ----
+.env
+.env.local
+.env.*.local

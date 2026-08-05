@@ -28,12 +28,7 @@ function PlatformIcon({ platform }: { platform: FeedPlatform }) {
   return <FaLinkedin className="text-blue-700 shrink-0" />;
 }
 
-<<<<<<< HEAD
-export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, onDelete, seeded, verifyStatus }: PostCardProps) {
-
-=======
 export function PostCard({ post, userRole, onVerify, onSeeding, onSchedule, onViewDetail, onDelete, seeded, verifyStatus }: PostCardProps) {
->>>>>>> 961099854cab42df4ea4717cb6d6f4d86f4742a1
   const [isInboxOpen, setIsInboxOpen] = useState(false);
   const inboxRef = useRef<HTMLDivElement>(null);
 

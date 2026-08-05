@@ -28,6 +28,8 @@ export interface NavGroupItem {
   id: string;
   icon: MaterialSymbolName;
   label: string;
+  /** Label section nhỏ phía trên (khác với label nav-item cha). Mặc định = label. */
+  sectionLabel?: string;
   items: NavLeafItem[];
 }
 
@@ -179,15 +181,29 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       id: "internal-engagement",
       href: "/all-platform/internal-engagement",
       icon: "chat_bubble",
-<<<<<<< HEAD
-
-=======
->>>>>>> 961099854cab42df4ea4717cb6d6f4d86f4742a1
       label: "Tương tác nội bộ",
       matchStartsWith: ["/all-platform/internal-engagement"],
     },
   ];
 
+  const libraryItems: NavLeafItem[] = [
+    {
+      type: "item",
+      id: "library-comment-templates",
+      href: "/all-platform/library",
+      icon: "chat_bubble",
+      label: "Thư viện mẫu câu",
+      exactMatch: true,
+    },
+    {
+      type: "item",
+      id: "library-extensions",
+      href: "/all-platform/library/extensions",
+      icon: "extension",
+      label: "Thư viện extension",
+      matchStartsWith: ["/all-platform/library/extensions"],
+    },
+  ];
 
   const channelItems: NavLeafItem[] = [
     {
@@ -325,6 +341,14 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
     label: "Sản xuất nội dung",
     items: contentItems,
   };
+  const libraryGroup: SidebarEntry = {
+    type: "group",
+    id: "library",
+    icon: "library_books",
+    label: "Thư viện",
+    sectionLabel: "Quản lý thư viện",
+    items: libraryItems,
+  };
   const channelGroup: SidebarEntry = {
     type: "group",
     id: "channel",
@@ -378,6 +402,7 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       items: managementItems,
     },
     contentGroup,
+    libraryGroup,
     channelGroupTeam,
     ...(isAdmin || isLeader
       ? [

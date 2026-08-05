@@ -116,17 +116,17 @@ export type MaterialSymbolName =
   | "warning_amber"
   | "navigate_next"
   | "keyboard_arrow_down"
-<<<<<<< HEAD
-  | "badge";
-=======
+  | "badge"
   | "request_quote"
   | "account_balance_wallet"
   | "military_tech"
   | "card_giftcard"
   | "shield"
   | "paid"
-  | "track_changes";
->>>>>>> 961099854cab42df4ea4717cb6d6f4d86f4742a1
+  | "track_changes"
+  | "library_books"
+  | "extension"
+  | "collections_bookmark";
 
 export interface MaterialIconProps {
   name: MaterialSymbolName;

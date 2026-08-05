@@ -1,44 +1,16 @@
-# TODO: Hoàn thiện UI Seeding Accounts ✅
+# TODO - Resolve Merge Conflict Markers
 
-## Step 1: Install @radix-ui/react-alert-dialog + create AlertDialog component ✅
-- [x] Install package
-- [x] Create `components/ui/alert-dialog.tsx`
+## Objective
+Xóa toàn bộ conflict marker (<<<<<<<, =======, >>>>>>>) còn sót trong repo,
+giữ lại phiên bản code "incoming" (96109985) ở mọi block (HEAD rỗng hoặc thiếu
+biến code phía sau dùng).
 
-## Step 2: Update StatCard.tsx - Icon góc phải ✅
-- [x] Replace iconText prop with LucideIcon
-- [x] Add proper icon colors per card type
+## Files to fix
+- [x] 1. `app/modules/facebook/src/modules/facebook/services/facebook_scraper.py` (2 blocks)
+- [x] 2. `app/modules/all_platform/router.py` (1 block)
+- [x] 3. `app/modules/all_platform/routers/extension_crawl.py` (3 blocks)
 
-## Step 3: Update se清理ding-accounts.service.ts - Thêm API methods ✅
-- [x] Add createAccount, deleteAccount, triggerRelogin (calls real API, fallback to optimistic toast)
-
-## Step 4: Create AddAccountDialog.tsx ✅
-- [x] Dialog form with platform select, name, email/phone, password, notes
-- [x] Submit calls service, refresh list, toast
-- [x] Supports edit mode (pre-fill data)
-
-## Step 5: Create BulkImportDialog.tsx ✅
-- [x] File upload UI with drag-drop area
-- [x] Instructions + placeholder download sample button
-- [x] Toast "Tính năng đang phát triển"
-
-## Step 6: Update SeedingAccountTable.tsx - DropdownMenu + AlertDialog ✅
-- [x] Replace raw "⋯" button with shadcn DropdownMenu + MoreHorizontal icon
-- [x] Menu items: Xem chi tiết, Chỉnh sửa, Đăng nhập lại (offline/warning only), Separator, Xóa
-- [x] Detail modal via AlertDialog showing full account info
-- [x] Delete confirmation via AlertDialog (shadcn)
-- [x] Edit dialog via AddAccountDialog (reused with pre-fill)
-
-## Step 7: Update SeedingAccountsManager.tsx - Wire dialogs ✅
-- [x] Import + render AddAccountDialog, BulkImportDialog
-- [x] onClick handlers for both buttons
-- [x] StatCard updated with proper lucide-react icons + colors
-
-## Step 8: TypeScript check ✅
-- [x] `npx tsc --noEmit --pretty` — no new errors
-
-## Summary
-All 3 requirements completed:
-1. ✅ Icon góc phải StatCard: dùng Users, CheckCircle2, PauseCircle, History, AlertTriangle
-2. ✅ "Nhập hàng loạt" / "+ Thêm tài khoản" → mở form modal (Dialog shadcn)
-3. ✅ Nút "..." → DropdownMenu với các mục đầy đủ + AlertDialog xác nhận xóa
-
+## Verification
+- [x] Backend: `py -3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000` → "Application startup complete." (no SyntaxError/NameError)
+- [x] Frontend: `npx tsc --noEmit --pretty` → EXIT_0, 0 errors
+- [x] Endpoint test: `curl http://localhost:8000/docs` → HTTP_200

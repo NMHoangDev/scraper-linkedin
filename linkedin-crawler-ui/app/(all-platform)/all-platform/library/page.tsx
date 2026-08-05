@@ -96,7 +96,7 @@ function InboxLibraryPanel() {
   return (
     <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
       <div className="space-y-4">
-        <div className="rounded-[28px] border border-border bg-white/90 p-5 shadow-sm shadow-slate-200/20">
+        <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
             <Input
               placeholder="Tìm kiếm title / label / nội dung..."
@@ -130,12 +130,12 @@ function InboxLibraryPanel() {
 
         <div className="grid gap-4">
           {filteredItems.length === 0 ? (
-            <div className="rounded-[28px] border border-border bg-surface p-6 text-sm text-muted-foreground shadow-sm shadow-slate-200/10">
+            <div className="rounded-xl border border-border bg-muted p-6 text-sm text-muted-foreground shadow-sm">
               Không có mẫu phù hợp. Vui lòng thêm mẫu mới hoặc thay đổi bộ lọc.
             </div>
           ) : (
             filteredItems.map((item) => (
-              <div key={item.id} className="rounded-[28px] border border-border bg-white/95 p-5 shadow-sm shadow-slate-200/20">
+              <div key={item.id} className="rounded-xl border border-border bg-card p-5 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -158,7 +158,7 @@ function InboxLibraryPanel() {
       </div>
 
       <aside className="space-y-4">
-        <div className="rounded-[28px] border border-border bg-card/90 p-5 shadow-sm shadow-slate-200/20">
+        <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-semibold text-foreground">Thêm / sửa mẫu inbox</h2>
             <Button type="button" size="sm" variant="outline" onClick={handleOpenNew}>
@@ -279,7 +279,7 @@ function CommentLibraryPanel() {
   return (
     <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
       <div className="space-y-4">
-        <div className="rounded-[28px] border border-border bg-white/90 p-5 shadow-sm shadow-slate-200/20">
+        <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
             <Input
               placeholder="Tìm kiếm title / label / nội dung..."
@@ -313,12 +313,12 @@ function CommentLibraryPanel() {
 
         <div className="grid gap-4">
           {filteredItems.length === 0 ? (
-            <div className="rounded-[28px] border border-border bg-surface p-6 text-sm text-muted-foreground shadow-sm shadow-slate-200/10">
+            <div className="rounded-xl border border-border bg-muted p-6 text-sm text-muted-foreground shadow-sm">
               Không có mẫu phù hợp. Vui lòng thêm mẫu mới hoặc thay đổi bộ lọc.
             </div>
           ) : (
             filteredItems.map((item) => (
-              <div key={item.id} className="rounded-[28px] border border-border bg-white/95 p-5 shadow-sm shadow-slate-200/20">
+              <div key={item.id} className="rounded-xl border border-border bg-card p-5 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -342,7 +342,7 @@ function CommentLibraryPanel() {
       </div>
 
       <aside className="space-y-4">
-        <div className="rounded-[28px] border border-border bg-card/90 p-5 shadow-sm shadow-slate-200/20">
+        <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-semibold text-foreground">Thêm / sửa mẫu comment</h2>
             <Button type="button" size="sm" variant="outline" onClick={handleOpenNew}>
@@ -412,8 +412,8 @@ export default function LibraryPage() {
   }, []);
 
   return (
-    <div className="space-y-6 p-6 bg-surface min-h-screen text-foreground">
-      <div className="rounded-[32px] border border-border bg-card/90 p-6 shadow-sm shadow-slate-200/30">
+    <div className="space-y-6 text-foreground">
+      <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
         <div>
           <h1 className="text-3xl font-semibold text-foreground">Thư viện mẫu câu</h1>
           <p className="mt-2 text-sm text-muted-foreground max-w-2xl leading-7">

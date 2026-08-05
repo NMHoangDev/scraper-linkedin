@@ -25,13 +25,6 @@ from app.modules.facebook.src.modules.facebook.services.facebook_scraper import 
 from app.modules.facebook.src.modules.crawl_fb.models.post import Post as FBPost
 
 
-# Reuse facebook keyword picker logic
-from app.modules.facebook.src.modules.facebook.services.facebook_scraper import (
-    _pick_by_keywords_and_threshold,
-)
-from app.modules.facebook.src.modules.crawl_fb.models.post import Post as FBPost
-
-
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -66,14 +59,11 @@ class ExtensionCrawlRequest(BaseModel):
     keywords: Optional[List[str]] = None
     post_limit: Optional[int] = None
 
-<<<<<<< HEAD
-=======
     # Định danh job/worker khi bài viết đến từ hàng đợi multi-VPS (không bắt buộc,
     # extension cũ/luồng thủ công không gửi field này vẫn hoạt động bình thường).
     job_id: Optional[str] = None
     worker_id: Optional[str] = None
 
->>>>>>> 961099854cab42df4ea4717cb6d6f4d86f4742a1
     @model_validator(mode="before")
     @classmethod
     def normalize_keywords(cls, data):
@@ -228,11 +218,6 @@ def sync_process_and_save_posts_db(payload: ExtensionCrawlRequest, legacy: bool)
         f"| Bài HÔM NAY={len(today_posts)} (today_vn={today_vn_str})"
     )
 
-<<<<<<< HEAD
-    # 4b. Build map theo post_url để MAP NGƯỢC object gốc (có author_url/author_name/content đầy đủ)
-    ext_post_by_url = {}
-    for (ext_post, _raw_time) in today_posts:
-=======
     # Note: _pick_by_keywords_and_threshold cần: url, date, reactions/comments/shares/score, content
     keywords = payload.keywords or []
     post_limit = payload.post_limit
@@ -241,7 +226,6 @@ def sync_process_and_save_posts_db(payload: ExtensionCrawlRequest, legacy: bool)
     # 4b. Build map theo post_url để MAP NGƯỢC object gốc (có author_url/author_name/content đầy đủ)
     ext_post_by_url = {}
     for (ext_post, _raw_time) in candidate_posts:
->>>>>>> 961099854cab42df4ea4717cb6d6f4d86f4742a1
         p_url = ext_post.post_url or ext_post.url
         if p_url:
             ext_post_by_url[p_url] = ext_post
@@ -256,21 +240,6 @@ def sync_process_and_save_posts_db(payload: ExtensionCrawlRequest, legacy: bool)
     # NOTE: FBPost model chỉ có url/date/reactions/comments/shares/score/content/media/images
     # KHÔNG có author_url/author_name => sau khi picker chọn xong phải map ngược object gốc theo post_url.
 
-<<<<<<< HEAD
-    # Note: _pick_by_keywords_and_threshold cần: url, date, reactions/comments/shares/score, content
-    keywords = payload.keywords or []
-    post_limit = payload.post_limit
-
-    logger.info(
-        "[KEYWORD-CHECK] payload.keywords=%s | post_limit=%s | total_posts_in_day=%s",
-        keywords,
-        post_limit,
-        len(today_posts),
-    )
-
-    posts_in_day: list[FBPost] = []
-    for (ext_post, raw_time) in today_posts:
-=======
     logger.info(
         "[KEYWORD-CHECK] payload.keywords=%s | post_limit=%s | candidate_count=%s",
         keywords,
@@ -280,7 +249,6 @@ def sync_process_and_save_posts_db(payload: ExtensionCrawlRequest, legacy: bool)
 
     posts_in_day: list[FBPost] = []
     for (ext_post, raw_time) in candidate_posts:
->>>>>>> 961099854cab42df4ea4717cb6d6f4d86f4742a1
         post_url = ext_post.post_url or ext_post.url
         if not post_url:
             continue

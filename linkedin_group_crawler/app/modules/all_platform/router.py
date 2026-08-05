@@ -34,9 +34,6 @@ from app.modules.all_platform.routers.websocket import router as websocket_route
 from app.modules.all_platform.routers.fb_inbox_accounts import router as fb_inbox_accounts_router
 from app.modules.all_platform.routers.crawl_fb_dashboard import router as crawl_fb_dashboard_router
 from app.modules.all_platform.routers.customer_lead import router as customer_lead_router
-<<<<<<< HEAD
-from app.modules.all_platform.routers.posts_delete import router as posts_delete_router
-=======
 from app.modules.all_platform.routers.quote import quote_forms_router, quotes_router
 from app.modules.all_platform.routers.sales_asset import router as sales_asset_router
 from app.modules.all_platform.routers.kpi_reward import router as kpi_reward_router
@@ -44,7 +41,6 @@ from app.modules.all_platform.routers.scheduled_comments import router as schedu
 from app.modules.all_platform.routers.posts_delete import router as posts_delete_router
 from app.modules.all_platform.routers.internal_engagement import router as internal_engagement_router
 from app.modules.all_platform.phone_bridge.router import router as phone_bridge_router
->>>>>>> 961099854cab42df4ea4717cb6d6f4d86f4742a1
 
 all_platform_router = APIRouter()
 
@@ -333,4 +329,3 @@ all_platform_router.include_router(
     prefix="/scheduled-comments",
     tags=["All-Platform Scheduled Comments"],
 )
-

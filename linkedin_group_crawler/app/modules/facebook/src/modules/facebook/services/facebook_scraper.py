@@ -132,7 +132,6 @@ def _pick_by_keywords_and_threshold(
             c_preview,
         )
 
-
     # No keywords => áp dụng NGƯỠNG CŨ theo yêu cầu:
 
     # - posts_in_day > 10  => lấy 3
@@ -154,10 +153,6 @@ def _pick_by_keywords_and_threshold(
 
         return selected
 
-<<<<<<< HEAD
-
-
-=======
     # Có keyword: ưu tiên bài khớp từ khóa (trong phạm vi posts_in_day - đã lọc hôm nay từ
     # trước), nếu thiếu so với target thì bù bằng bài tương tác cao nhất (loại trừ bài đã
     # chọn), nếu 0 bài khớp thì lấy thẳng top tương tác cao nhất thay thế - không bao giờ
@@ -165,7 +160,6 @@ def _pick_by_keywords_and_threshold(
     target = post_limit if (post_limit is not None and post_limit > 0) else 5
 
     sorted_by_score = sorted(posts_in_day, key=lambda p: p.score, reverse=True)
->>>>>>> 961099854cab42df4ea4717cb6d6f4d86f4742a1
 
     def matches(p: Post) -> bool:
         content = (p.content or "").lower()
@@ -183,33 +177,6 @@ def _pick_by_keywords_and_threshold(
                 matched_any = True
         return matched_any
 
-<<<<<<< HEAD
-
-    group_a = [p for p in posts_in_day if matches(p)]
-    group_a_scores = group_a
-    group_a_set = set(p.url for p in group_a_scores)
-    group_b = [p for p in posts_in_day if p.url not in group_a_set]
-    group_b.sort(key=lambda p: p.score, reverse=True)
-
-    # thresholds applied on group B AFTER subtract A
-    b_count = len(group_b)
-    extra = 0
-    if b_count > 10:
-        extra = 3
-    elif 3 <= b_count <= 10:
-        extra = 2
-    else:
-        extra = 1 if b_count > 0 else 0
-
-    # KPI strict: chỉ lấy bài match keyword (không cho lọt group_b không match)
-    selected = list(group_a)
-
-
-    if post_limit is not None and post_limit > 0:
-        # cap final result if user explicitly sets post_limit
-        selected = selected[:post_limit]
-
-=======
     matched = [p for p in posts_in_day if matches(p)]
 
     logger.info(
@@ -235,7 +202,6 @@ def _pick_by_keywords_and_threshold(
     remaining_needed = target - len(matched_sorted)
 
     selected = matched_sorted + backfill[:remaining_needed]
->>>>>>> 961099854cab42df4ea4717cb6d6f4d86f4742a1
     return selected
 
 from app.modules.facebook.src.core.utils.logger import setup_logger
