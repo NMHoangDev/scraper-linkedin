@@ -72,6 +72,30 @@ function cleanDocumentText(value: unknown): string {
     .trim();
 }
 
+/** Dữ liệu cũ (trước khi có cột riêng cho "Tên dịch vụ") chỉ lưu 1 chuỗi
+ * "• Tên ngắn — mô tả dài..." vào field description, không có serviceDescription
+ * riêng. Tách theo dấu gạch ngang "—"/"–" đầu tiên (đúng quy ước đã dùng khi
+ * soạn nội dung) để hiển thị đúng 2 cột thay vì Tên dịch vụ trống/lặp Mô tả. */
+function splitLegacyServiceText(raw: unknown): { name: string; rest: string } {
+  const text = textValue(raw).replace(/^"+|"+$/g, '').trim();
+  const match = text.match(/^•?\s*([^—–]+?)\s*[—–]\s*([\s\S]+)$/);
+  if (!match) return { name: '', rest: text };
+  return { name: match[1].trim(), rest: match[2].trim() };
+}
+
+/** Mô tả nhiều gạch đầu dòng ("• Ý 1. • Ý 2. ...") đang bị dồn thành 1 đoạn
+ * dính liền, khó đọc. Tách mỗi "•" thành 1 dòng riêng, bỏ dấu chấm cuối câu
+ * thừa (đã có xuống dòng phân tách rồi, không cần chấm câu nữa). Không có
+ * "•" thì giữ nguyên 1 dòng, chỉ bỏ dấu chấm cuối. */
+function formatDescriptionLines(raw: unknown): string[] {
+  const text = textValue(raw).replace(/^"+|"+$/g, '').trim();
+  if (!text) return [];
+  const parts = text.includes('•') ? text.split('•') : [text];
+  return parts
+    .map(part => part.trim().replace(/\.+\s*$/, ''))
+    .filter(Boolean);
+}
+
 export function QuoteDocumentRenderer({
   schemaSnapshot,
   quoteData = {},
@@ -112,8 +136,35 @@ export function QuoteDocumentRenderer({
     if (column.key === 'unitPrice') return formatVnd(item.unitPrice);
     if (column.key === 'quantity') return String(item.quantity || '');
     if (column.key === 'vatRate') return item.vatRate ? `${item.vatRate}%` : '';
-    const value = item[column.key] ?? item.description ?? '';
-    return String(value || '');
+    // "Mô tả" luôn qua tách dòng theo "•" (kể cả du lieu moi da co serviceDescription
+    // rieng) - phai xu ly TRUOC fallback chung ben duoi, khong thi item.description
+    // (luon co gia tri) se bi return thang o do, khien nhanh tach dong o day
+    // thanh dead code khong bao gio chay toi.
+    if (column.key === 'description') {
+      const raw = !item.serviceDescription ? splitLegacyServiceText(item.description).rest : item.description || '';
+      const lines = formatDescriptionLines(raw);
+      if (lines.length <= 1) return lines[0] || '';
+      return (
+        <>
+          {lines.map((line, lineIndex) => (
+            <div key={lineIndex} className="quote-desc-line">{line}</div>
+          ))}
+        </>
+      );
+    }
+    let value = item[column.key];
+    if (column.key === 'serviceDescription' && !value && ('name' in item) && item.name) {
+      value = String(item.name);
+    }
+    if (value !== undefined && value !== null && value !== '') {
+      return String(value);
+    }
+    // item.serviceDescription trống (du lieu cu) -> thu tach tu description
+    // theo quy uoc "Ten — Mo ta" thay vi de trong/lap noi dung.
+    if (column.key === 'serviceDescription' && item.description) {
+      return splitLegacyServiceText(item.description).name;
+    }
+    return '';
   };
 
   const notesValue = fieldValue('notes');

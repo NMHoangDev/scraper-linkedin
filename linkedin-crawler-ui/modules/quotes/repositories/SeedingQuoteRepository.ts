@@ -4,7 +4,6 @@ import type {
   CreateQuoteInput,
   Quote,
   QuoteForm,
-  QuoteReference,
   UpdateQuoteFormInput,
   UpdateQuoteInput,
 } from '../types';
@@ -66,7 +65,8 @@ function toCreateQuotePayload(input: CreateQuoteInput) {
     quote_form_id: input.quoteFormId,
     data: input.data,
     items: (input.items || []).map(item => ({
-      description: item.description ?? item.serviceDescription,
+      description: item.description ?? '',
+      service_description: item.serviceDescription ?? null,
       unit: item.unit,
       quantity: item.quantity,
       unit_price: item.unitPrice,
@@ -77,9 +77,15 @@ function toCreateQuotePayload(input: CreateQuoteInput) {
 
 function toUpdateQuotePayload(input: UpdateQuoteInput) {
   return {
-    status: input.status,
     data: input.data,
-    public_enabled: input.publicEnabled,
+    items: input.items?.map(item => ({
+      description: item.description ?? '',
+      service_description: item.serviceDescription ?? null,
+      unit: item.unit,
+      quantity: item.quantity,
+      unit_price: item.unitPrice,
+      vat_rate: item.vatRate,
+    })),
   };
 }
 
@@ -157,9 +163,16 @@ export class SeedingQuoteRepository implements QuoteRepository {
     await apiFetch<unknown>(`/api/all-platform/quotes/${encodeURIComponent(id)}`, { method: 'DELETE' });
   }
 
-  async publishQuote(id: string): Promise<QuoteReference> {
-    return apiFetch<QuoteReference>(`/api/all-platform/quotes/${encodeURIComponent(id)}/publish`, {
+  async approveQuote(id: string): Promise<Quote> {
+    return apiFetch<Quote>(`/api/all-platform/quotes/${encodeURIComponent(id)}/approve`, {
       method: 'POST',
+    });
+  }
+
+  async updateAndApproveQuote(id: string, input: UpdateQuoteInput): Promise<Quote> {
+    return apiFetch<Quote>(`/api/all-platform/quotes/${encodeURIComponent(id)}/update-and-approve`, {
+      method: 'POST',
+      body: JSON.stringify(toUpdateQuotePayload(input)),
     });
   }
 }

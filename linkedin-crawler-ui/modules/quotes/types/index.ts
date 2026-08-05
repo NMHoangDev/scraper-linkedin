@@ -1,5 +1,5 @@
 export type QuoteFormStatus = 'active' | 'inactive' | 'archived';
-export type QuoteStatus = 'draft' | 'confirmed' | 'cancelled';
+export type QuoteStatus = 'draft' | 'confirmed' | 'approved' | 'cancelled';
 export type QuoteLayoutType =
   | 'cloudgate_standard_quote'
   | 'villa_solution_package'
@@ -125,6 +125,9 @@ export interface Quote {
   createdById?: string;
   createdAt: string;
   updatedAt: string;
+  updatedById?: string;
+  approvedById?: string;
+  approvedAt?: string;
   publicToken?: string;
   publicUrl?: string;
   publicEnabled?: boolean;
@@ -135,6 +138,7 @@ export interface QuoteReference {
   number?: string;
   url?: string;
   totalAmount?: number;
+  status?: QuoteStatus;
 }
 
 export interface CreateQuoteFormInput {
@@ -157,8 +161,6 @@ export interface CreateQuoteInput {
 }
 
 export interface UpdateQuoteInput {
-  status?: QuoteStatus;
   data?: QuoteData;
   items?: QuoteItem[];
-  publicEnabled?: boolean;
 }

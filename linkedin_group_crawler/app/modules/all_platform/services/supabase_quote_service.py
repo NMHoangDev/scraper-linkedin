@@ -60,6 +60,7 @@ def _row_to_item(row: dict) -> dict:
         "id": row["id"],
         "quoteId": row["quote_id"],
         "description": row.get("description") or "",
+        "serviceDescription": row.get("service_description") or "",
         "unit": row.get("unit"),
         "quantity": float(row.get("quantity") or 0),
         "unitPrice": float(row.get("unit_price") or 0),
@@ -91,6 +92,9 @@ def _row_to_quote(row: dict, items: list[dict] | None = None) -> dict:
         "createdById": row.get("created_by"),
         "createdAt": row.get("created_at"),
         "updatedAt": row.get("updated_at"),
+        "updatedById": row.get("updated_by"),
+        "approvedById": row.get("approved_by"),
+        "approvedAt": row.get("approved_at"),
         "publicToken": row.get("public_token"),
         "publicUrl": f"/public/quotes/{row['public_token']}" if row.get("public_token") else None,
         "publicEnabled": row.get("public_enabled") if row.get("public_enabled") is not None else True,
@@ -303,9 +307,13 @@ def get_public_quote(token: str) -> dict:
         .single()
         .execute()
     )
-    if not result.data:
-        raise ValueError("Báo giá không tồn tại hoặc đã bị khóa.")
-    return _row_to_quote(result.data, _quote_items(result.data["id"]))
+    row = result.data
+    # 'confirmed' = quote tao truoc migration 053 (luon duoc coi la da chot/cong khai
+    # nhu cu, khong hoi to) - 'draft'/'cancelled' thi CHUA duoc xem cong khai, phai
+    # qua approve_quote() truoc.
+    if not row or row.get("status") not in ("approved", "confirmed"):
+        raise ValueError("Báo giá chưa được phát hành.")
+    return _row_to_quote(row, _quote_items(row["id"]))
 
 
 def create_quote(payload: dict, created_by: str | None) -> dict:
@@ -337,7 +345,7 @@ def create_quote(payload: dict, created_by: str | None) -> dict:
         "deal_id": payload.get("deal_id"),
         "quote_form_id": form["id"],
         "quote_number": quote_number,
-        "status": "confirmed",
+        "status": "draft",
         "form_schema_version": form["schema_version"],
         "form_snapshot": form["schema_json"],
         "data": {**data, "quoteNumber": quote_number},
@@ -346,8 +354,8 @@ def create_quote(payload: dict, created_by: str | None) -> dict:
         "total_amount": total,
         "currency": str(data.get("currency") or "VND"),
         "issued_at": now,
-        "public_token": secrets.token_urlsafe(16),
-        "public_enabled": True,
+        "public_token": None,
+        "public_enabled": False,
         "created_by": created_by,
     }
     quote_row = supabase.table(QUOTES_TABLE).insert(insert_data).execute().data[0]
@@ -357,6 +365,7 @@ def create_quote(payload: dict, created_by: str | None) -> dict:
         row = {
             "quote_id": quote_row["id"],
             "description": item.get("description") or "",
+            "service_description": item.get("service_description") or None,
             "unit": item.get("unit"),
             "quantity": float(item.get("quantity") or 0),
             "unit_price": float(item.get("unit_price") or 0),
@@ -368,39 +377,106 @@ def create_quote(payload: dict, created_by: str | None) -> dict:
         }
         inserted_items.append(supabase.table(ITEMS_TABLE).insert(row).execute().data[0])
 
+    supabase.table("quote_activity_log").insert({
+        "quote_id": quote_row["id"], "actor_id": created_by, "action": "created", "changes": None,
+    }).execute()
+
+    if quote_row.get("deal_id"):
+        # Chua duyet -> chi gan FK quote_id de Deal card thay ngay bao gia "Chua
+        # duyet", KHONG ghi last_attachment_url/estimated_budget (chua co public
+        # url that, chua chac chan gia da chot).
+        supabase.table("customer_leads").update({"quote_id": quote_row["id"]}).eq("id", quote_row["deal_id"]).execute()
+
     return _row_to_quote(quote_row, inserted_items)
 
 
-def update_quote(quote_id: str, payload: dict) -> dict:
+_RPC_ERROR_MESSAGES = {
+    "quote_not_found": "Không tìm thấy báo giá.",
+    "quote_already_approved": "Báo giá đã được duyệt, không thể chỉnh sửa.",
+    "quote_not_in_draft_status": "Báo giá không ở trạng thái chờ duyệt.",
+    "quote_missing_required_fields": "Báo giá thiếu thông tin bắt buộc (chưa có hạng mục hoặc tổng tiền = 0).",
+}
+
+
+def _raise_friendly_rpc_error(exc: Exception) -> None:
+    message = str(exc)
+    for code, friendly in _RPC_ERROR_MESSAGES.items():
+        if code in message:
+            raise ValueError(friendly) from exc
+    raise
+
+
+def update_quote(quote_id: str, payload: dict, actor_id: str | None) -> dict:
     supabase: Client = get_supabase_client()
-    update_data: dict[str, Any] = {"updated_at": _now_iso()}
-    if payload.get("status") is not None:
-        update_data["status"] = payload["status"]
-    if payload.get("public_enabled") is not None:
-        update_data["public_enabled"] = payload["public_enabled"]
-    if payload.get("data") is not None:
-        update_data["data"] = payload["data"]
-    supabase.table(QUOTES_TABLE).update(update_data).eq("id", quote_id).execute()
+    items = payload.get("items")
+    changes = {"data_changed": payload.get("data") is not None, "items_changed": items is not None}
+    try:
+        supabase.rpc("quote_update", {
+            "p_quote_id": quote_id,
+            "p_actor_id": actor_id,
+            "p_data": payload.get("data"),
+            "p_items": [item for item in items] if items is not None else [],
+            "p_changes": changes,
+        }).execute()
+    except Exception as exc:
+        _raise_friendly_rpc_error(exc)
     return get_quote(quote_id)
 
 
-def publish_quote(quote_id: str) -> dict:
-    """Xác nhận + bật public + gắn QuoteReference ngược vào deal (nếu quote có deal_id),
-    trả về QuoteReference {id, number, url, totalAmount}."""
-    quote = update_quote(quote_id, {"status": "confirmed", "public_enabled": True})
-    reference = {
-        "id": quote["id"],
-        "number": quote["quoteNumber"],
-        "url": quote["publicUrl"],
-        "totalAmount": quote["totalAmount"],
-    }
+def approve_quote(quote_id: str, actor_id: str | None) -> dict:
+    """Duyệt báo giá: khoá chỉnh sửa vĩnh viễn, sinh public_token (nếu chưa có),
+    bật public_enabled, ghi approved_by/approved_at + activity log. Idempotent
+    (gọi lại khi đã approved trả về nguyên trạng, không sinh thêm token/log)."""
+    supabase: Client = get_supabase_client()
+    try:
+        supabase.rpc("quote_approve", {
+            "p_quote_id": quote_id,
+            "p_actor_id": actor_id,
+            "p_public_token": secrets.token_urlsafe(16),
+        }).execute()
+    except Exception as exc:
+        _raise_friendly_rpc_error(exc)
+    quote = get_quote(quote_id)
     if quote.get("dealId"):
-        link_quote_to_deal(quote_id, quote["dealId"], reference)
-    return reference
+        link_quote_to_deal(quote_id, quote["dealId"], {
+            "id": quote["id"], "number": quote["quoteNumber"],
+            "url": quote["publicUrl"], "totalAmount": quote["totalAmount"],
+        })
+    return quote
+
+
+def update_and_approve_quote(quote_id: str, payload: dict, actor_id: str | None) -> dict:
+    """Dùng cho nút "Duyệt báo giá" khi đang sửa trong modal - lưu thay đổi cuối
+    + duyệt trong CÙNG 1 transaction Postgres (không tách 2 lệnh riêng, tránh
+    nửa vời khi 1 trong 2 bước lỗi)."""
+    supabase: Client = get_supabase_client()
+    items = payload.get("items")
+    changes = {"data_changed": payload.get("data") is not None, "items_changed": items is not None}
+    try:
+        supabase.rpc("quote_update_and_approve", {
+            "p_quote_id": quote_id,
+            "p_actor_id": actor_id,
+            "p_data": payload.get("data"),
+            "p_items": [item for item in items] if items is not None else [],
+            "p_changes": changes,
+            "p_public_token": secrets.token_urlsafe(16),
+        }).execute()
+    except Exception as exc:
+        _raise_friendly_rpc_error(exc)
+    quote = get_quote(quote_id)
+    if quote.get("dealId"):
+        link_quote_to_deal(quote_id, quote["dealId"], {
+            "id": quote["id"], "number": quote["quoteNumber"],
+            "url": quote["publicUrl"], "totalAmount": quote["totalAmount"],
+        })
+    return quote
 
 
 def delete_quote(quote_id: str) -> None:
     supabase: Client = get_supabase_client()
+    current = supabase.table(QUOTES_TABLE).select("status").eq("id", quote_id).single().execute().data
+    if current and current.get("status") == "approved":
+        raise ValueError("Báo giá đã duyệt, không thể xoá.")
     supabase.table(QUOTES_TABLE).delete().eq("id", quote_id).execute()
 
 

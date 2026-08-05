@@ -21,6 +21,7 @@ import {
   CONTRACT_STATUS_OPTIONS,
   DEAL_STAGE_META,
   allowedNextStages,
+  canApproveQuote,
   canWriteDeal,
   formatDate,
   formatDateTime,
@@ -45,6 +46,8 @@ type Props = {
   onDelete: (deal: Deal) => void;
   onUpdateContractStatus: (deal: Deal, status: ContractStatus) => void;
   onCreateQuote: (deal: Deal) => void;
+  /** Mở modal sửa báo giá đang gắn với deal này (chỉ khi chưa duyệt). */
+  onEditQuote: (deal: Deal) => void;
 };
 
 function tel(value?: string) {
@@ -61,6 +64,7 @@ export function DetailDrawer({
   onDelete,
   onUpdateContractStatus,
   onCreateQuote,
+  onEditQuote,
 }: Props) {
   const { user } = useAppAuth();
   if (!open || !deal) return null;
@@ -205,26 +209,66 @@ export function DetailDrawer({
                 </button>
               ) : null}
             </div>
-            {deal.quote ? (
-              <article className="crm-quote-row">
-                <div className="crm-quote-row-main">
-                  <div>
-                    <b>{deal.quote.number || deal.quote.id || 'Báo giá tham chiếu'}</b>
-                    <span>Tham chiếu thủ công</span>
+            {deal.quote ? (() => {
+              // Bao gia THAT (co id, tao qua wizard moi) - chi 'approved' moi
+              // coi la khoa. 'confirmed'/'draft' van la chua duyet, sua duoc -
+              // ke ca bao gia cu tao truoc migration 053 (status='confirmed')
+              // vi co the con loi du lieu can sua (vd ten dich vu bi lap mo ta)
+              // truoc khi duyet chinh thuc. Bao gia THAM CHIEU cu (khong co id
+              // - chi la link/doc dinh kem tay tu truoc khi co he thong nay)
+              // thi coi nhu da "chot" san, khong con gi de sua/duyet nua.
+              const isApproved = !deal.quote.id || deal.quote.status === 'approved';
+              const canEditThisQuote = !isApproved && (canWriteDeal(user, deal) || canApproveQuote(user));
+              // Gắn kèm dealId để trang chi tiết báo giá biết đường "Quay lại"
+              // đúng deal này (xem QuoteDetailPage.tsx) - mở CÙNG tab (không
+              // target="_blank") để nút Quay lại hoạt động như back thật.
+              const internalUrl = deal.quote.id
+                ? `/all-platform/quotes/${deal.quote.id}?dealId=${encodeURIComponent(deal.id)}`
+                : undefined;
+              return (
+                <article className="crm-quote-row">
+                  <div className="crm-quote-row-main">
+                    <div>
+                      <b>{deal.quote.number || deal.quote.id || 'Báo giá tham chiếu'}</b>
+                      <span className={isApproved ? 'crm-quote-tag crm-quote-tag--approved' : 'crm-quote-tag crm-quote-tag--draft'}>
+                        {isApproved ? '🟢 Đã duyệt' : '🟠 Chưa duyệt'}
+                      </span>
+                    </div>
+                    <strong>{formatVND(deal.quote.totalAmount || 0) || 'Chưa có giá trị'}</strong>
                   </div>
-                  <strong>{formatVND(deal.quote.totalAmount || 0) || 'Chưa có giá trị'}</strong>
-                </div>
-                <div className="crm-quote-row-actions">
-                  {deal.quote.url ? (
-                    <a href={deal.quote.url} className="crm-quote-btn" target="_blank" rel="noopener noreferrer">
-                      Mở báo giá
-                    </a>
-                  ) : (
-                    <span className="crm-quote-btn crm-quote-btn--disabled">Chưa có link</span>
-                  )}
-                </div>
-              </article>
-            ) : (
+                  <div className="crm-quote-row-actions">
+                    {!isApproved && canEditThisQuote ? (
+                      <button type="button" className="crm-quote-btn" onClick={() => onEditQuote(deal)}>
+                        Chỉnh sửa
+                      </button>
+                    ) : null}
+                    {isApproved && deal.quote.url ? (
+                      <a href={deal.quote.url} className="crm-quote-btn" target="_blank" rel="noopener noreferrer">
+                        Mở báo giá
+                      </a>
+                    ) : internalUrl ? (
+                      <a href={internalUrl} className="crm-quote-btn">
+                        Mở báo giá
+                      </a>
+                    ) : (
+                      <span className="crm-quote-btn crm-quote-btn--disabled">Chưa có link</span>
+                    )}
+                    {isApproved && deal.quote.url ? (
+                      <button
+                        type="button"
+                        className="crm-quote-btn"
+                        onClick={() => {
+                          const url = deal.quote?.url;
+                          if (url) void navigator.clipboard.writeText(`${window.location.origin}${url}`);
+                        }}
+                      >
+                        Sao chép link
+                      </button>
+                    ) : null}
+                  </div>
+                </article>
+              );
+            })() : (
               <p className="crm-empty-log">Chưa có báo giá</p>
             )}
           </section>
