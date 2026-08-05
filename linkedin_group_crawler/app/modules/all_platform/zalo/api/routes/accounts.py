@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from loguru import logger
 from pydantic import BaseModel, Field
 
+from app.modules.all_platform.auth_deps import get_authenticated_caller_email
 from app.modules.all_platform.zalo.api.security import verify_zalo_api_key
 from app.modules.all_platform.zalo.services.zca_auth_store import delete_zca_auth, list_zca_auth_users, load_zca_auth
 from app.modules.all_platform.zalo.services.zca_persistent_listener import get_listener_status, restart_listener, stop_listener
@@ -107,13 +108,18 @@ class ZaloAccountUpdate(BaseModel):
 async def list_accounts(
     owner_id: Optional[str] = Query(None),
     id_member: Optional[str] = Query(None),
-    email: Optional[str] = Query(None, description="Email của caller — dùng để tra role từ app_users"),
-    role: Optional[str] = Query(None, description="Override role (admin/leader/member) — chỉ dùng cho test nội bộ"),
     x_user_id: str = Header("default", alias="X-User-ID"),
+    caller_email: Optional[str] = Depends(get_authenticated_caller_email),
 ):
     # Role-based filtering: xác định owner/id_member filter dựa trên role của caller.
     # admin → xem tất cả; leader → xem team members; member → xem của mình.
-    rule_owner, rule_member = await _resolve_accounts_for_role(x_user_id, email, role)
+    #
+    # Trước đây `email`/`role` là query param client tự truyền (`?role=admin` là
+    # tự phong admin ngay lập tức — comment cũ ghi "chỉ dùng cho test nội bộ"
+    # nhưng không có gì chặn dùng thật trên production). Giờ email lấy từ JWT
+    # đã xác thực, role LUÔN tra từ DB (`_resolve_accounts_for_role` tự gọi
+    # `get_user_role`), không còn override từ client.
+    rule_owner, rule_member = await _resolve_accounts_for_role(x_user_id, caller_email, None)
 
     if rule_owner is None and rule_member is None:
         # admin: xem tất cả accounts
@@ -183,14 +189,45 @@ async def list_accounts(
     return {"owner_id": resolved_owner, "accounts": accounts}
 
 
+async def _require_admin_leader_or_self(
+    caller_email: Optional[str],
+    target_id_member: Optional[str],
+) -> None:
+    """403 nếu caller không phải admin/leader VÀ không phải chủ sở hữu thật của
+    account đang thao tác (id_member đích khớp chính id của caller).
+
+    Trước đây create/update/delete Zalo account không check gì (create/update)
+    hoặc check được bằng cách bỏ trống header (delete) — bất kỳ ai gọi API cũng
+    tạo/sửa account gán cho id_member tuỳ ý, hoặc xoá account của người khác.
+    """
+    if not caller_email:
+        raise HTTPException(status_code=401, detail="Cần đăng nhập để thao tác tài khoản Zalo")
+    caller_id = await get_app_user_id_by_email(caller_email)
+    if not caller_id:
+        raise HTTPException(status_code=403, detail="Không tìm thấy thông tin người dùng")
+    role = await get_user_role(caller_email)
+    if role in ("admin", "leader"):
+        return
+    if target_id_member and _normalize_id(target_id_member, "") == _normalize_id(caller_id, ""):
+        return
+    raise HTTPException(status_code=403, detail="Bạn không có quyền thao tác trên tài khoản Zalo này")
+
+
 @router.post("")
-async def create_account(body: ZaloAccountCreate):
+async def create_account(
+    body: ZaloAccountCreate,
+    caller_email: Optional[str] = Depends(get_authenticated_caller_email),
+):
     owner_id = _normalize_id(body.owner_id)
 
     # Auto-resolve id_member từ email nếu không truyền trực tiếp.
     resolved_id_member = body.id_member
     if not resolved_id_member and body.email:
         resolved_id_member = await get_app_user_id_by_email(body.email.strip().lower())
+
+    # Member thường chỉ được tạo account gán cho CHÍNH MÌNH; admin/leader tạo
+    # cho ai cũng được (vd leader tạo hộ account cho nhân viên mới).
+    await _require_admin_leader_or_self(caller_email, resolved_id_member or owner_id)
 
     # Generate random unique account_id
     while True:
@@ -236,9 +273,19 @@ async def create_account(body: ZaloAccountCreate):
 
 
 @router.patch("/{account_id}")
-async def update_account(account_id: str, body: ZaloAccountUpdate):
+async def update_account(
+    account_id: str,
+    body: ZaloAccountUpdate,
+    caller_email: Optional[str] = Depends(get_authenticated_caller_email),
+):
     safe_account_id = _normalize_id(account_id)
     existing = await get_zalo_account_by_id(safe_account_id) or {}
+    # Chủ sở hữu HIỆN TẠI (không phải body.owner_id — đó là giá trị caller MUỐN
+    # đổi thành, không phải quyền sở hữu thật để authorize hành động này).
+    await _require_admin_leader_or_self(
+        caller_email,
+        existing.get("id_member") or existing.get("owner_id"),
+    )
     owner_id = _normalize_id(body.owner_id) if body.owner_id else _normalize_id(existing.get("owner_id"), "default")
 
     # Auto-resolve id_member từ email nếu body.id_member không truyền và chưa có trong DB.
@@ -272,19 +319,19 @@ async def update_account(account_id: str, body: ZaloAccountUpdate):
 async def remove_account(
     account_id: str,
     delete_auth: bool = Query(False),
-    owner_id: Optional[str] = Query(None),
-    x_user_id: str = Header("default", alias="X-User-ID"),
+    caller_email: Optional[str] = Depends(get_authenticated_caller_email),
 ):
     safe_account_id = _normalize_id(account_id)
-    requester = _normalize_id(owner_id or x_user_id)
     existing = await get_zalo_account_by_id(safe_account_id)
-    if existing and requester != "default":
-        allowed = {
-            _normalize_id(existing.get("owner_id"), ""),
-            _normalize_id(existing.get("id_member"), ""),
-        }
-        if requester not in allowed:
-            raise HTTPException(status_code=403, detail="Zalo account does not belong to current user")
+    # Trước đây check quyền dựa vào `owner_id` query param / X-User-ID header do
+    # CLIENT tự gửi, và chỉ áp dụng "requester != 'default'" — bỏ trống cả 2 là
+    # bypass hoàn toàn (mặc định "default", điều kiện luôn sai). Giờ luôn check
+    # bằng identity đã xác thực từ JWT, không có đường bypass qua thiếu tham số.
+    if existing:
+        await _require_admin_leader_or_self(
+            caller_email,
+            existing.get("id_member") or existing.get("owner_id"),
+        )
 
     await stop_listener(safe_account_id)
     

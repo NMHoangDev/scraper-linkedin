@@ -2,7 +2,7 @@ import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone, date
 from app.core.supabase_client import get_supabase_client
-from app.modules.all_platform.schemas.customer_lead import STAGE_REQUIRED_FIELDS
+from app.modules.all_platform.schemas.customer_lead import STAGE_REQUIRED_FIELDS, is_transition_allowed
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +31,19 @@ def _serialize_datetimes(payload: Dict[str, Any]) -> Dict[str, Any]:
             out[k] = v
     return out
 
+
+# Cột UUID nullable trên customer_leads — frontend (vd wizard "Thêm deal và báo giá"
+# khi chưa chọn Leader/SDR) có thể gửi "" thay vì null, Postgres reject với
+# "invalid input syntax for type uuid" nếu insert/update thẳng chuỗi rỗng.
+_NULLABLE_UUID_COLUMNS = ("leaded_by", "sdr_id", "quote_id", "team_id")
+
+
+def _normalize_uuid_fields(payload: Dict[str, Any]) -> Dict[str, Any]:
+    for col in _NULLABLE_UUID_COLUMNS:
+        if payload.get(col) == "":
+            payload[col] = None
+    return payload
+
 # Cột lấy về — chỉ các cột có thật trên table customer_leads.
 # `days_in_stage` KHÔNG có trên table — nó được tính ở `_normalize_row()`
 # dựa vào `stage_entered_at`. Đừng select nó từ table.
@@ -39,20 +52,46 @@ BASE_COLUMNS = (
     "leaded_by, conv_id, source_platform, is_assigned, sdr_id, status, activity_status, "
     "deal_stage, prev_stage, follow_up_date, decision_maker, estimated_budget, stage_entered_at, "
     "last_attachment_url, last_attachment_name, closed_reason, "
-    "customer_since, service_package, lifetime_value, contract_signed_at, contract_status, "
+    "customer_since, service_package, lifetime_value, billing_type, contract_signed_at, contract_status, "
     "warranty_expires_at, care_note, last_care_at, "
+    "payment_due_date, payment_status, "
     "tags, has_budget, note, reject_reason, reject_reason_type, review_result, "
-    "created_at, updated_at, leader:leaded_by(name), sdr:sdr_id(name)"
+    "position, crm_package, zalo, facebook, telegram, pause_reason, closed_at, outcome_detail, quote_id, "
+    "leaded_by_name_hint, sdr_name_hint, team_id, "
+    "created_at, updated_at, leader:leaded_by(name), sdr:sdr_id(name), "
+    "quote:quote_id(quote_number, total_amount, public_token), "
+    "team:team_id(name_team, team_type)"
 )
 
 
 def _normalize_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    # leader_name/sdr_name resolve qua JOIN leaded_by(name)/sdr_id(name) — nếu
+    # leaded_by/sdr_id là NULL (người được chọn chưa liên kết tài khoản đăng
+    # nhập), fallback về *_name_hint (tên đã chọn tại thời điểm lưu, xem
+    # migration 046) để không mất dấu vết đã gán ai.
     if row.get("leader"):
         row["leader_name"] = row["leader"].get("name")
         row.pop("leader", None)
+    elif row.get("leaded_by_name_hint"):
+        row["leader_name"] = f"{row['leaded_by_name_hint']} (chưa liên kết tài khoản)"
     if row.get("sdr"):
         row["sdr_name"] = row["sdr"].get("name")
         row.pop("sdr", None)
+    elif row.get("sdr_name_hint"):
+        row["sdr_name"] = f"{row['sdr_name_hint']} (chưa liên kết tài khoản)"
+    if row.get("quote"):
+        row["quote_number"] = row["quote"].get("quote_number")
+        row["quote_total_amount"] = row["quote"].get("total_amount")
+        public_token = row["quote"].get("public_token")
+        row["quote_public_url"] = f"/public/quotes/{public_token}" if public_token else None
+        row.pop("quote", None)
+    if row.get("team"):
+        row["team_name"] = row["team"].get("name_team")
+        row["team_type"] = row["team"].get("team_type")
+        row.pop("team", None)
+    else:
+        row["team_name"] = None
+        row["team_type"] = None
     if row.get("tags") is None:
         row["tags"] = []
     if row.get("days_in_stage") is None and row.get("stage_entered_at"):
@@ -109,11 +148,12 @@ def get_all_customer_leads(
         if source_platform:
             query = query.eq("source_platform", source_platform)
 
-        # Role-based access (SDR chỉ thấy deal của mình)
-        if current_user and current_user.get("role") not in ["admin", "leader"]:
-            uid = current_user.get("id")
-            if uid:
-                query = query.or_(f"leaded_by.eq.{uid},sdr_id.eq.{uid}")
+        # Doc Pipeline gio la UNIVERSAL cho moi user da dang nhap (admin/leader/
+        # sale-team/member deu thay toan bo deal, ke ca cua nguoi khac/team
+        # khac) - phan quyen chi con ap dung o buoc GHI (update/delete/
+        # transition), xem can_write_deal() trong crm_permission_service.py.
+        # (Truoc day co self-scope leaded_by/sdr_id==uid cho non-admin/leader,
+        # da bo theo yeu cau "Member duoc xem Pipeline cua minh va team khac".)
 
         # Sắp xếp theo stage_entered_at DESC — deal mới nhất lên đầu trong cột
         offset = (page - 1) * page_size
@@ -134,8 +174,11 @@ def get_all_customer_leads(
             "page_size": page_size,
         }
     except Exception as e:
+        # KHONG nuot loi thanh ket qua rong "thanh cong" - truoc day lam vay khien
+        # loi schema (vd thieu cot moi tren mot Supabase project khac) hien ra nhu
+        # "khong co khach hang nao" thay vi bao loi that, rat kho debug.
         logger.error(f"Error getting customer leads: {e}")
-        return {"items": [], "total": 0, "page": page, "page_size": page_size}
+        raise
 
 
 def get_stage_counts(current_user: Optional[Dict[str, Any]] = None) -> Dict[str, int]:
@@ -145,10 +188,7 @@ def get_stage_counts(current_user: Optional[Dict[str, Any]] = None) -> Dict[str,
     try:
         supabase = get_supabase_client()
         q = supabase.table("customer_leads").select("deal_stage", count="exact")
-        if current_user and current_user.get("role") not in ["admin", "leader"]:
-            uid = current_user.get("id")
-            if uid:
-                q = q.or_(f"leaded_by.eq.{uid},sdr_id.eq.{uid}")
+        # Universal read - xem get_all_customer_leads() ve ly do bo self-scope.
         res = q.execute()
         counts: Dict[str, int] = {}
         for row in res.data or []:
@@ -157,7 +197,7 @@ def get_stage_counts(current_user: Optional[Dict[str, Any]] = None) -> Dict[str,
         return counts
     except Exception as e:
         logger.error(f"Error getting stage counts: {e}")
-        return {}
+        raise
 
 
 def get_customer_lead_by_id(lead_id: str) -> Optional[Dict[str, Any]]:
@@ -218,6 +258,7 @@ def create_customer_lead(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         # Serialize datetime → ISO string trước khi INSERT (supabase-py không
         # tự handle datetime/date → JSON serialize error).
         data = _serialize_datetimes(data)
+        data = _normalize_uuid_fields(data)
         res = supabase.table("customer_leads").insert(data).execute()
         if res.data:
             new_row = _normalize_row(res.data[0])
@@ -245,6 +286,7 @@ def update_customer_lead(lead_id: str, data: Dict[str, Any]) -> Optional[Dict[st
         supabase = get_supabase_client()
         # Serialize datetime/date → ISO string (supabase-py không tự JSON hóa)
         safe_data = _serialize_datetimes(dict(data))
+        safe_data = _normalize_uuid_fields(safe_data)
         res = (
             supabase.table("customer_leads")
             .update(safe_data)
@@ -324,8 +366,13 @@ def transition_stage(
                 "Muốn tiếp tục hãy tạo deal mới."
             )
 
-        # Server KHÔNG enforce state-machine transitions (allowed next stages) — để tránh
-        # phân kỳ logic với client. Required fields là đủ để bảo vệ data integrity.
+        # Chặn nhảy stage bậy (VD new_lead -> won bỏ qua pipeline) — backend có API
+        # riêng gọi trực tiếp được nên không thể chỉ dựa vào validate client-side.
+        if not is_transition_allowed(from_stage, to_stage):
+            raise TransitionError(
+                f"Không thể chuyển trực tiếp từ '{from_stage}' sang '{to_stage}' — "
+                "không đúng thứ tự pipeline."
+            )
 
         # Check required fields
         missing = _validate_required_fields(to_stage, payload)
@@ -346,8 +393,12 @@ def transition_stage(
             update["status"] = "closed"
             if not current.get("customer_since"):
                 update["customer_since"] = now
+            if not current.get("closed_at"):
+                update["closed_at"] = now
         elif to_stage == "lost":
             update["status"] = "rejected"
+            if not current.get("closed_at"):
+                update["closed_at"] = now
         else:
             update["status"] = "pending"
 
@@ -368,6 +419,9 @@ def transition_stage(
             "last_attachment_name",
             "closed_reason",
             "reject_reason_type",
+            "pause_reason",
+            "closed_at",
+            "outcome_detail",
         ]:
             if k in payload and payload[k] is not None:
                 update[k] = payload[k]
@@ -485,25 +539,42 @@ def get_activity_log(
 
 
 def delete_customer_lead(lead_id: str) -> bool:
-    try:
-        supabase = get_supabase_client()
-        supabase.table("customer_leads").delete().eq("id", lead_id).execute()
+    supabase = get_supabase_client()
+    supabase.table("customer_leads").delete().eq("id", lead_id).execute()
+    return True
+
+
+_TEST_ACCOUNT_EMAIL_DOMAINS = {"markee.vn", "markee.test", "markeeai.com"}
+_TEST_ACCOUNT_EMAILS = {"admin123@gmail.com"}
+
+
+def _is_test_account(email: str, name: str) -> bool:
+    email = (email or "").lower()
+    name = (name or "").lower()
+    if email in _TEST_ACCOUNT_EMAILS:
         return True
-    except Exception as e:
-        logger.error(f"Error deleting customer lead {lead_id}: {e}")
-        return False
+    domain = email.rsplit("@", 1)[-1] if "@" in email else ""
+    if domain in _TEST_ACCOUNT_EMAIL_DOMAINS:
+        return True
+    return "test" in name or "demo" in name
 
 
 def get_all_sdrs() -> List[Dict[str, Any]]:
+    """Danh sach nguoi co the gan lam Quan ly / Phu trach deal CRM.
+
+    Lay tat ca admin/leader that, loai tru cac acc test/dev/demo tao rieng
+    de test local (vd devadmin@markee.vn, leader@markee.test, admin123@gmail.com).
+    """
     try:
         supabase = get_supabase_client()
         res = (
             supabase.table("app_users")
-            .select("id, name, role")
+            .select("id, name, email, role")
             .in_("role", ["admin", "leader"])
             .execute()
         )
-        return res.data or []
+        users = [u for u in (res.data or []) if not _is_test_account(u.get("email"), u.get("name"))]
+        return [{"id": u["id"], "name": u["name"], "role": u["role"]} for u in users]
     except Exception as e:
         logger.error(f"Error getting SDRs: {e}")
         return []

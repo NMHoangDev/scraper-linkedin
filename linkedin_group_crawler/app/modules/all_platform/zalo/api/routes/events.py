@@ -26,6 +26,7 @@ from fastapi.responses import StreamingResponse
 from loguru import logger
 from pydantic import BaseModel
 
+from app.modules.all_platform.auth_deps import get_authenticated_caller_email
 from app.modules.all_platform.zalo.api.security import verify_zalo_api_key
 from app.modules.all_platform.zalo.services.message_events import (
     register_account_owner,
@@ -119,31 +120,25 @@ async def _resolve_accounts_for_caller(
 async def stream_zalo_events(
     request: Request,
     user_id: Optional[str] = Query(None, description="Caller user_id (fallback nếu không có email)"),
-    email: Optional[str] = Query(None, description="Email Supabase user — dùng để tra role"),
-    role: Optional[str] = Query(
-        None,
-        description="Override role (admin/leader/member) — chỉ dùng cho test nội bộ.",
-    ),
+    authenticated_email: Optional[str] = Depends(get_authenticated_caller_email),
 ):
     """SSE stream các Zalo message mới mà caller có quyền xem.
 
     Cleanup: khi client disconnect (đóng tab / mất mạng), generator dừng
     và tự gỡ queue khỏi event bus.
+
+    Trước đây `email`/`role` là query param client tự truyền — `?role=admin`
+    là tự phong admin ngay trên URL (comment cũ ghi "chỉ dùng cho test nội bộ"
+    nhưng không hề bị chặn trên production). EventSource của browser không set
+    được custom header, nhưng VẪN tự gửi cookie như request HTTP thường, nên
+    lấy identity từ JWT cookie qua get_authenticated_caller_email() hoạt động
+    bình thường mà không cần đổi gì phía FE.
     """
     caller_id = _normalize_user_id(user_id)
-    caller_email = _normalize_email(email)
+    caller_email = _normalize_email(authenticated_email)
 
-    # Xác định role:
-    #   1. Nếu FE truyền role (chỉ test) → dùng luôn.
-    #   2. Nếu có email → query app_users.
-    #   3. Fallback 'member' (chỉ xem của mình, fail-closed).
-    if role:
-        caller_role = (role or "").strip().lower() or "member"
-    elif caller_email:
-        caller_role = await get_user_role(caller_email)
-    else:
-        # Không có email + không override role: cho phép nhưng chỉ xem của mình.
-        caller_role = "member"
+    # Role LUÔN tra từ DB theo email đã xác thực — không còn override từ client.
+    caller_role = await get_user_role(caller_email) if caller_email else "member"
 
     accounts = await _resolve_accounts_for_caller(caller_id, caller_email, caller_role)
     account_ids: List[str] = [

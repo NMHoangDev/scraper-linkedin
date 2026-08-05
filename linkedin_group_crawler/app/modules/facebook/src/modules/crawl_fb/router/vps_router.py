@@ -1,7 +1,8 @@
 from typing import Optional, Dict, Any
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from app.modules.all_platform.auth_deps import require_admin
 from app.modules.facebook.src.modules.crud.vps_fb.vps_fb import (
     get_all_vps_fb,
     create_vps_fb,
@@ -19,6 +20,11 @@ router = APIRouter(
     prefix="/vps_fb",
     tags=["vps_fb"],
 )
+
+# Trước đây file này không có bất kỳ auth nào — /vps_fb/cookies/all trả nguyên
+# session cookie Facebook thật của mọi VPS cho bất kỳ ai gọi, không cần đăng
+# nhập. Chiếm đoạt cookie = đăng nhập thẳng vào acc mà không cần mật khẩu/2FA.
+Admin = Depends(require_admin)
 
 # --- MODELS FOR VPS_FB ---
 class VpsFbCreate(BaseModel):
@@ -45,7 +51,7 @@ class VpsCookieCreate(BaseModel):
 # ROUTES FOR VPS_FB
 # ==========================================
 @router.get("")
-def get_vps_list():
+def get_vps_list(_admin: dict = Admin):
     try:
         data = get_all_vps_fb()
         return {"data": data}
@@ -53,7 +59,7 @@ def get_vps_list():
         raise HTTPException(status_code=500, detail=str(exc))
 
 @router.post("")
-def create_vps(vps: VpsFbCreate):
+def create_vps(vps: VpsFbCreate, _admin: dict = Admin):
     try:
         data = create_vps_fb(vps.model_dump())
         return {"data": data}
@@ -61,7 +67,7 @@ def create_vps(vps: VpsFbCreate):
         raise HTTPException(status_code=500, detail=str(exc))
 
 @router.put("/{vps_id}")
-def update_vps(vps_id: int, vps: VpsFbUpdate):
+def update_vps(vps_id: int, vps: VpsFbUpdate, _admin: dict = Admin):
     update_data = vps.model_dump(exclude_unset=True)
     if not update_data:
         raise HTTPException(status_code=400, detail="No fields to update")
@@ -72,7 +78,7 @@ def update_vps(vps_id: int, vps: VpsFbUpdate):
         raise HTTPException(status_code=500, detail=str(exc))
 
 @router.delete("/{vps_id}")
-def delete_vps(vps_id: int):
+def delete_vps(vps_id: int, _admin: dict = Admin):
     try:
         data = delete_vps_fb(vps_id)
         return {"data": data, "message": "Deleted successfully"}
@@ -83,7 +89,7 @@ def delete_vps(vps_id: int):
 # ROUTES FOR VPS_COOKIE
 # ==========================================
 @router.get("/cookies/all")
-def get_all_cookies():
+def get_all_cookies(_admin: dict = Admin):
     try:
         data = get_all_vps_cookies()
         return {"data": data}
@@ -91,7 +97,7 @@ def get_all_cookies():
         raise HTTPException(status_code=500, detail=str(exc))
 
 @router.get("/{vps_id}/cookies")
-def get_cookies_by_vps(vps_id: int):
+def get_cookies_by_vps(vps_id: int, _admin: dict = Admin):
     try:
         data = get_vps_cookies_by_vps_id(vps_id)
         return {"data": data}
@@ -99,7 +105,7 @@ def get_cookies_by_vps(vps_id: int):
         raise HTTPException(status_code=500, detail=str(exc))
 
 @router.post("/cookies")
-def create_cookie(cookie_data: VpsCookieCreate):
+def create_cookie(cookie_data: VpsCookieCreate, _admin: dict = Admin):
     try:
         data = create_vps_cookie(cookie_data.model_dump(exclude_unset=True))
         return {"data": data}
@@ -107,7 +113,7 @@ def create_cookie(cookie_data: VpsCookieCreate):
         raise HTTPException(status_code=500, detail=str(exc))
 
 @router.delete("/cookies/{cookie_id}")
-def delete_cookie(cookie_id: str):
+def delete_cookie(cookie_id: str, _admin: dict = Admin):
     try:
         data = delete_vps_cookie(cookie_id)
         return {"data": data, "message": "Cookie deleted successfully"}

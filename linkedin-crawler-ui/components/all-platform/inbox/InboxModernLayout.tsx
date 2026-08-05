@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import type { RefObject } from "react";
 import {
   Inbox as InboxIcon,
@@ -13,17 +13,19 @@ import {
   MessageCircle,
   User,
   BarChart3,
-  Check,
   Star,
   UserPlus,
   Send,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import TeamAccountTree from "@/components/all-platform/inbox/TeamAccountTree";
 import { KpiProgressCard } from "@/components/all-platform/components/kpi-progress-card";
 import { CrmCustomerModal } from "@/components/all-platform/components/CrmCustomerModal";
-import { useAppAuth } from "@/contexts/AppAuthContext";
+import { SalesAssetPickerModal } from "@/components/all-platform/sales-assets/SalesAssetPickerModal";
+import { customerLeadService, type Customer } from "@/services/customer-lead.service";
+import type { SalesAsset } from "@/services/sales-asset.service";
 
 interface Session { user_id: string; fb_user_id?: string; label?: string; owner?: string; online?: boolean; inbox_enabled?: boolean; status?: string; }
 interface Conv { conv_id: string; name: string; preview: string; unread: boolean; time: string; is_customer: boolean; pushed_to_zalo: boolean; deleted: boolean; archived?: boolean; archived_at?: string; }
@@ -97,16 +99,19 @@ interface Props {
     user_id: string;
     is_lead: boolean;
   }) => Promise<void>;
-  onSuggestKpi: (payload: {
-    member_email: string;
-    conv_ids: string[];
-    user_id: string;
-  }) => Promise<void>;
   verifiedConvIds: Set<string>;
-  suggestedConvIds: Set<string>;
+  /** conv_id -> thoi diem xac nhan Lead (ISO string), de hien "Da xac nhan
+   * KPI tuan X" dung tuan LUC XAC NHAN, khong phai tuan dang xem lai. */
+  verifiedConvDates?: Record<string, string>;
+  /** conv_id -> created_at cua dong KPI Inbox (BAT KY hoi thoai nao da tinh,
+   * khong chi rieng Lead) - de hien "KPI Inbox tinh vao tuan X". */
+  inboxKpiWeekDates?: Record<string, string>;
   userEmail: string;
   ownerEmail: string;
-  onBulkVerifyKpi: (payload: { leader_email: string; target_date: string }) => Promise<void>;
+  /** Email cua CHU tai khoan FB dang duoc xem (khac userEmail khi leader/admin
+   * dang xem tai khoan cua 1 member khac) - dung de xac nhan/hien thi KPI
+   * dung nguoi, tranh gan nham cho leader. */
+  accountOwnerEmail: string;
 }
 
 const QUICK_REPLY_GROUPS = [
@@ -169,6 +174,23 @@ function statusLabel(status?: string): string {
   return "offline";
 }
 
+// So thu tu tuan trong nam - cung quy uoc voi AssignKpiModal/KpiRewardSections:
+// tuan 1 bat dau tu thu Hai cua/truoc ngay 1/1. Khong truyen date = tuan hien tai
+// (dung cho badge "Da dong bo KPI Inbox tu dong" - luon la tuan dang o).
+function getWeekNumber(date: Date): number {
+  const year = date.getFullYear();
+  const firstDay = new Date(year, 0, 1);
+  const dayOfWeek = firstDay.getDay() || 7;
+  const startMonday = new Date(firstDay);
+  startMonday.setDate(firstDay.getDate() - dayOfWeek + 1);
+  const diffDays = Math.round((date.getTime() - startMonday.getTime()) / 86400000);
+  return Math.floor(diffDays / 7) + 1;
+}
+
+function getCurrentWeekNumber(): number {
+  return getWeekNumber(new Date());
+}
+
 // StatCard — mini the thong ke tren dau trang, dung lai dung pattern da chuan hoa
 // o trang teams-management (icon chip pastel + so lon + nhan), khop 1:1 style
 // MetricCard cua app.markeeai.com.
@@ -210,8 +232,8 @@ export default function InboxModernLayout(props: Props) {
     archives, openConv, msgs, reply, customerNotes, savingNoteConv, toast,
     chatScrollRef, selectAcc, scan, setViewMode, setArchiveReading, setFilter,
     setReply, openChat, hoverConv, openArchive, mark, saveArchive, saveCustomerNote, sendReply,
-    needsReply, accLabel, syncFbInbox, onSuggestKpi, verifiedConvIds, suggestedConvIds,
-    userEmail, ownerEmail,
+    needsReply, accLabel, syncFbInbox, verifiedConvIds, verifiedConvDates = {}, inboxKpiWeekDates = {},
+    userEmail, ownerEmail, accountOwnerEmail,
   } = props;
 
   const [panelTab, setPanelTab] = useState<PanelTab>("templates");
@@ -219,17 +241,14 @@ export default function InboxModernLayout(props: Props) {
   const [kpiToast, setKpiToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [noteDraftState, setNoteDraftState] = useState({ convId: "", value: "" });
   const panelScrollRef = useRef<HTMLDivElement>(null);
-  const [targetDate, setTargetDate] = useState(() => new Date().toISOString().split("T")[0]);
-  const [isBulkSuggesting, setIsBulkSuggesting] = useState(false);
-  const [isBulkVerifying, setIsBulkVerifying] = useState(false);
   const [showLeadModal, setShowLeadModal] = useState(false);
   const [showAddAccountPicker, setShowAddAccountPicker] = useState(false);
+  const [showSalesAssetPicker, setShowSalesAssetPicker] = useState(false);
+  const [currentLead, setCurrentLead] = useState<Customer | null>(null);
   const [accountBarOpen, setAccountBarOpen] = useState(true);
   const [trackSearchOpen, setTrackSearchOpen] = useState(false);
   const [trackSearchQuery, setTrackSearchQuery] = useState("");
   const [trackSelectedIds, setTrackSelectedIds] = useState<Set<string>>(new Set());
-  const { user } = useAppAuth();
-
   const selectedSession = sessions.find(s => s.user_id === acc);
   const selectedConv = activeConvs.find(c => c.conv_id === openConv) || filtered.find(c => c.conv_id === openConv);
   const selectedArchive = archives.find(a => a.conv_id === openConv);
@@ -263,45 +282,37 @@ export default function InboxModernLayout(props: Props) {
 
   const canSend = !!openConv && !archiveReading && accOnline && !accPaused && !needRelogin;
   const appendTemplate = (text: string) => setReply(reply.trim() ? `${reply.trim()}\n${text}` : text);
+  const appendSalesAsset = (asset: SalesAsset) => {
+    const link = asset.sourceUrl || asset.shareUrl;
+    const meta = [asset.projectName, asset.version].filter(Boolean).join(" - ");
+    const text = `${asset.title}${meta ? ` (${meta})` : ""}\n${link}`;
+    setReply(reply.trim() ? `${reply.trim()}\n${text}` : text);
+    setShowSalesAssetPicker(false);
+    showToastKpi("Đã chèn tài liệu vào ô trả lời.", true);
+  };
+
+  useEffect(() => {
+    if (!openConv) {
+      void Promise.resolve().then(() => setCurrentLead(null));
+      return;
+    }
+    let cancelled = false;
+    void Promise.resolve().then(async () => {
+      try {
+        const lead = await customerLeadService.getByConvId(openConv);
+        if (!cancelled) setCurrentLead(lead);
+      } catch {
+        if (!cancelled) setCurrentLead(null);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [openConv]);
 
   const showToastKpi = (msg: string, ok: boolean) => {
     setKpiToast({ msg, ok });
     setTimeout(() => setKpiToast(null), 3500);
-  };
-
-  const handleSuggestKpi = async (payload: { member_email: string; conv_ids: string[]; user_id: string }) => {
-    try {
-      await onSuggestKpi(payload);
-      showToastKpi("Đã đề xuất KPI thành công!", true);
-    } catch {
-      showToastKpi("Lỗi khi đề xuất KPI", false);
-    }
-  };
-
-  const handleBulkSuggest = async () => {
-    if (!acc || !userEmail) return;
-    const pendingConvs = activeConvs.filter(c => !verifiedConvIds.has(c.conv_id) && !suggestedConvIds.has(c.conv_id));
-    if (pendingConvs.length === 0) {
-      showToastKpi("Không có hội thoại nào cần đề xuất KPI cho tài khoản này", false);
-      return;
-    }
-    const convIds = pendingConvs.map(c => c.conv_id);
-    setIsBulkSuggesting(true);
-    try {
-      await onSuggestKpi({ member_email: userEmail, conv_ids: convIds, user_id: acc });
-    } finally {
-      setIsBulkSuggesting(false);
-    }
-  };
-
-  const handleBulkVerify = async () => {
-    if (!ownerEmail) return;
-    setIsBulkVerifying(true);
-    try {
-      await props.onBulkVerifyKpi({ leader_email: ownerEmail, target_date: targetDate });
-    } finally {
-      setIsBulkVerifying(false);
-    }
   };
 
   const switchInbox = () => { setViewMode("inbox"); setArchiveReading(false); };
@@ -387,31 +398,9 @@ export default function InboxModernLayout(props: Props) {
             <div className="flex flex-wrap items-center gap-3">
               {accountBarOpen && (
                 <>
-                  {(role === "admin" || role === "leader") ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="date"
-                        value={targetDate}
-                        onChange={e => setTargetDate(e.target.value)}
-                        className="rounded-md border border-input px-2 py-1 text-xs outline-none focus:border-primary"
-                      />
-                      <button
-                        onClick={handleBulkVerify}
-                        disabled={isBulkVerifying}
-                        className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
-                      >
-                        {isBulkVerifying ? "ĐANG TÍNH..." : "TÍNH KPI HÀNG LOẠT"}
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={handleBulkSuggest}
-                      disabled={isBulkSuggesting || !acc}
-                      className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {isBulkSuggesting ? "ĐANG ĐỀ XUẤT..." : "ĐỀ XUẤT TÍNH KPI HÀNG LOẠT"}
-                    </button>
-                  )}
+                  {/* Da bo nut "Dua xuat/Tinh KPI hang loat" - KPI Inbox gio tinh
+                      tu dong hoan toan (auto-detect + khoa 30 ngay), khong con
+                      co che de xuat/xac nhan thu cong nao nua. */}
                   {(role === "admin" || role === "leader") && typeof toggleExtraAccount === "function" && (
                     <div className="relative">
                       <button
@@ -485,10 +474,10 @@ export default function InboxModernLayout(props: Props) {
           )}
         </div>
 
-        {userEmail && (
+        {(accountOwnerEmail || userEmail) && (
           <div className="grid grid-cols-1 gap-4 border-t border-border p-4 xl:grid-cols-2">
-            <KpiProgressCard email={userEmail} type="inbox" />
-            <KpiProgressCard email={userEmail} type="lead" />
+            <KpiProgressCard email={accountOwnerEmail || userEmail} type="inbox" />
+            <KpiProgressCard email={accountOwnerEmail || userEmail} type="lead" />
           </div>
         )}
       </div>
@@ -760,6 +749,15 @@ export default function InboxModernLayout(props: Props) {
 
           <div className="border-t border-border bg-card p-3">
             <div className="mb-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setShowSalesAssetPicker(true)}
+                disabled={!openConv || archiveReading}
+                className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-700 transition hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <FileText size={13} />
+                Gửi tài liệu
+              </button>
               {activeTemplateGroup.items.slice(0, 3).map(item => (
                 <button key={item} onClick={() => appendTemplate(item)} disabled={!openConv || archiveReading}
                   className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary transition hover:bg-primary/20 disabled:opacity-40 disabled:cursor-not-allowed">
@@ -893,86 +891,111 @@ export default function InboxModernLayout(props: Props) {
             {panelTab === "kpi" && (
               <div>
                 {/* Admin / Leader: Xac nhan KPI */}
-                {(role === "admin" || role === "leader") && (
+                {(role === "admin" || role === "leader") && (() => {
+                  const isConfirmed = verifiedConvIds?.has(openConv);
+                  const confirmedAt = verifiedConvDates[openConv];
+                  // Hoi thoai da xac nhan roi thi hien dung TUAN LUC XAC NHAN
+                  // (co the la tuan truoc), khong phai tuan dang xem lai hom nay.
+                  const confirmedWeekNumber = confirmedAt ? getWeekNumber(new Date(confirmedAt)) : getCurrentWeekNumber();
+                  return (
                   <div className={cn("mb-5 rounded-xl border p-4 transition-colors",
-                    verifiedConvIds?.has(openConv) ? "border-emerald-200 bg-emerald-50" : "border-primary/20 bg-card")}>
+                    isConfirmed ? "border-emerald-200 bg-emerald-50" : "border-primary/20 bg-card")}>
 
-                    <div className="mb-1 flex items-center justify-between">
-                      <div className={cn("text-xs font-bold uppercase", verifiedConvIds?.has(openConv) ? "text-emerald-700" : "text-foreground")}>
-                        {verifiedConvIds?.has(openConv) ? "Đã xác nhận KPI" : "Xác nhận KPI"}
+                    <div className="mb-1 flex flex-wrap items-center justify-between gap-1.5">
+                      <div className={cn("flex min-w-0 flex-wrap items-center gap-1.5 text-xs font-bold uppercase", isConfirmed ? "text-emerald-700" : "text-foreground")}>
+                        <span className="whitespace-nowrap">{isConfirmed ? "Đã xác nhận Lead" : "Xác nhận Lead"}</span>
+                        <span className="shrink-0 whitespace-nowrap rounded-full bg-black/5 px-1.5 py-0.5 text-[10px] font-semibold normal-case text-muted-foreground">Tuần {confirmedWeekNumber}</span>
                       </div>
-                      {verifiedConvIds?.has(openConv) && <CheckCircle2 size={18} className="text-emerald-500" />}
+                      {verifiedConvIds?.has(openConv) && <CheckCircle2 size={18} className="shrink-0 text-emerald-500" />}
                     </div>
 
-                    {!verifiedConvIds?.has(openConv) && (
-                      <div className="mb-3 text-xs text-muted-foreground">Chọn hội thoại bên trái rồi bấm xác nhận để tính KPI cho nhân sự.</div>
-                    )}
-
-                    {openConv && selectedConv ? (
-                      <div className="mb-4 rounded-xl border border-border bg-card p-3 shadow-sm">
-                        <div className="truncate text-sm font-bold text-foreground">{selectedName || "Hội thoại FB"}</div>
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {selectedConv.is_customer && <Badge variant="secondary" className="gap-1 border-transparent bg-emerald-100 text-[10px] text-emerald-700"><Star size={11} /> Đã đánh dấu khách</Badge>}
-                          {selectedConv.pushed_to_zalo && <Badge variant="secondary" className="gap-1 border-transparent bg-blue-100 text-[10px] text-blue-700"><Send size={11} /> Đã đẩy Zalo</Badge>}
-                        </div>
+                    {/* KPI Inbox tinh tu dong khi extension quet duoc tin nhan moi -
+                        badge nay chi de user yen tam biet acc dang/da duoc dong bo,
+                        khong phai nut bam. */}
+                    {!accOnline ? (
+                      <div className="mb-3 flex items-center gap-1.5 rounded-lg bg-muted/60 px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground">
+                        <Lock size={12} /> Tài khoản offline — chưa quét được KPI Inbox tự động.
+                      </div>
+                    ) : needRelogin ? (
+                      <div className="mb-3 flex items-center gap-1.5 rounded-lg bg-red-50 px-2.5 py-1.5 text-[11px] font-semibold text-red-600">
+                        🔴 Cần đăng nhập lại — chưa quét được KPI Inbox tự động.
+                      </div>
+                    ) : scanning ? (
+                      <div className="mb-3 flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] font-semibold text-amber-700">
+                        <RefreshCw size={12} className="animate-spin" /> Đang quét tự động...
                       </div>
                     ) : (
-                      <div className="mb-4 rounded-xl border border-dashed border-border bg-muted/40 p-4 text-center text-xs text-muted-foreground">
-                        Chưa chọn hội thoại
+                      <div className="mb-3 flex items-center justify-between gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-700">
+                        <span>✅ Đã đồng bộ KPI Inbox tự động</span>
+                        <button
+                          onClick={scan}
+                          title="Quét lại ngay để chắc chắn KPI đã đồng bộ đúng"
+                          className="flex shrink-0 items-center gap-1 rounded-md border border-emerald-300 bg-white px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 transition hover:bg-emerald-100"
+                        >
+                          <RefreshCw size={10} /> Quét lại
+                        </button>
                       </div>
                     )}
 
-                    {openConv && selectedConv && (
-                      verifiedConvIds?.has(openConv) ? (
-                        <div className="rounded-xl border border-emerald-200/50 bg-emerald-100/50 p-3 text-center text-xs font-semibold text-emerald-700">
-                          Bạn đã xác nhận KPI cho đoạn hội thoại này.
+                    {/* KPI Inbox tinh theo created_at cua dong fb_inbox_kpi (thoi diem
+                        tin nhan dau tien duoc auto-detect) - co the khac tuan voi luc
+                        Lead duoc xac nhan (vd hoi thoai cu, Lead moi danh dau hom nay).
+                        Hien ro cho leader biet dang xem lai 1 chat da tinh vao tuan nao. */}
+                    {openConv && (
+                      inboxKpiWeekDates[openConv] ? (
+                        <div className="mb-3 rounded-lg bg-violet-50 px-2.5 py-1.5 text-[11px] font-semibold text-violet-700">
+                          📊 KPI Inbox của hội thoại này tính vào Tuần {getWeekNumber(new Date(inboxKpiWeekDates[openConv]))}
                         </div>
                       ) : (
-                        <div className="flex flex-col gap-2.5">
-                          <button onClick={async () => {
-                            if (!acc) return;
-                            try {
-                              await syncFbInbox({ leader_email: ownerEmail, member_email: userEmail, conv_ids: [openConv], user_id: acc, is_lead: false });
-                              showToastKpi("Đã xác nhận inbox!", true);
-                            } catch { showToastKpi("Lỗi xác nhận", false); }
-                          }}
-                            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground shadow-sm transition hover:bg-primary/90 active:scale-[0.98]">
-                            <Check size={16} /> Xác nhận Inbox
-                          </button>
-                          <button onClick={async () => {
-                            if (!acc) return;
-                            try {
-                              await syncFbInbox({ leader_email: ownerEmail, member_email: userEmail, conv_ids: [openConv], user_id: acc, is_lead: true });
-                              showToastKpi("Đã xác nhận Inbox + Lead!", true);
-                              mark(openConv, "is_customer", true);
-                            } catch { showToastKpi("Lỗi xác nhận lead", false); }
-                          }}
-                            className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-600 active:scale-[0.98]">
-                            <Star size={16} /> Xác nhận Inbox + Lead
-                          </button>
+                        <div className="mb-3 text-[11px] font-medium text-muted-foreground">
+                          Hội thoại này chưa được tính KPI Inbox.
                         </div>
                       )
                     )}
-                  </div>
-                )}
 
-                {/* Member: De xuat KPI */}
-                {(role !== "admin" && role !== "leader") && (
-                  <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
-                    <div className="mb-1 text-xs font-bold uppercase text-blue-600">Đề xuất KPI</div>
-                    {openConv && selectedConv ? (
-                      <button
-                        disabled={verifiedConvIds?.has(openConv) || suggestedConvIds?.has(openConv)}
-                        onClick={async () => { if (!acc || !userEmail) return; handleSuggestKpi({ member_email: userEmail, conv_ids: [openConv], user_id: acc }); }}
-                        className={cn("w-full rounded-xl px-4 py-2.5 text-sm font-bold transition", verifiedConvIds?.has(openConv) || suggestedConvIds?.has(openConv) ? "cursor-not-allowed bg-muted text-muted-foreground" : "bg-blue-600 text-white hover:bg-blue-700")}
-                      >
-                        {verifiedConvIds?.has(openConv) ? "Đã tính KPI" : suggestedConvIds?.has(openConv) ? "Đã đề xuất" : "Đề xuất tính KPI"}
-                      </button>
-                    ) : (
-                      <div className="rounded-xl border border-dashed border-blue-300 bg-card p-3 text-center text-xs text-blue-500">Chọn hội thoại để đề xuất KPI</div>
+                    {!verifiedConvIds?.has(openConv) && (
+                      <div className="mb-3 text-xs text-muted-foreground">Chọn hội thoại bên trái rồi bấm xác nhận nếu đây là khách hàng tiềm năng (Lead).</div>
+                    )}
+
+                    {/* Da chon 1 hoi thoai roi thi ten da hien san o header khung chat phia
+                        tren - khong lap lai ten o day nua, chi hien badge trang thai neu co. */}
+                    {openConv && selectedConv && (selectedConv.is_customer || selectedConv.pushed_to_zalo) ? (
+                      <div className="mb-4 flex flex-wrap gap-1.5">
+                        {selectedConv.is_customer && <Badge variant="secondary" className="gap-1 border-transparent bg-emerald-100 text-[10px] text-emerald-700"><Star size={11} /> Đã đánh dấu khách</Badge>}
+                        {selectedConv.pushed_to_zalo && <Badge variant="secondary" className="gap-1 border-transparent bg-blue-100 text-[10px] text-blue-700"><Send size={11} /> Đã đẩy Zalo</Badge>}
+                      </div>
+                    ) : !openConv ? (
+                      <div className="mb-4 rounded-xl border border-dashed border-border bg-muted/40 p-4 text-center text-xs text-muted-foreground">
+                        Chưa chọn hội thoại
+                      </div>
+                    ) : null}
+
+                    {/* KPI Inbox gio tinh tu dong hoan toan khi extension quet duoc tin
+                        nhan (xem badge trang thai o tren) - khong con nut xac nhan Inbox
+                        thu cong nua. Nut con lai chi danh dau Lead (khach hang tiem nang),
+                        khong dung dung de "bao" KPI Inbox cho hoi thoai cu. */}
+                    {openConv && selectedConv && (
+                      verifiedConvIds?.has(openConv) ? (
+                        <div className="whitespace-nowrap rounded-xl border border-emerald-200/50 bg-emerald-100/50 p-3 text-center text-xs font-semibold text-emerald-700">
+                          Bạn đã đánh dấu Lead cho hội thoại này (Tuần {confirmedWeekNumber}).
+                        </div>
+                      ) : (
+                        <button onClick={async () => {
+                          if (!acc) return;
+                          try {
+                            await syncFbInbox({ leader_email: ownerEmail, member_email: accountOwnerEmail || userEmail, conv_ids: [openConv], user_id: acc, is_lead: true });
+                            showToastKpi("Đã xác nhận Lead!", true);
+                            mark(openConv, "is_customer", true);
+                          } catch { showToastKpi("Lỗi xác nhận lead", false); }
+                        }}
+                          className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-600 active:scale-[0.98]">
+                          <Star size={16} /> Xác nhận Lead
+                        </button>
+                      )
                     )}
                   </div>
-                )}
+                  );
+                })()}
 
                 {/* Tong quan */}
                 <div className="mb-3 text-sm font-bold text-foreground">Tổng quan inbox</div>
@@ -1000,6 +1023,14 @@ export default function InboxModernLayout(props: Props) {
           </div>
         </aside>
       </div>
+
+      <SalesAssetPickerModal
+        open={showSalesAssetPicker}
+        onClose={() => setShowSalesAssetPicker(false)}
+        onSend={appendSalesAsset}
+        customerLeadId={currentLead?.id || null}
+        dealId={currentLead?.id || null}
+      />
 
       {toast && <div className={cn("fixed bottom-6 right-6 z-50 rounded-xl px-5 py-3.5 font-semibold text-white shadow-lg", toast.ok ? "bg-green-600" : "bg-red-600")}>{toast.msg}</div>}
       {kpiToast && <div className={cn("fixed bottom-6 right-6 z-50 rounded-xl px-5 py-3.5 font-semibold text-white shadow-lg", kpiToast.ok ? "bg-green-600" : "bg-red-600")}>{kpiToast.msg}</div>}

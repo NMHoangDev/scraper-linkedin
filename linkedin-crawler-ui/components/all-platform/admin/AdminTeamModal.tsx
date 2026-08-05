@@ -1,9 +1,11 @@
-﻿"use client";
+"use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { MaterialIcon } from "@/components/ui";
 import { teamsService, usersService } from "@/services/all-platform.service";
 import type { AppUserProfile, TeamRow } from "@/services/all-platform.service";
+import { useMembers } from "@/hooks/useMembers";
+import { TEAM_TYPE_OPTIONS, type TeamType } from "@/lib/teamTypes";
 
 interface AdminTeamModalProps {
   isOpen: boolean;
@@ -18,13 +20,39 @@ export function AdminTeamModal({ isOpen, onClose, team, onSuccess }: AdminTeamMo
 
   // Form State
   const [nameTeam, setNameTeam] = useState("");
-  const [selectedLeaderId, setSelectedLeaderId] = useState("");
+  // selectedLeaderKey lưu selection key của roster (linkedUserId nếu đã liên kết,
+  // else memberId) — LUÔN duy nhất kể cả người chưa liên kết tài khoản, để
+  // dropdown hiện đủ 140 người và chọn tự do, không chặn ai.
+  const [selectedLeaderKey, setSelectedLeaderKey] = useState("");
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+  const [teamType, setTeamType] = useState<TeamType>("khac");
 
   const [allUsers, setAllUsers] = useState<AppUserProfile[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [leaderSearchQuery, setLeaderSearchQuery] = useState("");
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+
+  // Hiện ĐẦY ĐỦ toàn bộ danh bạ (140 người) — GET /api/all-platform/members —
+  // tích tự do không chặn ai. Người chưa liên kết tài khoản đăng nhập vẫn tích
+  // được bình thường; lúc lưu sẽ tự lọc ra ai có tài khoản thật để gửi lên (vì
+  // member_of_teams cần app_users.id thật), phần còn lại chờ họ tự liên kết sau.
+  const { members } = useMembers();
+  const rosterEntries = useMemo(() => {
+    return members
+      .map(m => {
+        const linkedUserId = m.linked_user_id || m.linked_user_id_2 || null;
+        const user = linkedUserId ? allUsers.find(u => u.id === linkedUserId) : undefined;
+        return {
+          memberId: m.id,
+          displayName: m.display_name,
+          linkedUserId,
+          email: user?.email || null,
+        };
+      })
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
+  }, [members, allUsers]);
+
+  const leaderKeyOf = (e: (typeof rosterEntries)[number]) => e.linkedUserId || e.memberId;
 
   // Load all users
   useEffect(() => {
@@ -51,41 +79,53 @@ export function AdminTeamModal({ isOpen, onClose, team, onSuccess }: AdminTeamMo
     if (isOpen) {
       if (team) {
         setNameTeam(team.name_team);
-        setSelectedLeaderId(team.id_leader || "");
-        setSelectedMemberIds(team.members?.map(m => m.id) || []);
+        setTeamType((team.team_type as TeamType) || "khac");
+        // team.leader_member_id la nguon that (members.id) tu migration 047 -
+        // luon co du Leader da lien ket tai khoan dang nhap hay chua. Fallback
+        // ve khop theo linkedUserId (du lieu cu truoc migration 047, chua co
+        // leader_member_id) de khong mat lua chon.
+        const leaderEntry = team.leader_member_id
+          ? rosterEntries.find(e => e.memberId === team.leader_member_id)
+          : rosterEntries.find(e => e.linkedUserId === team.id_leader);
+        setSelectedLeaderKey(leaderEntry ? leaderKeyOf(leaderEntry) : (team.id_leader || ""));
+        // team.members chứa app_users.id thật đã lưu trong DB — map ngược sang
+        // memberId tương ứng trong roster để tích đúng checkbox (selectedMemberIds
+        // giờ lưu theo memberId, chỉ resolve sang app_users.id lúc submit).
+        const existingUserIds = new Set(team.members?.map(m => m.id) || []);
+        const matched = rosterEntries
+          .filter(e => e.linkedUserId && existingUserIds.has(e.linkedUserId))
+          .map(e => e.memberId);
+        setSelectedMemberIds(matched);
       } else {
         setNameTeam("");
-        setSelectedLeaderId("");
+        setTeamType("khac");
+        setSelectedLeaderKey("");
         setSelectedMemberIds([]);
       }
       setLeaderSearchQuery("");
       setError(null);
     }
-  }, [isOpen, team]);
+  }, [isOpen, team, rosterEntries]);
 
   if (!isOpen) return null;
 
-  // Leader candidates: anyone (we can promote anyone to leader except admins if they want, but usually any user)
-  // Let's filter out admins just in case, or show all. Let's show all users.
-  const leadersList = allUsers.filter(u => u.role !== "admin");
-
-  const filteredLeaders = leadersList.filter(u => {
-    if (u.id === selectedLeaderId) return true;
+  // Leader candidates: toàn bộ danh bạ 140 người, chọn tự do — người chưa liên
+  // kết tài khoản đăng nhập vẫn hiện & chọn được, chỉ chặn ở bước submit (leader
+  // cần tài khoản thật để phân quyền role="leader").
+  const filteredLeaders = rosterEntries.filter(e => {
+    if (leaderKeyOf(e) === selectedLeaderKey) return true;
     const query = leaderSearchQuery.toLowerCase();
-    const nameMatch = u.name?.toLowerCase().includes(query) || false;
-    const emailMatch = u.email.toLowerCase().includes(query);
+    const nameMatch = e.displayName.toLowerCase().includes(query);
+    const emailMatch = (e.email || "").toLowerCase().includes(query);
     return nameMatch || emailMatch;
   });
 
-  // Member candidates: only role === "member"
-  const membersList = allUsers.filter(u => u.role === "member");
+  const selectedLeaderEntry = rosterEntries.find(e => leaderKeyOf(e) === selectedLeaderKey);
 
-  // Filter member list by search query (name or email)
-  const filteredMembers = membersList.filter(m => {
+  // Member candidates: toàn bộ danh bạ, lọc theo search query (tên hoặc email).
+  const filteredMembers = rosterEntries.filter(e => {
     const query = searchQuery.toLowerCase();
-    const nameMatch = m.name?.toLowerCase().includes(query) || false;
-    const emailMatch = m.email.toLowerCase().includes(query);
-    return nameMatch || emailMatch;
+    return e.displayName.toLowerCase().includes(query) || (e.email || "").toLowerCase().includes(query);
   });
 
   const handleToggleMember = (memberId: string) => {
@@ -102,7 +142,7 @@ export function AdminTeamModal({ isOpen, onClose, team, onSuccess }: AdminTeamMo
       setError("Tên team không được để trống");
       return;
     }
-    if (!selectedLeaderId) {
+    if (!selectedLeaderKey || !selectedLeaderEntry) {
       setError("Vui lòng chọn Leader cho team");
       return;
     }
@@ -111,29 +151,42 @@ export function AdminTeamModal({ isOpen, onClose, team, onSuccess }: AdminTeamMo
     setError(null);
 
     try {
-      // Find selected leader
-      const leaderUser = allUsers.find(u => u.id === selectedLeaderId);
-      if (!leaderUser) {
-        setError("Leader được chọn không hợp lệ");
-        setIsSubmitting(false);
-        return;
-      }
-
-      // 1. Promote to leader if not already leader
-      if (leaderUser.role !== "leader") {
-        const promoteRes = await usersService.updateRole(leaderUser.email, "leader");
-        if (!promoteRes.success) {
-          setError(promoteRes.message || "Không thể phân quyền Leader cho tài khoản này");
-          setIsSubmitting(false);
-          return;
+      // members (danh bạ 140 người) và app_users (tài khoản đăng nhập) là 2
+      // nghiệp vụ độc lập — Leader/Member được chọn tự do từ danh bạ, KHÔNG
+      // bắt buộc phải có tài khoản đăng nhập mới lưu được. Chỉ khi Leader ĐÃ
+      // liên kết tài khoản (linkedUserId có giá trị) mới tự động phân quyền
+      // role="leader" cho tài khoản đó — thuần là tiện ích cộng thêm, không
+      // phải điều kiện để tạo/sửa team.
+      if (selectedLeaderEntry.linkedUserId) {
+        const leaderUser = allUsers.find(u => u.id === selectedLeaderEntry.linkedUserId);
+        if (leaderUser && leaderUser.role !== "leader") {
+          const promoteRes = await usersService.updateRole(leaderUser.email, "leader");
+          if (!promoteRes.success) {
+            setError(promoteRes.message || "Không thể phân quyền Leader cho tài khoản này");
+            setIsSubmitting(false);
+            return;
+          }
         }
       }
 
-      // 2. Save Team
+      // Member trong danh sách tích: gửi cả memberId (id_member giờ có thể
+      // trỏ member chưa liên kết) — chỉ resolve sang app_users.id khi member
+      // đó ĐÃ liên kết, phần chưa liên kết vẫn cần lưu qua member_id riêng ở
+      // backend nếu sau này member_of_teams cũng được nới lỏng tương tự
+      // teams.id_leader. Hiện tại member_of_teams vẫn yêu cầu app_users.id
+      // thật (chưa nằm trong phạm vi yêu cầu này — chỉ áp dụng cho Leader).
+      const resolvedMemberIds = selectedMemberIds
+        .map(mid => rosterEntries.find(e => e.memberId === mid)?.linkedUserId)
+        .filter((id): id is string => Boolean(id));
+
       const payload = {
         name_team: nameTeam.trim(),
-        leader_id: selectedLeaderId,
-        member_ids: selectedMemberIds,
+        // Nguồn thật — members.id, luôn gửi bất kể đã liên kết tài khoản hay chưa.
+        leader_member_id: selectedLeaderEntry.memberId,
+        // Optional — chỉ gửi khi Leader đã có tài khoản đăng nhập thật.
+        leader_id: selectedLeaderEntry.linkedUserId || undefined,
+        member_ids: resolvedMemberIds,
+        team_type: teamType,
         // team.id giup backend tim dung team theo id thay vi theo ten cu, ho tro doi ten.
         ...(team ? { team_id: team.id } : {}),
       };
@@ -240,6 +293,19 @@ export function AdminTeamModal({ isOpen, onClose, team, onSuccess }: AdminTeamMo
           </div>
 
           <div className="space-y-1">
+            <label className="text-[10px] font-bold text-on-surface-variant uppercase block">Loại team</label>
+            <select
+              value={teamType}
+              onChange={(e) => setTeamType(e.target.value as TeamType)}
+              className="w-full bg-surface-container-low border border-outline-variant rounded-xl px-3 py-2 text-sm text-on-surface outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition"
+            >
+              {TEAM_TYPE_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1">
             <label className="text-[10px] font-bold text-on-surface-variant uppercase block">Chọn Leader *</label>
             <div className="relative mb-2">
               <input
@@ -254,15 +320,15 @@ export function AdminTeamModal({ isOpen, onClose, team, onSuccess }: AdminTeamMo
               </div>
             </div>
             <select
-              value={selectedLeaderId}
-              onChange={(e) => setSelectedLeaderId(e.target.value)}
+              value={selectedLeaderKey}
+              onChange={(e) => setSelectedLeaderKey(e.target.value)}
               className="w-full bg-surface-container-low border border-outline-variant rounded-xl px-3 py-2 text-sm text-on-surface outline-none focus:border-red-600 focus:ring-2 focus:ring-red-600/20 transition"
               required
             >
               <option value="">-- Chọn Leader --</option>
-              {filteredLeaders.map(u => (
-                <option key={u.id} value={u.id}>
-                  {u.name ? `${u.name} (${u.email})` : u.email} {u.role !== "leader" ? "[Sẽ phân quyền Leader]" : ""}
+              {filteredLeaders.map(e => (
+                <option key={leaderKeyOf(e)} value={leaderKeyOf(e)}>
+                  {e.linkedUserId ? `${e.displayName}${e.email ? ` (${e.email})` : ""}` : e.displayName}
                 </option>
               ))}
             </select>
@@ -274,7 +340,7 @@ export function AdminTeamModal({ isOpen, onClose, team, onSuccess }: AdminTeamMo
                 Chọn thành viên ({selectedMemberIds.length})
               </label>
               <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">
-                Role Member Only
+                Toàn bộ danh bạ ({rosterEntries.length})
               </span>
             </div>
 
@@ -304,17 +370,17 @@ export function AdminTeamModal({ isOpen, onClose, team, onSuccess }: AdminTeamMo
                   Không tìm thấy thành viên phù hợp (hoặc chưa có tài khoản Member)
                 </div>
               ) : (
-                filteredMembers.map(m => {
-                  const isSelected = selectedMemberIds.includes(m.id);
+                filteredMembers.map(e => {
+                  const isSelected = selectedMemberIds.includes(e.memberId);
                   return (
                     <div
-                      key={m.id}
-                      onClick={() => handleToggleMember(m.id)}
+                      key={e.memberId}
+                      onClick={() => handleToggleMember(e.memberId)}
                       className="flex items-center justify-between px-3 py-2.5 hover:bg-surface transition cursor-pointer select-none"
                     >
                       <div className="min-w-0 pr-2">
-                        <div className="text-xs font-bold text-on-surface truncate">{m.name || "Chưa thiết lập tên"}</div>
-                        <div className="text-[10px] text-on-surface-variant font-medium truncate">{m.email}</div>
+                        <div className="text-xs font-bold text-on-surface truncate">{e.displayName}</div>
+                        <div className="text-[10px] text-on-surface-variant font-medium truncate">{e.email || "Chưa liên kết tài khoản"}</div>
                       </div>
                       <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition shrink-0 ${
                         isSelected

@@ -20,6 +20,8 @@ import {
   Building2,
   Tag as TagIcon,
   Clock,
+  CalendarDays,
+  FileText,
   ArrowRight,
   AlertCircle,
   CheckCircle2,
@@ -29,19 +31,27 @@ import {
   Loader2,
   Trash2,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   customerLeadService,
   type ActivityLogEntry,
+  type ContractStatus,
   type Customer,
   type DealStage,
+  type PaymentStatus,
+  type ReviewResult,
   DEAL_STAGE_META,
   LOST_REASON_OPTIONS,
+  PAYMENT_STATUS_OPTIONS,
   REJECT_REASON_TYPE_OPTIONS,
+  REVIEW_RESULT_OPTIONS,
+  SERVICE_PACKAGE_OPTIONS,
   type RejectReasonType,
 } from "@/services/customer-lead.service";
 import {
   allowedNextStages,
   getCurrentStage,
+  isPaymentOverdue,
   stageBadgeClass,
   stageLabel,
 } from "@/services/crm-pipeline.helpers";
@@ -54,15 +64,68 @@ interface Props {
   onRequestTransition: (c: Customer, to: DealStage) => void;
   onEditCustomer: (c: Customer) => void;
   onDeleteCustomer: (c: Customer) => void;
+  /** Gọi lại sau khi sửa nhanh 1 field trong drawer (vd đổi trạng thái hợp đồng) — parent nên refetch list. */
+  onCustomerUpdated?: (customer: Customer) => void;
 }
 
-export function DealDetailDrawer({ customer, open, onClose, onRequestTransition, onEditCustomer, onDeleteCustomer }: Props) {
+const CONTRACT_STATUS_OPTIONS: { value: ContractStatus; label: string }[] = [
+  { value: "dang_xu_ly", label: "Đang xử lý" },
+  { value: "da_bao_gia", label: "Đã báo giá" },
+  { value: "da_chot", label: "Đã chốt" },
+  { value: "active", label: "Đang hoạt động" },
+  { value: "completed", label: "Đã hoàn thành" },
+  { value: "maintenance", label: "Bảo trì / bảo hành" },
+];
+
+function formatDate(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("vi-VN");
+}
+
+function formatVND(value?: number | null) {
+  if (!value) return null;
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function getServicePackageText(value?: string | null) {
+  if (!value) return "";
+  return SERVICE_PACKAGE_OPTIONS.find((option) => option.value === value)?.label || value;
+}
+
+function getTerminalContractStatus(stage: DealStage, currentLabel?: string | null) {
+  if (stage === "won") return "Đã chốt";
+  if (stage === "lost") return "Không hoạt động";
+  return currentLabel || "Đang xử lý";
+}
+
+export function DealDetailDrawer({ customer, open, onClose, onRequestTransition, onEditCustomer, onDeleteCustomer, onCustomerUpdated }: Props) {
   const [log, setLog] = useState<ActivityLogEntry[]>([]);
   const [loadingLog, setLoadingLog] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [contractStatusDraft, setContractStatusDraft] = useState<ContractStatus>("dang_xu_ly");
+  const [savingContractStatus, setSavingContractStatus] = useState(false);
+  const [paymentStatusDraft, setPaymentStatusDraft] = useState<PaymentStatus>("unpaid");
+  const [savingPaymentStatus, setSavingPaymentStatus] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewDraft, setReviewDraft] = useState<ReviewResult>("Chua_xem_xet");
+  const [savingReview, setSavingReview] = useState(false);
 
   const stage = useMemo(() => (customer ? getCurrentStage(customer) : null), [customer]);
   const nextOptions = useMemo(() => (stage ? allowedNextStages(stage) : []), [stage]);
+  const reviewButtonLabel = useMemo(() => (stage === "won" ? "Won Review" : "Lost Review"), [stage]);
+  const reviewButtonClass = useMemo(
+    () =>
+      stage === "lost"
+        ? "inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100"
+        : "inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100",
+    [stage],
+  );
 
   useEffect(() => {
     if (!open || !customer) {
@@ -77,9 +140,88 @@ export function DealDetailDrawer({ customer, open, onClose, onRequestTransition,
       .finally(() => setLoadingLog(false));
   }, [open, customer?.id]);
 
+  // Đồng bộ dropdown với deal đang mở — customer đổi (chuyển sang deal khác)
+  // hoặc load lại sau update thì phải nạp lại giá trị hiện tại.
+  useEffect(() => {
+    setContractStatusDraft(customer?.contract_status ?? "dang_xu_ly");
+  }, [customer?.id, customer?.contract_status]);
+
+  useEffect(() => {
+    setPaymentStatusDraft(customer?.payment_status ?? "unpaid");
+  }, [customer?.id, customer?.payment_status]);
+
+  useEffect(() => {
+    setReviewDraft(customer?.review_result ?? "Chua_xem_xet");
+  }, [customer?.id, customer?.review_result]);
+
+  async function handleContractStatusChange(next: ContractStatus) {
+    if (!customer || next === customer.contract_status) {
+      setContractStatusDraft(next);
+      return;
+    }
+    const prev = contractStatusDraft;
+    setContractStatusDraft(next);
+    setSavingContractStatus(true);
+    try {
+      const res = await customerLeadService.update(customer.id, { contract_status: next });
+      if (res?.success === false) throw new Error(res?.message || "Cập nhật thất bại");
+      toast.success("Đã cập nhật trạng thái hợp đồng");
+      onCustomerUpdated?.({ ...customer, contract_status: next });
+    } catch (err: any) {
+      setContractStatusDraft(prev);
+      toast.error(err?.message || "Không cập nhật được trạng thái hợp đồng");
+    } finally {
+      setSavingContractStatus(false);
+    }
+  }
+
+  async function handlePaymentStatusChange(next: PaymentStatus) {
+    if (!customer || next === customer.payment_status) {
+      setPaymentStatusDraft(next);
+      return;
+    }
+    const prev = paymentStatusDraft;
+    setPaymentStatusDraft(next);
+    setSavingPaymentStatus(true);
+    try {
+      const res = await customerLeadService.update(customer.id, { payment_status: next });
+      if (res?.success === false) throw new Error(res?.message || "Cập nhật thất bại");
+      toast.success("Đã cập nhật trạng thái thanh toán");
+      onCustomerUpdated?.({ ...customer, payment_status: next });
+    } catch (err: any) {
+      setPaymentStatusDraft(prev);
+      toast.error(err?.message || "Không cập nhật được trạng thái thanh toán");
+    } finally {
+      setSavingPaymentStatus(false);
+    }
+  }
+
+  async function handleSaveReview() {
+    if (!customer) return;
+    setSavingReview(true);
+    try {
+      const res = await customerLeadService.update(customer.id, { review_result: reviewDraft });
+      if (res?.success === false) throw new Error(res?.message || "Cập nhật review thất bại");
+      toast.success(`${reviewButtonLabel} đã được cập nhật`);
+      onCustomerUpdated?.({ ...customer, review_result: reviewDraft });
+      setReviewOpen(false);
+    } catch (err: any) {
+      toast.error(err?.message || "Không lưu được review");
+    } finally {
+      setSavingReview(false);
+    }
+  }
+
   if (!customer || !stage) return null;
 
   const isTerminal = stage === "won" || stage === "lost";
+  const leadName = customer.leader_name || customer.sdr_name || null;
+  const handlerName = customer.sdr_name || customer.leader_name || null;
+  const servicePackageLabel = getServicePackageText(customer.service_package);
+  const terminalContractStatus = getTerminalContractStatus(
+    stage,
+    CONTRACT_STATUS_OPTIONS.find((option) => option.value === contractStatusDraft)?.label || null,
+  );
   const lostReasonLabel =
     customer.reject_reason_type
       ? LOST_REASON_OPTIONS.find((r) => r.value === customer.reject_reason_type)?.label ??
@@ -97,7 +239,7 @@ export function DealDetailDrawer({ customer, open, onClose, onRequestTransition,
       />
       {/* Drawer */}
       <aside
-        className={`fixed right-0 top-0 z-[99991] flex h-screen w-full max-w-2xl flex-col border-l border-slate-200 bg-white shadow-2xl transition-transform duration-300 ${
+        className={`fixed right-0 top-0 z-[99991] flex h-screen w-full max-w-[42rem] flex-col border-l border-slate-200 bg-white shadow-2xl transition-transform duration-300 ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
       >
@@ -223,9 +365,194 @@ export function DealDetailDrawer({ customer, open, onClose, onRequestTransition,
                 Follow-up dự kiến: <b>{new Date(customer.follow_up_date).toLocaleDateString("vi-VN")}</b>
               </div>
             )}
+            {leadName && (
+              <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
+                  <UserCog className="size-3" /> Người lead
+                </div>
+                <div className="mt-0.5 truncate font-medium text-slate-700">{leadName}</div>
+              </div>
+            )}
+            {handlerName && (
+              <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
+                  <UserCog className="size-3" /> Người xử lý
+                </div>
+                <div className="mt-0.5 truncate font-medium text-slate-700">{handlerName}</div>
+              </div>
+            )}
+            {isTerminal && (
+              <div className="col-span-2 rounded-md border border-slate-200 bg-white px-3 py-2">
+                <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
+                  <CheckCircle2 className="size-3" /> Kết quả review
+                </div>
+                <div className="mt-0.5 font-medium text-slate-700">
+                  {REVIEW_RESULT_OPTIONS.find((item) => item.value === (customer.review_result ?? "Chua_xem_xet"))?.label ?? "Chưa xem xét"}
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Ghi chú hiện tại */}
+          {(customer.service_package ||
+            customer.lifetime_value ||
+            customer.contract_status ||
+            customer.contract_signed_at ||
+            customer.warranty_expires_at ||
+            customer.customer_since ||
+            customer.last_care_at ||
+            customer.last_attachment_name ||
+            customer.care_note) && (
+            <section className="space-y-2">
+              <h4 className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-500">
+                Hợp đồng & chăm sóc
+              </h4>
+              <div className="grid grid-cols-2 gap-2">
+                {servicePackageLabel && (
+                  <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                    <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
+                      <TagIcon className="size-3" /> Gói dịch vụ
+                    </div>
+                    <div className="mt-0.5 truncate font-medium text-slate-700">{servicePackageLabel}</div>
+                  </div>
+                )}
+                {customer.lifetime_value ? (
+                  <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                    <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
+                      <Wallet className="size-3" /> Giá trị hợp đồng
+                    </div>
+                    <div className="mt-0.5 font-semibold text-slate-700">{formatVND(customer.lifetime_value)}</div>
+                  </div>
+                ) : null}
+                <div className="col-span-2 rounded-md border border-slate-200 bg-white px-3 py-2">
+                  <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
+                    <FileText className="size-3" /> Trạng thái hợp đồng
+                    {!isTerminal && savingContractStatus && <Loader2 className="size-3 animate-spin text-slate-400" />}
+                  </div>
+                  {isTerminal ? (
+                    <div className="mt-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm font-medium text-slate-700">
+                      {terminalContractStatus}
+                    </div>
+                  ) : (
+                    <select
+                      value={contractStatusDraft}
+                      disabled={savingContractStatus}
+                      onChange={(e) => handleContractStatusChange(e.target.value as ContractStatus)}
+                      className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm font-medium text-slate-700 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
+                    >
+                      {CONTRACT_STATUS_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                <div className="col-span-2 rounded-md border border-slate-200 bg-white px-3 py-2">
+                  <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
+                    <Wallet className="size-3" /> Trạng thái thanh toán
+                    {savingPaymentStatus && <Loader2 className="size-3 animate-spin text-slate-400" />}
+                  </div>
+                  <select
+                    value={paymentStatusDraft}
+                    disabled={savingPaymentStatus}
+                    onChange={(e) => handlePaymentStatusChange(e.target.value as PaymentStatus)}
+                    className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm font-medium text-slate-700 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
+                  >
+                    {PAYMENT_STATUS_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {customer.payment_due_date && (
+                  <div
+                    className={`rounded-md border px-3 py-2 ${
+                      isPaymentOverdue(customer)
+                        ? "border-amber-200 bg-amber-50"
+                        : "border-slate-200 bg-white"
+                    }`}
+                  >
+                    <div
+                      className={`flex items-center gap-1.5 text-[11px] uppercase tracking-wider ${
+                        isPaymentOverdue(customer) ? "text-amber-700" : "text-slate-500"
+                      }`}
+                    >
+                      <CalendarDays className="size-3" />
+                      {isPaymentOverdue(customer) ? "Đã quá hạn thanh toán" : "Hạn thanh toán"}
+                    </div>
+                    <div
+                      className={`mt-0.5 font-medium ${
+                        isPaymentOverdue(customer) ? "text-amber-800" : "text-slate-700"
+                      }`}
+                    >
+                      {formatDate(customer.payment_due_date)}
+                    </div>
+                  </div>
+                )}
+                {customer.last_attachment_name && (
+                  <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                    <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
+                      <FileText className="size-3" /> File hợp đồng / báo giá
+                    </div>
+                    {customer.last_attachment_url ? (
+                      <a
+                        href={customer.last_attachment_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-0.5 block truncate font-medium text-blue-700 hover:underline"
+                      >
+                        {customer.last_attachment_name}
+                      </a>
+                    ) : (
+                      <div className="mt-0.5 truncate font-medium text-slate-700">
+                        {customer.last_attachment_name}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {customer.customer_since && (
+                  <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                    <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
+                      <CalendarDays className="size-3" /> Ngày thành khách hàng
+                    </div>
+                    <div className="mt-0.5 font-medium text-slate-700">{formatDate(customer.customer_since)}</div>
+                  </div>
+                )}
+                {customer.contract_signed_at && (
+                  <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                    <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
+                      <CalendarDays className="size-3" /> Ngày ký
+                    </div>
+                    <div className="mt-0.5 font-medium text-slate-700">{formatDate(customer.contract_signed_at)}</div>
+                  </div>
+                )}
+                {customer.warranty_expires_at && (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+                    <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-amber-700">
+                      <CalendarDays className="size-3" /> Hết hạn bảo hành
+                    </div>
+                    <div className="mt-0.5 font-medium text-amber-800">{formatDate(customer.warranty_expires_at)}</div>
+                  </div>
+                )}
+                {customer.last_care_at && (
+                  <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                    <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500">
+                      <Clock className="size-3" /> Chăm sóc gần nhất
+                    </div>
+                    <div className="mt-0.5 font-medium text-slate-700">{formatDate(customer.last_care_at)}</div>
+                  </div>
+                )}
+              </div>
+              {customer.care_note && (
+                <p className="whitespace-pre-line rounded-md border border-slate-200 bg-white p-3 text-sm text-slate-700">
+                  {customer.care_note}
+                </p>
+              )}
+            </section>
+          )}
+
           {customer.note && (
             <section>
               <h4 className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -340,6 +667,14 @@ export function DealDetailDrawer({ customer, open, onClose, onRequestTransition,
             >
               <UserCog className="size-3.5" /> Sửa thông tin
             </button>
+            {isTerminal && (
+              <button
+                onClick={() => onRequestTransition?.(customer, stage as DealStage)}
+                className={reviewButtonClass}
+              >
+                <CheckCircle2 className="size-3.5" /> {reviewButtonLabel}
+              </button>
+            )}
             <button
               onClick={() => {
                 if (confirm(`Xóa khách hàng "${customer.customer_name}"?\nHành động này không thể hoàn tác.`)) {
@@ -360,6 +695,50 @@ export function DealDetailDrawer({ customer, open, onClose, onRequestTransition,
           </button>
         </footer>
       </aside>
+
+      {reviewOpen && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-950/35 p-6 backdrop-blur-[1px]">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="border-b border-slate-100 px-5 py-4">
+              <h3 className="text-base font-bold text-slate-900">{reviewButtonLabel}</h3>
+              <p className="mt-1 text-sm text-slate-500">Cập nhật đánh giá cho deal terminal này.</p>
+            </div>
+            <div className="space-y-4 px-5 py-4">
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Kết quả review</span>
+                <select
+                  value={reviewDraft}
+                  onChange={(e) => setReviewDraft(e.target.value as ReviewResult)}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  {REVIEW_RESULT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4">
+              <button
+                type="button"
+                onClick={() => setReviewOpen(false)}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={savingReview}
+                onClick={handleSaveReview}
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-50"
+              >
+                {savingReview ? "Đang lưu..." : "Lưu review"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {chatOpen && customer.conv_id && (
         <QuickChatBox

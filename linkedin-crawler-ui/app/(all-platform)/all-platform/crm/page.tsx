@@ -1,4 +1,4 @@
-import CrmCustomersPage from "@/components/all-platform/customers/CrmCustomersPage";
+import { CrmShell } from "@/modules/crm";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function CrmRoute() {
-  return <CrmCustomersPage />;
+  return <CrmShell />;
 }

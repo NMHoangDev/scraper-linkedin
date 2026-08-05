@@ -16,6 +16,14 @@ from pydantic import BaseModel, model_validator
 from app.core.supabase_client import get_supabase_client
 from app.modules.all_platform.websocket import manager
 from app.modules.all_platform.services.supabase_facebook_crawl_service import parse_facebook_time
+from app.modules.all_platform.services import supabase_crawl_queue_service as queue_service
+
+# Reuse facebook keyword picker logic
+from app.modules.facebook.src.modules.facebook.services.facebook_scraper import (
+    _pick_by_keywords_and_threshold,
+)
+from app.modules.facebook.src.modules.crawl_fb.models.post import Post as FBPost
+
 
 # Reuse facebook keyword picker logic
 from app.modules.facebook.src.modules.facebook.services.facebook_scraper import (
@@ -58,6 +66,14 @@ class ExtensionCrawlRequest(BaseModel):
     keywords: Optional[List[str]] = None
     post_limit: Optional[int] = None
 
+<<<<<<< HEAD
+=======
+    # Định danh job/worker khi bài viết đến từ hàng đợi multi-VPS (không bắt buộc,
+    # extension cũ/luồng thủ công không gửi field này vẫn hoạt động bình thường).
+    job_id: Optional[str] = None
+    worker_id: Optional[str] = None
+
+>>>>>>> 961099854cab42df4ea4717cb6d6f4d86f4742a1
     @model_validator(mode="before")
     @classmethod
     def normalize_keywords(cls, data):
@@ -133,6 +149,11 @@ def sync_process_and_save_posts_db(payload: ExtensionCrawlRequest, legacy: bool)
         except Exception as e:
             logger.error(f"Error fetching group id for {group_url}: {e}")
 
+    # group_id có thể vẫn là chuỗi rỗng nếu không resolve được (group_url lạ,
+    # chưa có trong facebook_groups) -> Postgres từ chối "" cho cột UUID.
+    # Chuẩn hoá về None để insert NULL thay vì crash cả batch.
+    group_id = group_id or None
+
     # 2. Get existing post_urls to avoid duplicate insertion
     all_post_urls = [p.post_url or p.url for p in payload.posts if (p.post_url or p.url)]
     existing_urls = set()
@@ -144,7 +165,10 @@ def sync_process_and_save_posts_db(payload: ExtensionCrawlRequest, legacy: bool)
             logger.warning(f"Could not check existing urls in facebook_posts: {e}")
 
 
-    # 4. Lọc bài viết: chỉ giữ bài TRONG NGÀY HÔM NAY (giờ Việt Nam UTC+7)
+    # 4. Lọc bài viết: chỉ giữ bài TRONG NGÀY HÔM NAY (giờ Việt Nam UTC+7).
+    # Toàn bộ logic chọn bài (keyword match + fallback theo tương tác) đều chạy
+    # TRÊN TẬP NÀY - phạm vi luôn là "bài hôm nay", keyword chỉ dùng để ưu tiên/lọc
+    # bên trong tập đó, không mở rộng ra các ngày khác.
     vietnam_tz = timezone(timedelta(hours=7))
     now_vn = datetime.now(vietnam_tz)
     today_vn_str = now_vn.strftime('%Y-%m-%d')
@@ -204,9 +228,20 @@ def sync_process_and_save_posts_db(payload: ExtensionCrawlRequest, legacy: bool)
         f"| Bài HÔM NAY={len(today_posts)} (today_vn={today_vn_str})"
     )
 
+<<<<<<< HEAD
     # 4b. Build map theo post_url để MAP NGƯỢC object gốc (có author_url/author_name/content đầy đủ)
     ext_post_by_url = {}
     for (ext_post, _raw_time) in today_posts:
+=======
+    # Note: _pick_by_keywords_and_threshold cần: url, date, reactions/comments/shares/score, content
+    keywords = payload.keywords or []
+    post_limit = payload.post_limit
+    candidate_posts = today_posts
+
+    # 4b. Build map theo post_url để MAP NGƯỢC object gốc (có author_url/author_name/content đầy đủ)
+    ext_post_by_url = {}
+    for (ext_post, _raw_time) in candidate_posts:
+>>>>>>> 961099854cab42df4ea4717cb6d6f4d86f4742a1
         p_url = ext_post.post_url or ext_post.url
         if p_url:
             ext_post_by_url[p_url] = ext_post
@@ -221,6 +256,7 @@ def sync_process_and_save_posts_db(payload: ExtensionCrawlRequest, legacy: bool)
     # NOTE: FBPost model chỉ có url/date/reactions/comments/shares/score/content/media/images
     # KHÔNG có author_url/author_name => sau khi picker chọn xong phải map ngược object gốc theo post_url.
 
+<<<<<<< HEAD
     # Note: _pick_by_keywords_and_threshold cần: url, date, reactions/comments/shares/score, content
     keywords = payload.keywords or []
     post_limit = payload.post_limit
@@ -234,6 +270,17 @@ def sync_process_and_save_posts_db(payload: ExtensionCrawlRequest, legacy: bool)
 
     posts_in_day: list[FBPost] = []
     for (ext_post, raw_time) in today_posts:
+=======
+    logger.info(
+        "[KEYWORD-CHECK] payload.keywords=%s | post_limit=%s | candidate_count=%s",
+        keywords,
+        post_limit,
+        len(candidate_posts),
+    )
+
+    posts_in_day: list[FBPost] = []
+    for (ext_post, raw_time) in candidate_posts:
+>>>>>>> 961099854cab42df4ea4717cb6d6f4d86f4742a1
         post_url = ext_post.post_url or ext_post.url
         if not post_url:
             continue
@@ -415,6 +462,17 @@ def sync_process_and_save_posts_db(payload: ExtensionCrawlRequest, legacy: bool)
 async def process_and_save_posts(payload: ExtensionCrawlRequest, event_name: str, legacy: bool = False):
     # Offload sync Supabase DB calls to a separate thread to prevent blocking Uvicorn Asyncio EventLoop
     inserted_count, inserted_post_urls = await asyncio.to_thread(sync_process_and_save_posts_db, payload, legacy)
+
+    if payload.job_id:
+        try:
+            queue_service.complete_job(
+                payload.job_id,
+                success=True,
+                worker_id=payload.worker_id,
+                result_count=inserted_count,
+            )
+        except Exception as e:
+            logger.warning(f"[CRAWL-QUEUE] Không đóng được job {payload.job_id}: {e}")
 
     # Realtime WebSocket Broadcast
     msg_prefix = "Legacy: " if legacy else ""

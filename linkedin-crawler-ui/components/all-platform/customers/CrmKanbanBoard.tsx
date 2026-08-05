@@ -1,58 +1,79 @@
 "use client";
 
-/**
- * CrmKanbanBoard — layout theo thiết kế tham khảo "SalesFlow CRM".
- *
- * Cấu trúc 2 phần rõ ràng:
- *
- *  ┌───────────────────────────────────────────────────────────────┐
- *  │  PHẦN 1: PIPELINE CHÍNH (7 stage — scroll ngang)             │
- *  │  New Lead → Contacted → Qualified → Requirement →            │
- *  │  Proposal → Negotiation → Contract Sent                      │
- *  │                                                               │
- *  │  Mỗi stage là 1 cột dọc, có dot màu + count + danh sách    │
- *  │  card. Màu dot giảm dần theo stage (primary → primary/5).    │
- *  │  Card: tên deal + giá trị VND + số ngày ở stage + tag.      │
- *  ├───────────────────────────────────────────────────────────────┤
- *  │  ─── Terminal States ───                                      │
- *  │  PHẦN 2: 3 DROPTARGET LỚN (Won / Lost / On Hold)            │
- *  │  3 ô dashed-border lớn, mỗi ô có icon tròn + tiêu đề +      │
- *  │  mô tả. Kéo thẻ từ pipeline vào đây để chuyển stage cuối.  │
- *  └───────────────────────────────────────────────────────────────┘
- *
- * Logic nghiệp vụ (state machine, validation, audit log) đã có ở
- * CrmCustomersPage — chỉ cần gọi `onRequestMove(customer, toStage)`
- * với `toStage` tương ứng khi user kéo-thả.
- */
-
 import { useMemo, useState } from "react";
 import {
-  Plus,
-  MoreVertical,
+  AlertTriangle,
+  Building2,
+  CalendarDays,
   CheckCircle2,
-  XCircle,
-  PauseCircle,
-  Wallet,
   Clock,
+  FileText,
+  Mail,
+  MapPin,
+  MoreVertical,
+  PauseCircle,
+  Phone,
+  Tag,
   UserCog,
-  Inbox,
-  Pencil,
-  Trash2,
+  Wallet,
+  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+
 import { cn } from "@/lib/utils";
-import type { Customer, DealStage } from "@/services/customer-lead.service";
+import { useDragAutoScroll } from "@/hooks/useDragAutoScroll";
+import type { ContractStatus, Customer, DealStage } from "@/services/customer-lead.service";
 import {
   DEAL_STAGE_META,
+  PAYMENT_STATUS_OPTIONS,
   PIPELINE_COLUMNS,
+  SERVICE_PACKAGE_OPTIONS,
 } from "@/services/customer-lead.service";
-import {
-  getCurrentStage,
-  validateTransition,
-} from "@/services/crm-pipeline.helpers";
-import { useDragAutoScroll } from "@/hooks/useDragAutoScroll";
+import { getCurrentStage, isPaymentOverdue, validateTransition } from "@/services/crm-pipeline.helpers";
 
-/* ─────────── helpers ─────────── */
+interface Props {
+  customers: Customer[];
+  onRequestMove: (customer: Customer, to: DealStage) => void;
+  onCardClick: (customer: Customer) => void;
+  onEdit: (customer: Customer) => void;
+  onChat: (customer: Customer) => void;
+  onDelete: (id: string) => void;
+  onNewCustomer: () => void;
+  onResumeOnHold?: (customer: Customer) => void;
+}
+
+const PIPELINE_STAGES = PIPELINE_COLUMNS.filter((stage) => stage !== "on_hold");
+const TERMINAL_STAGES: Array<"won" | "lost" | "on_hold"> = ["won", "lost", "on_hold"];
+
+const CONTRACT_STATUS_META: Record<
+  string,
+  { label: string; className: string }
+> = {
+  dang_xu_ly: {
+    label: "Đang xử lý",
+    className: "border-red-200 bg-red-50 text-red-600",
+  },
+  da_bao_gia: {
+    label: "Đã báo giá",
+    className: "border-amber-200 bg-amber-50 text-amber-700",
+  },
+  da_chot: {
+    label: "Đã chốt",
+    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  },
+  active: {
+    label: "Đang hoạt động",
+    className: "border-sky-200 bg-sky-50 text-sky-700",
+  },
+  completed: {
+    label: "Đã hoàn thành",
+    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  },
+  maintenance: {
+    label: "Bảo trì / bảo hành",
+    className: "border-violet-200 bg-violet-50 text-violet-700",
+  },
+};
 
 function formatVND(value: number | null | undefined) {
   if (!value) return null;
@@ -63,305 +84,451 @@ function formatVND(value: number | null | undefined) {
   }).format(value);
 }
 
-/** Tỉ lệ opacity cho dot màu của 7 stage (giảm dần như thiết kế SalesFlow). */
-const STAGE_DOT_OPACITY: DealStage[] = [
-  "new_lead",       // 100%
-  "contacted",      // 60%
-  "qualified",      // 40%
-  "requirement",    // 30%
-  "proposal_sent",  // 20%
-  "negotiation",    // 10%
-  "contract_sent",  // 5%
-];
+function formatDate(value: string | null | undefined) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("vi-VN");
+}
 
-/* ─────────── Deal card ─────────── */
+function getDaysSinceCreated(customer: Customer) {
+  const base = customer.created_at || customer.stage_entered_at || customer.updated_at;
+  if (!base) return customer.days_in_stage ?? 0;
+
+  const createdAt = new Date(base);
+  if (Number.isNaN(createdAt.getTime())) return customer.days_in_stage ?? 0;
+
+  const diff = Date.now() - createdAt.getTime();
+  return Math.max(0, Math.floor(diff / 86400000));
+}
+
+function getPaymentStatusMeta(value: Customer["payment_status"] | null | undefined) {
+  return PAYMENT_STATUS_OPTIONS.find((option) => option.value === value) ?? PAYMENT_STATUS_OPTIONS[0];
+}
+
+function getServicePackageText(value: string | null | undefined) {
+  if (!value) return "";
+  return SERVICE_PACKAGE_OPTIONS.find((option) => option.value === value)?.label ?? value;
+}
+
+function getOwnerName(customer: Customer) {
+  return customer.sdr_name || customer.leader_name || "Chưa phân công";
+}
+
+function getOwnerInitial(customer: Customer) {
+  return getOwnerName(customer).charAt(0).toUpperCase() || "?";
+}
+
+function shouldShowBudget(customer: Customer) {
+  return Number(customer.estimated_budget || customer.lifetime_value || 0) > 0;
+}
+
+function getVisibleDetails(customer: Customer) {
+  return [
+    customer.city && {
+      key: "city",
+      icon: MapPin,
+      label: customer.city,
+    },
+    customer.industry && {
+      key: "industry",
+      icon: Building2,
+      label: customer.industry,
+    },
+    customer.decision_maker && {
+      key: "decision_maker",
+      icon: UserCog,
+      label: customer.decision_maker,
+    },
+  ].filter(Boolean) as Array<{ key: string; icon: typeof MapPin; label: string }>;
+}
+
+function getAssigneeLines(customer: Customer) {
+  return [
+    {
+      key: "leader",
+      label: `Leader: ${customer.leader_name || "Chưa phân công"}`,
+    },
+    {
+      key: "handler",
+      label: `Người xử lý: ${customer.sdr_name || customer.leader_name || "Chưa phân công"}`,
+    },
+  ];
+}
+
+function getContractLabel(customer: Customer) {
+  return customer.last_attachment_name || null;
+}
+
+function getImportantDateLabel(customer: Customer, effectiveStage: DealStage) {
+  if (effectiveStage === "won" && customer.contract_signed_at) return `Ngày chốt: ${formatDate(customer.contract_signed_at)}`;
+  if (effectiveStage === "lost" && customer.updated_at) return `Ngày mất: ${formatDate(customer.updated_at)}`;
+  if (customer.follow_up_date) return `Follow-up: ${formatDate(customer.follow_up_date)}`;
+  if (customer.contract_signed_at) return `Ngày ký: ${formatDate(customer.contract_signed_at)}`;
+  if (customer.warranty_expires_at) return `Bảo hành đến: ${formatDate(customer.warranty_expires_at)}`;
+  if (customer.customer_since) return `Ngày thành khách hàng: ${formatDate(customer.customer_since)}`;
+  return null;
+}
+
+function getNotePreview(customer: Customer, effectiveStage: DealStage) {
+  if (customer.review_result && effectiveStage === "won") {
+    const reviewLabel =
+      customer.review_result === "Qualify"
+        ? "Khách hàng đồng ý / chốt deal"
+        : customer.review_result === "Disqualify"
+          ? "Chưa đạt điều kiện chốt"
+          : "Chưa xem xét";
+    return `Review: ${reviewLabel}`;
+  }
+
+  if (customer.reject_reason) {
+    return `Lý do thất bại: ${customer.reject_reason}`;
+  }
+
+  if (customer.care_note) {
+    return `Ghi chú CSKH: ${customer.care_note}`;
+  }
+
+  if (customer.note) {
+    return `Ghi chú: ${customer.note}`;
+  }
+
+  return null;
+}
+
+function getTerminalContractStatusLabel(stage: DealStage) {
+  if (stage === "won") return "Đã chốt";
+  if (stage === "lost") return "Không hoạt động";
+  if (stage === "on_hold") return "Tạm giữ";
+  return null;
+}
+
+function getContractStatusLabel(customer: Customer, effectiveStage: DealStage) {
+  const terminalLabel = getTerminalContractStatusLabel(effectiveStage);
+  if (terminalLabel) return terminalLabel;
+
+  const value = customer.contract_status;
+  if (!value) return null;
+  return CONTRACT_STATUS_META[value]?.label ?? value;
+}
+
+function getContractStatusClass(customer: Customer, effectiveStage: DealStage) {
+  if (effectiveStage === "won") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (effectiveStage === "lost") return "border-red-200 bg-red-50 text-red-600";
+  if (effectiveStage === "on_hold") return "border-amber-200 bg-amber-50 text-amber-700";
+
+  const value = customer.contract_status as ContractStatus | null | undefined;
+  return value ? CONTRACT_STATUS_META[value]?.className ?? "border-slate-200 bg-slate-50 text-slate-600" : "border-slate-200 bg-slate-50 text-slate-600";
+}
+
+function getPaymentDueWarningLabel(customer: Customer) {
+  const dueAt = formatDate(customer.payment_due_date);
+  return dueAt ? `Tới hạn thanh toán: ${dueAt}` : "Cần xử lý thanh toán";
+}
 
 function DealCard({
   customer,
   onClick,
-  onEdit,
-  onChat,
-  onDelete,
-  onDropIntoTerminal,
-  /** Mở modal resume (chỉ dùng cho card đang On Hold). */
   onResume,
-  compact = false,
+  terminal = false,
 }: {
   customer: Customer;
   onClick: () => void;
-  onEdit: () => void;
-  onChat?: () => void;
-  onDelete: () => void;
-  onDropIntoTerminal: (c: Customer) => void;
-  /** Khi viewport nhỏ → compact mode (padding nhỏ, font nhỏ, ẩn một số metadata). */
-  compact?: boolean;
-  /** Callback resume deal đang On Hold — mở modal có dropdown chọn prev_stage/lost. */
   onResume?: () => void;
+  terminal?: boolean;
 }) {
   const stage = getCurrentStage(customer);
-  const budget = customer.estimated_budget ?? customer.lifetime_value ?? 0;
-  const days = customer.days_in_stage ?? 0;
-  const ownerInitial = (customer.sdr_name ?? customer.leader_name ?? "?")
-    .toString()
-    .charAt(0)
-    .toUpperCase();
-
-  // Từ stage "proposal_sent" trở đi mới show giá đã báo (estimated_budget đã được set)
-  const showPrice =
-    stage !== "new_lead" && stage !== "contacted" && budget > 0;
+  const isUnpaid = customer.payment_status === "unpaid" || customer.payment_status === "partial";
+  const isUnpaidTerminal = (stage === "won" || stage === "lost") && isUnpaid;
+  const effectiveStage = isUnpaidTerminal ? "contract_sent" : stage;
+  
+  const overdue = isPaymentOverdue(customer);
+  const paymentMeta = getPaymentStatusMeta(customer.payment_status);
+  let paymentBadgeClass = paymentMeta.badgeClass;
+  if (isUnpaid && overdue) {
+    paymentBadgeClass = "bg-amber-100 text-amber-700 border-amber-200";
+  }
+  const visibleDetails = getVisibleDetails(customer);
+  const assignees = getAssigneeLines(customer);
+  const contractLabel = getContractLabel(customer);
+  const importantDate = getImportantDateLabel(customer, effectiveStage);
+  const contractStatus = getContractStatusLabel(customer, effectiveStage);
+  const notePreview = getNotePreview(customer, effectiveStage);
+  const budget = Number(customer.estimated_budget || customer.lifetime_value || 0);
+  const showBudget = shouldShowBudget(customer);
+  const servicePackage = getServicePackageText(customer.service_package);
+  const daysInStage = customer.days_in_stage ?? getDaysSinceCreated(customer);
 
   return (
-    <div
+    <article
       draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData("text/customer-id", customer.id);
-        e.dataTransfer.effectAllowed = "move";
+      onDragStart={(event) => {
+        event.dataTransfer.setData("text/customer-id", customer.id);
+        event.dataTransfer.effectAllowed = "move";
       }}
       onClick={onClick}
       className={cn(
-        "group flex w-full cursor-grab flex-col overflow-hidden rounded-lg border border-border bg-card text-card-foreground shadow-sm transition-all",
-        "hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md active:cursor-grabbing",
-        compact ? "min-h-[140px] p-2.5" : "min-h-[170px] p-3",
+        "group flex cursor-grab flex-col rounded-xl border border-slate-200 p-3 text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md active:cursor-grabbing",
+        terminal ? "w-[280px]" : "w-full",
+        isUnpaidTerminal ? "bg-amber-100 border-amber-300" : "bg-white",
+        overdue && !isUnpaidTerminal && "border-amber-200 shadow-[0_4px_12px_rgba(245,158,11,0.16)]",
       )}
     >
-      {/* Header: tên + menu */}
-      <div className="mb-1 flex items-start justify-between gap-1.5">
-        <div className="min-w-0 flex-1">
-          <h4
-            className={cn(
-              "truncate font-semibold text-foreground",
-              compact ? "text-xs" : "text-sm",
-            )}
-            title={customer.customer_name}
-          >
-            {customer.customer_name}
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h4 className="truncate text-sm font-bold text-slate-900" title={customer.customer_name}>
+            {customer.customer_name || "Chưa có tên"}
           </h4>
-          {customer.company_name && (
-            <p
-              className={cn(
-                "truncate text-muted-foreground",
-                compact ? "text-[10px]" : "text-[11px]",
-              )}
-              title={customer.company_name}
-            >
-              {customer.company_name}
-            </p>
-          )}
+          <p className="truncate text-xs text-slate-500" title={customer.company_name || undefined}>
+            {customer.company_name || "Chưa có công ty"}
+          </p>
         </div>
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-          }}
-          className="shrink-0 rounded p-0.5 text-muted-foreground/40 opacity-0 transition hover:bg-muted hover:text-muted-foreground group-hover:opacity-100"
+          type="button"
+          onClick={(event) => event.stopPropagation()}
+          className="rounded-md p-1 text-slate-300 opacity-0 transition hover:bg-slate-100 hover:text-slate-500 group-hover:opacity-100"
         >
-          <MoreVertical className="size-3.5" />
+          <MoreVertical className="size-4" />
         </button>
       </div>
 
-      {/* Sản phẩm (service_package) */}
-      {customer.service_package && (
-        <div
-          className={cn(
-            "mb-1.5 truncate rounded bg-blue-50 px-1.5 py-0.5 font-medium text-blue-700",
-            compact ? "text-[10px]" : "text-[11px]",
-          )}
-          title={customer.service_package}
-        >
-          📦 {customer.service_package}
+      {servicePackage && (
+        <div className="mb-2 flex items-center gap-1.5 rounded-lg bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">
+          <Tag className="size-3.5 shrink-0" />
+          <span className="truncate">{servicePackage}</span>
         </div>
       )}
 
-      {/* Liên hệ: SĐT + email */}
-      {(customer.phone || customer.email) && (
+      {overdue && (
         <div
-          className={cn(
-            "mb-1.5 space-y-0.5 text-muted-foreground",
-            compact ? "text-[10px]" : "text-[11px]",
-          )}
+          className="mb-2 flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-700"
+          title={getPaymentDueWarningLabel(customer)}
         >
-          {customer.phone && (
-            <div className="flex items-center gap-1 truncate">
-              <span className="shrink-0">📞</span>
-              <span className="truncate">{customer.phone}</span>
-            </div>
-          )}
-          {customer.email && (
-            <div className="flex items-center gap-1 truncate">
-              <span className="shrink-0">✉</span>
-              <span className="truncate">{customer.email}</span>
-            </div>
-          )}
+          <AlertTriangle className="size-3.5 shrink-0" />
+          <span className="truncate">{getPaymentDueWarningLabel(customer)}</span>
         </div>
       )}
 
-      {/* Giá đã báo (chỉ từ stage proposal_sent trở đi) */}
-      {showPrice ? (
-        <div
-          className={cn(
-            "mb-2 flex items-baseline gap-1 rounded-md bg-emerald-50 px-2 py-1",
-          )}
-        >
-          <Wallet className="size-3 shrink-0 text-emerald-600" />
-          <span
-            className={cn(
-              "truncate font-bold text-emerald-700",
-              compact ? "text-xs" : "text-sm",
-            )}
+      <div className="space-y-1 text-[11px] text-slate-600">
+        {customer.phone && (
+          <div className="flex items-center gap-2 truncate">
+            <Phone className="size-3.5 shrink-0 text-slate-500" />
+            <span className="truncate">{customer.phone}</span>
+          </div>
+        )}
+        {customer.email && (
+          <div className="flex items-center gap-2 truncate">
+            <Mail className="size-3.5 shrink-0 text-slate-500" />
+            <span className="truncate">{customer.email}</span>
+          </div>
+        )}
+        {visibleDetails.map((detail) => {
+          const Icon = detail.icon;
+          return (
+            <div key={detail.key} className="flex items-center gap-2 truncate" title={detail.label}>
+              <Icon className="size-3.5 shrink-0 text-slate-500" />
+              <span className="truncate">{detail.label}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-2 space-y-1.5">
+        {assignees.map((assignee) => (
+          <div
+            key={assignee.key}
+            className="flex items-start gap-1.5 rounded-xl bg-violet-50 px-1.5 py-1 text-[10px] font-bold text-violet-700"
+            title={assignee.label}
           >
-            {formatVND(budget)}
-          </span>
-          <span className="ml-auto text-[9px] font-medium uppercase text-emerald-600/70">
-            đã báo
-          </span>
-        </div>
-      ) : null}
+            <UserCog className="mt-0.5 size-3.5 shrink-0" />
+            <span className="whitespace-normal break-words leading-tight">{assignee.label}</span>
+          </div>
+        ))}
+      </div>
 
-      {/* Footer: số ngày + owner avatar (+ nút Resume nếu đang On Hold) */}
-      <div className="mt-auto flex items-center justify-between gap-1.5 border-t border-border/40 pt-1.5">
-        <div className="flex items-center gap-1 text-muted-foreground">
-          <Clock className="size-3 shrink-0" />
-          <span className={cn("font-medium", compact ? "text-[10px]" : "text-[11px]")}>
-            {days} ngày
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          {stage === "on_hold" && onResume && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onResume();
-              }}
-              title="Mở lại deal — chọn stage đích"
-              className={cn(
-                "inline-flex shrink-0 items-center gap-1 rounded-md bg-amber-500 px-2 font-semibold text-white shadow-sm transition hover:bg-amber-600 active:scale-95",
-                compact ? "h-5 text-[10px]" : "h-6 text-[11px]",
-              )}
-            >
-              <PauseCircle className={compact ? "size-2.5" : "size-3"} />
-              Mở lại
-            </button>
-          )}
+      <div className="mt-2 space-y-1.5">
+        {contractLabel && (
+          <div
+            onPointerDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (customer.last_attachment_url) {
+                window.open(customer.last_attachment_url, "_blank");
+              } else {
+                toast.error("Chưa có link đính kèm cho hợp đồng/báo giá này");
+              }
+            }}
+            className="flex cursor-pointer transition-colors hover:bg-slate-100 hover:border-slate-300 items-start gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-1.5 py-1 text-[10px] text-slate-600"
+            title={contractLabel}
+          >
+            <FileText className="mt-0.5 size-3.5 shrink-0 text-slate-500" />
+            <span className="whitespace-normal break-words leading-tight">HĐ/BG: {contractLabel}</span>
+          </div>
+        )}
+
+        {contractStatus && (
           <div
             className={cn(
-              "flex shrink-0 items-center justify-center rounded-full bg-primary/10 font-semibold text-primary",
-              compact ? "size-5 text-[10px]" : "size-6 text-[11px]",
+              "flex items-start gap-1.5 rounded-xl border px-1.5 py-1 text-[10px] font-bold",
+              getContractStatusClass(customer, effectiveStage),
             )}
-            title={customer.sdr_name ?? customer.leader_name ?? "Chưa phân công"}
+            title={`Tình trạng HĐ: ${contractStatus}`}
           >
-            {ownerInitial}
+            <FileText className="mt-0.5 size-3.5 shrink-0" />
+            <span className="whitespace-normal break-words leading-tight">Tình trạng HĐ: {contractStatus}</span>
           </div>
-        </div>
+        )}
+
+        {customer.payment_status && customer.payment_status !== "paid" && (
+          <div
+            className={cn(
+              "flex items-start gap-1.5 rounded-xl border px-1.5 py-1 text-[10px] font-bold",
+              paymentBadgeClass,
+            )}
+            title={paymentMeta.label}
+          >
+            <Wallet className="mt-0.5 size-3.5 shrink-0" />
+            <span className="whitespace-normal break-words leading-tight">
+              {paymentMeta.label} {overdue ? "(Quá hạn)" : ""}
+            </span>
+          </div>
+        )}
+
+        {importantDate && (
+          <div
+            className="flex items-start gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-1.5 py-1 text-[10px] text-slate-600"
+            title={importantDate}
+          >
+            <CalendarDays className="mt-0.5 size-3.5 shrink-0 text-slate-500" />
+            <span className="whitespace-normal break-words leading-tight">{importantDate}</span>
+          </div>
+        )}
+
+        {notePreview && (
+          <div
+            className="flex items-start gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-1.5 py-1 text-[10px] text-slate-600"
+            title={notePreview}
+          >
+            <FileText className="mt-0.5 size-3.5 shrink-0 text-slate-500" />
+            <span className="whitespace-normal break-words leading-tight">{notePreview}</span>
+          </div>
+        )}
       </div>
-    </div>
+
+      {showBudget && (
+        <div className="mt-2 flex items-center gap-1.5 rounded-xl bg-emerald-50 px-2 py-1 text-emerald-700">
+          <Wallet className="size-3.5 shrink-0" />
+          <span className="truncate text-xs font-black">{formatVND(budget)}</span>
+          <span className="ml-auto text-[10px] font-bold uppercase tracking-wide text-emerald-600/80">
+            Đã báo
+          </span>
+        </div>
+      )}
+
+      <div className="mt-auto flex items-center justify-between gap-2 border-t border-slate-100 pt-3">
+        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+          <Clock className="size-3.5 shrink-0" />
+          <span>{daysInStage} ngày</span>
+        </div>
+
+        {stage === "on_hold" && onResume ? (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onResume();
+            }}
+            className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-3 py-1.5 text-[12px] font-semibold text-white transition hover:bg-amber-600"
+          >
+            <PauseCircle className="size-4" />
+            Mở lại
+          </button>
+        ) : (
+          <div
+            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-rose-100 text-[13px] font-black text-rose-700"
+            title={getOwnerName(customer)}
+          >
+            {getOwnerInitial(customer)}
+          </div>
+        )}
+      </div>
+    </article>
   );
 }
-
-/* ─────────── Stage column (dropzone cho pipeline chính) ─────────── */
 
 function StageColumn({
   stage,
   items,
-  /** Lookup toàn bộ customer theo id — cần thiết vì target có thể đang ở CỘT KHÁC. */
   customerById,
   onDrop,
   onCardClick,
-  onEdit,
-  onChat,
-  onDelete,
-  compact = false,
 }: {
   stage: DealStage;
   items: Customer[];
   customerById: Map<string, Customer>;
-  onDrop: (c: Customer) => void;
-  onCardClick: (c: Customer) => void;
-  onEdit: (c: Customer) => void;
-  onChat: (c: Customer) => void;
-  onDelete: (id: string) => void;
-  /** Card ở chế độ thu gọn (khi 7 cột). */
-  compact?: boolean;
+  onDrop: (customer: Customer) => void;
+  onCardClick: (customer: Customer) => void;
 }) {
   const [dragOver, setDragOver] = useState(false);
   const meta = DEAL_STAGE_META[stage];
-  const opacityIndex = STAGE_DOT_OPACITY.indexOf(stage);
-  const dotOpacity = opacityIndex >= 0 ? (100 - opacityIndex * 15) / 100 : 0.5;
-  const dotClass = `bg-primary/${Math.round(dotOpacity * 100)}`;
 
   return (
     <div
-      onDragOver={(e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
+      onDragOver={(event) => {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
         setDragOver(true);
       }}
       onDragLeave={() => setDragOver(false)}
-      onDrop={(e) => {
-        e.preventDefault();
+      onDrop={(event) => {
+        event.preventDefault();
         setDragOver(false);
-        const id = e.dataTransfer.getData("text/customer-id");
+        const id = event.dataTransfer.getData("text/customer-id");
         if (!id) return;
-        // QUAN TRỌNG: target có thể đang ở CỘT KHÁC (vd kéo từ new_lead → contacted).
-        // Lookup từ customerById (full map), KHÔNG từ `items` (chỉ chứa customer của stage hiện tại).
+
         const target = customerById.get(id);
         if (!target) return;
+
         const fromStage = getCurrentStage(target);
         if (fromStage === stage) return;
-        const v = validateTransition(fromStage, stage, target);
-        if (!v.ok) {
-          // Phân biệt 2 loại lỗi:
-          //  1. Lỗi state machine (terminal, không có transition hợp lệ, on_hold → sai stage):
-          //     → chặn hẳn, không mở modal.
-          //  2. Thiếu required fields (note, budget, attachment, reject_reason, follow_up_date):
-          //     → vẫn cho phép — parent sẽ mở StageTransitionModal để user bổ sung.
-          const isMissingFields =
-            Array.isArray(v.missing) && v.missing.length > 0;
-          if (!isMissingFields) {
-            toast.error(v.reason || "Chuyển stage không hợp lệ");
-            return;
-          }
-          // Thiếu data → drop vẫn hợp lệ, để parent mở modal nhập.
+
+        const validation = validateTransition(fromStage, stage, target);
+        const hasMissingFields = Array.isArray(validation.missing) && validation.missing.length > 0;
+
+        if (!validation.ok && !hasMissingFields) {
+          toast.error(validation.reason || "Chuyển stage không hợp lệ");
+          return;
         }
+
         onDrop(target);
       }}
       className={cn(
-        "flex w-full min-w-0 flex-col gap-3 rounded-xl transition",
-        dragOver && "ring-2 ring-primary/40",
+        "flex w-full flex-col rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition",
+        dragOver && "border-primary/40 ring-2 ring-primary/20",
       )}
     >
-      {/* Column header */}
-      <div className="flex items-center justify-between px-2">
+      <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <span className={cn("size-2 shrink-0 rounded-full", dotClass)} />
-          <h3 className="truncate text-[11px] font-semibold uppercase tracking-wider text-foreground">
+          <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: meta.color }} />
+          <h3 className="truncate text-xs font-bold uppercase tracking-wide text-slate-900">
             {meta.label}
           </h3>
         </div>
-        <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[12px] font-bold text-slate-500">
           {items.length}
         </span>
       </div>
 
-      {/* Card list — flex-col gap 2, KHÔNG giới hạn max-height.
-          Cột chứa nhiều card → tự giãn dài ra (board scroll ngang).
-          Đặt min-h để cột rỗng vẫn hiển thị placeholder dropzone. */}
-      <div className="flex min-h-[100px] flex-col gap-2 pr-1">
+      <div className="flex min-h-[140px] flex-col gap-4">
         {items.length === 0 ? (
-          <div className="flex h-20 items-center justify-center rounded-lg border-2 border-dashed border-border/60 text-[11px] text-muted-foreground/50">
+          <div className="flex min-h-[120px] items-center justify-center rounded-[20px] border-2 border-dashed border-slate-200 px-6 text-center text-[14px] font-medium text-slate-400">
             Kéo deal vào đây
           </div>
         ) : (
-          items.map((c) => (
-            <DealCard
-              key={c.id}
-              customer={c}
-              compact={compact}
-              onClick={() => onCardClick(c)}
-              onEdit={() => onEdit(c)}
-              onChat={() => onChat(c)}
-              onDelete={() => onDelete(c.id)}
-              onDropIntoTerminal={() => {/* không dùng trong col này */}}
-            />
+          items.map((customer) => (
+            <DealCard key={customer.id} customer={customer} onClick={() => onCardClick(customer)} />
           ))
         )}
       </div>
@@ -369,125 +536,136 @@ function StageColumn({
   );
 }
 
-/* ─────────── Terminal dropzone lớn (Won / Lost / On Hold) ─────────── */
-
 function TerminalDropzone({
   stage,
   count,
   totalValue,
   onDrop,
-  onCardClick,
-  onEdit,
-  onChat,
-  onDelete,
 }: {
   stage: "won" | "lost" | "on_hold";
   count: number;
   totalValue: number;
-  onDrop: (c: Customer) => void;
-  onCardClick: (c: Customer) => void;
-  onEdit: (c: Customer) => void;
-  onChat: (c: Customer) => void;
-  onDelete: (id: string) => void;
+  onDrop: (customer: Customer) => void;
 }) {
   const [dragOver, setDragOver] = useState(false);
-  const meta = DEAL_STAGE_META[stage];
 
-  // Màu theo từng terminal
   const palette = {
     won: {
-      ring: "ring-secondary/50",
-      border: "border-secondary",
-      bg: "bg-secondary/10 hover:bg-secondary/20",
-      text: "text-secondary",
-      iconWrap: "bg-secondary",
+      icon: CheckCircle2,
+      title: "Deal đã thắng",
+      helper: "Kéo deal đã chốt vào đây để ghi nhận doanh thu.",
+      className: "border-emerald-500 bg-emerald-50 text-emerald-700",
+      iconClassName: "bg-emerald-600",
     },
     lost: {
-      ring: "ring-destructive/50",
-      border: "border-destructive",
-      bg: "bg-destructive/10 hover:bg-destructive/20",
-      text: "text-destructive",
-      iconWrap: "bg-destructive",
+      icon: XCircle,
+      title: "Deal đã mất",
+      helper: "Kéo deal đã mất vào đây để archive.",
+      className: "border-red-400 bg-red-50 text-red-600",
+      iconClassName: "bg-red-500",
     },
     on_hold: {
-      ring: "ring-amber-500/50",
-      border: "border-amber-500",
-      bg: "bg-amber-500/10 hover:bg-amber-500/20",
-      text: "text-amber-700",
-      iconWrap: "bg-amber-500",
+      icon: PauseCircle,
+      title: "Deal tạm giữ",
+      helper: "Kéo deal đang tạm dừng vào đây.",
+      className: "border-amber-400 bg-amber-50 text-amber-700",
+      iconClassName: "bg-amber-500",
     },
   }[stage];
 
-  const Icon = stage === "won" ? CheckCircle2 : stage === "lost" ? XCircle : PauseCircle;
+  const Icon = palette.icon;
 
   return (
     <div
-      onDragOver={(e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
+      onDragOver={(event) => {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
         setDragOver(true);
       }}
       onDragLeave={() => setDragOver(false)}
-      onDrop={(e) => {
-        e.preventDefault();
+      onDrop={(event) => {
+        event.preventDefault();
         setDragOver(false);
-        const id = e.dataTransfer.getData("text/customer-id");
+        const id = event.dataTransfer.getData("text/customer-id");
         if (!id) return;
-        // Phải lookup từ parent truyền xuống — ở đây tạm không truy cập, parent xử lý qua callback
-        const fakeTarget = { id } as any;
-        onDrop(fakeTarget);
+        onDrop({ id } as Customer);
       }}
       className={cn(
-        "flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-6 text-center transition-all",
-        palette.bg,
-        palette.border,
-        dragOver && `ring-4 ${palette.ring}`,
+        "flex min-h-[140px] flex-col items-center justify-center rounded-2xl border-2 border-dashed p-4 text-center transition",
+        palette.className,
+        dragOver && "scale-[1.01] shadow-md",
       )}
     >
-      <div
-        className={cn(
-          "mb-1 flex size-12 items-center justify-center rounded-full text-white shadow-lg transition-transform group-hover:scale-110",
-          palette.iconWrap,
-          dragOver && "scale-110",
-        )}
-      >
+      <div className={cn("mb-3 flex size-12 items-center justify-center rounded-full text-white shadow-sm", palette.iconClassName)}>
         <Icon className="size-6" />
       </div>
-      <h4 className={cn("text-base font-semibold", palette.text)}>{meta.label}</h4>
-      <p className="max-w-[200px] text-[11px] text-muted-foreground">
-        {stage === "won" && "Kéo deal đã chốt vào đây để ghi nhận doanh thu."}
-        {stage === "lost" && "Kéo deal đã mất vào đây để archive."}
-        {stage === "on_hold" && "Kéo deal đang tạm dừng vào đây."}
-      </p>
-      <div className="mt-1 flex items-center gap-2 text-xs font-medium">
-        <span className={palette.text}>{count} deal</span>
-        {totalValue > 0 && (
-          <>
-            <span className="text-muted-foreground/50">·</span>
-            <span className={palette.text}>{formatVND(totalValue)}</span>
-          </>
-        )}
-      </div>
+      <h3 className="text-lg font-bold">{palette.title}</h3>
+      <p className="mt-1 max-w-[200px] text-xs text-slate-600">{palette.helper}</p>
+      <strong className="mt-3 text-base font-bold">
+        {count} deal
+        {totalValue > 0 ? ` · ${formatVND(totalValue)}` : ""}
+      </strong>
     </div>
   );
 }
 
-/* ─────────── Main board ─────────── */
+function TerminalRow({
+  stage,
+  items,
+  onCardClick,
+  onResume,
+}: {
+  stage: "won" | "lost" | "on_hold";
+  items: Customer[];
+  onCardClick: (customer: Customer) => void;
+  onResume?: (customer: Customer) => void;
+}) {
+  const palette = {
+    won: {
+      title: "Deal đã thắng",
+      color: "bg-emerald-500",
+    },
+    lost: {
+      title: "Deal đã mất",
+      color: "bg-red-500",
+    },
+    on_hold: {
+      title: "Deal tạm giữ",
+      color: "bg-amber-500",
+    },
+  }[stage];
 
-interface Props {
-  customers: Customer[];
-  onRequestMove: (c: Customer, to: DealStage) => void;
-  onCardClick: (c: Customer) => void;
-  onEdit: (c: Customer) => void;
-  onChat: (c: Customer) => void;
-  onDelete: (id: string) => void;
-  onNewCustomer: () => void;
-  /**
-   * Mở modal resume deal đang On Hold — cho phép user chọn prev_stage hoặc lost
-   * thay vì kéo-thả card dọc qua viewport dài (kéo ngược từ terminal section
-   * lên pipeline section đứt drag-over).
-   */
-  onResumeOnHold?: (c: Customer) => void;
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <span className={cn("size-3 rounded-full", palette.color)} />
+        <h4 className="text-[16px] font-black uppercase tracking-wide text-slate-900">{palette.title}</h4>
+        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[12px] font-bold text-slate-500">
+          {items.length}
+        </span>
+      </div>
+
+      <div className="overflow-x-auto pb-3">
+        {items.length === 0 ? (
+          <div className="flex min-h-[96px] items-center justify-center rounded-[24px] border-2 border-dashed border-slate-200 px-6 text-center text-[15px] font-medium text-slate-400">
+            Chưa có deal ở trạng thái này
+          </div>
+        ) : (
+          <div className="flex min-w-max gap-4">
+            {items.map((customer) => (
+              <DealCard
+                key={customer.id}
+                customer={customer}
+                terminal
+                onClick={() => onCardClick(customer)}
+                onResume={stage === "on_hold" && onResume ? () => onResume(customer) : undefined}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function CrmKanbanBoard({
@@ -500,261 +678,158 @@ export function CrmKanbanBoard({
   onNewCustomer,
   onResumeOnHold,
 }: Props) {
-  // Group theo stage
+  void onEdit;
+  void onChat;
+  void onDelete;
+  void onNewCustomer;
+
   const grouped = useMemo(() => {
-    const out: Record<DealStage, Customer[]> = {
-      new_lead: [], contacted: [], qualified: [], requirement: [],
-      proposal_sent: [], negotiation: [], contract_sent: [],
-      on_hold: [], won: [], lost: [],
+    const groups: Record<DealStage, Customer[]> = {
+      new_lead: [],
+      contacted: [],
+      qualified: [],
+      requirement: [],
+      proposal_sent: [],
+      negotiation: [],
+      contract_sent: [],
+      on_hold: [],
+      won: [],
+      lost: [],
     };
-    for (const c of customers) {
-      const stage = getCurrentStage(c);
-      if (out[stage]) out[stage].push(c);
-    }
-    return out;
+
+    customers.forEach((customer) => {
+      let stage = getCurrentStage(customer);
+      const isUnpaid = customer.payment_status === "unpaid" || customer.payment_status === "partial";
+      if ((stage === "won" || stage === "lost") && isUnpaid) {
+        stage = "contract_sent";
+      }
+      groups[stage].push(customer);
+    });
+
+    return groups;
   }, [customers]);
 
-  // 7 stage chính (loại on_hold ra vì nó nằm ở terminal section)
-  const pipelineStages = useMemo(
-    () => PIPELINE_COLUMNS.filter((s) => s !== "on_hold"),
-    [],
-  );
-
-  // Khi viewport rất rộng (2xl = 1536px) → 7 cột, card cần compact để không tràn
-  // Khi nhỏ hơn → 4/3/2/1 cột, card ở dạng đầy đủ
-  const useCompactCard = useMemo(() => {
-    if (typeof window === "undefined") return false;
-    return window.innerWidth >= 1536;
-  }, []);
-
-  // Lookup customer theo id cho dropzone terminal
   const customerById = useMemo(() => {
     const map = new Map<string, Customer>();
-    for (const c of customers) map.set(c.id, c);
+    customers.forEach((customer) => map.set(customer.id, customer));
     return map;
   }, [customers]);
 
-  // Auto-scroll window khi kéo card dọc qua 2 phần board (Pipeline → Terminal).
-  // Board này window-scroll (không có scrollbar riêng trên container),
-  // nên dùng `scrollOn: "window"` — chỉ scroll khi con trỏ chạm mép viewport.
-  // Edge 96px (≈ 1.5 ô card) để dễ kích hoạt hơn so với mặc định. Tốc độ
-  // max 14px/frame (~840px/s @60fps) — đủ nhanh để cover 100vh viewport
-  // trong ~1.5s, nhưng không giật.
+  const terminalStats = useMemo(
+    () => ({
+      won: {
+        count: grouped.won.length,
+        value: grouped.won.reduce((sum, customer) => sum + Number(customer.estimated_budget || customer.lifetime_value || 0), 0),
+      },
+      lost: {
+        count: grouped.lost.length,
+        value: 0,
+      },
+      on_hold: {
+        count: grouped.on_hold.length,
+        value: 0,
+      },
+    }),
+    [grouped],
+  );
+
   useDragAutoScroll<HTMLDivElement>({
     scrollOn: "window",
     edge: 96,
     maxSpeed: 14,
   });
 
-  function handleTerminalDrop(stage: "won" | "lost" | "on_hold", fakeOrReal: Customer) {
-    const c = customerById.get(fakeOrReal.id);
-    if (!c) return;
-    const fromStage = getCurrentStage(c);
+  function handleTerminalDrop(stage: "won" | "lost" | "on_hold", maybeCustomer: Customer) {
+    const customer = customerById.get(maybeCustomer.id);
+    if (!customer) return;
+
+    const fromStage = getCurrentStage(customer);
     if (fromStage === stage) return;
-    const v = validateTransition(fromStage, stage, c);
-    if (!v.ok) {
-      const isMissingFields = Array.isArray(v.missing) && v.missing.length > 0;
-      if (!isMissingFields) {
-        toast.error(v.reason || "Chuyển stage không hợp lệ");
-        return;
-      }
-      // Thiếu data → vẫn cho qua, parent sẽ mở modal nhập lý do lost / follow-up / ...
+
+    const validation = validateTransition(fromStage, stage, customer);
+    const hasMissingFields = Array.isArray(validation.missing) && validation.missing.length > 0;
+
+    if (!validation.ok && !hasMissingFields) {
+      toast.error(validation.reason || "Chuyển stage không hợp lệ");
+      return;
     }
-    onRequestMove(c, stage);
+
+    onRequestMove(customer, stage);
   }
 
-  const terminalStats = {
-    won: {
-      count: grouped.won.length,
-      value: grouped.won.reduce((s, c) => s + (c.estimated_budget ?? c.lifetime_value ?? 0), 0),
-    },
-    lost: { count: grouped.lost.length, value: 0 },
-    on_hold: { count: grouped.on_hold.length, value: 0 },
-  };
-
   return (
-    <div className="space-y-10">
-      {/* ── PHẦN 1: PIPELINE CHÍNH (7 stage) ── */}
-      <section>
-        {/* Header strip nhỏ — tiêu đề + nút thêm deal */}
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">Pipeline bán hàng</h2>
-            <p className="text-xs text-muted-foreground">
-              Kéo thả deal qua từng stage — có validate theo quy tắc nghiệp vụ.
-            </p>
-          </div>
-          <button
-            onClick={onNewCustomer}
-            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 active:scale-95"
-          >
-            <Plus className="size-4" /> Thêm deal
-          </button>
+    <div className="space-y-8">
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-[24px] font-black tracking-tight text-slate-900">Pipeline bán hàng</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Kéo thả deal qua từng stage. Các stage cuối nằm riêng bên dưới.
+          </p>
         </div>
 
-        {/* Grid responsive:
-            - mobile  : 1 cột (xếp dọc)
-            - md      : 2 cột
-            - lg      : 3 cột
-            - xl      : 4 cột
-            - 2xl     : 7 cột (compact card để không tràn) */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7">
-          {pipelineStages.map((stage) => (
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+          {PIPELINE_STAGES.map((stage) => (
             <StageColumn
               key={stage}
               stage={stage}
               items={grouped[stage]}
               customerById={customerById}
-              compact={useCompactCard}
-              onDrop={(c) => onRequestMove(c, stage)}
+              onDrop={(customer) => onRequestMove(customer, stage)}
               onCardClick={onCardClick}
-              onEdit={onEdit}
-              onChat={onChat}
-              onDelete={onDelete}
             />
           ))}
         </div>
       </section>
 
-      {/* ── Visual separator ── */}
-      <div className="my-4 flex items-center gap-4">
-        <div className="h-px flex-1 bg-border" />
-        <span className="px-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+      <div className="flex items-center gap-6">
+        <div className="h-px flex-1 bg-slate-300" />
+        <span className="px-2 text-[12px] font-black uppercase tracking-[0.28em] text-slate-400">
           Trạng thái cuối
         </span>
-        <div className="h-px flex-1 bg-border" />
+        <div className="h-px flex-1 bg-slate-300" />
       </div>
 
-      {/* ── PHẦN 2: 3 DROPTARGET LỚN (Won / Lost / On Hold) ── */}
-      <section>
-        <div className="mb-3">
-          <h2 className="text-lg font-semibold text-foreground">Kết quả cuối cùng</h2>
-          <p className="text-xs text-muted-foreground">
-            3 trạng thái này là <b>terminal</b> — kéo deal vào đây để đóng vòng pipeline.
+      <section className="space-y-6">
+        <div>
+          <h2 className="text-[24px] font-black tracking-tight text-slate-900">Kết quả cuối cùng</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Kéo deal vào các trạng thái terminal để đóng vòng pipeline.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
           <TerminalDropzone
             stage="won"
             count={terminalStats.won.count}
             totalValue={terminalStats.won.value}
-            onDrop={(c) => handleTerminalDrop("won", c)}
-            onCardClick={onCardClick}
-            onEdit={onEdit}
-            onChat={onChat}
-            onDelete={onDelete}
+            onDrop={(customer) => handleTerminalDrop("won", customer)}
           />
           <TerminalDropzone
             stage="lost"
             count={terminalStats.lost.count}
             totalValue={terminalStats.lost.value}
-            onDrop={(c) => handleTerminalDrop("lost", c)}
-            onCardClick={onCardClick}
-            onEdit={onEdit}
-            onChat={onChat}
-            onDelete={onDelete}
+            onDrop={(customer) => handleTerminalDrop("lost", customer)}
           />
           <TerminalDropzone
             stage="on_hold"
             count={terminalStats.on_hold.count}
             totalValue={terminalStats.on_hold.value}
-            onDrop={(c) => handleTerminalDrop("on_hold", c)}
-            onCardClick={onCardClick}
-            onEdit={onEdit}
-            onChat={onChat}
-            onDelete={onDelete}
+            onDrop={(customer) => handleTerminalDrop("on_hold", customer)}
           />
         </div>
 
-        {/* List deal đã vào terminal (gọn, có thể xem/đóng) */}
-        {(grouped.won.length > 0 ||
-          grouped.lost.length > 0 ||
-          grouped.on_hold.length > 0) && (
-          <div className="mt-8 space-y-6">
-            {grouped.on_hold.length > 0 && (
-              <TerminalList
-                title="Đang tạm dừng (On Hold)"
-                items={grouped.on_hold}
-                colorClass="text-amber-700"
-                onCardClick={onCardClick}
-                onEdit={onEdit}
-                onChat={onChat}
-                onDelete={onDelete}
-                onResume={(c) => onResumeOnHold?.(c)}
-              />
-            )}
-            {grouped.won.length > 0 && (
-              <TerminalList
-                title="Đã chốt (Won)"
-                items={grouped.won}
-                colorClass="text-secondary"
-                onCardClick={onCardClick}
-                onEdit={onEdit}
-                onChat={onChat}
-                onDelete={onDelete}
-              />
-            )}
-            {grouped.lost.length > 0 && (
-              <TerminalList
-                title="Đã rớt (Lost)"
-                items={grouped.lost}
-                colorClass="text-destructive"
-                onCardClick={onCardClick}
-                onEdit={onEdit}
-                onChat={onChat}
-                onDelete={onDelete}
-              />
-            )}
-          </div>
-        )}
+        <div className="space-y-8">
+          {TERMINAL_STAGES.map((stage) => (
+            <TerminalRow
+              key={stage}
+              stage={stage}
+              items={grouped[stage]}
+              onCardClick={onCardClick}
+              onResume={stage === "on_hold" ? onResumeOnHold : undefined}
+            />
+          ))}
+        </div>
       </section>
-    </div>
-  );
-}
-
-/* ─────────── Helper: list deal trong từng terminal (compact) ─────────── */
-
-function TerminalList({
-  title,
-  items,
-  colorClass,
-  onCardClick,
-  onEdit,
-  onChat,
-  onDelete,
-  onResume,
-}: {
-  title: string;
-  items: Customer[];
-  colorClass: string;
-  onCardClick: (c: Customer) => void;
-  onEdit: (c: Customer) => void;
-  onChat?: (c: Customer) => void;
-  onDelete: (id: string) => void;
-  /** Callback resume deal On Hold (mở modal có dropdown chọn stage đích). */
-  onResume?: (c: Customer) => void;
-}) {
-  return (
-    <div>
-      <h3 className={cn("mb-2 text-sm font-semibold", colorClass)}>
-        {title} <span className="text-muted-foreground/60">· {items.length}</span>
-      </h3>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-        {items.map((c) => (
-          <DealCard
-            key={c.id}
-            customer={c}
-            compact={false}
-            onClick={() => onCardClick(c)}
-            onEdit={() => onEdit(c)}
-            onChat={onChat ? () => onChat(c) : undefined}
-            onDelete={() => onDelete(c.id)}
-            onDropIntoTerminal={() => {/* không dùng ở đây */}}
-            onResume={onResume ? () => onResume(c) : undefined}
-          />
-        ))}
-      </div>
     </div>
   );
 }

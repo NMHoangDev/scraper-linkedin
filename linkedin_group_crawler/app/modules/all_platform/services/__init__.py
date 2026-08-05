@@ -36,6 +36,68 @@ from app.modules.all_platform.services.supabase_categories_service import (
     update_category,
     delete_category,
 )
+from app.modules.all_platform.services.supabase_members_service import (
+    get_all_members,
+    get_member,
+    create_member,
+    update_member,
+    delete_member,
+    get_all_skills,
+    create_skill,
+    update_skill,
+    delete_skill,
+    parse_excel_rows,
+    import_members_from_rows,
+    sync_members_from_list,
+)
+from app.modules.all_platform.services.supabase_quick_comment_service import (
+    get_all_quick_comments,
+    add_quick_comment,
+    update_quick_comment,
+    delete_quick_comment,
+    reorder_quick_comment,
+)
+from app.modules.all_platform.services.supabase_quote_service import (
+    list_quote_forms,
+    get_quote_form,
+    get_public_quote_form,
+    create_quote_form,
+    update_quote_form,
+    delete_quote_form,
+    duplicate_quote_form,
+    share_quote_form,
+    list_quotes,
+    get_quote,
+    get_public_quote,
+    create_quote,
+    update_quote,
+    delete_quote,
+    publish_quote,
+    link_quote_to_deal,
+)
+from app.modules.all_platform.services.supabase_sales_asset_service import (
+    list_sales_assets,
+    get_sales_asset,
+    create_sales_asset,
+    update_sales_asset,
+    archive_sales_asset,
+    delete_sales_asset,
+    send_sales_asset,
+)
+from app.modules.all_platform.services.supabase_kpi_reward_service import (
+    list_reward_rules,
+    save_reward_rules,
+    submit_reward_rules,
+    review_reward_rules,
+    get_reward_summary,
+)
+from app.modules.all_platform.services.supabase_quick_inbox_service import (
+    get_all_quick_inbox,
+    add_quick_inbox,
+    update_quick_inbox,
+    delete_quick_inbox,
+    reorder_quick_inbox,
+)
 from app.modules.all_platform.services.supabase_groups_service import (
     get_facebook_groups,
     add_facebook_group,
@@ -51,6 +113,7 @@ from app.modules.all_platform.services.supabase_user_service import (
     upsert_user,
     update_user_slug,
     update_user_role,
+    update_user_active_status,
     get_team_members,
     add_team_member,
     get_all_users,
@@ -64,6 +127,8 @@ from app.modules.all_platform.services.supabase_user_service import (
 from app.modules.all_platform.services.auth_service import (
     register_user,
     login_user,
+    login_with_google,
+    admin_create_user,
     logout_user,
     decode_token,
     get_user_by_id,
@@ -99,4 +164,9 @@ from app.modules.all_platform.services.supabase_linkedin_account_service import 
 )
 from app.modules.all_platform.services.platforms_service import (
     get_all_platforms,
+)
+from app.modules.all_platform.services.crm_permission_service import (
+    is_sale_member,
+    has_full_crm_access,
+    can_write_deal,
 )

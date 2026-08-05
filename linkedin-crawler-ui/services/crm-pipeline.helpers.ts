@@ -47,9 +47,6 @@ export function isValidDealStage(s: unknown): s is DealStage {
 /** Lấy stage hiện tại của 1 customer — fallback về new_lead nếu không có. */
 export function getCurrentStage(c: Pick<Customer, "deal_stage" | "status">): DealStage {
   if (c.deal_stage && isValidDealStage(c.deal_stage)) return c.deal_stage;
-  // Backward-compat: map từ status cũ
-  if (c.status === "closed") return "won";
-  if (c.status === "rejected") return "lost";
   return "new_lead";
 }
 
@@ -151,6 +148,14 @@ export function stageBadgeClass(s: DealStage): string {
 /** Màu header cho cột Kanban. */
 export function stageHeaderClass(s: DealStage): string {
   return DEAL_STAGE_META[s]?.headerClass ?? "bg-slate-500";
+}
+
+/** Khách còn nợ (chưa/một phần) VÀ đã qua hạn thanh toán → cần nhắc thu tiền gấp. */
+export function isPaymentOverdue(
+  c: Pick<Customer, "payment_status" | "payment_due_date">,
+): boolean {
+  if (!c.payment_due_date || c.payment_status === "paid") return false;
+  return new Date(c.payment_due_date).getTime() < Date.now();
 }
 
 export { DEAL_STAGE_META, DEAL_STAGE_TRANSITIONS, LOST_REASON_OPTIONS, PIPELINE_COLUMNS, REQ as STAGE_REQ_MAP, TERMINAL_STAGES };

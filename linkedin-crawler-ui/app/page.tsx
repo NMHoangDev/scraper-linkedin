@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAppAuth } from "@/contexts/AppAuthContext";
+import { getDashboardHrefForRole } from "@/components/all-platform/layout/AllPlatformSidebar";
 
 export default function HomePage() {
   const router = useRouter();
@@ -10,7 +11,7 @@ export default function HomePage() {
 
   useEffect(() => {
     if (isLoading) return;
-    router.replace(user ? "/all-platform/post-feed" : "/auth/login");
+    router.replace(user ? getDashboardHrefForRole(user.role) : "/auth/login");
   }, [isLoading, router, user]);
 
   return (

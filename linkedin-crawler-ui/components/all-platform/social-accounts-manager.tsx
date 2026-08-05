@@ -45,6 +45,8 @@ export function SocialAccountsManager({ onAccountChange }: SocialAccountsProps) 
     session_cookie: "",
     is_primary: false,
     notes: "",
+    is_banned: false,
+    ban_reason: "",
   });
 
   const fetchAccounts = useCallback(async () => {
@@ -101,6 +103,8 @@ export function SocialAccountsManager({ onAccountChange }: SocialAccountsProps) 
       notes: acc.notes || "",
       two_fa_secret: acc.two_fa_secret || "",
       session_cookie: acc.session_cookie || "",
+      is_banned: acc.is_banned ?? false,
+      ban_reason: acc.ban_reason || "",
     });
     setShowForm(true);
   };
@@ -112,6 +116,8 @@ export function SocialAccountsManager({ onAccountChange }: SocialAccountsProps) 
       account_profile_id: "", id_platform: null,
       is_primary: false, notes: "",
       two_fa_secret: "", session_cookie: "",
+      is_banned: false,
+      ban_reason: "",
     });
     setShowForm(true);
   };
@@ -129,6 +135,12 @@ export function SocialAccountsManager({ onAccountChange }: SocialAccountsProps) 
         id_platform: formData.id_platform,
         is_primary: formData.is_primary,
         notes: formData.notes || undefined,
+        is_banned: formData.is_banned,
+
+    ban_reason:
+        formData.is_banned
+            ? formData.ban_reason
+            : undefined,
       };
       let res;
       if (editingId) {
@@ -158,7 +170,18 @@ export function SocialAccountsManager({ onAccountChange }: SocialAccountsProps) 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold text-on-surface">Tài khoản mạng xã hội</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-bold text-on-surface">Tài khoản mạng xã hội</h2>
+            <a
+              href="https://www.youtube.com/watch?v=qA5U5IbOq7w"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+            >
+              <MaterialIcon name="videocam" className="text-[15px]" />
+              Video hướng dẫn
+            </a>
+          </div>
           <p className="text-xs text-on-surface-variant">Quản lý danh sách tài khoản Facebook/LinkedIn phục vụ crawl dữ liệu</p>
         </div>
         <button type="button" onClick={openAdd}
@@ -168,21 +191,21 @@ export function SocialAccountsManager({ onAccountChange }: SocialAccountsProps) 
       </div>
 
       {/* Platform tabs */}
-      <div className="flex gap-2">
+      <div className="inline-flex w-full max-w-full items-center gap-1 overflow-x-auto rounded-xl border border-outline-variant bg-surface-container-low p-1 sm:w-fit">
         {PLATFORMS.map(({ key, label, Icon }) => {
           const count = platformAccounts(key).length;
           const active = activePlatform === key;
           return (
             <button key={key} type="button" onClick={() => setActivePlatform(key)}
               className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer border",
-                active ? "bg-primary/10 text-primary border-primary/20"
-                  : "bg-surface-container-low text-on-surface-variant border-outline-variant hover:bg-surface-container-highest hover:text-on-surface"
+                "whitespace-nowrap flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wide transition-all duration-200 ease-out cursor-pointer",
+                active ? "bg-primary text-white shadow-[0_2px_8px_-1px_rgba(217,55,55,0.4)]"
+                  : "text-on-surface-variant hover:bg-surface hover:text-primary"
               )}>
-              <Icon size={12} /> {label}
+              <Icon size={9} /> {label}
               {count > 0 && (
-                <span className={cn("ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-black",
-                  active ? "bg-primary/20 text-primary" : "bg-surface-container-highest text-on-surface-variant")}>
+                <span className={cn("ml-0.5 px-1 py-0.5 rounded-full text-[8px] font-black normal-case leading-none",
+                  active ? "bg-white/25 text-white" : "bg-surface-container-highest text-on-surface-variant")}>
                   {count}
                 </span>)}
             </button>);
@@ -205,11 +228,17 @@ export function SocialAccountsManager({ onAccountChange }: SocialAccountsProps) 
       {loading ? (
         <div className="text-center py-12 text-on-surface-variant text-xs">Đang tải danh sách tài khoản...</div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-12 bg-surface-container-low rounded-xl border border-dashed border-outline-variant">
-          <MaterialIcon name="account_circle" className="text-4xl text-on-surface-variant mx-auto mb-2" />
-          <p className="text-on-surface-variant text-xs">Chưa có tài khoản {activePlatform === "facebook" ? "Facebook" : "LinkedIn"} nào</p>
-          <button onClick={openAdd} className="mt-3 text-primary text-xs font-bold hover:underline cursor-pointer">
-            + Thêm tài khoản mới
+        <div className="text-center py-16 bg-surface-container-low/60 rounded-2xl border border-dashed border-outline-variant">
+          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
+            <MaterialIcon name="group_add" className="text-3xl text-primary" />
+          </div>
+          <p className="text-on-surface font-semibold text-sm">
+            Chưa có tài khoản {activePlatform === "facebook" ? "Facebook" : activePlatform === "linkedin" ? "LinkedIn" : ""} nào
+          </p>
+          <p className="text-on-surface-variant text-xs mt-1">Thêm tài khoản để bắt đầu quản lý</p>
+          <button onClick={openAdd}
+            className="mt-4 inline-flex items-center gap-1.5 bg-primary hover:bg-on-primary-fixed-variant text-white px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ease-out active:scale-95 shadow-[0_2px_8px_-1px_rgba(217,55,55,0.35)] cursor-pointer">
+            <FaPlus size={10} /> Thêm tài khoản ngay
           </button>
         </div>
       ) : (
@@ -217,8 +246,9 @@ export function SocialAccountsManager({ onAccountChange }: SocialAccountsProps) 
           <table className="w-full border-collapse text-left text-xs">
             <thead className="bg-surface-container-low border-b border-outline-variant text-[10px] font-bold text-on-surface-variant uppercase">
               <tr>
+                <th className="py-3 px-4">FB Ban</th>
                 <th className="py-3 px-4">Tên tài khoản</th>
-                <th className="py-3 px-4">Email đăng nhập</th>
+                <th className="py-3 px-4">Email đăng nhập</th>   
                 <th className="py-3 px-4">Trạng thái</th>
                 <th className="py-3 px-4">Platform</th>
                 <th className="py-3 px-4 text-center">Hành động</th>
@@ -226,7 +256,37 @@ export function SocialAccountsManager({ onAccountChange }: SocialAccountsProps) 
             </thead>
             <tbody className="divide-y divide-outline-variant text-on-surface-variant">
               {filtered.map((acc) => (
+                
                 <tr key={acc.id} className="hover:bg-surface-container-low/30 transition">
+                  <td className="py-3 px-4">
+
+    {acc.is_banned ? (
+
+        <div>
+
+            <span className="bg-red-100 text-red-600 px-2 py-1 rounded">
+                Đã BAN
+            </span>
+
+            {acc.ban_reason && (
+
+                <div className="text-xs text-gray-500 mt-1">
+                    {acc.ban_reason}
+                </div>
+
+            )}
+
+        </div>
+
+    ) : (
+
+        <span className="text-green-600">
+            Bình thường
+        </span>
+
+    )}
+
+</td>
                   <td className="py-3.5 px-4 font-bold text-on-surface flex items-center gap-2">
                     <span className={cn("w-6 h-6 rounded-lg flex items-center justify-center text-[10px]",
                       acc.platform === "facebook" ? "bg-primary/10 text-primary" :
@@ -432,7 +492,48 @@ export function SocialAccountsManager({ onAccountChange }: SocialAccountsProps) 
                   </select>
                 </div>
               </div>
+              <div className="space-y-3">
 
+    <label className="flex items-center gap-2">
+
+        <input
+            type="checkbox"
+            checked={formData.is_banned}
+            onChange={(e)=>
+                setFormData({
+                    ...formData,
+                    is_banned:e.target.checked,
+                    ban_reason:e.target.checked
+                        ? formData.ban_reason
+                        : "",
+                })
+            }
+        />
+
+        <span className="text-sm font-medium">
+            Facebook Account bị BAN
+        </span>
+
+    </label>
+
+    {formData.is_banned && (
+
+        <textarea
+            rows={1}
+            placeholder="Nhập lý do tài khoản bị BAN..."
+            value={formData.ban_reason}
+            onChange={(e)=>
+                setFormData({
+                    ...formData,
+                    ban_reason:e.target.value,
+                })
+            }
+            className="w-full px-3 py-2 border rounded-xl"
+        />
+
+    )}
+
+</div>
               {/* Ghi chú */}
               <div className="space-y-1">
                 <label className="block text-[10px] font-bold text-on-surface-variant uppercase">Ghi chú</label>

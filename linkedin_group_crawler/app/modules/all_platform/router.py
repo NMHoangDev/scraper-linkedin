@@ -8,6 +8,9 @@ from app.modules.all_platform.routers import (
     seeding_router,
     kpi_router,
     categories_router,
+    members_router,
+    quick_comment_router,
+    quick_inbox_router,
     users_router,
     teams_router,
     auth_router,
@@ -24,11 +27,24 @@ from app.modules.all_platform.routers.crawl_linkedin import crawl_linkedin_route
 from app.modules.all_platform.routers.linkedin_legacy import router as linkedin_legacy_router
 from app.modules.all_platform.routers.crawl_facebook import crawl_facebook_router
 from app.modules.all_platform.routers.extension_crawl import router as extension_crawl_router
+from app.modules.all_platform.routers.crawl_queue import router as crawl_queue_router
+from app.modules.all_platform.routers.fb_account_pool import router as fb_account_pool_router
 from app.modules.all_platform.routers.fb import router as fb_automation_router
 from app.modules.all_platform.routers.websocket import router as websocket_router
 from app.modules.all_platform.routers.fb_inbox_accounts import router as fb_inbox_accounts_router
+from app.modules.all_platform.routers.crawl_fb_dashboard import router as crawl_fb_dashboard_router
 from app.modules.all_platform.routers.customer_lead import router as customer_lead_router
+<<<<<<< HEAD
 from app.modules.all_platform.routers.posts_delete import router as posts_delete_router
+=======
+from app.modules.all_platform.routers.quote import quote_forms_router, quotes_router
+from app.modules.all_platform.routers.sales_asset import router as sales_asset_router
+from app.modules.all_platform.routers.kpi_reward import router as kpi_reward_router
+from app.modules.all_platform.routers.scheduled_comments import router as scheduled_comments_router
+from app.modules.all_platform.routers.posts_delete import router as posts_delete_router
+from app.modules.all_platform.routers.internal_engagement import router as internal_engagement_router
+from app.modules.all_platform.phone_bridge.router import router as phone_bridge_router
+>>>>>>> 961099854cab42df4ea4717cb6d6f4d86f4742a1
 
 all_platform_router = APIRouter()
 
@@ -63,9 +79,24 @@ all_platform_router.include_router(
     tags=["All-Platform Facebook Crawl"],
 )
 all_platform_router.include_router(
+    crawl_fb_dashboard_router,
+    prefix="/facebook",
+    tags=["All-Platform Facebook Crawl Queue Dashboard"],
+)
+all_platform_router.include_router(
     extension_crawl_router,
     prefix="/extension",
     tags=["All-Platform Extension Crawl"],
+)
+all_platform_router.include_router(
+    crawl_queue_router,
+    prefix="/extension/queue",
+    tags=["All-Platform Extension Crawl Queue"],
+)
+all_platform_router.include_router(
+    fb_account_pool_router,
+    prefix="/extension/accounts",
+    tags=["All-Platform Extension FB Account Pool"],
 )
 all_platform_router.include_router(
     fb_automation_router,
@@ -128,12 +159,38 @@ all_platform_router.include_router(
     prefix="/kpi",
     tags=["All-Platform KPI"],
 )
+all_platform_router.include_router(
+    kpi_reward_router,
+    prefix="/kpi-rewards",
+    tags=["All-Platform KPI Rewards"],
+)
 
 # ── Categories (platform-agnostic) ────────────────────────────────────────────
 all_platform_router.include_router(
     categories_router,
     prefix="/categories",
     tags=["All-Platform Categories"],
+)
+
+# ── Members (HR roster, platform-agnostic) ────────────────────────────────────
+all_platform_router.include_router(
+    members_router,
+    prefix="/members",
+    tags=["All-Platform Members"],
+)
+
+# ── Quick Comment Library (platform-agnostic) ─────────────────────────────────
+all_platform_router.include_router(
+    quick_comment_router,
+    prefix="/quick-comments",
+    tags=["All-Platform Quick Comments"],
+)
+
+# ── Quick Inbox Library (platform-agnostic) ───────────────────────────────────
+all_platform_router.include_router(
+    quick_inbox_router,
+    prefix="/quick-inbox",
+    tags=["All-Platform Quick Inbox"],
 )
 
 # ── Users & Teams ──────────────────────────────────────────────────────────────
@@ -168,6 +225,21 @@ all_platform_router.include_router(
     tags=["All-Platform FB Inbox Accounts"],
 )
 
+# ── Internal Engagement (Tương tác nội bộ — MarkeeAI FB Page posts) ────────────
+all_platform_router.include_router(
+    internal_engagement_router,
+    prefix="/internal-engagement",
+    tags=["All-Platform Internal Engagement"],
+)
+
+# ── Account Online Summary (Facebook + Zalo online/total, cross-platform) ──────
+from app.modules.all_platform.routers.account_online_summary import router as account_online_summary_router
+all_platform_router.include_router(
+    account_online_summary_router,
+    prefix="/accounts",
+    tags=["All-Platform Account Online Summary"],
+)
+
 # ── FB Post KPI ────────────────────────────────────────────────────────────────
 from app.modules.all_platform.routers.fb_post_kpi import router as fb_post_kpi_router
 all_platform_router.include_router(
@@ -190,11 +262,34 @@ all_platform_router.include_router(
     prefix="/admin/dashboard",
     tags=["All-Platform Admin Dashboard"],
 )
+all_platform_router.include_router(
+    phone_bridge_router,
+    prefix="/admin/phone-bridge",
+    tags=["All-Platform Admin Phone Bridge"],
+)
 
 # ── Customer Leads ─────────────────────────────────────────────────────────────
 all_platform_router.include_router(
     customer_lead_router,
     tags=["Customer Leads"]
+)
+
+# ── Quote Forms + Quotes ───────────────────────────────────────────────────────
+all_platform_router.include_router(
+    quote_forms_router,
+    prefix="/quote-forms",
+    tags=["All-Platform Quote Forms"],
+)
+all_platform_router.include_router(
+    quotes_router,
+    prefix="/quotes",
+    tags=["All-Platform Quotes"],
+)
+
+all_platform_router.include_router(
+    sales_asset_router,
+    prefix="/sales-assets",
+    tags=["All-Platform Sales Assets"],
 )
 
 # ── WebSocket ────────────────────────────────────────────────────────────────
@@ -231,4 +326,11 @@ all_platform_router.include_router(zalo_conversations_router, prefix="/zalo", ta
 all_platform_router.include_router(zalo_events_router, prefix="/zalo", tags=["Zalo Events"])
 all_platform_router.include_router(zalo_inbox_share_router, prefix="/zalo", tags=["Zalo Inbox Share"])
 all_platform_router.include_router(zalo_proxy_router, prefix="/zalo", tags=["Zalo Proxy"])
+
+# ── Scheduled Comments ─────────────────────────────────────────────────────────
+all_platform_router.include_router(
+    scheduled_comments_router,
+    prefix="/scheduled-comments",
+    tags=["All-Platform Scheduled Comments"],
+)
 

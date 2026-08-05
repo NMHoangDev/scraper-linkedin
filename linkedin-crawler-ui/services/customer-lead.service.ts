@@ -4,7 +4,14 @@ import { API_BASE_URL, API_KEY } from "@/lib/env";
    CRM Customer Interface — full schema
    ============================================================= */
 
-export type ContractStatus = "active" | "completed" | "maintenance";
+export type ContractStatus =
+  | "active"
+  | "completed"
+  | "maintenance"
+  | "da_bao_gia"
+  | "dang_xu_ly"
+  | "da_chot";
+export type PaymentStatus = "unpaid" | "partial" | "paid";
 export type ActivityStatus = "active" | "paused" | "churned";
 export type LeadStatus = "pending" | "closed" | "rejected";
 export type ReviewResult = "Qualify" | "Disqualify" | "Chua_xem_xet";
@@ -314,6 +321,12 @@ export interface Customer {
   warranty_expires_at: string | null;
   care_note: string | null;
   last_care_at: string | null;
+  /** Ngày khách hàng cần thanh toán (hạn thu tiền kỳ hiện tại/tiếp theo). */
+  payment_due_date?: string | null;
+  /** unpaid (chưa thanh toán) | partial (một phần) | paid (đã thanh toán đủ). */
+  payment_status?: PaymentStatus | null;
+  last_attachment_url?: string | null;
+  last_attachment_name?: string | null;
   tags: string[];
   has_budget: boolean;
   note: string | null;
@@ -443,6 +456,16 @@ export const CITY_OPTIONS = [
   "Yên Bái",
 ];
 
+export const PAYMENT_STATUS_OPTIONS: {
+  value: PaymentStatus;
+  label: string;
+  badgeClass: string;
+}[] = [
+  { value: "unpaid", label: "Chưa thanh toán", badgeClass: "bg-red-100 text-red-700 border-red-200" },
+  { value: "partial", label: "Thanh toán một phần", badgeClass: "bg-amber-100 text-amber-700 border-amber-200" },
+  { value: "paid", label: "Đã thanh toán", badgeClass: "bg-green-100 text-green-700 border-green-200" },
+];
+
 export const HAS_BUDGET_OPTIONS: { value: boolean; label: string }[] = [
   { value: true, label: "Có ngân sách" },
   { value: false, label: "Chưa có ngân sách" },
@@ -463,16 +486,8 @@ export const CARE_NOTE_OPTIONS = [
   "Khách từ chối — theo dõi lại sau",
 ];
 
-export const REJECT_REASON_TYPE_OPTIONS: { value: RejectReasonType; label: string }[] = [
-  { value: "Khong_lien_lac_duoc", label: "Không liên lạc được" },
-  { value: "Chua_co_nhu_cau", label: "Chưa có nhu cầu" },
-  { value: "Cham_trai_nghiem", label: "Chấm trái nghiệm" },
-  { value: "Thieu_nhan_su", label: "Thiếu nhân sự" },
-  { value: "Chia_tay_doi_tac_cu", label: "Chia tay đối tác cũ" },
-  { value: "Khong_du_tai_chinh", label: "Không đủ tài chính" },
-  { value: "Chua_phu_hop_thoi_diem", label: "Chưa phù hợp thời điểm" },
-  { value: "Khac", label: "Khác" },
-];
+/** @deprecated Dùng LOST_REASON_OPTIONS — cùng giá trị, đã gộp về 1 nguồn nhãn duy nhất. */
+export const REJECT_REASON_TYPE_OPTIONS = LOST_REASON_OPTIONS;
 
 export const REVIEW_RESULT_OPTIONS: { value: ReviewResult; label: string }[] = [
   { value: "Qualify", label: "Qualify ✓" },
@@ -540,12 +555,21 @@ export const customerLeadService = {
     if (params?.page_size) q.set("page_size", String(params.page_size));
     const qs = q.toString() ? `?${q.toString()}` : "";
     const data = await apiFetch(`/api/all-platform/customer-leads${qs}`);
+    // success:false van la HTTP 200 (BaseResponse) nen apiFetch khong tu throw —
+    // truoc day rot xuong fallback {items:[]} lang le, nhin giong "khong co khach
+    // hang nao" thay vi loi that (vd schema mismatch tren 1 Supabase project khac).
+    if (data?.success === false) {
+      throw new Error(data?.message || "Không tải được danh sách khách hàng");
+    }
     return data?.data as CustomerListResponse ?? { items: [], total: 0, page: 1, page_size: 50 };
   },
 
   /** Số deal ở mỗi stage — cho header KPI / tab counts. */
   getStageCounts: async (): Promise<Record<string, number>> => {
     const data = await apiFetch(`/api/all-platform/customer-leads/stage-counts`);
+    if (data?.success === false) {
+      throw new Error(data?.message || "Không tải được số liệu theo stage");
+    }
     return data?.data ?? {};
   },
 

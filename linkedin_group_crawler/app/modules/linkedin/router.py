@@ -12,9 +12,23 @@ from typing_extensions import Annotated
 
 import httpx
 from playwright.sync_api import sync_playwright
-from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Query, Request, status
 
 from app.core.config import BASE_DIR, Settings, settings
+
+
+def get_current_user(request: Request, authorization: str | None = Header(default=None)) -> dict:
+    """Wrapper lazy-import cho auth_deps.get_current_user.
+
+    Import thang o module-level se gay circular import: linkedin.router ->
+    all_platform (package __init__) -> all_platform.router ->
+    routers.linkedin_legacy -> linkedin.router (dang load do, chua co
+    attribute `router`/`linkedin_app_router`) -> ImportError. Import ben
+    trong ham nay chi chay luc co request that (app da load xong het),
+    khong con vong lap.
+    """
+    from app.modules.all_platform.auth_deps import get_current_user as _get_current_user
+    return _get_current_user(request, authorization)
 from app.modules.linkedin.schemas.request_models import (
     AddMemberRequest,
     AddListGroupRequest,
@@ -2540,15 +2554,41 @@ def linkedin_sync_all_progress(payload: SyncAllProgressRequest) -> SyncAllProgre
         finally:
             browser.close()
 
+def _caller_has_leader_permission(email: str) -> bool:
+    """Tra quyen leader THAT qua webhook n8n (cung co che voi /auth/check-permission
+    ben duoi) - dung thay cho viec tin field leader_role client tu khai trong body."""
+    webhook_url = settings.n8n_webhook_check_permission_url
+    if not webhook_url or not email:
+        return False
+    try:
+        _status_code, response_text = post_json_to_n8n_webhook(
+            url=webhook_url,
+            json_body={"email": email},
+        )
+        resp_data = json.loads(response_text)
+        if isinstance(resp_data, dict):
+            return bool(resp_data.get("permission", False))
+        if isinstance(resp_data, list) and resp_data and isinstance(resp_data[0], dict):
+            return bool(resp_data[0].get("permission", False))
+    except Exception:
+        logger.exception("_caller_has_leader_permission webhook failed for %s", email)
+    return False
+
+
 @router.post(
     "/kpi/assign",
     response_model=BaseResponse,
     dependencies=[Depends(verify_api_key)],
 )
-def linkedin_assign_kpi(payload: AssignKpiRequest) -> BaseResponse:
+def linkedin_assign_kpi(payload: AssignKpiRequest, user: dict = Depends(get_current_user)) -> BaseResponse:
     """Leader gán KPI cho member trực tiếp vào Google Sheet."""
 
-    if payload.leader_role != "leader":
+    # Truoc day chi kiem tra payload.leader_role == "leader" - field nay do
+    # client tu khai trong body, tu sua duoc bang DevTools/curl de bypass.
+    # Gio tra quyen that qua webhook n8n (cung co che voi check-permission)
+    # dua tren email da xac thuc JWT (user["email"]), khong phai payload.
+    caller_email = str(user.get("email") or "").strip().lower()
+    if not _caller_has_leader_permission(caller_email):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Chỉ leader mới có quyền gán KPI.",
@@ -2951,8 +2991,19 @@ def get_kpi_by_email(payload: GetKpiByEmailRequest) -> GetKpiByEmailResponse:
     response_model=AddMemberResponse,
     dependencies=[Depends(verify_api_key)],
 )
-def add_member(payload: AddMemberRequest) -> AddMemberResponse:
+def add_member(payload: AddMemberRequest, user: dict = Depends(get_current_user)) -> AddMemberResponse:
     """Thêm member mới qua Google Sheet và n8n."""
+    # Truoc day ai cung gan duoc member bat ky vao doi cua leader bat ky chi
+    # can dien 2 email trong body. Gio bat buoc nguoi goi phai la leader that
+    # (tra qua webhook n8n) VA phai dung la leader duoc dien trong payload.
+    caller_email = str(user.get("email") or "").strip().lower()
+    target_leader_email = payload.email_leader.strip().lower()
+    if not _caller_has_leader_permission(caller_email) or caller_email != target_leader_email:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chỉ leader mới có quyền thêm thành viên vào đội của mình.",
+        )
+
     # 1. Update/check user in users tab of Google Sheet directly
     sheet_res = gsheet.update_user_leader_in_users_sheet(
         member_email=payload.email_member,
@@ -3000,7 +3051,10 @@ def add_member(payload: AddMemberRequest) -> AddMemberResponse:
 )
 def verify_leader_code(payload: VerifyLeaderCodeRequest) -> BaseResponse:
     """Xác nhận mã code leader."""
-    is_valid = (payload.code == "888" or payload.code == settings.leader_code)
+    # Truoc day chuoi literal "888" luon duoc chap nhan bat ke settings.leader_code
+    # duoc cau hinh la gi -> bat ky ai biet "888" (hardcode trong code, khong phai
+    # bi mat) deu tu phong duoc Leader cho email bat ky. Bo backdoor nay.
+    is_valid = payload.code == settings.leader_code
     if not is_valid:
         return BaseResponse(success=False, message="Mã code không đúng.")
     
@@ -3020,8 +3074,14 @@ def verify_leader_code(payload: VerifyLeaderCodeRequest) -> BaseResponse:
     response_model=BaseResponse,
     dependencies=[Depends(verify_api_key)],
 )
-def update_role_to_member(payload: UpdateRoleToMemberRequest) -> BaseResponse:
+def update_role_to_member(payload: UpdateRoleToMemberRequest, user: dict = Depends(get_current_user)) -> BaseResponse:
     """Cập nhật vai trò member cho tài khoản."""
+    caller_email = str(user.get("email") or "").strip().lower()
+    if not _caller_has_leader_permission(caller_email):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chỉ leader/admin mới có quyền hạ cấp vai trò.",
+        )
     if payload.email:
         res = gsheet.update_user_role_to_member_in_sheet(payload.email)
         if not res.get("success"):

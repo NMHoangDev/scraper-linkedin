@@ -1,9 +1,12 @@
 "use client";
 
-import { useState, type FormEvent, useCallback } from "react";
+import { useEffect, useState, type FormEvent, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { GoogleOAuthProvider, GoogleLogin, type CredentialResponse } from "@react-oauth/google";
 import { useAppAuth } from "@/contexts/AppAuthContext";
+import { GOOGLE_OAUTH_CLIENT_ID } from "@/lib/env";
+import { getDashboardHrefForRole } from "@/components/all-platform/layout/AllPlatformSidebar";
 
 /* -------------------------------------------------------------------------- */
 /*  Material Symbols — class already defined in globals.css                    */
@@ -38,8 +41,41 @@ export function AuthPage() {
   const [forgotError, setForgotError] = useState<string | null>(null);
   const [forgotLoading, setForgotLoading] = useState(false);
 
-  const { login, register, setLwuuSession } = useAppAuth();
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [googleError, setGoogleError] = useState<string | null>(null);
+
+  const { user, isAuthenticated, isLoading: authLoading, login, loginWithGoogle, register, setLwuuSession } = useAppAuth();
   const router = useRouter();
+
+  // Nếu đã đăng nhập (vd bấm nút Back của trình duyệt quay lại /auth/login sau
+  // khi login xong, hoặc mở lại tab cũ còn cookie hợp lệ) thì đưa thẳng vào
+  // đúng dashboard theo role thay vì hiện lại form login. Phải đợi authLoading
+  // xong (AppAuthProvider gọi /auth/me lúc mount) rồi mới quyết định — nếu
+  // check ngay khi isLoading còn true sẽ luôn thấy isAuthenticated=false (state
+  // chưa kịp cập nhật) và không bao giờ redirect được.
+  useEffect(() => {
+    if (authLoading) return;
+    if (isAuthenticated && user) {
+      router.replace(getDashboardHrefForRole(user.role));
+    }
+  }, [authLoading, isAuthenticated, user, router]);
+
+  const handleGoogleSuccess = useCallback(
+    async (credentialResponse: CredentialResponse) => {
+      setGoogleError(null);
+      if (!credentialResponse.credential) {
+        setGoogleError("Không nhận được thông tin đăng nhập từ Google.");
+        return;
+      }
+      try {
+        const user = await loginWithGoogle(credentialResponse.credential);
+        router.push(getDashboardHrefForRole(user.role));
+      } catch (err) {
+        setGoogleError(err instanceof Error ? err.message : "Đăng nhập Google thất bại.");
+      }
+    },
+    [loginWithGoogle, router],
+  );
 
   const switchMode = useCallback((m: AuthMode) => {
     setMode(m);
@@ -53,16 +89,14 @@ export function AuthPage() {
     setSubmitStatus("loading");
 
     try {
-      if (mode === "login") {
-        await login(email.trim(), password);
-      } else {
-        await register(email.trim(), password, name.trim() || undefined);
-      }
+      const user = mode === "login"
+        ? await login(email.trim(), password)
+        : await register(email.trim(), password, name.trim() || undefined);
       localStorage.setItem("linkedin_crawler_email", email.trim());
       if (remember) {
         setLwuuSession(email.trim(), true);
       }
-      router.push("/all-platform/post-feed");
+      router.push(getDashboardHrefForRole(user.role));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Có lỗi xảy ra");
       setSubmitStatus("idle");
@@ -132,6 +166,7 @@ export function AuthPage() {
   const isSuccess = submitStatus === "success";
 
   return (
+    <GoogleOAuthProvider clientId={GOOGLE_OAUTH_CLIENT_ID}>
     <div
       className="min-h-screen flex items-center justify-center relative overflow-hidden"
       style={{ background: "var(--color-background)" }}
@@ -242,7 +277,40 @@ export function AuthPage() {
             </h1>
           </div>
 
+          {/* ── Đăng nhập bằng Google (mặc định) ── */}
+          {!showPasswordForm && (
+            <div className="px-6 py-8 flex flex-col items-center gap-4">
+              <p className="text-sm text-on-surface-variant text-center">
+                Đăng nhập bằng tài khoản Google được cấp cho công việc tại Markee.
+              </p>
+              <div className="flex justify-center">
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={() => setGoogleError("Đăng nhập Google thất bại. Vui lòng thử lại.")}
+                  text="signin_with"
+                  shape="pill"
+                  width={280}
+                />
+              </div>
+              {googleError && (
+                <div className="w-full flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 text-sm text-red-600 font-medium">
+                  <Icon name="error" className="text-red-500 text-base" />
+                  {googleError}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowPasswordForm(true)}
+                className="text-xs text-on-surface-variant hover:underline bg-transparent border-0 p-0 cursor-pointer mt-2"
+              >
+                Đăng nhập bằng mật khẩu (dev/test)
+              </button>
+            </div>
+          )}
+
           {/* ── Tabs ── */}
+          {showPasswordForm && (
+          <>
           <div className="flex" style={{ borderBottom: "1px solid #e1e3e4" }}>
             <button
               type="button"
@@ -459,7 +527,16 @@ export function AuthPage() {
                 {mode === "login" ? "Đăng ký ngay" : "Đăng nhập"}
               </button>
             </p>
+            <button
+              type="button"
+              onClick={() => { setShowPasswordForm(false); setError(null); }}
+              className="text-xs text-on-surface-variant hover:underline bg-transparent border-0 p-0 cursor-pointer mt-2"
+            >
+              Quay lại đăng nhập bằng Google
+            </button>
           </div>
+          </>
+          )}
         </div>
 
         {/* ── System footer ── */}
@@ -566,5 +643,6 @@ export function AuthPage() {
         </div>
       )}
     </div>
+    </GoogleOAuthProvider>
   );
 }

@@ -16,10 +16,12 @@ import uuid
 from datetime import datetime, date
 from typing import Optional, List
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.core.logger import get_logger
+from app.core.supabase_client import get_supabase_client
+from app.modules.all_platform.auth_deps import get_current_user
 from app.modules.all_platform.services.supabase_linkedin_account_service import (
     get_linkedin_accounts,
     add_linkedin_account,
@@ -34,6 +36,18 @@ from app.modules.all_platform.services.supabase_linkedin_crawl_service import (
 logger = get_logger(__name__)
 
 router = APIRouter()
+
+
+def _require_owner_or_leader(user: dict, target_id_member: Optional[str]) -> None:
+    """403 nếu caller không phải admin/leader VÀ không phải chủ sở hữu (id_member
+    khớp chính user["id"]). Trước đây toàn bộ router này không check gì cả —
+    ai cũng list/sửa/xoá tài khoản LinkedIn (kể cả mật khẩu lưu) của người khác."""
+    role = str(user.get("role") or "member").strip().lower()
+    if role in ("admin", "leader"):
+        return
+    if target_id_member and str(target_id_member) == str(user.get("id")):
+        return
+    raise HTTPException(status_code=403, detail="Không có quyền thao tác tài khoản LinkedIn này")
 
 
 # ── Schemas ────────────────────────────────────────────────────────────────────
@@ -77,50 +91,79 @@ class CrawlLinkedInPostRequest(BaseModel):
 # ── LinkedIn Account CRUD ──────────────────────────────────────────────────────
 
 @router.get("/accounts")
-def li_accounts_list() -> BaseResponse:
-    """List all LinkedIn accounts."""
+def li_accounts_list(user: dict = Depends(get_current_user)) -> BaseResponse:
+    """List LinkedIn accounts. Admin/leader thấy tất cả; member chỉ thấy của mình."""
     try:
         data = get_linkedin_accounts()
+        role = str(user.get("role") or "member").strip().lower()
+        if role not in ("admin", "leader"):
+            data = [row for row in data if str(row.get("id_member")) == str(user.get("id"))]
         return BaseResponse(success=True, data=data)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Failed to list linkedin accounts")
         return BaseResponse(success=False, message=str(e))
 
 
 @router.post("/accounts")
-def li_accounts_create(payload: LinkedInAccountCreate) -> BaseResponse:
+def li_accounts_create(payload: LinkedInAccountCreate, user: dict = Depends(get_current_user)) -> BaseResponse:
     """Add a new LinkedIn account."""
     try:
         if not payload.email_linkedin.strip() or not payload.password.strip():
             return BaseResponse(success=False, message="email_linkedin và password không được để trống")
+        role = str(user.get("role") or "member").strip().lower()
+        # Member thuong chi duoc tao account gan cho chinh minh, khong duoc
+        # tuy y gan email_member cho nguoi khac.
+        email_member = payload.email_member.strip() if role in ("admin", "leader") else str(user.get("email") or "")
         data = add_linkedin_account(
-            email_member=payload.email_member.strip(),
+            email_member=email_member,
             email_linkedin=payload.email_linkedin.strip().lower(),
             password=payload.password,
         )
         return BaseResponse(success=True, data=data, message="Đã thêm tài khoản")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Failed to create linkedin account")
         return BaseResponse(success=False, message=str(e))
 
 
+def _get_account_owner(account_id: str) -> Optional[str]:
+    supabase = get_supabase_client()
+    res = (
+        supabase.table("linkedin_account_crawl")
+        .select("id_member")
+        .eq("id", account_id)
+        .limit(1)
+        .execute()
+    )
+    return res.data[0].get("id_member") if res.data else None
+
+
 @router.put("/accounts/{account_id}")
-def li_accounts_update(account_id: str, payload: LinkedInAccountUpdate) -> BaseResponse:
+def li_accounts_update(account_id: str, payload: LinkedInAccountUpdate, user: dict = Depends(get_current_user)) -> BaseResponse:
     """Update a LinkedIn account."""
     try:
+        _require_owner_or_leader(user, _get_account_owner(account_id))
         data = update_linkedin_account(account_id, payload.model_dump(exclude_none=True))
         return BaseResponse(success=True, data=data, message="Đã cập nhật")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Failed to update linkedin account %s", account_id)
         return BaseResponse(success=False, message=str(e))
 
 
 @router.delete("/accounts/{account_id}")
-def li_accounts_delete(account_id: str) -> BaseResponse:
+def li_accounts_delete(account_id: str, user: dict = Depends(get_current_user)) -> BaseResponse:
     """Delete a LinkedIn account."""
     try:
+        _require_owner_or_leader(user, _get_account_owner(account_id))
         data = delete_linkedin_account(account_id)
         return BaseResponse(success=True, data=data, message="Đã xóa tài khoản")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Failed to delete linkedin account %s", account_id)
         return BaseResponse(success=False, message=str(e))
@@ -129,7 +172,7 @@ def li_accounts_delete(account_id: str) -> BaseResponse:
 # ── Crawl Endpoint ─────────────────────────────────────────────────────────────
 
 @router.post("/crawl-linkedin-post")
-def crawl_linkedin_post(payload: CrawlLinkedInPostRequest) -> BaseResponse:
+def crawl_linkedin_post(payload: CrawlLinkedInPostRequest, user: dict = Depends(get_current_user)) -> BaseResponse:
     """
     Crawl LinkedIn posts using the Playwright-based crawler flow.
 
@@ -158,6 +201,17 @@ def crawl_linkedin_post(payload: CrawlLinkedInPostRequest) -> BaseResponse:
             return BaseResponse(success=False, message="email_linkedin không được để trống")
         if not payload.group_urls:
             return BaseResponse(success=False, message="Chưa chọn nhóm nào để cào")
+
+        supabase = get_supabase_client()
+        acc_res = (
+            supabase.table("linkedin_account_crawl")
+            .select("id_member")
+            .eq("email_linkedin", email)
+            .limit(1)
+            .execute()
+        )
+        owner_id_member = acc_res.data[0].get("id_member") if acc_res.data else None
+        _require_owner_or_leader(user, owner_id_member)
 
         # 1. Get password from Supabase
         password = get_linkedin_account_password(email)
@@ -276,21 +330,36 @@ def crawl_linkedin_post(payload: CrawlLinkedInPostRequest) -> BaseResponse:
             },
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("crawl-linkedin-post endpoint failed")
         return BaseResponse(success=False, message=str(e))
 
 
 @router.delete("/crawl-sessions/{session_id}")
-def delete_crawl_session(session_id: str) -> BaseResponse:
+def delete_crawl_session(session_id: str, user: dict = Depends(get_current_user)) -> BaseResponse:
     """Delete a specific crawl session and its associated posts."""
     try:
+        supabase = get_supabase_client()
+        session_res = (
+            supabase.table("crawl_linkedin_session")
+            .select("id_member")
+            .eq("id", session_id)
+            .limit(1)
+            .execute()
+        )
+        owner_id_member = session_res.data[0].get("id_member") if session_res.data else None
+        _require_owner_or_leader(user, owner_id_member)
+
         from app.modules.all_platform.services.supabase_linkedin_crawl_service import delete_crawl_session_by_id
         success = delete_crawl_session_by_id(session_id)
         if success:
             return BaseResponse(success=True, message="Đã xóa phiên cào và các bài viết liên quan")
         else:
             return BaseResponse(success=False, message="Không tìm thấy phiên cào hoặc đã bị xóa")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Failed to delete crawl session %s", session_id)
         return BaseResponse(success=False, message=str(e))

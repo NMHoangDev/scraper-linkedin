@@ -1,0 +1,49 @@
+{
+  "manifest_version": 3,
+  "name": "FB Bulk Comment Extension",
+  "version": "1.0",
+  "description": "Seeding Comment hàng loạt trên Facebook",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "tabs",
+    "storage"
+  ],
+  "host_permissions": [
+    "*://*.facebook.com/*",
+    "http://localhost:*/*",
+    "http://127.0.0.1:*/*",
+    "*://seeding.markeeai.com/*",
+    "*://*.seeding.markeeai.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Bulk Comment Extension"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.facebook.com/*"],
+      "js": ["graphql-sniffer.js"],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["*://*.facebook.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "http://localhost:*/*", 
+        "http://127.0.0.1:*/*",
+        "*://*.vercel.app/*",
+        "*://seeding.markeeai.com/*",
+        "*://*.seeding.markeeai.com/*"
+      ],
+      "js": ["bridge.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -31,10 +31,8 @@ from fastapi.responses import JSONResponse
 from app.modules.linkedin.router import linkedin_app_router, router
 from app.modules.linkedin.schemas.response_models import BaseResponse
 from app.core.config import settings
-from app.modules.all_platform.jobs.crawl_24h_job import setup_all_platform_jobs
 from app.modules.facebook.src.modules.api_router.index import api_router
 from app.modules.all_platform.router import all_platform_router
-from app.modules.all_platform.routers.websocket import router as websocket_router
 from app.core.playwright_browser_pool import (
     shutdown_playwright_pool,
     warmup_playwright_pool,
@@ -62,9 +60,25 @@ async def lifespan(_: FastAPI):
     if _os.getenv("DISABLE_SCHEDULER", "").strip() in ("1", "true", "True"):
         logger.warning("DISABLE_SCHEDULER enabled -> not starting scheduler.")
     else:
-        # TODO: Re-enable when needed
-        # setup_all_platform_jobs()
-        logger.warning("24h crawl scheduler DISABLED - comment this block to re-enable")
+        if _os.getenv("DISABLE_COMMENT_SCHEDULER", "").strip() not in ("1", "true", "True"):
+            try:
+                from app.modules.all_platform.jobs.scheduled_comment_job import setup_scheduled_comment_job
+                setup_scheduled_comment_job()
+                logger.info("Scheduled comment job started")
+            except Exception:
+                logger.exception("Failed to start scheduled comment job")
+        try:
+            # setup_all_platform_jobs() tự đọc DISABLE_ALL_PLATFORM_CRAWL_24H để BỎ QUA riêng
+            # job cào 24h Playwright (job từng làm nghẽn API login -- xem commit 6556153,
+            # "fix: disable 24h crawler scheduler ... to prevent blocking login API"). Bật lại
+            # ở đây chỉ để khôi phục 3 cron bảo trì hàng đợi/pool còn lại (requeue job/acc FB
+            # bị treo khi worker VPS crash, backup điểm tuần) -- các cron này chỉ query Supabase
+            # qua thread riêng, không đụng Playwright, không phải nguyên nhân gây nghẽn login.
+            from app.modules.all_platform.jobs.crawl_24h_job import setup_all_platform_jobs
+            setup_all_platform_jobs()
+            logger.info("All-platform maintenance scheduler started (24h Facebook crawl stays gated by DISABLE_ALL_PLATFORM_CRAWL_24H)")
+        except Exception:
+            logger.exception("Failed to start all-platform maintenance scheduler")
     async def _warmup_background() -> None:
         try:
             await asyncio.to_thread(warmup_playwright_pool)
@@ -173,6 +187,10 @@ async def handle_cors_middleware(request: Request, call_next):
         if origin.startswith("chrome-extension://") else "",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        "http://localhost:3002",
+        "http://127.0.0.1:3002",
         "http://localhost:8080",
         "http://127.0.0.1:8080",
     }

@@ -17,7 +17,12 @@ import {
   Activity,
   Settings,
   ShieldCheck,
+<<<<<<< HEAD
   BadgeCheck,
+=======
+  ClipboardList,
+  Cable,
+>>>>>>> 961099854cab42df4ea4717cb6d6f4d86f4742a1
   type LucideIcon,
 } from "lucide-react";
 import type { MaterialSymbolName } from "@/components/ui";
@@ -45,8 +50,13 @@ const MAP: Partial<Record<MaterialSymbolName, LucideIcon>> = {
   monitoring: Activity,
   settings: Settings,
   verified_user: ShieldCheck,
+<<<<<<< HEAD
   badge: BadgeCheck,
   chat_bubble: MessageCircle,
+=======
+  assignment: ClipboardList,
+  settings_input_component: Cable,
+>>>>>>> 961099854cab42df4ea4717cb6d6f4d86f4742a1
 };
 
 export function materialToLucideIcon(name: MaterialSymbolName): LucideIcon {

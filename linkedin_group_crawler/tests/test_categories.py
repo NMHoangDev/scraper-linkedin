@@ -7,7 +7,15 @@ from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 from app.main import app
 from app.core.config import settings
+from app.modules.all_platform.auth_deps import require_admin
+from app.modules.facebook.src.modules.crawl_fb.router.sheet_management import get_sheet_management_service
 
+class MockSheetManagementService:
+    async def delete_groups_and_posts_by_category(self, cat_type, val):
+        pass
+
+app.dependency_overrides[require_admin] = lambda: {"user_id": "admin", "role": "admin"}
+app.dependency_overrides[get_sheet_management_service] = lambda: MockSheetManagementService()
 client = TestClient(app)
 
 SHARED_SVC_PATH = "app.shared.services.category_sheet_service.CategorySheetService"

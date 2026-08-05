@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { FaFacebook, FaPlus, FaLink } from "react-icons/fa";
+import { FaFacebook, FaPlus } from "react-icons/fa";
 import { MaterialIcon } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { fbInboxAccountService, type FbInboxAccount } from "@/services/all-platform.service";
@@ -50,6 +50,7 @@ export function FbInboxAccountsTab({ onChange }: FbInboxAccountsTabProps) {
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [connErr, setConnErr] = useState(false);
   const [ownerNames, setOwnerNames] = useState<Record<string, string>>({});
+  const [detailAccount, setDetailAccount] = useState<UnifiedAccount | null>(null);
 
   const showToast = (msg: string, ok: boolean) => { setToast({ msg, ok }); setTimeout(() => setToast(null), 3500); };
 
@@ -60,8 +61,13 @@ export function FbInboxAccountsTab({ onChange }: FbInboxAccountsTabProps) {
       const { installed } = await pingExtension();
       setExtInstalled(installed);
       if (installed) {
-        const cfg = await getFbProvisionConfig();
-        await provisionExtension({ serverUrl: cfg.serverUrl, owner, apiKey: cfg.extensionApiKey, label: user?.name || user?.email || owner });
+        try {
+          const cfg = await getFbProvisionConfig();
+          await provisionExtension({ serverUrl: cfg.serverUrl, owner, apiKey: cfg.extensionApiKey, label: user?.name || user?.email || owner });
+        } catch (err) {
+          // Backend chưa cấu hình FB extension (thiếu env) — không crash trang, chỉ log để debug.
+          console.warn("[FbInboxAccountsTab] Không lấy được cấu hình FB extension:", err);
+        }
       }
     })();
   }, [owner, user?.email, user?.name]);
@@ -80,24 +86,51 @@ export function FbInboxAccountsTab({ onChange }: FbInboxAccountsTabProps) {
     }).catch(() => {});
   }, [owner, user?.email, user?.name]);
 
+  // Tên
+  const ownerLabel = useCallback((s: Session) => (s.owner && ownerNames[s.owner]) || "", [ownerNames]);
+  const accLabel = useCallback((s: Session) => {
+    const explicit = (s.label || "").trim();
+    if (explicit && explicit !== s.user_id) return explicit;
+    return s.email || ownerLabel(s) || "Tài khoản Facebook";
+  }, [ownerLabel]);
+
   const loadAll = useCallback(async () => {
     try {
       const [rSessions, rInbox] = await Promise.all([
         fbFetch("/sessions").then(r => r.json()).catch(() => ({ sessions: [] })),
         fbInboxAccountService.list().catch(() => ({ success: false, data: { accounts: [] } }))
       ]);
-      setSessions(rSessions.sessions || []);
+      const nextSessions: Session[] = rSessions.sessions || [];
+      setSessions(nextSessions);
       setConnErr(false);
 
+      let nextInbox: FbInboxAccount[] = [];
       if (rInbox.success && rInbox.data) {
-        setInboxAccounts((rInbox.data as any).accounts || []);
+        nextInbox = (rInbox.data as any).accounts || [];
+        setInboxAccounts(nextInbox);
+      }
+
+      // Tu dong dam bao MOI session (them moi, relogin, hay tai khoan cu con thieu
+      // row) deu co fb_inbox_accounts - thay hoan toan cho nut "Bat tinh KPI" thu
+      // cong truoc day. fbInboxAccountService.create() da tu update-or-insert theo
+      // user_id (idempotent, xem link_user_account phia backend) nen goi lai moi
+      // 5s (chu ky poll) khong tao trung, chi "chua bam" thi lan poll sau se tu bu.
+      const unlinked = nextSessions.filter(s => !nextInbox.some(
+        acc => acc.user_id === s.user_id || (!!acc.fb_user_id && !!s.fb_user_id && acc.fb_user_id === s.fb_user_id),
+      ));
+      for (const s of unlinked) {
+        fbInboxAccountService.create({
+          user_id: s.user_id,
+          fb_user_id: s.fb_user_id || undefined,
+          account_label: accLabel(s) || undefined,
+        }).catch(() => { /* im lang - lan poll sau se thu lai */ });
       }
     } catch {
       setConnErr(true);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [accLabel]);
 
   useEffect(() => {
     loadAll();
@@ -113,7 +146,6 @@ export function FbInboxAccountsTab({ onChange }: FbInboxAccountsTabProps) {
     }
     setAdding(true);
     setStatus("⏳ Đang mở Facebook... Hãy đăng nhập tài khoản cần thêm trong tab mới. Hệ thống tự lưu khi xong.");
-    const beforeIds = new Set(sessions.map(s => s.user_id));
     const cfg = await getFbProvisionConfig();
     await provisionExtension({ serverUrl: cfg.serverUrl, owner, apiKey: cfg.extensionApiKey, label: user?.name || user?.email || owner });
     const res = await addAccountViaExtension();
@@ -121,36 +153,14 @@ export function FbInboxAccountsTab({ onChange }: FbInboxAccountsTabProps) {
     if (res.success) {
       setStatus("");
       showToast(relogin ? "Đã đăng nhập lại tài khoản." : "Đã thêm tài khoản Facebook.", true);
-      // Mac dinh tu dong bat KPI Inbox cho tai khoan VUA them (khong dong lai
-      // cho tai khoan relogin, vi no da co san tu truoc) - tranh phai bam
-      // tay "Bat tinh KPI" cho tung acc moi.
-      if (!relogin) {
-        try {
-          const fresh = await fbFetch("/sessions").then(r => r.json()).catch(() => ({ sessions: [] }));
-          const newSessions: Session[] = (fresh.sessions || []).filter((s: Session) => !beforeIds.has(s.user_id));
-          for (const s of newSessions) {
-            await fbInboxAccountService.create({
-              user_id: s.user_id,
-              fb_user_id: s.fb_user_id || undefined,
-              account_label: accLabel(s) || undefined,
-            }).catch(() => {});
-          }
-        } catch { /* khong chan luong them acc neu buoc auto-KPI loi */ }
-      }
+      // KPI Inbox tu bat cho MOI truong hop (them moi/relogin/tai khoan cu) ngay
+      // trong loadAll() - xem comment o do, khong can lam gi rieng o day nua.
       setTimeout(loadAll, 800);
     } else {
       setStatus("");
       showToast(res.error || "Thêm tài khoản thất bại.", false);
     }
   }
-
-  // Tên
-  const ownerLabel = (s: Session) => (s.owner && ownerNames[s.owner]) || "";
-  const accLabel = (s: Session) => {
-    const explicit = (s.label || "").trim();
-    if (explicit && explicit !== s.user_id) return explicit;
-    return s.email || ownerLabel(s) || "Tài khoản Facebook";
-  };
 
   // Extension actions
   async function rename(uid: string, current: string) {
@@ -218,42 +228,6 @@ export function FbInboxAccountsTab({ onChange }: FbInboxAccountsTabProps) {
     catch { showToast("Không copy được, hãy bôi đen + Ctrl C", false); }
   }
 
-  // KPI actions
-  async function linkKpi(acc: UnifiedAccount) {
-    try {
-      const res = await fbInboxAccountService.create({
-        user_id: acc.user_id,
-        fb_user_id: acc.fb_user_id || undefined,
-        account_label: acc.label || undefined,
-      });
-      if (res.success) {
-        showToast("Đã liên kết KPI thành công", true);
-        loadAll();
-        onChange?.();
-      } else {
-        showToast(res.message || "Liên kết thất bại", false);
-      }
-    } catch {
-      showToast("Lỗi kết nối server", false);
-    }
-  }
-
-  async function unlinkKpi(inboxId: string) {
-    if (!window.confirm("Hủy liên kết KPI cho tài khoản này?")) return;
-    try {
-      const res = await fbInboxAccountService.delete(inboxId);
-      if (res.success) {
-        showToast("Đã hủy liên kết KPI", true);
-        loadAll();
-        onChange?.();
-      } else {
-        showToast(res.message || "Hủy liên kết thất bại", false);
-      }
-    } catch {
-      showToast("Lỗi kết nối server", false);
-    }
-  }
-
   // Hợp nhất data
   const unifiedList: UnifiedAccount[] = [];
   for (const s of sessions) {
@@ -295,7 +269,18 @@ export function FbInboxAccountsTab({ onChange }: FbInboxAccountsTabProps) {
       <div className="bg-surface rounded-xl border border-outline-variant p-5">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <div className="text-base font-bold text-on-surface">Thêm tài khoản mới</div>
+            <div className="flex items-center gap-2">
+              <div className="text-base font-bold text-on-surface">Thêm tài khoản mới</div>
+              <a
+                href="https://www.youtube.com/watch?v=EbmV5aGJyys"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+              >
+                <MaterialIcon name="videocam" className="text-[15px]" />
+                Video hướng dẫn
+              </a>
+            </div>
             <div className="text-xs text-on-surface-variant mt-0.5">Bấm nút bên phải, đăng nhập Facebook như bình thường — hệ thống tự ghi nhớ.</div>
           </div>
           <div className="flex items-center gap-2">
@@ -359,10 +344,17 @@ export function FbInboxAccountsTab({ onChange }: FbInboxAccountsTabProps) {
             <p className="text-on-surface-variant text-xs">Đang tải dữ liệu...</p>
           </div>
         ) : unifiedList.length === 0 ? (
-          <div className="text-center py-12 bg-surface-container-low">
-            <FaFacebook className="text-4xl text-on-surface-variant mx-auto mb-2" size={32} />
-            <p className="text-on-surface-variant text-xs">Chưa có tài khoản Facebook nào được thêm</p>
-            <p className="text-on-surface-variant text-[10px] mt-1">Hãy cài extension và thêm tài khoản để bắt đầu</p>
+          <div className="text-center py-16 bg-surface-container-low/60">
+            <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
+              <FaFacebook className="text-3xl text-primary" />
+            </div>
+            <p className="text-on-surface font-semibold text-sm">Chưa có tài khoản Facebook nào được thêm</p>
+            <p className="text-on-surface-variant text-xs mt-1">Hãy cài extension và thêm tài khoản để bắt đầu</p>
+            <button onClick={() => addAccount(false)} disabled={adding}
+              className="mt-4 inline-flex items-center gap-1.5 bg-primary hover:bg-on-primary-fixed-variant text-white px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 ease-out active:scale-95 shadow-[0_2px_8px_-1px_rgba(217,55,55,0.35)] cursor-pointer disabled:opacity-50">
+              <FaPlus size={10} />
+              {adding ? "Đang chờ đăng nhập..." : "Thêm tài khoản ngay"}
+            </button>
           </div>
         ) : (
           <table className="w-full border-collapse text-left text-xs">
@@ -371,7 +363,6 @@ export function FbInboxAccountsTab({ onChange }: FbInboxAccountsTabProps) {
                 <th className="py-3 px-4">Tên hiển thị & Meta</th>
                 <th className="py-3 px-4">User ID (FB)</th>
                 <th className="py-3 px-4">Trạng thái Extension</th>
-                <th className="py-3 px-4 text-center">Tính KPI Inbox</th>
                 <th className="py-3 px-4 text-center">Hành động</th>
               </tr>
             </thead>
@@ -379,32 +370,36 @@ export function FbInboxAccountsTab({ onChange }: FbInboxAccountsTabProps) {
               {unifiedList.map((acc) => (
                 <tr key={acc.user_id} className="hover:bg-surface-container-low/30 transition">
                   <td className="py-3.5 px-4 min-w-[200px]">
-                    <div className="flex items-center gap-2">
+                    <div
+                      className="flex items-center gap-2 cursor-pointer group/name"
+                      onClick={() => setDetailAccount(acc)}
+                      title="Xem chi tiết tài khoản"
+                    >
                       <span className="w-6 h-6 rounded-lg bg-[#0866FF]/10 text-[#0866FF] flex items-center justify-center shrink-0">
                         <FaFacebook size={12} />
                       </span>
                       <div className="min-w-0">
-                        <div className="font-bold text-on-surface flex items-center gap-1">
+                        <div className="font-bold text-on-surface flex items-center gap-1 group-hover/name:underline group-hover/name:text-primary">
                           {acc.label}
-                          {acc.session && <button onClick={() => rename(acc.user_id, acc.label)} title="Đổi tên hiển thị" className="text-[10px] text-on-surface-variant hover:text-primary cursor-pointer">✎</button>}
+                          {acc.session && <button onClick={(e) => { e.stopPropagation(); rename(acc.user_id, acc.label); }} title="Đổi tên hiển thị" className="text-[10px] text-on-surface-variant hover:text-primary cursor-pointer no-underline">✎</button>}
                         </div>
                         {(acc.email || acc.note) && (
                           <div className="text-[10px] text-on-surface-variant truncate max-w-[200px] mt-0.5">
                             {acc.email && <span title="Email đăng nhập">✉ {acc.email}</span>}
                             {acc.note && <span> · {acc.note}</span>}
-                            {acc.session && <button onClick={() => acc.session && editMeta(acc.session)} title="Sửa meta" className="ml-1 text-[10px] text-on-surface-variant hover:text-primary cursor-pointer">✎</button>}
+                            {acc.session && <button onClick={(e) => { e.stopPropagation(); if (acc.session) editMeta(acc.session); }} title="Sửa meta" className="ml-1 text-[10px] text-on-surface-variant hover:text-primary cursor-pointer">✎</button>}
                           </div>
                         )}
                         {!acc.email && !acc.note && acc.session && (
                           <div className="text-[10px] mt-0.5 text-on-surface-variant">
                             <span className="italic">Chưa có thông tin</span>
-                            <button onClick={() => acc.session && editMeta(acc.session)} className="ml-1 hover:text-primary cursor-pointer">Thêm</button>
+                            <button onClick={(e) => { e.stopPropagation(); if (acc.session) editMeta(acc.session); }} className="ml-1 hover:text-primary cursor-pointer">Thêm</button>
                           </div>
                         )}
                       </div>
                     </div>
                   </td>
-                  <td className="py-3.5 px-4 font-mono text-[11px]">
+                  <td className="py-3.5 px-4 font-mono text-[11px] cursor-pointer" onClick={() => setDetailAccount(acc)} title="Xem chi tiết tài khoản">
                     <div className="text-on-surface">{acc.fb_user_id || "—"}</div>
                     <div className="text-on-surface-variant text-[9px] mt-0.5 truncate max-w-[120px]" title={acc.user_id}>UID: {acc.user_id.replace(/^fb_/, "")}</div>
                   </td>
@@ -424,20 +419,6 @@ export function FbInboxAccountsTab({ onChange }: FbInboxAccountsTabProps) {
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-red-50 text-red-600 border-red-200">
                         🔴 Cần đăng nhập lại
                       </span>
-                    )}
-                  </td>
-                  <td className="py-3.5 px-4 text-center">
-                    {acc.hasKpi ? (
-                      <div className="inline-flex flex-col items-center gap-1">
-                        <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100">
-                          <MaterialIcon name="check_circle" className="text-[12px]" /> Đã bật KPI
-                        </span>
-                        <button onClick={() => acc.inboxAccountId && unlinkKpi(acc.inboxAccountId)} className="text-[9px] text-on-surface-variant hover:text-red-500 underline cursor-pointer transition">Hủy KPI</button>
-                      </div>
-                    ) : (
-                      <button onClick={() => linkKpi(acc)} className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 px-2.5 py-1.5 rounded-md transition cursor-pointer">
-                        <FaLink size={10} /> Bật tính KPI
-                      </button>
                     )}
                   </td>
                   <td className="py-3.5 px-4">
@@ -472,6 +453,68 @@ export function FbInboxAccountsTab({ onChange }: FbInboxAccountsTabProps) {
         <div className={cn("fixed bottom-6 right-6 px-5 py-3.5 rounded-xl text-white font-bold shadow-xl animate-in slide-in-from-bottom-5 z-50 flex items-center gap-2", toast.ok ? "bg-emerald-600" : "bg-primary")}>
           <MaterialIcon name={toast.ok ? "check_circle" : "error"} className="text-lg" />
           {toast.msg}
+        </div>
+      )}
+
+      {detailAccount && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-sm"
+          onClick={() => setDetailAccount(null)}
+        >
+          <div
+            style={{ width: "100%", maxWidth: 448 }}
+            className="bg-surface rounded-2xl border border-outline-variant shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-outline-variant">
+              <div className="flex items-center gap-2">
+                <span className="w-8 h-8 rounded-lg bg-[#0866FF]/10 text-[#0866FF] flex items-center justify-center shrink-0">
+                  <FaFacebook size={14} />
+                </span>
+                <h3 className="font-bold text-on-surface">Chi tiết tài khoản</h3>
+              </div>
+              <button onClick={() => setDetailAccount(null)} className="w-8 h-8 flex items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container-low cursor-pointer">
+                <MaterialIcon name="close" className="text-[18px]" />
+              </button>
+            </div>
+            <div className="px-5 py-4">
+              {([
+                ["Tên hiển thị", detailAccount.label],
+                ["User ID hệ thống", detailAccount.user_id],
+                ["Facebook UID", detailAccount.fb_user_id || "Chưa có"],
+                ["Email đăng nhập", detailAccount.email || "Chưa có"],
+                ["Ghi chú", detailAccount.note || "Chưa có"],
+              ] as [string, string][]).map(([label, value], i, arr) => (
+                <div key={label} className={cn("flex items-center justify-between py-2.5", i !== arr.length - 1 && "border-b border-outline-variant")}>
+                  <span className="text-[12px] text-on-surface-variant">{label}</span>
+                  <span className="text-[13px] font-semibold text-on-surface text-right max-w-[60%] truncate" title={value}>{value}</span>
+                </div>
+              ))}
+              <div className="flex items-center justify-between py-2.5 border-t border-outline-variant mt-1">
+                <span className="text-[12px] text-on-surface-variant">Trạng thái</span>
+                {!detailAccount.session ? (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-surface-container-low text-on-surface-variant border-outline-variant">Offline (Lưu KPI)</span>
+                ) : detailAccount.online ? (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-green-50 text-green-700 border-green-200">🟢 Sẵn sàng</span>
+                ) : (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-red-50 text-red-600 border-red-200">🔴 Cần đăng nhập lại</span>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-outline-variant bg-surface-container-low/40">
+              {detailAccount.fb_user_id && (
+                <button
+                  onClick={() => window.open(`https://www.facebook.com/profile.php?id=${detailAccount.fb_user_id}`, "_blank")}
+                  className="px-3 py-2 text-[12px] font-bold text-primary border border-primary/30 hover:bg-primary/10 rounded-lg transition cursor-pointer"
+                >
+                  Mở Facebook ↗
+                </button>
+              )}
+              <button onClick={() => setDetailAccount(null)} className="px-4 py-2 text-[12px] font-bold text-on-surface-variant hover:bg-surface-container-low rounded-lg transition cursor-pointer">
+                Đóng
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

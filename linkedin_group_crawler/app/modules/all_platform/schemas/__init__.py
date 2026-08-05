@@ -30,9 +30,52 @@ from app.modules.all_platform.schemas.categories import (
     CategoryUpdateRequest,
     CategoryDeleteRequest,
 )
+from app.modules.all_platform.schemas.members import (
+    MemberCreateRequest,
+    MemberUpdateRequest,
+    MemberDeleteRequest,
+)
+from app.modules.all_platform.schemas.quick_comment import (
+    QuickCommentAddRequest,
+    QuickCommentUpdateRequest,
+    QuickCommentReorderRequest,
+)
+from app.modules.all_platform.schemas.quick_inbox import (
+    QuickInboxAddRequest,
+    QuickInboxUpdateRequest,
+    QuickInboxReorderRequest,
+)
+from app.modules.all_platform.schemas.quote import (
+    QuoteFormCreateRequest,
+    QuoteFormUpdateRequest,
+    QuoteItemInput,
+    QuoteCreateRequest,
+    QuoteUpdateRequest,
+)
+from app.modules.all_platform.schemas.sales_asset import (
+    SalesAssetCreateRequest,
+    SalesAssetUpdateRequest,
+    SalesAssetSendRequest,
+)
+from app.modules.all_platform.schemas.kpi_reward import (
+    KpiRewardRulesSaveRequest,
+    KpiRewardSubmitRequest,
+    KpiRewardReviewRequest,
+    KpiRewardSummaryRequest,
+)
+from app.modules.all_platform.schemas.internal_engagement import (
+    InternalEngagementActionRecordRequest,
+    InternalEngagementPost,
+    InternalEngagementSummaryRequest,
+    MyMarksRequest,
+    PostInteractionsRequest,
+    TeamTotalsRequest,
+    TeamTrendRequest,
+)
 from app.modules.all_platform.schemas.auth import (
     RegisterRequest,
     LoginRequest,
+    GoogleLoginRequest,
     RefreshTokenRequest,
     UpdateProfileRequest,
     PromoteToLeaderRequest,

@@ -4,6 +4,7 @@ import { useAppAuth } from "@/contexts/AppAuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { TeamManagement } from "@/components/all-platform/leader/team-management";
+import { getDashboardHrefForRole } from "@/components/all-platform/layout/AllPlatformSidebar";
 
 export default function TeamManagementPage() {
   const { user, isLoading } = useAppAuth();
@@ -16,7 +17,7 @@ export default function TeamManagementPage() {
       setAuthorized(true);
     } else {
       // Member hoặc chưa đăng nhập → redirect
-      router.replace("/all-platform/post-feed");
+      router.replace(getDashboardHrefForRole(user?.role));
     }
   }, [user, isLoading, router]);
 

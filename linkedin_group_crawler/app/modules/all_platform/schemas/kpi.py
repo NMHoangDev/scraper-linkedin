@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel,model_validator
 from typing import Optional, List
 
 
@@ -18,7 +18,13 @@ class KpiWeekItem(BaseModel):
     kpi_lead: int = 0
     kpi_inbox: int = 0
     platform: str = "Facebook"
-
+    is_failed: bool = False
+    reason_not_met: Optional[str] = None
+    @model_validator(mode="after")
+    def validate_reason(self):
+        if self.is_failed and not (self.reason_not_met or "").strip():
+            raise ValueError("reason_not_met is required when is_failed=True")
+        return self
 
 class AssignKpiRequest(BaseModel):
     leader_role: str = "leader"

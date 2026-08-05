@@ -16,6 +16,10 @@ class LoginRequest(BaseModel):
     password: str = Field(..., max_length=128)
 
 
+class GoogleLoginRequest(BaseModel):
+    credential: str = Field(..., min_length=10, description="Google ID token (JWT) from Google Identity Services")
+
+
 class RefreshTokenRequest(BaseModel):
     token: str
 
@@ -55,6 +59,8 @@ class SocialAccountCreateRequest(BaseModel):
     id_platform: int | None = Field(None, description="FK to platforms table (optional)")
     is_primary: bool = False
     notes: str | None = Field(None, max_length=1000)
+    is_banned: bool = False
+    ban_reason: str | None = Field(None, max_length=1000)
 
 
 class SocialAccountUpdateRequest(BaseModel):
@@ -67,3 +73,5 @@ class SocialAccountUpdateRequest(BaseModel):
     is_active: bool | None = None
     is_primary: bool | None = None
     notes: str | None = Field(None, max_length=1000)
+    is_banned: bool | None = None
+    ban_reason: str | None = Field(None, max_length=1000)

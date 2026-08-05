@@ -8,9 +8,12 @@ services:
         NEXT_PUBLIC_LINKEDIN_CRAWLER_API_URL: https://seeding.markeeai.com
         NEXT_PUBLIC_API_FACEBOOK_BASE_URL: https://seeding.markeeai.com
         NEXT_PUBLIC_LINKEDIN_CRAWLER_API_KEY: secret_api_key
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: 957838257147-3jf82as4b1i0g1js004bkrpa1lhpcvp3.apps.googleusercontent.com
     image: scraper-linkedin-frontend:latest
     container_name: seeding-frontend
     restart: unless-stopped
+    environment:
+      TZ: Asia/Ho_Chi_Minh
     env_file:
       - ./linkedin-crawler-ui/.env
     expose:
@@ -29,7 +32,10 @@ services:
     restart: unless-stopped
     env_file:
       - ./linkedin_group_crawler/.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
+      TZ: Asia/Ho_Chi_Minh
       DISABLE_ZCA_LISTENERS: "0"
     expose:
       - "8000"
@@ -49,6 +55,8 @@ services:
     depends_on:
       - frontend
       - backend
+    environment:
+      TZ: Asia/Ho_Chi_Minh
     ports:
       - "8080:8080"
     volumes:

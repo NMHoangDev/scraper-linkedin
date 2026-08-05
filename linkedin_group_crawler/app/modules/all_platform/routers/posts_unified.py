@@ -4,10 +4,14 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.core.supabase_client import execute_supabase_query, get_supabase_client
+from app.core.supabase_client import (
+    execute_supabase_query,
+    get_supabase_client,
+    is_transient_supabase_error,
+)
 from app.modules.all_platform.schemas import BaseResponse
 from app.modules.all_platform.schemas.posts import (
     UnifiedPostsRequest,
@@ -21,6 +25,25 @@ from app.modules.all_platform.services.unified_posts_service import (
 )
 
 router = APIRouter()
+
+
+def _fail(exc: Exception) -> BaseResponse:
+    """Turn a service exception into the right HTTP shape.
+
+    A transient upstream failure (Supabase closed a pooled socket, pool timeout,
+    Cloudflare 5xx) is infrastructure, not a result: it must be a 5xx so the
+    browser retries. Returning HTTP 200 + success=False made the frontend render
+    httpx's raw "Server disconnected without sending a response." in a red
+    banner, and its retry never fired because res.ok was true.
+    """
+    if isinstance(exc, HTTPException):
+        raise exc
+    if is_transient_supabase_error(exc):
+        raise HTTPException(
+            status_code=503,
+            detail="Mất kết nối tới cơ sở dữ liệu, vui lòng thử lại.",
+        ) from exc
+    return BaseResponse(success=False, message=str(exc))
 
 
 class FeedOverviewRequest(BaseModel):
@@ -57,7 +80,7 @@ def unified_get_posts(payload: UnifiedPostsRequest) -> BaseResponse:
         )
         return BaseResponse(success=True, data=data)
     except Exception as e:
-        return BaseResponse(success=False, message=str(e))
+        return _fail(e)
 
 
 @router.post("/posts/filter")
@@ -85,7 +108,7 @@ def unified_filter_posts(payload: UnifiedFilterRequest) -> BaseResponse:
         )
         return BaseResponse(success=True, data=data)
     except Exception as e:
-        return BaseResponse(success=False, message=str(e))
+        return _fail(e)
 
 
 @router.post("/stats")
@@ -98,7 +121,7 @@ def unified_get_stats(payload: UnifiedPostsRequest) -> BaseResponse:
         )
         return BaseResponse(success=True, data=data)
     except Exception as e:
-        return BaseResponse(success=False, message=str(e))
+        return _fail(e)
 
 
 @router.post("/stats/daily-trend")
@@ -115,7 +138,7 @@ def unified_get_daily_trend(payload: UnifiedPostsRequest) -> BaseResponse:
         )
         return BaseResponse(success=True, data=data)
     except Exception as e:
-        return BaseResponse(success=False, message=str(e))
+        return _fail(e)
 
 
 @router.post("/feed/overview")
@@ -158,4 +181,4 @@ def unified_feed_overview(payload: FeedOverviewRequest) -> BaseResponse:
         # SQL RPC returns JSONB; supabase-py decodes it to dict already.
         return BaseResponse(success=True, data=rpc_data)
     except Exception as e:
-        return BaseResponse(success=False, message=str(e))
+        return _fail(e)

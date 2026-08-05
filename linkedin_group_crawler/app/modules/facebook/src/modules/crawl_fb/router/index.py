@@ -20,6 +20,7 @@ from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_posts impo
 from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_groups_24h import TargetGroupSheet24HService
 from app.modules.facebook.src.modules.gg_sheet.services.google_sheets_intent_service import IntentSheetService
 from app.modules.facebook.src.core.config.env import Config
+from app.modules.all_platform.auth_deps import require_admin
 
 from fastapi.encoders import jsonable_encoder
 import traceback
@@ -44,6 +45,9 @@ class LoginPayload(BaseModel):
     email: str
     password: str
     secret_2fa: Optional[str] = None
+    # Nhân viên sở hữu acc này -- gắn vào pool crawl_fb_accounts để VPS worker (hàng đợi
+    # multi-VPS) claim đúng acc theo đúng chủ nhóm. Optional để không phá vỡ caller cũ.
+    id_member: Optional[str] = None
 
 class CheckPhonePayload(BaseModel):
     session_id: str
@@ -299,14 +303,22 @@ async def controlled_login_task(auth_service: FacebookAuth, email: str, password
 
 # ── ROUTER ĐĂNG NHẬP (STANDALONE LOGIN) ───────────────────────────────────────
 
-async def controlled_login_task(auth_service: FacebookAuth, email: str, password: str, session_id: str, secret_2fa: Optional[str]):
+async def controlled_login_task(
+    auth_service: FacebookAuth,
+    email: str,
+    password: str,
+    session_id: str,
+    secret_2fa: Optional[str],
+    id_member: Optional[str] = None,
+):
     """Tiến trình ngầm bọc Playwright."""
     await asyncio.to_thread(
         auth_service.standalone_login,
         custom_email=email,
         custom_pass=password,
         session_id=session_id,
-        custom_2fa=secret_2fa
+        custom_2fa=secret_2fa,
+        id_member=id_member,
     )
 
 @crawl_fb_router.post("/auth/login", status_code=status.HTTP_200_OK)
@@ -331,7 +343,8 @@ async def standalone_login_api(payload: LoginPayload):
             email=payload.email,
             password=payload.password,
             session_id=session_id,
-            secret_2fa=payload.secret_2fa
+            secret_2fa=payload.secret_2fa,
+            id_member=payload.id_member,
         )
     )
 
@@ -484,7 +497,8 @@ async def submit_otp_api(payload: SubmitOTPPayload):
 @crawl_fb_router.delete("/groups/delete", status_code=status.HTTP_200_OK)
 async def delete_group_api(
     group_url: str,
-    service: CrawlService = Depends(get_crawl_service)
+    service: CrawlService = Depends(get_crawl_service),
+    _admin: dict = Depends(require_admin),
 ):
     """
     Endpoint xóa Group Facebook

@@ -31,6 +31,11 @@ def _clear_people_caches() -> None:
     _TEAM_MEMBERS_CACHE.clear()
     _ALL_USERS_CACHE["expires_at"] = 0.0
     _ALL_USERS_CACHE["data"] = []
+    # _TEAMS_WITH_KPI_CACHE (dung boi /teams/with-kpi, man Admin Teams
+    # Management) co TTL 30s rieng - truoc day KHONG duoc xoa o day, nen sau
+    # khi tao/sua/xoa team, man hinh admin van thay du lieu CU toi 30s (team
+    # moi tao "bien mat" tam thoi, nhin giong loi khong luu duoc).
+    _TEAMS_WITH_KPI_CACHE.clear()
 
 
 def _clear_auth_cache(user_id: str | None = None, email: str | None = None) -> None:
@@ -47,13 +52,16 @@ def _is_transient_supabase_error(exc: Exception) -> bool:
     return any(part in msg for part in ("server disconnected", "remoteprotocolerror", "timed out", "timeout"))
 
 
+_SAFE_USER_COLUMNS = "id, email, name, role, is_active, created_at, updated_at"
+
+
 def get_user(email: str) -> dict:
-    """Get user by email."""
+    """Get user by email. Never returns the password hash."""
     supabase: Client = get_supabase_client()
 
     result = (
         supabase.table("app_users")
-        .select("*")
+        .select(_SAFE_USER_COLUMNS)
         .eq("email", email)
         .execute()
     )
@@ -114,6 +122,23 @@ def update_user_role(email: str, role: str) -> dict:
     return result.data[0] if result.data else {}
 
 
+def update_user_active_status(email: str, is_active: bool) -> dict:
+    """Admin-only: kích hoạt/vô hiệu hóa tài khoản mà không cần biết mật khẩu
+    (khác với deactivate_account() ở auth_service.py — cái đó là tự người dùng
+    tắt tài khoản của chính mình, phải nhập đúng mật khẩu)."""
+    supabase: Client = get_supabase_client()
+
+    result = (
+        supabase.table("app_users")
+        .update({"is_active": is_active, "updated_at": "now()"})
+        .eq("email", email.lower().strip())
+        .execute()
+    )
+    _clear_people_caches()
+    _clear_auth_cache(email=email)
+    return result.data[0] if result.data else {}
+
+
 def get_team_members(leader_id: str) -> list[dict]:
     """Get all members of a leader's team by leader user id."""
     cache_key = str(leader_id)
@@ -144,7 +169,7 @@ def get_team_members(leader_id: str) -> list[dict]:
     users_result = execute_supabase_query(
         lambda: (
             get_supabase_client().table("app_users")
-            .select("*")
+            .select(_SAFE_USER_COLUMNS)
             .in_("id", member_ids)
             .execute()
         )
@@ -189,7 +214,7 @@ def get_all_users() -> list[dict]:
     if isinstance(cached, list) and cached and float(_ALL_USERS_CACHE.get("expires_at") or 0) > now:
         return _clone_rows(cached)
 
-    result = execute_supabase_query(lambda: get_supabase_client().table("app_users").select("*").execute())
+    result = execute_supabase_query(lambda: get_supabase_client().table("app_users").select(_SAFE_USER_COLUMNS).execute())
     rows = result.data or []
     _ALL_USERS_CACHE["data"] = _clone_rows(rows)
     _ALL_USERS_CACHE["expires_at"] = time.monotonic() + _USER_LIST_CACHE_TTL_SECONDS
@@ -280,13 +305,30 @@ def _load_all_teams() -> list[dict]:
         for u in (users_result.data or []):
             user_map[str(u["id"])] = u
 
+    # Leader chua lien ket tai khoan (id_leader NULL) van can hien ten - lay
+    # tu members.display_name qua leader_member_id (nguon that cua "ai la
+    # leader", xem migration 047).
+    leader_member_ids = {str(t["leader_member_id"]) for t in teams_rows if t.get("leader_member_id")}
+    member_map = {}
+    if leader_member_ids:
+        members_result = (
+            supabase.table("members")
+            .select("id, display_name, full_name, email")
+            .in_("id", list(leader_member_ids))
+            .execute()
+        )
+        for m in (members_result.data or []):
+            member_map[str(m["id"])] = m
+
     # Build the final output list
     teams_list = []
     for r in teams_rows:
         tid = str(r["id"])
         leader_id = str(r.get("id_leader")) if r.get("id_leader") else ""
+        leader_member_id = str(r.get("leader_member_id")) if r.get("leader_member_id") else ""
         leader = user_map.get(leader_id) or {}
-        
+        leader_member = member_map.get(leader_member_id) or {}
+
         # Build member list for this team
         mids = team_members_map.get(tid, [])
         members = []
@@ -299,12 +341,22 @@ def _load_all_teams() -> list[dict]:
                     "name": mem.get("name") or mem["email"].split("@")[0],
                 })
 
+        # Leader da lien ket tai khoan -> uu tien ten/email tai khoan that.
+        # Chua lien ket -> fallback ve display_name trong danh ba (khong con
+        # "mat ten" nhu truoc migration 047).
+        leader_name = leader.get("name") or (leader.get("email") or "").split("@")[0]
+        if not leader_name:
+            leader_name = leader_member.get("display_name") or leader_member.get("full_name") or ""
+
         teams_list.append({
             "id": tid,
             "name_team": r.get("name_team"),
+            "team_type": r.get("team_type") or "khac",
             "id_leader": leader_id,
+            "leader_member_id": leader_member_id,
             "leader_email": leader.get("email") or "",
-            "leader_name": leader.get("name") or (leader.get("email") or "").split("@")[0],
+            "leader_name": leader_name,
+            "leader_linked": bool(leader_id),
             "members": members,
             "number_of_member": len(members),
         })
@@ -418,16 +470,35 @@ def get_all_teams_with_kpi(
     return payload
 
 
-def create_team(name_team: str, leader_email_or_id: str, member_emails_or_ids: list[str]) -> list[dict]:
-    """Create a new team in the teams table and associate members in member_of_teams."""
+def create_team(
+    name_team: str,
+    leader_email_or_id: str,
+    member_emails_or_ids: list[str],
+    leader_member_id: str | None = None,
+    team_type: str | None = None,
+) -> list[dict]:
+    """Create a new team in the teams table and associate members in member_of_teams.
+
+    leader_email_or_id la OPTIONAL tu migration 047 - Leader duoc chon tu danh
+    ba (members, 140 nguoi) co the CHUA co tai khoan dang nhap (app_users).
+    Khi do leader_email_or_id rong, id_leader luu NULL, va leader_member_id
+    (id trong bang members) la nguon that duy nhat de biet ai la leader.
+
+    team_type (migration 049) la nguon that de phan quyen "Sale" - khong
+    truyen thi DB tu dong set 'khac' (DEFAULT).
+    """
     supabase: Client = get_supabase_client()
-    leader_id = _resolve_user_id(supabase, leader_email_or_id)
+    leader_id = _resolve_user_id(supabase, leader_email_or_id) if leader_email_or_id else None
 
     # 1. Insert into teams table
-    team_data = {
+    team_data: dict = {
         "name_team": name_team,
         "id_leader": leader_id,
     }
+    if leader_member_id:
+        team_data["leader_member_id"] = leader_member_id
+    if team_type:
+        team_data["team_type"] = team_type
     team_res = supabase.table("teams").insert(team_data).execute()
     if not team_res.data:
         return []
@@ -457,15 +528,27 @@ def create_team(name_team: str, leader_email_or_id: str, member_emails_or_ids: l
     return [new_team]
 
 
-def update_team(team_name: str, leader_email_or_id: str, member_emails_or_ids: list[str], team_id: str | None = None) -> list[dict]:
+def update_team(
+    team_name: str,
+    leader_email_or_id: str,
+    member_emails_or_ids: list[str],
+    team_id: str | None = None,
+    leader_member_id: str | None = None,
+    team_type: str | None = None,
+) -> list[dict]:
     """Replace members of a team in member_of_teams, and optionally update its leader/name.
 
     Neu co team_id (sua tu UI, biet chac team nao) thi tim theo id de ho tro doi ten team
     an toan. Neu khong co team_id (cac noi goi cu hon) thi fallback ve tim theo name_team
     nhu truoc, giu tuong thich nguoc.
+
+    leader_email_or_id la OPTIONAL (xem create_team) - Leader chua co tai
+    khoan dang nhap van luu duoc, id_leader = NULL, leader_member_id la
+    nguon that. team_type (migration 049) tuong tu - optional, khong gui thi
+    giu nguyen gia tri cu (khong ghi de).
     """
     supabase: Client = get_supabase_client()
-    leader_id = _resolve_user_id(supabase, leader_email_or_id)
+    leader_id = _resolve_user_id(supabase, leader_email_or_id) if leader_email_or_id else None
 
     # 1. Find the team - uu tien theo id neu co, tranh truong hop doi ten lam mat team cu
     if team_id:
@@ -474,19 +557,21 @@ def update_team(team_name: str, leader_email_or_id: str, member_emails_or_ids: l
         team_res = supabase.table("teams").select("id").eq("name_team", team_name).execute()
     if not team_res.data:
         # If team doesn't exist, create it
-        return create_team(team_name, leader_id, member_emails_or_ids)
+        return create_team(team_name, leader_id or "", member_emails_or_ids, leader_member_id=leader_member_id, team_type=team_type)
 
     found_team_id = team_res.data[0]["id"]
 
     # 2. Update leader + name_team (ho tro doi ten team) trong bang teams
-    supabase.table("teams").update({"id_leader": leader_id, "name_team": team_name}).eq("id", found_team_id).execute()
+    update_payload: dict = {"id_leader": leader_id, "name_team": team_name}
+    if leader_member_id:
+        update_payload["leader_member_id"] = leader_member_id
+    if team_type:
+        update_payload["team_type"] = team_type
+    supabase.table("teams").update(update_payload).eq("id", found_team_id).execute()
     team_id = found_team_id
 
-    # 3. Remove all existing members from member_of_teams for this team
-    supabase.table("member_of_teams").delete().eq("id_teams", team_id).execute()
-
-    # 4. Insert new members
-    mot_records = []
+    # 3. Resolve danh sach member moi duoc gui len
+    desired_member_ids: set[str] = set()
     for mid in member_emails_or_ids:
         m_str = str(mid).strip()
         if not m_str:
@@ -495,28 +580,49 @@ def update_team(team_name: str, leader_email_or_id: str, member_emails_or_ids: l
             resolved_member_id = _resolve_user_id(supabase, m_str)
         except ValueError:
             continue
-        mot_records.append({
-            "id_teams": team_id,
-            "id_member": resolved_member_id
-        })
+        desired_member_ids.add(resolved_member_id)
 
-    if mot_records:
-        supabase.table("member_of_teams").insert(mot_records).execute()
+    # 4. Chi xoa/them phan THAY DOI (khong con xoa het roi insert lai toan bo).
+    # Truoc day xoa het + insert lai toan bo -> neu 1 member vua duoc them thang
+    # vao DB (vd fix du lieu tay) ma khong nam trong danh sach FE dang gui (FE
+    # load form tu truoc, chua biet ve thay doi do) thi lan luu tiep theo se
+    # xoa mat member do, du nguoi sua team khong co y dinh xoa ai ca.
+    existing_res = supabase.table("member_of_teams").select("id_member").eq("id_teams", team_id).execute()
+    existing_member_ids = {r["id_member"] for r in (existing_res.data or [])}
+
+    to_remove = existing_member_ids - desired_member_ids
+    to_add = desired_member_ids - existing_member_ids
+
+    if to_remove:
+        supabase.table("member_of_teams").delete().eq("id_teams", team_id).in_("id_member", list(to_remove)).execute()
+
+    if to_add:
+        supabase.table("member_of_teams").insert(
+            [{"id_teams": team_id, "id_member": mid} for mid in to_add]
+        ).execute()
 
     _clear_people_caches()
     return [{"id": team_id, "name_team": team_name, "id_leader": leader_id}]
 
 
-def delete_team(team_name: str, leader_email_or_id: str) -> int:
-    """Delete a team and its member associations."""
-    supabase: Client = get_supabase_client()
-    leader_id = _resolve_user_id(supabase, leader_email_or_id)
+def delete_team(team_name: str, leader_email_or_id: str, team_id: str | None = None) -> int:
+    """Delete a team and its member associations.
 
-    # 1. Find the team by name_team and leader_id
-    team_res = supabase.table("teams").select("id").eq("name_team", team_name).eq("id_leader", leader_id).execute()
+    Uu tien tim theo team_id (FE gui khi biet chac team nao, tu migration 047
+    - Leader co the chua co tai khoan dang nhap nen khong the resolve
+    leader_email_or_id, tim theo id_leader se luon ra rong). Fallback ve
+    name_team + leader_id nhu cu neu khong co team_id (tuong thich nguoc).
+    """
+    supabase: Client = get_supabase_client()
+
+    if team_id:
+        team_res = supabase.table("teams").select("id").eq("id", team_id).execute()
+    else:
+        leader_id = _resolve_user_id(supabase, leader_email_or_id)
+        team_res = supabase.table("teams").select("id").eq("name_team", team_name).eq("id_leader", leader_id).execute()
     if not team_res.data:
         return 0
-        
+
     team_id = team_res.data[0]["id"]
 
     # 2. Delete member relationships first (due to foreign keys)

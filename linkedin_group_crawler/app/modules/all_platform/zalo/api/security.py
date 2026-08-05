@@ -11,11 +11,12 @@ def verify_zalo_api_key(
     if not settings.api_key:
         return
 
-    import logging
-    logger = logging.getLogger("app.zalo.security")
     provided_key = x_api_key or api_key
-    logger.info(f"verify_zalo_api_key: provided={provided_key}, expected={settings.api_key}")
-    if provided_key not in (settings.api_key, "admin-key"):
+    # Trước đây chuỗi literal "admin-key" luôn được chấp nhận thay cho API key
+    # thật — bất kỳ ai gửi header X-API-Key: admin-key đều bypass được toàn bộ
+    # xác thực của mọi route Zalo (accounts, conversations, broadcasts...).
+    # Cũng bỏ log giá trị API key thật ra log (rò rỉ secret vào log file).
+    if provided_key != settings.api_key:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API key",

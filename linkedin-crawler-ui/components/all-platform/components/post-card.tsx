@@ -5,13 +5,15 @@ import { FaFacebook, FaLinkedin } from "react-icons/fa";
 import { FiExternalLink } from "react-icons/fi";
 import { cn } from "@/lib/utils";
 import type { UnifiedPost, FeedPlatform } from "@/types/unified.types";
-import { INBOX_TEMPLATES, composeInboxMessage } from "./inbox-templates";
+import { useMemo } from "react";
+import { useQuickInboxLibrary, composeQuickInboxMessage } from "./use-quick-inbox-library";
 
 interface PostCardProps {
   post: UnifiedPost;
   userRole?: string;
   onVerify?: (post: UnifiedPost) => void;
   onSeeding?: (post: UnifiedPost) => void;
+  onSchedule?: (post: UnifiedPost) => void;
   onViewDetail?: (post: UnifiedPost) => void;
   onDelete?: (post: UnifiedPost) => void | Promise<void>;
   seeded?: boolean;
@@ -26,8 +28,12 @@ function PlatformIcon({ platform }: { platform: FeedPlatform }) {
   return <FaLinkedin className="text-blue-700 shrink-0" />;
 }
 
+<<<<<<< HEAD
 export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, onDelete, seeded, verifyStatus }: PostCardProps) {
 
+=======
+export function PostCard({ post, userRole, onVerify, onSeeding, onSchedule, onViewDetail, onDelete, seeded, verifyStatus }: PostCardProps) {
+>>>>>>> 961099854cab42df4ea4717cb6d6f4d86f4742a1
   const [isInboxOpen, setIsInboxOpen] = useState(false);
   const inboxRef = useRef<HTMLDivElement>(null);
 
@@ -59,6 +65,20 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, on
   const isRejected = (link?: string) => {
     return link && link.startsWith("Bị từ chối");
   };
+
+  const { libraryItems, fallbackItems } = useQuickInboxLibrary();
+  const inboxGroups = useMemo(() => {
+    const templates = libraryItems.length > 0 ? libraryItems : fallbackItems;
+    const groups = new Map<string, { category: string; templates: typeof templates }>();
+    templates.forEach((item) => {
+      const category = item.label || "Khác";
+      if (!groups.has(category)) {
+        groups.set(category, { category, templates: [] });
+      }
+      groups.get(category)!.templates.push(item);
+    });
+    return Array.from(groups.values());
+  }, [fallbackItems, libraryItems]);
 
   const score = post.score || 0;
   let scoreBg = "bg-muted text-muted-foreground border-border";
@@ -255,6 +275,14 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, on
               Xem chi tiết
             </button>
 
+            <button
+              type="button"
+              onClick={() => onSchedule?.(post)}
+              className="px-3 py-2 bg-card border border-amber-300 text-amber-600 hover:bg-amber-50 rounded-lg text-sm font-semibold transition shadow-sm cursor-pointer"
+            >
+              Lên lịch
+            </button>
+
 
 
             {/* Inbox ngay */}
@@ -274,17 +302,17 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, on
                       <span className="text-[10px] font-bold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">Tự chèn bài khách + Copy</span>
                     </div>
                     <div className="max-h-[320px] overflow-y-auto custom-scrollbar">
-                      {INBOX_TEMPLATES.map((group, gIdx) => (
+                      {inboxGroups.map((group, gIdx) => (
                         <div key={gIdx}>
                           <div className="px-3 py-2 text-[10px] font-bold text-muted-foreground bg-muted sticky top-0 border-b border-border backdrop-blur-sm z-10">
                             {group.category}
                           </div>
                           {group.templates.map((template, tIdx) => (
                             <button
-                              key={tIdx}
+                              key={template.id || tIdx}
                               className="w-full text-left px-3 py-3 hover:bg-primary/5 group/item transition border-b border-border last:border-0"
                               onClick={() => {
-                                const message = composeInboxMessage(template, post.content);
+                                const message = composeQuickInboxMessage(template, post.content);
                                 navigator.clipboard.writeText(message).then(() => {
                                   setIsInboxOpen(false);
                                   const targetUrl = post.author_url || post.post_url;
@@ -299,7 +327,7 @@ export function PostCard({ post, userRole, onVerify, onSeeding, onViewDetail, on
                                 {template.title}
                               </div>
                               <div className="text-[10px] text-muted-foreground line-clamp-2 leading-relaxed opacity-90">
-                                {composeInboxMessage(template, post.content)}
+                                {composeQuickInboxMessage(template, post.content)}
                               </div>
                             </button>
                           ))}

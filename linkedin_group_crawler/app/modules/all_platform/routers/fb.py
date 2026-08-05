@@ -14,10 +14,14 @@ import copy
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
+from fastapi.concurrency import run_in_threadpool
+from loguru import logger
 
 from app.modules.all_platform.services import decode_token, get_team_members, get_user_by_id
+from app.modules.all_platform.services.supabase_kpi_service import auto_count_fb_inbox_reply, mark_fb_inbox_lead
 from app.core.supabase_client import get_supabase_client
 
 
@@ -458,13 +462,55 @@ async def fb_session_meta(data: dict, request: Request, authorization: str | Non
     return _json_response(status, payload)
 
 
+
+# Cac cum tu quen thuoc cua tin phishing/spam tu dong tren Messenger (gia mao
+# canh bao "mat tai khoan", "thieu tin nhan"...) - danh sach thu cong, chi
+# chan duoc mau da biet, khong bat duoc spam kieu moi. Cap nhat khi thay mau
+# spam moi lap lai nhieu lan trong inbox thuc te.
+_SPAM_PREVIEW_PATTERNS = (
+    "thiếu tin nhắn",
+    "khôi phục ngay",
+    "tài khoản của bạn sẽ bị",
+    "tài khoản của bạn đã bị",
+    "xác minh tài khoản",
+    "vi phạm tiêu chuẩn cộng đồng",
+    "vi phạm điều khoản",
+)
+
+
+def _looks_like_spam_preview(preview: Any) -> bool:
+    p = str(preview or "").strip().lower()
+    if not p:
+        return False
+    return any(pat in p for pat in _SPAM_PREVIEW_PATTERNS)
+
+
 @router.get("/inbox/conversations")
-async def fb_inbox_conversations(request: Request, authorization: str | None = Header(None)) -> JSONResponse:
+async def fb_inbox_conversations(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    authorization: str | None = Header(None),
+) -> JSONResponse:
     user = _current_user(request, authorization)
     uid = str(request.query_params.get("user_id") or "")
     await _require_fb_account_scope(user, uid)
     params = dict(request.query_params)
     status, payload = await _markee_json("GET", "/inbox/conversations", params=params, cache_ttl=3.0)
+    # Tinh KPI Inbox tu dong ngay khi TAI DANH SACH hoi thoai - khong can nguoi
+    # dung mo tung cai (theo yeu cau: "load ds ve la tinh luon, khong can mo").
+    # Loc bot hoi thoai co preview khop mau spam/phishing quen thuoc de tranh
+    # tinh rac (xem _SPAM_PREVIEW_PATTERNS) - khong loc theo is_customer vi
+    # hoi thoai moi/chua gan nhan van can duoc tinh. idempotent theo conv_id
+    # (khoa 30 ngay trong auto_count_fb_inbox_reply) nen goi lai moi lan load
+    # la an toan.
+    if status < 400 and uid and isinstance(payload, dict):
+        conv_ids = {
+            str(c.get("conv_id"))
+            for c in (payload.get("conversations") or [])
+            if isinstance(c, dict) and c.get("conv_id") and not _looks_like_spam_preview(c.get("preview"))
+        }
+        for conv_id in list(conv_ids)[:200]:
+            background_tasks.add_task(auto_count_fb_inbox_reply, uid, conv_id)
     return _json_response(status, payload)
 
 
@@ -547,11 +593,21 @@ async def fb_inbox_archive_thread_get(request: Request, authorization: str | Non
 
 
 @router.post("/inbox/thread")
-async def fb_inbox_thread_load(data: dict, request: Request, authorization: str | None = Header(None)) -> JSONResponse:
+async def fb_inbox_thread_load(
+    data: dict,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    authorization: str | None = Header(None),
+) -> JSONResponse:
     user = _current_user(request, authorization)
     uid = str(data.get("user_id") or "")
     conv_id = str(data.get("conv_id") or "")
     await _require_fb_account_scope(user, uid)
+    # Hoi thoai duoc tai (mo xem / quet ve) -> tinh KPI Inbox tu dong, khong can
+    # nhan vien phai tra loi hay bam "La khach". auto_count_fb_inbox_reply tu no
+    # da idempotent theo conv_id (khoa 30 ngay) nen goi lai nhieu lan la an toan.
+    if uid and conv_id:
+        background_tasks.add_task(auto_count_fb_inbox_reply, uid, conv_id)
     recent_key = f"{uid}:{conv_id}"
     now = time.monotonic()
     cached = _THREAD_LOAD_RECENT.get(recent_key)
@@ -573,6 +629,11 @@ async def fb_inbox_thread_load(data: dict, request: Request, authorization: str 
 
 @router.get("/inbox/thread")
 async def fb_inbox_thread_get(request: Request, authorization: str | None = Header(None)) -> JSONResponse:
+    # KHONG tu tinh KPI o day - endpoint nay con duoc goi ngam de preload/cache
+    # preview cho CA danh sach hoi thoai (kha nang tinh nham nhung hoi thoai
+    # nguoi dung chua he mo xem), va gay ngap threadpool khi list dai. Auto-count
+    # chi gan o POST /inbox/thread ben duoi, noi chi chay khi thuc su mo/tai 1
+    # hoi thoai cu the (openChat o frontend).
     user = _current_user(request, authorization)
     uid = str(request.query_params.get("user_id") or "")
     await _require_fb_account_scope(user, uid)
@@ -582,13 +643,91 @@ async def fb_inbox_thread_get(request: Request, authorization: str | None = Head
 
 
 @router.post("/inbox/reply")
-async def fb_inbox_reply(data: dict, request: Request, authorization: str | None = Header(None)) -> JSONResponse:
+async def fb_inbox_reply(
+    data: dict,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    authorization: str | None = Header(None),
+) -> JSONResponse:
     user = _current_user(request, authorization)
     uid = str(data.get("user_id") or "")
+    conv_id = str(data.get("conv_id") or "")
     await _require_fb_account_scope(user, uid)
     status, payload = await _markee_json("POST", "/inbox/reply", json_body=data)
     _clear_markee_cache("/inbox/conversations", "/inbox/thread", "/inbox/reply_status")
+    # Nhân viên đã nhắn cho khách qua nút Trả lời trong tool → tự động tính +1
+    # KPI inbox cho hội thoại này (không cần leader xác nhận thủ công). Chạy nền
+    # để không làm chậm phản hồi gửi tin; idempotent theo conv_id (30-day lock
+    # trong auto_count_fb_inbox_reply). Tính năng này từng bị merge "khôi phục
+    # code cũ" (nhánh library, 2026-07-09) vô tình xoá mất — xem CLAUDE.md.
+    if status < 400 and uid and conv_id:
+        background_tasks.add_task(auto_count_fb_inbox_reply, uid, conv_id)
     return _json_response(status, payload)
+
+
+@router.post("/inbox/mark-opened")
+async def fb_inbox_mark_opened(
+    data: dict,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    authorization: str | None = Header(None),
+) -> JSONResponse:
+    """FE gọi mỗi khi người dùng MỞ 1 hội thoại (openChat), không phụ thuộc việc
+    hội thoại đó có cần tải lại từ Markee hay không (khac voi /inbox/thread -
+    cai do co the bi skip vi da co cache/da doc, khien auto-count bi bo lo dù
+    user vừa thực sự bấm mở). Idempotent theo conv_id (khoa 30 ngay trong
+    auto_count_fb_inbox_reply) nen goi lai nhieu lan la an toan."""
+    user = _current_user(request, authorization)
+    uid = str(data.get("user_id") or "")
+    conv_id = str(data.get("conv_id") or "")
+    await _require_fb_account_scope(user, uid)
+    if uid and conv_id:
+        background_tasks.add_task(auto_count_fb_inbox_reply, uid, conv_id)
+    return _json_response(200, {"success": True})
+
+
+@router.post("/inbox/reply-detected")
+async def fb_inbox_reply_detected(data: dict) -> JSONResponse:
+    """Nội bộ: service gọi khi quét Inbox phát hiện nhân viên đã trả lời khách
+    TRỰC TIẾP trên Facebook (không qua nút Trả lời trong tool). Cho phép tính KPI
+    cả 2 đường (qua tool + trả lời thẳng trên FB), không yêu cầu user token vì đây
+    là gọi server-to-server (giống pattern /fb/post-kpi/save).
+
+    QUAN TRỌNG: chạy ĐỒNG BỘ (không dùng BackgroundTasks) và trả về đúng kết quả
+    thật (success=False nếu ghi Supabase lỗi, vd mất kết nối tạm thời) — để
+    service biết CHẮC là đã ghi được rồi mới đánh dấu kpi_notified, tránh mất
+    KPI vĩnh viễn khi Supabase disconnect thoáng qua (service sẽ tự thử lại ở
+    lần quét sau nếu response này báo fail)."""
+    uid = str(data.get("user_id") or "")
+    conv_id = str(data.get("conv_id") or "")
+    if not uid or not conv_id:
+        return _json_response(200, {"success": False, "message": "Thiếu user_id/conv_id"})
+    try:
+        result = await run_in_threadpool(auto_count_fb_inbox_reply, uid, conv_id, True)
+        return _json_response(200, {"success": True, "data": result})
+    except Exception as e:
+        logger.warning(f"auto_count_fb_inbox_reply (reply-detected) that bai user_id={uid} conv_id={conv_id}: {e}")
+        return _json_response(200, {"success": False, "message": str(e)})
+
+
+@router.post("/inbox/mark-lead")
+async def fb_inbox_mark_lead(data: dict) -> JSONResponse:
+    """Nội bộ: service gọi khi nhân viên bấm "Đánh dấu là khách" trong tab Inbox
+    (field=is_customer, value=true). Set is_lead=True cho hội thoại đó trong
+    fb_inbox_kpi — nếu chưa có dòng KPI (chưa từng tính reply) thì tạo mới luôn.
+    Không yêu cầu user token, gọi server-to-server giống /fb/post-kpi/save.
+    Chạy đồng bộ, trả kết quả thật (không dùng BackgroundTasks) — cùng lý do với
+    /inbox/reply-detected, tránh mất lead khi Supabase disconnect thoáng qua."""
+    uid = str(data.get("user_id") or "")
+    conv_id = str(data.get("conv_id") or "")
+    if not uid or not conv_id:
+        return _json_response(200, {"success": False, "message": "Thiếu user_id/conv_id"})
+    try:
+        result = await run_in_threadpool(mark_fb_inbox_lead, uid, conv_id, True)
+        return _json_response(200, {"success": True, "data": result})
+    except Exception as e:
+        logger.warning(f"mark_fb_inbox_lead that bai user_id={uid} conv_id={conv_id}: {e}")
+        return _json_response(200, {"success": False, "message": str(e)})
 
 
 @router.get("/inbox/reply_status")

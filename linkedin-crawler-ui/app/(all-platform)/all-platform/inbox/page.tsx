@@ -213,6 +213,7 @@ function InboxPageContent() {
   const [scopeReady, setScopeReady] = useState(false);
   const [allowedOwnerIds, setAllowedOwnerIds] = useState<Set<string> | null>(new Set());
   const [ownerNames, setOwnerNames] = useState<Record<string, string>>({});
+  const [ownerEmails, setOwnerEmails] = useState<Record<string, string>>({});
   const [teams, setTeams] = useState<TeamRow[]>([]);
   const [extInstalled, setExtInstalled] = useState<boolean | null>(null);
   const [convs, setConvs] = useState<Conv[]>([]);
@@ -229,6 +230,12 @@ function InboxPageContent() {
   const [viewMode, setViewMode] = useState<"inbox" | "archive">("inbox");
   const [loadingArchives, setLoadingArchives] = useState(false);
   const [verifiedConvIds, setVerifiedConvIds] = useState<Set<string>>(new Set());
+  // conv_id -> thoi diem xac nhan Lead (ISO string) - de hien "Da xac nhan KPI
+  // tuan X" dung tuan LUC XAC NHAN, khong phai tuan dang xem lai hoi thoai.
+  const [verifiedConvDates, setVerifiedConvDates] = useState<Record<string, string>>({});
+  // conv_id -> created_at cua dong KPI Inbox tuong ung - de hien "KPI Inbox
+  // tinh vao tuan X" cho BAT KY hoi thoai nao da duoc tinh (khong chi Lead).
+  const [inboxKpiWeekDates, setInboxKpiWeekDates] = useState<Record<string, string>>({});
   const [suggestedConvIds, setSuggestedConvIds] = useState<Set<string>>(new Set()); // local state for optimistic updates
   const [archiveReading, setArchiveReading] = useState(false);
   const [openConv, setOpenConv] = useState(() => searchParams.get("conv") || "");
@@ -367,10 +374,21 @@ function InboxPageContent() {
     if (!owner) return;
     let cancelled = false;
     const myName = user?.name || user?.email || owner;
+    const myEmail = user?.email || "";
     const buildMap = (rows: UserRow[]): Record<string, string> => {
       const m: Record<string, string> = { [owner]: myName };
       for (const u of rows || []) {
         if (u?.id) m[u.id] = u.name || u.email || u.id;
+      }
+      return m;
+    };
+    // Song song voi ownerNames - can email that su cua chu tai khoan dang xem
+    // de xac nhan KPI cho DUNG member, khong bi nham thanh email cua nguoi
+    // dang dang nhap (leader/admin) khi ho dang xem tai khoan cua member khac.
+    const buildEmailMap = (rows: UserRow[]): Record<string, string> => {
+      const m: Record<string, string> = { [owner]: myEmail };
+      for (const u of rows || []) {
+        if (u?.id && u?.email) m[u.id] = u.email;
       }
       return m;
     };
@@ -387,7 +405,9 @@ function InboxPageContent() {
           const usersData = usersRes || {};
           const teamsData = teamsRes || {};
           if (!cancelled) {
-            setOwnerNames(buildMap(Array.isArray(usersData?.data) ? usersData.data : []));
+            const rows = Array.isArray(usersData?.data) ? usersData.data : [];
+            setOwnerNames(buildMap(rows));
+            setOwnerEmails(buildEmailMap(rows));
             setTeams(Array.isArray(teamsData?.data) ? teamsData.data : []);
             setAllowedOwnerIds(null);
             setScopeReady(true);
@@ -395,6 +415,7 @@ function InboxPageContent() {
         } catch {
           if (!cancelled) {
             setOwnerNames({ [owner]: myName });
+            setOwnerEmails({ [owner]: myEmail });
             setTeams([]);
             setAllowedOwnerIds(null);
             setScopeReady(true);
@@ -412,6 +433,7 @@ function InboxPageContent() {
           if (!cancelled) {
             setAllowedOwnerIds(new Set(all));
             setOwnerNames(buildMap(rows));
+            setOwnerEmails(buildEmailMap(rows));
             setTeams([{ id: `leader-${owner}`, name_team: "Team của tôi", id_leader: owner, leader_name: myName, members: rows }]);
             setScopeReady(true);
           }
@@ -419,6 +441,7 @@ function InboxPageContent() {
           if (!cancelled) {
             setAllowedOwnerIds(new Set([owner]));
             setOwnerNames({ [owner]: myName });
+            setOwnerEmails({ [owner]: myEmail });
             setTeams([{ id: `leader-${owner}`, name_team: "Team của tôi", id_leader: owner, leader_name: myName, members: [] }]);
             setScopeReady(true);
           }
@@ -429,6 +452,7 @@ function InboxPageContent() {
       if (!cancelled) {
         setAllowedOwnerIds(new Set([owner]));
         setOwnerNames({ [owner]: myName });
+        setOwnerEmails({ [owner]: myEmail });
         setTeams([]);
         setScopeReady(true);
       }
@@ -551,6 +575,10 @@ function InboxPageContent() {
       setNeedsPinMessage(d.needs_pin_message || "");
       convsErrorStreakRef.current = 0;
       void idbSetConvs(requestAcc, list);
+      // Backend giờ tự tính KPI Inbox cho MỌI hội thoại ngay khi tải danh sách
+      // (không cần mở từng cái) - refetch trạng thái KPI sau 1 nhịp để UI cập
+      // nhật kịp các dòng KPI mới vừa được ghi ở lần load này.
+      setTimeout(() => { void fetchVerifiedConvIds(); }, 1500);
 
       // Background preload: tải trước thread cho 3 hội thoại chưa đọc đầu tiên
       // Không block UI, không hiện spinner — khi user bấm vào sẽ hiện ngay từ cache
@@ -799,9 +827,36 @@ function InboxPageContent() {
   async function mark(conv_id: string, field: string, value: boolean) {
     try {
       const r = await fbFetch("/inbox/mark", { method: "POST", headers: fbHeaders(), body: JSON.stringify({ user_id: acc, conv_id, field, value }) });
-      if (r.ok) { setConvs(prev => prev.map(c => c.conv_id === conv_id ? { ...c, [field]: value } : c)); }
+      if (r.ok) {
+        setConvs(prev => prev.map(c => c.conv_id === conv_id ? { ...c, [field]: value } : c));
+        // Tu dong xac nhan KPI Inbox ngay khi hoi thoai duoc danh dau "la khach" -
+        // bo han buoc de xuat/xac nhan thu cong (theo yeu cau leader ban ron).
+        // Leader/member van xem duoc trang thai va bam "Xac nhan Inbox" thu cong
+        // neu can sua/bo sung rieng le.
+        if (field === "is_customer" && value === true) {
+          void autoConfirmInboxKpi(conv_id);
+        }
+      }
       else { const d = await r.json().catch(() => ({})); showToast(d.detail || "Lỗi", false); }
     } catch { showToast("Không kết nối được", false); }
+  }
+
+  async function autoConfirmInboxKpi(conv_id: string) {
+    if (!acc || !user?.email) return;
+    try {
+      await allPlatformKpiService.syncFbInbox({
+        leader_email: user.email,
+        member_email: selectedAccountOwnerEmail || user.email,
+        conv_ids: [conv_id],
+        user_id: acc,
+        is_lead: false,
+      });
+      await fetchVerifiedConvIds();
+    } catch {
+      // Im lang - day la tu dong hoa nen, khong lam gian doan thao tac chinh
+      // (leader/member van thay trang thai qua tab KPI, co the bam xac nhan
+      // thu cong lai neu tu dong bi loi).
+    }
   }
 
   async function saveArchive(conv_id: string, hide = false) {
@@ -821,6 +876,11 @@ function InboxPageContent() {
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { showToast(d.detail || "Lỗi lưu trữ", false); return; }
       setConvs(prev => prev.map(c => c.conv_id === conv_id ? { ...c, archived: true, is_customer: hide ? c.is_customer : true, deleted: hide ? true : c.deleted } : c));
+      // "Luu khach" (khong hide) cung dan den is_customer = true - tu dong xac
+      // nhan KPI Inbox luon, giong het hanh vi trong mark() o tren.
+      if (!hide) {
+        void autoConfirmInboxKpi(conv_id);
+      }
       setArchives(prev => {
         const entry = d.archive as ArchiveConv | undefined;
         if (!entry) return prev;
@@ -901,8 +961,20 @@ function InboxPageContent() {
   }) {
     try {
       await allPlatformKpiService.syncFbInbox(payload);
-      // Refresh verified conv_ids after sync
-      await fetchVerifiedConvIds();
+      // Cap nhat UI ngay (khong doi refetch) - nut "Xac nhan Lead" phai doi
+      // trang thai tuc thi sau khi bam, khong bat nguoi dung phai F5 moi thay.
+      if (payload.is_lead) {
+        setVerifiedConvIds(prev => new Set([...prev, ...payload.conv_ids]));
+        const now = new Date().toISOString();
+        setVerifiedConvDates(prev => {
+          const next = { ...prev };
+          payload.conv_ids.forEach(id => { next[id] = now; });
+          return next;
+        });
+      }
+      // Van refetch nen (best-effort) de dong bo lai voi server, phong khi co
+      // sai lech (vd nguoi khac cung xac nhan) - khong chan UI, khong throw.
+      void fetchVerifiedConvIds();
     } catch {
       showToast("Lỗi xác nhận KPI inbox", false);
       throw new Error("KPI sync failed");
@@ -916,49 +988,13 @@ function InboxPageContent() {
       if (res.success) {
         // confirmed = đã được leader duyệt
         setVerifiedConvIds(new Set(res.data?.confirmed_conv_ids || []));
+        setVerifiedConvDates(res.data?.confirmed_at_by_conv || {});
+        setInboxKpiWeekDates(res.data?.inbox_confirmed_at_by_conv || {});
         // pending = đã đề xuất nhưng chưa được duyệt
         setSuggestedConvIds(new Set(res.data?.pending_conv_ids || []));
       }
     } catch (e) {
       console.warn("Failed to fetch verified conv IDs:", e);
-    }
-  }
-
-  async function suggestFbInboxKpi(payload: {
-    member_email: string;
-    conv_ids: string[];
-    user_id: string;
-  }) {
-    // Optimistic update
-    setSuggestedConvIds(prev => new Set([...prev, ...payload.conv_ids]));
-
-    try {
-      await allPlatformKpiService.suggestFbInbox(payload);
-      await fetchVerifiedConvIds();
-      showToast(payload.conv_ids.length > 1 ? `Đã đề xuất ${payload.conv_ids.length} inbox cho KPI` : `Đã đề xuất inbox cho KPI`, true);
-    } catch {
-      // Revert optimistic update on error
-      setSuggestedConvIds(prev => {
-        const next = new Set(prev);
-        payload.conv_ids.forEach(id => next.delete(id));
-        return next;
-      });
-      showToast("Lỗi đề xuất KPI inbox", false);
-      throw new Error("Suggest KPI failed");
-    }
-  }
-
-  async function bulkVerifyFbInboxKpi(payload: {
-    leader_email: string;
-    target_date: string;
-  }) {
-    try {
-      await allPlatformKpiService.bulkVerifyFbInbox(payload);
-      await fetchVerifiedConvIds();
-      showToast(`Đã tính KPI hàng loạt thành công!`, true);
-    } catch {
-      showToast("Lỗi tính KPI hàng loạt", false);
-      throw new Error("Bulk verify KPI failed");
     }
   }
 
@@ -1012,6 +1048,14 @@ function InboxPageContent() {
     const requestSeq = ++threadRequestSeqRef.current;
     setArchiveReading(false);
     setOpenConv(conv_id); openConvRef.current = conv_id;
+    // Tinh KPI Inbox tu dong ngay khi MO hoi thoai - goi rieng, khong phu thuoc
+    // nhanh cache/scan ben duoi (hoi thoai da doc/da co cache se SKIP goi
+    // /inbox/thread POST, khien auto-count bi bo lo du user vua bam mo that).
+    void fbFetch("/inbox/mark-opened", { method: "POST", headers: fbHeaders(), body: JSON.stringify({ user_id: accountId, conv_id }) }).catch(() => {});
+    // Backend tinh KPI (background task) khong co tin hieu dong bo ve ket qua,
+    // nen refetch inboxKpiWeekDates sau 1 nhip de UI bat kip dong KPI moi vua
+    // duoc ghi (thay vi phai F5 tay).
+    setTimeout(() => { if (openConvRef.current === conv_id) void fetchVerifiedConvIds(); }, 1500);
     const currentConv = convs.find(c => c.conv_id === conv_id);
     openConvListSigRef.current = currentConv ? convListSignature(currentConv) : "";
 
@@ -1262,6 +1306,11 @@ function InboxPageContent() {
   const selectedSession = sessions.find(s => s.user_id === acc);
   const accOnline = selectedSession?.status === "online";
   const accPaused = selectedSession?.status === "paused";
+  // Email cua CHU tai khoan FB dang xem (vd Le Hai) - khac voi user?.email (nguoi
+  // dang dang nhap, vd leader) khi leader dang xem tai khoan cua 1 member khac.
+  // Dung cho xac nhan/hien thi KPI dung nguoi, khong bi gan nham cho leader.
+  const selectedAccountOwnerEmail =
+    (selectedSession?.owner && ownerEmails[selectedSession.owner]) || user?.email || "";
 
   useEffect(() => {
     if (!openConv || archiveReading) return;
@@ -1349,12 +1398,12 @@ function InboxPageContent() {
         needsReply={needsReply}
         accLabel={accLabel}
         syncFbInbox={syncFbInboxKpi}
-        onSuggestKpi={suggestFbInboxKpi}
         verifiedConvIds={verifiedConvIds}
-        suggestedConvIds={suggestedConvIds}
+        verifiedConvDates={verifiedConvDates}
+        inboxKpiWeekDates={inboxKpiWeekDates}
         userEmail={user?.email || ""}
         ownerEmail={user?.email || ""}
-        onBulkVerifyKpi={bulkVerifyFbInboxKpi}
+        accountOwnerEmail={selectedAccountOwnerEmail}
       />
     );
   }

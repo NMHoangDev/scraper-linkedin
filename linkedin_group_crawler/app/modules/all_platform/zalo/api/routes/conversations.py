@@ -12,6 +12,7 @@ from loguru import logger
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, UploadFile, File, Form, BackgroundTasks
 from pydantic import BaseModel, Field
 
+from app.modules.all_platform.auth_deps import get_authenticated_caller_email
 from app.modules.all_platform.zalo.api.security import verify_zalo_api_key
 from app.modules.all_platform.zalo.schemas.library import (
     ZaloConversationListResponse,
@@ -251,7 +252,10 @@ async def list_conversations_for_caller(
 async def get_conversations(
     account_id: Optional[str] = Query(None),
     x_user_id: str = Header("default", alias="X-User-ID"),
-    x_caller_email: Optional[str] = Header(None, alias="X-Caller-Email"),
+    # Trước đây trực tiếp tin header X-Caller-Email client tự gửi (lấy từ
+    # localStorage — ai cũng sửa được bằng DevTools để mạo danh leader/admin
+    # bất kỳ). Giờ lấy từ JWT đã xác thực (cookie crawlpro_access_token).
+    x_caller_email: Optional[str] = Depends(get_authenticated_caller_email),
     limit: int = Query(500, ge=1, le=2000),
 ):
     user_id = _normalize_user_id(account_id or x_user_id)
@@ -271,7 +275,10 @@ async def get_conversations(
 @router.get("/resolve-account")
 async def resolve_conversation_account(
     conv_id: str = Query(...),
-    x_caller_email: Optional[str] = Header(None, alias="X-Caller-Email"),
+    # Trước đây trực tiếp tin header X-Caller-Email client tự gửi (lấy từ
+    # localStorage — ai cũng sửa được bằng DevTools để mạo danh leader/admin
+    # bất kỳ). Giờ lấy từ JWT đã xác thực (cookie crawlpro_access_token).
+    x_caller_email: Optional[str] = Depends(get_authenticated_caller_email),
 ):
     """Tim tai khoan Zalo dang giu 1 conv_id, dung cho luong 'Xu ly' tu trang
     Khach hang (CRM) - bam vao la tu dong chon dung acc + nhay thang toi hoi
@@ -657,7 +664,10 @@ async def get_conversation_messages(
     background_tasks: BackgroundTasks,
     account_id: Optional[str] = Query(None),
     x_user_id: str = Header("default", alias="X-User-ID"),
-    x_caller_email: Optional[str] = Header(None, alias="X-Caller-Email"),
+    # Trước đây trực tiếp tin header X-Caller-Email client tự gửi (lấy từ
+    # localStorage — ai cũng sửa được bằng DevTools để mạo danh leader/admin
+    # bất kỳ). Giờ lấy từ JWT đã xác thực (cookie crawlpro_access_token).
+    x_caller_email: Optional[str] = Depends(get_authenticated_caller_email),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
 ):
@@ -702,7 +712,10 @@ async def sync_conversation_messages_manually(
     background_tasks: BackgroundTasks,
     account_id: Optional[str] = Query(None),
     x_user_id: str = Header("default", alias="X-User-ID"),
-    x_caller_email: Optional[str] = Header(None, alias="X-Caller-Email"),
+    # Trước đây trực tiếp tin header X-Caller-Email client tự gửi (lấy từ
+    # localStorage — ai cũng sửa được bằng DevTools để mạo danh leader/admin
+    # bất kỳ). Giờ lấy từ JWT đã xác thực (cookie crawlpro_access_token).
+    x_caller_email: Optional[str] = Depends(get_authenticated_caller_email),
 ):
     """Đồng bộ bù tin nhắn thủ công cho một cuộc hội thoại từ Zalo."""
     user_id = _normalize_user_id(account_id or x_user_id)
@@ -739,7 +752,10 @@ async def send_message_to_conversation(
     body: SendMessageRequest,
     account_id: Optional[str] = Query(None),
     x_user_id: str = Header("default", alias="X-User-ID"),
-    x_caller_email: Optional[str] = Header(None, alias="X-Caller-Email"),
+    # Trước đây trực tiếp tin header X-Caller-Email client tự gửi (lấy từ
+    # localStorage — ai cũng sửa được bằng DevTools để mạo danh leader/admin
+    # bất kỳ). Giờ lấy từ JWT đã xác thực (cookie crawlpro_access_token).
+    x_caller_email: Optional[str] = Depends(get_authenticated_caller_email),
 ):
     """Gửi tin nhắn văn bản trực tiếp vào một hội thoại Zalo qua ZCA API.
 
@@ -801,7 +817,10 @@ async def send_media_to_conversation(
     files: List[UploadFile] = File(...),
     account_id: Optional[str] = Query(None),
     x_user_id: str = Header("default", alias="X-User-ID"),
-    x_caller_email: Optional[str] = Header(None, alias="X-Caller-Email"),
+    # Trước đây trực tiếp tin header X-Caller-Email client tự gửi (lấy từ
+    # localStorage — ai cũng sửa được bằng DevTools để mạo danh leader/admin
+    # bất kỳ). Giờ lấy từ JWT đã xác thực (cookie crawlpro_access_token).
+    x_caller_email: Optional[str] = Depends(get_authenticated_caller_email),
 ):
     """Gửi hình ảnh hoặc tài liệu kèm chữ vào một hội thoại Zalo qua ZCA API."""
     user_id = _normalize_user_id(account_id or x_user_id)
@@ -927,7 +946,10 @@ async def mark_conversation_read(
     background_tasks: BackgroundTasks,
     account_id: Optional[str] = Query(None),
     x_user_id: str = Header("default", alias="X-User-ID"),
-    x_caller_email: Optional[str] = Header(None, alias="X-Caller-Email"),
+    # Trước đây trực tiếp tin header X-Caller-Email client tự gửi (lấy từ
+    # localStorage — ai cũng sửa được bằng DevTools để mạo danh leader/admin
+    # bất kỳ). Giờ lấy từ JWT đã xác thực (cookie crawlpro_access_token).
+    x_caller_email: Optional[str] = Depends(get_authenticated_caller_email),
 ):
     """Đánh dấu hội thoại là đã đọc. Cập nhật trong Supabase và thông báo ZCA (nếu đăng nhập)."""
     user_id = _normalize_user_id(account_id or x_user_id)

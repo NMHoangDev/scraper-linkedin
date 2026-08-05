@@ -17,6 +17,10 @@ export interface NavLeafItem {
   label: string;
   matchStartsWith?: string[];
   badge?: number;
+  // Chi active dung khi pathname == href, khong prefix-match sang cac trang con
+  // (vd "Teams" va "Rule KPI & Thuong" cung nam duoi /admin/teams-management/... -
+  // neu khong co co nay, ca 2 muc sidebar se sang mau cung luc).
+  exactMatch?: boolean;
 }
 
 export interface NavGroupItem {
@@ -45,6 +49,7 @@ function pathMatchesPrefix(pathname: string, prefix: string): boolean {
 }
 
 export function isLeafActive(pathname: string, item: NavLeafItem) {
+  if (item.exactMatch) return pathname === item.href;
   if (pathname === item.href) return true;
   if (item.matchStartsWith?.some((prefix) => pathMatchesPrefix(pathname, prefix))) return true;
   return pathMatchesPrefix(pathname, item.href) && item.href !== "/all-platform/post-feed";
@@ -63,12 +68,20 @@ export function getInitials(name?: string) {
   return parts[0]?.[0]?.toUpperCase() || "U";
 }
 
-export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: "personal" | "team"): SidebarEntry[] {
-  const dashboardHref = isAdmin
-    ? "/all-platform/admin/dashboard"
-    : isLeader
-      ? "/all-platform/leader/dashboard"
-      : "/all-platform/post-feed";
+/** Trang chủ đúng theo role — dùng chung cho sidebar (mục "Trang chủ") lẫn
+ * redirect ngay sau khi đăng nhập (AuthPage.tsx), để admin/leader không bị
+ * đưa nhầm về post-feed (trang chủ của member) sau khi đăng nhập. */
+export function getDashboardHrefForRole(role?: string | null): string {
+  if (role === "admin") return "/all-platform/admin/dashboard";
+  if (role === "leader") return "/all-platform/leader/dashboard";
+  // Member: trang chủ giờ là Dashboard Pipeline cá nhân (số liệu deal/phase/
+  // trễ hạn...) thay vì post-feed — post-feed vẫn còn, chỉ không còn là
+  // trang chủ mặc định (vẫn truy cập được qua mục "Sản xuất nội dung").
+  return "/all-platform/crm/my-dashboard";
+}
+
+export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: "personal" | "team", isSale: boolean = false): SidebarEntry[] {
+  const dashboardHref = getDashboardHrefForRole(isAdmin ? "admin" : isLeader ? "leader" : "member");
   const teamHref = isAdmin
     ? "/all-platform/admin/teams-management"
     : "/all-platform/leader/team";
@@ -80,8 +93,36 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       href: teamHref,
       icon: "groups",
       label: "Teams",
-      matchStartsWith: [teamHref],
+      exactMatch: true,
     },
+    ...(isAdmin
+      ? ([
+          {
+            type: "item",
+            id: "kpi-rules",
+            href: "/all-platform/admin/teams-management/kpi-rules",
+            icon: "tune",
+            label: "Rule KPI & Thưởng",
+            matchStartsWith: ["/all-platform/admin/teams-management/kpi-rules"],
+          },
+          {
+            type: "item",
+            id: "kpi-summary",
+            href: "/all-platform/admin/teams-management/kpi-summary",
+            icon: "monitoring",
+            label: "Tổng hợp KPI & Thưởng",
+            matchStartsWith: ["/all-platform/admin/teams-management/kpi-summary"],
+          },
+          {
+            type: "item",
+            id: "kpi-leaderboard",
+            href: "/all-platform/kpi-leaderboard",
+            icon: "trending_up",
+            label: "KPI & Leaderboard",
+            matchStartsWith: ["/all-platform/kpi-leaderboard"],
+          },
+        ] as NavLeafItem[])
+      : []),
     {
       type: "item",
       id: "accounts",
@@ -89,6 +130,14 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       icon: "manage_accounts",
       label: "Tài khoản seeding",
       matchStartsWith: ["/all-platform/quan-ly-tai-khoan"],
+    },
+    {
+      type: "item",
+      id: "crawl-queue-monitor",
+      href: "/all-platform/giam-sat-hang-doi",
+      icon: "monitoring",
+      label: "Giám sát hàng đợi cào",
+      matchStartsWith: ["/all-platform/giam-sat-hang-doi"],
     },
     {
       type: "item",
@@ -106,6 +155,14 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       label: "Danh mục",
       matchStartsWith: ["/all-platform/quan-ly-danh-muc"],
     },
+    {
+      type: "item",
+      id: "members",
+      href: "/all-platform/admin/quan-ly-thanh-vien",
+      icon: "manage_accounts",
+      label: "Quản lý thành viên",
+      matchStartsWith: ["/all-platform/admin/quan-ly-thanh-vien"],
+    },
   ];
 
   const contentItems: NavLeafItem[] = [
@@ -122,7 +179,10 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       id: "internal-engagement",
       href: "/all-platform/internal-engagement",
       icon: "chat_bubble",
+<<<<<<< HEAD
 
+=======
+>>>>>>> 961099854cab42df4ea4717cb6d6f4d86f4742a1
       label: "Tương tác nội bộ",
       matchStartsWith: ["/all-platform/internal-engagement"],
     },
@@ -161,7 +221,39 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       href: "/all-platform/crm",
       icon: "group",
       label: "CRM",
-      matchStartsWith: ["/all-platform/crm"],
+      exactMatch: true,
+    },
+    // Phan tich CRM: theo yeu cau Mylife (22/07) chi leader/admin thay "full"
+    // CRM, member chi thay pipeline ban hang (muc "crm" o tren). Mo rong cho
+    // Sale (team_type='sale', migration 049) - duoc nang quyen ngang leader
+    // rieng cho Pipeline + Phan tich CRM.
+    ...(isAdmin || isLeader || isSale
+      ? ([
+          {
+            type: "item",
+            id: "crm-analytics",
+            href: "/all-platform/crm/analytics",
+            icon: "monitoring",
+            label: "Phân tích CRM",
+            matchStartsWith: ["/all-platform/crm/analytics"],
+          },
+        ] as NavLeafItem[])
+      : []),
+    {
+      type: "item",
+      id: "quotes",
+      href: "/all-platform/quotes",
+      icon: "star",
+      label: "Mẫu báo giá",
+      matchStartsWith: ["/all-platform/quotes"],
+    },
+    {
+      type: "item",
+      id: "sales-assets",
+      href: "/all-platform/sales-assets",
+      icon: "campaign",
+      label: "Tài liệu bán hàng",
+      matchStartsWith: ["/all-platform/sales-assets"],
     },
   ];
 
@@ -218,6 +310,14 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
     label: "Trang chủ",
     matchStartsWith: [dashboardHref],
   };
+  const phoneBridgeEntry: NavLeafItem = {
+    type: "item",
+    id: "admin-phone-bridge",
+    href: "/all-platform/admin/phone-bridge",
+    icon: "settings_input_component",
+    label: "Phone Bridge",
+    matchStartsWith: ["/all-platform/admin/phone-bridge"],
+  };
   const contentGroup: SidebarEntry = {
     type: "group",
     id: "content",
@@ -245,6 +345,7 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
   if (workspaceTab === "personal") {
     return [
       homeEntry,
+      ...(isAdmin ? [phoneBridgeEntry] : []),
       contentGroup,
       channelGroup,
       {
@@ -268,6 +369,7 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
 
   return [
     homeEntry,
+    ...(isAdmin ? [phoneBridgeEntry] : []),
     {
       type: "group",
       id: "management",
@@ -277,13 +379,17 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
     },
     contentGroup,
     channelGroupTeam,
-    {
-      type: "group",
-      id: "resources",
-      icon: "database",
-      label: "Quản lý tài nguyên",
-      items: resourceItems,
-    },
+    ...(isAdmin || isLeader
+      ? [
+          {
+            type: "group",
+            id: "resources",
+            icon: "database",
+            label: "Quản lý tài nguyên",
+            items: resourceItems,
+          } as SidebarEntry,
+        ]
+      : []),
     {
       type: "item",
       id: "settings",
@@ -455,7 +561,8 @@ export function AllPlatformSidebar({
 
   const isAdmin = user?.role === "admin";
   const isLeader = user?.role === "leader";
-  const entries = useMemo(() => buildEntries(isAdmin, isLeader, workspaceTab), [isAdmin, isLeader, workspaceTab]);
+  const isSale = Boolean(user?.is_sale);
+  const entries = useMemo(() => buildEntries(isAdmin, isLeader, workspaceTab, isSale), [isAdmin, isLeader, workspaceTab, isSale]);
 
   const handleLogout = async () => {
     await logout();
@@ -675,6 +782,14 @@ export function AllPlatformSidebar({
                 <MaterialIcon name="notifications" className="text-[18px]" />
               </button>
             ) : null}
+            <button
+              type="button"
+              onClick={() => void handleLogout()}
+              title="Đăng xuất"
+              className="relative rounded-lg p-1.5 text-on-surface-variant outline-none transition hover:bg-red-50 hover:text-red-600 focus-visible:ring-2 focus-visible:ring-[var(--color-markee-primary)]/40"
+            >
+              <MaterialIcon name="logout" className="text-[18px]" />
+            </button>
           </div>
         </div>
       </aside>

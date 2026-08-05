@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { MaterialIcon } from "@/components/ui";
+import { OnlineTotalWidget } from "@/components/all-platform/accounts/OnlineTotalWidget";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import {
   allPlatformGroupsService,
@@ -81,12 +82,12 @@ function MetricCard({
   hint?: string;
 }) {
   return (
-    <div className="rounded-xl border border-outline-variant bg-surface p-4 shadow-none">
-      <p className="text-xs font-semibold capitalize text-on-surface-variant">{label}</p>
-      <p className="mt-2 text-2xl font-bold text-on-surface">
+    <div className="rounded-lg border border-outline-variant bg-surface px-3 py-2 shadow-none">
+      <p className="truncate text-xs font-semibold capitalize text-on-surface-variant">{label}</p>
+      <p className="text-xl font-bold leading-tight text-on-surface">
         {typeof value === "number" ? value.toLocaleString("vi-VN") : value}
       </p>
-      {hint ? <p className="mt-1 text-xs text-on-surface-variant">{hint}</p> : null}
+      {hint ? <p className="text-xs leading-tight text-on-surface-variant">{hint}</p> : null}
     </div>
   );
 }
@@ -105,13 +106,13 @@ function ProgressListCard({
   const max = items[0]?.count || 1;
 
   return (
-    <div className="rounded-xl border border-outline-variant bg-surface p-5 shadow-none">
-      <h3 className="flex items-center gap-2 text-sm font-bold text-on-surface">
-        <MaterialIcon name={icon as any} className="text-[18px] text-primary" />
+    <div className="rounded-lg border border-outline-variant bg-surface p-3 shadow-none">
+      <h3 className="flex items-center gap-1.5 text-sm font-bold text-on-surface">
+        <MaterialIcon name={icon as any} className="text-base text-primary" />
         {title}
       </h3>
 
-      <div className="mt-4 space-y-3">
+      <div className="mt-2 space-y-2">
         {items.length === 0 ? (
           <p className="text-xs text-on-surface-variant">{emptyText}</p>
         ) : (
@@ -119,14 +120,14 @@ function ProgressListCard({
             const percent = Math.max(10, Math.round((item.count / max) * 100));
 
             return (
-              <div key={item.label} className="space-y-1.5">
-                <div className="flex items-center justify-between gap-3">
+              <div key={item.label} className="space-y-1">
+                <div className="flex items-center justify-between gap-2">
                   <span className="truncate text-xs font-semibold text-on-surface">{item.label}</span>
-                  <span className="rounded-full bg-surface-container-low px-2 py-0.5 text-[11px] font-semibold text-on-surface-variant">
+                  <span className="rounded-full bg-surface-container-low px-1.5 py-0.5 text-xs font-semibold text-on-surface-variant">
                     {item.count}
                   </span>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-surface-container-low">
+                <div className="h-1.5 overflow-hidden rounded-full bg-surface-container-low">
                   <div
                     className="h-full rounded-full bg-primary"
                     style={{ width: `${percent}%` }}
@@ -155,15 +156,15 @@ function SideInfoCard({
   actionLabel: string;
 }) {
   return (
-    <div className="rounded-xl border border-outline-variant bg-surface p-4 shadow-none">
-      <h3 className="flex items-center gap-2 text-sm font-bold text-on-surface">
-        <MaterialIcon name={icon as any} className="text-[18px] text-primary" />
+    <div className="rounded-lg border border-outline-variant bg-surface p-3 shadow-none">
+      <h3 className="flex items-center gap-1.5 text-sm font-bold text-on-surface">
+        <MaterialIcon name={icon as any} className="text-base text-primary" />
         {title}
       </h3>
-      <div className="mt-4 space-y-3">{children}</div>
+      <div className="mt-2 space-y-2">{children}</div>
       <Link
         href={href}
-        className="mt-4 inline-flex w-full items-center justify-center rounded-xl border border-outline-variant py-2 text-xs font-semibold text-on-surface-variant transition-all hover:bg-surface-container-low"
+        className="mt-2 inline-flex w-full items-center justify-center rounded-lg border border-outline-variant py-1.5 text-xs font-semibold text-on-surface-variant transition-all hover:bg-surface-container-low"
       >
         {actionLabel}
       </Link>
@@ -181,6 +182,7 @@ export function LeaderDashboardContent() {
   const [groups, setGroups] = useState<GroupRecord[]>([]);
   const [posts, setPosts] = useState<UnifiedPost[]>([]);
   const [kpiMembers, setKpiMembers] = useState<any[]>([]);
+  const [replyCounts, setReplyCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -214,7 +216,11 @@ export function LeaderDashboardContent() {
       setError(null);
 
       try {
-        const [kpiRes, fbGroupsRes, liGroupsRes, fbPostsRes, liPostsRes] = await Promise.all([
+        const memberEmails = Array.from(
+          new Set([user.email, ...(selectedTeam.members || []).map((m) => m.email)].filter(Boolean)),
+        );
+
+        const [kpiRes, fbGroupsRes, liGroupsRes, fbPostsRes, liPostsRes, replyRes] = await Promise.all([
           allPlatformKpiService.getAll(user.email, selectedTeamId, startDate, endDate),
           allPlatformGroupsService.getAll("facebook"),
           allPlatformGroupsService.getAll("linkedin"),
@@ -236,9 +242,18 @@ export function LeaderDashboardContent() {
             page: 1,
             page_size: 20,
           }),
+          allPlatformKpiService.getFbInboxProgressBulk(memberEmails, startDate, endDate),
         ]);
 
         setKpiMembers(kpiRes.success && kpiRes.data?.members ? kpiRes.data.members : []);
+
+        const nextReplyCounts: Record<string, number> = {};
+        if (replyRes.success && replyRes.data) {
+          for (const [email, info] of Object.entries(replyRes.data)) {
+            nextReplyCounts[email] = info?.kpi_fb_inbox_count || 0;
+          }
+        }
+        setReplyCounts(nextReplyCounts);
 
         const allGroups = [
           ...((fbGroupsRes.success && fbGroupsRes.data ? fbGroupsRes.data : []) as FacebookGroup[]),
@@ -325,6 +340,10 @@ export function LeaderDashboardContent() {
   const totalLeads = memberMetrics.reduce((sum, member) => sum + member.leadCurrent, 0);
   const totalTraffic = memberMetrics.reduce((sum, member) => sum + member.traffic, 0);
   const totalInbox = memberMetrics.reduce((sum, member) => sum + member.inboxCurrent, 0);
+  // "Khach reply" - so tin nhan THUC TE khach gui toi (khong phu thuoc da xac
+  // nhan tinh KPI hay chua), khac voi "KPI Inbox" (chi tinh hoi thoai da duoc
+  // leader xac nhan qua fb_inbox_kpi).
+  const totalReply = Object.values(replyCounts).reduce((sum, c) => sum + (c || 0), 0);
 
   const industryDistribution = useMemo(
     () => buildDistribution(groups, (group) => group.industry_name || group.industry),
@@ -375,27 +394,27 @@ export function LeaderDashboardContent() {
   ).length;
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6 bg-surface font-sans">
-      <div className="flex flex-col gap-4 rounded-xl border border-outline-variant bg-surface p-4 sm:flex-row sm:items-end sm:justify-between sm:p-5">
-        <div className="flex items-start gap-3">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <MaterialIcon name="dashboard" className="text-[28px]" />
+    <div className="mx-auto flex w-full max-w-none flex-col gap-3 bg-surface font-sans">
+      <div className="flex flex-col gap-2 rounded-xl border border-outline-variant bg-surface px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <MaterialIcon name="dashboard" className="text-xl" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-on-surface">
+            <h1 className="text-lg font-bold leading-tight text-on-surface">
               Dashboard leader
             </h1>
-            <p className="mt-1 text-sm text-on-surface-variant">
+            <p className="text-xs leading-tight text-on-surface-variant">
               Tổng quan hiệu suất team, nhóm và nội dung cần xử lý trong tuần.
             </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-2">
           <select
             value={selectedTeamId}
             onChange={(event) => setSelectedTeamId(event.target.value)}
-            className="rounded-xl border border-outline-variant bg-surface px-3 py-2 text-sm font-semibold text-on-surface outline-none transition focus:border-primary focus:ring-1 focus:ring-primary/20"
+            className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm font-semibold text-on-surface outline-none transition focus:border-primary focus:ring-1 focus:ring-primary/20"
           >
             {teams.length === 0 ? <option value="">Chưa có team</option> : null}
             {teams.map((team) => (
@@ -408,7 +427,7 @@ export function LeaderDashboardContent() {
           <select
             value={selectedWeek}
             onChange={(event) => setSelectedWeek(event.target.value)}
-            className="rounded-xl border border-outline-variant bg-surface px-3 py-2 text-sm font-semibold text-on-surface outline-none transition focus:border-primary focus:ring-1 focus:ring-primary/20"
+            className="rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm font-semibold text-on-surface outline-none transition focus:border-primary focus:ring-1 focus:ring-primary/20"
           >
             {recentWeeks.map((week) => (
               <option key={week.value} value={week.value}>
@@ -420,22 +439,25 @@ export function LeaderDashboardContent() {
       </div>
 
       {error ? (
-        <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-primary">
+        <div className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-sm font-medium text-primary">
           {error}
         </div>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <OnlineTotalWidget />
+
+      <div className="grid grid-cols-3 gap-2 lg:grid-cols-6">
         <MetricCard label="Tổng groups" value={loading ? "..." : totalGroups} />
         <MetricCard label="Comment tuần này" value={loading ? "..." : totalComments} />
         <MetricCard label="KPI Inbox" value={loading ? "..." : totalInbox} />
+        <MetricCard label="Khách reply" value={loading ? "..." : totalReply} />
         <MetricCard label="Leads mang về" value={loading ? "..." : totalLeads} />
         <MetricCard label="UTM traffic" value={loading ? "..." : totalTraffic} />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_340px]">
-        <div className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-2 xl:grid-cols-[minmax(0,2fr)_280px]">
+        <div className="space-y-2">
+          <div className="grid gap-2 lg:grid-cols-3">
             <ProgressListCard
               title="Groups theo ngành"
               icon="groups"
@@ -456,150 +478,148 @@ export function LeaderDashboardContent() {
             />
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-            <div className="rounded-xl border border-outline-variant bg-surface p-5 shadow-none">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="flex items-center gap-2 text-sm font-bold text-on-surface">
-                  <MaterialIcon name="assignment" className="text-[18px] text-primary" />
-                  Bài post điểm cao chưa assign
-                </h3>
-                <span className="rounded-full bg-surface-container-low px-2 py-0.5 text-[11px] font-semibold text-on-surface-variant">
-                  {unassignedPosts.length} bài
-                </span>
-              </div>
-
-              <div className="mt-4 divide-y divide-outline-variant">
-                {unassignedPosts.length === 0 ? (
-                  <p className="py-8 text-xs text-on-surface-variant">Chưa có bài nổi bật cần assign.</p>
-                ) : (
-                  unassignedPosts.map((post) => (
-                    <div key={post.id} className="flex flex-col gap-3 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-on-surface">{post.group_name}</p>
-                        <p className="mt-1 line-clamp-2 text-xs text-on-surface-variant">{post.content}</p>
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-on-surface-variant">
-                          <span>Score {post.score}</span>
-                          <span>{post.platform}</span>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => router.push("/all-platform/post-feed")}
-                        className="inline-flex items-center justify-center rounded-xl bg-primary px-3 py-1.5 text-xs font-semibold text-white"
-                      >
-                        Assign
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
+          <div className="rounded-lg border border-outline-variant bg-surface p-3 shadow-none">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="flex items-center gap-1.5 text-sm font-bold text-on-surface">
+                <MaterialIcon name="assignment" className="text-base text-primary" />
+                Bài post điểm cao chưa assign
+              </h3>
+              <span className="rounded-full bg-surface-container-low px-2 py-0.5 text-xs font-semibold text-on-surface-variant">
+                {unassignedPosts.length} bài
+              </span>
             </div>
 
-            <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-none">
-              <div className="border-b border-outline-variant px-5 py-4">
-                <h3 className="flex items-center gap-2 text-sm font-bold text-on-surface">
-                  <MaterialIcon name="analytics" className="text-[18px] text-primary" />
-                  UTM Top Performers tuần này
-                </h3>
-              </div>
+            <div className="mt-1.5 divide-y divide-outline-variant">
+              {unassignedPosts.length === 0 ? (
+                <p className="py-3 text-xs text-on-surface-variant">Chưa có bài nổi bật cần assign.</p>
+              ) : (
+                unassignedPosts.slice(0, 3).map((post) => (
+                  <div key={post.id} className="flex flex-col gap-1.5 py-2 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-semibold text-on-surface">{post.group_name}</p>
+                      <p className="line-clamp-1 text-xs text-on-surface-variant">{post.content}</p>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-on-surface-variant">
+                        <span>Score {post.score}</span>
+                        <span>{post.platform}</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => router.push("/all-platform/post-feed")}
+                      className="inline-flex shrink-0 items-center justify-center rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white"
+                    >
+                      Assign
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="border-b border-outline-variant bg-surface-container-low">
+          <div className="overflow-hidden rounded-lg border border-outline-variant bg-surface shadow-none">
+            <div className="border-b border-outline-variant px-3 py-2">
+              <h3 className="flex items-center gap-1.5 text-sm font-bold text-on-surface">
+                <MaterialIcon name="analytics" className="text-base text-primary" />
+                UTM Top Performers tuần này
+              </h3>
+            </div>
+
+            <div className="w-full">
+              <table className="w-full table-fixed text-xs">
+                <thead className="border-b border-outline-variant bg-surface-container-low">
+                  <tr>
+                    <th className="px-3 py-1.5 text-left text-xs font-semibold capitalize text-on-surface-variant">Thành viên</th>
+                    <th className="px-3 py-1.5 text-left text-xs font-semibold capitalize text-on-surface-variant">Team</th>
+                    <th className="px-3 py-1.5 text-right text-xs font-semibold capitalize text-on-surface-variant">Traffic</th>
+                    <th className="px-3 py-1.5 text-right text-xs font-semibold capitalize text-on-surface-variant">Leads</th>
+                    <th className="px-3 py-1.5 text-right text-xs font-semibold capitalize text-on-surface-variant">Comment</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topTrafficMembers.length === 0 ? (
                     <tr>
-                      <th className="px-4 py-2.5 text-left text-xs font-semibold capitalize text-on-surface-variant">Thành viên</th>
-                      <th className="px-4 py-2.5 text-left text-xs font-semibold capitalize text-on-surface-variant">Team</th>
-                      <th className="px-4 py-2.5 text-right text-xs font-semibold capitalize text-on-surface-variant">Traffic</th>
-                      <th className="px-4 py-2.5 text-right text-xs font-semibold capitalize text-on-surface-variant">Leads</th>
-                      <th className="px-4 py-2.5 text-right text-xs font-semibold capitalize text-on-surface-variant">Comment</th>
+                      <td colSpan={5} className="px-3 py-3 text-center text-xs text-on-surface-variant">
+                        Chưa có dữ liệu hiệu suất trong tuần này.
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {topTrafficMembers.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="px-4 py-8 text-center text-xs text-on-surface-variant">
-                          Chưa có dữ liệu hiệu suất trong tuần này.
+                  ) : (
+                    topTrafficMembers.slice(0, 4).map((member) => (
+                      <tr key={member.id} className="border-b border-outline-variant last:border-b-0">
+                        <td className="truncate px-3 py-1.5">
+                          <div className="truncate font-semibold text-on-surface">{member.name || member.email}</div>
+                          <div className="truncate text-xs text-on-surface-variant">{member.email}</div>
                         </td>
+                        <td className="truncate px-3 py-1.5 text-on-surface-variant">{selectedTeam?.name_team || "-"}</td>
+                        <td className="px-3 py-1.5 text-right font-semibold text-on-surface">{member.traffic}</td>
+                        <td className="px-3 py-1.5 text-right text-on-surface-variant">{member.leadCurrent}</td>
+                        <td className="px-3 py-1.5 text-right text-on-surface-variant">{member.commentCurrent}</td>
                       </tr>
-                    ) : (
-                      topTrafficMembers.map((member) => (
-                        <tr key={member.id} className="border-b border-outline-variant last:border-b-0">
-                          <td className="px-4 py-3.5">
-                            <div className="font-semibold text-on-surface">{member.name || member.email}</div>
-                            <div className="text-[11px] text-on-surface-variant">{member.email}</div>
-                          </td>
-                          <td className="px-4 py-3.5 text-on-surface-variant">{selectedTeam?.name_team || "-"}</td>
-                          <td className="px-4 py-3.5 text-right font-semibold text-on-surface">{member.traffic}</td>
-                          <td className="px-4 py-3.5 text-right text-on-surface-variant">{member.leadCurrent}</td>
-                          <td className="px-4 py-3.5 text-right text-on-surface-variant">{member.commentCurrent}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-2">
           <SideInfoCard
             title="Team KPI"
             icon="monitoring"
             href="/all-platform/leader/team"
             actionLabel="Xem Leaderboard"
           >
-            <div className="rounded-xl bg-surface-container-low p-3">
-              <div className="flex items-center justify-between gap-3">
+            <div className="rounded-lg bg-surface-container-low p-2">
+              <div className="flex items-center justify-between gap-2">
                 <div>
                   <p className="text-xs font-semibold text-on-surface-variant">{selectedTeam?.name_team || "Chưa chọn team"}</p>
-                  <p className="mt-1 text-lg font-bold text-on-surface">{kpiPercent}%</p>
+                  <p className="text-base font-bold leading-tight text-on-surface">{kpiPercent}%</p>
                 </div>
-                <span className="rounded-full bg-surface px-2.5 py-1 text-[11px] font-semibold text-on-surface-variant">
+                <span className="rounded-full bg-surface px-2 py-0.5 text-xs font-semibold text-on-surface-variant">
                   {totalCurrent}/{totalTarget || 0}
                 </span>
               </div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-container-highest">
+              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-container-highest">
                 <div className="h-full rounded-full bg-primary" style={{ width: `${kpiPercent}%` }} />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-xl bg-surface-container-low px-2 py-3">
-                <p className="text-[11px] text-on-surface-variant">Đạt KPI</p>
-                <p className="mt-1 text-sm font-bold text-on-surface">{healthyMembers}</p>
+            <div className="grid grid-cols-3 gap-1.5 text-center">
+              <div className="rounded-lg bg-surface-container-low px-1.5 py-1.5">
+                <p className="text-xs text-on-surface-variant">Đạt KPI</p>
+                <p className="text-xs font-bold text-on-surface">{healthyMembers}</p>
               </div>
-              <div className="rounded-xl bg-surface-container-low px-2 py-3">
-                <p className="text-[11px] text-on-surface-variant">Đang chạy</p>
-                <p className="mt-1 text-sm font-bold text-on-surface">{reviewMembers}</p>
+              <div className="rounded-lg bg-surface-container-low px-1.5 py-1.5">
+                <p className="text-xs text-on-surface-variant">Đang chạy</p>
+                <p className="text-xs font-bold text-on-surface">{reviewMembers}</p>
               </div>
-              <div className="rounded-xl bg-surface-container-low px-2 py-3">
-                <p className="text-[11px] text-on-surface-variant">Chưa chạy</p>
-                <p className="mt-1 text-sm font-bold text-on-surface">{stalledMembers}</p>
+              <div className="rounded-lg bg-surface-container-low px-1.5 py-1.5">
+                <p className="text-xs text-on-surface-variant">Chưa chạy</p>
+                <p className="text-xs font-bold text-on-surface">{stalledMembers}</p>
               </div>
             </div>
           </SideInfoCard>
 
           <SideInfoCard
-            title="Account Safety"
+            title="Sức khỏe KPI thành viên"
             icon="shield"
             href="/all-platform/quan-ly-tai-khoan"
             actionLabel="Xem chi tiết"
           >
-            <div className="flex items-center justify-between rounded-xl bg-surface-container-low px-3 py-2.5">
-              <span className="text-xs font-medium text-on-surface-variant">Ổn định</span>
-              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-600">
+            <div className="flex items-center justify-between rounded-lg bg-surface-container-low px-2.5 py-1.5">
+              <span className="text-sm font-medium text-on-surface-variant">Ổn định</span>
+              <span className="rounded-full bg-emerald-50 px-1.5 py-0 text-xs font-semibold text-emerald-600">
                 {healthyMembers}
               </span>
             </div>
-            <div className="flex items-center justify-between rounded-xl bg-surface-container-low px-3 py-2.5">
-              <span className="text-xs font-medium text-on-surface-variant">Cần theo dõi</span>
-              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-600">
+            <div className="flex items-center justify-between rounded-lg bg-surface-container-low px-2.5 py-1.5">
+              <span className="text-sm font-medium text-on-surface-variant">Cần theo dõi</span>
+              <span className="rounded-full bg-amber-50 px-1.5 py-0 text-xs font-semibold text-amber-600">
                 {reviewMembers}
               </span>
             </div>
-            <div className="flex items-center justify-between rounded-xl bg-surface-container-low px-3 py-2.5">
-              <span className="text-xs font-medium text-on-surface-variant">Không hoạt động</span>
-              <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-primary">
+            <div className="flex items-center justify-between rounded-lg bg-surface-container-low px-2.5 py-1.5">
+              <span className="text-sm font-medium text-on-surface-variant">Không hoạt động</span>
+              <span className="rounded-full bg-red-50 px-1.5 py-0 text-xs font-semibold text-primary">
                 {stalledMembers}
               </span>
             </div>
@@ -611,27 +631,27 @@ export function LeaderDashboardContent() {
             href="/all-platform/quan-ly-nhom"
             actionLabel="Xem chi tiết"
           >
-            <div className="flex items-center justify-between rounded-xl bg-surface-container-low px-3 py-2.5">
-              <span className="text-xs font-medium text-on-surface-variant">Đang sống</span>
-              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-600">
+            <div className="flex items-center justify-between rounded-lg bg-surface-container-low px-2.5 py-1.5">
+              <span className="text-sm font-medium text-on-surface-variant">Đang sống</span>
+              <span className="rounded-full bg-emerald-50 px-1.5 py-0 text-xs font-semibold text-emerald-600">
                 {aliveGroups}
               </span>
             </div>
-            <div className="flex items-center justify-between rounded-xl bg-surface-container-low px-3 py-2.5">
-              <span className="text-xs font-medium text-on-surface-variant">Cần theo dõi</span>
-              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-600">
+            <div className="flex items-center justify-between rounded-lg bg-surface-container-low px-2.5 py-1.5">
+              <span className="text-sm font-medium text-on-surface-variant">Cần theo dõi</span>
+              <span className="rounded-full bg-amber-50 px-1.5 py-0 text-xs font-semibold text-amber-600">
                 {warningGroups}
               </span>
             </div>
-            <div className="flex items-center justify-between rounded-xl bg-surface-container-low px-3 py-2.5">
-              <span className="text-xs font-medium text-on-surface-variant">Rủi ro</span>
-              <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-primary">
+            <div className="flex items-center justify-between rounded-lg bg-surface-container-low px-2.5 py-1.5">
+              <span className="text-sm font-medium text-on-surface-variant">Rủi ro</span>
+              <span className="rounded-full bg-red-50 px-1.5 py-0 text-xs font-semibold text-primary">
                 {atRiskGroups}
               </span>
             </div>
-            <div className="flex items-center justify-between rounded-xl bg-surface-container-low px-3 py-2.5">
-              <span className="text-xs font-medium text-on-surface-variant">Thiếu taxonomy</span>
-              <span className="rounded-full bg-surface-container-highest px-2 py-0.5 text-[11px] font-semibold text-on-surface-variant">
+            <div className="flex items-center justify-between rounded-lg bg-surface-container-low px-2.5 py-1.5">
+              <span className="text-sm font-medium text-on-surface-variant">Thiếu taxonomy</span>
+              <span className="rounded-full bg-surface-container-highest px-1.5 py-0 text-xs font-semibold text-on-surface-variant">
                 {missingTaxonomyGroups}
               </span>
             </div>

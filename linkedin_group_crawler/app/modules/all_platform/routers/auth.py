@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Header, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 
+from app.modules.all_platform.auth_deps import require_admin
 from app.modules.all_platform.schemas import (
     RegisterRequest,
     LoginRequest,
+    GoogleLoginRequest,
     ChangePasswordRequest,
     DeactivateAccountRequest,
     UpdateProfileRequest,
@@ -21,6 +23,7 @@ from pydantic import BaseModel
 from app.modules.all_platform.services import (
     register_user,
     login_user,
+    login_with_google,
     logout_user,
     decode_token,
     get_user_by_id,
@@ -34,6 +37,7 @@ from app.modules.all_platform.services import (
     deactivate_account,
     reset_password_without_old,
     get_user_by_email,
+    is_sale_member,
 )
 
 router = APIRouter()
@@ -123,6 +127,34 @@ def auth_login(payload: LoginRequest, response: Response) -> BaseResponse:
         return BaseResponse(success=False, message=f"Login failed: {e}")
 
 
+@router.post("/google")
+def auth_google_login(payload: GoogleLoginRequest, response: Response) -> BaseResponse:
+    """Login via Google Sign-In (ID token from Google Identity Services).
+
+    Mirrors /login exactly on success — same cookie, same response shape — so
+    every downstream page/route keeps working unchanged regardless of which
+    login method was used.
+    """
+    try:
+        data = login_with_google(payload.credential)
+        token = (data or {}).get("access_token")
+        if token:
+            response.set_cookie(
+                key="crawlpro_access_token",
+                value=token,
+                httponly=True,
+                secure=False,
+                samesite="lax",
+                max_age=5 * 24 * 60 * 60,
+                path="/",
+            )
+        return BaseResponse(success=True, message="Login successful", data={"user": data.get("user")})
+    except ValueError as e:
+        return BaseResponse(success=False, message=str(e))
+    except Exception as e:
+        return BaseResponse(success=False, message=f"Login failed: {e}")
+
+
 @router.post("/check-email")
 def auth_check_email(payload: CheckEmailRequest) -> BaseResponse:
     """Check if email exists for forgot password flow."""
@@ -174,6 +206,7 @@ def auth_me(request: Request, authorization: str | None = Header(None)) -> BaseR
             "role": user.get("role"),
             "is_active": user.get("is_active"),
             "created_at": user.get("created_at"),
+            "is_sale": is_sale_member(user.get("id")),
         })
     except HTTPException as e:
         return BaseResponse(success=False, message=e.detail)
@@ -293,8 +326,16 @@ class AdminResetPasswordRequest(BaseModel):
     email: str
 
 @router.post("/admin/reset-password")
-def auth_admin_reset_password(payload: AdminResetPasswordRequest) -> BaseResponse:
-    """Admin tool to reset password to 123123."""
+def auth_admin_reset_password(
+    payload: AdminResetPasswordRequest,
+    _admin: dict = Depends(require_admin),
+) -> BaseResponse:
+    """Admin tool to reset password to 123123.
+
+    Truoc day khong co Depends() nao ca -> bat ky ai cung reset duoc mat khau
+    cua bat ky tai khoan nao (ke ca admin) ve gia tri co dinh "123123" ->
+    chiem tai khoan hoan toan. Gio bat buoc phai la admin da xac thuc.
+    """
     try:
         from app.modules.all_platform.services.auth_service import _hash_password
         from app.core.supabase_client import get_supabase_client

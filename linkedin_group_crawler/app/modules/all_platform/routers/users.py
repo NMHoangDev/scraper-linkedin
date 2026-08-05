@@ -4,14 +4,17 @@ from __future__ import annotations
 
 from typing import List
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from app.modules.all_platform.auth_deps import get_current_user, require_admin, require_admin_or_leader
 from app.modules.all_platform.schemas import BaseResponse
 from app.modules.all_platform.services import (
     get_user,
     upsert_user,
+    admin_create_user,
     update_user_slug,
     update_user_role,
+    update_user_active_status,
     get_team_members,
     add_team_member,
     get_all_users,
@@ -25,9 +28,15 @@ from app.modules.all_platform.services import (
 
 router = APIRouter()
 
+# Migration 049 - phai khop CHECK constraint teams_team_type_check.
+TEAM_TYPES = (
+    "dev", "marketing", "sale", "presales", "technical",
+    "back_office", "intern", "freelancer", "khac",
+)
+
 
 @router.get("/me")
-def users_get_me(email: str = Query(...)) -> BaseResponse:
+def users_get_me(email: str = Query(...), user: dict = Depends(get_current_user)) -> BaseResponse:
     """Get current user profile."""
     try:
         data = get_user(email)
@@ -51,8 +60,9 @@ def users_update_slug(payload: dict) -> BaseResponse:
 
 
 @router.post("/update-role")
-def users_update_role(payload: dict) -> BaseResponse:
-    """Update user's role."""
+def users_update_role(payload: dict, _admin: dict = Depends(require_admin)) -> BaseResponse:
+    """Update user's role. CHỈ admin — endpoint này trước đây không có auth gì cả,
+    bất kỳ ai (kể cả member) cũng tự đổi role mình thành admin được."""
     try:
         email = payload.get("email")
         role = payload.get("role")
@@ -64,8 +74,52 @@ def users_update_role(payload: dict) -> BaseResponse:
         return BaseResponse(success=False, message=str(e))
 
 
+@router.post("/set-active")
+def users_set_active(payload: dict, _admin: dict = Depends(require_admin_or_leader)) -> BaseResponse:
+    """Admin/leader: kích hoạt/vô hiệu hóa 1 tài khoản (khoá đăng nhập ngay,
+    is_active được check lại mỗi request qua get_current_user). Nới cho leader
+    theo quyết định 2026-07-23 khi gộp trang Quản lý thành viên + Quản lý
+    người dùng thành 1 bảng duy nhất."""
+    try:
+        email = payload.get("email")
+        is_active = payload.get("is_active")
+        if not email or is_active is None:
+            return BaseResponse(success=False, message="email and is_active are required")
+        data = update_user_active_status(email, bool(is_active))
+        return BaseResponse(success=True, message="Đã cập nhật trạng thái", data=data)
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@router.post("/create")
+def users_create(payload: dict, caller: dict = Depends(require_admin_or_leader)) -> BaseResponse:
+    """Admin/leader: provision a new login account (app_users row) for someone,
+    so they can then sign in with Google using that email. Does not set a
+    usable password — Google Sign-In is the only intended login path for
+    accounts created this way.
+
+    Leader được tạo member/leader tự do, nhưng KHÔNG được tạo role=admin — nếu
+    không sẽ mở đường tự leo thang quyền qua 1 email mới (bypass /update-role,
+    vẫn chỉ admin mới đổi được role tài khoản có sẵn)."""
+    try:
+        email = payload.get("email")
+        role = payload.get("role") or "member"
+        name = payload.get("name")
+        if not email:
+            return BaseResponse(success=False, message="email is required")
+        if role == "admin" and str(caller.get("role") or "").strip().lower() != "admin":
+            return BaseResponse(success=False, message="Chỉ admin mới tạo được tài khoản role admin")
+        data = admin_create_user(email=email, name=name, role=role)
+        message = "Email đã có tài khoản, đã liên kết vào tài khoản hiện có" if data.get("already_existed") else "Đã tạo tài khoản"
+        return BaseResponse(success=True, message=message, data=data)
+    except ValueError as e:
+        return BaseResponse(success=False, message=str(e))
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
 @router.get("/all-profiles")
-def users_get_all() -> BaseResponse:
+def users_get_all(user: dict = Depends(get_current_user)) -> BaseResponse:
     """Get all user profiles."""
     try:
         data = get_all_users()
@@ -75,7 +129,7 @@ def users_get_all() -> BaseResponse:
 
 
 @router.get("/by-role")
-def users_get_by_role(role: str = Query(...)) -> BaseResponse:
+def users_get_by_role(role: str = Query(...), user: dict = Depends(get_current_user)) -> BaseResponse:
     """Get users filtered by role."""
     try:
         data = get_users_by_role(role)
@@ -154,18 +208,26 @@ def teams_get_with_kpi(
 
 @teams_router.post("")
 def teams_create(payload: dict) -> BaseResponse:
-    """Create a new team. Accepts leader_id (UUID) or leader_email."""
+    """Create a new team. Leader duoc chon tu danh ba members (140 nguoi) -
+    leader_member_id la bat buoc (nguon that), leader_id/leader_email la
+    OPTIONAL, chi dung khi Leader do da lien ket tai khoan dang nhap
+    (app_users). Xem migration 047 - members va app_users la 2 nghiep vu
+    doc lap, khong bat member phai co tai khoan moi lam Leader/Member duoc."""
     try:
         name_team = payload.get("name_team", "").strip()
-        # Accept either leader_id (UUID) or leader_email from UI
+        leader_member_id = (payload.get("leader_member_id") or "").strip() or None
+        # Accept either leader_id (UUID) or leader_email from UI - optional
         leader_identifier = (payload.get("leader_id") or payload.get("leader_email") or "").strip()
         member_ids: List[str] = payload.get("member_ids", [])
         member_emails: List[str] = payload.get("member_emails", [])
         # Merge both — members can be IDs or emails
         all_members: List[str] = list(set((member_ids or []) + (member_emails or [])))
-        if not name_team or not leader_identifier:
+        team_type = (payload.get("team_type") or "").strip() or None
+        if team_type and team_type not in TEAM_TYPES:
+            return BaseResponse(success=False, message=f"team_type phải là một trong: {', '.join(TEAM_TYPES)}")
+        if not name_team or not (leader_member_id or leader_identifier):
             return BaseResponse(success=False, message="name_team và leader là bắt buộc")
-        data = create_team(name_team, leader_identifier, all_members)
+        data = create_team(name_team, leader_identifier, all_members, leader_member_id=leader_member_id, team_type=team_type)
         return BaseResponse(success=True, message="Đã tạo team", data=data)
     except Exception as e:
         return BaseResponse(success=False, message=str(e))
@@ -173,7 +235,8 @@ def teams_create(payload: dict) -> BaseResponse:
 
 @teams_router.put("")
 def teams_update(payload: dict) -> BaseResponse:
-    """Update a team (replace members, optionally rename). Accepts leader_id (UUID) or leader_email.
+    """Update a team (replace members, optionally rename). Leader tu danh ba
+    members - leader_id/leader_email la OPTIONAL (xem teams_create).
 
     team_id (optional): khi UI biet ro id cua team dang sua, gui kem de tim theo id thay vi
     theo name_team - cho phep doi ten team ma khong bi hieu nham thanh "tao team moi".
@@ -181,23 +244,33 @@ def teams_update(payload: dict) -> BaseResponse:
     try:
         name_team = payload.get("name_team", "").strip()
         team_id = (payload.get("team_id") or "").strip() or None
+        leader_member_id = (payload.get("leader_member_id") or "").strip() or None
         leader_identifier = (payload.get("leader_id") or payload.get("leader_email") or "").strip()
         member_ids: List[str] = payload.get("member_ids", [])
         member_emails: List[str] = payload.get("member_emails", [])
         all_members: List[str] = list(set((member_ids or []) + (member_emails or [])))
-        if not name_team or not leader_identifier:
+        team_type = (payload.get("team_type") or "").strip() or None
+        if team_type and team_type not in TEAM_TYPES:
+            return BaseResponse(success=False, message=f"team_type phải là một trong: {', '.join(TEAM_TYPES)}")
+        if not name_team or not (leader_member_id or leader_identifier):
             return BaseResponse(success=False, message="name_team và leader là bắt buộc")
-        data = update_team(name_team, leader_identifier, all_members, team_id=team_id)
+        data = update_team(name_team, leader_identifier, all_members, team_id=team_id, leader_member_id=leader_member_id, team_type=team_type)
         return BaseResponse(success=True, message="Đã cập nhật team", data=data)
     except Exception as e:
         return BaseResponse(success=False, message=str(e))
 
 
 @teams_router.delete("")
-def teams_delete(name_team: str = Query(...), leader: str = Query(...)) -> BaseResponse:
-    """Delete a team by name_team + leader (UUID or email)."""
+def teams_delete(
+    name_team: str = Query(...),
+    leader: str = Query(default=""),
+    team_id: str = Query(default=""),
+) -> BaseResponse:
+    """Delete a team. Uu tien team_id (chinh xac, hoat dong ca khi Leader chua
+    co tai khoan dang nhap nen khong resolve duoc leader) - leader chi con la
+    fallback tuong thich nguoc khi FE khong gui team_id."""
     try:
-        deleted = delete_team(name_team, leader)
+        deleted = delete_team(name_team, leader, team_id=team_id or None)
         return BaseResponse(success=True, message=f"Đã xóa {deleted} bản ghi team", data={"deleted": deleted})
     except Exception as e:
         return BaseResponse(success=False, message=str(e))

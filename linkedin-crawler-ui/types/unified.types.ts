@@ -5,7 +5,7 @@
    These types mirror the Supabase database schema. */
 
 export type FeedPlatform = "facebook" | "linkedin";
-export type CategoryType = "intent" | "industry" | "tier" | "team" | "icp" | "content_type" | "product_seeding";
+export type CategoryType = "intent" | "industry" | "tier" | "team" | "icp" | "content_type" | "product_seeding" | "crm_source" | "crm_service_package" | "crm_package" | "crm_industry";
 export type VerifyStatus = "pending" | "yes" | "no";
 export type UserRole = "member" | "leader" | "admin";
 
@@ -149,6 +149,147 @@ export interface Category {
   created_at?: string;
 }
 
+// ── Members (HR roster, độc lập với app_users) ────────────────────────────────
+
+export interface Skill {
+  id: string;
+  name: string;
+  category?: string | null;
+  created_at?: string;
+}
+
+export interface MemberProfile {
+  id: string;
+  display_name: string;
+  full_name: string;
+  email?: string | null;
+  telegram_username?: string | null;
+  phone?: string | null;
+  birth_date?: string | null;
+  gender?: string | null;
+  team?: string | null;
+  position?: string | null;
+  department?: string | null;
+  experience_year?: number | null;
+  linked_user_id?: string | null;
+  linked_user_id_2?: string | null;
+  skill_ids?: string[];
+  skills?: Skill[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface QuickCommentTemplate {
+  id: string;
+  title: string;
+  label: string;
+  content: string;
+  platform: "all" | "facebook" | "linkedin";
+  order_index: number;
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// ── Internal Engagement (Tương tác nội bộ — MarkeeAI FB Page posts) ─────────────
+
+export interface InternalEngagementPost {
+  id: string;
+  fanpage_id: string;
+  fanpage_name?: string;
+  facebook_post_id?: string;
+  content: string;
+  media_urls: string[];
+  permalink_url?: string;
+  status?: string;
+  created_at?: string;
+}
+
+export type InternalEngagementMarkStatus = "need" | "received" | "completed";
+
+export interface InternalEngagementTeamRef {
+  id: string;
+  name_team?: string;
+}
+
+export interface InternalEngagementInteraction {
+  id: string;
+  id_member: string;
+  member_email?: string;
+  member_name?: string;
+  action_type: string;
+  content?: string | null;
+  reaction_id?: string | null;
+  account_name?: string | null;
+  profile_id?: string | null;
+  team_id?: string;
+  team_name?: string;
+  is_caller?: boolean;
+  summary: string;
+  created_at: string;
+}
+
+export interface InternalEngagementPostInteractionsData {
+  role: string;
+  teams: InternalEngagementTeamRef[];
+  items: InternalEngagementInteraction[];
+}
+
+export interface InternalEngagementPostTeamCount {
+  team_id: string;
+  team_name: string;
+  count: number;
+}
+
+export interface InternalEngagementPostTeamCountsData {
+  role: string;
+  teams: InternalEngagementPostTeamCount[];
+}
+
+export interface InternalEngagementTeamTrendPoint {
+  date: string;
+  total: number;
+}
+
+export interface InternalEngagementTeamTrendSeries {
+  team_id: string;
+  team_name: string;
+  series: InternalEngagementTeamTrendPoint[];
+}
+
+export interface InternalEngagementTeamTrendData {
+  role: string;
+  teams: InternalEngagementTeamTrendSeries[];
+}
+
+export interface InternalEngagementTeamTotal {
+  team_id: string;
+  team_name: string;
+  number_of_member: number;
+  total: number;
+  active_days: number;
+  range_days: number;
+  stability_score: number;
+  by_action_type: Record<string, number>;
+}
+
+export interface InternalEngagementTeamTotalsData {
+  role: string;
+  teams: InternalEngagementTeamTotal[];
+}
+
+export interface QuickInboxTemplate {
+  id: string;
+  title: string;
+  label: string;
+  content: string;
+  content_with_post?: string;
+  order_index: number;
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // ── Users & Teams ─────────────────────────────────────────────────────────────
 
 export interface TeamMember {
@@ -271,6 +412,9 @@ export interface AppUser {
   role: UserRole;
   is_active: boolean;
   created_at?: string;
+  /** true nếu user thuộc 1 team có team_type='sale' (migration 049) — được
+   * nâng quyền ngang leader cho riêng Pipeline + Phân tích CRM. */
+  is_sale?: boolean;
 }
 
 export interface AuthLoginResponse {
@@ -292,6 +436,8 @@ export interface SocialAccount {
   session_cookie?: string;
   is_active: boolean;
   is_primary: boolean;
+  is_banned?: boolean;
+  ban_reason?: string;
   notes?: string;
   created_at?: string;
   updated_at?: string;
@@ -346,5 +492,43 @@ export interface CustomerLead {
   reject_reason?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+// ── Scheduled Comments ─────────────────────────────────────────────────────────
+
+export type ScheduledCommentStatus = "pending" | "processing" | "posted" | "failed" | "cancelled";
+
+export interface ScheduledComment {
+  id: string;
+  id_post_fb?: string;
+  id_post_li?: string;
+  platform: FeedPlatform;
+  post_url: string;
+  group_name?: string;
+  post_content?: string;
+  id_member: string;
+  id_social_account?: string;
+  comment_content?: string;
+  ai_generated: boolean;
+  status: ScheduledCommentStatus;
+  scheduled_at: string;
+  posted_at?: string;
+  error_message?: string;
+  link_comment?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface CreateScheduledCommentRequest {
+  id_post_fb?: string;
+  id_post_li?: string;
+  platform: FeedPlatform;
+  post_url: string;
+  group_name?: string;
+  post_content?: string;
+  id_social_account?: string;
+  comment_content?: string;
+  ai_generated: boolean;
+  scheduled_at: string;
 }
 

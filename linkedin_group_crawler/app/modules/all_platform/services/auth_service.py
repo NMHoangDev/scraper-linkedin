@@ -14,6 +14,7 @@ from jose import JWTError, jwt
 
 from app.core.config import settings
 from app.core.supabase_client import execute_supabase_query, get_supabase_client
+from app.modules.all_platform.services.crm_permission_service import is_sale_member
 
 _USER_PUBLIC_FIELDS = "id, email, name, role, is_active, created_at, updated_at"
 _USER_CACHE_TTL_SECONDS = 30.0
@@ -178,6 +179,128 @@ def login_user(email: str, password: str) -> dict:
             "email": cached_user["email"],
             "name": cached_user.get("name"),
             "role": cached_user.get("role", "member"),
+            "is_sale": is_sale_member(cached_user["id"]),
+        },
+        "access_token": access_token,
+    }
+
+
+_VALID_ROLES = ("admin", "leader", "member")
+
+
+def admin_create_user(email: str, name: Optional[str], role: str) -> dict:
+    """Admin-only: provision a new app_users row for someone who will log in via
+    Google Sign-In. Google login never auto-creates accounts (see
+    login_with_google) — this is the explicit "add this email" step an admin
+    does instead. Sets a random password nobody knows (password column is
+    NOT NULL); the account is only ever meant to be used via Google.
+
+    Neu email nay DA co trong app_users (vd admin bam "Tao tai khoan" cho 1
+    member ma email do that ra da duoc cap tai khoan tu truoc, hoac 2 member
+    trong danh ba tinh co dung chung 1 email), KHONG bao loi trung - tra ve
+    thang tai khoan da co de FE lien ket (members.linked_user_id) vao do, dung
+    tinh than "chi lien ket, khong tao trung" thay vi chan thao tac.
+    """
+    email = email.lower().strip()
+    if not email or "@" not in email:
+        raise ValueError("Email không hợp lệ")
+    if role not in _VALID_ROLES:
+        raise ValueError(f"Role phải là một trong: {', '.join(_VALID_ROLES)}")
+
+    existing = execute_supabase_query(
+        lambda: get_supabase_client()
+        .table("app_users")
+        .select("id, email, name, role")
+        .eq("email", email)
+        .execute()
+    )
+    if existing.data:
+        user = existing.data[0]
+        return {
+            "id": user["id"],
+            "email": user["email"],
+            "name": user.get("name"),
+            "role": user["role"],
+            "already_existed": True,
+        }
+
+    random_password = secrets.token_urlsafe(32)
+    user_data = {
+        "email": email,
+        "password": _hash_password(random_password),
+        "name": (name or "").strip() or None,
+        "role": role,
+        "is_active": True,
+    }
+    result = execute_supabase_query(
+        lambda: get_supabase_client().table("app_users").insert(user_data).execute()
+    )
+    if not result.data:
+        raise ValueError("Không tạo được tài khoản")
+
+    user = result.data[0]
+    return {
+        "id": user["id"],
+        "email": user["email"],
+        "name": user.get("name"),
+        "role": user["role"],
+    }
+
+
+def login_with_google(id_token_str: str) -> dict:
+    """Login via Google Sign-In. Verifies the ID token against our OAuth client,
+    then maps the verified email to an EXISTING app_users row — never creates a
+    new account here (admin stays the only one who provisions accounts).
+
+    Returns user + token or raises ValueError with the same messages as
+    login_user() so the frontend error handling is unchanged.
+    """
+    from google.auth.transport import requests as google_requests
+    from google.oauth2 import id_token as google_id_token
+
+    if not settings.google_oauth_client_id:
+        raise ValueError("Google Sign-In chưa được cấu hình trên server")
+
+    try:
+        claims = google_id_token.verify_oauth2_token(
+            id_token_str, google_requests.Request(), settings.google_oauth_client_id,
+        )
+    except Exception:
+        raise ValueError("Token Google không hợp lệ hoặc đã hết hạn")
+
+    if not claims.get("email_verified"):
+        raise ValueError("Email Google chưa được xác minh")
+
+    email = str(claims.get("email") or "").lower().strip()
+    if not email:
+        raise ValueError("Không lấy được email từ tài khoản Google")
+
+    result = execute_supabase_query(
+        lambda: get_supabase_client()
+        .table("app_users")
+        .select("id, email, name, role, is_active")
+        .eq("email", email)
+        .execute()
+    )
+    if not result.data:
+        raise ValueError("Email chưa được cấp tài khoản trong hệ thống. Liên hệ admin để được thêm.")
+
+    user = result.data[0]
+    if not user.get("is_active", True):
+        raise ValueError("Tài khoản đã bị vô hiệu hóa")
+
+    cached_user = _cache_user(user)
+    access_token = create_access_token(user["id"], user["email"], user["role"])
+
+    _store_session_async(user["id"], access_token)
+
+    return {
+        "user": {
+            "id": cached_user["id"],
+            "email": cached_user["email"],
+            "name": cached_user.get("name"),
+            "role": cached_user.get("role", "member"),
+            "is_sale": is_sale_member(cached_user["id"]),
         },
         "access_token": access_token,
     }

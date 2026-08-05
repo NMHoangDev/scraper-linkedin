@@ -1,6 +1,6 @@
 import type { CrawlSessionGroup } from "@/types/api";
 
-/** Giá trị string từ bản ghi sheet/webhook (key thường gặp). */
+/** GiÃ¡ trá»‹ string tá»« báº£n ghi sheet/webhook (key thÆ°á»ng gáº·p). */
 export function pickStr(
   record: Record<string, unknown>,
   keys: string[],
@@ -31,7 +31,7 @@ export function pickNum(
   return 0;
 }
 
-/** Các key thường dùng cho số dòng sheet / STT. */
+/** CÃ¡c key thÆ°á»ng dÃ¹ng cho sá»‘ dÃ²ng sheet / STT. */
 const ROW_NUMBER_KEYS = [
   "row_number",
   "rowNumber",
@@ -40,7 +40,7 @@ const ROW_NUMBER_KEYS = [
   "Stt",
 ] as const;
 
-/** Có số dòng thực sự (>0) từ sheet/webhook — không tính ô trống / 0. */
+/** CÃ³ sá»‘ dÃ²ng thá»±c sá»± (>0) tá»« sheet/webhook â€” khÃ´ng tÃ­nh Ã´ trá»‘ng / 0. */
 export function hasMeaningfulRowNumber(record: Record<string, unknown>): boolean {
   for (const k of ROW_NUMBER_KEYS) {
     if (!(k in record)) continue;
@@ -53,15 +53,15 @@ export function hasMeaningfulRowNumber(record: Record<string, unknown>): boolean
   return false;
 }
 
-/** ``row_number`` / ``STT`` … đúng như bản ghi từ API (get-all-posts); không ép số cột «#». Chỉ fallback khi không có số ≥ 1. */
+/** ``row_number`` / ``STT`` â€¦ Ä‘Ãºng nhÆ° báº£n ghi tá»« API (get-all-posts); khÃ´ng Ã©p sá»‘ cá»™t Â«#Â». Chá»‰ fallback khi khÃ´ng cÃ³ sá»‘ â‰¥ 1. */
 const POST_URL_KEYS = [
-  "URL_Bài_Viết",
+  "URL_BÃ i_Viáº¿t",
   "post_url",
   "postUrl",
   "urlbaiviet",
 ] as const;
 
-/** URL bài từ bản ghi sheet/API. */
+/** URL bÃ i tá»« báº£n ghi sheet/API. */
 export function pickPostUrlFromRecord(
   record: Record<string, unknown>,
 ): string {
@@ -73,7 +73,7 @@ function linkedinActivityIdFromUrl(url: string): string {
   return match?.[1] ?? "";
 }
 
-/** So khớp cùng bài LinkedIn (ưu tiên activity id). */
+/** So khá»›p cÃ¹ng bÃ i LinkedIn (Æ°u tiÃªn activity id). */
 export function postsShareSameLinkedInUrl(left: string, right: string): boolean {
   const a = left.trim();
   const b = right.trim();
@@ -99,11 +99,11 @@ export function pickPositiveRowNumberFromPost(
 }
 
 /**
- * Khi sheet/n8n không trả ``row_number``/``STT``, gán fallback là **thứ tự bài trong phiên** (1…n)
- * để UI và ``sheet_row`` gửi webhook không bị trống.
+ * Khi sheet/n8n khÃ´ng tráº£ ``row_number``/``STT``, gÃ¡n fallback lÃ  **thá»© tá»± bÃ i trong phiÃªn** (1â€¦n)
+ * Ä‘á»ƒ UI vÃ  ``sheet_row`` gá»­i webhook khÃ´ng bá»‹ trá»‘ng.
  *
- * Lưu ý: Đây là ordinal trong phiên, không phải tự động bằng **số hàng Google Sheet** —
- * để khớp đúng hàng sheet cần map STT trong workflow n8n.
+ * LÆ°u Ã½: ÄÃ¢y lÃ  ordinal trong phiÃªn, khÃ´ng pháº£i tá»± Ä‘á»™ng báº±ng **sá»‘ hÃ ng Google Sheet** â€” 
+ * Ä‘á»ƒ khá»›p Ä‘Ãºng hÃ ng sheet cáº§n map STT trong workflow n8n.
  */
 export function enrichPostRowNumberIfMissing(
   record: Record<string, unknown>,
@@ -126,11 +126,11 @@ function isEmptySheetCell(v: unknown): boolean {
 }
 
 /**
- * Gộp meta phiên (email, id phiên, nhóm, **tổng số bài trong phiên**) vào bản ghi bài trước khi gửi ``sheet_row``.
+ * Gá»™p meta phiÃªn (email, id phiÃªn, nhÃ³m, **tá»•ng sá»‘ bÃ i trong phiÃªn**) vÃ o báº£n ghi bÃ i trÆ°á»›c khi gá»­i ``sheet_row``.
  *
- * - Email / nhóm / id phiên: chỉ điền khi ô trên dòng đang trống (không ghi đè ``Ngày``, nội dung, …).
- * - ``posts_count`` và cột «Tổng số bài lấy được mỗi lần cào»: **luôn** gán theo bảng phiên (khớp UI).
- * - ``row_number`` / ``STT``: giữ nguyên như object ``post`` (dữ liệu GET); không ghi đè ordinal bảng.
+ * - Email / nhÃ³m / id phiÃªn: chá»‰ Ä‘iá»n khi Ã´ trÃªn dÃ²ng Ä‘ang trá»‘ng (khÃ´ng ghi Ä‘Ã¨ ``NgÃ y``, ná»™i dung, â€¦).
+ * - ``posts_count`` vÃ  cá»™t Â«Tá»•ng sá»‘ bÃ i láº¥y Ä‘Æ°á»£c má»—i láº§n cÃ oÂ»: **luÃ´n** gÃ¡n theo báº£ng phiÃªn (khá»›p UI).
+ * - ``row_number`` / ``STT``: giá»¯ nguyÃªn nhÆ° object ``post`` (dá»¯ liá»‡u GET); khÃ´ng ghi Ä‘Ã¨ ordinal báº£ng.
  */
 export function buildReactionWebhookSheetRow(
   post: Record<string, unknown>,
@@ -154,16 +154,16 @@ export function buildReactionWebhookSheetRow(
   fill("email_crawl", ec);
   fill("group_url", gu);
   fill("groupUrl", gu);
-  fill("URL_Nhóm", gu);
+  fill("URL_NhÃ³m", gu);
   fill("URL_nhom", gu);
   fill("group_name", gn);
   fill("groupName", gn);
-  fill("Tên nhóm", gn);
+  fill("TÃªn nhÃ³m", gn);
 
   const pc = session.posts_count;
   if (typeof pc === "number" && Number.isFinite(pc) && pc >= 0) {
     out["posts_count"] = pc;
-    out["Tổng số bài lấy được mỗi lần cào"] = pc;
+    out["Tá»•ng sá»‘ bÃ i láº¥y Ä‘Æ°á»£c má»—i láº§n cÃ o"] = pc;
   }
 
   return out;
@@ -171,28 +171,34 @@ export function buildReactionWebhookSheetRow(
 
 export function shortenSessionId(id: string, head = 14, tail = 8): string {
   if (id.length <= head + tail + 3) return id;
-  return `${id.slice(0, head)}…${id.slice(-tail)}`;
+  return `${id.slice(0, head)}â€¦${id.slice(-tail)}`;
 }
 
-/** Ngày đại diện của phiên (max ``Ngày`` / ``date`` trong các bài). */
+function formatDateDdMm(raw: string): string {
+  const day = raw.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return raw || "â€”";
+  return `${day.slice(8, 10)}/${day.slice(5, 7)}`;
+}
+
+/** NgÃ y Ä‘áº¡i diá»‡n cá»§a phiÃªn (max ``NgÃ y`` / ``date`` trong cÃ¡c bÃ i). */
 export function sessionLatestDateLabel(session: CrawlSessionGroup): string {
   let best = "";
   for (const p of session.posts) {
-    const d = pickStr(p, ["Ngày", "date", "targetDate"])
+    const d = pickStr(p, ["NgÃ y", "date", "targetDate"])
       .slice(0, 10)
       .trim();
     if (d && d > best) best = d;
-    const raw = pickStr(p, ["Đăng vào", "posted_at", "created_at"]);
+    const raw = pickStr(p, ["ÄÄƒng vÃ o", "posted_at", "created_at"]);
     if (raw.length >= 10) {
       const head = raw.slice(0, 10);
       if (head > best) best = head;
     }
   }
-  return best || "—";
+  return best ? formatDateDdMm(best) : "â€”";
 }
 
 export function formatCellValue(v: unknown): string {
-  if (v == null) return "—";
+  if (v == null) return "â€”";
   if (typeof v === "object")
     try {
       return JSON.stringify(v);

@@ -16,8 +16,9 @@ interface AppAuthContextType {
   user: AppUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name?: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<AppUser>;
+  loginWithGoogle: (credential: string) => Promise<AppUser>;
+  register: (email: string, password: string, name?: string) => Promise<AppUser>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   setLwuuSession: (email: string, remember: boolean) => void;
@@ -27,15 +28,31 @@ interface AppAuthContextType {
 const AppAuthContext = createContext<AppAuthContextType | undefined>(undefined);
 const AUTH_CHECK_TIMEOUT_MS = 6000;
 
+// ─── DEV BYPASS ────────────────────────────────────────────────────────────
+// Bật NEXT_PUBLIC_SKIP_AUTH=true trong .env.local để bỏ qua gọi API /auth/me
+// và /auth/login khi backend (Supabase) chưa sẵn sàng. Dùng khi chỉ làm UI.
+// NHỚ: không để true khi build production.
+const SKIP_AUTH = process.env.NEXT_PUBLIC_SKIP_AUTH === "true";
+const MOCK_USER: AppUser = {
+  id: "dev-mock-user",
+  email: "dev@markee.ai",
+  name: "Dev User",
+  role: "admin",
+  is_active: true,
+};
+
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
-    const timer = window.setTimeout(() => reject(new Error("Auth check timeout")), ms);
+    const timer = window.setTimeout(
+      () => reject(new Error("Auth check timeout")),
+      ms,
+    );
     promise.then(
-      value => {
+      (value) => {
         window.clearTimeout(timer);
         resolve(value);
       },
-      error => {
+      (error) => {
         window.clearTimeout(timer);
         reject(error);
       },
@@ -48,6 +65,10 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const refreshUser = useCallback(async () => {
+    if (SKIP_AUTH) {
+      setUser(MOCK_USER);
+      return;
+    }
     try {
       const res = await withTimeout(authService.me(), AUTH_CHECK_TIMEOUT_MS);
       if (res.success && res.data) {
@@ -84,6 +105,10 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
   }, [refreshUser]);
 
   const login = useCallback(async (email: string, password: string) => {
+    if (SKIP_AUTH) {
+      setUser(MOCK_USER);
+      return MOCK_USER;
+    }
     setIsLoading(true);
     try {
       const res = await authService.login({ email, password });
@@ -93,25 +118,52 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
       // Cookie is set by backend; just take user.
       const data = res.data as { user: AppUser };
       setUser(data.user);
+      return data.user;
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  const register = useCallback(async (email: string, password: string, name?: string) => {
+  const loginWithGoogle = useCallback(async (credential: string) => {
+    if (SKIP_AUTH) {
+      setUser(MOCK_USER);
+      return MOCK_USER;
+    }
     setIsLoading(true);
     try {
-      const res = await authService.register({ email, password, name });
+      const res = await authService.loginWithGoogle(credential);
       if (!res.success || !res.data) {
-        throw new Error(res.message || "Registration failed");
+        throw new Error(res.message || "Login failed");
       }
-      // Cookie is set by backend; just take user.
+      // Cookie is set by backend; just take user — data.user.role phản ánh
+      // đúng role hiện tại trong app_users (backend resolve theo email Google
+      // ngay lúc login), dùng để AuthPage.tsx redirect đúng dashboard theo role.
       const data = res.data as { user: AppUser };
       setUser(data.user);
+      return data.user;
     } finally {
       setIsLoading(false);
     }
   }, []);
+
+  const register = useCallback(
+    async (email: string, password: string, name?: string) => {
+      setIsLoading(true);
+      try {
+        const res = await authService.register({ email, password, name });
+        if (!res.success || !res.data) {
+          throw new Error(res.message || "Registration failed");
+        }
+        // Cookie is set by backend; just take user.
+        const data = res.data as { user: AppUser };
+        setUser(data.user);
+        return data.user;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [],
+  );
 
   const logout = useCallback(async () => {
     await authService.logout();
@@ -133,6 +185,7 @@ export function AppAuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user,
         isLoading,
         login,
+        loginWithGoogle,
         register,
         logout,
         refreshUser,

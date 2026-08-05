@@ -154,8 +154,18 @@ def _pick_by_keywords_and_threshold(
 
         return selected
 
+<<<<<<< HEAD
 
 
+=======
+    # Có keyword: ưu tiên bài khớp từ khóa (trong phạm vi posts_in_day - đã lọc hôm nay từ
+    # trước), nếu thiếu so với target thì bù bằng bài tương tác cao nhất (loại trừ bài đã
+    # chọn), nếu 0 bài khớp thì lấy thẳng top tương tác cao nhất thay thế - không bao giờ
+    # trả về rỗng chỉ vì không có bài nào khớp từ khóa hôm nay.
+    target = post_limit if (post_limit is not None and post_limit > 0) else 5
+
+    sorted_by_score = sorted(posts_in_day, key=lambda p: p.score, reverse=True)
+>>>>>>> 961099854cab42df4ea4717cb6d6f4d86f4742a1
 
     def matches(p: Post) -> bool:
         content = (p.content or "").lower()
@@ -173,6 +183,7 @@ def _pick_by_keywords_and_threshold(
                 matched_any = True
         return matched_any
 
+<<<<<<< HEAD
 
     group_a = [p for p in posts_in_day if matches(p)]
     group_a_scores = group_a
@@ -198,6 +209,33 @@ def _pick_by_keywords_and_threshold(
         # cap final result if user explicitly sets post_limit
         selected = selected[:post_limit]
 
+=======
+    matched = [p for p in posts_in_day if matches(p)]
+
+    logger.info(
+        "[DEBUG pick_by_keywords] target=%s matched_count=%s posts_in_day_count=%s",
+        target,
+        len(matched),
+        len(posts_in_day),
+    )
+
+    if not matched:
+        # 0 bài khớp từ khóa hôm nay -> lấy top `target` bài tương tác cao nhất thay thế.
+        return sorted_by_score[:target]
+
+    matched_sorted = sorted(matched, key=lambda p: p.score, reverse=True)
+
+    if len(matched_sorted) >= target:
+        return matched_sorted[:target]
+
+    # Thiếu so với target -> bù thêm bài tương tác cao nhất trong ngày, loại trừ bài đã
+    # chọn (khớp keyword) để tránh trùng lặp.
+    matched_urls = {p.url for p in matched_sorted}
+    backfill = [p for p in sorted_by_score if p.url not in matched_urls]
+    remaining_needed = target - len(matched_sorted)
+
+    selected = matched_sorted + backfill[:remaining_needed]
+>>>>>>> 961099854cab42df4ea4717cb6d6f4d86f4742a1
     return selected
 
 from app.modules.facebook.src.core.utils.logger import setup_logger
@@ -216,6 +254,8 @@ class GroupTarget:
     url: str
     Intent:str
     id_member: str = ""
+    keywords: Optional[List[str]] = None
+    post_limit: Optional[int] = None
 
 class FacebookScraper:
     def __init__(self, config):
