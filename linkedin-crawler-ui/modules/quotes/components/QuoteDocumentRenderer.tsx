@@ -16,6 +16,10 @@ import {
 
 interface Totals {
   subtotalAmount: number;
+  /** Tiền giảm giá (đã tính sẵn = subtotalAmount * discountPercent / 100) - optional
+   * để không phá các nơi gọi cũ (villa layout, quote đã lưu trước khi có tính năng
+   * giảm giá) chưa truyền field này. */
+  discountAmount?: number;
   totalVatAmount: number;
   totalAmount: number;
 }
@@ -167,6 +171,14 @@ export function QuoteDocumentRenderer({
     return '';
   };
 
+  const discountPercentValue = textValue(quoteData.discountPercent);
+  // Trang chi tiết/public chỉ truyền subtotalAmount/totalVatAmount/totalAmount
+  // đã LƯU (không kèm discountAmount) - tự suy ra từ % lưu trong quoteData để
+  // không phải sửa từng nơi gọi. Nơi nào đã tính sẵn discountAmount (bước
+  // preview khi đang điền/xem lại) thì ưu tiên dùng giá trị đó.
+  const resolvedDiscountAmount =
+    totals.discountAmount ??
+    (discountPercentValue ? (totals.subtotalAmount * Number(discountPercentValue)) / 100 : 0);
   const notesValue = fieldValue('notes');
   const notesRows = splitLines(notesValue).map(cleanDocumentText).filter(Boolean);
   const commitments = fieldValue('commitments');
@@ -447,6 +459,12 @@ export function QuoteDocumentRenderer({
             <span>{findField('subtotalAmount').label || 'Tổng trước VAT'}</span>
             <strong>{formatVnd(totals.subtotalAmount)}</strong>
           </div>
+          {resolvedDiscountAmount ? (
+            <div className="sheet-total-row sheet-total-row--discount">
+              <span>Giảm giá{discountPercentValue ? ` (${discountPercentValue}%)` : ''}</span>
+              <strong>-{formatVnd(resolvedDiscountAmount)}</strong>
+            </div>
+          ) : null}
           <div className="sheet-total-row">
             <span>{findField('totalVatAmount').label || 'VAT'}</span>
             <strong>{formatVnd(totals.totalVatAmount)}</strong>

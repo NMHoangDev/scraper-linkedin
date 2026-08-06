@@ -346,6 +346,10 @@
   padding-top: 0.5rem;
 }
 
+.quote-total-row--discount {
+  color: #b91c1c;
+}
+
 .quote-table--editable td input,
 .quote-table--editable td select {
   width: 100%;
@@ -1098,6 +1102,14 @@
   background: #ffffff;
   color: #111827;
   font-size: 1rem;
+}
+
+.sheet-total-row--discount {
+  color: #b91c1c;
+}
+
+.sheet-total-row--discount strong {
+  color: #b91c1c;
 }
 
 .sheet-note {
