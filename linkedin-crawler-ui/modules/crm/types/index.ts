@@ -212,6 +212,7 @@ export type UpdateDealInput = Partial<CreateDealInput> & {
 export interface StageTransitionInput {
   note?: string;
   pauseReason?: string;
+  attachmentUrl?: string;
   decisionMaker?: string;
   estimatedBudget?: number;
   followUpDate?: string;
