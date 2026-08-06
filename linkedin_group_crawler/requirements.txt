@@ -28,4 +28,5 @@ asyncssh
 google-generativeai
 # Import Excel danh sách thành viên
 openpyxl
+beautifulsoup4
 

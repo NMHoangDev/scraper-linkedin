@@ -3,7 +3,7 @@ pulled from MarkeeAI, for employees to seed-comment/react on internally."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from app.modules.all_platform.schemas import (
     BaseResponse,
@@ -15,16 +15,35 @@ from app.modules.all_platform.schemas import (
     TeamTotalsRequest,
     TeamTrendRequest,
 )
+from app.modules.all_platform.schemas.internal_engagement import (
+    AddCustomPostRequest,
+    CreateSeedingCampaignRequest,
+    DebugFetchMetaRequest,
+    DeleteCustomPostRequest,
+    OverrideMarkeePostRequest,
+    UpdateCustomPostRequest,
+)
 from app.modules.all_platform.services import markeeai_client
 from app.modules.all_platform.services.markeeai_account_links_service import resolve_markeeai_credentials
 from app.modules.all_platform.services.supabase_internal_engagement_kpi_service import (
+    add_custom_post,
+    create_seeding_campaign_db,
+    debug_fetch_facebook_post_metadata,
+    delete_custom_post_db,
+    delete_seeding_campaign_db,
     get_action_summary,
+    get_custom_posts_db,
+    get_markee_overrides_db,
     get_marks_by_links,
     get_post_interactions,
     get_post_team_counts,
+    get_seeder_leaderboard_db,
+    get_seeding_campaigns_db,
     get_team_daily_trend,
     get_team_totals,
     record_action,
+    update_custom_post_db,
+    upsert_markee_override_db,
 )
 
 router = APIRouter()
@@ -37,32 +56,207 @@ async def list_posts(page: int = 1, page_size: int = 20, email: str | None = Non
         # lấy bài bằng đúng danh tính đó (đúng campaign họ thực sự tham gia).
         # Không có thì rơi về 1 service account dùng chung như trước.
         creds = resolve_markeeai_credentials(email) if email else None
-        all_posts = await markeeai_client.get_all_company_posts(creds)
-        total = len(all_posts)
-        start = max(page - 1, 0) * page_size
-        page_items = all_posts[start : start + page_size]
+        try:
+            all_posts = await markeeai_client.get_all_company_posts(creds)
+        except Exception as markee_err:
+            logger.warning(f"Không thể kết nối MarkeeAI ({markee_err}), fallback bài viết rỗng.")
+            all_posts = []
 
-        items = [
-            InternalEngagementPost(
-                id=p["id"],
-                fanpage_id=p["fanpage_id"],
-                fanpage_name=p.get("fanpage_name"),
-                facebook_post_id=p.get("facebook_post_id"),
-                content=p.get("content") or "",
-                media_urls=p.get("media_urls") or [],
-                permalink_url=p.get("permalink_url"),
-                status=p.get("status"),
-                created_at=p.get("created_at"),
-            ).model_dump()
-            for p in page_items
-        ]
+        # Lấy danh sách overrides từ DB nội bộ
+        markee_ids = [str(p["id"]) for p in all_posts if isinstance(p, dict) and "id" in p]
+        overrides = get_markee_overrides_db(markee_ids) if markee_ids else {}
+
+        filtered_posts = []
+        for p in all_posts:
+            if not isinstance(p, dict):
+                continue
+            post_id = str(p.get("id"))
+            ov = overrides.get(post_id, {})
+            if ov.get("is_hidden"):
+                continue
+
+            fan_name = ov.get("override_fanpage_name") or p.get("fanpage_name")
+            cnt = ov.get("override_content") if ov.get("override_content") is not None else (p.get("content") or "")
+            media = ov.get("override_media_urls") if ov.get("override_media_urls") is not None else (p.get("media_urls") or [])
+
+            filtered_posts.append(
+                InternalEngagementPost(
+                    id=post_id,
+                    fanpage_id=p.get("fanpage_id", ""),
+                    fanpage_name=fan_name,
+                    facebook_post_id=p.get("facebook_post_id"),
+                    content=cnt,
+                    media_urls=media,
+                    permalink_url=p.get("permalink_url"),
+                    status=p.get("status"),
+                    created_at=p.get("created_at"),
+                ).model_dump()
+            )
+
+        total = len(filtered_posts)
+        start = max(page - 1, 0) * page_size
+        page_items = filtered_posts[start : start + page_size]
+
         return BaseResponse(
             success=True,
-            data={"items": items, "total": total, "page": page, "page_size": page_size},
+            data={"items": page_items, "total": total, "page": page, "page_size": page_size},
         )
     except Exception as e:
         return BaseResponse(success=False, message=str(e))
 
+
+@router.put("/custom-posts/{id}", response_model=BaseResponse)
+def update_custom_post(id: str, payload: UpdateCustomPostRequest) -> BaseResponse:
+    """API sửa bài viết thủ công (hỗ trợ gia hạn deadline, đổi Target KPI)"""
+    try:
+        fan_name = payload.fanpage_name or payload.page_name
+        data = update_custom_post_db(
+            post_id=id,
+            email_member=payload.email,
+            content=payload.content,
+            fanpage_name=fan_name,
+            media_urls=payload.media_urls,
+            campaign_id=payload.campaign_id,
+            campaign_name=payload.campaign_name,
+            deadline=payload.deadline,
+            target_comments=payload.target_comments,
+            assigned_team_ids=payload.assigned_team_ids,
+        )
+        return BaseResponse(success=True, data=data)
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@router.delete("/custom-posts/{id}", response_model=BaseResponse)
+def delete_custom_post(id: str, payload: DeleteCustomPostRequest) -> BaseResponse:
+    """API xóa (soft delete) bài viết thủ công"""
+    try:
+        data = delete_custom_post_db(post_id=id, email_member=payload.email)
+        return BaseResponse(success=True, data=data)
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@router.put("/markee-posts/{id}/override", response_model=BaseResponse)
+def override_markee_post(id: str, payload: OverrideMarkeePostRequest) -> BaseResponse:
+    """API ghi đè (sửa) bài viết Markee"""
+    try:
+        fan_name = payload.fanpage_name or payload.page_name
+        data = upsert_markee_override_db(
+            markee_post_id=id,
+            email_member=payload.email,
+            is_hidden=payload.is_hidden,
+            fanpage_name=fan_name,
+            content=payload.content,
+            media_urls=payload.media_urls,
+        )
+        return BaseResponse(success=True, data=data)
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@router.delete("/markee-posts/{id}/override", response_model=BaseResponse)
+def hide_markee_post(id: str, payload: DeleteCustomPostRequest) -> BaseResponse:
+    """API ẩn (xóa) bài viết Markee bằng cách lưu is_hidden = true trong overrides"""
+    try:
+        data = upsert_markee_override_db(
+            markee_post_id=id,
+            email_member=payload.email,
+            is_hidden=True,
+        )
+        return BaseResponse(success=True, data=data)
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@router.post("/add-custom-post", response_model=BaseResponse)
+@router.post("/social-posts/import", response_model=BaseResponse)
+async def create_custom_post(payload: AddCustomPostRequest) -> BaseResponse:
+    """API để Frontend gọi lưu link thủ công (nhận url hoặc link_post)"""
+    try:
+        target_url = payload.url or payload.link_post
+        if not target_url or not target_url.strip():
+            return BaseResponse(success=False, message="Vui lòng cung cấp link bài viết (url hoặc link_post).")
+
+        fan_name = payload.fanpage_name or payload.page_name
+        data = await add_custom_post(
+            email_member=payload.email,
+            link_post=target_url.strip(),
+            content=payload.content,
+            fanpage_name=fan_name,
+            media_urls=payload.media_urls,
+            cookie=payload.cookie,
+            campaign_id=payload.campaign_id,
+            campaign_name=payload.campaign_name,
+            deadline=payload.deadline,
+            target_comments=payload.target_comments if payload.target_comments is not None else 32,
+            assigned_team_ids=payload.assigned_team_ids,
+        )
+        return BaseResponse(success=True, data=data)
+    except HTTPException as http_err:
+        raise http_err
+    except Exception as e:
+        msg = str(e)
+        if "đã tồn tại" in msg.lower():
+            raise HTTPException(status_code=400, detail="Bài viết này đã tồn tại trong hệ thống!")
+        return BaseResponse(success=False, message=msg)
+
+
+@router.post("/custom-posts/debug-fetch", response_model=BaseResponse)
+def debug_fetch_meta(payload: DebugFetchMetaRequest) -> BaseResponse:
+    """Endpoint dùng cho Postman / Dev test cào OpenGraph metadata từ link Facebook"""
+    try:
+        data = debug_fetch_facebook_post_metadata(payload.url, cookie=payload.cookie)
+        return BaseResponse(success=True, data=data)
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@router.get("/custom-posts", response_model=BaseResponse)
+def list_custom_posts(page: int = 1, page_size: int = 20) -> BaseResponse:
+    """API lấy danh sách bài thủ công và format giống bài Fanpage để FE dễ dùng"""
+    try:
+        result = get_custom_posts_db(page, page_size)
+        
+        items = []
+        for p in result["items"]:
+            post_url = p.get("link_post") or p.get("post_url") or ""
+            fanpage_name = p.get("fanpage_name") or p.get("page_name") or "Markee AI Marketing"
+            content = p.get("content") or "Bài viết Facebook được nhân viên chia sẻ thủ công."
+            media_urls = p.get("media_urls") or p.get("media_url") or []
+            if isinstance(media_urls, str):
+                media_urls = [media_urls]
+            created_at = p.get("published_at") or p.get("created_at")
+
+            items.append({
+                "id": str(p["id"]),
+                "platform": p.get("platform", "facebook"),
+                "fanpage_id": "custom",
+                "fanpage_name": fanpage_name,
+                "page_name": fanpage_name,
+                "facebook_post_id": "",
+                "content": content,
+                "media_urls": media_urls,
+                "media_url": media_urls,
+                "permalink_url": post_url,
+                "post_url": post_url,
+                "link_post": post_url,
+                "status": "published",
+                "created_at": str(created_at) if created_at else None,
+                "published_at": str(created_at) if created_at else None,
+                "campaign_id": p.get("campaign_id"),
+                "campaign_name": p.get("campaign_name"),
+                "deadline": str(p.get("deadline")) if p.get("deadline") else None,
+                "target_comments": p.get("target_comments"),
+                "assigned_team_ids": p.get("assigned_team_ids") or [],
+            })
+        
+        return BaseResponse(
+            success=True,
+            data={"items": items, "total": result["total"], "page": page, "page_size": page_size},
+        )
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
 
 @router.post("/my-marks", response_model=BaseResponse)
 def my_marks(payload: MyMarksRequest) -> BaseResponse:
@@ -144,6 +338,46 @@ def team_totals(payload: TeamTotalsRequest) -> BaseResponse:
             date_to=payload.date_to,
             team_id=payload.team_id,
         )
+        return BaseResponse(success=True, data=data)
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@router.get("/seeding/campaigns", response_model=BaseResponse)
+def list_seeding_campaigns() -> BaseResponse:
+    """Lấy danh sách các chiến dịch Seeding"""
+    try:
+        data = get_seeding_campaigns_db()
+        return BaseResponse(success=True, data=data)
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@router.post("/seeding/campaigns", response_model=BaseResponse)
+def create_seeding_campaign(payload: CreateSeedingCampaignRequest) -> BaseResponse:
+    """Tạo mới chiến dịch Seeding"""
+    try:
+        data = create_seeding_campaign_db(payload.model_dump(exclude_none=True))
+        return BaseResponse(success=True, data=data)
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@router.delete("/seeding/campaigns/{id}", response_model=BaseResponse)
+def delete_seeding_campaign(id: str) -> BaseResponse:
+    """Xóa chiến dịch Seeding"""
+    try:
+        data = delete_seeding_campaign_db(id)
+        return BaseResponse(success=True, data=data)
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@router.get("/seeding/leaderboard", response_model=BaseResponse)
+def get_seeder_leaderboard() -> BaseResponse:
+    """Bảng xếp hạng Seeder nổi bật kết nối với View v_seeder_leaderboard"""
+    try:
+        data = get_seeder_leaderboard_db()
         return BaseResponse(success=True, data=data)
     except Exception as e:
         return BaseResponse(success=False, message=str(e))

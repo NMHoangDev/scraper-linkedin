@@ -203,6 +203,11 @@ export interface InternalEngagementPost {
   permalink_url?: string;
   status?: string;
   created_at?: string;
+  campaign_id?: string;
+  campaign_name?: string;
+  deadline?: string;
+  target_comments?: number;
+  assigned_team_ids?: string[];
 }
 
 export type InternalEngagementMarkStatus = "need" | "received" | "completed";

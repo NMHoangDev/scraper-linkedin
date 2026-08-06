@@ -365,13 +365,17 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
     },
     contentGroup,
     channelGroupTeam,
-    {
-      type: "group",
-      id: "resources",
-      icon: "database",
-      label: "Quản lý tài nguyên",
-      items: resourceItems,
-    },
+    ...(isAdmin || isLeader
+      ? [
+          {
+            type: "group",
+            id: "resources",
+            icon: "database",
+            label: "Quản lý tài nguyên",
+            items: resourceItems,
+          } as SidebarEntry,
+        ]
+      : []),
     {
       type: "item",
       id: "settings",

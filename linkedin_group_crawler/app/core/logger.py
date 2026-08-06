@@ -38,3 +38,7 @@ def get_logger(name: str) -> logging.Logger:
 
     setup_logging()
     return logging.getLogger(name)
+
+
+# Default logger instance for direct imports (from app.core.logger import logger)
+logger = get_logger("app")
