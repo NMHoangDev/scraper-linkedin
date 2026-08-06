@@ -510,13 +510,13 @@ export function DealFormFields({
           <h3 className="crm-form-title">Tham chiếu báo giá</h3>
           <div className="crm-form-grid">
             <Field label="Số báo giá">
-              <input value={form.quoteNumber} onChange={event => setValue('quoteNumber', event.target.value)} placeholder="BG-2026-..." />
+              <input value={form.quoteNumber} readOnly placeholder="Chưa có báo giá" title="Tham chiếu báo giá chỉ đọc, được đồng bộ từ báo giá đã gắn với deal." />
             </Field>
             <Field label="Tổng tiền báo giá">
-              <input value={form.quoteTotalAmount} onChange={event => setValue('quoteTotalAmount', event.target.value)} inputMode="decimal" placeholder="0" />
+              <input value={form.quoteTotalAmount} readOnly inputMode="decimal" placeholder="0" title="Tham chiếu báo giá chỉ đọc, được đồng bộ từ báo giá đã gắn với deal." />
             </Field>
             <Field full label="Link báo giá / hợp đồng">
-              <input value={form.quoteUrl} onChange={event => setValue('quoteUrl', event.target.value)} placeholder="https://... hoặc /public/quotes/..." />
+              <input value={form.quoteUrl} readOnly placeholder="Chưa có link báo giá" title="Tham chiếu báo giá chỉ đọc, được đồng bộ từ báo giá đã gắn với deal." />
             </Field>
           </div>
         </section>

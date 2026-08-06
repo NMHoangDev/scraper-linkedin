@@ -248,6 +248,21 @@
   box-shadow: 0 0 0 3px rgba(190, 30, 75, 0.12);
 }
 
+.crm-field input[readonly],
+.crm-field textarea[readonly] {
+  cursor: default;
+  background: #f8fafc;
+  color: #475569;
+  border-color: #dbe3ef;
+  box-shadow: none;
+}
+
+.crm-field input[readonly]:focus,
+.crm-field textarea[readonly]:focus {
+  border-color: #dbe3ef;
+  box-shadow: none;
+}
+
 .crm-filter-select,
 .crm-analytics-filter-select {
   position: relative;
