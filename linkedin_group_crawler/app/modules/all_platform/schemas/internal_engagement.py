@@ -43,11 +43,11 @@ ACTION_TYPES = (
 
 class InternalEngagementActionRecordRequest(BaseModel):
     email_member: str
-    link_post: str
-    fanpage_id: str
+    link_post: str | None = ""
+    fanpage_id: str | None = ""
     fanpage_name: str | None = None
     facebook_post_id: str | None = None
-    action_type: str
+    action_type: str = "comment"
     content: str | None = None
     reaction_id: str | None = None
     id_social_account: str | None = None
@@ -82,6 +82,15 @@ class TeamTotalsRequest(TeamScopedRequest):
     date_to: str | None = None
 
 
+class CreateSeedingCampaignRequest(BaseModel):
+    name: str
+    description: str | None = None
+    color_code: str | None = "#fff1f2"
+    start_date: str | None = None
+    end_date: str | None = None
+    created_by_email: str | None = None
+
+
 class AddCustomPostRequest(BaseModel):
     email: str
     link_post: str | None = None
@@ -91,8 +100,39 @@ class AddCustomPostRequest(BaseModel):
     content: str | None = None
     media_urls: List[str] | None = None
     cookie: str | None = None
+    campaign_id: str | None = None
+    campaign_name: str | None = None
+    deadline: str | None = None
+    target_comments: int | None = None
+    assigned_team_ids: List[str] | None = None
 
 
 class DebugFetchMetaRequest(BaseModel):
     url: str
     cookie: str | None = None
+
+
+class UpdateCustomPostRequest(BaseModel):
+    email: str
+    content: str | None = None
+    fanpage_name: str | None = None
+    page_name: str | None = None
+    media_urls: List[str] | None = None
+    campaign_id: str | None = None
+    campaign_name: str | None = None
+    deadline: str | None = None
+    target_comments: int | None = None
+    assigned_team_ids: List[str] | None = None
+
+
+class DeleteCustomPostRequest(BaseModel):
+    email: str
+
+
+class OverrideMarkeePostRequest(BaseModel):
+    email: str
+    is_hidden: bool | None = None
+    fanpage_name: str | None = None
+    page_name: str | None = None
+    content: str | None = None
+    media_urls: List[str] | None = None

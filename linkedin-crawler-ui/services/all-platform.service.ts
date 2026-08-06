@@ -265,20 +265,42 @@ export const allPlatformSeedingService = {
 // ── Internal Engagement (Tương tác nội bộ — MarkeeAI FB Page posts) ─────────────
 
 export const internalEngagementService = {
-  addCustomPost: (linkOrPayload: string | { link: string; email: string; content?: string; fanpage_name?: string; media_urls?: string[] }, emailParam?: string): Promise<ApiResponse<any>> => {
+  addCustomPost: (linkOrPayload: string | {
+    link?: string;
+    link_post?: string;
+    url?: string;
+    email: string;
+    content?: string;
+    fanpage_name?: string;
+    media_urls?: string[];
+    campaign_id?: string;
+    campaign_name?: string;
+    deadline?: string;
+    target_likes?: number;
+    target_comments?: number;
+    target_shares?: number;
+    assigned_team_ids?: string[];
+  }, emailParam?: string): Promise<ApiResponse<any>> => {
     const payload = typeof linkOrPayload === "string" 
-      ? { link: linkOrPayload, email: emailParam || "", content: undefined, fanpage_name: undefined, media_urls: undefined }
+      ? { link: linkOrPayload, email: emailParam || "" }
       : linkOrPayload;
       
     return requestJson(`${BASE}/internal-engagement/add-custom-post`, {
       method: "POST",
       body: JSON.stringify({
-        link_post: payload.link,
-        url: payload.link,
+        link_post: payload.link || payload.link_post || payload.url,
+        url: payload.link || payload.link_post || payload.url,
         email: payload.email,
         content: payload.content,
         fanpage_name: payload.fanpage_name,
         media_urls: payload.media_urls,
+        campaign_id: payload.campaign_id,
+        campaign_name: payload.campaign_name,
+        deadline: payload.deadline,
+        target_likes: payload.target_likes,
+        target_comments: payload.target_comments,
+        target_shares: payload.target_shares,
+        assigned_team_ids: payload.assigned_team_ids,
       }),
     });
   },
@@ -292,6 +314,46 @@ export const internalEngagementService = {
   listCustomPosts: (page: number = 1, pageSize: number = 20): Promise<ApiResponse<{ items: InternalEngagementPost[]; total: number; page: number; page_size: number }>> => {
     const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
     return requestJson(`${BASE}/internal-engagement/custom-posts?${params.toString()}`);
+  },
+
+  updateCustomPost: (id: string, payload: {
+    email: string;
+    content?: string;
+    fanpage_name?: string;
+    media_urls?: string[];
+    campaign_id?: string;
+    campaign_name?: string;
+    deadline?: string;
+    target_likes?: number;
+    target_comments?: number;
+    target_shares?: number;
+    assigned_team_ids?: string[];
+  }): Promise<ApiResponse<any>> => {
+    return requestJson(`${BASE}/internal-engagement/custom-posts/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  deleteCustomPost: (id: string, email: string): Promise<ApiResponse<any>> => {
+    return requestJson(`${BASE}/internal-engagement/custom-posts/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  overrideMarkeePost: (id: string, payload: { email: string; content?: string; fanpage_name?: string; media_urls?: string[] }): Promise<ApiResponse<any>> => {
+    return requestJson(`${BASE}/internal-engagement/markee-posts/${encodeURIComponent(id)}/override`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  hideMarkeePost: (id: string, email: string): Promise<ApiResponse<any>> => {
+    return requestJson(`${BASE}/internal-engagement/markee-posts/${encodeURIComponent(id)}/override`, {
+      method: "DELETE",
+      body: JSON.stringify({ email }),
+    });
   },
 
   getMyMarks: (emailMember: string, linkPosts: string[]): Promise<ApiResponse<{ marks: Record<string, InternalEngagementMarkStatus> }>> => {
@@ -319,6 +381,27 @@ export const internalEngagementService = {
       method: "POST",
       body: JSON.stringify({ email, days, team_id: teamId }),
     });
+  },
+
+  getCampaigns: (): Promise<ApiResponse<Array<{ id: string; name: string; color_code?: string; start_date?: string; end_date?: string }>>> => {
+    return requestJson(`${BASE}/internal-engagement/seeding/campaigns`);
+  },
+
+  createCampaign: (payload: { name: string; description?: string; color_code?: string; start_date?: string; end_date?: string; created_by_email?: string }): Promise<ApiResponse<any>> => {
+    return requestJson(`${BASE}/internal-engagement/seeding/campaigns`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  deleteCampaign: (id: string): Promise<ApiResponse<any>> => {
+    return requestJson(`${BASE}/internal-engagement/seeding/campaigns/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+  },
+
+  getLeaderboard: (): Promise<ApiResponse<Array<{ user_id: string; member_name: string; member_email: string; team_name: string; total_assigned: number; total_completed: number; total_ontime: number; completion_rate: number; score: number }>>> => {
+    return requestJson(`${BASE}/internal-engagement/seeding/leaderboard`);
   },
 
   getTeamTotals: (email: string, dateFrom?: string, dateTo?: string, teamId?: string): Promise<ApiResponse<InternalEngagementTeamTotalsData>> => {
