@@ -18,6 +18,7 @@ import {
   SOURCE_OPTIONS,
   canApproveQuote,
   formatVND,
+  getContractUrl,
   humanizeCrmError,
 } from '../constants/crmConfig';
 import { useCrm } from '../hooks/useCrm';
@@ -226,20 +227,24 @@ export function CrmShell() {
   async function handleMove(payload: StageTransitionInput) {
     if (!stageData) return;
     try {
+      const transitionPayload: StageTransitionInput = {
+        ...payload,
+        attachmentUrl: payload.attachmentUrl || getContractUrl(stageData.deal) || undefined,
+      };
       const isReviewUpdate =
         stageData.deal.stage === stageData.toStage && (stageData.toStage === 'won' || stageData.toStage === 'lost');
       const deal = isReviewUpdate
         ? await updateDeal(stageData.deal.id, {
-            decisionMaker: payload.decisionMaker,
-            estimatedBudget: payload.estimatedBudget,
-            followUpDate: payload.followUpDate,
+            decisionMaker: transitionPayload.decisionMaker,
+            estimatedBudget: transitionPayload.estimatedBudget,
+            followUpDate: transitionPayload.followUpDate,
             outcome: {
-              ...payload.outcome,
+              ...transitionPayload.outcome,
               reviewType: stageData.toStage as 'won' | 'lost',
               reviewedAt: new Date().toISOString(),
             },
           })
-        : await moveDeal(stageData.deal.id, stageData.toStage, payload);
+        : await moveDeal(stageData.deal.id, stageData.toStage, transitionPayload);
       const toStage = stageData.toStage;
       setStageData(null);
       // Đóng luôn drawer chi tiết — nó vẫn phủ kín màn hình phía sau StageModal,

@@ -626,6 +626,7 @@ export class SeedingCrmRepository implements CrmRepository {
     const transitionPayload = {
       to_stage: stage,
       note: payload.note || payload.pauseReason || outcome?.reasonText || outcome?.rootCause || undefined,
+      attachment_url: payload.attachmentUrl || undefined,
       follow_up_date: payload.followUpDate || undefined,
       decision_maker: payload.decisionMaker || undefined,
       estimated_budget: payload.estimatedBudget,
