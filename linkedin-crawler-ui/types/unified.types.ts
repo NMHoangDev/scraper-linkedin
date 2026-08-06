@@ -232,6 +232,7 @@ export interface InternalEngagementInteraction {
   is_caller?: boolean;
   summary: string;
   created_at: string;
+  raw_created_at?: string | null;
 }
 
 export interface InternalEngagementPostInteractionsData {
