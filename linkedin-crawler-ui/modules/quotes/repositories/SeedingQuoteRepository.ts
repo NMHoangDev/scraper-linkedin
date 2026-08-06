@@ -15,6 +15,17 @@ type ApiResponse<T> = {
   data?: T;
 };
 
+type QuoteItemPayload = {
+  description: string;
+  service_description: string | null;
+  unit?: string;
+  quantity: number;
+  unit_price: number;
+  discount_percent: number;
+  vat_rate: number;
+  children: QuoteItemPayload[];
+};
+
 function getDefaultHeaders(): Record<string, string> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (API_KEY) headers['X-API-Key'] = API_KEY;
@@ -64,28 +75,27 @@ function toCreateQuotePayload(input: CreateQuoteInput) {
     deal_id: input.dealId,
     quote_form_id: input.quoteFormId,
     data: input.data,
-    items: (input.items || []).map(item => ({
-      description: item.description ?? '',
-      service_description: item.serviceDescription ?? null,
-      unit: item.unit,
-      quantity: item.quantity,
-      unit_price: item.unitPrice,
-      vat_rate: item.vatRate,
-    })),
+    items: (input.items || []).map(toQuoteItemPayload),
   };
 }
 
 function toUpdateQuotePayload(input: UpdateQuoteInput) {
   return {
     data: input.data,
-    items: input.items?.map(item => ({
-      description: item.description ?? '',
-      service_description: item.serviceDescription ?? null,
-      unit: item.unit,
-      quantity: item.quantity,
-      unit_price: item.unitPrice,
-      vat_rate: item.vatRate,
-    })),
+    items: input.items?.map(toQuoteItemPayload),
+  };
+}
+
+function toQuoteItemPayload(item: NonNullable<CreateQuoteInput['items']>[number]): QuoteItemPayload {
+  return {
+    description: item.description ?? '',
+    service_description: item.serviceDescription ?? null,
+    unit: item.unit,
+    quantity: item.quantity,
+    unit_price: item.unitPrice,
+    discount_percent: item.discountPercent ?? 0,
+    vat_rate: item.vatRate,
+    children: (item.children || []).map(toQuoteItemPayload),
   };
 }
 

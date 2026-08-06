@@ -73,16 +73,21 @@ export interface QuoteForm {
 export interface QuoteItem {
   id?: string;
   quoteId?: string;
+  parentItemId?: string;
   description?: string;
   serviceDescription?: string;
   unit?: string;
   quantity: number;
   unitPrice: number;
+  discountPercent?: number;
+  discountAmount?: number;
+  amountAfterDiscount?: number;
   vatRate: number;
   subtotalAmount?: number;
   vatAmount?: number;
   totalAmount?: number;
   sortOrder?: number;
+  children?: QuoteItem[];
   [key: string]: unknown;
 }
 

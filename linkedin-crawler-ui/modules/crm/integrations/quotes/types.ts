@@ -24,6 +24,10 @@ export function quoteDraftFromForm(form: QuoteForm, dealDraft?: DealFormState): 
   const solutionItems = Array.isArray(solutionField?.defaultValue)
     ? (solutionField?.defaultValue as VillaSolutionItem[])
     : [];
+  const quoteItemsField = fields.find(field => field.key === 'quoteItems');
+  const quoteItems = Array.isArray(quoteItemsField?.defaultValue)
+    ? (JSON.parse(JSON.stringify(quoteItemsField.defaultValue)) as QuoteItem[])
+    : [];
 
   if (fields.some(field => field.key === 'quoteDate') && !data.quoteDate) {
     data.quoteDate = new Date().toISOString().slice(0, 10);
@@ -41,7 +45,7 @@ export function quoteDraftFromForm(form: QuoteForm, dealDraft?: DealFormState): 
     });
   }
 
-  return { data, items: [], solutionItems };
+  return { data, items: quoteItems, solutionItems };
 }
 
 /** Dựng lại QuoteDraft từ 1 báo giá đã tồn tại (chế độ sửa) - để prefill wizard
