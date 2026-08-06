@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class QuoteFormCreateRequest(BaseModel):
@@ -31,7 +31,9 @@ class QuoteItemInput(BaseModel):
     unit: Optional[str] = None
     quantity: float = 0
     unit_price: float = 0
-    vat_rate: float = 0
+    discount_percent: float = Field(default=0, ge=0, le=100)
+    vat_rate: float = Field(default=0, ge=0, le=100)
+    children: list["QuoteItemInput"] = Field(default_factory=list)
 
 
 class QuoteCreateRequest(BaseModel):

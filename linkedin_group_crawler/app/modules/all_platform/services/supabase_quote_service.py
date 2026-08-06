@@ -59,16 +59,21 @@ def _row_to_item(row: dict) -> dict:
     return {
         "id": row["id"],
         "quoteId": row["quote_id"],
+        "parentItemId": row.get("parent_item_id"),
         "description": row.get("description") or "",
         "serviceDescription": row.get("service_description") or "",
         "unit": row.get("unit"),
         "quantity": float(row.get("quantity") or 0),
         "unitPrice": float(row.get("unit_price") or 0),
+        "discountPercent": float(row.get("discount_percent") or 0),
+        "discountAmount": float(row.get("discount_amount") or 0),
+        "amountAfterDiscount": float(row.get("amount_after_discount") or 0),
         "vatRate": float(row.get("vat_rate") or 0),
         "subtotalAmount": float(row.get("subtotal_amount") or 0),
         "vatAmount": float(row.get("vat_amount") or 0),
         "totalAmount": float(row.get("total_amount") or 0),
         "sortOrder": row.get("sort_order") or 0,
+        "children": [],
     }
 
 
@@ -82,7 +87,7 @@ def _row_to_quote(row: dict, items: list[dict] | None = None) -> dict:
         "formSchemaVersion": row["form_schema_version"],
         "formSnapshot": row.get("form_snapshot") or {},
         "data": row.get("data") or {},
-        "items": [_row_to_item(i) for i in (items or [])],
+        "items": _quote_item_tree(items or []),
         "subtotalAmount": float(row.get("subtotal_amount") or 0),
         "vatAmount": float(row.get("vat_amount") or 0),
         "totalAmount": float(row.get("total_amount") or 0),
@@ -111,6 +116,21 @@ def _quote_items(quote_id: str) -> list[dict]:
         .execute()
     )
     return result.data or []
+
+
+def _quote_item_tree(rows: list[dict]) -> list[dict]:
+    mapped = [_row_to_item(row) for row in rows]
+    by_id = {item["id"]: item for item in mapped if item.get("id")}
+    roots: list[dict] = []
+    for item in mapped:
+        parent_id = item.get("parentItemId")
+        if parent_id and parent_id in by_id:
+            by_id[parent_id].setdefault("children", []).append(item)
+        else:
+            roots.append(item)
+    for item in mapped:
+        item["children"] = sorted(item.get("children") or [], key=lambda child: child.get("sortOrder") or 0)
+    return sorted(roots, key=lambda item: item.get("sortOrder") or 0)
 
 
 def _slug_code(name: str) -> str:
@@ -159,16 +179,70 @@ def _next_quote_number() -> str:
     return f"{prefix}{max_seq + 1:04d}"
 
 
-def _calculate_item(quantity: float, unit_price: float, vat_rate: float) -> tuple[float, float, float]:
+def _validate_percent(value: Any, field_name: str) -> float:
+    try:
+        pct = float(value or 0)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field_name} must be between 0 and 100.") from exc
+    if pct < 0 or pct > 100:
+        raise ValueError(f"{field_name} must be between 0 and 100.")
+    return pct
+
+
+def _calculate_item(quantity: float, unit_price: float, vat_rate: float, discount_percent: float = 0) -> tuple[float, float, float, float, float]:
     subtotal = quantity * unit_price
-    vat = subtotal * vat_rate / 100
-    return subtotal, vat, subtotal + vat
+    discount = subtotal * discount_percent / 100
+    after_discount = subtotal - discount
+    vat = after_discount * vat_rate / 100
+    return subtotal, discount, after_discount, vat, after_discount + vat
 
 
 def _calculate_totals(items: list[dict]) -> tuple[float, float, float]:
     subtotal = sum(i["subtotal"] for i in items)
     vat = sum(i["vat"] for i in items)
     return subtotal, vat, subtotal + vat
+
+
+def _flatten_computed_items(raw_items: list[dict]) -> tuple[list[dict], float, float, float]:
+    flattened: list[dict] = []
+    subtotal = 0.0
+    vat = 0.0
+    total = 0.0
+
+    def append_item(item: dict, parent_temp_index: int | None, sort_order: int) -> int:
+        nonlocal subtotal, vat, total
+        discount_percent = _validate_percent(item.get("discount_percent"), "discount_percent")
+        vat_rate = _validate_percent(item.get("vat_rate"), "vat_rate")
+        item_subtotal, item_discount, item_after_discount, item_vat, item_total = _calculate_item(
+            float(item.get("quantity") or 0),
+            float(item.get("unit_price") or 0),
+            vat_rate,
+            discount_percent,
+        )
+        row = {
+            **item,
+            "parent_temp_index": parent_temp_index,
+            "sort_order": sort_order,
+            "discount_percent": discount_percent,
+            "vat_rate": vat_rate,
+            "subtotal": item_subtotal,
+            "discount": item_discount,
+            "after_discount": item_after_discount,
+            "vat": item_vat,
+            "total": item_total,
+        }
+        flattened.append(row)
+        subtotal += item_subtotal
+        vat += item_vat
+        total += item_total
+        return len(flattened) - 1
+
+    for parent_index, item in enumerate(raw_items):
+        parent_flat_index = append_item(item, None, parent_index)
+        for child_index, child in enumerate(item.get("children") or []):
+            append_item(child, parent_flat_index, child_index)
+
+    return flattened, subtotal, vat, total
 
 
 def _clamp_discount_percent(value: Any) -> float:
@@ -355,19 +429,7 @@ def create_quote(payload: dict, created_by: str | None) -> dict:
         subtotal, vat, total = _calculate_villa_totals(data.get("solutionItems") or [])
         items_to_insert: list[dict] = []
     else:
-        computed_items = []
-        for item in raw_items:
-            item_subtotal, item_vat, item_total = _calculate_item(
-                float(item.get("quantity") or 0), float(item.get("unit_price") or 0), float(item.get("vat_rate") or 0)
-            )
-            computed_items.append({**item, "subtotal": item_subtotal, "vat": item_vat, "total": item_total})
-        subtotal, vat, total = _calculate_totals(computed_items)
-        items_to_insert = computed_items
-
-    if not is_villa and data.get("discountPercent"):
-        # Villa layout khong co dong dich vu rieng (chi solutionItems, khong
-        # co VAT theo dong) nen chua ho tro giam gia % o day - chi cloudgate.
-        _discount_amount, vat, total = _apply_discount(subtotal, vat, data.get("discountPercent"))
+        items_to_insert, subtotal, vat, total = _flatten_computed_items(raw_items)
 
     quote_number = _next_quote_number()
     now = _now_iso()
@@ -391,21 +453,29 @@ def create_quote(payload: dict, created_by: str | None) -> dict:
     quote_row = supabase.table(QUOTES_TABLE).insert(insert_data).execute().data[0]
 
     inserted_items = []
+    inserted_ids_by_flat_index: dict[int, str] = {}
     for index, item in enumerate(items_to_insert):
+        parent_temp_index = item.get("parent_temp_index")
         row = {
             "quote_id": quote_row["id"],
+            "parent_item_id": inserted_ids_by_flat_index.get(parent_temp_index) if parent_temp_index is not None else None,
             "description": item.get("description") or "",
             "service_description": item.get("service_description") or None,
             "unit": item.get("unit"),
             "quantity": float(item.get("quantity") or 0),
             "unit_price": float(item.get("unit_price") or 0),
+            "discount_percent": item["discount_percent"],
+            "discount_amount": item["discount"],
+            "amount_after_discount": item["after_discount"],
             "vat_rate": float(item.get("vat_rate") or 0),
             "subtotal_amount": item["subtotal"],
             "vat_amount": item["vat"],
             "total_amount": item["total"],
-            "sort_order": index,
+            "sort_order": item["sort_order"],
         }
-        inserted_items.append(supabase.table(ITEMS_TABLE).insert(row).execute().data[0])
+        inserted = supabase.table(ITEMS_TABLE).insert(row).execute().data[0]
+        inserted_items.append(inserted)
+        inserted_ids_by_flat_index[index] = inserted["id"]
 
     supabase.table("quote_activity_log").insert({
         "quote_id": quote_row["id"], "actor_id": created_by, "action": "created", "changes": None,
@@ -425,6 +495,7 @@ _RPC_ERROR_MESSAGES = {
     "quote_already_approved": "Báo giá đã được duyệt, không thể chỉnh sửa.",
     "quote_not_in_draft_status": "Báo giá không ở trạng thái chờ duyệt.",
     "quote_missing_required_fields": "Báo giá thiếu thông tin bắt buộc (chưa có hạng mục hoặc tổng tiền = 0).",
+    "quote_item_invalid_percent": "Giảm giá/VAT phải nằm trong khoảng 0-100.",
 }
 
 

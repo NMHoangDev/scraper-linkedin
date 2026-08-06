@@ -245,9 +245,15 @@ export function DetailDrawer({
                         Chỉnh sửa
                       </button>
                     ) : null}
-                    {!isApproved && canEditThisQuote ? (
-                      <button type="button" className="crm-quote-btn crm-quote-btn--danger" onClick={() => onDeleteQuote(deal)}>
-                        Xoá
+                    {deal.quote.id && !isApproved && canEditThisQuote ? (
+                      <button
+                        type="button"
+                        className="crm-quote-btn crm-quote-btn--danger"
+                        title="Xóa báo giá khỏi deal"
+                        aria-label="Xóa báo giá khỏi deal"
+                        onClick={() => onDeleteQuote(deal)}
+                      >
+                        Xóa báo giá
                       </button>
                     ) : null}
                     {isApproved && deal.quote.url ? (

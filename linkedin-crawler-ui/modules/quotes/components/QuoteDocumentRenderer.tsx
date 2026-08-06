@@ -8,10 +8,13 @@ import type {
   VillaSolutionItem,
 } from '../types';
 import {
+  calculateItemAfterDiscount,
+  calculateItemDiscount,
   calculateItemSubtotal,
   calculateItemTotal,
   calculateItemVat,
   formatVnd,
+  flattenQuoteItems,
 } from '../utils/quoteCalculations';
 
 interface Totals {
@@ -136,9 +139,19 @@ export function QuoteDocumentRenderer({
     if (column.type === 'auto-number' || column.key === 'order') return String(index + 1);
     if (column.key === 'subtotal') return formatVnd(calculateItemSubtotal(item));
     if (column.key === 'vatAmount') return formatVnd(calculateItemVat(item));
-    if (column.key === 'total') return formatVnd(calculateItemTotal(item));
+    if (column.key === 'total') {
+      const discount = calculateItemDiscount(item);
+      return discount ? (
+        <span className="quote-price-stack">
+          <s>{formatVnd(calculateItemSubtotal(item) + calculateItemVat({ ...item, discountPercent: 0 }))}</s>
+          <b>{formatVnd(calculateItemTotal(item))}</b>
+        </span>
+      ) : formatVnd(calculateItemTotal(item));
+    }
     if (column.key === 'unitPrice') return formatVnd(item.unitPrice);
     if (column.key === 'quantity') return String(item.quantity || '');
+    if (column.key === 'discountPercent') return item.discountPercent ? `${item.discountPercent}%` : '—';
+    if (column.key === 'amountAfterDiscount') return formatVnd(calculateItemAfterDiscount(item));
     if (column.key === 'vatRate') return item.vatRate ? `${item.vatRate}%` : '';
     // "Mô tả" luôn qua tách dòng theo "•" (kể cả du lieu moi da co serviceDescription
     // rieng) - phai xu ly TRUOC fallback chung ben duoi, khong thi item.description
@@ -171,14 +184,17 @@ export function QuoteDocumentRenderer({
     return '';
   };
 
+  const lineDiscountAmount = flattenQuoteItems(quoteItems).reduce(
+    (sum, item) => sum + calculateItemDiscount(item),
+    0
+  );
   const discountPercentValue = textValue(quoteData.discountPercent);
-  // Trang chi tiết/public chỉ truyền subtotalAmount/totalVatAmount/totalAmount
-  // đã LƯU (không kèm discountAmount) - tự suy ra từ % lưu trong quoteData để
-  // không phải sửa từng nơi gọi. Nơi nào đã tính sẵn discountAmount (bước
-  // preview khi đang điền/xem lại) thì ưu tiên dùng giá trị đó.
+  // Quote mới dùng giảm giá theo từng dòng cha/con. Giữ fallback discountPercent
+  // tổng cho quote cũ đã lưu trước khi có cấu trúc line-level discount.
   const resolvedDiscountAmount =
     totals.discountAmount ??
-    (discountPercentValue ? (totals.subtotalAmount * Number(discountPercentValue)) / 100 : 0);
+    (lineDiscountAmount ||
+      (discountPercentValue ? (totals.subtotalAmount * Number(discountPercentValue)) / 100 : 0));
   const notesValue = fieldValue('notes');
   const notesRows = splitLines(notesValue).map(cleanDocumentText).filter(Boolean);
   const commitments = fieldValue('commitments');
@@ -232,7 +248,27 @@ export function QuoteDocumentRenderer({
     { key: 'vatRate', label: 'VAT', type: 'number' as const },
     { key: 'total', label: 'Thành tiền', type: 'currency' as const },
   ];
-  const standardColumns = visibleColumns.length ? visibleColumns : defaultColumns;
+  const standardColumns = (visibleColumns.length ? [...visibleColumns] : [...defaultColumns])
+    .filter(column => !['subtotal', 'vatAmount'].includes(column.key));
+  if (!standardColumns.some(column => column.key === 'order' || column.type === 'auto-number')) {
+    standardColumns.unshift({ key: 'order', label: 'STT', type: 'auto-number' as const });
+  }
+  if (!standardColumns.some(column => column.key === 'description')) {
+    const unitIndex = standardColumns.findIndex(column => column.key === 'unit');
+    standardColumns.splice(unitIndex >= 0 ? unitIndex : 2, 0, { key: 'description', label: 'Mô tả', type: 'textarea' });
+  }
+  if (!standardColumns.some(column => column.key === 'discountPercent')) {
+    const vatIndex = standardColumns.findIndex(column => column.key === 'vatRate');
+    standardColumns.splice(vatIndex >= 0 ? vatIndex : standardColumns.length - 1, 0, { key: 'discountPercent', label: 'Giảm giá', type: 'number' });
+  }
+  const displayedQuoteRows = quoteItems.flatMap((item, parentIndex) => [
+    { item, number: String(parentIndex + 1), isChild: false },
+    ...(item.children || []).map((child, childIndex) => ({
+      item: child,
+      number: `${parentIndex + 1}.${childIndex + 1}`,
+      isChild: true,
+    })),
+  ]);
 
   if (layoutType === 'villa_solution_package') {
     const setupTotal = activeSolutionItems.reduce(
@@ -425,15 +461,15 @@ export function QuoteDocumentRenderer({
               </tr>
             </thead>
             <tbody>
-              {quoteItems.length === 0 ? (
+              {displayedQuoteRows.length === 0 ? (
                 <tr>
                   <td colSpan={Math.max(standardColumns.length, 1)} className="empty-row">
                     Chưa có hạng mục báo giá.
                   </td>
                 </tr>
               ) : (
-                quoteItems.map((item, index) => (
-                  <tr key={item.id || index}>
+                displayedQuoteRows.map((row, index) => (
+                  <tr key={row.item.id || `${row.number}-${index}`} className={row.isChild ? 'quote-item-row quote-item-row--child' : 'quote-item-row quote-item-row--parent'}>
                     {standardColumns.map(column => (
                       <td
                         key={column.key}
@@ -444,7 +480,9 @@ export function QuoteDocumentRenderer({
                             : undefined
                         }
                       >
-                        {renderCell(item, column, index)}
+                        {column.type === 'auto-number' || column.key === 'order'
+                          ? row.number
+                          : renderCell(row.item, column, index)}
                       </td>
                     ))}
                   </tr>
@@ -461,7 +499,7 @@ export function QuoteDocumentRenderer({
           </div>
           {resolvedDiscountAmount ? (
             <div className="sheet-total-row sheet-total-row--discount">
-              <span>Giảm giá{discountPercentValue ? ` (${discountPercentValue}%)` : ''}</span>
+              <span>Giảm giá</span>
               <strong>-{formatVnd(resolvedDiscountAmount)}</strong>
             </div>
           ) : null}

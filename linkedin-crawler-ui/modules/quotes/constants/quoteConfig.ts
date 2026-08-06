@@ -153,6 +153,7 @@ export const serviceColumns: QuoteField[] = [
   ['unit', 'ĐVT', 'text', 'Ví dụ: Gói, Tháng, Người dùng', 'Nhập đơn vị tính phù hợp với dịch vụ.'],
   ['quantity', 'Số lượng', 'number', 'Ví dụ: 1', 'Nhập số lượng khách đăng ký.'],
   ['unitPrice', 'Đơn giá', 'currency', 'Ví dụ: 15000000', 'Nhập giá cho một đơn vị, chưa gồm VAT.'],
+  ['discountPercent', 'Giảm giá (%)', 'number', 'Ví dụ: 10', 'Nhập phần trăm giảm giá riêng cho dòng này, từ 0 đến 100.'],
   ['vatRate', 'VAT', 'number', 'Ví dụ: 10', 'Nhập phần trăm thuế, ví dụ 10.'],
 ].map(([key, label, type, placeholder, helpText]) => ({
   key,

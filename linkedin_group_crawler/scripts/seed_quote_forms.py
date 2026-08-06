@@ -99,6 +99,9 @@ def standard_schema():
                         field("serviceDescription", "Tên dịch vụ", "textarea", required=True,
                               placeholder="Ví dụ: Thiết kế website doanh nghiệp",
                               help_text="Nhập tên sản phẩm hoặc dịch vụ khách cần."),
+                        field("description", "Mô tả", "textarea", required=False,
+                              placeholder="Ví dụ: Thiết kế UI, lập trình, bàn giao source",
+                              help_text="Mô tả phạm vi công việc và nội dung bàn giao."),
                         field("unit", "ĐVT", "text", required=True,
                               placeholder="Ví dụ: Gói, Tháng, Người dùng",
                               help_text="Nhập đơn vị tính phù hợp với dịch vụ."),
@@ -108,12 +111,16 @@ def standard_schema():
                               placeholder="Ví dụ: 15000000", help_text="Nhập giá cho một đơn vị, chưa gồm VAT."),
                         field("subtotal", "Thành tiền trước VAT", "calculated", editable=False,
                               formula="quantity * unitPrice"),
+                        field("discountPercent", "Giảm giá (%)", "number", required=True, default_value=0,
+                              placeholder="Ví dụ: 10", help_text="Nhập phần trăm giảm giá riêng cho dòng này, từ 0 đến 100."),
+                        field("amountAfterDiscount", "Sau giảm giá", "calculated", editable=False, visible=False,
+                              formula="subtotal - (subtotal * discountPercent / 100)"),
                         field("vatRate", "Thuế VAT", "number", required=True, default_value=10,
                               placeholder="Ví dụ: 10", help_text="Nhập phần trăm thuế, ví dụ 10."),
                         field("vatAmount", "Tiền VAT", "calculated", editable=False, visible=False,
-                              formula="subtotal * vatRate / 100"),
+                              formula="amountAfterDiscount * vatRate / 100"),
                         field("total", "Thành tiền thanh toán (VND)", "calculated", editable=False,
-                              formula="subtotal + vatAmount"),
+                              formula="amountAfterDiscount + vatAmount"),
                     ],
                 }),
             ]),
@@ -140,6 +147,123 @@ def standard_schema():
             ]),
         ],
     }
+
+
+def chatbot_douyin_quote_items():
+    return [
+        {
+            "serviceDescription": "Tải video nguồn",
+            "description": "Nhóm dịch vụ xử lý video đầu vào cho hệ thống chatbot_auto_inbox và lồng tiếng Douyin.",
+            "unit": "Gói",
+            "quantity": 1,
+            "unitPrice": 5000000,
+            "discountPercent": 10,
+            "vatRate": 10,
+            "children": [
+                {
+                    "serviceDescription": "Tải qua relay bot Telegram công khai",
+                    "description": "Nhận link Douyin/TikTok từ relay bot Telegram và đưa vào hàng đợi xử lý.",
+                    "unit": "Tác vụ",
+                    "quantity": 1,
+                    "unitPrice": 1000000,
+                    "discountPercent": 0,
+                    "vatRate": 10,
+                },
+                {
+                    "serviceDescription": "Tải trực tiếp bằng cookie Douyin",
+                    "description": "Dùng cookie hợp lệ để tải trực tiếp video nguồn khi relay không đủ dữ liệu.",
+                    "unit": "Tác vụ",
+                    "quantity": 1,
+                    "unitPrice": 1500000,
+                    "discountPercent": 50,
+                    "vatRate": 10,
+                },
+                {
+                    "serviceDescription": "Tự động làm mới cookie Douyin theo lịch",
+                    "description": "Theo dõi hạn cookie và nhắc/làm mới theo lịch vận hành đã thống nhất.",
+                    "unit": "Tháng",
+                    "quantity": 1,
+                    "unitPrice": 1200000,
+                    "discountPercent": 0,
+                    "vatRate": 10,
+                },
+                {
+                    "serviceDescription": "Giới hạn thời lượng video nguồn",
+                    "description": "Áp rule giới hạn thời lượng trước khi đưa video vào pipeline lồng tiếng.",
+                    "unit": "Rule",
+                    "quantity": 1,
+                    "unitPrice": 800000,
+                    "discountPercent": 100,
+                    "vatRate": 10,
+                },
+            ],
+        },
+        {
+            "serviceDescription": "Lồng tiếng Douyin và đồng bộ chatbot_auto_inbox",
+            "description": "Nhóm xử lý âm thanh, transcript và đồng bộ nội dung đã hoàn thiện về hệ thống inbox tự động.",
+            "unit": "Gói",
+            "quantity": 1,
+            "unitPrice": 8000000,
+            "discountPercent": 0,
+            "vatRate": 10,
+            "children": [
+                {
+                    "serviceDescription": "Tách transcript và chuẩn hóa nội dung",
+                    "description": "Tạo transcript tiếng gốc, chuẩn hóa câu thoại và loại bỏ đoạn không cần xử lý.",
+                    "unit": "Gói",
+                    "quantity": 1,
+                    "unitPrice": 2000000,
+                    "discountPercent": 0,
+                    "vatRate": 10,
+                },
+                {
+                    "serviceDescription": "Lồng tiếng Việt theo giọng thương hiệu",
+                    "description": "Sinh voice tiếng Việt theo cấu hình giọng và tốc độ đọc đã thống nhất.",
+                    "unit": "Video",
+                    "quantity": 10,
+                    "unitPrice": 350000,
+                    "discountPercent": 0,
+                    "vatRate": 10,
+                },
+                {
+                    "serviceDescription": "Đồng bộ kết quả vào chatbot_auto_inbox",
+                    "description": "Gắn file hoàn thiện, metadata và trạng thái xử lý vào luồng trả lời tự động.",
+                    "unit": "Gói",
+                    "quantity": 1,
+                    "unitPrice": 2500000,
+                    "discountPercent": 0,
+                    "vatRate": 10,
+                },
+            ],
+        },
+    ]
+
+
+def chatbot_douyin_schema():
+    schema = standard_schema()
+    fields = [field for section_data in schema["sections"] for field in section_data["fields"]]
+    defaults = {
+        "sellerCompanyName": "MARKEE AI",
+        "sellerAddress": "TP. Hồ Chí Minh",
+        "sellerContactName": "Markee Sales",
+        "sellerPhone": "076 5055 708",
+        "sellerEmail": "sales@markeeai.com",
+        "sellerWebsite": "markeeai.com",
+        "quoteTitle": "Hệ thống chatbot_auto_inbox và lồng tiếng Douyin",
+        "defaultVatRate": 10,
+        "notes": [
+            "Cấu trúc dịch vụ cha/con có thể chỉnh sửa trực tiếp trong form báo giá.",
+            "Giảm giá áp dụng riêng cho từng dòng, không áp dụng chồng từ dịch vụ cha xuống dịch vụ con.",
+            "Chi phí chưa bao gồm các hạng mục phát sinh ngoài phạm vi đã mô tả.",
+        ],
+        "companyRepresentative": "MARKEE AI",
+    }
+    for item in fields:
+        if item["key"] in defaults:
+            item["defaultValue"] = defaults[item["key"]]
+        if item["key"] == "quoteItems":
+            item["defaultValue"] = chatbot_douyin_quote_items()
+    return schema
 
 
 def villa_schema():
@@ -245,6 +369,16 @@ TEMPLATES = [
         "layout_type": "villa_solution_package",
         "schema_json": villa_schema(),
     },
+    {
+        "code": "HE_THONG_CHATBOT_AUTO_INBOX_VA_LONG_TIENG_DOUYIN",
+        "name": "Hệ thống chatbot_auto_inbox và lồng tiếng Douyin",
+        "description": "Mẫu báo giá dùng cấu trúc dịch vụ cha/con chung cho hệ thống chatbot_auto_inbox, tải video nguồn và lồng tiếng Douyin.",
+        "status": "active",
+        "schema_version": 1,
+        "layout_type": "cloudgate_standard_quote",
+        "schema_json": chatbot_douyin_schema(),
+        "force_update": True,
+    },
 ]
 
 
@@ -258,9 +392,15 @@ def main() -> int:
             .execute()
         )
         if existing.data:
-            print(f"SKIP (already exists): {template['code']} -> {existing.data[0]['id']}")
+            if template.get("force_update"):
+                update_payload = {key: value for key, value in template.items() if key != "force_update"}
+                client.table("quote_forms").update(update_payload).eq("id", existing.data[0]["id"]).execute()
+                print(f"UPDATED: {template['code']} -> {existing.data[0]['id']} ({template['name']})")
+            else:
+                print(f"SKIP (already exists): {template['code']} -> {existing.data[0]['id']}")
             continue
-        result = client.table("quote_forms").insert(template).execute()
+        insert_payload = {key: value for key, value in template.items() if key != "force_update"}
+        result = client.table("quote_forms").insert(insert_payload).execute()
         row = result.data[0] if result.data else {}
         print(f"CREATED: {template['code']} -> {row.get('id')} ({template['name']})")
     return 0

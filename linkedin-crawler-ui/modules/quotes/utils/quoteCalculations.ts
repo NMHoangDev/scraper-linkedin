@@ -9,19 +9,33 @@ export const parseCurrencyInput = (value: unknown) => {
 
 const toSafeNumber = (value: unknown) => parseCurrencyInput(value);
 
+const toSafePercent = (value: unknown) => {
+  if (value === null || value === undefined || value === '') return 0;
+  if (typeof value === 'number') return Number.isNaN(value) ? 0 : value;
+  const normalized = String(value).replace(',', '.').replace(/[^\d.-]/g, '');
+  const parsed = Number.parseFloat(normalized);
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+
 export const calculateItemSubtotal = (item?: Partial<QuoteItem>) =>
   toSafeNumber(item?.quantity) * toSafeNumber(item?.unitPrice);
 
+export const calculateItemDiscount = (item?: Partial<QuoteItem>) =>
+  (calculateItemSubtotal(item) * clampDiscountPercent(item?.discountPercent)) / 100;
+
+export const calculateItemAfterDiscount = (item?: Partial<QuoteItem>) =>
+  calculateItemSubtotal(item) - calculateItemDiscount(item);
+
 export const calculateItemVat = (item?: Partial<QuoteItem>) =>
-  (calculateItemSubtotal(item) * toSafeNumber(item?.vatRate)) / 100;
+  (calculateItemAfterDiscount(item) * toSafeNumber(item?.vatRate)) / 100;
 
 export const calculateItemTotal = (item?: Partial<QuoteItem>) =>
-  calculateItemSubtotal(item) + calculateItemVat(item);
+  calculateItemAfterDiscount(item) + calculateItemVat(item);
 
 /** Kẹp % giảm giá về [0, 100] - phòng người dùng gõ số âm hoặc >100% làm tổng
  * tiền ra số vô lý (âm hoặc lớn hơn cả tổng gốc). */
 export const clampDiscountPercent = (value: unknown) => {
-  const pct = toSafeNumber(value);
+  const pct = toSafePercent(value);
   if (pct < 0) return 0;
   if (pct > 100) return 100;
   return pct;
@@ -37,26 +51,28 @@ export const clampDiscountPercent = (value: unknown) => {
  */
 export const calculateQuoteTotals = (
   items: Partial<QuoteItem>[] = [],
-  discountPercent: unknown = 0
+  _discountPercent: unknown = 0
 ) => {
-  const pct = clampDiscountPercent(discountPercent);
-  const subtotalAmount = items.reduce(
-    (sum, item) => sum + calculateItemSubtotal(item),
+  void _discountPercent;
+  const allItems = flattenQuoteItems(items);
+  const discountAmount = allItems.reduce(
+    (sum, item) => sum + calculateItemDiscount(item),
     0
   );
-  const grossVatAmount = items.reduce(
+  const totalVatAmount = allItems.reduce(
     (sum, item) => sum + calculateItemVat(item),
     0
   );
-  const discountAmount = (subtotalAmount * pct) / 100;
-  const totalVatAmount = (grossVatAmount * (100 - pct)) / 100;
   return {
-    subtotalAmount,
+    subtotalAmount: allItems.reduce((sum, item) => sum + calculateItemSubtotal(item), 0),
     discountAmount,
     totalVatAmount,
-    totalAmount: subtotalAmount - discountAmount + totalVatAmount,
+    totalAmount: allItems.reduce((sum, item) => sum + calculateItemTotal(item), 0),
   };
 };
+
+export const flattenQuoteItems = (items: Partial<QuoteItem>[] = []): Partial<QuoteItem>[] =>
+  items.flatMap(item => [item, ...flattenQuoteItems(item.children || [])]);
 
 export const calculateVillaTotals = (items: Partial<VillaSolutionItem>[] = []) => {
   const totalAmount = items.reduce(

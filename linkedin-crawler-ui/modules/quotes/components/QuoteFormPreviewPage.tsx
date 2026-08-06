@@ -14,12 +14,19 @@ interface Props {
 function sampleItems(vatRate = 10): QuoteItem[] {
   return [
     {
-      serviceDescription: 'Dịch vụ tư vấn Demo',
-      description: 'Nội dung demo để kiểm tra renderer.',
+      serviceDescription: 'Tải video nguồn',
+      description: 'Nhóm dịch vụ xử lý video đầu vào cho hệ thống chatbot_auto_inbox và lồng tiếng Douyin.',
       unit: 'Gói',
       quantity: 1,
       unitPrice: 5000000,
+      discountPercent: 10,
       vatRate,
+      children: [
+        { serviceDescription: 'Tải qua relay bot Telegram công khai', description: 'Nhận link và tải qua relay bot.', unit: 'Tác vụ', quantity: 1, unitPrice: 1000000, discountPercent: 0, vatRate },
+        { serviceDescription: 'Tải trực tiếp bằng cookie Douyin', description: 'Dùng cookie hợp lệ để tải trực tiếp.', unit: 'Tác vụ', quantity: 1, unitPrice: 1500000, discountPercent: 50, vatRate },
+        { serviceDescription: 'Tự động làm mới cookie Douyin theo lịch', description: 'Theo dõi và refresh cookie định kỳ.', unit: 'Tháng', quantity: 1, unitPrice: 1200000, discountPercent: 0, vatRate },
+        { serviceDescription: 'Giới hạn thời lượng video nguồn', description: 'Áp rule thời lượng trước khi đưa vào xử lý.', unit: 'Rule', quantity: 1, unitPrice: 800000, discountPercent: 100, vatRate },
+      ],
     },
   ];
 }
@@ -48,10 +55,12 @@ export function QuoteFormPreviewPage({ formId }: Props) {
   );
   quoteData.quoteDate ||= new Date().toISOString().slice(0, 10);
   quoteData.quoteNumber ||= 'Sẽ sinh khi lưu';
-  const solutionItems = (form.schemaJson.sections
-    .flatMap(section => section.fields)
-    .find(field => field.key === 'solutionItems')?.defaultValue || []) as VillaSolutionItem[];
-  const items = sampleItems(Number(quoteData.defaultVatRate || 10));
+  const fields = form.schemaJson.sections.flatMap(section => section.fields);
+  const solutionItems = (fields.find(field => field.key === 'solutionItems')?.defaultValue || []) as VillaSolutionItem[];
+  const defaultQuoteItems = fields.find(field => field.key === 'quoteItems')?.defaultValue;
+  const items = Array.isArray(defaultQuoteItems)
+    ? (defaultQuoteItems as QuoteItem[])
+    : sampleItems(Number(quoteData.defaultVatRate || 10));
   const totals =
     form.schemaJson.layoutType === 'villa_solution_package'
       ? calculateVillaTotals(solutionItems)
