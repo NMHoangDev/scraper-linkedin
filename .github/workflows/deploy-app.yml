@@ -25,6 +25,22 @@ jobs:
           git checkout "${{ github.event.inputs.ref }}"
           git pull origin "${{ github.event.inputs.ref }}" || true
 
+      # Docker build cua frontend chi thay context ./linkedin-crawler-ui nen
+      # KHONG thay duoc thu muc ngoai ../extensions -> npm predev/prebuild se
+      # tu bo qua va dung nguyen public/*.zip da commit tu lan cuoi co ai do
+      # nho tay build+commit lai, de bi cu (bug da gap: sua extensions/ nhung
+      # quen build lai zip). Chay rieng buoc nay tren host (repo day du, thay
+      # ca extensions/ lan linkedin-crawler-ui/) truoc khi build image de zip
+      # luon la ban moi nhat tu source, khong phu thuoc nguoi lam co nho hay
+      # khong.
+      - name: Dong goi lai extension zip tu source moi nhat
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" -e HOME=/tmp \
+            -v "$PWD:/repo" -w /repo/linkedin-crawler-ui \
+            node:20-alpine \
+            sh -c "npm ci && npm run build:extensions"
+
       - name: Build frontend + backend
         run: docker compose build frontend backend
 
