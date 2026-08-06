@@ -8,7 +8,7 @@ export function ReviewQuoteStep({ schema, draft }: { schema: QuoteSchema; draft:
   const totals =
     schema.layoutType === 'villa_solution_package'
       ? calculateVillaTotals(draft.solutionItems)
-      : calculateQuoteTotals(draft.items);
+      : calculateQuoteTotals(draft.items, draft.data.discountPercent);
 
   return (
     <div className="crm-wizard-review-step">

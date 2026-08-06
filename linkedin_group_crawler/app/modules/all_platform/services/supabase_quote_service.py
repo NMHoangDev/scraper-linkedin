@@ -171,6 +171,31 @@ def _calculate_totals(items: list[dict]) -> tuple[float, float, float]:
     return subtotal, vat, subtotal + vat
 
 
+def _clamp_discount_percent(value: Any) -> float:
+    """Kẹp % giảm giá về [0, 100] - phòng payload gửi số âm/quá lớn làm tổng
+    tiền ra số vô lý. Khớp clampDiscountPercent() phía frontend."""
+    try:
+        pct = float(value or 0)
+    except (TypeError, ValueError):
+        return 0.0
+    return max(0.0, min(100.0, pct))
+
+
+def _apply_discount(subtotal: float, gross_vat: float, discount_percent: Any) -> tuple[float, float, float]:
+    """Giảm giá % trên TỔNG TRƯỚC THUẾ (subtotal), VAT tính lại trên phần đã
+    giảm. Vì giảm giá nhân đều lên mọi dòng và VAT mỗi dòng tuyến tính theo
+    subtotal dòng đó, tổng VAT sau giảm = tổng VAT gốc × (1 - %/100) - đúng
+    cho cả trường hợp các dòng có VAT % khác nhau (xem chứng minh trong
+    quoteCalculations.ts phía frontend, cùng công thức).
+
+    Trả về (discount_amount, vat_amount, total_amount)."""
+    pct = _clamp_discount_percent(discount_percent)
+    discount_amount = subtotal * pct / 100
+    vat_amount = gross_vat * (100 - pct) / 100
+    total_amount = subtotal - discount_amount + vat_amount
+    return discount_amount, vat_amount, total_amount
+
+
 def _calculate_villa_totals(solution_items: list[dict]) -> tuple[float, float, float]:
     total = sum(float(item.get("offerPrice") or 0) for item in solution_items)
     return total, 0, total
@@ -338,6 +363,11 @@ def create_quote(payload: dict, created_by: str | None) -> dict:
             computed_items.append({**item, "subtotal": item_subtotal, "vat": item_vat, "total": item_total})
         subtotal, vat, total = _calculate_totals(computed_items)
         items_to_insert = computed_items
+
+    if not is_villa and data.get("discountPercent"):
+        # Villa layout khong co dong dich vu rieng (chi solutionItems, khong
+        # co VAT theo dong) nen chua ho tro giam gia % o day - chi cloudgate.
+        _discount_amount, vat, total = _apply_discount(subtotal, vat, data.get("discountPercent"))
 
     quote_number = _next_quote_number()
     now = _now_iso()

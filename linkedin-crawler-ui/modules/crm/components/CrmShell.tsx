@@ -280,6 +280,18 @@ export function CrmShell() {
     }
   }
 
+  async function handleDeleteQuote(deal: Deal) {
+    if (!deal.quote?.id) return;
+    if (!window.confirm(`Xoá báo giá ${deal.quote.number || ''} khỏi deal "${deal.customerName}"? Không thể hoàn tác.`)) return;
+    try {
+      await seedingQuoteRepository.deleteQuote(deal.quote.id);
+      await refreshDealAfterQuoteChange(deal.id);
+      setToast('Đã xoá báo giá.');
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Không xoá được báo giá.');
+    }
+  }
+
   // Sau khi tạo/sửa/duyệt báo giá: refresh cả list board (card ngoài kanban)
   // LẪN selectedDeal đang mở trong drawer (nếu trùng deal) - trước đây chỉ
   // loadDeals() nên drawer đang mở vẫn hiện dữ liệu cũ cho tới khi đóng/mở lại.
@@ -438,6 +450,7 @@ export function CrmShell() {
         onUpdateContractStatus={updateContractStatus}
         onCreateQuote={deal => setQuoteModal({ open: true, deal, editQuote: null })}
         onEditQuote={handleEditQuote}
+        onDeleteQuote={handleDeleteQuote}
       />
       <StageModal
         open={Boolean(stageData)}

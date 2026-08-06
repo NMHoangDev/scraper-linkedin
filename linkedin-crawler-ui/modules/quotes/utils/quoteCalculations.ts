@@ -18,19 +18,43 @@ export const calculateItemVat = (item?: Partial<QuoteItem>) =>
 export const calculateItemTotal = (item?: Partial<QuoteItem>) =>
   calculateItemSubtotal(item) + calculateItemVat(item);
 
-export const calculateQuoteTotals = (items: Partial<QuoteItem>[] = []) => {
+/** Kẹp % giảm giá về [0, 100] - phòng người dùng gõ số âm hoặc >100% làm tổng
+ * tiền ra số vô lý (âm hoặc lớn hơn cả tổng gốc). */
+export const clampDiscountPercent = (value: unknown) => {
+  const pct = toSafeNumber(value);
+  if (pct < 0) return 0;
+  if (pct > 100) return 100;
+  return pct;
+};
+
+/**
+ * Giảm giá % áp dụng trên TỔNG TRƯỚC THUẾ (subtotal), rồi VAT tính lại trên
+ * phần đã giảm - không phải giảm sau khi đã cộng VAT. Vì giảm giá là 1 hệ số
+ * NHÂN đều lên mọi dòng, và VAT mỗi dòng cũng tuyến tính theo subtotal dòng
+ * đó, nên tổng VAT sau giảm = tổng VAT gốc (không giảm) × (1 - %/100) —
+ * đúng cho mọi trường hợp kể cả các dòng có VAT % khác nhau, không cần tính
+ * lại VAT từng dòng riêng. Xem chứng minh trong PR mô tả "Luồng duyệt báo giá".
+ */
+export const calculateQuoteTotals = (
+  items: Partial<QuoteItem>[] = [],
+  discountPercent: unknown = 0
+) => {
+  const pct = clampDiscountPercent(discountPercent);
   const subtotalAmount = items.reduce(
     (sum, item) => sum + calculateItemSubtotal(item),
     0
   );
-  const totalVatAmount = items.reduce(
+  const grossVatAmount = items.reduce(
     (sum, item) => sum + calculateItemVat(item),
     0
   );
+  const discountAmount = (subtotalAmount * pct) / 100;
+  const totalVatAmount = (grossVatAmount * (100 - pct)) / 100;
   return {
     subtotalAmount,
+    discountAmount,
     totalVatAmount,
-    totalAmount: subtotalAmount + totalVatAmount,
+    totalAmount: subtotalAmount - discountAmount + totalVatAmount,
   };
 };
 
@@ -41,6 +65,7 @@ export const calculateVillaTotals = (items: Partial<VillaSolutionItem>[] = []) =
   );
   return {
     subtotalAmount: totalAmount,
+    discountAmount: 0,
     totalVatAmount: 0,
     totalAmount,
   };

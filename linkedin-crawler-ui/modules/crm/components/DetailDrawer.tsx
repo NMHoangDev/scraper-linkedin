@@ -48,6 +48,8 @@ type Props = {
   onCreateQuote: (deal: Deal) => void;
   /** Mở modal sửa báo giá đang gắn với deal này (chỉ khi chưa duyệt). */
   onEditQuote: (deal: Deal) => void;
+  /** Xoá hẳn báo giá đang gắn với deal này (chỉ khi chưa duyệt). */
+  onDeleteQuote: (deal: Deal) => void;
 };
 
 function tel(value?: string) {
@@ -65,6 +67,7 @@ export function DetailDrawer({
   onUpdateContractStatus,
   onCreateQuote,
   onEditQuote,
+  onDeleteQuote,
 }: Props) {
   const { user } = useAppAuth();
   if (!open || !deal) return null;
@@ -240,6 +243,11 @@ export function DetailDrawer({
                     {!isApproved && canEditThisQuote ? (
                       <button type="button" className="crm-quote-btn" onClick={() => onEditQuote(deal)}>
                         Chỉnh sửa
+                      </button>
+                    ) : null}
+                    {!isApproved && canEditThisQuote ? (
+                      <button type="button" className="crm-quote-btn crm-quote-btn--danger" onClick={() => onDeleteQuote(deal)}>
+                        Xoá
                       </button>
                     ) : null}
                     {isApproved && deal.quote.url ? (

@@ -47,7 +47,7 @@ export function QuoteFormFiller({ schema, value, onChange }: Props) {
   const totals =
     layoutType === 'villa_solution_package'
       ? calculateVillaTotals(value.solutionItems)
-      : calculateQuoteTotals(value.items);
+      : calculateQuoteTotals(value.items, value.data.discountPercent);
 
   function setData(key: string, fieldValue: unknown) {
     onChange({ ...value, data: { ...value.data, [key]: fieldValue } });
@@ -107,6 +107,12 @@ export function QuoteFormFiller({ schema, value, onChange }: Props) {
             <span>Tạm tính</span>
             <strong>{formatVnd(totals.subtotalAmount)}</strong>
           </div>
+          {totals.discountAmount ? (
+            <div className="quote-total-row quote-total-row--discount">
+              <span>Giảm giá{value.data.discountPercent ? ` (${value.data.discountPercent}%)` : ''}</span>
+              <strong>-{formatVnd(totals.discountAmount)}</strong>
+            </div>
+          ) : null}
           <div className="quote-total-row">
             <span>VAT</span>
             <strong>{formatVnd(totals.totalVatAmount)}</strong>
@@ -131,7 +137,7 @@ function FieldInput({
   field: QuoteField;
   value: unknown;
   data: QuoteData;
-  totals: { subtotalAmount: number; totalVatAmount: number; totalAmount: number };
+  totals: { subtotalAmount: number; discountAmount?: number; totalVatAmount: number; totalAmount: number };
   onChange: (value: unknown) => void;
 }) {
   if (field.visible === false) return null;
