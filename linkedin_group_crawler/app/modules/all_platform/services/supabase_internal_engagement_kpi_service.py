@@ -862,38 +862,27 @@ def delete_seeding_campaign_db(campaign_id: str) -> dict:
 
 
 def get_seeder_leaderboard_db() -> list[dict]:
-    """Bypass view v_seeder_leaderboard and compute accurate Seeder leaderboard metrics directly (Fixed to match exact 20 members)."""
+    """Bypass view v_seeder_leaderboard and compute accurate Seeder leaderboard metrics directly, synchronized with get_all_teams()."""
     supabase: Client = get_supabase_client()
-    members_res = supabase.table("members").select("id, display_name, email, team, linked_user_id, app_users!members_linked_user_id_fkey(name)").execute()
-    teams_res = supabase.table("teams").select("id, name_team, id_leader").execute()
-    teams_map = {str(t["id"]): t["name_team"] for t in (teams_res.data or [])}
 
-    # Load team memberships
-    mot_res = supabase.table("member_of_teams").select("id_member, id_teams").execute()
-    user_teams = defaultdict(list)
-    for mot in (mot_res.data or []):
-        user_teams[str(mot["id_member"])].append(str(mot["id_teams"]))
+    # Single Source of Truth for Teams & Members (same as get_post_interactions)
+    all_teams = get_all_teams()
+    member_team_map = _member_team_map(all_teams)  # app_user_id -> {"team_id": ..., "team_name": ...}
 
-    member_teams_map = defaultdict(set)
-    for m in (members_res.data or []):
-        m_id = str(m["id"])
-        user_id = str(m.get("linked_user_id") or m_id)
-        
-        # Lấy team từ bảng quan hệ
-        if user_id in user_teams:
-            for t_id in user_teams[user_id]:
-                member_teams_map[m_id].add(str(t_id).lower())
-                t_name = teams_map.get(str(t_id))
-                if t_name:
-                    member_teams_map[m_id].add(t_name.lower())
-                    
-        # Lấy thêm team từ cột m.team để không bị sót thành viên nào
-        m_team = m.get("team")
-        if m_team and "chưa" not in str(m_team).lower() and str(m_team).lower() != "null":
-            member_teams_map[m_id].add(str(m_team).lower())
-            for tid, tname in teams_map.items():
-                if tname.lower() == str(m_team).lower():
-                    member_teams_map[m_id].add(str(tid).lower())
+    # Map app_users to members for display name and linked id fallback
+    members_res = (
+        supabase.table("members")
+        .select("id, display_name, email, team, linked_user_id, app_users!members_linked_user_id_fkey(name)")
+        .execute()
+    ).data or []
+
+    # Map app_user_id -> member_info dict
+    user_to_member_row = {}
+    for m in members_res:
+        luid = str(m.get("linked_user_id") or "")
+        if luid:
+            user_to_member_row[luid] = m
+        user_to_member_row[str(m["id"])] = m
 
     posts_res = supabase.table("internal_engagement_custom_posts").select("id, assigned_team_ids, link_post").eq("is_deleted", False).execute()
     active_posts = posts_res.data or []
@@ -904,22 +893,28 @@ def get_seeder_leaderboard_db() -> list[dict]:
         kpi_by_member[str(k["id_member"])].append(k)
 
     leaderboard = []
-    for m in (members_res.data or []):
-        m_id = str(m["id"])
-        user_id = str(m.get("linked_user_id") or m_id)
-        m_teams = member_teams_map.get(m_id, set())
+    # Iterate over exact 20 active members from get_all_teams()
+    for user_id, team_info in member_team_map.items():
+        m_row = user_to_member_row.get(user_id, {})
+        m_id = str(m_row.get("id") or user_id)
+
+        team_id = str(team_info["team_id"]).lower()
+        team_name = team_info["team_name"]
+
+        # Active team identifiers (both ID and lowercased name)
+        m_teams = {team_id, team_name.lower()}
 
         assigned_links = []
         for post in active_posts:
             assigned = post.get("assigned_team_ids") or []
             if not assigned:
-                if len(m_teams) > 0:
-                    assigned_links.append(post["link_post"])
+                assigned_links.append(post["link_post"])
                 continue
 
             has_match = False
             for t in assigned:
-                if str(t).lower() in m_teams:
+                t_str = str(t).lower()
+                if t_str in m_teams or t_str == team_id or t_str == team_name.lower():
                     has_match = True
                     break
             if has_match:
@@ -940,27 +935,15 @@ def get_seeder_leaderboard_db() -> list[dict]:
         rate = round((total_completed / total_assigned * 100), 1) if total_assigned > 0 else 0.0
         score = total_completed
 
-        team_name = "Chưa phân team"
-        m_team_ids = user_teams.get(user_id, [])
-        if m_team_ids:
-            team_name = teams_map.get(str(m_team_ids[0])) or "Chưa phân team"
-        else:
-            m_team_val = m.get("team")
-            if m_team_val and "chưa" not in str(m_team_val).lower():
-                if m_team_val in teams_map.values():
-                    team_name = m_team_val
-                elif m_team_val in teams_map:
-                    team_name = teams_map.get(m_team_val)
+        app_user_data = m_row.get("app_users") or {}
+        member_name = app_user_data.get("name") or m_row.get("display_name") or m_row.get("email") or "Thành viên ẩn"
 
-        app_user_data = m.get("app_users") or {}
-        member_name = app_user_data.get("name") or m.get("display_name") or m.get("email") or "Thành viên ẩn"
-
-        # BẮT BUỘC ĐƯA VÀO LEADERBOARD: Miễn là thuộc hệ thống, không bỏ sót ai để khớp tuyệt đối con số 20
         leaderboard.append({
             "user_id": m_id,
             "member_name": member_name,
-            "member_email": m.get("email"),
+            "member_email": m_row.get("email"),
             "team_name": team_name,
+            "team_id": team_info["team_id"],
             "total_assigned": total_assigned,
             "total_completed": total_completed,
             "total_ontime": total_ontime,
