@@ -34,6 +34,68 @@ function fmtRelativeTime(iso?: string): string {
   return `${Math.floor(diffHours / 24)} ngày trước`;
 }
 
+/**
+ * Bug 5 Fix: Smart deadline format.
+ * So sánh ngày deadline với 00:00:00 của ngày hiện tại để xác định khoảng cách.
+ */
+function fmtDeadline(isoDeadline?: string | null): string {
+  if (!isoDeadline) return "Đang thực hiện";
+  const deadlineDate = new Date(isoDeadline);
+  if (Number.isNaN(deadlineDate.getTime())) return "Đang thực hiện";
+
+  const now = new Date();
+  const timeLabel = deadlineDate.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+
+  // Đã quá hạn
+  if (deadlineDate < now) {
+    const d = deadlineDate;
+    const dateStr = `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+    return `Đã quá hạn (${timeLabel} ${dateStr})`;
+  }
+
+  // Số ngày còn lại (tính từ đầu ngày hôm nay)
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const deadlineStart = new Date(deadlineDate.getFullYear(), deadlineDate.getMonth(), deadlineDate.getDate());
+  const diffDays = Math.round((deadlineStart.getTime() - todayStart.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) {
+    const diffMs = deadlineDate.getTime() - now.getTime();
+    const diffH = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffM = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    return `Hạn ${timeLabel} hôm nay (còn ${diffH}g ${diffM}p)`;
+  }
+  if (diffDays === 1) {
+    return `Hạn ${timeLabel} ngày mai`;
+  }
+  return `Hạn ${timeLabel} (còn ${diffDays} ngày)`;
+}
+
+/**
+ * Bug 1 Fix: Format member interaction time to Asia/Ho_Chi_Minh (UTC+7) timezone
+ * format cleanly as HH:mm DD/MM/YYYY.
+ */
+function formatMemberTime(rawCreatedAt?: string | null, fallbackTime: string = "—"): string {
+  if (!rawCreatedAt) return fallbackTime;
+  const date = new Date(rawCreatedAt);
+  if (Number.isNaN(date.getTime())) return fallbackTime;
+
+  try {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Ho_Chi_Minh",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    const parts = formatter.formatToParts(date);
+    const p = Object.fromEntries(parts.map((x) => [x.type, x.value]));
+    return `${p.hour}:${p.minute} ${p.day}/${p.month}/${p.year}`;
+  } catch (e) {
+    return fallbackTime;
+  }
+}
 
 
 type ToastType = "success" | "error" | "warning" | "info";
@@ -77,6 +139,9 @@ export default function InternalEngagementPage() {
   }>>([]);
   const [membersCount, setMembersCount] = useState<number>(0);
   const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
+  const [isLeaderboardModalOpen, setIsLeaderboardModalOpen] = useState(false);
+  const [leaderboardCurrentPage, setLeaderboardCurrentPage] = useState(1);
+  const LEADERBOARD_PAGE_SIZE = 10;
   const [newCampaignName, setNewCampaignName] = useState("");
   const [newCampaignColor, setNewCampaignColor] = useState("#fff1f2");
   const [newCampaignStartDate, setNewCampaignStartDate] = useState("");
@@ -220,21 +285,29 @@ export default function InternalEngagementPage() {
     setIsDeletingPost(true);
     try {
       let res;
-      if (sourceTab === "markee") {
-        res = await internalEngagementService.hideMarkeePost(deletingPost.id, user.email);
-      } else {
+      // Bug 2 Fix: Determine if it's a custom post or Markee post by checking fanpage_id
+      if (deletingPost.fanpage_id === "custom") {
         res = await internalEngagementService.deleteCustomPost(deletingPost.id, user.email);
+      } else {
+        res = await internalEngagementService.hideMarkeePost(deletingPost.id, user.email);
       }
 
       if (res && res.success) {
-        showToast("Đã xóa/ẩn bài viết thành công!");
+        showToast("Đã xóa/ẩn bài viết thành công!", "success");
+        
+        // Optimistic Update: Immediately filter out the deleted post from state so it disappears from UI
+        const deletedId = deletingPost.id;
+        setCustomPosts((prev) => prev.filter((p) => p.id !== deletedId));
+        setPosts((prev) => prev.filter((p) => p.id !== deletedId));
         setDeletingPost(null);
-        loadPosts();
+        
+        // Refresh from server in background to keep totals and pagination consistent
+        await loadPosts();
       } else {
-        showToast(res?.message || "Không thể xóa bài viết.");
+        showToast(res?.message || "Không thể xóa bài viết.", "error");
       }
     } catch (error) {
-      showToast("Có lỗi xảy ra khi xóa bài viết.");
+      showToast("Có lỗi xảy ra khi xóa bài viết.", "error");
     } finally {
       setIsDeletingPost(false);
     }
@@ -345,7 +418,32 @@ export default function InternalEngagementPage() {
     try {
       const res = await internalEngagementService.getLeaderboard();
       if (res.success && res.data) {
-        setLeaderboard(res.data);
+        // Calculate and sort leaderboard dynamically
+        const calculated = res.data.map((item) => {
+          const assigned = Number(item.total_assigned) || 0;
+          const completed = Number(item.total_completed) || 0;
+          const rate = assigned > 0 ? Math.round((completed / assigned) * 1000) / 10 : 0;
+          return {
+            ...item,
+            total_assigned: assigned,
+            total_completed: completed,
+            completion_rate: rate,
+            score: completed, // 1 Completed = 1 Point
+          };
+        });
+
+        const filtered = calculated.filter(
+          (item) => item.total_assigned > 0 || item.total_completed > 0
+        );
+
+        filtered.sort((a, b) => {
+          if (b.completion_rate !== a.completion_rate) {
+            return b.completion_rate - a.completion_rate;
+          }
+          return b.total_completed - a.total_completed;
+        });
+
+        setLeaderboard(filtered);
       }
     } catch {
       // ignore
@@ -615,25 +713,60 @@ export default function InternalEngagementPage() {
   }, [posts, customPosts]);
 
   const realStats = useMemo(() => {
-    const totalSeeder = membersCount > 0 ? membersCount : leaderboard.length > 0 ? leaderboard.length : 32;
-    const receivedCount = allCombinedPosts.length;
-    const interactedCount = leaderboard.filter((item) => item.total_completed > 0).length;
-    const completedFullCount = leaderboard.filter((item) => item.completion_rate >= 100 || (item.total_assigned > 0 && item.total_completed >= item.total_assigned)).length;
-    const pendingCount = leaderboard.filter((item) => item.total_assigned > 0 && item.total_completed === 0).length;
+    // 1. Total Seeders: Distinct members belonging to assigned teams across all active posts
+    const activeAssignedTeams = new Set<string>();
+    allCombinedPosts.forEach((post) => {
+      const teams = (post as any).assigned_team_ids || [];
+      teams.forEach((t: string) => {
+        if (t) activeAssignedTeams.add(t.toLowerCase());
+      });
+    });
 
-    const receivedPercent = Math.min(100, Math.round((receivedCount / Math.max(1, totalSeeder)) * 100));
-    const interactedPercent = Math.min(100, Math.round((interactedCount / Math.max(1, totalSeeder)) * 100));
+    const assignedDbTeams = dbTeams.filter(
+      (t) => activeAssignedTeams.has(t.id.toLowerCase()) || activeAssignedTeams.has(t.name_team.toLowerCase())
+    );
+
+    const totalSeeder = activeAssignedTeams.size === 0
+      ? (dbTeams.reduce((sum, t) => sum + (t.member_count || 0), 0) || (membersCount > 0 ? membersCount : 32))
+      : (assignedDbTeams.reduce((sum, t) => sum + (t.member_count || 0), 0));
+
+    const activePosts = allCombinedPosts.length;
+
+    const totalTargetComments = allCombinedPosts.reduce((sum, post) => {
+      const teams = ((post as any).assigned_team_ids || []).map((t: string) => t?.toLowerCase());
+      if (teams.length === 0) {
+        return sum + totalSeeder;
+      } else {
+        const assignedDbTeams = dbTeams.filter(
+          (t) => teams.includes(t.id.toLowerCase()) || teams.includes(t.name_team.toLowerCase())
+        );
+        const postTarget = assignedDbTeams.reduce((s, t) => s + (t.member_count || 0), 0);
+        return sum + (postTarget || totalSeeder);
+      }
+    }, 0);
+
+    const totalCompletedComments = allCombinedPosts.reduce((sum, post) => {
+      const postTeamStats = teamCounts[post.id] || [];
+      const assignedTeams = (post as any).assigned_team_ids || [];
+      const postInteracted = postTeamStats
+        .filter((t) => assignedTeams.length === 0 || assignedTeams.includes(t.team_id) || assignedTeams.includes(t.team_name))
+        .reduce((s, t) => s + (t.count || 0), 0);
+      return sum + postInteracted;
+    }, 0);
+
+    const activeUniqueMembers = leaderboard.filter((item) => item.total_completed > 0).length;
+
+    const perfectMembers = leaderboard.filter((item) => item.total_completed === item.total_assigned && item.total_assigned > 0).length;
 
     return {
       totalSeeder,
-      receivedCount,
-      receivedPercent,
-      interactedCount,
-      interactedPercent,
-      completedFullCount,
-      pendingCount: pendingCount || Math.max(0, totalSeeder - interactedCount),
+      activePosts,
+      totalTargetComments,
+      totalCompletedComments,
+      activeUniqueMembers,
+      perfectMembers,
     };
-  }, [membersCount, leaderboard, allCombinedPosts]);
+  }, [membersCount, leaderboard, allCombinedPosts, dbTeams, teamCounts]);
 
   // Unified multi-filter algorithm: Search, Campaign, Team, Status
   const filteredPosts = useMemo(() => {
@@ -667,14 +800,12 @@ export default function InternalEngagementPage() {
       }
 
       // 4. Status Filter
-      const markStatus = marks[post.permalink_url || ""] || "need";
-      const targetLikes = Number((post as any).target_likes) || 32;
-      const targetComments = Number((post as any).target_comments) || 32;
-      const targetTotal = Math.max(targetLikes, targetComments);
-      const interactedCount = markStatus === "completed" ? targetTotal : Math.round(targetTotal * 0.65);
-      const progressPercent = Math.min(100, Math.round((interactedCount / Math.max(1, targetTotal)) * 100));
+      const rawTarget = (post as any).target_comments || (post as any).targetComments;
+      const targetTotal = Number(rawTarget) > 0 ? Number(rawTarget) : 32;
+      const postTeamStats = teamCounts[post.id] || [];
+      const interactedCount = postTeamStats.reduce((sum, t) => sum + (t.count || 0), 0);
 
-      const isCompleted = progressPercent >= 100 || markStatus === "completed";
+      const isCompleted = targetTotal > 0 && interactedCount >= targetTotal;
       const isOverdue = (post as any).deadline && new Date((post as any).deadline) < new Date() && !isCompleted;
 
       if (tab === "need" || tab === ("in_progress" as any)) {
@@ -687,7 +818,7 @@ export default function InternalEngagementPage() {
 
       return true;
     });
-  }, [allCombinedPosts, search, selectedCampaignId, selectedTeamFilter, tab, marks, dbTeams]);
+  }, [allCombinedPosts, search, selectedCampaignId, selectedTeamFilter, tab, dbTeams, teamCounts]);
 
   const tabCounts = useMemo(() => {
     let all = allCombinedPosts.length;
@@ -696,13 +827,11 @@ export default function InternalEngagementPage() {
     let overdue = 0;
 
     allCombinedPosts.forEach((post) => {
-      const markStatus = marks[post.permalink_url || ""] || "need";
-      const targetLikes = Number((post as any).target_likes) || 32;
-      const targetComments = Number((post as any).target_comments) || 32;
-      const targetTotal = Math.max(targetLikes, targetComments);
-      const interactedCount = markStatus === "completed" ? targetTotal : Math.round(targetTotal * 0.65);
-      const progressPercent = Math.min(100, Math.round((interactedCount / Math.max(1, targetTotal)) * 100));
-      const isComp = progressPercent >= 100 || markStatus === "completed";
+      const rawTarget = (post as any).target_comments || (post as any).targetComments;
+      const targetTotal = Number(rawTarget) > 0 ? Number(rawTarget) : 32;
+      const postTeamStats = teamCounts[post.id] || [];
+      const interactedCount = postTeamStats.reduce((sum, t) => sum + (t.count || 0), 0);
+      const isComp = targetTotal > 0 && interactedCount >= targetTotal;
       const isOver = (post as any).deadline && new Date((post as any).deadline) < new Date() && !isComp;
 
       if (isComp) completed++;
@@ -711,7 +840,7 @@ export default function InternalEngagementPage() {
     });
 
     return { all, need, completed, overdue, received: need };
-  }, [allCombinedPosts, marks]);
+  }, [allCombinedPosts, teamCounts]);
 
   // Admin/leader: badge "Team X: N tương tác" hiển thị dưới mỗi bài.
   useEffect(() => {
@@ -928,6 +1057,64 @@ export default function InternalEngagementPage() {
     );
   };
 
+  const activeLeaderboard = useMemo(() => {
+    // 1. Tạo danh sách các Team hợp lệ (dựa trên các bài viết đang chạy)
+    const validTeamKeys = new Set<string>();
+    allCombinedPosts.forEach((post: any) => {
+      const assigned = post.assigned_team_ids || [];
+      assigned.forEach((t: string) => validTeamKeys.add(String(t).toLowerCase().trim()));
+    });
+
+    // 2. Lọc danh sách Leaderboard an toàn
+    const filtered = leaderboard.filter((item: any) => {
+      // 2.1. Ai có tương tác thật -> Chắc chắn giữ lại
+      if (item.total_completed > 0) return true;
+
+      const teamName = String(item.team_name || item.team || "").toLowerCase().trim();
+      const teamId = String(item.team_id || "").toLowerCase().trim();
+
+      // 2.2. Xóa sổ ngay lập tức bọn vô gia cư
+      if (!teamName || teamName === "null" || teamName.includes("chưa phân team")) {
+        return false;
+      }
+
+      // 2.3. Nếu không có bài viết nào đang chạy, hiển thị những người có team hợp lệ
+      if (validTeamKeys.size === 0) return true;
+
+      // 2.4. So sánh linh hoạt: Kiểm tra xem Team của user này có nằm trong danh sách bài viết không
+      // Match bằng ID (nếu Backend trả về UUID)
+      if (teamId && validTeamKeys.has(teamId)) return true;
+      // Match bằng Tên (nếu Backend trả về Chuỗi tên)
+      if (teamName && validTeamKeys.has(teamName)) return true;
+
+      // 2.5. Match chéo qua dbTeams (Đề phòng Backend trả về tên nhưng post lại lưu UUID)
+      const matchedDbTeam = dbTeams.find(
+        (t) => t.id.toLowerCase() === teamId || t.name_team.toLowerCase() === teamName
+      );
+      if (matchedDbTeam) {
+        if (validTeamKeys.has(matchedDbTeam.id.toLowerCase())) return true;
+        if (validTeamKeys.has(matchedDbTeam.name_team.toLowerCase())) return true;
+      }
+
+      // Nếu không dính bất kỳ điều kiện nào, user này không thuộc các team đang chạy job
+      return false;
+    });
+
+    // 3. Sắp xếp: Ưu tiên Tỷ lệ (%), sau đó tới Số bài hoàn thành
+    return filtered.sort((a: any, b: any) => {
+      if (b.completion_rate !== a.completion_rate) {
+        return b.completion_rate - a.completion_rate;
+      }
+      return b.total_completed - a.total_completed;
+    });
+  }, [leaderboard, allCombinedPosts, dbTeams]);
+
+  const leaderboardTotalPages = Math.ceil(activeLeaderboard.length / LEADERBOARD_PAGE_SIZE);
+  const paginatedLeaderboard = activeLeaderboard.slice(
+    (leaderboardCurrentPage - 1) * LEADERBOARD_PAGE_SIZE,
+    leaderboardCurrentPage * LEADERBOARD_PAGE_SIZE
+  );
+
   return (
     <div className="w-full bg-[#f7f8fb] text-[#252733]">
       <div className="min-h-screen">
@@ -998,24 +1185,30 @@ export default function InternalEngagementPage() {
               <span className="text-[11px] text-gray-400 font-medium">Thành viên đang hoạt động</span>
             </div>
             <div className="border border-rose-100 rounded-2xl p-4 bg-rose-50/20 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-              <span className="text-xs font-semibold text-rose-600 block">Đã nhận bài</span>
-              <div className="text-2xl font-black text-rose-950 mt-1">{realStats.receivedCount}</div>
-              <span className="text-[11px] text-rose-500 font-medium">Bài viết Seeding nội bộ hiện tại</span>
+              <span className="text-xs font-semibold text-rose-600 block">Bài viết đang chạy</span>
+              <div className="text-2xl font-black text-rose-950 mt-1">{realStats.activePosts}</div>
+              <span className="text-[11px] text-rose-500 font-medium">Bài viết Seeding hiện tại</span>
             </div>
             <div className="border border-emerald-100 rounded-2xl p-4 bg-emerald-50/20 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-              <span className="text-xs font-semibold text-emerald-600 block">Đã tương tác</span>
-              <div className="text-2xl font-black text-emerald-950 mt-1">{realStats.interactedCount}</div>
-              <span className="text-[11px] text-emerald-500 font-medium">{realStats.interactedPercent}% tổng thành viên</span>
+              <span className="text-xs font-semibold text-emerald-600 block">Tiến độ KPI Comment</span>
+              <div className="text-2xl font-black text-emerald-950 mt-1">
+                {realStats.totalCompletedComments} / {realStats.totalTargetComments}
+              </div>
+              <span className="text-[11px] text-emerald-500 font-medium">
+                {Math.round((realStats.totalCompletedComments / Math.max(1, realStats.totalTargetComments)) * 100)}% mục tiêu
+              </span>
             </div>
             <div className="border border-amber-100 rounded-2xl p-4 bg-amber-50/20 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-              <span className="text-xs font-semibold text-amber-600 block">Hoàn thành đầy đủ</span>
-              <div className="text-2xl font-black text-amber-950 mt-1">{realStats.completedFullCount}</div>
-              <span className="text-[11px] text-amber-500 font-medium">Đạt target Comment</span>
+              <span className="text-xs font-semibold text-amber-600 block">Seeder đã tham gia</span>
+              <div className="text-2xl font-black text-amber-950 mt-1">{realStats.activeUniqueMembers}</div>
+              <span className="text-[11px] text-amber-500 font-medium">
+                {Math.round((realStats.activeUniqueMembers / Math.max(1, realStats.totalSeeder)) * 100)}% tổng Seeder
+              </span>
             </div>
-            <div className="border border-red-200 rounded-2xl p-4 bg-red-50/30 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-              <span className="text-xs font-semibold text-red-600 block">Chưa tương tác</span>
-              <div className="text-2xl font-black text-red-950 mt-1">{realStats.pendingCount}</div>
-              <span className="text-[11px] text-red-500 font-medium">Chưa tương tác / Đang quá hạn</span>
+            <div className="border border-blue-200 rounded-2xl p-4 bg-blue-50/30 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+              <span className="text-xs font-semibold text-blue-600 block">Hoàn thành 100%</span>
+              <div className="text-2xl font-black text-blue-950 mt-1">{realStats.perfectMembers}</div>
+              <span className="text-[11px] text-blue-500 font-medium">Đã xong tất cả bài được giao</span>
             </div>
           </div>
 
@@ -1104,7 +1297,7 @@ export default function InternalEngagementPage() {
               <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
                 <span>🏆</span> Xếp hạng Seeder nổi bật
               </h2>
-              <button onClick={loadLeaderboard} className="text-xs text-[#be123c] hover:underline font-semibold">
+              <button onClick={() => { setIsLeaderboardModalOpen(true); setLeaderboardCurrentPage(1); }} className="text-xs text-[#be123c] hover:underline font-semibold">
                 Xem tất cả →
               </button>
             </div>
@@ -1122,14 +1315,14 @@ export default function InternalEngagementPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {leaderboard.length === 0 ? (
+                  {activeLeaderboard.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="py-6 text-center text-gray-400 text-xs">
                         Đang cập nhật dữ liệu bảng xếp hạng...
                       </td>
                     </tr>
                   ) : (
-                    leaderboard.slice(0, 5).map((item, idx) => {
+                    activeLeaderboard.slice(0, 5).map((item, idx) => {
                       const rank = idx + 1;
                       const badgeBg = rank === 1 ? "bg-amber-100 text-amber-800 border-amber-300" : rank === 2 ? "bg-slate-100 text-slate-700 border-slate-300" : rank === 3 ? "bg-orange-100 text-orange-800 border-orange-300" : "bg-gray-50 text-gray-600 border-gray-200";
                       const rankIcon = rank === 1 ? "🥇 1" : rank === 2 ? "🥈 2" : rank === 3 ? "🥉 3" : rank;
@@ -1290,13 +1483,28 @@ export default function InternalEngagementPage() {
                   const campaignName = matchedCamp?.name || (post as any).campaign_name || (post as any).campaignName || null;
 const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode || "#fff1f2";
                   const rawTarget = (post as any).target_comments || (post as any).targetComments;
-                  const targetTotal = Number(rawTarget) > 0 ? Number(rawTarget) : 32;
-
                   const rawDeadline = (post as any).deadline || (post as any).due_date || (post as any).dueDate;
 
                   // TÍNH TOÁN DATA THẬT
                   const postTeamStats = teamCounts[post.id] || [];
-                  const interactedCount = postTeamStats.reduce((sum, t) => sum + (t.count || 0), 0);
+
+                  // Strict Summary Card Scoping: Filter by assigned teams only
+                  const assignedTeams: string[] = (post as any).assigned_team_ids || [];
+                  let targetTotal = 0;
+                  if (assignedTeams.length === 0) {
+                    targetTotal = Number(rawTarget) > 0 ? Number(rawTarget) : (membersCount > 0 ? membersCount : 32);
+                  } else {
+                    targetTotal = dbTeams
+                      .filter((t) => assignedTeams.includes(t.id) || assignedTeams.includes(t.name_team))
+                      .reduce((sum, t) => sum + (t.member_count || 0), 0);
+                    if (targetTotal === 0) {
+                      targetTotal = Number(rawTarget) > 0 ? Number(rawTarget) : 32;
+                    }
+                  }
+
+                  const interactedCount = postTeamStats
+                    .filter((t) => assignedTeams.length === 0 || assignedTeams.includes(t.team_id) || assignedTeams.includes(t.team_name))
+                    .reduce((sum, t) => sum + (t.count || 0), 0);
 
                   const progressPercent = Math.min(100, Math.round((interactedCount / Math.max(1, targetTotal)) * 100));
                   const pendingCount = Math.max(0, targetTotal - interactedCount);
@@ -1304,7 +1512,9 @@ const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode
                   const commentActual = interactedCount;
                   const completedCount = interactedCount;
 
-                  const isCompleted = progressPercent >= 100 || status === "completed";
+                  // Bug 2 Fix: isCompleted only based on actual member count reaching target.
+                  // Do NOT use `status` from `marks` (that tracks the logged-in user's personal mark, not team KPI).
+                  const isCompleted = targetTotal > 0 && interactedCount >= targetTotal;
                   const isOverdue = rawDeadline && new Date(rawDeadline) < new Date() && !isCompleted;
 
                   return (
@@ -1355,7 +1565,8 @@ const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode
                             <div>
                               <div className="font-bold text-sm text-gray-900">{post.fanpage_name || "MARKee AI Marketing"}</div>
                               <div className="text-xs text-gray-400 font-medium">
-                                {fmtRelativeTime(post.created_at)} · {rawDeadline ? `Hạn ${new Date(rawDeadline).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })} hôm nay` : "Đang thực hiện"}
+                                {/* Bug 5 Fix: dùng fmtDeadline thay vì hardcode 'hôm nay' */}
+                                {fmtRelativeTime(post.created_at)} · {fmtDeadline(rawDeadline)}
                               </div>
                             </div>
                           </div>
@@ -1730,6 +1941,22 @@ const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode
                             return true;
                           });
 
+                          // Bug 4 Fix: Sort mặc định — Hoàn thành lên trên (theo thời gian sớm nhất),
+                          // Chưa hoàn thành xuống dưới.
+                          const statusOrder: Record<string, number> = { completed: 0, failed: 1, received: 2, overdue: 3 };
+                          filteredRoster.sort((a, b) => {
+                            const aOrder = statusOrder[a.status] ?? 99;
+                            const bOrder = statusOrder[b.status] ?? 99;
+                            if (aOrder !== bOrder) return aOrder - bOrder;
+                            // Trong cùng nhóm completed: sắp theo thời gian tăng dần (ai làm trước xếp trên)
+                            if (a.status === "completed" && b.status === "completed") {
+                              const aTime = a.raw_created_at ? new Date(a.raw_created_at).getTime() : Infinity;
+                              const bTime = b.raw_created_at ? new Date(b.raw_created_at).getTime() : Infinity;
+                              return aTime - bTime;
+                            }
+                            return 0;
+                          });
+
                           // 2. RENDER GIAO DIỆN
                           if (filteredRoster.length === 0) {
                             return (
@@ -1744,7 +1971,9 @@ const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode
                           return filteredRoster.map((m, idx) => (
                             <tr key={m.id_member || idx} className="hover:bg-gray-50/80">
                               <td className="py-3 font-bold text-gray-900">{m.name}</td>
-                              <td className="py-3 text-gray-500">{m.team}</td>
+                              <td className="py-3 text-gray-500">
+                                {dbTeams.find((t) => t.id === m.team_id || t.name_team.toLowerCase() === (m.team || "").toLowerCase())?.name_team || m.team || "Team"}
+                              </td>
                               <td className="py-3">
                                 <span
                                   className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${m.status === "completed"
@@ -1760,7 +1989,7 @@ const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode
                               <td className="py-3 text-center">
                                 {m.comment ? <span className="text-emerald-600 font-bold">✓</span> : <span className="text-gray-300">—</span>}
                               </td>
-                              <td className="py-3 text-right text-gray-500">{m.time}</td>
+                              <td className="py-3 text-right text-gray-500">{formatMemberTime(m.raw_created_at, m.time)}</td>
                             </tr>
                           ));
                         })()}
@@ -2207,6 +2436,105 @@ const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode
                 >
                   {isSubmittingTask ? "Đang tạo..." : "Tạo bài viết Seeding"}
                 </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Modal Bảng xếp hạng Seeder chi tiết (Phân trang 10 thành viên) */}
+        {isLeaderboardModalOpen ? (
+          <div
+            className="fixed inset-0 bg-[rgba(25,27,35,.42)] flex items-center justify-center z-[40] p-5"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) setIsLeaderboardModalOpen(false);
+            }}
+          >
+            <div className="w-[min(800px,100%)] bg-white rounded-2xl shadow-[0_30px_80px_rgba(0,0,0,.25)] overflow-hidden flex flex-col max-h-[85vh]">
+              <div className="flex justify-between items-center p-5 border-b border-gray-100">
+                <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <span>🏆</span> Bảng xếp hạng Seeder chi tiết
+                </h3>
+                <button
+                  type="button"
+                  className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500 font-bold"
+                  onClick={() => setIsLeaderboardModalOpen(false)}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="p-5 overflow-y-auto flex-1">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        <th className="pb-3 pl-2">Hạng</th>
+                        <th className="pb-3">Thành viên</th>
+                        <th className="pb-3 text-center">Được giao</th>
+                        <th className="pb-3 text-center">Hoàn thành</th>
+                        <th className="pb-3 text-center">Đúng hạn</th>
+                        <th className="pb-3 text-center">Tỷ lệ</th>
+                        <th className="pb-3 text-right pr-2">Điểm</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {paginatedLeaderboard.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="py-6 text-center text-gray-400 text-xs">
+                            Không có dữ liệu.
+                          </td>
+                        </tr>
+                      ) : paginatedLeaderboard.map((item, idx) => {
+                        const rank = (leaderboardCurrentPage - 1) * LEADERBOARD_PAGE_SIZE + idx + 1;
+                        const badgeBg = rank === 1 ? "bg-amber-100 text-amber-800 border-amber-300" : rank === 2 ? "bg-slate-100 text-slate-700 border-slate-300" : rank === 3 ? "bg-orange-100 text-orange-800 border-orange-300" : "bg-gray-50 text-gray-600 border-gray-200";
+                        const rankIcon = rank === 1 ? "🥇 1" : rank === 2 ? "🥈 2" : rank === 3 ? "🥉 3" : rank;
+                        return (
+                          <tr key={item.user_id || idx} className="hover:bg-gray-50/60 transition-colors">
+                            <td className="py-3.5 pl-2">
+                              <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-bold border ${badgeBg}`}>
+                                {rankIcon}
+                              </span>
+                            </td>
+                            <td className="py-3.5">
+                              <div className="font-bold text-gray-900">{item.member_name}</div>
+                              <div className="text-xs text-gray-400 font-normal">{item.team_name}</div>
+                            </td>
+                            <td className="py-3.5 text-center text-gray-700 font-medium">{item.total_assigned}</td>
+                            <td className="py-3.5 text-center text-emerald-600 font-bold">{item.total_completed}</td>
+                            <td className="py-3.5 text-center text-blue-600 font-medium">{item.total_ontime}</td>
+                            <td className="py-3.5 text-center text-gray-700 font-medium">{item.completion_rate}%</td>
+                            <td className="py-3.5 text-right pr-2 font-black text-emerald-600 text-base">{item.score}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Phân trang */}
+              <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
+                <span className="text-xs text-gray-500 font-semibold">
+                  Trang {leaderboardCurrentPage} / {Math.max(1, leaderboardTotalPages)} ({activeLeaderboard.length} thành viên)
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={leaderboardCurrentPage === 1}
+                    onClick={() => setLeaderboardCurrentPage((p) => Math.max(1, p - 1))}
+                    className="px-3 py-1.5 border border-gray-200 bg-white rounded-xl text-xs font-bold disabled:opacity-50 text-gray-700 hover:bg-gray-50 transition"
+                  >
+                    ◀ Trước
+                  </button>
+                  <button
+                    type="button"
+                    disabled={leaderboardCurrentPage >= leaderboardTotalPages}
+                    onClick={() => setLeaderboardCurrentPage((p) => Math.min(leaderboardTotalPages, p + 1))}
+                    className="px-3 py-1.5 border border-gray-200 bg-white rounded-xl text-xs font-bold disabled:opacity-50 text-gray-700 hover:bg-gray-50 transition"
+                  >
+                    Sau ▶
+                  </button>
+                </div>
               </div>
             </div>
           </div>

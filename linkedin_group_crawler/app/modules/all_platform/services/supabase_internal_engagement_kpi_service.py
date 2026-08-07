@@ -12,6 +12,7 @@ import logging
 import re
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 import urllib.parse
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
@@ -77,13 +78,6 @@ def record_action(payload: dict) -> dict:
 
 
 def get_marks_by_links(email_member: str, link_posts: list[str]) -> dict[str, str]:
-    """Bucket each link_post into need/received/completed for this member.
-
-    - "completed": at least one successful action_type='comment' (or any
-      successful reaction) row exists for that link_post.
-    - "received": at least one 'pending'/'failed' row exists but no success.
-    - "need": no row at all.
-    """
     if not link_posts:
         return {}
 
@@ -117,7 +111,6 @@ def get_action_summary(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
 ) -> dict:
-    """Count successful actions by type for a member (simple KPI summary)."""
     supabase: Client = get_supabase_client()
     id_member = _get_member_id(email_member)
     if not id_member:
@@ -145,16 +138,7 @@ def get_action_summary(
     return {"total": len(rows), "by_action_type": by_action_type}
 
 
-# ── Team visibility (admin sees all teams, leader sees own team) ──────────────
-
 def resolve_team_scope(email: str, team_id_filter: Optional[str] = None) -> tuple[list[dict], str]:
-    """Resolve which teams the caller may see, based on their role.
-
-    - admin: every team (or just `team_id_filter` if given, for the dropdown).
-    - leader: only the team(s) they lead — `team_id_filter` is ignored (a
-      leader cannot use it to peek at another team).
-    - member/unknown: no teams (feature is admin/leader only).
-    """
     user = get_user(email)
     role = user.get("role", "member")
     all_teams = get_all_teams()
@@ -174,23 +158,15 @@ def resolve_team_scope(email: str, team_id_filter: Optional[str] = None) -> tupl
 
 
 def _member_team_map(teams: list[dict]) -> dict[str, dict]:
-    """member_id -> {team_id, team_name} (first team wins if a member is in more than one).
-
-    Includes the team's leader too — `get_all_teams()`'s `members` list only
-    holds `member_of_teams` rows, which does NOT include the leader
-    themselves, so without this a leader's own interactions would never show
-    up in their own "xem tương tác thành viên" view."""
+    """member_id -> {team_id, team_name} (Chỉ lấy thành viên được tick, KHÔNG ép Leader vào)."""
     out: dict[str, dict] = {}
     for t in teams:
-        if t.get("id_leader"):
-            out.setdefault(t["id_leader"], {"team_id": t["id"], "team_name": t.get("name_team") or "Team"})
         for m in t.get("members", []):
             out.setdefault(m["id"], {"team_id": t["id"], "team_name": t.get("name_team") or "Team"})
     return out
 
 
 def _enrich_rows(rows: list[dict]) -> list[dict]:
-    """Join id_member -> name/email and id_social_account -> account_name."""
     if not rows:
         return []
     supabase: Client = get_supabase_client()
@@ -230,148 +206,8 @@ def _enrich_rows(rows: list[dict]) -> list[dict]:
     return enriched
 
 
-def get_post_interactions(link_post: str, email: str, team_id: Optional[str] = None) -> dict:
-    """Chi tiết tương tác: Chỉ lấy những Team được giao, và KPI của đúng bài viết này."""
-    teams, role = resolve_team_scope(email, team_id)
-    if not teams:
-        return {"role": role, "teams": [], "items": []}
-
-    supabase: Client = get_supabase_client()
-    
-    # 1. Lấy thông tin bài viết gốc (Deadline + Danh sách Team được giao)
-    post_res = supabase.table("internal_engagement_custom_posts").select("deadline, assigned_team_ids").eq("link_post", link_post).execute()
-    post_data = post_res.data[0] if post_res.data else {}
-    
-    deadline_str = post_data.get("deadline")
-    assigned_team_ids = post_data.get("assigned_team_ids") or []
-    
-    is_past_deadline = False
-    if deadline_str:
-        try:
-            is_past_deadline = datetime.fromisoformat(deadline_str) < datetime.now(timezone.utc)
-        except ValueError:
-            pass
-
-    # 2. CHỐT CHẶN TEAM: Chỉ lấy những Team có trong danh sách được giao
-    valid_teams = []
-    for t in teams:
-        if not assigned_team_ids or t["id"] in assigned_team_ids or t.get("name_team") in assigned_team_ids:
-            valid_teams.append(t)
-
-    # Nếu không có team nào hợp lệ, trả về rỗng ngay để tránh lỗi
-    if not valid_teams:
-        return {"role": role, "teams": [], "items": []}
-
-    member_team = _member_team_map(valid_teams)
-    member_ids = list(member_team.keys())
-
-    if not member_ids:
-        return {"role": role, "teams": [], "items": []}
-
-    users = supabase.table("app_users").select("id, name, email").in_("id", member_ids).execute().data or []
-    user_map = {u["id"]: u for u in users}
-
-    # 3. CHỐT CHẶN KPI: Chỉ lấy KPI của đúng link_post này và của những member hợp lệ
-    kpi_rows = (
-        supabase.table("internal_engagement_kpi")
-        .select("*")
-        .eq("link_post", link_post) 
-        .in_("id_member", member_ids)
-        .order("created_at", desc=True) # Sắp xếp giảm dần để lấy hành động mới nhất
-        .execute()
-    ).data or []
-    
-    # Gom nhóm KPI theo member (Lọc dữ liệu cũ, chỉ giữ record mới nhất nếu họ thao tác nhiều lần)
-    kpi_by_member = {}
-    for row in kpi_rows:
-        m_id = row["id_member"]
-        if m_id not in kpi_by_member:
-            kpi_by_member[m_id] = row
-
-    # 4. Trộn dữ liệu xuất ra UI
-    items = []
-    for m_id, t_info in member_team.items():
-        user = user_map.get(m_id, {})
-        name = user.get("name") or (user.get("email") or "").split("@")[0] or "Thành viên ẩn"
-        
-        kpi = kpi_by_member.get(m_id)
-        if kpi:
-            if kpi["status"] == "success":
-                status, status_label = "completed", "Hoàn thành"
-            else:
-                status, status_label = "failed", "Lỗi / Thất bại"
-            
-            comment_done = kpi.get("action_type") == "comment" and status == "completed"
-            
-            if kpi.get("created_at"):
-                try:
-                    time_str = datetime.fromisoformat(kpi["created_at"]).astimezone().strftime("%H:%M")
-                except Exception:
-                    time_str = kpi["created_at"][:10]
-            else:
-                time_str = "—"
-        else:
-            if is_past_deadline:
-                status, status_label = "overdue", "Quá hạn"
-            else:
-                status, status_label = "received", "Đã nhận"
-            comment_done = False
-            time_str = "Chưa hoàn thành" if status == "received" else "—"
-
-        items.append({
-            "id_member": m_id,
-            "name": name,
-            "team": t_info.get("team_name", "Team"),
-            "status": status,
-            "statusLabel": status_label,
-            "comment": comment_done,
-            "time": time_str
-        })
-
-    return {
-        "role": role,
-        "teams": [{"id": t["id"], "name_team": t.get("name_team")} for t in valid_teams],
-        "items": items,
-    }
-
-
-def get_post_team_counts(link_post: str, email: str, team_id: Optional[str] = None) -> dict:
-    """Per-team interaction counts for one post — for the small badges under a post."""
-    teams, role = resolve_team_scope(email, team_id)
-    if not teams:
-        return {"role": role, "teams": []}
-
-    member_team = _member_team_map(teams)
-    team_meta = {t["id"]: t.get("name_team") or "Team" for t in teams}
-    counts: dict[str, int] = defaultdict(int)
-
-    if member_team:
-        supabase: Client = get_supabase_client()
-        rows = (
-            supabase.table("internal_engagement_kpi")
-            .select("id_member")
-            .eq("link_post", link_post)
-            .eq("status", "success")
-            .in_("id_member", list(member_team.keys()))
-            .execute()
-        ).data or []
-        for row in rows:
-            team_info = member_team.get(row["id_member"])
-            if team_info:
-                counts[team_info["team_id"]] += 1
-
-    return {
-        "role": role,
-        "teams": [
-            {"team_id": tid, "team_name": name, "count": counts.get(tid, 0)}
-            for tid, name in team_meta.items()
-        ],
-    }
-
-
 def get_team_daily_trend(email: str, days: int = 14, team_id: Optional[str] = None) -> dict:
-    """Per-team daily interaction counts for the last `days` days — powers the
-    stability/trend chart (which team engages consistently vs. sporadically)."""
+    """Độ ổn định: Chỉ lấy thành viên được tick rõ ràng trong UI."""
     teams, role = resolve_team_scope(email, team_id)
     if not teams:
         return {"role": role, "teams": []}
@@ -414,8 +250,7 @@ def get_team_totals(
     date_to: Optional[str] = None,
     team_id: Optional[str] = None,
 ) -> dict:
-    """Per-team totals + a simple stability score (share of days in range that
-    had at least one interaction — higher = more consistent, not spiky)."""
+    """Per-team totals + stability score (Chỉ tính members được tick)."""
     teams, role = resolve_team_scope(email, team_id)
     if not teams:
         return {"role": role, "teams": []}
@@ -474,13 +309,11 @@ def get_team_totals(
 
 
 def fetch_facebook_post_metadata(url: str, cookie: Optional[str] = None) -> dict[str, Optional[str]]:
-    """Tự động cào OpenGraph metadata (Tiêu đề, nội dung, hình ảnh, trang) từ link Facebook"""
     debug_res = debug_fetch_facebook_post_metadata(url, cookie=cookie)
     return debug_res.get("metadata", {})
 
 
 def debug_fetch_facebook_post_metadata(url: str, cookie: Optional[str] = None) -> dict:
-    """Hàm Debug kiểm tra xem Facebook trả về status gì và metadata bóc tách được những gì"""
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
@@ -515,7 +348,6 @@ def debug_fetch_facebook_post_metadata(url: str, cookie: Optional[str] = None) -
     }
 
     urls_to_try = [url]
-    # Nếu là link Facebook, thử thêm domain mbasic.facebook.com hoặc m.facebook.com (rất thân thiện với cào HTML)
     if "facebook.com" in url:
         mbasic_url = url.replace("www.facebook.com", "mbasic.facebook.com").replace("web.facebook.com", "mbasic.facebook.com").replace("m.facebook.com", "mbasic.facebook.com")
         if mbasic_url != url:
@@ -536,33 +368,28 @@ def debug_fetch_facebook_post_metadata(url: str, cookie: Optional[str] = None) -
                 if res.status_code != 200 and not debug_info["is_redirected_to_login"]:
                     continue
 
-                # Extract HTML <title>
                 m_html_title = re.search(r'<title[^>]*>(.*?)</title>', res_text, re.IGNORECASE | re.DOTALL)
                 if m_html_title and not debug_info["page_title"]:
                     debug_info["page_title"] = html.unescape(m_html_title.group(1).strip())
 
-                # Extract og:title
                 if not metadata["title"]:
                     m_title = re.search(r'<meta\s+property=["\']og:title["\']\s+content=["\']([^"\']+)["\']', res_text, re.IGNORECASE) or \
                               re.search(r'<meta\s+content=["\']([^"\']+)["\']\s+property=["\']og:title["\']', res_text, re.IGNORECASE)
                     if m_title:
                         metadata["title"] = html.unescape(m_title.group(1))
 
-                # Extract og:description
                 if not metadata["description"]:
                     m_desc = re.search(r'<meta\s+property=["\']og:description["\']\s+content=["\']([^"\']+)["\']', res_text, re.IGNORECASE) or \
                              re.search(r'<meta\s+content=["\']([^"\']+)["\']\s+property=["\']og:description["\']', res_text, re.IGNORECASE)
                     if m_desc:
                         metadata["description"] = html.unescape(m_desc.group(1))
 
-                # Extract og:image
                 if not metadata["image"]:
                     m_img = re.search(r'<meta\s+property=["\']og:image["\']\s+content=["\']([^"\']+)["\']', res_text, re.IGNORECASE) or \
                             re.search(r'<meta\s+content=["\']([^"\']+)["\']\s+property=["\']og:image["\']', res_text, re.IGNORECASE)
                     if m_img:
                         metadata["image"] = html.unescape(m_img.group(1))
 
-                # Extract og:site_name
                 if not metadata["site_name"]:
                     m_site = re.search(r'<meta\s+property=["\']og:site_name["\']\s+content=["\']([^"\']+)["\']', res_text, re.IGNORECASE) or \
                              re.search(r'<meta\s+content=["\']([^"\']+)["\']\s+property=["\']og:site_name["\']', res_text, re.IGNORECASE)
@@ -580,11 +407,8 @@ def debug_fetch_facebook_post_metadata(url: str, cookie: Optional[str] = None) -
 
 
 def extract_fanpage_name_from_meta_or_url(link_post: str, meta: dict) -> str:
-    """Trích xuất tên trang hoặc nhóm từ title/meta hoặc từ URL Facebook"""
     title = meta.get("title") or meta.get("page_title")
     if title:
-        # Ví dụ: "Việc làm CNTT Đà Nẵng - New | 🚀 CMC Global Đà Nẵng..."
-        # Tên trang/nhóm nằm TRƯỚC ký tự '|' (pipe) hoặc '-' đầu tiên
         if "|" in title:
             candidate = title.split("|")[0].strip()
             if candidate and candidate.lower() not in ["facebook", "share"]:
@@ -600,7 +424,6 @@ def extract_fanpage_name_from_meta_or_url(link_post: str, meta: dict) -> str:
     if site_name and site_name.strip().lower() not in ["facebook", "share"]:
         return site_name.strip()
 
-    # Fallback trích xuất từ URL nếu không có title
     if "facebook.com/groups/" in link_post:
         return "Nhóm Facebook"
 
@@ -615,7 +438,6 @@ def extract_fanpage_name_from_meta_or_url(link_post: str, meta: dict) -> str:
 
 
 def clean_facebook_content(meta: dict, fanpage_name: str) -> Optional[str]:
-    """Làm sạch nội dung bài viết: loại bỏ tên trang bị lặp ở đầu và '| Facebook' ở cuối"""
     raw_title = (meta.get("title") or meta.get("page_title") or "").strip()
     raw_desc = (meta.get("description") or "").strip()
 
@@ -648,18 +470,11 @@ _TRACKING_PARAMS = {
 
 
 def clean_url(url: str) -> str:
-    """Làm sạch URL bạo lực theo yêu cầu:
-    1. Nếu có share_url= trong query params -> urllib.parse.unquote giải mã lấy link thật trước.
-    2. Nếu URL chứa /watch (video) -> Giữ lại query ?v=...
-    3. Mọi format khác (posts, permalink, groups, photo, pfbid, share...) -> split('?')[0] chặt sạch rác.
-    4. Strip trailing '#' và '/' để chuẩn hóa tuyệt đối.
-    """
     if not url:
         return ""
 
     cleaned = url.strip()
 
-    # 1. Unquote if share_url parameter exists in query
     if "share_url=" in cleaned:
         try:
             parsed = urlparse(cleaned)
@@ -671,7 +486,6 @@ def clean_url(url: str) -> str:
         except Exception:
             pass
 
-    # 2. If video link with /watch, keep ?v= parameter
     if "/watch" in cleaned:
         try:
             parsed = urlparse(cleaned)
@@ -685,13 +499,10 @@ def clean_url(url: str) -> str:
         except Exception:
             cleaned = cleaned.split("?")[0].rstrip("/#")
     else:
-        # 3. For all other post URLs: split('?')[0] chop off all query parameters!
         cleaned = cleaned.split("?")[0]
 
-    # 4. Strip trailing # and /
     cleaned = cleaned.rstrip("/#")
 
-    # Standardize domain to www.facebook.com
     try:
         parsed = urlparse(cleaned)
         netloc = parsed.netloc
@@ -704,7 +515,6 @@ def clean_url(url: str) -> str:
 
 
 def strip_fb_tracking_params(url_str: str) -> str:
-    """Loại bỏ các query tracking parameters khỏi URL Facebook."""
     return clean_url(url_str)
 
 
@@ -723,11 +533,9 @@ async def normalize_facebook_url_and_scrape(raw_url: str) -> tuple[str, str]:
 
     try:
         async with httpx.AsyncClient(follow_redirects=True, timeout=15.0, headers=headers) as client:
-            # --- BƯỚC 1: Bắt URL gốc sau khi Redirect ---
             first_res = await client.get(initial_clean_url)
             resolved_url = str(first_res.url)
             
-            # BÍ QUYẾT: Đọc HTML tìm og:url để giải mã link /share/ của Facebook
             soup1 = BeautifulSoup(first_res.text or "", "html.parser")
             og_url = soup1.find("meta", property="og:url") or soup1.find("meta", attrs={"name": "og:url"})
             if og_url and og_url.get("content"):
@@ -738,7 +546,6 @@ async def normalize_facebook_url_and_scrape(raw_url: str) -> tuple[str, str]:
             if "/login" not in resolved_url.lower() and "checkpoint" not in resolved_url.lower():
                 final_url = clean_url(resolved_url)
 
-            # --- BƯỚC 2: Tạo URL mbasic từ link gốc để cào Content ---
             urls_to_scrape = [final_url]
             if "facebook.com" in final_url:
                 mbasic = final_url.replace("www.facebook.com", "mbasic.facebook.com").replace("web.facebook.com", "mbasic.facebook.com")
@@ -798,21 +605,14 @@ async def add_custom_post(
     target_comments: int = 32,
     assigned_team_ids: Optional[list] = None,
 ) -> dict:
-    """Lưu link bài viết thủ công vào DB kèm dữ liệu bóc tách/gán mặc định.
-    Googlebot bypass unshorten URL & cào title content (Fallback: Bài viết Facebook - Cần tương tác).
-    Nếu bài viết đã tồn tại nhưng is_deleted = True -> Restore và UPDATE.
-    Nếu bài viết đã tồn tại và is_deleted = False -> Báo lỗi HTTP 400 'Bài viết này đã tồn tại trong hệ thống!'.
-    """
     supabase: Client = get_supabase_client()
     user_id = _get_member_id(email_member)
 
     if not user_id:
         raise Exception("Không tìm thấy thông tin user.")
 
-    # 1. Unshorten, cào content Googlebot & làm sạch bạo lực URL
     clean_url, scraped_content = await normalize_facebook_url_and_scrape(link_post)
 
-    # 2. Kiểm tra bài viết trùng lặp dựa trên clean_url
     existing_res = (
         supabase.table("internal_engagement_custom_posts")
         .select("*")
@@ -822,7 +622,6 @@ async def add_custom_post(
 
     if existing_res.data:
         existing_post = existing_res.data[0]
-        # Nếu bài viết đã tồn tại và đang KHÔNG bị xóa -> Báo lỗi HTTP 400
         if not existing_post.get("is_deleted"):
             raise HTTPException(status_code=400, detail="Bài viết này đã tồn tại trong hệ thống!")
 
@@ -838,7 +637,6 @@ async def add_custom_post(
     now_iso = datetime.now(timezone.utc).isoformat()
     default_deadline = deadline or (datetime.now(timezone.utc) + timedelta(hours=18)).isoformat()
 
-    # 2. Nếu bài viết đã tồn tại và ĐÃ BỊ XÓA (is_deleted = True) -> Restore và UPDATE
     if existing_res.data and existing_post.get("is_deleted"):
         update_payload = {
             "is_deleted": False,
@@ -866,7 +664,6 @@ async def add_custom_post(
         item["platform"] = "facebook"
         return item
 
-    # 3. Chưa từng có -> INSERT mới
     data = {
         "link_post": clean_url,
         "id_member": user_id,
@@ -904,8 +701,9 @@ async def add_custom_post(
         item["platform"] = "facebook"
         return item
 
+
 def get_custom_posts_db(page: int = 1, page_size: int = 20) -> dict:
-    """Lấy danh sách bài viết thủ công (chỉ lấy bài chưa bị xóa is_deleted = false), sắp xếp thời gian mới nhất giảm dần"""
+    """Lấy danh sách bài viết thủ công (chỉ lấy bài chưa bị xóa is_deleted = false)"""
     supabase: Client = get_supabase_client()
     start = (page - 1) * page_size
     end = start + page_size - 1
@@ -942,7 +740,6 @@ def update_custom_post_db(
     target_comments: Optional[int] = None,
     assigned_team_ids: Optional[list] = None,
 ) -> dict:
-    """Cập nhật bài viết thủ công trong DB (nội dung, deadline, target KPI, chiến dịch)"""
     supabase: Client = get_supabase_client()
     user_id = _get_member_id(email_member) if email_member else None
 
@@ -973,7 +770,6 @@ def update_custom_post_db(
 
 
 def delete_custom_post_db(post_id: str, email_member: str) -> dict:
-    """Xóa bài viết thủ công trong DB (Soft delete: is_deleted = true)"""
     supabase: Client = get_supabase_client()
     user_id = _get_member_id(email_member) if email_member else None
 
@@ -996,7 +792,6 @@ def upsert_markee_override_db(
     content: Optional[str] = None,
     media_urls: Optional[list] = None,
 ) -> dict:
-    """Ghi đè thông tin bài viết Markee hoặc đặt is_hidden = true bằng upsert"""
     supabase: Client = get_supabase_client()
     user_id = _get_member_id(email_member) if email_member else None
 
@@ -1024,7 +819,6 @@ def upsert_markee_override_db(
 
 
 def get_markee_overrides_db(markee_post_ids: list[str]) -> dict[str, dict]:
-    """Lấy danh sách bản ghi override của Markee posts"""
     if not markee_post_ids:
         return {}
     supabase: Client = get_supabase_client()
@@ -1038,14 +832,12 @@ def get_markee_overrides_db(markee_post_ids: list[str]) -> dict[str, dict]:
 
 
 def get_seeding_campaigns_db() -> list[dict]:
-    """Lấy danh sách các chiến dịch Seeding"""
     supabase: Client = get_supabase_client()
     res = supabase.table("seeding_campaigns").select("*").order("created_at", desc=True).execute()
     return res.data or []
 
 
 def create_seeding_campaign_db(payload: dict) -> dict:
-    """Tạo mới một chiến dịch Seeding"""
     supabase: Client = get_supabase_client()
     created_by_id = _get_member_id(payload.get("created_by_email")) if payload.get("created_by_email") else None
 
@@ -1064,52 +856,94 @@ def create_seeding_campaign_db(payload: dict) -> dict:
 
 
 def delete_seeding_campaign_db(campaign_id: str) -> dict:
-    """Xóa chiến dịch Seeding từ bảng seeding_campaigns"""
     supabase: Client = get_supabase_client()
     res = supabase.table("seeding_campaigns").delete().eq("id", campaign_id).execute()
     return {"deleted": True, "id": campaign_id}
 
 
 def get_seeder_leaderboard_db() -> list[dict]:
-    """Lấy bảng xếp hạng Seeder nổi bật từ View v_seeder_leaderboard"""
+    """Bypass view v_seeder_leaderboard and compute accurate Seeder leaderboard metrics directly, synchronized with get_all_teams()."""
     supabase: Client = get_supabase_client()
-    try:
-        res = supabase.table("v_seeder_leaderboard").select("*").execute()
-        if res.data:
-            return res.data
-    except Exception as err:
-        logger.warning(f"Không thể query v_seeder_leaderboard view: {err}")
 
-    # Fallback nếu view chưa sẵn sàng
-    members_res = supabase.table("members").select("id, display_name, email, team").execute()
-    teams_res = supabase.table("teams").select("id, name_team").execute()
-    teams_map = {str(t["id"]): t["name_team"] for t in (teams_res.data or [])}
+    # Single Source of Truth for Teams & Members (same as get_post_interactions)
+    all_teams = get_all_teams()
+    member_team_map = _member_team_map(all_teams)  # app_user_id -> {"team_id": ..., "team_name": ...}
+
+    # Map app_users to members for display name and linked id fallback
+    members_res = (
+        supabase.table("members")
+        .select("id, display_name, email, team, linked_user_id, app_users!members_linked_user_id_fkey(name)")
+        .execute()
+    ).data or []
+
+    # Map app_user_id -> member_info dict
+    user_to_member_row = {}
+    for m in members_res:
+        luid = str(m.get("linked_user_id") or "")
+        if luid:
+            user_to_member_row[luid] = m
+        user_to_member_row[str(m["id"])] = m
+
+    posts_res = supabase.table("internal_engagement_custom_posts").select("id, assigned_team_ids, link_post").eq("is_deleted", False).execute()
+    active_posts = posts_res.data or []
 
     kpi_res = supabase.table("internal_engagement_kpi").select("id_member, link_post, status, is_ontime").execute()
     kpi_by_member = defaultdict(list)
     for k in (kpi_res.data or []):
-        kpi_by_member[k["id_member"]].append(k)
+        kpi_by_member[str(k["id_member"])].append(k)
 
     leaderboard = []
-    for m in (members_res.data or []):
-        m_id = m["id"]
-        rows = kpi_by_member.get(m_id, [])
-        assigned_links = set(r["link_post"] for r in rows)
+    # Iterate over exact 20 active members from get_all_teams()
+    for user_id, team_info in member_team_map.items():
+        m_row = user_to_member_row.get(user_id, {})
+        m_id = str(m_row.get("id") or user_id)
+
+        team_id = str(team_info["team_id"]).lower()
+        team_name = team_info["team_name"]
+
+        # Active team identifiers (both ID and lowercased name)
+        m_teams = {team_id, team_name.lower()}
+
+        assigned_links = []
+        for post in active_posts:
+            assigned = post.get("assigned_team_ids") or []
+            if not assigned:
+                assigned_links.append(post["link_post"])
+                continue
+
+            has_match = False
+            for t in assigned:
+                t_str = str(t).lower()
+                if t_str in m_teams or t_str == team_id or t_str == team_name.lower():
+                    has_match = True
+                    break
+            if has_match:
+                assigned_links.append(post["link_post"])
+
+        rows = kpi_by_member.get(user_id, [])
+        success_links = set(r["link_post"] for r in rows if r.get("status") == "success")
+        completed_links = [l for l in assigned_links if l in success_links]
+        ontime_links = [
+            l for l in completed_links 
+            if any(r.get("link_post") == l and r.get("is_ontime", True) for r in rows if r.get("status") == "success")
+        ]
+
         total_assigned = len(assigned_links)
-        completed_links = set(r["link_post"] for r in rows if r.get("status") == "success")
         total_completed = len(completed_links)
-        ontime_links = set(r["link_post"] for r in rows if r.get("status") == "success" and r.get("is_ontime", True))
         total_ontime = len(ontime_links)
 
         rate = round((total_completed / total_assigned * 100), 1) if total_assigned > 0 else 0.0
-        score = round((total_completed * 3) + (total_ontime * 2) + (rate * 0.4))
+        score = total_completed
 
-        team_name = teams_map.get(str(m.get("team")), m.get("team") or "Chưa phân team")
+        app_user_data = m_row.get("app_users") or {}
+        member_name = app_user_data.get("name") or m_row.get("display_name") or m_row.get("email") or "Thành viên ẩn"
+
         leaderboard.append({
             "user_id": m_id,
-            "member_name": m.get("display_name") or m.get("email"),
-            "member_email": m.get("email"),
+            "member_name": member_name,
+            "member_email": m_row.get("email"),
             "team_name": team_name,
+            "team_id": team_info["team_id"],
             "total_assigned": total_assigned,
             "total_completed": total_completed,
             "total_ontime": total_ontime,
@@ -1119,3 +953,220 @@ def get_seeder_leaderboard_db() -> list[dict]:
 
     leaderboard.sort(key=lambda x: (x["score"], x["completion_rate"]), reverse=True)
     return leaderboard
+
+
+def get_post_interactions(link_post: str, email: str, team_id: Optional[str] = None) -> dict:
+    """Chi tiết tương tác: Lấy chuẩn theo Cầu nối linked_user_id."""
+    teams, role = resolve_team_scope(email, team_id)
+    if not teams:
+        return {"role": role, "teams": [], "items": []}
+
+    supabase: Client = get_supabase_client()
+    
+    post_res = supabase.table("internal_engagement_custom_posts").select("deadline, assigned_team_ids").eq("link_post", link_post).execute()
+    post_data = post_res.data[0] if post_res.data else {}
+    deadline_str = post_data.get("deadline")
+    assigned_team_ids = post_data.get("assigned_team_ids") or []
+    
+    is_past_deadline = False
+    if deadline_str:
+        try:
+            is_past_deadline = datetime.fromisoformat(deadline_str) < datetime.now(timezone.utc)
+        except ValueError:
+            pass
+
+    valid_teams = []
+    for t in teams:
+        if not assigned_team_ids or t["id"] in assigned_team_ids or t.get("name_team") in assigned_team_ids:
+            valid_teams.append(t)
+
+    if not valid_teams:
+        return {"role": role, "teams": [], "items": []}
+
+    member_team = _member_team_map(valid_teams)
+    member_ids = list(member_team.keys())
+
+    if not member_ids:
+        return {"role": role, "teams": [], "items": []}
+
+    members_res = supabase.table("members").select("id, linked_user_id").in_("id", member_ids).execute().data or []
+    linked_to_original = {}
+    original_to_linked = {}
+    for m in members_res:
+        orig = str(m["id"])
+        linked = str(m.get("linked_user_id") or orig)
+        linked_to_original[linked] = orig
+        original_to_linked[orig] = linked
+
+    for m_id in member_ids:
+        orig = str(m_id)
+        if orig not in original_to_linked:
+            original_to_linked[orig] = orig
+            linked_to_original[orig] = orig
+
+    linked_user_ids = list(linked_to_original.keys())
+
+    member_team_db = {}
+    mot_res = (
+        supabase.table("member_of_teams")
+        .select("id_member, teams!inner(id, name_team)")
+        .in_("id_member", member_ids)
+        .execute()
+    ).data or []
+    for mot in mot_res:
+        m_id = str(mot["id_member"])
+        t_data = mot.get("teams") or {}
+        if m_id not in member_team_db and t_data:
+            member_team_db[m_id] = {
+                "team_id": t_data.get("id"),
+                "team_name": t_data.get("name_team") or "Team"
+            }
+
+    users = supabase.table("app_users").select("id, name, email").in_("id", linked_user_ids).execute().data or []
+    user_map = {linked_to_original.get(str(u["id"]), str(u["id"])): u for u in users}
+
+    kpi_rows = (
+        supabase.table("internal_engagement_kpi")
+        .select("*")
+        .eq("link_post", link_post)
+        .in_("id_member", linked_user_ids)
+        .order("created_at", desc=True)
+        .execute()
+    ).data or []
+
+    kpi_by_member: dict[str, dict] = {}
+    for row in kpi_rows:
+        linked_id = str(row["id_member"])
+        m_id = linked_to_original.get(linked_id, linked_id)
+        status = row.get("status")
+        if m_id not in kpi_by_member:
+            kpi_by_member[m_id] = row
+        elif status == "success" and kpi_by_member[m_id].get("status") != "success":
+            kpi_by_member[m_id] = row
+
+    items = []
+    for m_id in member_ids:
+        t_info = member_team_db.get(m_id) or member_team.get(m_id) or {}
+        user = user_map.get(m_id, {})
+        name = user.get("name") or (user.get("email") or "").split("@")[0] or "Thành viên ẩn"
+
+        kpi = kpi_by_member.get(m_id)
+        if kpi:
+            if kpi["status"] == "success":
+                status, status_label = "completed", "Hoàn thành"
+            else:
+                status, status_label = "failed", "Lỗi / Thất bại"
+            
+            comment_done = kpi.get("action_type") == "comment" and status == "completed"
+            
+            if kpi.get("created_at"):
+                try:
+                    raw_dt_str = kpi["created_at"]
+                    if raw_dt_str.endswith("Z"):
+                        raw_dt_str = raw_dt_str[:-1] + "+00:00"
+                    parsed_dt = datetime.fromisoformat(raw_dt_str)
+                    if parsed_dt.tzinfo is None:
+                        parsed_dt = parsed_dt.replace(tzinfo=timezone.utc)
+                    local_dt = parsed_dt.astimezone()
+                    time_str = local_dt.strftime("%H:%M %d/%m")
+                    raw_created_at = parsed_dt.isoformat()
+                except Exception:
+                    time_str = kpi["created_at"][:10]
+                    raw_created_at = kpi["created_at"]
+            else:
+                time_str = "—"
+                raw_created_at = None
+        else:
+            if is_past_deadline:
+                status, status_label = "overdue", "Quá hạn"
+            else:
+                status, status_label = "received", "Đã nhận"
+            comment_done = False
+            time_str = "Chưa hoàn thành" if status == "received" else "—"
+            raw_created_at = None
+
+        items.append({
+            "id_member": m_id,
+            "name": name,
+            "team": t_info.get("team_name", "Team"),
+            "team_id": t_info.get("team_id"),
+            "status": status,
+            "statusLabel": status_label,
+            "comment": comment_done,
+            "time": time_str,
+            "raw_created_at": raw_created_at,
+        })
+
+    return {
+        "role": role,
+        "teams": [{"id": t["id"], "name_team": t.get("name_team")} for t in valid_teams],
+        "items": items,
+    }
+
+
+def get_post_team_counts(link_post: str, email: str, team_id: Optional[str] = None) -> dict:
+    teams, role = resolve_team_scope(email, team_id)
+    if not teams:
+        return {"role": role, "teams": []}
+
+    supabase: Client = get_supabase_client()
+
+    post_res = supabase.table("internal_engagement_custom_posts").select("assigned_team_ids").eq("link_post", link_post).execute()
+    post_data = post_res.data[0] if post_res.data else {}
+    assigned_team_ids = post_data.get("assigned_team_ids") or []
+
+    valid_teams = []
+    for t in teams:
+        if not assigned_team_ids or t["id"] in assigned_team_ids or t.get("name_team") in assigned_team_ids:
+            valid_teams.append(t)
+
+    if not valid_teams:
+        return {"role": role, "teams": []}
+
+    member_team = _member_team_map(valid_teams)
+    team_meta = {t["id"]: t.get("name_team") or "Team" for t in valid_teams}
+    counts: dict[str, int] = defaultdict(int)
+
+    if member_team:
+        member_ids = list(member_team.keys())
+        
+        members_res = supabase.table("members").select("id, linked_user_id").in_("id", member_ids).execute().data or []
+        linked_to_original = {}
+        for m in members_res:
+            orig = str(m["id"])
+            linked = str(m.get("linked_user_id") or orig)
+            linked_to_original[linked] = orig
+        
+        for m_id in member_ids:
+            orig = str(m_id)
+            if orig not in linked_to_original.values():
+                linked_to_original[orig] = orig
+        
+        linked_user_ids = list(linked_to_original.keys())
+
+        rows = (
+            supabase.table("internal_engagement_kpi")
+            .select("id_member")
+            .eq("link_post", link_post)
+            .eq("status", "success")
+            .in_("id_member", linked_user_ids)
+            .execute()
+        ).data or []
+
+        distinct_members = set()
+        for row in rows:
+            linked_id = str(row["id_member"])
+            orig_m_id = linked_to_original.get(linked_id, linked_id)
+            if orig_m_id not in distinct_members:
+                distinct_members.add(orig_m_id)
+                team_info = member_team.get(orig_m_id)
+                if team_info:
+                    counts[team_info["team_id"]] += 1
+
+    return {
+        "role": role,
+        "teams": [
+            {"team_id": tid, "team_name": name, "count": counts.get(tid, 0)}
+            for tid, name in team_meta.items()
+        ],
+    }
