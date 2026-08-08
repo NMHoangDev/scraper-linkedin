@@ -192,7 +192,8 @@ async def create_custom_post(payload: AddCustomPostRequest) -> BaseResponse:
             target_comments=payload.target_comments if payload.target_comments is not None else 32,
             assigned_team_ids=payload.assigned_team_ids,
         )
-        return BaseResponse(success=True, data=data)
+        debug_msg = data.pop("_debug_info", None) if isinstance(data, dict) else None
+        return BaseResponse(success=True, message=debug_msg or "Tạo bài viết Seeding thành công!", data=data)
     except HTTPException as http_err:
         raise http_err
     except Exception as e:

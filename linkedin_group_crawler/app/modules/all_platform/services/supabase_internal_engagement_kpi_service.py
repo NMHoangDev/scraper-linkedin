@@ -361,10 +361,12 @@ def debug_fetch_facebook_post_metadata(url: str, cookie: Optional[str] = None) -
             with httpx.Client(follow_redirects=True, timeout=8.0) as client:
                 res = client.get(target, headers=headers)
                 debug_info["http_status"] = res.status_code
-                debug_info["final_url"] = str(res.url)
                 debug_info["is_redirected_to_login"] = "/login" in str(res.url).lower() or "login.php" in str(res.url).lower()
 
                 res_text = res.text
+                if not metadata.get("raw_html"):
+                    metadata["raw_html"] = res_text
+
                 if res.status_code != 200 and not debug_info["is_redirected_to_login"]:
                     continue
 
@@ -380,7 +382,7 @@ def debug_fetch_facebook_post_metadata(url: str, cookie: Optional[str] = None) -
 
                 if not metadata["description"]:
                     m_desc = re.search(r'<meta\s+property=["\']og:description["\']\s+content=["\']([^"\']+)["\']', res_text, re.IGNORECASE) or \
-                             re.search(r'<meta\s+content=["\']([^"\']+)["\']\s+property=["\']og:description["\']', res_text, re.IGNORECASE)
+                              re.search(r'<meta\s+content=["\']([^"\']+)["\']\s+property=["\']og:description["\']', res_text, re.IGNORECASE)
                     if m_desc:
                         metadata["description"] = html.unescape(m_desc.group(1))
 
@@ -406,58 +408,173 @@ def debug_fetch_facebook_post_metadata(url: str, cookie: Optional[str] = None) -
     return debug_info
 
 
+INVALID_FANPAGE_NAMES = {
+    "photo", "photo.php", "photos", "reel", "reels", "post", "posts",
+    "video", "videos", "watch", "permalink", "permalink.php", "story",
+    "story.php", "profile", "profile.php", "groups", "group", "pfbid",
+    "share", "p", "facebook", "log in", "đăng nhập", "chú ý", "null", "none"
+}
+
+
+def clean_fb_string(s: Optional[str]) -> str:
+    if not s:
+        return ""
+    cleaned = html.unescape(str(s)).strip()
+    suffixes = [
+        "| Facebook", "- Facebook", "| Meta", "- Meta",
+        "on Facebook", "trên Facebook", "| FB", "- FB"
+    ]
+    for suf in suffixes:
+        if cleaned.lower().endswith(suf.lower()):
+            cleaned = cleaned[:-len(suf)].strip()
+    return cleaned
+
+
 def extract_fanpage_name_from_meta_or_url(link_post: str, meta: dict) -> str:
-    title = meta.get("title") or meta.get("page_title")
-    if title:
-        if "|" in title:
-            candidate = title.split("|")[0].strip()
-            if candidate and candidate.lower() not in ["facebook", "share"]:
-                return candidate
-        elif " - " in title:
-            candidate = title.split(" - ")[0].strip()
-            if candidate and candidate.lower() not in ["facebook", "share"]:
-                return candidate
-        elif title.strip() and title.strip().lower() not in ["facebook", "share"]:
-            return title.strip()
+    raw_title = meta.get("title") or meta.get("page_title") or meta.get("og:title") or ""
+    raw_desc = meta.get("description") or meta.get("og:description") or ""
 
-    site_name = meta.get("site_name")
-    if site_name and site_name.strip().lower() not in ["facebook", "share"]:
-        return site_name.strip()
+    clean_title = clean_fb_string(raw_title)
+    clean_desc = clean_fb_string(raw_desc)
 
+    # 1. Kỹ thuật "Chẻ chuỗi" (Split) từ Title kết hợp check URL mở rộng (/reel/, /share/...) và so sánh độ dài chuỗi
+    if clean_title:
+        is_video_link = any(k in link_post.lower() for k in ["/reel/", "/reels/", "/videos/", "/watch", "/share/"])
+
+        # Xử lý dấu phân cách |
+        if "|" in clean_title:
+            parts = clean_title.split("|")
+            # Nếu là link video/share HOẶC phần đầu dài hơn phần đuôi (Caption | Tên Page)
+            if is_video_link or len(parts[0].strip()) > len(parts[-1].strip()):
+                candidate = parts[-1].strip()
+            else:
+                candidate = parts[0].strip()
+
+            candidate = clean_fb_string(candidate)
+            if candidate and candidate.lower() not in INVALID_FANPAGE_NAMES and len(candidate) < 100:
+                return candidate
+
+        # Xử lý dấu phân cách -
+        elif " - " in clean_title:
+            parts = clean_title.split(" - ")
+            if is_video_link or len(parts[0].strip()) > len(parts[-1].strip()):
+                candidate = parts[-1].strip()
+            else:
+                candidate = parts[0].strip()
+
+            candidate = clean_fb_string(candidate)
+            if candidate and candidate.lower() not in INVALID_FANPAGE_NAMES and len(candidate) < 100:
+                return candidate
+
+        elif len(clean_title) >= 2 and clean_title.lower() not in INVALID_FANPAGE_NAMES and len(clean_title) < 100:
+            return clean_title
+
+    # 2. Thử bóc từ Meta (cho bài KHÔNG caption)
+    raw_html = meta.get("raw_html") or ""
+    desc_str = raw_desc
+    if not desc_str and raw_html:
+        desc_match = re.search(r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']+)["\']', raw_html, re.IGNORECASE) or \
+                     re.search(r'<meta\s+content=["\']([^"\']+)["\']\s+name=["\']description["\']', raw_html, re.IGNORECASE)
+        if desc_match:
+            desc_str = desc_match.group(1)
+
+    if desc_str:
+        unescaped_desc = html.unescape(desc_str).strip()
+        keywords = ["lượt thích", "đang nói về", "lượt đăng ký", "người theo dõi", "followers", "likes"]
+        if any(kw in unescaped_desc.lower() for kw in keywords):
+            possible_name = re.split(r'\.\s+|\s+-\s+|\s+\|\s+', unescaped_desc)[0].strip()
+            possible_name = clean_fb_string(possible_name)
+            if possible_name and possible_name.lower() not in INVALID_FANPAGE_NAMES:
+                return possible_name
+
+    # 3. Cào sâu vào JSON Relay (Cho bài CÓ caption) - Khóa mục tiêu để tránh bắt nhầm user đang login
+    if raw_html:
+        patterns = [
+            r'"actors"\s*:\s*\[\s*\{\s*"__typename"\s*:\s*"(?:Page|User)"[^}]*?"name"\s*:\s*"([^"]+)"',
+            r'"author"\s*:\s*\{\s*"__typename"\s*:\s*"(?:Page|User)"[^}]*?"name"\s*:\s*"([^"]+)"',
+            r'"owner"\s*:\s*\{\s*"__typename"\s*:\s*"(?:Page|User)"[^}]*?"name"\s*:\s*"([^"]+)"',
+            r'"publisher"\s*:\s*\{\s*"__typename"\s*:\s*"(?:Page|User)"[^}]*?"name"\s*:\s*"([^"]+)"',
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, raw_html)
+            if match:
+                try:
+                    name = match.group(1).encode().decode('unicode-escape', errors='ignore').strip()
+                except Exception:
+                    name = match.group(1).strip()
+                name = clean_fb_string(name)
+                if name and name.lower() not in INVALID_FANPAGE_NAMES and len(name) < 80:
+                    if name != "Họ Nguyễn TênQ":
+                        return name
+
+    # 4. Quét site_name
+    site_name = clean_fb_string(meta.get("site_name") or "")
+    if site_name and site_name.lower() not in INVALID_FANPAGE_NAMES:
+        return site_name
+
+    # 5. Quét từ URL Path (lọc bỏ triệt để các từ khóa rác)
     if "facebook.com/groups/" in link_post:
         return "Nhóm Facebook"
 
-    invalid_subs = ["permalink.php", "story.php", "watch", "photo.php", "groups", "pfbid", "profile.php", "share", "p"]
-    parts = link_post.replace("https://", "").replace("http://", "").replace("www.", "").split("/")
+    parts = link_post.replace("https://", "").replace("http://", "").replace("www.", "").replace("web.", "").replace("m.", "").split("/")
     if len(parts) > 1 and parts[0].startswith("facebook.com"):
         sub = parts[1].split("?")[0].strip()
-        if sub and sub.lower() not in invalid_subs:
+        if sub and sub.lower() not in INVALID_FANPAGE_NAMES:
             return sub
+
+    # 6. CHỈ Fallback khi TOÀN BỘ phương pháp bóc tách (Meta, JSON Regex, URL Path) đều rỗng
+    if "/photo" in link_post.lower() or "fbid=" in link_post.lower() or "set=" in link_post.lower():
+        return "Bài viết Ảnh Facebook"
+    elif "/reel/" in link_post.lower() or "/reels/" in link_post.lower():
+        return "Video Reel Facebook"
 
     return "Markee AI Marketing"
 
 
 def clean_facebook_content(meta: dict, fanpage_name: str) -> Optional[str]:
-    raw_title = (meta.get("title") or meta.get("page_title") or "").strip()
-    raw_desc = (meta.get("description") or "").strip()
+    raw_html = meta.get("raw_html") or ""
+    raw_desc = meta.get("description") or meta.get("og:description") or ""
 
-    clean_title = raw_title
-    for suffix in ["| Facebook", "- Facebook", "| Meta", "- Meta"]:
-        if clean_title.endswith(suffix):
-            clean_title = clean_title[:-len(suffix)].strip()
-
-    if fanpage_name and clean_title.startswith(fanpage_name):
-        clean_title = clean_title[len(fanpage_name):].lstrip(" |-:")
-
-    parts = []
-    if clean_title and clean_title.lower() not in ["facebook", "share"]:
-        parts.append(clean_title)
+    if not raw_desc and raw_html:
+        desc_match = re.search(r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']+)["\']', raw_html, re.IGNORECASE) or \
+                     re.search(r'<meta\s+content=["\']([^"\']+)["\']\s+name=["\']description["\']', raw_html, re.IGNORECASE) or \
+                     re.search(r'<meta\s+property=["\']og:description["\']\s+content=["\']([^"\']+)["\']', raw_html, re.IGNORECASE)
+        if desc_match:
+            raw_desc = desc_match.group(1)
 
     if raw_desc:
-        if not clean_title or (clean_title not in raw_desc and raw_desc not in clean_title):
-            parts.append(raw_desc)
-        elif len(raw_desc) > len(clean_title):
-            parts = [raw_desc]
+        raw_desc = html.unescape(raw_desc).strip()
+
+    stats_keywords = ["lượt thích", "người theo dõi", "đang nói về", "lượt đăng ký", "followers", "likes"]
+    is_stats_desc = any(kw in raw_desc.lower() for kw in stats_keywords)
+
+    clean_desc = clean_fb_string(raw_desc) if not is_stats_desc else ""
+
+    raw_title = clean_fb_string(meta.get("title") or meta.get("page_title") or "")
+    clean_title = raw_title
+    if fanpage_name and clean_title.startswith(fanpage_name):
+        clean_title = clean_title[len(fanpage_name):].strip()
+        for prefix in ["-", "|", ":", "–"]:
+            if clean_title.startswith(prefix):
+                clean_title = clean_title[1:].strip()
+
+    if not clean_title and raw_title:
+        for delim in [" - ", " | ", " : ", " – "]:
+            if delim in raw_title:
+                parts = raw_title.split(delim, 1)
+                if len(parts) > 1 and parts[1].strip():
+                    clean_title = parts[1].strip()
+                    break
+
+    parts = []
+    if clean_title and clean_title.lower() not in INVALID_FANPAGE_NAMES:
+        parts.append(clean_title)
+
+    if clean_desc and clean_desc.lower() not in INVALID_FANPAGE_NAMES:
+        if not clean_title or (clean_title not in clean_desc and clean_desc not in clean_title):
+            parts.append(clean_desc)
+        elif len(clean_desc) > len(clean_title):
+            parts = [clean_desc]
 
     return "\n\n".join(parts) if parts else None
 
@@ -465,7 +582,7 @@ def clean_facebook_content(meta: dict, fanpage_name: str) -> Optional[str]:
 _TRACKING_PARAMS = {
     "mibextid", "ref", "__cft__", "__tn__", "rdid", "wtsid", "sfnsn",
     "paipv", "notif_id", "notif_t", "checkpoint_data", "refsrc", "hrc", "_rdr",
-    "st", "s", "set"
+    "st", "s"
 }
 
 
@@ -486,32 +603,32 @@ def clean_url(url: str) -> str:
         except Exception:
             pass
 
-    if "/watch" in cleaned:
-        try:
-            parsed = urlparse(cleaned)
-            query_params = parse_qs(parsed.query)
-            v_val = query_params.get("v", [None])[0]
-            base_path = cleaned.split("?")[0].rstrip("/#")
-            if v_val:
-                cleaned = f"{base_path}?v={v_val}"
-            else:
-                cleaned = base_path
-        except Exception:
-            cleaned = cleaned.split("?")[0].rstrip("/#")
-    else:
-        cleaned = cleaned.split("?")[0]
-
-    cleaned = cleaned.rstrip("/#")
-
     try:
         parsed = urlparse(cleaned)
         netloc = parsed.netloc
         if netloc in ["m.facebook.com", "mobile.facebook.com", "web.facebook.com", "l.facebook.com", "fb.com"]:
-            cleaned = urlunparse(parsed._replace(netloc="www.facebook.com"))
+            netloc = "www.facebook.com"
+
+        query_params = parse_qs(parsed.query, keep_blank_values=True)
+        # BẮT BUỘC GIỮ LẠI CÁC PARAMS ĐỊNH DANH (fbid, set, story_fbid, id, v, ...), CHỈ LỌC BỎ TRACKING PARAMS RÁC
+        filtered_params = {
+            k: v for k, v in query_params.items()
+            if k.lower() not in _TRACKING_PARAMS
+        }
+
+        new_query = urllib.parse.urlencode(filtered_params, doseq=True)
+        cleaned = urlunparse((
+            parsed.scheme or "https",
+            netloc,
+            parsed.path,
+            parsed.params,
+            new_query,
+            ""
+        ))
     except Exception:
         pass
 
-    return cleaned
+    return cleaned.rstrip("/#")
 
 
 def strip_fb_tracking_params(url_str: str) -> str:
@@ -546,8 +663,10 @@ async def normalize_facebook_url_and_scrape(raw_url: str) -> tuple[str, str]:
             if "/login" not in resolved_url.lower() and "checkpoint" not in resolved_url.lower():
                 final_url = clean_url(resolved_url)
 
+            is_reel = "/reel/" in final_url.lower() or "/reels/" in final_url.lower()
+
             urls_to_scrape = [final_url]
-            if "facebook.com" in final_url:
+            if "facebook.com" in final_url and not is_reel:
                 mbasic = final_url.replace("www.facebook.com", "mbasic.facebook.com").replace("web.facebook.com", "mbasic.facebook.com")
                 if mbasic != final_url:
                     urls_to_scrape.append(mbasic)
@@ -561,8 +680,35 @@ async def normalize_facebook_url_and_scrape(raw_url: str) -> tuple[str, str]:
                 soup = BeautifulSoup(html_text, "html.parser")
 
                 content_text = None
-                og_title = soup.find("meta", property="og:title") or soup.find("meta", attrs={"name": "og:title"})
-                if og_title and og_title.get("content"): content_text = og_title["content"]
+
+                # Bóc tách riêng dành cho Facebook Reel (/reel/ và /reels/)
+                if is_reel:
+                    # 1. Trích xuất caption từ description meta
+                    og_desc = soup.find("meta", property="og:description") or soup.find("meta", attrs={"name": "og:description"}) or soup.find("meta", attrs={"name": "description"})
+                    if og_desc and og_desc.get("content"):
+                        content_text = og_desc["content"]
+
+                    # 2. Quét regex từ JSON script thô của Reel
+                    if not content_text:
+                        reel_msg = re.search(r'"message":\s*\{\s*"text":\s*"([^"]+)"', html_text) or re.search(r'"caption":\s*\{\s*"text":\s*"([^"]+)"', html_text)
+                        if reel_msg:
+                            content_text = reel_msg.group(1).encode().decode('unicode-escape', errors='ignore')
+
+                    # 3. Quét Tên Fanpage / Chủ Reel
+                    owner_name = None
+                    owner_match = re.search(r'"owner":\s*\{\s*"name":\s*"([^"]+)"', html_text) or re.search(r'"owner_name":\s*"([^"]+)"', html_text)
+                    if owner_match:
+                        owner_name = owner_match.group(1).encode().decode('unicode-escape', errors='ignore')
+
+                    if content_text and owner_name and owner_name.lower() not in content_text.lower():
+                        content_text = f"[{owner_name}] {content_text}"
+                    elif owner_name and not content_text:
+                        content_text = f"Video Reel từ {owner_name}"
+
+                # Bóc tách cho bài viết thường / Photo / Video
+                if not content_text:
+                    og_title = soup.find("meta", property="og:title") or soup.find("meta", attrs={"name": "og:title"})
+                    if og_title and og_title.get("content"): content_text = og_title["content"]
                 if not content_text:
                     title_tag = soup.find("title")
                     if title_tag and title_tag.text: content_text = title_tag.text
@@ -631,11 +777,47 @@ async def add_custom_post(
 
     final_fanpage_name = fanpage_name or extract_fanpage_name_from_meta_or_url(clean_url, meta)
     auto_content = clean_facebook_content(meta, final_fanpage_name)
-    final_content = content or auto_content or scraped_content or "Bài viết Facebook - Cần tương tác"
-    final_media_urls = media_urls or ([meta["image"]] if meta.get("image") else [])
+    final_content = content or auto_content or scraped_content
+    if not final_content or final_content == "Bài viết Facebook - Cần tương tác":
+        raw_desc = meta.get("description") or meta.get("og:description") or ""
+        if raw_desc:
+            unescaped_desc = html.unescape(raw_desc).strip()
+            stats_keywords = ["lượt thích", "người theo dõi", "đang nói về", "lượt đăng ký", "followers", "likes"]
+            if not any(kw in unescaped_desc.lower() for kw in stats_keywords) and len(unescaped_desc) > 3:
+                final_content = unescaped_desc
 
+    if not final_content:
+        final_content = "Bài viết Facebook - Cần tương tác"
+
+    # Dọn dẹp Content: Gọt bỏ Tên Fanpage nếu nó bị dính ở đầu Caption
+    if final_fanpage_name and final_content:
+        ignore_names = [
+            "Bài viết Ảnh Facebook", "Video Reel Facebook", "Markee AI Marketing",
+            "Thành viên ẩn", "Nhóm Facebook"
+        ]
+        if final_fanpage_name not in ignore_names:
+            if final_content.startswith(final_fanpage_name):
+                final_content = final_content[len(final_fanpage_name):].strip()
+                while final_content and final_content[0] in ("-", "|", ":", ".", "–", "\n", "\r"):
+                    final_content = final_content[1:].strip()
+
+    final_media_urls = media_urls or ([meta["image"]] if meta.get("image") else [])
     now_iso = datetime.now(timezone.utc).isoformat()
     default_deadline = deadline or (datetime.now(timezone.utc) + timedelta(hours=18)).isoformat()
+
+    raw_html = meta.get("raw_html") or ""
+    title_match = re.search(r'<title[^>]*>(.*?)</title>', raw_html, re.IGNORECASE | re.DOTALL)
+    title_debug = html.unescape(title_match.group(1).strip()) if title_match else "N/A"
+
+    meta_match = re.search(r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']+)["\']', raw_html, re.IGNORECASE) or \
+                 re.search(r'<meta\s+property=["\']og:description["\']\s+content=["\']([^"\']+)["\']', raw_html, re.IGNORECASE)
+    meta_debug = html.unescape(meta_match.group(1).strip()) if meta_match else "N/A"
+
+    json_debug = "NO_JSON_PAGE"
+    if '"__typename":"Page"' in raw_html or '"__typename":"User"' in raw_html or '"__typename": "Page"' in raw_html or '"__typename": "User"' in raw_html:
+        json_debug = "HAS_JSON_PAGE"
+
+    message_debug = f"TITLE: {title_debug} | META: {meta_debug} | JSON_CHECK: {json_debug} | SNIPPET: {raw_html[:3000]}"
 
     if existing_res.data and existing_post.get("is_deleted"):
         update_payload = {
@@ -662,6 +844,7 @@ async def add_custom_post(
         )
         item = res.data[0] if res.data else existing_post
         item["platform"] = "facebook"
+        item["_debug_info"] = message_debug
         return item
 
     data = {
@@ -683,6 +866,7 @@ async def add_custom_post(
         res = supabase.table("internal_engagement_custom_posts").insert(data).execute()
         item = res.data[0] if res.data else {}
         item["platform"] = "facebook"
+        item["_debug_info"] = message_debug
         return item
     except Exception as err:
         logger.error(f"Lỗi khi insert full data vào internal_engagement_custom_posts: {err}")
@@ -699,6 +883,7 @@ async def add_custom_post(
         res = supabase.table("internal_engagement_custom_posts").insert(fallback_data).execute()
         item = res.data[0] if res.data else {}
         item["platform"] = "facebook"
+        item["_debug_info"] = message_debug
         return item
 
 
@@ -869,10 +1054,20 @@ def get_seeder_leaderboard_db() -> list[dict]:
     all_teams = get_all_teams()
     member_team_map = _member_team_map(all_teams)  # app_user_id -> {"team_id": ..., "team_name": ...}
 
+    # Query app_users directly for active users to match get_post_interactions logic
+    active_user_ids = list(member_team_map.keys())
+    app_users_data = (
+        supabase.table("app_users")
+        .select("id, name, email")
+        .in_("id", active_user_ids)
+        .execute()
+    ).data or []
+    app_user_map = {str(u["id"]): u for u in app_users_data}
+
     # Map app_users to members for display name and linked id fallback
     members_res = (
         supabase.table("members")
-        .select("id, display_name, email, team, linked_user_id, app_users!members_linked_user_id_fkey(name)")
+        .select("id, display_name, email, team, linked_user_id")
         .execute()
     ).data or []
 
@@ -893,7 +1088,7 @@ def get_seeder_leaderboard_db() -> list[dict]:
         kpi_by_member[str(k["id_member"])].append(k)
 
     leaderboard = []
-    # Iterate over exact 20 active members from get_all_teams()
+    # Iterate over exact active members from get_all_teams()
     for user_id, team_info in member_team_map.items():
         m_row = user_to_member_row.get(user_id, {})
         m_id = str(m_row.get("id") or user_id)
@@ -935,13 +1130,23 @@ def get_seeder_leaderboard_db() -> list[dict]:
         rate = round((total_completed / total_assigned * 100), 1) if total_assigned > 0 else 0.0
         score = total_completed
 
-        app_user_data = m_row.get("app_users") or {}
-        member_name = app_user_data.get("name") or m_row.get("display_name") or m_row.get("email") or "Thành viên ẩn"
+        # Multi-layer fallback for name: app_users.name -> members.display_name -> email -> email prefix -> "Thành viên ẩn"
+        app_u = app_user_map.get(user_id, {})
+        raw_email = app_u.get("email") or m_row.get("email") or ""
+        email_prefix = raw_email.split("@")[0] if raw_email else ""
+
+        member_name = (
+            app_u.get("name")
+            or m_row.get("display_name")
+            or raw_email
+            or email_prefix
+            or "Thành viên ẩn"
+        )
 
         leaderboard.append({
             "user_id": m_id,
             "member_name": member_name,
-            "member_email": m_row.get("email"),
+            "member_email": raw_email or None,
             "team_name": team_name,
             "team_id": team_info["team_id"],
             "total_assigned": total_assigned,
