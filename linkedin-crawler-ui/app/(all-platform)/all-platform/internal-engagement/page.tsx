@@ -153,9 +153,9 @@ export default function InternalEngagementPage() {
   const [taskLink, setTaskLink] = useState("");
   const [taskCampaignId, setTaskCampaignId] = useState("");
   const [taskDeadline, setTaskDeadline] = useState("");
-  const [taskAssignedTeams, setTaskAssignedTeams] = useState<string[]>(["Sale", "Marketing", "Presale", "Operation"]);
-  const [taskTargetLikes, setTaskTargetLikes] = useState<number>(32);
-  const [taskTargetComments, setTaskTargetComments] = useState<number>(32);
+  const [taskAssignedTeams, setTaskAssignedTeams] = useState<string[]>([]);
+  const [taskTargetLikes, setTaskTargetLikes] = useState<number>(0);
+  const [taskTargetComments, setTaskTargetComments] = useState<number>(0);
   const [taskTargetShares, setTaskTargetShares] = useState<number>(15);
   const [isSubmittingTask, setIsSubmittingTask] = useState(false);
 
@@ -432,18 +432,15 @@ export default function InternalEngagementPage() {
           };
         });
 
-        const filtered = calculated.filter(
-          (item) => item.total_assigned > 0 || item.total_completed > 0
-        );
-
-        filtered.sort((a, b) => {
+        // Sort leaderboard dynamically without stripping unassigned members
+        calculated.sort((a, b) => {
           if (b.completion_rate !== a.completion_rate) {
             return b.completion_rate - a.completion_rate;
           }
           return b.total_completed - a.total_completed;
         });
 
-        setLeaderboard(filtered);
+        setLeaderboard(calculated);
       }
     } catch {
       // ignore
@@ -518,19 +515,31 @@ export default function InternalEngagementPage() {
   };
 
   // Dynamic Target KPI Calculation based on selected teams
+  const totalSelectedMembers = useMemo(() => {
+    if (taskAssignedTeams.length === 0) return 0;
+    if (dbTeams.length > 0) {
+      return dbTeams.reduce((sum, t) => {
+        const isSelected = taskAssignedTeams.includes(t.id) || taskAssignedTeams.includes(t.name_team);
+        return sum + (isSelected ? (t.member_count || 0) : 0);
+      }, 0);
+    }
+    return taskAssignedTeams.length * 5;
+  }, [taskAssignedTeams, dbTeams]);
+
   useEffect(() => {
-    if (dbTeams.length === 0) return;
+    setTaskTargetLikes(totalSelectedMembers);
+    setTaskTargetComments(totalSelectedMembers);
+  }, [totalSelectedMembers]);
 
-    const selectedTeamObjects = dbTeams.filter(
-      (t) => taskAssignedTeams.includes(t.id) || taskAssignedTeams.includes(t.name_team)
-    );
-
-    const totalSelectedMembersCount = selectedTeamObjects.reduce((sum, t) => sum + (t.member_count || 0), 0);
-    const finalTarget = totalSelectedMembersCount > 0 ? totalSelectedMembersCount : (membersCount > 0 ? membersCount : 32);
-
-    setTaskTargetLikes(finalTarget);
-    setTaskTargetComments(finalTarget);
-  }, [taskAssignedTeams, dbTeams, membersCount]);
+  const openCreateTaskModal = () => {
+    setTaskLink("");
+    setTaskCampaignId("");
+    setTaskDeadline("");
+    setTaskAssignedTeams([]);
+    setTaskTargetLikes(0);
+    setTaskTargetComments(0);
+    setIsCreateTaskModalOpen(true);
+  };
 
   const isAllTeamsSelected = useMemo(() => {
     if (dbTeams.length === 0) return false;
@@ -613,11 +622,23 @@ export default function InternalEngagementPage() {
     const fbRegex = /^(https?:\/\/)?(www\.|m\.|mobile\.|web\.)?(facebook\.com|fb\.com|fb\.watch)\/.+$/i;
 
     if (!taskLink.trim()) {
-      return showToast("Vui lòng nhập link bài viết Facebook.", "error");
+      return showToast("Vui lòng nhập link bài viết!", "error");
     }
 
     if (!fbRegex.test(taskLink.trim())) {
       return showToast("Vui lòng nhập đường link Facebook hợp lệ (facebook.com).", "error");
+    }
+
+    if (taskAssignedTeams.length === 0) {
+      return showToast("Vui lòng chọn ít nhất một Team thực hiện!", "error");
+    }
+
+    const targetComm = Number(taskTargetComments);
+    if (isNaN(targetComm) || targetComm <= 0 || targetComm > totalSelectedMembers) {
+      return showToast(
+        `Số lượng Target Comment phải từ 1 đến tối đa ${totalSelectedMembers} (tương ứng tổng số thành viên đã chọn)!`,
+        "error"
+      );
     }
 
     if (!user?.email) {
@@ -627,14 +648,19 @@ export default function InternalEngagementPage() {
     setIsSubmittingTask(true);
     try {
       const selectedCamp = campaigns.find((c) => c.id === taskCampaignId);
-      const targetComm = Number(taskTargetComments) > 0 ? Number(taskTargetComments) : (membersCount > 0 ? membersCount : 32);
 
       const resolvedTeamUUIDs = taskAssignedTeams
         .map((val) => {
-          const match = dbTeams.find((t) => t.id === val || t.name_team === val);
+          const match = dbTeams.find(
+            (t) =>
+              t.id === val ||
+              t.name_team === val ||
+              t.name_team.toLowerCase().includes(val.toLowerCase()) ||
+              val.toLowerCase().includes(t.name_team.toLowerCase())
+          );
           return match ? match.id : val;
         })
-        .filter((id) => Boolean(id));
+        .filter((id) => Boolean(id) && id.length > 20);
 
       const payload = {
         link: taskLink.trim(),
@@ -655,6 +681,8 @@ export default function InternalEngagementPage() {
         setTaskCampaignId("");
         setTaskDeadline("");
         setTaskAssignedTeams([]);
+        setTaskTargetComments(0);
+        setTaskTargetLikes(0);
         await loadPosts();
       } else {
         showToast(res?.message || "Lỗi khi tạo bài viết Seeding.", "error");
@@ -713,26 +741,17 @@ export default function InternalEngagementPage() {
   }, [posts, customPosts]);
 
   const realStats = useMemo(() => {
-    // 1. Total Seeders: Distinct members belonging to assigned teams across all active posts
-    const activeAssignedTeams = new Set<string>();
-    allCombinedPosts.forEach((post) => {
-      const teams = (post as any).assigned_team_ids || [];
-      teams.forEach((t: string) => {
-        if (t) activeAssignedTeams.add(t.toLowerCase());
-      });
-    });
-
-    const assignedDbTeams = dbTeams.filter(
-      (t) => activeAssignedTeams.has(t.id.toLowerCase()) || activeAssignedTeams.has(t.name_team.toLowerCase())
-    );
-
-    const totalSeeder = activeAssignedTeams.size === 0
-      ? (dbTeams.reduce((sum, t) => sum + (t.member_count || 0), 0) || (membersCount > 0 ? membersCount : 32))
-      : (assignedDbTeams.reduce((sum, t) => sum + (t.member_count || 0), 0));
+    // 1. Total Seeders: Total active members across all teams in company (always 20)
+    const totalSeeder = dbTeams.reduce((sum, t) => sum + (t.member_count || 0), 0) || (membersCount > 0 ? membersCount : 20);
 
     const activePosts = allCombinedPosts.length;
 
+    // 3. Target KPI Comments: Sum of post.target_comments across active posts (e.g. 20 + 20 + 6 = 46)
     const totalTargetComments = allCombinedPosts.reduce((sum, post) => {
+      const rawTarget = Number((post as any).target_comments);
+      if (!isNaN(rawTarget) && rawTarget > 0) {
+        return sum + rawTarget;
+      }
       const teams = ((post as any).assigned_team_ids || []).map((t: string) => t?.toLowerCase());
       if (teams.length === 0) {
         return sum + totalSeeder;
@@ -1058,56 +1077,23 @@ export default function InternalEngagementPage() {
   };
 
   const activeLeaderboard = useMemo(() => {
-    // 1. Tạo danh sách các Team hợp lệ (dựa trên các bài viết đang chạy)
-    const validTeamKeys = new Set<string>();
-    allCombinedPosts.forEach((post: any) => {
-      const assigned = post.assigned_team_ids || [];
-      assigned.forEach((t: string) => validTeamKeys.add(String(t).toLowerCase().trim()));
-    });
-
-    // 2. Lọc danh sách Leaderboard an toàn
+    // Keep all valid company members (only filter out unassigned/null entries)
     const filtered = leaderboard.filter((item: any) => {
-      // 2.1. Ai có tương tác thật -> Chắc chắn giữ lại
-      if (item.total_completed > 0) return true;
-
       const teamName = String(item.team_name || item.team || "").toLowerCase().trim();
-      const teamId = String(item.team_id || "").toLowerCase().trim();
-
-      // 2.2. Xóa sổ ngay lập tức bọn vô gia cư
       if (!teamName || teamName === "null" || teamName.includes("chưa phân team")) {
         return false;
       }
-
-      // 2.3. Nếu không có bài viết nào đang chạy, hiển thị những người có team hợp lệ
-      if (validTeamKeys.size === 0) return true;
-
-      // 2.4. So sánh linh hoạt: Kiểm tra xem Team của user này có nằm trong danh sách bài viết không
-      // Match bằng ID (nếu Backend trả về UUID)
-      if (teamId && validTeamKeys.has(teamId)) return true;
-      // Match bằng Tên (nếu Backend trả về Chuỗi tên)
-      if (teamName && validTeamKeys.has(teamName)) return true;
-
-      // 2.5. Match chéo qua dbTeams (Đề phòng Backend trả về tên nhưng post lại lưu UUID)
-      const matchedDbTeam = dbTeams.find(
-        (t) => t.id.toLowerCase() === teamId || t.name_team.toLowerCase() === teamName
-      );
-      if (matchedDbTeam) {
-        if (validTeamKeys.has(matchedDbTeam.id.toLowerCase())) return true;
-        if (validTeamKeys.has(matchedDbTeam.name_team.toLowerCase())) return true;
-      }
-
-      // Nếu không dính bất kỳ điều kiện nào, user này không thuộc các team đang chạy job
-      return false;
+      return true;
     });
 
-    // 3. Sắp xếp: Ưu tiên Tỷ lệ (%), sau đó tới Số bài hoàn thành
+    // Sort by completion rate (%) desc, then total completed desc
     return filtered.sort((a: any, b: any) => {
       if (b.completion_rate !== a.completion_rate) {
         return b.completion_rate - a.completion_rate;
       }
       return b.total_completed - a.total_completed;
     });
-  }, [leaderboard, allCombinedPosts, dbTeams]);
+  }, [leaderboard]);
 
   const leaderboardTotalPages = Math.ceil(activeLeaderboard.length / LEADERBOARD_PAGE_SIZE);
   const paginatedLeaderboard = activeLeaderboard.slice(
@@ -1152,7 +1138,7 @@ export default function InternalEngagementPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setIsCreateTaskModalOpen(true)}
+                onClick={openCreateTaskModal}
                 className="px-4 py-2.5 bg-[#be123c] hover:bg-[#9f1239] text-white rounded-xl text-[13px] font-bold shadow-sm transition flex items-center gap-2"
               >
                 <span className="text-base font-bold">+</span> Thêm bài viết Seeding
@@ -2404,17 +2390,31 @@ const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-xs font-bold text-rose-900">💬 Target KPI Comment tự động:</span>
                     <span className="text-[11px] font-semibold text-rose-600">
-                      Tự động tính theo tổng {taskTargetComments} thành viên được giao
+                      {totalSelectedMembers === 0
+                        ? "Tự động tính theo tổng 0 thành viên được giao"
+                        : `Tự động tính theo tổng ${totalSelectedMembers} thành viên được giao (Tối đa: ${totalSelectedMembers})`}
                     </span>
                   </div>
                   <div>
                     <label className="text-[11px] font-semibold text-gray-600 block mb-1">Target Comment (Mục tiêu số lượt Comment):</label>
                     <input
                       type="number"
+                      min={1}
+                      max={totalSelectedMembers > 0 ? totalSelectedMembers : 1}
                       value={taskTargetComments}
                       onChange={(e) => setTaskTargetComments(Number(e.target.value))}
+                      disabled={isSubmittingTask}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none bg-white font-bold text-gray-900 focus:border-rose-500"
                     />
+                    {totalSelectedMembers === 0 ? (
+                      <p className="text-[11px] font-semibold text-amber-600 mt-1 flex items-center gap-1">
+                        ⚠️ Vui lòng chọn ít nhất một Team thực hiện ở trên.
+                      </p>
+                    ) : (taskTargetComments <= 0 || taskTargetComments > totalSelectedMembers) ? (
+                      <p className="text-[11px] font-semibold text-red-600 mt-1 flex items-center gap-1">
+                        ⚠️ Target Comment phải từ 1 đến tối đa {totalSelectedMembers}.
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               </div>
