@@ -3,7 +3,11 @@ pulled from MarkeeAI, for employees to seed-comment/react on internally."""
 
 from __future__ import annotations
 
+import logging
+from typing import Optional
 from fastapi import APIRouter, HTTPException
+
+logger = logging.getLogger(__name__)
 
 from app.modules.all_platform.schemas import (
     BaseResponse,
@@ -42,6 +46,7 @@ from app.modules.all_platform.services.supabase_internal_engagement_kpi_service 
     get_team_daily_trend,
     get_team_totals,
     record_action,
+    sync_facebook_post_engagement_db,
     update_custom_post_db,
     upsert_markee_override_db,
 )
@@ -250,6 +255,14 @@ def list_custom_posts(page: int = 1, page_size: int = 20) -> BaseResponse:
                 "deadline": str(p.get("deadline")) if p.get("deadline") else None,
                 "target_comments": p.get("target_comments"),
                 "assigned_team_ids": p.get("assigned_team_ids") or [],
+                "public_likes": p.get("public_likes") or p.get("fb_total_likes") or 0,
+                "public_comments": p.get("public_comments") or p.get("fb_total_comments") or 0,
+                "public_shares": p.get("public_shares") or p.get("fb_total_shares") or 0,
+                "fb_total_likes": p.get("public_likes") or p.get("fb_total_likes") or 0,
+                "fb_total_comments": p.get("public_comments") or p.get("fb_total_comments") or 0,
+                "fb_total_shares": p.get("public_shares") or p.get("fb_total_shares") or 0,
+                "synced_at": str(p.get("synced_at") or p.get("last_synced_at")) if (p.get("synced_at") or p.get("last_synced_at")) else None,
+                "last_synced_at": str(p.get("synced_at") or p.get("last_synced_at")) if (p.get("synced_at") or p.get("last_synced_at")) else None,
             })
         
         return BaseResponse(
@@ -258,6 +271,24 @@ def list_custom_posts(page: int = 1, page_size: int = 20) -> BaseResponse:
         )
     except Exception as e:
         return BaseResponse(success=False, message=str(e))
+
+
+@router.post("/custom-posts/{post_id}/sync", response_model=BaseResponse)
+@router.post("/posts/{post_id}/sync", response_model=BaseResponse)
+def sync_post_metrics_endpoint(post_id: str, cookie: Optional[str] = None) -> BaseResponse:
+    """API cào lại dữ liệu số lượng Like, Comment, Share thực tế từ Facebook và lưu vào DB"""
+    try:
+        data = sync_facebook_post_engagement_db(post_id=post_id, cookie=cookie)
+        return BaseResponse(
+            success=True,
+            message="Đồng bộ chỉ số bài viết gốc từ Facebook thành công!",
+            data=data,
+        )
+    except HTTPException as http_err:
+        raise http_err
+    except Exception as e:
+        logger.error(f"Lỗi khi đồng bộ chỉ số bài viết {post_id}: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/my-marks", response_model=BaseResponse)
 def my_marks(payload: MyMarksRequest) -> BaseResponse:

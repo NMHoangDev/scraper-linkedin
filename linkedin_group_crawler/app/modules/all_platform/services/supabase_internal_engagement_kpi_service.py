@@ -1375,3 +1375,193 @@ def get_post_team_counts(link_post: str, email: str, team_id: Optional[str] = No
             for tid, name in team_meta.items()
         ],
     }
+
+
+def parse_formatted_number(val: Union[str, int, float, None]) -> int:
+    """
+    Chuyển đổi các chuỗi số tương tác định dạng Facebook/MXH về số nguyên (Integer).
+    - "1,2K" / "1.2k" -> 1200
+    - "1.5 Tr" / "1.5M" -> 1500000
+    - "123.456" / "123,456" -> 123456
+    - "15K lượt thích" -> 15000
+    """
+    if val is None:
+        return 0
+    if isinstance(val, (int, float)):
+        return int(val)
+
+    s = str(val).strip().lower()
+    if not s:
+        return 0
+
+    s = re.sub(
+        r'(lượt thích|bình luận|thảo luận|lượt chia sẻ|chia sẻ|người theo dõi|likes?|comments?|shares?|followers?)',
+        '',
+        s
+    ).strip()
+
+    match_unit = re.search(r'([\d.,]+)\s*(k|m|tr|b)?', s)
+    if not match_unit:
+        return 0
+
+    num_str = match_unit.group(1)
+    unit = match_unit.group(2)
+
+    try:
+        if unit:
+            num_clean = num_str.replace(',', '.')
+            val_float = float(num_clean)
+
+            if unit == 'k':
+                return int(val_float * 1000)
+            elif unit in ('m', 'tr'):
+                return int(val_float * 1000000)
+            elif unit == 'b':
+                return int(val_float * 1000000000)
+
+        if re.match(r'^\d{1,3}([.,]\d{3})+$', num_str):
+            num_clean = re.sub(r'[.,]', '', num_str)
+            return int(num_clean)
+
+        num_clean = num_str.replace(',', '.')
+        return int(float(num_clean))
+    except Exception:
+        return 0
+
+
+def extract_facebook_post_engagement_stats(meta: dict) -> dict:
+    stats = {"likes": 0, "comments": 0, "shares": 0}
+    raw_html = meta.get("raw_html") or ""
+    raw_desc = meta.get("description") or meta.get("og:description") or ""
+
+    # BƯỚC 1: QUÉT JSON REGEX TRƯỚC (Số liệu JSON GraphQL luôn chuẩn xác 100%, không dính text Page)
+    if raw_html:
+        # 1. Mảng quét LIKES / REACTIONS
+        like_pats = [
+            r'"reaction_count"\s*:\s*\{\s*"count"\s*:\s*(\d+)',  # Bài thường
+            r'"i18n_reaction_count"\s*:\s*"([\d.,]+[kKmMbBtrTR]?)"',  # Bài thường (dự phòng)
+            r'"unified_reactors"\s*:\s*\{\s*"count"\s*:\s*(\d+)',  # Reels
+            r'"likers"\s*:\s*\{\s*"count"\s*:\s*(\d+)',  # Reels (dự phòng)
+        ]
+        for pat in like_pats:
+            m = re.search(pat, raw_html)
+            if m:
+                val = parse_formatted_number(m.group(1))
+                if val > 0:
+                    stats["likes"] = val
+                    break
+
+        # 2. Mảng quét COMMENTS
+        comment_pats = [
+            r'"comment_rendering_instance"\s*:\s*\{\s*"comments"\s*:\s*\{\s*"total_count"\s*:\s*(\d+)',  # Bài thường
+            r'"total_comment_count"\s*:\s*(\d+)',  # Reels
+            r'"comments"\s*:\s*\{\s*"total_count"\s*:\s*(\d+)',
+            r'"comment_count"\s*:\s*\{\s*"total_count"\s*:\s*(\d+)',
+        ]
+        for pat in comment_pats:
+            m = re.search(pat, raw_html)
+            if m:
+                val = parse_formatted_number(m.group(1))
+                if val > 0:
+                    stats["comments"] = val
+                    break
+
+        # 3. Mảng quét SHARES
+        share_pats = [
+            r'"share_count"\s*:\s*\{\s*"count"\s*:\s*(\d+)',  # Bài thường
+            r'"i18n_share_count"\s*:\s*"([\d.,]+[kKmMbBtrTR]?)"',  # Bài thường (dự phòng)
+            r'"share_count_reduced"\s*:\s*"([\d.,]+[kKmMbBtrTR]?)"',  # Reels
+            r'"share_count_reduced"\s*:\s*(\d+)',
+        ]
+        for pat in share_pats:
+            m = re.search(pat, raw_html)
+            if m:
+                val = parse_formatted_number(m.group(1))
+                if val > 0:
+                    stats["shares"] = val
+                    break
+
+    # BƯỚC 2: FALLBACK SANG META DESCRIPTION NẾU JSON TRẢ VỀ 0
+    desc_text = html.unescape(raw_desc or "")
+    if not desc_text and raw_html:
+        m_desc = re.search(r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']+)["\']', raw_html, re.IGNORECASE) or \
+                 re.search(r'<meta\s+property=["\']og:description["\']\s+content=["\']([^"\']+)["\']', raw_html, re.IGNORECASE)
+        if m_desc:
+            desc_text = html.unescape(m_desc.group(1))
+
+    if desc_text:
+        # TIỀN XỬ LÝ: Xóa bỏ các cụm số liệu của Fanpage ở đầu chuỗi (Followers, Page Likes, Đang nói về...)
+        clean_desc = re.sub(
+            r'[\d.,]+\s*[kKmMbBtrTR]?\s*(?:người theo dõi|lượt thích trang|followers|page likes|đang nói về|lượt đăng ký)',
+            '',
+            desc_text,
+            flags=re.IGNORECASE
+        )
+
+        if stats["likes"] == 0:
+            like_matches = re.findall(r'([\d.,]+\s*(?:k|m|tr|b)?)\s*(?:lượt thích|thích|likes?|reactions?)', clean_desc, re.IGNORECASE)
+            if like_matches:
+                stats["likes"] = parse_formatted_number(like_matches[-1])
+
+        if stats["comments"] == 0:
+            comment_matches = re.findall(r'([\d.,]+\s*(?:k|m|tr|b)?)\s*(?:bình luận|thảo luận|comments?)', clean_desc, re.IGNORECASE)
+            if comment_matches:
+                stats["comments"] = parse_formatted_number(comment_matches[-1])
+
+        if stats["shares"] == 0:
+            share_matches = re.findall(r'([\d.,]+\s*(?:k|m|tr|b)?)\s*(?:lượt chia sẻ|chia sẻ|shares?)', clean_desc, re.IGNORECASE)
+            if share_matches:
+                stats["shares"] = parse_formatted_number(share_matches[-1])
+
+    return stats
+
+
+def sync_facebook_post_engagement_db(post_id: str, cookie: Optional[str] = None) -> dict:
+    """
+    Cào lại dữ liệu Like, Comment, Share từ Facebook và cập nhật đè 4 trường dữ liệu vào DB.
+    """
+    supabase: Client = get_supabase_client()
+    
+    post_res = (
+        supabase.table("internal_engagement_custom_posts")
+        .select("*")
+        .eq("id", post_id)
+        .execute()
+    )
+
+    if not post_res.data:
+        raise Exception("Không tìm thấy bài viết hoặc bài viết đã bị xóa.")
+
+    post = post_res.data[0]
+    if post.get("is_deleted"):
+        raise Exception("Bài viết này đã bị xóa khỏi hệ thống.")
+
+    link_post = post.get("link_post")
+    if not link_post:
+        raise Exception("Bài viết không có link liên kết Facebook hợp lệ.")
+
+    meta = fetch_facebook_post_metadata(link_post, cookie=cookie)
+    stats = extract_facebook_post_engagement_stats(meta)
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    update_data: dict = {
+        "fb_total_likes": stats["likes"],
+        "fb_total_comments": stats["comments"],
+        "fb_total_shares": stats["shares"],
+        "last_synced_at": now_iso,
+        "updated_at": now_iso,
+    }
+
+    res = (
+        supabase.table("internal_engagement_custom_posts")
+        .update(update_data)
+        .eq("id", post_id)
+        .execute()
+    )
+
+    result_data = res.data[0] if res.data else {**post, **update_data}
+    result_data["public_likes"] = result_data.get("fb_total_likes", stats["likes"])
+    result_data["public_comments"] = result_data.get("fb_total_comments", stats["comments"])
+    result_data["public_shares"] = result_data.get("fb_total_shares", stats["shares"])
+    result_data["synced_at"] = result_data.get("last_synced_at", now_iso)
+    return result_data

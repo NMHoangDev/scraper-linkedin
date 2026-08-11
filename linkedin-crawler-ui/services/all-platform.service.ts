@@ -342,7 +342,19 @@ export const internalEngagementService = {
     });
   },
 
-  overrideMarkeePost: (id: string, payload: { email: string; content?: string; fanpage_name?: string; media_urls?: string[] }): Promise<ApiResponse<any>> => {
+  overrideMarkeePost: (id: string, payload: {
+    email: string;
+    content?: string;
+    fanpage_name?: string;
+    media_urls?: string[];
+    campaign_id?: string;
+    campaign_name?: string;
+    deadline?: string;
+    target_likes?: number;
+    target_comments?: number;
+    target_shares?: number;
+    assigned_team_ids?: string[];
+  }): Promise<ApiResponse<any>> => {
     return requestJson(`${BASE}/internal-engagement/markee-posts/${encodeURIComponent(id)}/override`, {
       method: "PUT",
       body: JSON.stringify(payload),
@@ -353,6 +365,12 @@ export const internalEngagementService = {
     return requestJson(`${BASE}/internal-engagement/markee-posts/${encodeURIComponent(id)}/override`, {
       method: "DELETE",
       body: JSON.stringify({ email }),
+    });
+  },
+
+  syncPostMetrics: (postId: string): Promise<ApiResponse<any>> => {
+    return requestJson(`${BASE}/internal-engagement/custom-posts/${encodeURIComponent(postId)}/sync`, {
+      method: "POST",
     });
   },
 
