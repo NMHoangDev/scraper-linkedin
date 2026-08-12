@@ -24,6 +24,7 @@ from app.modules.all_platform.schemas.internal_engagement import (
     CreateSeedingCampaignRequest,
     DebugFetchMetaRequest,
     DeleteCustomPostRequest,
+    MarkActionRequest,
     OverrideMarkeePostRequest,
     UpdateCustomPostRequest,
 )
@@ -45,6 +46,7 @@ from app.modules.all_platform.services.supabase_internal_engagement_kpi_service 
     get_seeding_campaigns_db,
     get_team_daily_trend,
     get_team_totals,
+    mark_action_by_fb_uid,
     record_action,
     sync_facebook_post_engagement_db,
     update_custom_post_db,
@@ -306,10 +308,33 @@ def record_kpi_action(payload: InternalEngagementActionRecordRequest) -> BaseRes
     """Record the final result of one comment/reaction/share attempt made by the
     extension. Called by the extension itself right after it executes an action
     (success or failure), so status/error_message reflect the real outcome."""
+    print(f"Nhận request KPI: {payload.model_dump(exclude_none=True)}")
     try:
         data = record_action(payload.model_dump(exclude_none=True))
         return BaseResponse(success=True, data=data)
     except Exception as e:
+        print(f"[KPI RECORD ERROR] Lỗi khi lưu KPI: {e}")
+        return BaseResponse(success=False, message=str(e))
+
+
+@router.post("/mark-action", response_model=BaseResponse)
+@router.post("/kpi/mark-done", response_model=BaseResponse)
+def mark_action_endpoint(payload: MarkActionRequest) -> BaseResponse:
+    """API ghi nhận hành động tương tác (Like, Comment, Share) từ Extension hoặc FE vào bảng KPI"""
+    try:
+        data = mark_action_by_fb_uid(
+            action_type=payload.action_type,
+            fb_uid=payload.fb_uid,
+            post_url=payload.post_url,
+            email_member=payload.email_member,
+        )
+        return BaseResponse(
+            success=True,
+            message=f"Đã ghi nhận {payload.action_type} thành công!",
+            data=data,
+        )
+    except Exception as e:
+        logger.error(f"Lỗi khi mark action {payload.action_type}: {e}")
         return BaseResponse(success=False, message=str(e))
 
 

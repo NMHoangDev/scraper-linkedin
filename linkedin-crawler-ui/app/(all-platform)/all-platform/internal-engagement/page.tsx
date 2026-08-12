@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { FaFacebook, FaLinkedin, FaYoutube, FaTiktok, FaLink } from "react-icons/fa6";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { API_BASE_URL } from "@/lib/env";
 import {
@@ -23,6 +24,43 @@ import { TeamPerformancePanel } from "@/components/all-platform/internal-engagem
 type TaskStatusTab = "all" | "need" | "received" | "completed";
 type SourceTab = "markee" | "custom";
 
+const getPlatformIcon = (url?: string) => {
+  if (!url) {
+    return (
+      <div className="w-8 h-8 rounded-full bg-gray-100 text-gray-500 grid place-items-center shrink-0 shadow-xs" title="Link">
+        <FaLink className="w-4 h-4" />
+      </div>
+    );
+  }
+  const lowerUrl = url.toLowerCase();
+  if (lowerUrl.includes("linkedin.com") || lowerUrl.includes("lnkd.in")) {
+    return (
+      <div className="w-8 h-8 rounded-full bg-[#0a66c2] text-white grid place-items-center shrink-0 shadow-xs" title="LinkedIn">
+        <FaLinkedin className="w-4 h-4" />
+      </div>
+    );
+  }
+  if (lowerUrl.includes("youtube.com") || lowerUrl.includes("youtu.be")) {
+    return (
+      <div className="w-8 h-8 rounded-full bg-[#ff0000] text-white grid place-items-center shrink-0 shadow-xs" title="YouTube">
+        <FaYoutube className="w-4 h-4" />
+      </div>
+    );
+  }
+  if (lowerUrl.includes("tiktok.com")) {
+    return (
+      <div className="w-8 h-8 rounded-full bg-black text-white grid place-items-center shrink-0 shadow-xs" title="TikTok">
+        <FaTiktok className="w-4 h-4" />
+      </div>
+    );
+  }
+  return (
+    <div className="w-8 h-8 rounded-full bg-[#1877f2] text-white grid place-items-center shrink-0 shadow-xs" title="Facebook">
+      <FaFacebook className="w-4 h-4" />
+    </div>
+  );
+};
+
 function fmtRelativeTime(iso?: string): string {
   if (!iso) return "";
   const date = new Date(iso);
@@ -39,9 +77,9 @@ function fmtRelativeTime(iso?: string): string {
  * So sánh ngày deadline với 00:00:00 của ngày hiện tại để xác định khoảng cách.
  */
 function fmtDeadline(isoDeadline?: string | null): string {
-  if (!isoDeadline) return "Đang thực hiện";
+  if (!isoDeadline) return "Không giới hạn";
   const deadlineDate = new Date(isoDeadline);
-  if (Number.isNaN(deadlineDate.getTime())) return "Đang thực hiện";
+  if (Number.isNaN(deadlineDate.getTime())) return "Không giới hạn";
 
   const now = new Date();
   const timeLabel = deadlineDate.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
@@ -1640,6 +1678,9 @@ export default function InternalEngagementPage() {
                   const isCompleted = targetTotal > 0 && interactedCount >= targetTotal;
                   const isOverdue = rawDeadline && new Date(rawDeadline) < new Date() && !isCompleted;
 
+                  const postUrl = post.permalink_url || (post as any).link_post || (post as any).link || "";
+                  const isFacebookPost = Boolean(postUrl && (postUrl.includes('facebook.com') || postUrl.includes('fb.watch') || postUrl.includes('fb.com')));
+
                   return (
                     <article
                       key={post.id}
@@ -1652,7 +1693,7 @@ export default function InternalEngagementPage() {
                         className="w-full md:w-32 self-stretch p-4 flex items-center justify-center text-center shrink-0 border-b md:border-b-0 md:border-r border-gray-100 transition-colors"
                       >
                         <span className="font-extrabold text-[#1e40af] text-xs md:text-sm tracking-wider uppercase leading-tight">
-                          {campaignName || "REEL FB"}
+                          {campaignName || "TỰ DO"}
                         </span>
                       </div>
 
@@ -1670,13 +1711,8 @@ export default function InternalEngagementPage() {
                               />
                             ) : null}
 
-                            {/* FACEBOOK SOCIAL ICON */}
-                            <div
-                              className="w-8 h-8 rounded-full bg-[#1877f2] text-white grid place-items-center font-bold text-sm shrink-0 shadow-xs"
-                              title="Facebook"
-                            >
-                              f
-                            </div>
+                            {/* MULTI-PLATFORM SOCIAL ICON */}
+                            {getPlatformIcon(post.permalink_url || (post as any).link_post || (post as any).link)}
 
                             <div>
                               <div className="font-bold text-sm text-gray-900">{post.fanpage_name || "Markee Agency"}</div>
@@ -1738,68 +1774,70 @@ export default function InternalEngagementPage() {
                           📌 {post.content || "(Bài viết không có nội dung văn bản)"}
                         </div>
 
-                        {/* KHỐI TƯƠNG TÁC BÀI GỐC (PUBLIC METRICS BOX) */}
-                        <div className="mb-3.5 p-3 border border-dashed border-gray-200 rounded-2xl bg-white flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5 text-xs">
-                          {/* Thông số bên trái */}
-                          <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap text-gray-700">
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <span className="w-2 h-2 rounded-full bg-rose-500 inline-block animate-pulse"></span>
-                              <span className="font-extrabold text-[11px] text-gray-600 uppercase tracking-wider">
-                                TƯƠNG TÁC BÀI GỐC
-                              </span>
+                        {/* KHỐI TƯƠNG TÁC BÀI GỐC (PUBLIC METRICS BOX) - CHỈ HÌNH THÀNH KHI LÀ FACEBOOK */}
+                        {isFacebookPost ? (
+                          <div className="mb-3.5 p-3 border border-dashed border-gray-200 rounded-2xl bg-white flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5 text-xs">
+                            {/* Thông số bên trái */}
+                            <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap text-gray-700">
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="w-2 h-2 rounded-full bg-rose-500 inline-block animate-pulse"></span>
+                                <span className="font-extrabold text-[11px] text-gray-600 uppercase tracking-wider">
+                                  TƯƠNG TÁC BÀI GỐC
+                                </span>
+                              </div>
+
+                              <div className="hidden sm:block h-3.5 w-px bg-gray-200" />
+
+                              {/* Metrics Row */}
+                              <div className="flex items-center gap-2.5 text-xs text-gray-500">
+                                {/* Like */}
+                                <div className="flex items-center gap-1">
+                                  <svg className="w-3.5 h-3.5 text-gray-400 stroke-[1.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+                                  </svg>
+                                  <span className="font-bold text-gray-900">{formatCompactNumber((post as any).public_likes ?? (post as any).fb_total_likes ?? (post as any).likes ?? 0)}</span>
+                                  <span className="text-gray-400 text-[11px]">like</span>
+                                </div>
+
+                                <span className="text-gray-300">|</span>
+
+                                {/* Comment */}
+                                <div className="flex items-center gap-1">
+                                  <svg className="w-3.5 h-3.5 text-gray-400 stroke-[1.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 0 1-.923 1.785A5.969 5.969 0 0 0 6 21c1.282 0 2.47-.402 3.445-1.087.51-.358 1.155-.41 1.705-.224A8.948 8.948 0 0 0 12 20.25z" />
+                                  </svg>
+                                  <span className="font-bold text-gray-900">{formatCompactNumber((post as any).public_comments ?? (post as any).fb_total_comments ?? (post as any).comments_count ?? 0)}</span>
+                                  <span className="text-gray-400 text-[11px]">bình luận</span>
+                                </div>
+
+                                <span className="text-gray-300">|</span>
+
+                                {/* Share */}
+                                <div className="flex items-center gap-1">
+                                  <svg className="w-3.5 h-3.5 text-gray-400 stroke-[1.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 8.25H7.5a2.25 2.25 0 0 0-2.25 2.25v9a2.25 2.25 0 0 0 2.25 2.25h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25H15m0-3-3-3m0 0-3 3m3-3V15" />
+                                  </svg>
+                                  <span className="font-bold text-gray-900">{formatCompactNumber((post as any).public_shares ?? (post as any).fb_total_shares ?? (post as any).shares_count ?? 0)}</span>
+                                  <span className="text-gray-400 text-[11px]">chia sẻ</span>
+                                </div>
+                              </div>
                             </div>
 
-                            <div className="hidden sm:block h-3.5 w-px bg-gray-200" />
-
-                            {/* Metrics Row */}
-                            <div className="flex items-center gap-2.5 text-xs text-gray-500">
-                              {/* Like */}
-                              <div className="flex items-center gap-1">
-                                <svg className="w-3.5 h-3.5 text-gray-400 stroke-[1.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
-                                </svg>
-                                <span className="font-bold text-gray-900">{formatCompactNumber((post as any).public_likes ?? (post as any).fb_total_likes ?? (post as any).likes ?? 0)}</span>
-                                <span className="text-gray-400 text-[11px]">like</span>
-                              </div>
-
-                              <span className="text-gray-300">|</span>
-
-                              {/* Comment */}
-                              <div className="flex items-center gap-1">
-                                <svg className="w-3.5 h-3.5 text-gray-400 stroke-[1.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 0 1-.923 1.785A5.969 5.969 0 0 0 6 21c1.282 0 2.47-.402 3.445-1.087.51-.358 1.155-.41 1.705-.224A8.948 8.948 0 0 0 12 20.25z" />
-                                </svg>
-                                <span className="font-bold text-gray-900">{formatCompactNumber((post as any).public_comments ?? (post as any).fb_total_comments ?? (post as any).comments_count ?? 0)}</span>
-                                <span className="text-gray-400 text-[11px]">bình luận</span>
-                              </div>
-
-                              <span className="text-gray-300">|</span>
-
-                              {/* Share */}
-                              <div className="flex items-center gap-1">
-                                <svg className="w-3.5 h-3.5 text-gray-400 stroke-[1.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 8.25H7.5a2.25 2.25 0 0 0-2.25 2.25v9a2.25 2.25 0 0 0 2.25 2.25h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25H15m0-3-3-3m0 0-3 3m3-3V15" />
-                                </svg>
-                                <span className="font-bold text-gray-900">{formatCompactNumber((post as any).public_shares ?? (post as any).fb_total_shares ?? (post as any).shares_count ?? 0)}</span>
-                                <span className="text-gray-400 text-[11px]">chia sẻ</span>
-                              </div>
+                            {/* Bên phải: Thời gian & Nút Đồng bộ */}
+                            <div className="flex items-center gap-2 shrink-0 ml-auto sm:ml-0">
+                              <span className="text-gray-400 text-[11px]">Cập nhật {fmtRelativeTime((post as any).synced_at ?? (post as any).last_synced_at ?? (post as any).updated_at ?? post.created_at)}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleSyncPostMetrics(post)}
+                                disabled={syncingPostId === post.id}
+                                className="flex items-center gap-1 px-3 py-1 border border-gray-300 rounded-full text-xs font-semibold text-gray-700 hover:bg-gray-50 transition bg-white shadow-2xs cursor-pointer"
+                              >
+                                <span className={syncingPostId === post.id ? "animate-spin inline-block" : ""}>🔄</span>
+                                <span>{syncingPostId === post.id ? "Đang đồng bộ..." : "Đồng bộ"}</span>
+                              </button>
                             </div>
                           </div>
-
-                          {/* Bên phải: Thời gian & Nút Đồng bộ */}
-                          <div className="flex items-center gap-2 shrink-0 ml-auto sm:ml-0">
-                            <span className="text-gray-400 text-[11px]">Cập nhật {fmtRelativeTime((post as any).synced_at ?? (post as any).last_synced_at ?? (post as any).updated_at ?? post.created_at)}</span>
-                            <button
-                              type="button"
-                              onClick={() => handleSyncPostMetrics(post)}
-                              disabled={syncingPostId === post.id}
-                              className="flex items-center gap-1 px-3 py-1 border border-gray-300 rounded-full text-xs font-semibold text-gray-700 hover:bg-gray-50 transition bg-white shadow-2xs cursor-pointer"
-                            >
-                              <span className={syncingPostId === post.id ? "animate-spin inline-block" : ""}>🔄</span>
-                              <span>{syncingPostId === post.id ? "Đang đồng bộ..." : "Đồng bộ"}</span>
-                            </button>
-                          </div>
-                        </div>
+                        ) : null}
 
                         {/* Progress Bar */}
                         <div className="mb-3.5">
@@ -1812,11 +1850,11 @@ export default function InternalEngagementPage() {
                           </div>
                         </div>
 
-                        {/* 3 KPI SUB-BOXES GRID (THUẦN COMMENT) */}
+                        {/* 3 KPI SUB-BOXES GRID (ĐÃ ĐỔI THÀNH "ĐÃ TƯƠNG TÁC") */}
                         <div className="grid grid-cols-3 gap-2.5 mb-4">
                           <div className="bg-[#f8fafc] p-3 rounded-xl border border-gray-100">
-                            <span className="text-[11px] text-gray-500 font-semibold block mb-1">O Comment</span>
-                            <span className="text-sm md:text-base font-bold text-gray-900">{commentActual}/{targetTotal}</span>
+                            <span className="text-[11px] text-gray-500 font-semibold block mb-1">Đã tương tác</span>
+                            <span className="text-sm md:text-base font-bold text-gray-900">{interactedCount}/{targetTotal}</span>
                           </div>
                           <div className="bg-[#f8fafc] p-3 rounded-xl border border-gray-100">
                             <span className="text-[11px] text-emerald-600 font-semibold block mb-1">✓ Hoàn thành</span>
@@ -1838,14 +1876,48 @@ export default function InternalEngagementPage() {
                             >
                               Xem tương tác thành viên →
                             </button>
-                            <a
-                              href={post.permalink_url || (post as any).link_post || "#"}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs font-medium text-gray-500 hover:underline flex items-center gap-1"
-                            >
-                              Xem bài viết gốc ↗
-                            </a>
+
+                            {/* Nút Xem bài viết gốc có Tooltip */}
+                            <div className="relative group inline-block">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const postUrl = post.permalink_url || (post as any).link_post || "";
+                                  if (!postUrl) return;
+                                  // Đồng bộ email_member vào Extension storage trước khi mở tab Facebook
+                                  // để graphql-sniffer có thể ghi nhận Like/Share thủ công
+                                  const currentOrigin = typeof window !== "undefined" ? window.location.origin : "https://seeding.markeeai.com";
+                                  const fanpageId = (post as any).fanpage_id || (post as any).fanpageId || "";
+                                  const fanpageName = (post as any).fanpage_name || (post as any).fanpageName || "";
+                                  const facebookPostId = (post as any).facebook_post_id || (post as any).id_post || (post as any).facebookPostId || post.id || "unknown";
+
+                                  window.postMessage({
+                                    type: "SYNC_ACTIVE_MEMBER",
+                                    action: "SYNC_ACTIVE_MEMBER",
+                                    payload: {
+                                      email_member: user?.email || "",
+                                      apiBase: currentOrigin,
+                                      fanpage_id: fanpageId,
+                                      fanpage_name: fanpageName,
+                                      facebook_post_id: facebookPostId,
+                                      target_link: postUrl,
+                                    },
+                                  }, "*");
+                                  // Delay nhẹ để Extension kịp xử lý storage rồi mới mở tab
+                                  setTimeout(() => { window.open(postUrl, "_blank"); }, 200);
+                                }}
+                                className="text-xs font-medium text-gray-500 hover:text-blue-600 hover:underline flex items-center gap-1 text-left transition-colors cursor-pointer"
+                              >
+                                Xem bài viết gốc ↗
+                              </button>
+
+                              {/* Tooltip hiển thị khi Hover */}
+                              <div className="absolute bottom-full left-0 mb-1 hidden group-hover:block w-max z-10 pointer-events-none">
+                                <div className="bg-gray-800 text-white text-xs rounded py-1 px-2 shadow-lg">
+                                  Bấm vào xem bài viết gốc để Like & Share thủ công
+                                </div>
+                              </div>
+                            </div>
                           </div>
 
                           <div className="flex items-center gap-2">
@@ -2080,7 +2152,9 @@ export default function InternalEngagementPage() {
                           <th className="pb-2.5">Thành viên</th>
                           <th className="pb-2.5">Team</th>
                           <th className="pb-2.5">Trạng thái</th>
-                          <th className="pb-2.5 text-center">Comment</th>
+                          <th className="pb-2.5 text-center">👍 Like</th>
+                          <th className="pb-2.5 text-center">💬 Comment</th>
+                          <th className="pb-2.5 text-center">↗️ Share</th>
                           <th className="pb-2.5 text-right">Thời gian</th>
                         </tr>
                       </thead>
@@ -2123,7 +2197,7 @@ export default function InternalEngagementPage() {
                           if (filteredRoster.length === 0) {
                             return (
                               <tr>
-                                <td colSpan={5} className="py-8 text-center text-gray-400 font-medium">
+                                <td colSpan={7} className="py-8 text-center text-gray-400 font-medium">
                                   Không tìm thấy thành viên nào khớp với bộ lọc.
                                 </td>
                               </tr>
@@ -2138,20 +2212,59 @@ export default function InternalEngagementPage() {
                               </td>
                               <td className="py-3">
                                 <span
-                                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${m.status === "completed"
-                                    ? "bg-emerald-50 text-emerald-700"
-                                    : m.status === "received"
-                                      ? "bg-blue-50 text-blue-700"
-                                      : "bg-red-50 text-red-700"
-                                    }`}
+                                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                                    m.status === "completed"
+                                      ? "bg-emerald-50 text-emerald-700"
+                                      : m.status === "received"
+                                        ? "bg-blue-50 text-blue-700"
+                                        : "bg-red-50 text-red-700"
+                                  }`}
                                 >
                                   {m.statusLabel}
                                 </span>
                               </td>
+                              {/* 👍 Like */}
                               <td className="py-3 text-center">
-                                {m.comment ? <span className="text-emerald-600 font-bold">✓</span> : <span className="text-gray-300">—</span>}
+                                {m.like
+                                  ? <span
+                                      style={{ color: "#10b981" }}
+                                      className="font-bold text-sm cursor-default"
+                                      title={m.like_time ? `Đã like lúc: ${formatMemberTime(m.like_time)}` : "Đã like"}
+                                    >✓</span>
+                                  : <span style={{ color: "#9ca3af" }}>—</span>}
                               </td>
-                              <td className="py-3 text-right text-gray-500">{formatMemberTime(m.raw_created_at, m.time)}</td>
+                              {/* 💬 Comment */}
+                              <td className="py-3 text-center">
+                                {m.comment
+                                  ? <span
+                                      style={{ color: "#10b981" }}
+                                      className="font-bold text-sm cursor-default"
+                                      title={m.comment_time ? `Đã comment lúc: ${formatMemberTime(m.comment_time)}` : "Đã comment"}
+                                    >✓</span>
+                                  : <span style={{ color: "#9ca3af" }}>—</span>}
+                              </td>
+                              {/* ↗️ Share */}
+                              <td className="py-3 text-center">
+                                {m.share
+                                  ? <span
+                                      style={{ color: "#10b981" }}
+                                      className="font-bold text-sm cursor-default"
+                                      title={m.share_time ? `Đã share lúc: ${formatMemberTime(m.share_time)}` : "Đã share"}
+                                    >✓</span>
+                                  : <span style={{ color: "#9ca3af" }}>—</span>}
+                              </td>
+                              {/* Thời gian: lấy mốc gần nhất trong 3 hành động */}
+                              <td className="py-3 text-right text-gray-500">
+                                {(() => {
+                                  const candidates = [m.like_time, m.comment_time, m.share_time, m.raw_created_at]
+                                    .filter(Boolean)
+                                    .map((t: string) => new Date(t).getTime())
+                                    .filter((n: number) => !Number.isNaN(n));
+                                  if (candidates.length === 0) return m.time || "—";
+                                  const latestTs = Math.max(...candidates);
+                                  return formatMemberTime(new Date(latestTs).toISOString(), m.time);
+                                })()}
+                              </td>
                             </tr>
                           ));
                         })()}

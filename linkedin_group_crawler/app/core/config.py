@@ -432,7 +432,13 @@ class Settings:
         if self.cors_origins is None:
             self.cors_origins = _parse_csv(
                 os.getenv("CORS_ORIGINS"),
-                default=("http://localhost:3000", "http://127.0.0.1:3000"),
+                default=(
+                    "http://localhost:3000",
+                    "http://127.0.0.1:3000",
+                    "https://facebook.com",
+                    "https://www.facebook.com",
+                    "https://web.facebook.com",
+                ),
             )
 
 

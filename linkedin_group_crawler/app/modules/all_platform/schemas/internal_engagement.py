@@ -52,8 +52,11 @@ class InternalEngagementActionRecordRequest(BaseModel):
     reaction_id: str | None = None
     id_social_account: str | None = None
     profile_id: str | None = None
-    status: str = "success"
-    error_message: str | None = None
+class MarkActionRequest(BaseModel):
+    action_type: str = "like"
+    fb_uid: str | None = None
+    post_url: str | None = None
+    email_member: str | None = None
 
 
 class InternalEngagementSummaryRequest(BaseModel):
