@@ -49,7 +49,7 @@ function fmtDeadline(isoDeadline?: string | null): string {
   // Đã quá hạn
   if (deadlineDate < now) {
     const d = deadlineDate;
-    const dateStr = `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+    const dateStr = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
     return `Đã quá hạn (${timeLabel} ${dateStr})`;
   }
 
@@ -196,17 +196,17 @@ export default function InternalEngagementPage() {
         const updatePostItem = (p: InternalEngagementPost) =>
           p.id === post.id
             ? ({
-                ...p,
-                public_likes: newLikes,
-                public_comments: newComments,
-                public_shares: newShares,
-                fb_total_likes: newLikes,
-                fb_total_comments: newComments,
-                fb_total_shares: newShares,
-                synced_at: newSyncedAt,
-                last_synced_at: newSyncedAt,
-                updated_at: newSyncedAt,
-              } as any)
+              ...p,
+              public_likes: newLikes,
+              public_comments: newComments,
+              public_shares: newShares,
+              fb_total_likes: newLikes,
+              fb_total_comments: newComments,
+              fb_total_shares: newShares,
+              synced_at: newSyncedAt,
+              last_synced_at: newSyncedAt,
+              updated_at: newSyncedAt,
+            } as any)
             : p;
 
         setPosts((prev) => prev.map(updatePostItem));
@@ -400,13 +400,13 @@ export default function InternalEngagementPage() {
 
       if (res && res.success) {
         showToast("Đã xóa/ẩn bài viết thành công!", "success");
-        
+
         // Optimistic Update: Immediately filter out the deleted post from state so it disappears from UI
         const deletedId = deletingPost.id;
         setCustomPosts((prev) => prev.filter((p) => p.id !== deletedId));
         setPosts((prev) => prev.filter((p) => p.id !== deletedId));
         setDeletingPost(null);
-        
+
         // Refresh from server in background to keep totals and pagination consistent
         await loadPosts();
       } else {
@@ -756,14 +756,14 @@ export default function InternalEngagementPage() {
   };
 
   const handleCreateTaskSubmit = async () => {
-    const fbRegex = /^(https?:\/\/)?(www\.|m\.|mobile\.|web\.)?(facebook\.com|fb\.com|fb\.watch)\/.+$/i;
+    const socialRegex = /^(https?:\/\/)?([\w-]+\.)*(facebook\.com|fb\.com|fb\.watch|youtube\.com|youtu\.be|tiktok\.com|linkedin\.com|lnkd\.in)\/.+$/i;
 
     if (!taskLink.trim()) {
       return showToast("Vui lòng nhập link bài viết!", "error");
     }
 
-    if (!fbRegex.test(taskLink.trim())) {
-      return showToast("Vui lòng nhập đường link Facebook hợp lệ (facebook.com).", "error");
+    if (!socialRegex.test(taskLink.trim())) {
+      return showToast("Vui lòng nhập đường link hợp lệ (Facebook, YouTube, TikTok, LinkedIn).", "error");
     }
 
     if (taskAssignedTeams.length === 0) {
@@ -1596,7 +1596,7 @@ export default function InternalEngagementPage() {
                   </span>
                 </div>
               ) : (
-               pagedPosts.map((post) => {
+                pagedPosts.map((post) => {
                   const status = marks[post.permalink_url || ""] || "need";
                   const isSelected = selectedIds.has(post.id);
 
@@ -1604,7 +1604,7 @@ export default function InternalEngagementPage() {
                   const postCampId = (post as any).campaign_id || (post as any).campaignId;
                   const matchedCamp = campaigns.find((c) => c.id === postCampId);
                   const campaignName = matchedCamp?.name || (post as any).campaign_name || (post as any).campaignName || null;
-const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode || "#fff1f2";
+                  const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode || "#fff1f2";
                   const rawTarget = (post as any).target_comments || (post as any).targetComments;
                   const rawDeadline = (post as any).deadline || (post as any).due_date || (post as any).dueDate;
 
@@ -1631,7 +1631,7 @@ const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode
 
                   const progressPercent = Math.min(100, Math.round((interactedCount / Math.max(1, targetTotal)) * 100));
                   const pendingCount = Math.max(0, targetTotal - interactedCount);
-                  
+
                   const commentActual = interactedCount;
                   const completedCount = interactedCount;
 
@@ -1643,9 +1643,8 @@ const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode
                   return (
                     <article
                       key={post.id}
-                      className={`border rounded-2xl mb-4 bg-white transition relative flex flex-col md:flex-row overflow-hidden ${
-                        isSelected ? "border-[#c71f4d] bg-[#fff8f9] shadow-md" : "border-[#e7e9ef] hover:border-rose-200 shadow-xs"
-                      }`}
+                      className={`border rounded-2xl mb-4 bg-white transition relative flex flex-col md:flex-row overflow-hidden ${isSelected ? "border-[#c71f4d] bg-[#fff8f9] shadow-md" : "border-[#e7e9ef] hover:border-rose-200 shadow-xs"
+                        }`}
                     >
                       {/* DẢI CAMPAIGN BÊN TRÁI (LEFT SIDEBAR) - STRETCH CẢ CARD */}
                       <div
@@ -1689,13 +1688,12 @@ const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode
 
                           <div className="flex items-center gap-2">
                             <span
-                              className={`px-3 py-1 rounded-full text-xs font-bold ${
-                                isCompleted
+                              className={`px-3 py-1 rounded-full text-xs font-bold ${isCompleted
                                   ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
                                   : isOverdue
-                                  ? "bg-red-50 text-red-600 border border-red-200"
-                                  : "bg-amber-50 text-amber-700 border border-amber-200"
-                              }`}
+                                    ? "bg-red-50 text-red-600 border border-red-200"
+                                    : "bg-amber-50 text-amber-700 border border-amber-200"
+                                }`}
                             >
                               {isCompleted ? "Đã hoàn thành" : isOverdue ? "Quá hạn" : "Đang thực hiện"}
                             </span>
@@ -2141,10 +2139,10 @@ const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode
                               <td className="py-3">
                                 <span
                                   className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${m.status === "completed"
-                                      ? "bg-emerald-50 text-emerald-700"
-                                      : m.status === "received"
-                                        ? "bg-blue-50 text-blue-700"
-                                        : "bg-red-50 text-red-700"
+                                    ? "bg-emerald-50 text-emerald-700"
+                                    : m.status === "received"
+                                      ? "bg-blue-50 text-blue-700"
+                                      : "bg-red-50 text-red-700"
                                     }`}
                                 >
                                   {m.statusLabel}
