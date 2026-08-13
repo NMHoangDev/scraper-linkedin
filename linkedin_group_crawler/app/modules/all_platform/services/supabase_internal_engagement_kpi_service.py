@@ -68,6 +68,7 @@ def record_action(payload: dict) -> dict:
         "action_type": payload.get("action_type") or "comment",
         "content": payload.get("content") or payload.get("text") or "",
         "status": payload.get("status") or "success",
+        "platform": payload.get("platform") or "facebook",
     }
     if payload.get("reaction_id"):
         data["reaction_id"] = payload.get("reaction_id")
@@ -755,6 +756,10 @@ async def add_custom_post(
     deadline: Optional[str] = None,
     target_comments: int = 32,
     assigned_team_ids: Optional[list] = None,
+    platform: Optional[str] = None,
+    likes: Optional[int] = None,
+    comments: Optional[int] = None,
+    shares: Optional[int] = None,
 ) -> dict:
     supabase: Client = get_supabase_client()
     user_id = _get_member_id(email_member)
@@ -762,12 +767,27 @@ async def add_custom_post(
     if not user_id:
         raise Exception("Không tìm thấy thông tin user.")
 
-    clean_url, scraped_content = await normalize_facebook_url_and_scrape(link_post)
+    is_linkedin = (
+        platform == "linkedin"
+        or "linkedin.com" in link_post.lower()
+        or "lnkd.in" in link_post.lower()
+    )
+    final_platform = "linkedin" if is_linkedin else "facebook"
+
+    if is_linkedin:
+        # LinkedIn yêu cầu đăng nhập để xem hầu hết nội dung — KHÔNG gọi
+        # normalize_facebook_url_and_scrape (scrape HTTP server-side kiểu Facebook,
+        # sẽ chỉ nhận được trang login). FE phải cào content/fanpage_name thật qua
+        # extension (dùng session LinkedIn thật của user) rồi gửi lên đây.
+        final_clean_url = clean_url(link_post)
+        scraped_content = content or "Bài viết LinkedIn - Cần tương tác"
+    else:
+        final_clean_url, scraped_content = await normalize_facebook_url_and_scrape(link_post)
 
     existing_res = (
         supabase.table("internal_engagement_custom_posts")
         .select("*")
-        .eq("link_post", clean_url)
+        .eq("link_post", final_clean_url)
         .execute()
     )
 
@@ -777,13 +797,18 @@ async def add_custom_post(
             raise HTTPException(status_code=400, detail="Bài viết này đã tồn tại trong hệ thống!")
 
     meta = {}
-    if not content or not fanpage_name or not media_urls:
-        meta = fetch_facebook_post_metadata(clean_url, cookie=cookie)
+    if not is_linkedin and (not content or not fanpage_name or not media_urls):
+        meta = fetch_facebook_post_metadata(final_clean_url, cookie=cookie)
 
-    final_fanpage_name = fanpage_name or extract_fanpage_name_from_meta_or_url(clean_url, meta)
-    auto_content = clean_facebook_content(meta, final_fanpage_name)
+    if is_linkedin:
+        final_fanpage_name = fanpage_name or "Thành viên LinkedIn"
+        auto_content = ""
+    else:
+        final_fanpage_name = fanpage_name or extract_fanpage_name_from_meta_or_url(final_clean_url, meta)
+        auto_content = clean_facebook_content(meta, final_fanpage_name)
     final_content = content or auto_content or scraped_content
-    if not final_content or final_content == "Bài viết Facebook - Cần tương tác":
+    placeholder_texts = {"Bài viết Facebook - Cần tương tác", "Bài viết LinkedIn - Cần tương tác"}
+    if not final_content or final_content in placeholder_texts:
         raw_desc = meta.get("description") or meta.get("og:description") or ""
         if raw_desc:
             unescaped_desc = html.unescape(raw_desc).strip()
@@ -792,7 +817,7 @@ async def add_custom_post(
                 final_content = unescaped_desc
 
     if not final_content:
-        final_content = "Bài viết Facebook - Cần tương tác"
+        final_content = "Bài viết LinkedIn - Cần tương tác" if is_linkedin else "Bài viết Facebook - Cần tương tác"
 
     # Dọn dẹp Content: Gọt bỏ Tên Fanpage nếu nó bị dính ở đầu Caption
     if final_fanpage_name and final_content:
@@ -840,7 +865,13 @@ async def add_custom_post(
             "deadline": default_deadline,
             "target_comments": target_comments,
             "assigned_team_ids": assigned_team_ids or [],
+            "platform": final_platform,
         }
+        if likes is not None or comments is not None or shares is not None:
+            update_payload["fb_total_likes"] = likes or 0
+            update_payload["fb_total_comments"] = comments or 0
+            update_payload["fb_total_shares"] = shares or 0
+            update_payload["last_synced_at"] = now_iso
         res = (
             supabase.table("internal_engagement_custom_posts")
             .update(update_payload)
@@ -848,12 +879,12 @@ async def add_custom_post(
             .execute()
         )
         item = res.data[0] if res.data else existing_post
-        item["platform"] = "facebook"
+        item["platform"] = final_platform
         item["_debug_info"] = message_debug
         return item
 
     data = {
-        "link_post": clean_url,
+        "link_post": final_clean_url,
         "id_member": user_id,
         "fanpage_name": final_fanpage_name,
         "content": final_content,
@@ -865,18 +896,24 @@ async def add_custom_post(
         "deadline": default_deadline,
         "target_comments": target_comments,
         "assigned_team_ids": assigned_team_ids or [],
+        "platform": final_platform,
     }
-    
+    if likes is not None or comments is not None or shares is not None:
+        data["fb_total_likes"] = likes or 0
+        data["fb_total_comments"] = comments or 0
+        data["fb_total_shares"] = shares or 0
+        data["last_synced_at"] = now_iso
+
     try:
         res = supabase.table("internal_engagement_custom_posts").insert(data).execute()
         item = res.data[0] if res.data else {}
-        item["platform"] = "facebook"
+        item["platform"] = final_platform
         item["_debug_info"] = message_debug
         return item
     except Exception as err:
         logger.error(f"Lỗi khi insert full data vào internal_engagement_custom_posts: {err}")
         fallback_data = {
-            "link_post": clean_url,
+            "link_post": final_clean_url,
             "id_member": user_id,
             "is_deleted": False,
             "campaign_id": campaign_id,
@@ -884,10 +921,11 @@ async def add_custom_post(
             "deadline": default_deadline,
             "target_comments": target_comments,
             "assigned_team_ids": assigned_team_ids or [],
+            "platform": final_platform,
         }
         res = supabase.table("internal_engagement_custom_posts").insert(fallback_data).execute()
         item = res.data[0] if res.data else {}
-        item["platform"] = "facebook"
+        item["platform"] = final_platform
         item["_debug_info"] = message_debug
         return item
 
@@ -1599,6 +1637,62 @@ def extract_facebook_post_engagement_stats(meta: dict) -> dict:
                 stats["shares"] = parse_formatted_number(share_matches[-1])
 
     return stats
+
+
+def sync_linkedin_post_engagement_db(
+    post_id: str,
+    likes: Optional[int] = None,
+    comments: Optional[int] = None,
+    shares: Optional[int] = None,
+) -> dict:
+    """
+    Cập nhật đè 3 chỉ số Like/Comment/Share cho bài LinkedIn. Khác với bản Facebook,
+    LinkedIn không thể tự cào server-side (cần đăng nhập) — số liệu do FE cào được qua
+    extension (session LinkedIn thật của user) rồi gửi lên đây để lưu, không tự fetch lại.
+    Chỉ số nào không được truyền (None) thì giữ nguyên giá trị cũ trong DB, KHÔNG ép về 0
+    — tránh caller chỉ gửi 1 phần (vd chỉ likes) lại vô tình xoá mất comments/shares đã có.
+    """
+    supabase: Client = get_supabase_client()
+
+    post_res = (
+        supabase.table("internal_engagement_custom_posts")
+        .select("*")
+        .eq("id", post_id)
+        .execute()
+    )
+    if not post_res.data:
+        raise Exception("Không tìm thấy bài viết hoặc bài viết đã bị xóa.")
+
+    post = post_res.data[0]
+    if post.get("is_deleted"):
+        raise Exception("Bài viết này đã bị xóa khỏi hệ thống.")
+
+    final_likes = likes if likes is not None else (post.get("fb_total_likes") or 0)
+    final_comments = comments if comments is not None else (post.get("fb_total_comments") or 0)
+    final_shares = shares if shares is not None else (post.get("fb_total_shares") or 0)
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    update_data: dict = {
+        "fb_total_likes": final_likes,
+        "fb_total_comments": final_comments,
+        "fb_total_shares": final_shares,
+        "last_synced_at": now_iso,
+        "updated_at": now_iso,
+    }
+
+    res = (
+        supabase.table("internal_engagement_custom_posts")
+        .update(update_data)
+        .eq("id", post_id)
+        .execute()
+    )
+
+    result_data = res.data[0] if res.data else {**post, **update_data}
+    result_data["public_likes"] = result_data.get("fb_total_likes", final_likes)
+    result_data["public_comments"] = result_data.get("fb_total_comments", final_comments)
+    result_data["public_shares"] = result_data.get("fb_total_shares", final_shares)
+    result_data["synced_at"] = result_data.get("last_synced_at", now_iso)
+    return result_data
 
 
 def sync_facebook_post_engagement_db(post_id: str, cookie: Optional[str] = None) -> dict:

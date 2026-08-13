@@ -29,6 +29,10 @@ from app.modules.all_platform.schemas.internal_engagement import (
     UpdateCustomPostRequest,
 )
 from app.modules.all_platform.services import markeeai_client
+from app.modules.all_platform.services.internal_engagement_linkedin_sync_service import (
+    NoLinkedInAccountError,
+    sync_linkedin_post_engagement_via_playwright,
+)
 from app.modules.all_platform.services.markeeai_account_links_service import resolve_markeeai_credentials
 from app.modules.all_platform.services.supabase_internal_engagement_kpi_service import (
     add_custom_post,
@@ -49,6 +53,7 @@ from app.modules.all_platform.services.supabase_internal_engagement_kpi_service 
     mark_action_by_fb_uid,
     record_action,
     sync_facebook_post_engagement_db,
+    sync_linkedin_post_engagement_db,
     update_custom_post_db,
     upsert_markee_override_db,
 )
@@ -198,6 +203,10 @@ async def create_custom_post(payload: AddCustomPostRequest) -> BaseResponse:
             deadline=payload.deadline,
             target_comments=payload.target_comments if payload.target_comments is not None else 32,
             assigned_team_ids=payload.assigned_team_ids,
+            platform=payload.platform,
+            likes=payload.likes,
+            comments=payload.comments,
+            shares=payload.shares,
         )
         debug_msg = data.pop("_debug_info", None) if isinstance(data, dict) else None
         return BaseResponse(success=True, message=debug_msg or "Tạo bài viết Seeding thành công!", data=data)
@@ -277,20 +286,52 @@ def list_custom_posts(page: int = 1, page_size: int = 20) -> BaseResponse:
 
 @router.post("/custom-posts/{post_id}/sync", response_model=BaseResponse)
 @router.post("/posts/{post_id}/sync", response_model=BaseResponse)
-def sync_post_metrics_endpoint(post_id: str, cookie: Optional[str] = None) -> BaseResponse:
-    """API cào lại dữ liệu số lượng Like, Comment, Share thực tế từ Facebook và lưu vào DB"""
+def sync_post_metrics_endpoint(
+    post_id: str,
+    cookie: Optional[str] = None,
+    likes: Optional[int] = None,
+    comments: Optional[int] = None,
+    shares: Optional[int] = None,
+) -> BaseResponse:
+    """API cập nhật số lượng Like, Comment, Share của bài viết gốc.
+    Facebook: backend tự cào server-side. LinkedIn: không tự cào được (cần đăng nhập)
+    nên FE phải cào qua extension rồi gửi số liệu lên qua likes/comments/shares."""
     try:
-        data = sync_facebook_post_engagement_db(post_id=post_id, cookie=cookie)
-        return BaseResponse(
-            success=True,
-            message="Đồng bộ chỉ số bài viết gốc từ Facebook thành công!",
-            data=data,
-        )
+        if likes is not None or comments is not None or shares is not None:
+            data = sync_linkedin_post_engagement_db(
+                post_id=post_id, likes=likes, comments=comments, shares=shares
+            )
+            message = "Đồng bộ chỉ số bài viết LinkedIn thành công!"
+        else:
+            data = sync_facebook_post_engagement_db(post_id=post_id, cookie=cookie)
+            message = "Đồng bộ chỉ số bài viết gốc từ Facebook thành công!"
+        return BaseResponse(success=True, message=message, data=data)
     except HTTPException as http_err:
         raise http_err
     except Exception as e:
         logger.error(f"Lỗi khi đồng bộ chỉ số bài viết {post_id}: {e}")
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/custom-posts/{post_id}/sync-playwright", response_model=BaseResponse)
+def sync_post_metrics_playwright_endpoint(post_id: str) -> BaseResponse:
+    """Đồng bộ Like/Comment/Share bài LinkedIn hoàn toàn server-side qua Playwright
+    (dùng account LinkedIn đã đăng ký của người tạo bài) — không cần browser extension.
+    FE nên tự fallback sang luồng extension (endpoint /sync ở trên) nếu gọi API này
+    trả về error_code=NO_LINKEDIN_ACCOUNT hoặc thất bại vì lý do khác."""
+    try:
+        data = sync_linkedin_post_engagement_via_playwright(post_id)
+        return BaseResponse(
+            success=True,
+            message="Đồng bộ (tự động, không cần Extension) thành công!",
+            data=data,
+        )
+    except NoLinkedInAccountError as e:
+        return BaseResponse(success=False, message=str(e), data={"error_code": "NO_LINKEDIN_ACCOUNT"})
+    except Exception as e:
+        logger.error(f"Lỗi đồng bộ Playwright cho bài {post_id}: {e}")
+        return BaseResponse(success=False, message=str(e), data={"error_code": "PLAYWRIGHT_SYNC_FAILED"})
+
 
 @router.post("/my-marks", response_model=BaseResponse)
 def my_marks(payload: MyMarksRequest) -> BaseResponse:

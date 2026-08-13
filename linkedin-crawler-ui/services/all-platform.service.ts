@@ -280,11 +280,15 @@ export const internalEngagementService = {
     target_comments?: number;
     target_shares?: number;
     assigned_team_ids?: string[];
+    platform?: string;
+    likes?: number;
+    comments?: number;
+    shares?: number;
   }, emailParam?: string): Promise<ApiResponse<any>> => {
-    const payload = typeof linkOrPayload === "string" 
+    const payload = typeof linkOrPayload === "string"
       ? { link: linkOrPayload, email: emailParam || "" }
       : linkOrPayload;
-      
+
     return requestJson(`${BASE}/internal-engagement/add-custom-post`, {
       method: "POST",
       body: JSON.stringify({
@@ -301,6 +305,10 @@ export const internalEngagementService = {
         target_comments: payload.target_comments,
         target_shares: payload.target_shares,
         assigned_team_ids: payload.assigned_team_ids,
+        platform: payload.platform,
+        likes: payload.likes,
+        comments: payload.comments,
+        shares: payload.shares,
       }),
     });
   },
@@ -368,8 +376,22 @@ export const internalEngagementService = {
     });
   },
 
-  syncPostMetrics: (postId: string): Promise<ApiResponse<any>> => {
-    return requestJson(`${BASE}/internal-engagement/custom-posts/${encodeURIComponent(postId)}/sync`, {
+  syncPostMetrics: (postId: string, metrics?: { likes?: number; comments?: number; shares?: number }): Promise<ApiResponse<any>> => {
+    const params = new URLSearchParams();
+    if (metrics?.likes !== undefined) params.set("likes", String(metrics.likes));
+    if (metrics?.comments !== undefined) params.set("comments", String(metrics.comments));
+    if (metrics?.shares !== undefined) params.set("shares", String(metrics.shares));
+    const qs = params.toString();
+    return requestJson(`${BASE}/internal-engagement/custom-posts/${encodeURIComponent(postId)}/sync${qs ? `?${qs}` : ""}`, {
+      method: "POST",
+    });
+  },
+
+  // Đồng bộ LinkedIn hoàn toàn server-side (Playwright + account đã đăng ký), không cần Extension.
+  // Trả success:false kèm data.error_code === "NO_LINKEDIN_ACCOUNT" nếu người tạo bài chưa có
+  // tài khoản LinkedIn nào — FE nên tự fallback sang syncPostMetrics (qua extension) khi đó.
+  syncLinkedInPlaywright: (postId: string): Promise<ApiResponse<any>> => {
+    return requestJson(`${BASE}/internal-engagement/custom-posts/${encodeURIComponent(postId)}/sync-playwright`, {
       method: "POST",
     });
   },

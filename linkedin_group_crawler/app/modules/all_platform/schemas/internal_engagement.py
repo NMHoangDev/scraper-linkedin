@@ -52,6 +52,11 @@ class InternalEngagementActionRecordRequest(BaseModel):
     reaction_id: str | None = None
     id_social_account: str | None = None
     profile_id: str | None = None
+    platform: str | None = None
+    status: str | None = None
+    error_message: str | None = None
+
+
 class MarkActionRequest(BaseModel):
     action_type: str = "like"
     fb_uid: str | None = None
@@ -108,6 +113,10 @@ class AddCustomPostRequest(BaseModel):
     deadline: str | None = None
     target_comments: int | None = None
     assigned_team_ids: List[str] | None = None
+    platform: str | None = None
+    likes: int | None = None
+    comments: int | None = None
+    shares: int | None = None
 
 
 class DebugFetchMetaRequest(BaseModel):
