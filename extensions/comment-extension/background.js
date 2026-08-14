@@ -245,6 +245,12 @@ async function runBulkComment(payload, uiTabId, postsToRun) {
             if (result && verifyConfig && verifyConfig.email_member) {
                 try {
                     const apiBase = verifyConfig.apiBase || "https://seeding.markeeai.com";
+                    const detectedPlatform = (result && result.platform)
+                        ? result.platform
+                        : ((url && (url.includes("youtube.com") || url.includes("youtu.be")))
+                            ? "youtube"
+                            : ((url && (url.includes("linkedin.com") || url.includes("lnkd.in"))) ? "linkedin" : "facebook"));
+                    const platformId = detectedPlatform === "youtube" ? 2 : (detectedPlatform === "linkedin" ? 3 : 1);
 
                     if (verifyConfig.mode === "internal_engagement") {
                         // Trang Tương tác nội bộ — lưu vào bảng KPI riêng, không đụng
@@ -255,9 +261,10 @@ async function runBulkComment(payload, uiTabId, postsToRun) {
                             body: JSON.stringify({
                                 email_member: verifyConfig.email_member,
                                 link_post: url,
+                                platform: detectedPlatform,
                                 fanpage_id: currentPost.fanpage_id,
                                 fanpage_name: currentPost.fanpage_name,
-                                facebook_post_id: currentPost.id_post,
+                                facebook_post_id: currentPost.id_post || currentPost.facebook_post_id || "unknown",
                                 action_type: "comment",
                                 content: text,
                                 status: result.success ? "success" : "failed",
@@ -279,20 +286,39 @@ async function runBulkComment(payload, uiTabId, postsToRun) {
                         const verifyBody = {
                             email_member: verifyConfig.email_member,
                             link_post: url,
-                            platform: "facebook",
+                            platform: detectedPlatform,
                             content: text,
                             link_comment: result.url || `Bị từ chối / Không lấy được link - ${Date.now()}-${Math.random().toString(36).substring(7)}`,
                             profile_id: result.uid || "Unknown",
                             id_post: currentPost.id_post,
                             id_social_account: verifyConfig.id_social_account || undefined,
-                            id_platform: 1
+                            id_platform: currentPost.id_platform || platformId
                         };
 
-                        await fetch(`${apiBase}/api/all-platform/facebook/seeding-mark/verify`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify(verifyBody)
-                        });
+                        const verifyEndpoint = detectedPlatform === "youtube"
+                            ? `${apiBase}/api/all-platform/youtube/seeding-mark/verify`
+                            : `${apiBase}/api/all-platform/facebook/seeding-mark/verify`;
+
+                        try {
+                            const vResp = await fetch(verifyEndpoint, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify(verifyBody)
+                            });
+                            if (!vResp.ok && detectedPlatform === "youtube") {
+                                await fetch(`${apiBase}/api/all-platform/facebook/seeding-mark/verify`, {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify(verifyBody)
+                                });
+                            }
+                        } catch (err) {
+                            await fetch(`${apiBase}/api/all-platform/facebook/seeding-mark/verify`, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify(verifyBody)
+                            }).catch(() => {});
+                        }
                     }
                 } catch(e) {
                     console.error("Lỗi lưu KPI:", e);

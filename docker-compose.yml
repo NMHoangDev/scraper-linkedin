@@ -5,8 +5,8 @@ services:
       context: ./linkedin-crawler-ui
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_LINKEDIN_CRAWLER_API_URL: https://seeding.markeeai.com
-        NEXT_PUBLIC_API_FACEBOOK_BASE_URL: https://seeding.markeeai.com
+        NEXT_PUBLIC_LINKEDIN_CRAWLER_API_URL: http://localhost:8080/
+        NEXT_PUBLIC_API_FACEBOOK_BASE_URL: http://localhost:8080/
         NEXT_PUBLIC_LINKEDIN_CRAWLER_API_KEY: secret_api_key
         NEXT_PUBLIC_GOOGLE_CLIENT_ID: 957838257147-3jf82as4b1i0g1js004bkrpa1lhpcvp3.apps.googleusercontent.com
     image: scraper-linkedin-frontend:latest

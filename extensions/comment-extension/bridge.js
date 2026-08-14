@@ -1,49 +1,81 @@
-// This file is injected into localhost (UI)
+// -----------------------------------------------------------------------------
+// UNIFIED EXTENSION BRIDGE SCRIPT (bridge.js)
+// Injected into Web App pages (localhost, seeding.markeeai.com, vercel.app)
+// Bridge between Web App window.postMessage and Extension chrome.runtime.sendMessage
+// -----------------------------------------------------------------------------
+
+function safeSendMessage(message, callback) {
+    try {
+        if (!chrome.runtime?.id) {
+            window.postMessage({ action: "COMMENT_EXTENSION_INVALIDATED" }, "*");
+            window.postMessage({ action: "LI_EXTENSION_INVALIDATED" }, "*");
+            return;
+        }
+        chrome.runtime.sendMessage(message, callback);
+    } catch (e) {
+        window.postMessage({ action: "COMMENT_EXTENSION_INVALIDATED" }, "*");
+        window.postMessage({ action: "LI_EXTENSION_INVALIDATED" }, "*");
+    }
+}
+
 window.addEventListener("message", function(event) {
     if (event.source !== window || !event.data) return;
+    const { action, payload } = event.data;
+    if (!action) return;
 
-    if (event.data.action === "START_BULK_COMMENT") {
-        console.log("Bridge received START_BULK_COMMENT", event.data);
-        
-        // Gửi tới background script của extension
-        chrome.runtime.sendMessage({
+    if (action === "START_BULK_COMMENT" || action === "LI_START_COMMENT") {
+        console.log("[Bridge] Received comment request:", action, payload);
+        const url = payload?.url || payload?.posts?.[0]?.url;
+        const text = payload?.text || payload?.content;
+        const postsToRun = payload?.posts || (url ? [{ url, fanpage_id: payload?.fanpage_id, fanpage_name: payload?.fanpage_name }] : []);
+
+        const normalizedPayload = {
+            ...payload,
+            text: text,
+            content: text,
+            posts: postsToRun,
+        };
+
+        safeSendMessage({
             action: "START_BULK_COMMENT",
-            payload: event.data.payload
+            payload: normalizedPayload
         }, response => {
             if (response && response.success) {
-                // Phản hồi lại UI là đã bắt đầu
                 window.postMessage({ action: "BULK_COMMENT_STARTED", success: true }, "*");
+                window.postMessage({ action: "LI_COMMENT_STARTED", success: true }, "*");
             }
         });
-    } else if (event.data.action === "SYNC_ACTIVE_MEMBER" || event.data.type === "SYNC_ACTIVE_MEMBER") {
-        // Web UI bắn event này khi user mở tab Facebook thủ công
-        // để đồng bộ email_member và apiBase vào storage trước khi Like/Share
-        chrome.runtime.sendMessage({
+    } else if (action === "SYNC_ACTIVE_MEMBER" || event.data.type === "SYNC_ACTIVE_MEMBER") {
+        safeSendMessage({
             action: "SYNC_ACTIVE_MEMBER",
-            payload: event.data.payload
-        }, () => { /* fire-and-forget */ });
-    } else if (event.data.action === "STOP_BULK_COMMENT") {
-        chrome.runtime.sendMessage({ action: "STOP_BULK_COMMENT" }, response => {
+            payload: payload
+        }, () => {});
+    } else if (action === "STOP_BULK_COMMENT") {
+        safeSendMessage({ action: "STOP_BULK_COMMENT" }, response => {
             window.postMessage({ action: "STOP_BULK_COMMENT_RESPONSE", payload: response }, "*");
         });
-    } else if (event.data.action === "PING_COMMENT_EXTENSION") {
+    } else if (action === "PING_COMMENT_EXTENSION" || action === "PING_LI_EXTENSION") {
         window.postMessage({ action: "COMMENT_EXTENSION_READY" }, "*");
-    } else if (event.data.action === "GET_STATUS") {
-        chrome.runtime.sendMessage({ action: "GET_STATUS" }, response => {
+        window.postMessage({ action: "LI_EXTENSION_READY" }, "*");
+    } else if (action === "GET_STATUS") {
+        safeSendMessage({ action: "GET_STATUS" }, response => {
             window.postMessage({ action: "STATUS_RESPONSE", payload: response }, "*");
         });
     }
 });
 
-// Lắng nghe tiến trình từ background và gửi xuống UI
+// Lắng nghe tiến trình từ background và relay xuống Web App UI
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "BULK_COMMENT_PROGRESS") {
         window.postMessage({ action: "BULK_COMMENT_PROGRESS", payload: request.payload }, "*");
+        window.postMessage({ action: "LI_COMMENT_PROGRESS", payload: request.payload }, "*");
     } else if (request.action === "BULK_COMMENT_DONE") {
         window.postMessage({ action: "BULK_COMMENT_DONE", payload: request.payload }, "*");
+        window.postMessage({ action: "LI_COMMENT_DONE", payload: request.payload }, "*");
     }
     return true;
 });
 
-// Gửi tín hiệu rằng Extension đã sẵn sàng
+// Gửi tín hiệu sẵn sàng khi vừa load bridge.js
 window.postMessage({ action: "COMMENT_EXTENSION_READY" }, "*");
+window.postMessage({ action: "LI_EXTENSION_READY" }, "*");

@@ -312,7 +312,12 @@ export const internalEngagementService = {
       }),
     });
   },
-
+  debugFetchMeta: (url: string, cookie?: string): Promise<ApiResponse<any>> => {
+    return requestJson(`${BASE}/internal-engagement/custom-posts/debug-fetch`, {
+      method: "POST",
+      body: JSON.stringify({ url, cookie }),
+    });
+  },
   listPosts: (page: number = 1, pageSize: number = 20, email?: string): Promise<ApiResponse<{ items: InternalEngagementPost[]; total: number; page: number; page_size: number }>> => {
     const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
     if (email) params.set("email", email);
