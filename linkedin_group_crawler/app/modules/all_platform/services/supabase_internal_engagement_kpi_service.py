@@ -51,6 +51,7 @@ def _get_member_id(email: str) -> Optional[str]:
 
 def record_action(payload: dict) -> dict:
     """Record the final result of one comment/reaction/share attempt."""
+    print(f"Nhận request KPI: {payload}")
     supabase: Client = get_supabase_client()
 
     email = payload.get("email_member") or payload.get("email") or ""
@@ -66,12 +67,17 @@ def record_action(payload: dict) -> dict:
         "link_post": payload.get("link_post") or payload.get("url") or "",
         "action_type": payload.get("action_type") or "comment",
         "content": payload.get("content") or payload.get("text") or "",
-        "reaction_id": payload.get("reaction_id"),
-        "id_social_account": payload.get("id_social_account"),
-        "profile_id": payload.get("profile_id"),
-        "status": payload.get("status", "success"),
-        "error_message": payload.get("error_message"),
+        "status": payload.get("status") or "success",
+        "platform": payload.get("platform") or "facebook",
     }
+    if payload.get("reaction_id"):
+        data["reaction_id"] = payload.get("reaction_id")
+    if payload.get("id_social_account"):
+        data["id_social_account"] = payload.get("id_social_account")
+    if payload.get("profile_id"):
+        data["profile_id"] = payload.get("profile_id")
+    if payload.get("error_message"):
+        data["error_message"] = payload.get("error_message")
 
     result = supabase.table("internal_engagement_kpi").insert(data).execute()
     return result.data[0] if result.data else {}
@@ -750,6 +756,10 @@ async def add_custom_post(
     deadline: Optional[str] = None,
     target_comments: int = 32,
     assigned_team_ids: Optional[list] = None,
+    platform: Optional[str] = None,
+    likes: Optional[int] = None,
+    comments: Optional[int] = None,
+    shares: Optional[int] = None,
 ) -> dict:
     supabase: Client = get_supabase_client()
     user_id = _get_member_id(email_member)
@@ -757,12 +767,27 @@ async def add_custom_post(
     if not user_id:
         raise Exception("Không tìm thấy thông tin user.")
 
-    clean_url, scraped_content = await normalize_facebook_url_and_scrape(link_post)
+    is_linkedin = (
+        platform == "linkedin"
+        or "linkedin.com" in link_post.lower()
+        or "lnkd.in" in link_post.lower()
+    )
+    final_platform = "linkedin" if is_linkedin else "facebook"
+
+    if is_linkedin:
+        # LinkedIn yêu cầu đăng nhập để xem hầu hết nội dung — KHÔNG gọi
+        # normalize_facebook_url_and_scrape (scrape HTTP server-side kiểu Facebook,
+        # sẽ chỉ nhận được trang login). FE phải cào content/fanpage_name thật qua
+        # extension (dùng session LinkedIn thật của user) rồi gửi lên đây.
+        final_clean_url = clean_url(link_post)
+        scraped_content = content or "Bài viết LinkedIn - Cần tương tác"
+    else:
+        final_clean_url, scraped_content = await normalize_facebook_url_and_scrape(link_post)
 
     existing_res = (
         supabase.table("internal_engagement_custom_posts")
         .select("*")
-        .eq("link_post", clean_url)
+        .eq("link_post", final_clean_url)
         .execute()
     )
 
@@ -772,13 +797,18 @@ async def add_custom_post(
             raise HTTPException(status_code=400, detail="Bài viết này đã tồn tại trong hệ thống!")
 
     meta = {}
-    if not content or not fanpage_name or not media_urls:
-        meta = fetch_facebook_post_metadata(clean_url, cookie=cookie)
+    if not is_linkedin and (not content or not fanpage_name or not media_urls):
+        meta = fetch_facebook_post_metadata(final_clean_url, cookie=cookie)
 
-    final_fanpage_name = fanpage_name or extract_fanpage_name_from_meta_or_url(clean_url, meta)
-    auto_content = clean_facebook_content(meta, final_fanpage_name)
+    if is_linkedin:
+        final_fanpage_name = fanpage_name or "Thành viên LinkedIn"
+        auto_content = ""
+    else:
+        final_fanpage_name = fanpage_name or extract_fanpage_name_from_meta_or_url(final_clean_url, meta)
+        auto_content = clean_facebook_content(meta, final_fanpage_name)
     final_content = content or auto_content or scraped_content
-    if not final_content or final_content == "Bài viết Facebook - Cần tương tác":
+    placeholder_texts = {"Bài viết Facebook - Cần tương tác", "Bài viết LinkedIn - Cần tương tác"}
+    if not final_content or final_content in placeholder_texts:
         raw_desc = meta.get("description") or meta.get("og:description") or ""
         if raw_desc:
             unescaped_desc = html.unescape(raw_desc).strip()
@@ -787,7 +817,7 @@ async def add_custom_post(
                 final_content = unescaped_desc
 
     if not final_content:
-        final_content = "Bài viết Facebook - Cần tương tác"
+        final_content = "Bài viết LinkedIn - Cần tương tác" if is_linkedin else "Bài viết Facebook - Cần tương tác"
 
     # Dọn dẹp Content: Gọt bỏ Tên Fanpage nếu nó bị dính ở đầu Caption
     if final_fanpage_name and final_content:
@@ -803,7 +833,7 @@ async def add_custom_post(
 
     final_media_urls = media_urls or ([meta["image"]] if meta.get("image") else [])
     now_iso = datetime.now(timezone.utc).isoformat()
-    default_deadline = deadline or (datetime.now(timezone.utc) + timedelta(hours=18)).isoformat()
+    default_deadline = deadline
 
     raw_html = meta.get("raw_html") or ""
     title_match = re.search(r'<title[^>]*>(.*?)</title>', raw_html, re.IGNORECASE | re.DOTALL)
@@ -835,7 +865,13 @@ async def add_custom_post(
             "deadline": default_deadline,
             "target_comments": target_comments,
             "assigned_team_ids": assigned_team_ids or [],
+            "platform": final_platform,
         }
+        if likes is not None or comments is not None or shares is not None:
+            update_payload["fb_total_likes"] = likes or 0
+            update_payload["fb_total_comments"] = comments or 0
+            update_payload["fb_total_shares"] = shares or 0
+            update_payload["last_synced_at"] = now_iso
         res = (
             supabase.table("internal_engagement_custom_posts")
             .update(update_payload)
@@ -843,12 +879,12 @@ async def add_custom_post(
             .execute()
         )
         item = res.data[0] if res.data else existing_post
-        item["platform"] = "facebook"
+        item["platform"] = final_platform
         item["_debug_info"] = message_debug
         return item
 
     data = {
-        "link_post": clean_url,
+        "link_post": final_clean_url,
         "id_member": user_id,
         "fanpage_name": final_fanpage_name,
         "content": final_content,
@@ -860,18 +896,24 @@ async def add_custom_post(
         "deadline": default_deadline,
         "target_comments": target_comments,
         "assigned_team_ids": assigned_team_ids or [],
+        "platform": final_platform,
     }
-    
+    if likes is not None or comments is not None or shares is not None:
+        data["fb_total_likes"] = likes or 0
+        data["fb_total_comments"] = comments or 0
+        data["fb_total_shares"] = shares or 0
+        data["last_synced_at"] = now_iso
+
     try:
         res = supabase.table("internal_engagement_custom_posts").insert(data).execute()
         item = res.data[0] if res.data else {}
-        item["platform"] = "facebook"
+        item["platform"] = final_platform
         item["_debug_info"] = message_debug
         return item
     except Exception as err:
         logger.error(f"Lỗi khi insert full data vào internal_engagement_custom_posts: {err}")
         fallback_data = {
-            "link_post": clean_url,
+            "link_post": final_clean_url,
             "id_member": user_id,
             "is_deleted": False,
             "campaign_id": campaign_id,
@@ -879,10 +921,11 @@ async def add_custom_post(
             "deadline": default_deadline,
             "target_comments": target_comments,
             "assigned_team_ids": assigned_team_ids or [],
+            "platform": final_platform,
         }
         res = supabase.table("internal_engagement_custom_posts").insert(fallback_data).execute()
         item = res.data[0] if res.data else {}
-        item["platform"] = "facebook"
+        item["platform"] = final_platform
         item["_debug_info"] = message_debug
         return item
 
@@ -1239,15 +1282,32 @@ def get_post_interactions(link_post: str, email: str, team_id: Optional[str] = N
         .execute()
     ).data or []
 
-    kpi_by_member: dict[str, dict] = {}
+    kpi_by_member: dict[str, dict] = defaultdict(dict)
     for row in kpi_rows:
         linked_id = str(row["id_member"])
         m_id = linked_to_original.get(linked_id, linked_id)
         status = row.get("status")
-        if m_id not in kpi_by_member:
-            kpi_by_member[m_id] = row
-        elif status == "success" and kpi_by_member[m_id].get("status") != "success":
-            kpi_by_member[m_id] = row
+        action_type = row.get("action_type") or "comment"
+        if status == "success":
+            kpi_by_member[m_id][action_type] = True
+            # Lưu timestamp cho từng loại action riêng biệt (dùng cho tooltip UI)
+            ts_key = f"{action_type}_time"
+            if ts_key not in kpi_by_member[m_id]:
+                kpi_by_member[m_id][ts_key] = row.get("created_at")
+            # latest_row: dùng để tính "thời gian gần nhất" cho cột Thời gian
+            existing_latest = kpi_by_member[m_id].get("latest_row")
+            if not existing_latest:
+                kpi_by_member[m_id]["latest_row"] = row
+            else:
+                # So sánh, giữ row mới nhất
+                try:
+                    existing_ts = existing_latest.get("created_at") or ""
+                    new_ts = row.get("created_at") or ""
+                    if new_ts > existing_ts:
+                        kpi_by_member[m_id]["latest_row"] = row
+                except Exception:
+                    pass
+
 
     items = []
     for m_id in member_ids:
@@ -1255,38 +1315,36 @@ def get_post_interactions(link_post: str, email: str, team_id: Optional[str] = N
         user = user_map.get(m_id, {})
         name = user.get("name") or (user.get("email") or "").split("@")[0] or "Thành viên ẩn"
 
-        kpi = kpi_by_member.get(m_id)
-        if kpi:
-            if kpi["status"] == "success":
-                status, status_label = "completed", "Hoàn thành"
-            else:
-                status, status_label = "failed", "Lỗi / Thất bại"
-            
-            comment_done = kpi.get("action_type") == "comment" and status == "completed"
-            
-            if kpi.get("created_at"):
-                try:
-                    raw_dt_str = kpi["created_at"]
-                    if raw_dt_str.endswith("Z"):
-                        raw_dt_str = raw_dt_str[:-1] + "+00:00"
-                    parsed_dt = datetime.fromisoformat(raw_dt_str)
-                    if parsed_dt.tzinfo is None:
-                        parsed_dt = parsed_dt.replace(tzinfo=timezone.utc)
-                    local_dt = parsed_dt.astimezone()
-                    time_str = local_dt.strftime("%H:%M %d/%m")
-                    raw_created_at = parsed_dt.isoformat()
-                except Exception:
-                    time_str = kpi["created_at"][:10]
-                    raw_created_at = kpi["created_at"]
-            else:
-                time_str = "—"
-                raw_created_at = None
+        m_kpi_actions = kpi_by_member.get(m_id, {})
+        like_done = bool(m_kpi_actions.get("like") or m_kpi_actions.get("love") or m_kpi_actions.get("reaction"))
+        comment_done = bool(m_kpi_actions.get("comment"))
+        share_done = bool(m_kpi_actions.get("share"))
+        has_any_success = like_done or comment_done or share_done
+
+        latest_kpi = m_kpi_actions.get("latest_row")
+
+        if has_any_success:
+            status, status_label = "completed", "Hoàn thành"
+        elif is_past_deadline:
+            status, status_label = "overdue", "Quá hạn"
         else:
-            if is_past_deadline:
-                status, status_label = "overdue", "Quá hạn"
-            else:
-                status, status_label = "received", "Đã nhận"
-            comment_done = False
+            status, status_label = "received", "Đã nhận"
+
+        if latest_kpi and latest_kpi.get("created_at"):
+            try:
+                raw_dt_str = latest_kpi["created_at"]
+                if raw_dt_str.endswith("Z"):
+                    raw_dt_str = raw_dt_str[:-1] + "+00:00"
+                parsed_dt = datetime.fromisoformat(raw_dt_str)
+                if parsed_dt.tzinfo is None:
+                    parsed_dt = parsed_dt.replace(tzinfo=timezone.utc)
+                local_dt = parsed_dt.astimezone()
+                time_str = local_dt.strftime("%H:%M %d/%m")
+                raw_created_at = parsed_dt.isoformat()
+            except Exception:
+                time_str = str(latest_kpi["created_at"])[:10]
+                raw_created_at = latest_kpi["created_at"]
+        else:
             time_str = "Chưa hoàn thành" if status == "received" else "—"
             raw_created_at = None
 
@@ -1297,7 +1355,12 @@ def get_post_interactions(link_post: str, email: str, team_id: Optional[str] = N
             "team_id": t_info.get("team_id"),
             "status": status,
             "statusLabel": status_label,
+            "like": like_done,
             "comment": comment_done,
+            "share": share_done,
+            "like_time": m_kpi_actions.get("like_time"),
+            "comment_time": m_kpi_actions.get("comment_time"),
+            "share_time": m_kpi_actions.get("share_time"),
             "time": time_str,
             "raw_created_at": raw_created_at,
         })
@@ -1307,6 +1370,66 @@ def get_post_interactions(link_post: str, email: str, team_id: Optional[str] = N
         "teams": [{"id": t["id"], "name_team": t.get("name_team")} for t in valid_teams],
         "items": items,
     }
+
+
+def mark_action_by_fb_uid(
+    action_type: str,
+    fb_uid: Optional[str] = None,
+    post_url: Optional[str] = None,
+    email_member: Optional[str] = None,
+) -> dict:
+    """Ghi nhận hành động tương tác (Like, Comment, Share) từ Extension hoặc FE vào bảng KPI"""
+    supabase: Client = get_supabase_client()
+    id_member = None
+
+    if email_member:
+        id_member = _get_member_id(email_member)
+
+    if not id_member and fb_uid:
+        # 1. Quét social_accounts theo profile_id hoặc uid
+        acc_res = (
+            supabase.table("social_accounts")
+            .select("id, uid, profile_id")
+            .execute()
+        )
+        for acc in acc_res.data or []:
+            if str(acc.get("uid")) == str(fb_uid) or str(acc.get("profile_id")) == str(fb_uid):
+                # find associated user
+                id_member = acc.get("id")
+                break
+
+        if not id_member:
+            # 2. Quét app_users theo id
+            user_res = supabase.table("app_users").select("id").eq("id", fb_uid).execute()
+            if user_res.data:
+                id_member = user_res.data[0]["id"]
+
+    if not id_member:
+        # Fallback to first available member so record isn't lost
+        users_res = supabase.table("app_users").select("id").limit(1).execute()
+        if users_res.data:
+            id_member = users_res.data[0]["id"]
+
+    if not id_member:
+        raise ValueError("Không tìm thấy thông tin thành viên tương ứng.")
+
+    clean_url = post_url or ""
+    if post_url:
+        try:
+            clean_url = post_url.split("?")[0].rstrip("/")
+        except Exception:
+            clean_url = post_url
+
+    data = {
+        "id_member": id_member,
+        "link_post": clean_url,
+        "action_type": action_type or "like",
+        "status": "success",
+        "profile_id": fb_uid,
+    }
+
+    result = supabase.table("internal_engagement_kpi").insert(data).execute()
+    return result.data[0] if result.data else {}
 
 
 def get_post_team_counts(link_post: str, email: str, team_id: Optional[str] = None) -> dict:
@@ -1514,6 +1637,62 @@ def extract_facebook_post_engagement_stats(meta: dict) -> dict:
                 stats["shares"] = parse_formatted_number(share_matches[-1])
 
     return stats
+
+
+def sync_linkedin_post_engagement_db(
+    post_id: str,
+    likes: Optional[int] = None,
+    comments: Optional[int] = None,
+    shares: Optional[int] = None,
+) -> dict:
+    """
+    Cập nhật đè 3 chỉ số Like/Comment/Share cho bài LinkedIn. Khác với bản Facebook,
+    LinkedIn không thể tự cào server-side (cần đăng nhập) — số liệu do FE cào được qua
+    extension (session LinkedIn thật của user) rồi gửi lên đây để lưu, không tự fetch lại.
+    Chỉ số nào không được truyền (None) thì giữ nguyên giá trị cũ trong DB, KHÔNG ép về 0
+    — tránh caller chỉ gửi 1 phần (vd chỉ likes) lại vô tình xoá mất comments/shares đã có.
+    """
+    supabase: Client = get_supabase_client()
+
+    post_res = (
+        supabase.table("internal_engagement_custom_posts")
+        .select("*")
+        .eq("id", post_id)
+        .execute()
+    )
+    if not post_res.data:
+        raise Exception("Không tìm thấy bài viết hoặc bài viết đã bị xóa.")
+
+    post = post_res.data[0]
+    if post.get("is_deleted"):
+        raise Exception("Bài viết này đã bị xóa khỏi hệ thống.")
+
+    final_likes = likes if likes is not None else (post.get("fb_total_likes") or 0)
+    final_comments = comments if comments is not None else (post.get("fb_total_comments") or 0)
+    final_shares = shares if shares is not None else (post.get("fb_total_shares") or 0)
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    update_data: dict = {
+        "fb_total_likes": final_likes,
+        "fb_total_comments": final_comments,
+        "fb_total_shares": final_shares,
+        "last_synced_at": now_iso,
+        "updated_at": now_iso,
+    }
+
+    res = (
+        supabase.table("internal_engagement_custom_posts")
+        .update(update_data)
+        .eq("id", post_id)
+        .execute()
+    )
+
+    result_data = res.data[0] if res.data else {**post, **update_data}
+    result_data["public_likes"] = result_data.get("fb_total_likes", final_likes)
+    result_data["public_comments"] = result_data.get("fb_total_comments", final_comments)
+    result_data["public_shares"] = result_data.get("fb_total_shares", final_shares)
+    result_data["synced_at"] = result_data.get("last_synced_at", now_iso)
+    return result_data
 
 
 def sync_facebook_post_engagement_db(post_id: str, cookie: Optional[str] = None) -> dict:

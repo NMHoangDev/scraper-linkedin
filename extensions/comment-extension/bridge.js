@@ -15,6 +15,13 @@ window.addEventListener("message", function(event) {
                 window.postMessage({ action: "BULK_COMMENT_STARTED", success: true }, "*");
             }
         });
+    } else if (event.data.action === "SYNC_ACTIVE_MEMBER" || event.data.type === "SYNC_ACTIVE_MEMBER") {
+        // Web UI bắn event này khi user mở tab Facebook thủ công
+        // để đồng bộ email_member và apiBase vào storage trước khi Like/Share
+        chrome.runtime.sendMessage({
+            action: "SYNC_ACTIVE_MEMBER",
+            payload: event.data.payload
+        }, () => { /* fire-and-forget */ });
     } else if (event.data.action === "STOP_BULK_COMMENT") {
         chrome.runtime.sendMessage({ action: "STOP_BULK_COMMENT" }, response => {
             window.postMessage({ action: "STOP_BULK_COMMENT_RESPONSE", payload: response }, "*");

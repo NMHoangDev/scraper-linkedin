@@ -195,6 +195,7 @@ export interface QuickCommentTemplate {
 
 export interface InternalEngagementPost {
   id: string;
+  platform?: FeedPlatform;
   fanpage_id: string;
   fanpage_name?: string;
   facebook_post_id?: string;

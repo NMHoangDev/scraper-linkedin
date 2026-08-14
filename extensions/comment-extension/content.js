@@ -40,6 +40,165 @@ document.addEventListener("fb-graphql-docid-captured", (evt) => {
   }
 });
 
+// Hiển thị Toast thông báo xanh cho người dùng khi tương tác bài mục tiêu thành công
+function showToastNotification(msg) {
+  try {
+    let toast = document.getElementById("markee-extension-toast");
+    if (!toast) {
+      toast = document.createElement("div");
+      toast.id = "markee-extension-toast";
+      toast.style.position = "fixed";
+      toast.style.bottom = "24px";
+      toast.style.right = "24px";
+      toast.style.zIndex = "99999999";
+      toast.style.backgroundColor = "#10b981";
+      toast.style.color = "#ffffff";
+      toast.style.padding = "12px 20px";
+      toast.style.borderRadius = "12px";
+      toast.style.boxShadow = "0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2)";
+      toast.style.fontSize = "14px";
+      toast.style.fontWeight = "600";
+      toast.style.fontFamily = "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+      toast.style.display = "flex";
+      toast.style.alignItems = "center";
+      toast.style.gap = "8px";
+      toast.style.transition = "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)";
+      toast.style.opacity = "0";
+      toast.style.transform = "translateY(10px)";
+      document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.style.opacity = "1";
+    toast.style.transform = "translateY(0)";
+
+    setTimeout(() => {
+      if (toast) {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateY(10px)";
+      }
+    }, 3500);
+  } catch (e) {}
+}
+
+// 1. Tự động xóa config trong bộ nhớ session & local ngay khi người dùng đóng tab Facebook
+window.addEventListener("beforeunload", () => {
+  try {
+    if (chrome.storage && chrome.storage.session) {
+      chrome.storage.session.clear();
+    }
+    chrome.storage.local.remove(["markee_verify_config", "markee_email_member"]);
+  } catch (e) {}
+});
+
+// Hàm đọc config ưu tiên từ chrome.storage.session (nếu không có mới đọc local)
+function getStoredConfig(callback) {
+  const keys = ["markee_verify_config", "markee_email_member"];
+  if (chrome.storage && chrome.storage.session) {
+    chrome.storage.session.get(keys, (sessionData) => {
+      if (sessionData && sessionData.markee_verify_config && sessionData.markee_verify_config.email_member) {
+        return callback(sessionData);
+      }
+      chrome.storage.local.get(keys, callback);
+    });
+  } else {
+    chrome.storage.local.get(keys, callback);
+  }
+}
+
+// Hàm bóc tách ID toàn năng cho mọi loại link Facebook
+function getUniversalFacebookId(url) {
+  if (!url) return "";
+
+  // 1. Quét các định dạng có từ khóa rõ ràng: /posts/, /permalink/, /reel/, /videos/, /fbid=, v=
+  const keywordMatch = url.match(/(?:\/posts\/|\/permalink\/|\/reel\/|\/videos\/|v=|fbid=|\/story\.php\?story_fbid=)([0-9]+)/);
+  if (keywordMatch && keywordMatch[1]) {
+    return keywordMatch[1];
+  }
+
+  // 2. Quét các cụm số đứng sau dấu gạch chéo (Thường gặp ở link rút gọn sau khi trình duyệt redirect)
+  const slashMatch = url.match(/\/([0-9]{10,})(?:\/|\?|$)/);
+  if (slashMatch && slashMatch[1]) {
+    return slashMatch[1];
+  }
+
+  // 3. Fallback cuối cùng: Lọc ra chuỗi số dài nhất (từ 10 chữ số trở lên) có mặt trong URL
+  const allNumbers = url.match(/[0-9]{10,}/g);
+  if (allNumbers && allNumbers.length > 0) {
+    // Trả về chuỗi số dài nhất tìm được (tránh lấy nhầm ID tài khoản cá nhân ngắn)
+    return allNumbers.reduce((a, b) => (a.length >= b.length ? a : b));
+  }
+
+  return "";
+}
+
+let reelShareTimer = null;
+
+// Lắng nghe sự kiện Like/Share bắt được từ graphql-sniffer.js (MAIN world)
+document.addEventListener("markee-action-captured", (evt) => {
+  try {
+    const { actionType, fbUid, postUrl, delayMs } = evt.detail || {};
+    if (!actionType) return;
+
+    const executeRecordAction = () => {
+      // Gửi yêu cầu tới Background kiểm tra xem TAB HIỆN TẠI có phải là Tab mục tiêu được cấp quyền không
+      chrome.runtime.sendMessage({ action: "CHECK_TAB_PERMISSION" }, (response) => {
+        if (chrome.runtime.lastError || !response || !response.allowed) {
+          // Sai tab hoặc Tab mục tiêu đã đóng (Session đã tự hủy) -> CÂM LẶNG 100%, KHÔNG LOG, KHÔNG TOAST
+          return;
+        }
+
+        const verifyConfig = response.config || {};
+        const emailMember = verifyConfig.email_member || "";
+        if (!emailMember) return;
+
+        // ĐÚNG TAB MỤC TIÊU ĐƯỢC CẤP QUYỀN -> Hiển thị Toast thông báo xanh cho người dùng
+        showToastNotification(`✅ Đã ghi nhận ${actionType === "like" ? "Like" : "Share"} thành công!`);
+
+        let apiBase = verifyConfig.apiBase || "https://seeding.markeeai.com";
+        if (!apiBase || typeof apiBase !== "string" || !apiBase.startsWith("http")) {
+          apiBase = "https://seeding.markeeai.com";
+        }
+        apiBase = apiBase.replace(/\/$/, "");
+
+        const kpiPayload = {
+          email_member: emailMember,
+          link_post: verifyConfig.target_link || postUrl,
+          fanpage_id: verifyConfig.fanpage_id || "",
+          fanpage_name: verifyConfig.fanpage_name || "",
+          facebook_post_id: verifyConfig.facebook_post_id || "unknown",
+          action_type: actionType,
+          content: "",          // Like/Share không có content, để rỗng
+          profile_id: fbUid || "",
+          status: "success",
+        };
+
+        const recordEndpoint = `${apiBase}/api/all-platform/internal-engagement/kpi/record`;
+        console.log(`[Comment Extension] Ghi nhận ${actionType} cho Tab mục tiêu:`, kpiPayload);
+
+        chrome.runtime.sendMessage({
+            action: "RECORD_KPI_BACKGROUND",
+            endpoint: recordEndpoint,
+            payload: kpiPayload
+        }, (res) => {
+            if (res && res.success) {
+                console.log("[Comment Extension] Đã lưu KPI thành công.");
+            }
+        });
+      });
+    };
+
+    // Nếu là thao tác Share Reel (có delayMs), hoãn 3s trước khi hiển thị Toast và đẩy KPI về Supabase
+    if (delayMs && delayMs > 0) {
+      if (reelShareTimer) clearTimeout(reelShareTimer);
+      console.log(`[Comment Extension] Bắt được thao tác Share Reel, chờ ${delayMs}ms trước khi gửi KPI...`);
+      reelShareTimer = setTimeout(executeRecordAction, delayMs);
+    } else {
+      executeRecordAction();
+    }
+  } catch (e) {}
+});
+
+
 function getTokensFromPage() {
   return new Promise((resolve, reject) => {
     try {

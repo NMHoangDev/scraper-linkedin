@@ -181,7 +181,7 @@ _register_graceful_signal_handlers()
 async def handle_cors_middleware(request: Request, call_next):
     origin = request.headers.get("origin", "")
 
-    # Allow Chrome extension origin and known frontend origins
+    # Allow Chrome extension origin, known frontend origins, and Facebook origins
     allowed_origins = {
         "chrome-extension://" + origin.replace("chrome-extension://", "").split("/")[0]
         if origin.startswith("chrome-extension://") else "",
@@ -193,6 +193,14 @@ async def handle_cors_middleware(request: Request, call_next):
         "http://127.0.0.1:3002",
         "http://localhost:8080",
         "http://127.0.0.1:8080",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "https://seeding.markeeai.com",
+        "https://facebook.com",
+        "https://www.facebook.com",
+        "https://web.facebook.com",
+        "https://m.facebook.com",
+        "https://touch.facebook.com",
     }
     # Thêm origin từ env CORS_ORIGINS (ngăn cách dấu phẩy) — cho phép cấu hình domain deploy
     # mà không hardcode vào code (vd seeding.zenithglobal.dev khi chạy bản demo).
@@ -202,7 +210,12 @@ async def handle_cors_middleware(request: Request, call_next):
         if _o:
             allowed_origins.add(_o)
 
-    is_allowed = origin in allowed_origins or origin.startswith("chrome-extension://")
+    is_allowed = (
+        origin in allowed_origins
+        or origin.startswith("chrome-extension://")
+        or origin.endswith(".facebook.com")
+        or origin == "https://facebook.com"
+    )
 
     if request.method == "OPTIONS":
         response = Response(status_code=200)
