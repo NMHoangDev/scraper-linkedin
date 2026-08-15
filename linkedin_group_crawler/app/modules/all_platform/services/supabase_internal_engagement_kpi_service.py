@@ -592,11 +592,23 @@ _TRACKING_PARAMS = {
 }
 
 
+def sanitize_linkedin_url(url: str) -> str:
+    """Chuẩn hóa URL LinkedIn: Chuyển subdomain quốc gia (vn., en.,...) thành www. và xóa tracking parameters ?..."""
+    if not url or "linkedin.com" not in url.lower():
+        return url or ""
+    clean_url_str = re.sub(r'https?://[a-zA-Z]{2,3}\.linkedin\.com', 'https://www.linkedin.com', url.strip(), flags=re.IGNORECASE)
+    clean_url_str = clean_url_str.split('?')[0].strip()
+    return clean_url_str
+
+
 def clean_url(url: str) -> str:
     if not url:
         return ""
 
     cleaned = url.strip()
+
+    if "linkedin.com" in cleaned.lower():
+        cleaned = sanitize_linkedin_url(cleaned)
 
     if "share_url=" in cleaned:
         try:
@@ -767,20 +779,198 @@ async def add_custom_post(
     if not user_id:
         raise Exception("Không tìm thấy thông tin user.")
 
+def fetch_youtube_post_metadata(url: str) -> dict:
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
+    }
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=10) as response:
+            html_content = response.read().decode("utf-8", errors="ignore")
+
+        # 1. Trích xuất Tên Kênh (Channel Name)
+        channel_name = ""
+        author_match = re.search(
+            r'<span\s+itemprop=["\']author["\'][^>]*>[\s\S]*?<link\s+itemprop=["\']name["\']\s+content=["\']([^"\']+)["\']',
+            html_content, re.IGNORECASE
+        )
+        if author_match and author_match.group(1):
+            channel_name = author_match.group(1)
+
+        if not channel_name:
+            meta_author = re.search(r'<meta\s+itemprop=["\']author["\']\s+content=["\']([^"\']+)["\']', html_content, re.IGNORECASE)
+            if meta_author and meta_author.group(1):
+                channel_name = meta_author.group(1)
+
+        if not channel_name:
+            channel_json = re.search(r'"channel"\s*:\s*\{\s*"simpleText"\s*:\s*"([^"]+)"\}', html_content, re.IGNORECASE)
+            if channel_json and channel_json.group(1):
+                channel_name = channel_json.group(1)
+
+        if not channel_name:
+            owner_json = re.search(r'"videoOwnerRenderer"\s*:\s*\{\s*"title"\s*:\s*\{\s*"runs"\s*:\s*\[\s*\{\s*"text"\s*:\s*"([^"]+)"', html_content, re.IGNORECASE) or \
+                         re.search(r'"ownerChannelName"\s*:\s*"([^"]+)"', html_content, re.IGNORECASE) or \
+                         re.search(r'"author"\s*:\s*"([^"]+)"', html_content, re.IGNORECASE)
+            if owner_json and owner_json.group(1):
+                channel_name = owner_json.group(1)
+
+        if not channel_name:
+            link_name = re.search(r'<link\s+itemprop=["\']name["\']\s+content=["\']([^"\']+)["\']', html_content, re.IGNORECASE)
+            if link_name and link_name.group(1):
+                channel_name = link_name.group(1)
+
+        # 2. Trích xuất Mô tả (Description)
+        description = ""
+        meta_desc = re.search(r'<meta\s+itemprop=["\']description["\']\s+content=["\']([^"\']+)["\']', html_content, re.IGNORECASE)
+        if meta_desc and meta_desc.group(1):
+            description = meta_desc.group(1)
+
+        if not description:
+            meta_name_desc = re.search(r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']+)["\']', html_content, re.IGNORECASE) or \
+                            re.search(r'<meta\s+property=["\']og:description["\']\s+content=["\']([^"\']+)["\']', html_content, re.IGNORECASE)
+            if meta_name_desc and meta_name_desc.group(1):
+                description = meta_name_desc.group(1)
+
+        # 3. Trích xuất Tiêu đề (Title)
+        title = ""
+        meta_title = re.search(r'<meta\s+itemprop=["\']name["\']\s+content=["\']([^"\']+)["\']', html_content, re.IGNORECASE) or \
+                     re.search(r'<meta\s+property=["\']og:title["\']\s+content=["\']([^"\']+)["\']', html_content, re.IGNORECASE) or \
+                     re.search(r'<title[^>]*>(.*?)</title>', html_content, re.IGNORECASE | re.DOTALL)
+        if meta_title and meta_title.group(1):
+            title = re.sub(r'\s*-\s*YouTube$', '', meta_title.group(1), flags=re.IGNORECASE).strip()
+        def _decode(text: str) -> str:
+            if not text:
+                return ""
+            try:
+                text = re.sub(r'\\u([0-9a-fA-F]{4})', lambda m: chr(int(m.group(1), 16)), text)
+            except Exception:
+                pass
+            text = text.replace('\\"', '"').replace('\\\\', '\\').replace('\\n', '\n').replace('\\r', '')
+            return html.unescape(text).strip()
+
+        return {
+            "channel_name": _decode(channel_name),
+            "description": _decode(description),
+            "title": _decode(title),
+        }
+    except Exception as e:
+        logger.error(f"Lỗi khi cào metadata YouTube: {e}")
+        return {"channel_name": "", "description": "", "title": ""}
+
+
+def extract_linkedin_metadata(data: dict | str) -> dict[str, str]:
+    """
+    Trích xuất author_name và content từ object metadata của bài viết LinkedIn.
+    Cấu trúc mong đợi:
+    - title / page_title chứa: "Nội dung bài viết... | Tên Người Đăng"
+    - description chứa nội dung bài viết
+    """
+    if not data:
+        return {"author_name": "", "content": ""}
+
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except Exception:
+            data = {"description": data}
+
+    meta = data.get("metadata") if isinstance(data, dict) and isinstance(data.get("metadata"), dict) else {}
+
+    raw_desc = (meta.get("description") or data.get("description") or "") if isinstance(data, dict) else ""
+    content = str(raw_desc).strip() if raw_desc else ""
+
+    raw_title = (meta.get("title") or data.get("page_title") or data.get("title") or "") if isinstance(data, dict) else ""
+    full_title = str(raw_title).strip() if raw_title else ""
+
+    author_name = ""
+    if " | " in full_title:
+        parts = full_title.split(" | ")
+        author_name = parts[-1].strip()
+    elif " on LinkedIn:" in full_title:
+        author_name = full_title.split(" on LinkedIn:")[0].strip()
+    elif " trên LinkedIn:" in full_title:
+        author_name = full_title.split(" trên LinkedIn:")[0].strip()
+
+    return {
+        "author_name": author_name,
+        "content": content
+    }
+
+
+def fetch_linkedin_post_metadata(url: str) -> dict[str, str]:
+    """Cào metadata bài viết LinkedIn từ HTML thô và bóc tách author_name + content."""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
+    }
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=10) as response:
+            html_content = response.read().decode("utf-8", errors="ignore")
+
+        meta_title_match = re.search(r'<meta\s+property=["\']og:title["\']\s+content=["\']([^"\']+)["\']', html_content, re.IGNORECASE) or \
+                           re.search(r'<title[^>]*>(.*?)</title>', html_content, re.IGNORECASE | re.DOTALL)
+        page_title = html.unescape(meta_title_match.group(1)).strip() if meta_title_match and meta_title_match.group(1) else ""
+
+        meta_desc_match = re.search(r'<meta\s+property=["\']og:description["\']\s+content=["\']([^"\']+)["\']', html_content, re.IGNORECASE) or \
+                          re.search(r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']+)["\']', html_content, re.IGNORECASE)
+        description = html.unescape(meta_desc_match.group(1)).strip() if meta_desc_match and meta_desc_match.group(1) else ""
+
+        return extract_linkedin_metadata({
+            "page_title": page_title,
+            "title": page_title,
+            "description": description
+        })
+    except Exception as e:
+        logger.error(f"Lỗi khi cào metadata LinkedIn: {e}")
+        return {"author_name": "", "content": ""}
+
+
+async def add_custom_post(
+    email_member: str,
+    link_post: str,
+    content: Optional[str] = None,
+    fanpage_name: Optional[str] = None,
+    media_urls: Optional[list] = None,
+    cookie: Optional[str] = None,
+    campaign_id: Optional[str] = None,
+    campaign_name: Optional[str] = None,
+    deadline: Optional[str] = None,
+    target_comments: int = 32,
+    assigned_team_ids: Optional[list] = None,
+    platform: Optional[str] = None,
+    likes: Optional[int] = None,
+    comments: Optional[int] = None,
+    shares: Optional[int] = None,
+) -> dict:
+    supabase: Client = get_supabase_client()
+    user_id = _get_member_id(email_member)
+
+    if not user_id:
+        raise Exception("Không tìm thấy thông tin user.")
+
     is_linkedin = (
         platform == "linkedin"
         or "linkedin.com" in link_post.lower()
-        or "lnkd.in" in link_post.lower()
     )
-    final_platform = "linkedin" if is_linkedin else "facebook"
+    is_youtube = (
+        platform == "youtube"
+        or "youtube.com" in link_post.lower()
+        or "youtu.be" in link_post.lower()
+    )
+    final_platform = "linkedin" if is_linkedin else ("youtube" if is_youtube else "facebook")
 
+    li_meta = {}
+    yt_meta = {}
     if is_linkedin:
-        # LinkedIn yêu cầu đăng nhập để xem hầu hết nội dung — KHÔNG gọi
-        # normalize_facebook_url_and_scrape (scrape HTTP server-side kiểu Facebook,
-        # sẽ chỉ nhận được trang login). FE phải cào content/fanpage_name thật qua
-        # extension (dùng session LinkedIn thật của user) rồi gửi lên đây.
         final_clean_url = clean_url(link_post)
-        scraped_content = content or "Bài viết LinkedIn - Cần tương tác"
+        li_meta = fetch_linkedin_post_metadata(final_clean_url)
+        scraped_content = content or li_meta.get("content") or "Bài viết LinkedIn - Cần tương tác"
+    elif is_youtube:
+        final_clean_url = clean_url(link_post)
+        yt_meta = fetch_youtube_post_metadata(final_clean_url)
+        scraped_content = content or yt_meta.get("title") or yt_meta.get("description") or "Video YouTube - Cần tương tác"
     else:
         final_clean_url, scraped_content = await normalize_facebook_url_and_scrape(link_post)
 
@@ -797,19 +987,23 @@ async def add_custom_post(
             raise HTTPException(status_code=400, detail="Bài viết này đã tồn tại trong hệ thống!")
 
     meta = {}
-    if not is_linkedin and (not content or not fanpage_name or not media_urls):
+    if not is_linkedin and not is_youtube and (not content or not fanpage_name or not media_urls):
         meta = fetch_facebook_post_metadata(final_clean_url, cookie=cookie)
 
     if is_linkedin:
-        final_fanpage_name = fanpage_name or "Thành viên LinkedIn"
-        auto_content = ""
+        final_fanpage_name = fanpage_name or li_meta.get("author_name") or "Thành viên LinkedIn"
+        auto_content = li_meta.get("content") or ""
+    elif is_youtube:
+        final_fanpage_name = fanpage_name or yt_meta.get("channel_name") or "Kênh YouTube"
+        auto_content = yt_meta.get("title") or yt_meta.get("description") or ""
     else:
         final_fanpage_name = fanpage_name or extract_fanpage_name_from_meta_or_url(final_clean_url, meta)
         auto_content = clean_facebook_content(meta, final_fanpage_name)
+
     final_content = content or auto_content or scraped_content
-    placeholder_texts = {"Bài viết Facebook - Cần tương tác", "Bài viết LinkedIn - Cần tương tác"}
+    placeholder_texts = {"Bài viết Facebook - Cần tương tác", "Bài viết LinkedIn - Cần tương tác", "Video YouTube - Cần tương tác"}
     if not final_content or final_content in placeholder_texts:
-        raw_desc = meta.get("description") or meta.get("og:description") or ""
+        raw_desc = meta.get("description") or meta.get("og:description") or yt_meta.get("description") or ""
         if raw_desc:
             unescaped_desc = html.unescape(raw_desc).strip()
             stats_keywords = ["lượt thích", "người theo dõi", "đang nói về", "lượt đăng ký", "followers", "likes"]
@@ -817,7 +1011,7 @@ async def add_custom_post(
                 final_content = unescaped_desc
 
     if not final_content:
-        final_content = "Bài viết LinkedIn - Cần tương tác" if is_linkedin else "Bài viết Facebook - Cần tương tác"
+        final_content = "Bài viết LinkedIn - Cần tương tác" if is_linkedin else ("Video YouTube - Cần tương tác" if is_youtube else "Bài viết Facebook - Cần tương tác")
 
     # Dọn dẹp Content: Gọt bỏ Tên Fanpage nếu nó bị dính ở đầu Caption
     if final_fanpage_name and final_content:
@@ -889,6 +1083,7 @@ async def add_custom_post(
         "fanpage_name": final_fanpage_name,
         "content": final_content,
         "media_urls": final_media_urls,
+        "created_at": now_iso,
         "published_at": now_iso,
         "is_deleted": False,
         "campaign_id": campaign_id,

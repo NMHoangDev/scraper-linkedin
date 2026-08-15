@@ -51,7 +51,7 @@ class PromoteToLeaderRequest(BaseModel):
 
 
 class SocialAccountCreateRequest(BaseModel):
-    platform: str = Field(..., description="facebook | linkedin")
+    platform: str = Field(..., description="facebook | linkedin | youtube")
     account_name: str = Field(..., min_length=1, max_length=255)
     account_email: str | None = Field(None, max_length=255)
     account_password: str | None = Field(None, max_length=255)

@@ -21,6 +21,7 @@ import type {
 import { useQuickCommentLibrary } from "@/components/all-platform/components/use-quick-comment-library";
 import { TeamPerformancePanel } from "@/components/all-platform/internal-engagement/TeamPerformancePanel";
 import { pingLiExtension, fetchLinkedInPostInfo } from "@/lib/li-ext-bridge";
+import { extractLinkedInMetadata, sanitizeLinkedInUrl } from "@/lib/linkedin-metadata";
 
 type TaskStatusTab = "all" | "need" | "received" | "completed";
 type SourceTab = "markee" | "custom";
@@ -874,55 +875,46 @@ export default function InternalEngagementPage() {
   const taskLinkedInMetricsRef = useRef<{ likes?: number; comments?: number; shares?: number }>({});
 
   const autoFetchLiInfo = async (link: string, opts?: { silent?: boolean }) => {
-    // Link đang được coi là "hiện hành" theo lastAutoFetchedLiLinkRef — nếu user đã đổi
-    // sang link khác trong lúc đang chờ extension phản hồi, ref sẽ trỏ sang link mới đó
-    // rồi, nên kết quả trả về chậm của link CŨ này phải bị bỏ qua, không được ghi đè
-    // content/author/metrics của link MỚI đang hiển thị.
-    const isStale = () => lastAutoFetchedLiLinkRef.current !== link;
+    const cleanLink = sanitizeLinkedInUrl(link);
+    const isStale = () => lastAutoFetchedLiLinkRef.current !== link && lastAutoFetchedLiLinkRef.current !== cleanLink;
 
     setIsFetchingLiInfo(true);
     setLiAutoFetchStatus("fetching");
     try {
-      const ping = await pingLiExtension();
+      const res = await internalEngagementService.debugFetchMeta(cleanLink);
       if (isStale()) return;
-      if (!ping.installed) {
-        setLiAutoFetchStatus("failed");
+
+      if (res && res.success && res.data) {
+        const extracted = extractLinkedInMetadata(res.data);
+        if (extracted.content) setTaskLinkedInContent(extracted.content);
+        if (extracted.author_name) setTaskLinkedInAuthor(extracted.author_name);
+        setLiAutoFetchStatus("success");
         if (!opts?.silent) {
-          showToast("Chưa cài LinkedIn Extension hoặc chưa kết nối — vui lòng dán tay nội dung bên dưới.", "error");
+          showToast("Đã tự động lấy nội dung bài viết LinkedIn thành công!", "success");
         }
-        return;
-      }
-      const fetched = await fetchLinkedInPostInfo(link);
-      if (isStale()) return;
-      if (!fetched.success) {
+      } else {
         setLiAutoFetchStatus("failed");
-        if (!opts?.silent) {
-          showToast(fetched.error || "Không lấy được nội dung — vui lòng dán tay bên dưới.", "error");
-        }
-        return;
       }
-      if (fetched.content) setTaskLinkedInContent(fetched.content);
-      if (fetched.author) setTaskLinkedInAuthor(fetched.author);
-      taskLinkedInMetricsRef.current = { likes: fetched.likes, comments: fetched.comments, shares: fetched.shares };
-      setLiAutoFetchStatus("success");
-      showToast("Đã tự động lấy nội dung bài viết LinkedIn thành công!", "success");
+    } catch (err) {
+      if (!isStale()) {
+        setLiAutoFetchStatus("failed");
+      }
     } finally {
       if (!isStale()) setIsFetchingLiInfo(false);
     }
   };
 
   const handleAutoFetchLiInfo = () => {
-    const trimmed = taskLink.trim();
+    const trimmed = sanitizeLinkedInUrl(taskLink.trim());
     if (!trimmed) return showToast("Vui lòng dán link bài viết LinkedIn trước.", "error");
     lastAutoFetchedLiLinkRef.current = trimmed;
     autoFetchLiInfo(trimmed);
   };
 
-  // Tự động lấy nội dung ngay khi dán/gõ xong link LinkedIn (giống luồng Facebook,
-  // không cần bấm nút) — debounce 900ms, chỉ chạy lại khi link thực sự đổi.
+  // Tự động lấy nội dung ngay khi dán/gõ xong link LinkedIn — debounce 600ms, chỉ chạy lại khi link thực sự đổi.
   useEffect(() => {
     if (!isCreateTaskModalOpen) return;
-    const trimmed = taskLink.trim();
+    const trimmed = sanitizeLinkedInUrl(taskLink.trim());
     const isLinkedIn = isLinkedInUrl(trimmed);
     if (!isLinkedIn || !trimmed) return;
     if (lastAutoFetchedLiLinkRef.current === trimmed) return;
@@ -930,7 +922,7 @@ export default function InternalEngagementPage() {
     const timer = window.setTimeout(() => {
       lastAutoFetchedLiLinkRef.current = trimmed;
       autoFetchLiInfo(trimmed, { silent: true });
-    }, 900);
+    }, 600);
 
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -939,11 +931,12 @@ export default function InternalEngagementPage() {
   const handleCreateTaskSubmit = async () => {
     const socialRegex = /^(https?:\/\/)?([\w-]+\.)*(facebook\.com|fb\.com|fb\.watch|youtube\.com|youtu\.be|tiktok\.com|linkedin\.com|lnkd\.in)\/.+$/i;
 
-    if (!taskLink.trim()) {
+    const rawLink = taskLink.trim();
+    if (!rawLink) {
       return showToast("Vui lòng nhập link bài viết!", "error");
     }
 
-    if (!socialRegex.test(taskLink.trim())) {
+    if (!socialRegex.test(rawLink)) {
       return showToast("Vui lòng nhập đường link hợp lệ (Facebook, YouTube, TikTok, LinkedIn).", "error");
     }
 
@@ -963,14 +956,11 @@ export default function InternalEngagementPage() {
       return showToast("Chưa xác định được tài khoản đăng nhập.", "error");
     }
 
-    const isLinkedInLink = isLinkedInUrl(taskLink.trim());
+    const isLinkedInLink = isLinkedInUrl(rawLink);
+    const finalCleanLink = isLinkedInLink ? sanitizeLinkedInUrl(rawLink) : rawLink;
 
     if (isLinkedInLink && liAutoFetchStatus === "fetching") {
       return showToast("Đang tự động lấy nội dung bài viết, vui lòng đợi vài giây...", "error");
-    }
-
-    if (isLinkedInLink && !taskLinkedInContent.trim()) {
-      return showToast("Không lấy được nội dung bài viết LinkedIn — vui lòng dán tay nội dung.", "error");
     }
 
     setIsSubmittingTask(true);
@@ -991,7 +981,7 @@ export default function InternalEngagementPage() {
         .filter((id) => Boolean(id) && id.length > 20);
 
       const payload = {
-        link: taskLink.trim(),
+        link: finalCleanLink,
         email: user.email,
         platform: isLinkedInLink ? "linkedin" : "facebook",
         content: isLinkedInLink ? taskLinkedInContent.trim() : undefined,
@@ -1071,12 +1061,18 @@ export default function InternalEngagementPage() {
     }
   };
 
-  // Combine all posts into a single unified list (no separate source tabs)
+  // Combine all posts into a single unified list sorted by newest creation time (created_at DESC)
   const allCombinedPosts = useMemo(() => {
     const map = new Map<string, InternalEngagementPost>();
     posts.forEach((p) => map.set(p.id, p));
     customPosts.forEach((p) => map.set(p.id, p));
-    return Array.from(map.values());
+    const list = Array.from(map.values());
+
+    return list.sort((a, b) => {
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return timeB - timeA;
+    });
   }, [posts, customPosts]);
 
   const realStats = useMemo(() => {
@@ -1376,43 +1372,31 @@ export default function InternalEngagementPage() {
       return showToast("Chưa xác định được tài khoản đăng nhập — tải lại trang trước khi comment (nếu không KPI sẽ không được ghi nhận).");
     }
 
-    const isLinkedIn = modalPost.platform === "linkedin";
-    if (isLinkedIn) {
-      if (!isLiExtensionReady) return showToast("Chưa kết nối được LinkedIn Extension. Vui lòng cài đặt và tải lại trang.");
-      window.postMessage(
-        {
-          action: "LI_START_COMMENT",
-          payload: {
-            url: modalPost.permalink_url || (modalPost as any).link_post,
-            text: commentText,
-            verifyConfig: {
-              apiBase: API_BASE_URL,
-              email_member: user.email,
-              id_platform: 2,
-              mode: "internal_engagement" as const,
-            },
-          },
-        },
-        "*",
-      );
-      return;
-    }
+    const isLinkedIn = modalPost.platform === "linkedin" || Boolean(modalPost.permalink_url && (modalPost.permalink_url.includes("linkedin.com") || modalPost.permalink_url.includes("lnkd.in")));
+    const isReady = isLinkedIn ? (isLiExtensionReady || isExtensionReady) : isExtensionReady;
+    if (!isReady) return showToast("Chưa kết nối được Extension. Vui lòng cài đặt và tải lại trang.");
 
-    if (!isExtensionReady) return showToast("Chưa kết nối được Extension. Vui lòng cài đặt và tải lại trang.");
+    const rawPostLink = modalPost.permalink_url || (modalPost as any).link_post;
+    const targetLink = isLinkedIn ? sanitizeLinkedInUrl(rawPostLink) : rawPostLink;
 
     window.postMessage(
       {
         action: "START_BULK_COMMENT",
         payload: {
-          url: modalPost.permalink_url || (modalPost as any).link_post,
-          content: commentText,
-          text: commentText,
+          url: targetLink,
+          content: commentText.trim(),
+          text: commentText.trim(),
           posts: [
             {
-              url: modalPost.permalink_url || (modalPost as any).link_post,
+              url: targetLink,
+              fanpage_id: (modalPost as any).fanpage_id,
+              fanpage_name: (modalPost as any).fanpage_name,
             },
           ],
-          verifyConfig: buildVerifyConfig(),
+          verifyConfig: {
+            ...buildVerifyConfig(),
+            id_platform: isLinkedIn ? 3 : ((modalPost as any).platform === "youtube" ? 2 : 1),
+          },
         },
       },
       "*",
@@ -1924,7 +1908,9 @@ export default function InternalEngagementPage() {
                             {getPlatformIcon(post.permalink_url || (post as any).link_post || (post as any).link)}
 
                             <div>
-                              <div className="font-bold text-sm text-gray-900">{post.fanpage_name || "Markee Agency"}</div>
+                              <div className="font-bold text-sm text-gray-900">
+                                {post.fanpage_name || (postUrl.toLowerCase().includes("youtube.com") || postUrl.toLowerCase().includes("youtu.be") ? "Kênh YouTube" : "Markee Agency")}
+                              </div>
                               <div className="text-xs text-gray-400 font-medium">
                                 {fmtRelativeTime(post.created_at)} · {fmtDeadline(rawDeadline)}
                               </div>
@@ -2120,12 +2106,14 @@ export default function InternalEngagementPage() {
                                 Xem bài viết gốc ↗
                               </button>
 
-                              {/* Tooltip hiển thị khi Hover */}
-                              <div className="absolute bottom-full left-0 mb-1 hidden group-hover:block w-max z-10 pointer-events-none">
-                                <div className="bg-gray-800 text-white text-xs rounded py-1 px-2 shadow-lg">
-                                  Bấm vào xem bài viết gốc để Like & Share thủ công
+                              {/* Tooltip hiển thị khi Hover - Chỉ dành cho Facebook */}
+                              {isFacebookPost ? (
+                                <div className="absolute bottom-full left-0 mb-1 hidden group-hover:block w-max z-10 pointer-events-none">
+                                  <div className="bg-gray-800 text-white text-xs rounded py-1 px-2 shadow-lg">
+                                    Bấm vào xem bài viết gốc để Like & Share thủ công
+                                  </div>
                                 </div>
-                              </div>
+                              ) : null}
                             </div>
                           </div>
 
@@ -2883,47 +2871,6 @@ export default function InternalEngagementPage() {
 
                       {isLinkedInTaskLink && liAutoFetchStatus === "success" ? (
                         <p className="text-[11px] text-green-700 font-semibold">✓ Đã tự động lấy nội dung bài viết LinkedIn.</p>
-                      ) : null}
-
-                      {isLinkedInTaskLink && liAutoFetchStatus === "failed" ? (
-                  <div className="bg-[#0a66c2]/5 border border-[#0a66c2]/20 rounded-xl p-3 space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-[11px] text-[#0a66c2] font-semibold">
-                        Không tự lấy được nội dung (thường do chưa cài/kết nối LinkedIn Extension, hoặc chưa đăng nhập LinkedIn) — vui lòng dán tay bên dưới.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={handleAutoFetchLiInfo}
-                        disabled={isFetchingLiInfo || isSubmittingTask || !taskLink.trim()}
-                        className="shrink-0 px-3 py-1.5 rounded-lg border border-[#0a66c2] text-[#0a66c2] hover:bg-[#0a66c2]/10 text-[11px] font-bold disabled:opacity-50 whitespace-nowrap"
-                      >
-                        {isFetchingLiInfo ? "Đang lấy..." : "🔄 Thử lại"}
-                      </button>
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-gray-700 block mb-1">
-                        Nội dung bài viết <span className="text-red-500">*</span>:
-                      </label>
-                      <textarea
-                        value={taskLinkedInContent}
-                        onChange={(e) => setTaskLinkedInContent(e.target.value)}
-                        disabled={isSubmittingTask}
-                        rows={3}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-sm outline-none focus:border-rose-500 resize-y"
-                        placeholder="Dán nội dung bài viết LinkedIn vào đây..."
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-gray-700 block mb-1">Tên tác giả (tuỳ chọn):</label>
-                      <input
-                        value={taskLinkedInAuthor}
-                        onChange={(e) => setTaskLinkedInAuthor(e.target.value)}
-                        disabled={isSubmittingTask}
-                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-sm outline-none focus:border-rose-500"
-                        placeholder="Nguyễn Văn A"
-                      />
-                    </div>
-                  </div>
                       ) : null}
                     </>
                   );
