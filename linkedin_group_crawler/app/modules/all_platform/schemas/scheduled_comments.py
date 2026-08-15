@@ -25,8 +25,8 @@ class CreateScheduledCommentRequest(BaseModel):
     @field_validator("platform")
     @classmethod
     def validate_platform(cls, v: str) -> str:
-        if v not in ("facebook", "linkedin"):
-            raise ValueError("platform must be 'facebook' or 'linkedin'")
+        if v not in ("facebook", "linkedin", "youtube"):
+            raise ValueError("platform must be 'facebook', 'linkedin', or 'youtube'")
         return v
 
     @field_validator("scheduled_at")

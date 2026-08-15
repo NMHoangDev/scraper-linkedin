@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { MaterialIcon, type MaterialSymbolName } from "@/components/ui";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { cn } from "@/lib/utils";
 import { authService } from "@/services/all-platform.service";
+import { pingLiExtension } from "@/lib/li-ext-bridge";
 
-type Tab = "personal" | "password";
+type Tab = "personal" | "password" | "extensions";
 type Notice = { type: "success" | "error"; text: string };
 
 export function ProfileContent() {
@@ -32,6 +33,20 @@ export function ProfileContent() {
   const [showDeactivatePw, setShowDeactivatePw] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
   const [deactivateMsg, setDeactivateMsg] = useState<Notice | null>(null);
+
+  // Extensions tab state
+  const [isLiExtensionReady, setIsLiExtensionReady] = useState<boolean | null>(null);
+  const [checkingLiExtension, setCheckingLiExtension] = useState(false);
+
+  const checkLiExtension = useCallback(async () => {
+    setCheckingLiExtension(true);
+    try {
+      const res = await pingLiExtension();
+      setIsLiExtensionReady(res.installed);
+    } finally {
+      setCheckingLiExtension(false);
+    }
+  }, []);
 
   const handleSaveProfile = useCallback(async () => {
     setSavingProfile(true);
@@ -143,9 +158,14 @@ export function ProfileContent() {
     }
   }, [deactivatePw, logout]);
 
+  useEffect(() => {
+    if (activeTab === "extensions") void checkLiExtension();
+  }, [activeTab, checkLiExtension]);
+
   const TABS: { key: Tab; label: string; icon: MaterialSymbolName }[] = [
     { key: "personal", label: "Thông tin cá nhân", icon: "person" },
     { key: "password", label: "Đổi mật khẩu", icon: "lock" },
+    { key: "extensions", label: "Tiện ích mở rộng", icon: "download" },
   ];
 
   const createdAtLabel = user?.created_at
@@ -493,6 +513,87 @@ export function ProfileContent() {
                     className="flex items-center gap-2 text-xs text-on-surface-variant font-medium"
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                    <span>{t}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: Extensions */}
+      {activeTab === "extensions" && (
+        <div className="grid grid-cols-12 gap-6">
+          <div className="col-span-12 lg:col-span-8 min-w-0 space-y-6">
+            <div className="rounded-xl border border-outline-variant bg-surface p-6 space-y-6 shadow-sm">
+              <h2 className="text-sm font-bold text-on-surface border-b border-outline-variant pb-3 flex items-center gap-2">
+                <MaterialIcon name="download" className="text-primary" />
+                Tiện ích mở rộng (Chrome Extension)
+              </h2>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Cài các tiện ích mở rộng bên dưới để dùng các tính năng cào bài viết / comment
+                tự động ngay trên trình duyệt của bạn (dùng session đăng nhập sẵn có).
+              </p>
+
+              <div className="flex items-center justify-between gap-4 rounded-xl border border-outline-variant p-4">
+                <div className="min-w-0 space-y-1">
+                  <div className="text-xs font-bold text-on-surface">LinkedIn Group Post Crawler</div>
+                  <p className="text-[11px] text-on-surface-variant leading-normal">
+                    Cào bài viết theo Group, lấy nội dung/tương tác 1 bài viết và comment tự động
+                    cho tính năng &quot;Tương tác nội bộ&quot; (LinkedIn).
+                  </p>
+                  <div className="flex items-center gap-2 pt-1">
+                    {isLiExtensionReady === null ? (
+                      <span className="text-[10px] text-on-surface-variant">Chưa kiểm tra kết nối</span>
+                    ) : isLiExtensionReady ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-[10px] font-bold border border-green-200">
+                        <MaterialIcon name="check_circle" className="text-[12px]" /> Đã kết nối
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[10px] font-bold border border-amber-200">
+                        Chưa kết nối
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => void checkLiExtension()}
+                      disabled={checkingLiExtension}
+                      className="text-[10px] font-bold text-primary hover:underline disabled:opacity-50"
+                    >
+                      {checkingLiExtension ? "Đang kiểm tra..." : "Kiểm tra lại"}
+                    </button>
+                  </div>
+                </div>
+                <a
+                  href="/linkedin-group-crawler-extension.zip"
+                  download
+                  className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:bg-on-primary-fixed-variant text-white text-xs font-bold transition-all active:scale-95 shadow-sm"
+                >
+                  <MaterialIcon name="download" className="text-sm" />
+                  Tải Extension
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div className="col-span-12 lg:col-span-4 min-w-0">
+            <div className="rounded-xl border border-outline-variant bg-surface p-6 space-y-4 shadow-sm">
+              <h3 className="text-xs font-bold text-on-surface border-b border-outline-variant pb-2">
+                Hướng dẫn cài đặt
+              </h3>
+              <ul className="space-y-3">
+                {[
+                  "Tải file .zip về máy rồi giải nén ra 1 thư mục.",
+                  "Mở chrome://extensions, bật \"Developer mode\" (Chế độ dành cho nhà phát triển).",
+                  "Bấm \"Load unpacked\" (Tải tiện ích đã giải nén) và chọn đúng thư mục vừa giải nén.",
+                  "Bấm \"Kiểm tra lại\" ở trên để xác nhận đã kết nối được.",
+                ].map((t) => (
+                  <li
+                    key={t}
+                    className="flex items-start gap-2 text-xs text-on-surface-variant font-medium"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0 mt-1.5" />
                     <span>{t}</span>
                   </li>
                 ))}

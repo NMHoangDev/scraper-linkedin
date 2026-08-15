@@ -51,6 +51,7 @@ def _get_member_id(email: str) -> Optional[str]:
 
 def record_action(payload: dict) -> dict:
     """Record the final result of one comment/reaction/share attempt."""
+    print(f"Nhận request KPI: {payload}")
     supabase: Client = get_supabase_client()
 
     email = payload.get("email_member") or payload.get("email") or ""
@@ -66,12 +67,17 @@ def record_action(payload: dict) -> dict:
         "link_post": payload.get("link_post") or payload.get("url") or "",
         "action_type": payload.get("action_type") or "comment",
         "content": payload.get("content") or payload.get("text") or "",
-        "reaction_id": payload.get("reaction_id"),
-        "id_social_account": payload.get("id_social_account"),
-        "profile_id": payload.get("profile_id"),
-        "status": payload.get("status", "success"),
-        "error_message": payload.get("error_message"),
+        "status": payload.get("status") or "success",
+        "platform": payload.get("platform") or "facebook",
     }
+    if payload.get("reaction_id"):
+        data["reaction_id"] = payload.get("reaction_id")
+    if payload.get("id_social_account"):
+        data["id_social_account"] = payload.get("id_social_account")
+    if payload.get("profile_id"):
+        data["profile_id"] = payload.get("profile_id")
+    if payload.get("error_message"):
+        data["error_message"] = payload.get("error_message")
 
     result = supabase.table("internal_engagement_kpi").insert(data).execute()
     return result.data[0] if result.data else {}
@@ -586,11 +592,23 @@ _TRACKING_PARAMS = {
 }
 
 
+def sanitize_linkedin_url(url: str) -> str:
+    """Chuẩn hóa URL LinkedIn: Chuyển subdomain quốc gia (vn., en.,...) thành www. và xóa tracking parameters ?..."""
+    if not url or "linkedin.com" not in url.lower():
+        return url or ""
+    clean_url_str = re.sub(r'https?://[a-zA-Z]{2,3}\.linkedin\.com', 'https://www.linkedin.com', url.strip(), flags=re.IGNORECASE)
+    clean_url_str = clean_url_str.split('?')[0].strip()
+    return clean_url_str
+
+
 def clean_url(url: str) -> str:
     if not url:
         return ""
 
     cleaned = url.strip()
+
+    if "linkedin.com" in cleaned.lower():
+        cleaned = sanitize_linkedin_url(cleaned)
 
     if "share_url=" in cleaned:
         try:
@@ -750,6 +768,10 @@ async def add_custom_post(
     deadline: Optional[str] = None,
     target_comments: int = 32,
     assigned_team_ids: Optional[list] = None,
+    platform: Optional[str] = None,
+    likes: Optional[int] = None,
+    comments: Optional[int] = None,
+    shares: Optional[int] = None,
 ) -> dict:
     supabase: Client = get_supabase_client()
     user_id = _get_member_id(email_member)
@@ -757,12 +779,205 @@ async def add_custom_post(
     if not user_id:
         raise Exception("Không tìm thấy thông tin user.")
 
-    clean_url, scraped_content = await normalize_facebook_url_and_scrape(link_post)
+def fetch_youtube_post_metadata(url: str) -> dict:
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
+    }
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=10) as response:
+            html_content = response.read().decode("utf-8", errors="ignore")
+
+        # 1. Trích xuất Tên Kênh (Channel Name)
+        channel_name = ""
+        author_match = re.search(
+            r'<span\s+itemprop=["\']author["\'][^>]*>[\s\S]*?<link\s+itemprop=["\']name["\']\s+content=["\']([^"\']+)["\']',
+            html_content, re.IGNORECASE
+        )
+        if author_match and author_match.group(1):
+            channel_name = author_match.group(1)
+
+        if not channel_name:
+            meta_author = re.search(r'<meta\s+itemprop=["\']author["\']\s+content=["\']([^"\']+)["\']', html_content, re.IGNORECASE)
+            if meta_author and meta_author.group(1):
+                channel_name = meta_author.group(1)
+
+        if not channel_name:
+            channel_json = re.search(r'"channel"\s*:\s*\{\s*"simpleText"\s*:\s*"([^"]+)"\}', html_content, re.IGNORECASE)
+            if channel_json and channel_json.group(1):
+                channel_name = channel_json.group(1)
+
+        if not channel_name:
+            owner_json = re.search(r'"videoOwnerRenderer"\s*:\s*\{\s*"title"\s*:\s*\{\s*"runs"\s*:\s*\[\s*\{\s*"text"\s*:\s*"([^"]+)"', html_content, re.IGNORECASE) or \
+                         re.search(r'"ownerChannelName"\s*:\s*"([^"]+)"', html_content, re.IGNORECASE) or \
+                         re.search(r'"author"\s*:\s*"([^"]+)"', html_content, re.IGNORECASE)
+            if owner_json and owner_json.group(1):
+                channel_name = owner_json.group(1)
+
+        if not channel_name:
+            link_name = re.search(r'<link\s+itemprop=["\']name["\']\s+content=["\']([^"\']+)["\']', html_content, re.IGNORECASE)
+            if link_name and link_name.group(1):
+                channel_name = link_name.group(1)
+
+        # 2. Trích xuất Mô tả (Description)
+        description = ""
+        meta_desc = re.search(r'<meta\s+itemprop=["\']description["\']\s+content=["\']([^"\']+)["\']', html_content, re.IGNORECASE)
+        if meta_desc and meta_desc.group(1):
+            description = meta_desc.group(1)
+
+        if not description:
+            meta_name_desc = re.search(r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']+)["\']', html_content, re.IGNORECASE) or \
+                            re.search(r'<meta\s+property=["\']og:description["\']\s+content=["\']([^"\']+)["\']', html_content, re.IGNORECASE)
+            if meta_name_desc and meta_name_desc.group(1):
+                description = meta_name_desc.group(1)
+
+        # 3. Trích xuất Tiêu đề (Title)
+        title = ""
+        meta_title = re.search(r'<meta\s+itemprop=["\']name["\']\s+content=["\']([^"\']+)["\']', html_content, re.IGNORECASE) or \
+                     re.search(r'<meta\s+property=["\']og:title["\']\s+content=["\']([^"\']+)["\']', html_content, re.IGNORECASE) or \
+                     re.search(r'<title[^>]*>(.*?)</title>', html_content, re.IGNORECASE | re.DOTALL)
+        if meta_title and meta_title.group(1):
+            title = re.sub(r'\s*-\s*YouTube$', '', meta_title.group(1), flags=re.IGNORECASE).strip()
+        def _decode(text: str) -> str:
+            if not text:
+                return ""
+            try:
+                text = re.sub(r'\\u([0-9a-fA-F]{4})', lambda m: chr(int(m.group(1), 16)), text)
+            except Exception:
+                pass
+            text = text.replace('\\"', '"').replace('\\\\', '\\').replace('\\n', '\n').replace('\\r', '')
+            return html.unescape(text).strip()
+
+        return {
+            "channel_name": _decode(channel_name),
+            "description": _decode(description),
+            "title": _decode(title),
+        }
+    except Exception as e:
+        logger.error(f"Lỗi khi cào metadata YouTube: {e}")
+        return {"channel_name": "", "description": "", "title": ""}
+
+
+def extract_linkedin_metadata(data: dict | str) -> dict[str, str]:
+    """
+    Trích xuất author_name và content từ object metadata của bài viết LinkedIn.
+    Cấu trúc mong đợi:
+    - title / page_title chứa: "Nội dung bài viết... | Tên Người Đăng"
+    - description chứa nội dung bài viết
+    """
+    if not data:
+        return {"author_name": "", "content": ""}
+
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except Exception:
+            data = {"description": data}
+
+    meta = data.get("metadata") if isinstance(data, dict) and isinstance(data.get("metadata"), dict) else {}
+
+    raw_desc = (meta.get("description") or data.get("description") or "") if isinstance(data, dict) else ""
+    content = str(raw_desc).strip() if raw_desc else ""
+
+    raw_title = (meta.get("title") or data.get("page_title") or data.get("title") or "") if isinstance(data, dict) else ""
+    full_title = str(raw_title).strip() if raw_title else ""
+
+    author_name = ""
+    if " | " in full_title:
+        parts = full_title.split(" | ")
+        author_name = parts[-1].strip()
+    elif " on LinkedIn:" in full_title:
+        author_name = full_title.split(" on LinkedIn:")[0].strip()
+    elif " trên LinkedIn:" in full_title:
+        author_name = full_title.split(" trên LinkedIn:")[0].strip()
+
+    return {
+        "author_name": author_name,
+        "content": content
+    }
+
+
+def fetch_linkedin_post_metadata(url: str) -> dict[str, str]:
+    """Cào metadata bài viết LinkedIn từ HTML thô và bóc tách author_name + content."""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
+    }
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=10) as response:
+            html_content = response.read().decode("utf-8", errors="ignore")
+
+        meta_title_match = re.search(r'<meta\s+property=["\']og:title["\']\s+content=["\']([^"\']+)["\']', html_content, re.IGNORECASE) or \
+                           re.search(r'<title[^>]*>(.*?)</title>', html_content, re.IGNORECASE | re.DOTALL)
+        page_title = html.unescape(meta_title_match.group(1)).strip() if meta_title_match and meta_title_match.group(1) else ""
+
+        meta_desc_match = re.search(r'<meta\s+property=["\']og:description["\']\s+content=["\']([^"\']+)["\']', html_content, re.IGNORECASE) or \
+                          re.search(r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']+)["\']', html_content, re.IGNORECASE)
+        description = html.unescape(meta_desc_match.group(1)).strip() if meta_desc_match and meta_desc_match.group(1) else ""
+
+        return extract_linkedin_metadata({
+            "page_title": page_title,
+            "title": page_title,
+            "description": description
+        })
+    except Exception as e:
+        logger.error(f"Lỗi khi cào metadata LinkedIn: {e}")
+        return {"author_name": "", "content": ""}
+
+
+async def add_custom_post(
+    email_member: str,
+    link_post: str,
+    content: Optional[str] = None,
+    fanpage_name: Optional[str] = None,
+    media_urls: Optional[list] = None,
+    cookie: Optional[str] = None,
+    campaign_id: Optional[str] = None,
+    campaign_name: Optional[str] = None,
+    deadline: Optional[str] = None,
+    target_comments: int = 32,
+    assigned_team_ids: Optional[list] = None,
+    platform: Optional[str] = None,
+    likes: Optional[int] = None,
+    comments: Optional[int] = None,
+    shares: Optional[int] = None,
+) -> dict:
+    supabase: Client = get_supabase_client()
+    user_id = _get_member_id(email_member)
+
+    if not user_id:
+        raise Exception("Không tìm thấy thông tin user.")
+
+    is_linkedin = (
+        platform == "linkedin"
+        or "linkedin.com" in link_post.lower()
+    )
+    is_youtube = (
+        platform == "youtube"
+        or "youtube.com" in link_post.lower()
+        or "youtu.be" in link_post.lower()
+    )
+    final_platform = "linkedin" if is_linkedin else ("youtube" if is_youtube else "facebook")
+
+    li_meta = {}
+    yt_meta = {}
+    if is_linkedin:
+        final_clean_url = clean_url(link_post)
+        li_meta = fetch_linkedin_post_metadata(final_clean_url)
+        scraped_content = content or li_meta.get("content") or "Bài viết LinkedIn - Cần tương tác"
+    elif is_youtube:
+        final_clean_url = clean_url(link_post)
+        yt_meta = fetch_youtube_post_metadata(final_clean_url)
+        scraped_content = content or yt_meta.get("title") or yt_meta.get("description") or "Video YouTube - Cần tương tác"
+    else:
+        final_clean_url, scraped_content = await normalize_facebook_url_and_scrape(link_post)
 
     existing_res = (
         supabase.table("internal_engagement_custom_posts")
         .select("*")
-        .eq("link_post", clean_url)
+        .eq("link_post", final_clean_url)
         .execute()
     )
 
@@ -772,14 +987,23 @@ async def add_custom_post(
             raise HTTPException(status_code=400, detail="Bài viết này đã tồn tại trong hệ thống!")
 
     meta = {}
-    if not content or not fanpage_name or not media_urls:
-        meta = fetch_facebook_post_metadata(clean_url, cookie=cookie)
+    if not is_linkedin and not is_youtube and (not content or not fanpage_name or not media_urls):
+        meta = fetch_facebook_post_metadata(final_clean_url, cookie=cookie)
 
-    final_fanpage_name = fanpage_name or extract_fanpage_name_from_meta_or_url(clean_url, meta)
-    auto_content = clean_facebook_content(meta, final_fanpage_name)
+    if is_linkedin:
+        final_fanpage_name = fanpage_name or li_meta.get("author_name") or "Thành viên LinkedIn"
+        auto_content = li_meta.get("content") or ""
+    elif is_youtube:
+        final_fanpage_name = fanpage_name or yt_meta.get("channel_name") or "Kênh YouTube"
+        auto_content = yt_meta.get("title") or yt_meta.get("description") or ""
+    else:
+        final_fanpage_name = fanpage_name or extract_fanpage_name_from_meta_or_url(final_clean_url, meta)
+        auto_content = clean_facebook_content(meta, final_fanpage_name)
+
     final_content = content or auto_content or scraped_content
-    if not final_content or final_content == "Bài viết Facebook - Cần tương tác":
-        raw_desc = meta.get("description") or meta.get("og:description") or ""
+    placeholder_texts = {"Bài viết Facebook - Cần tương tác", "Bài viết LinkedIn - Cần tương tác", "Video YouTube - Cần tương tác"}
+    if not final_content or final_content in placeholder_texts:
+        raw_desc = meta.get("description") or meta.get("og:description") or yt_meta.get("description") or ""
         if raw_desc:
             unescaped_desc = html.unescape(raw_desc).strip()
             stats_keywords = ["lượt thích", "người theo dõi", "đang nói về", "lượt đăng ký", "followers", "likes"]
@@ -787,7 +1011,7 @@ async def add_custom_post(
                 final_content = unescaped_desc
 
     if not final_content:
-        final_content = "Bài viết Facebook - Cần tương tác"
+        final_content = "Bài viết LinkedIn - Cần tương tác" if is_linkedin else ("Video YouTube - Cần tương tác" if is_youtube else "Bài viết Facebook - Cần tương tác")
 
     # Dọn dẹp Content: Gọt bỏ Tên Fanpage nếu nó bị dính ở đầu Caption
     if final_fanpage_name and final_content:
@@ -803,7 +1027,7 @@ async def add_custom_post(
 
     final_media_urls = media_urls or ([meta["image"]] if meta.get("image") else [])
     now_iso = datetime.now(timezone.utc).isoformat()
-    default_deadline = deadline or (datetime.now(timezone.utc) + timedelta(hours=18)).isoformat()
+    default_deadline = deadline
 
     raw_html = meta.get("raw_html") or ""
     title_match = re.search(r'<title[^>]*>(.*?)</title>', raw_html, re.IGNORECASE | re.DOTALL)
@@ -835,7 +1059,13 @@ async def add_custom_post(
             "deadline": default_deadline,
             "target_comments": target_comments,
             "assigned_team_ids": assigned_team_ids or [],
+            "platform": final_platform,
         }
+        if likes is not None or comments is not None or shares is not None:
+            update_payload["fb_total_likes"] = likes or 0
+            update_payload["fb_total_comments"] = comments or 0
+            update_payload["fb_total_shares"] = shares or 0
+            update_payload["last_synced_at"] = now_iso
         res = (
             supabase.table("internal_engagement_custom_posts")
             .update(update_payload)
@@ -843,16 +1073,17 @@ async def add_custom_post(
             .execute()
         )
         item = res.data[0] if res.data else existing_post
-        item["platform"] = "facebook"
+        item["platform"] = final_platform
         item["_debug_info"] = message_debug
         return item
 
     data = {
-        "link_post": clean_url,
+        "link_post": final_clean_url,
         "id_member": user_id,
         "fanpage_name": final_fanpage_name,
         "content": final_content,
         "media_urls": final_media_urls,
+        "created_at": now_iso,
         "published_at": now_iso,
         "is_deleted": False,
         "campaign_id": campaign_id,
@@ -860,18 +1091,24 @@ async def add_custom_post(
         "deadline": default_deadline,
         "target_comments": target_comments,
         "assigned_team_ids": assigned_team_ids or [],
+        "platform": final_platform,
     }
-    
+    if likes is not None or comments is not None or shares is not None:
+        data["fb_total_likes"] = likes or 0
+        data["fb_total_comments"] = comments or 0
+        data["fb_total_shares"] = shares or 0
+        data["last_synced_at"] = now_iso
+
     try:
         res = supabase.table("internal_engagement_custom_posts").insert(data).execute()
         item = res.data[0] if res.data else {}
-        item["platform"] = "facebook"
+        item["platform"] = final_platform
         item["_debug_info"] = message_debug
         return item
     except Exception as err:
         logger.error(f"Lỗi khi insert full data vào internal_engagement_custom_posts: {err}")
         fallback_data = {
-            "link_post": clean_url,
+            "link_post": final_clean_url,
             "id_member": user_id,
             "is_deleted": False,
             "campaign_id": campaign_id,
@@ -879,10 +1116,11 @@ async def add_custom_post(
             "deadline": default_deadline,
             "target_comments": target_comments,
             "assigned_team_ids": assigned_team_ids or [],
+            "platform": final_platform,
         }
         res = supabase.table("internal_engagement_custom_posts").insert(fallback_data).execute()
         item = res.data[0] if res.data else {}
-        item["platform"] = "facebook"
+        item["platform"] = final_platform
         item["_debug_info"] = message_debug
         return item
 
@@ -1239,15 +1477,32 @@ def get_post_interactions(link_post: str, email: str, team_id: Optional[str] = N
         .execute()
     ).data or []
 
-    kpi_by_member: dict[str, dict] = {}
+    kpi_by_member: dict[str, dict] = defaultdict(dict)
     for row in kpi_rows:
         linked_id = str(row["id_member"])
         m_id = linked_to_original.get(linked_id, linked_id)
         status = row.get("status")
-        if m_id not in kpi_by_member:
-            kpi_by_member[m_id] = row
-        elif status == "success" and kpi_by_member[m_id].get("status") != "success":
-            kpi_by_member[m_id] = row
+        action_type = row.get("action_type") or "comment"
+        if status == "success":
+            kpi_by_member[m_id][action_type] = True
+            # Lưu timestamp cho từng loại action riêng biệt (dùng cho tooltip UI)
+            ts_key = f"{action_type}_time"
+            if ts_key not in kpi_by_member[m_id]:
+                kpi_by_member[m_id][ts_key] = row.get("created_at")
+            # latest_row: dùng để tính "thời gian gần nhất" cho cột Thời gian
+            existing_latest = kpi_by_member[m_id].get("latest_row")
+            if not existing_latest:
+                kpi_by_member[m_id]["latest_row"] = row
+            else:
+                # So sánh, giữ row mới nhất
+                try:
+                    existing_ts = existing_latest.get("created_at") or ""
+                    new_ts = row.get("created_at") or ""
+                    if new_ts > existing_ts:
+                        kpi_by_member[m_id]["latest_row"] = row
+                except Exception:
+                    pass
+
 
     items = []
     for m_id in member_ids:
@@ -1255,38 +1510,36 @@ def get_post_interactions(link_post: str, email: str, team_id: Optional[str] = N
         user = user_map.get(m_id, {})
         name = user.get("name") or (user.get("email") or "").split("@")[0] or "Thành viên ẩn"
 
-        kpi = kpi_by_member.get(m_id)
-        if kpi:
-            if kpi["status"] == "success":
-                status, status_label = "completed", "Hoàn thành"
-            else:
-                status, status_label = "failed", "Lỗi / Thất bại"
-            
-            comment_done = kpi.get("action_type") == "comment" and status == "completed"
-            
-            if kpi.get("created_at"):
-                try:
-                    raw_dt_str = kpi["created_at"]
-                    if raw_dt_str.endswith("Z"):
-                        raw_dt_str = raw_dt_str[:-1] + "+00:00"
-                    parsed_dt = datetime.fromisoformat(raw_dt_str)
-                    if parsed_dt.tzinfo is None:
-                        parsed_dt = parsed_dt.replace(tzinfo=timezone.utc)
-                    local_dt = parsed_dt.astimezone()
-                    time_str = local_dt.strftime("%H:%M %d/%m")
-                    raw_created_at = parsed_dt.isoformat()
-                except Exception:
-                    time_str = kpi["created_at"][:10]
-                    raw_created_at = kpi["created_at"]
-            else:
-                time_str = "—"
-                raw_created_at = None
+        m_kpi_actions = kpi_by_member.get(m_id, {})
+        like_done = bool(m_kpi_actions.get("like") or m_kpi_actions.get("love") or m_kpi_actions.get("reaction"))
+        comment_done = bool(m_kpi_actions.get("comment"))
+        share_done = bool(m_kpi_actions.get("share"))
+        has_any_success = like_done or comment_done or share_done
+
+        latest_kpi = m_kpi_actions.get("latest_row")
+
+        if has_any_success:
+            status, status_label = "completed", "Hoàn thành"
+        elif is_past_deadline:
+            status, status_label = "overdue", "Quá hạn"
         else:
-            if is_past_deadline:
-                status, status_label = "overdue", "Quá hạn"
-            else:
-                status, status_label = "received", "Đã nhận"
-            comment_done = False
+            status, status_label = "received", "Đã nhận"
+
+        if latest_kpi and latest_kpi.get("created_at"):
+            try:
+                raw_dt_str = latest_kpi["created_at"]
+                if raw_dt_str.endswith("Z"):
+                    raw_dt_str = raw_dt_str[:-1] + "+00:00"
+                parsed_dt = datetime.fromisoformat(raw_dt_str)
+                if parsed_dt.tzinfo is None:
+                    parsed_dt = parsed_dt.replace(tzinfo=timezone.utc)
+                local_dt = parsed_dt.astimezone()
+                time_str = local_dt.strftime("%H:%M %d/%m")
+                raw_created_at = parsed_dt.isoformat()
+            except Exception:
+                time_str = str(latest_kpi["created_at"])[:10]
+                raw_created_at = latest_kpi["created_at"]
+        else:
             time_str = "Chưa hoàn thành" if status == "received" else "—"
             raw_created_at = None
 
@@ -1297,7 +1550,12 @@ def get_post_interactions(link_post: str, email: str, team_id: Optional[str] = N
             "team_id": t_info.get("team_id"),
             "status": status,
             "statusLabel": status_label,
+            "like": like_done,
             "comment": comment_done,
+            "share": share_done,
+            "like_time": m_kpi_actions.get("like_time"),
+            "comment_time": m_kpi_actions.get("comment_time"),
+            "share_time": m_kpi_actions.get("share_time"),
             "time": time_str,
             "raw_created_at": raw_created_at,
         })
@@ -1307,6 +1565,66 @@ def get_post_interactions(link_post: str, email: str, team_id: Optional[str] = N
         "teams": [{"id": t["id"], "name_team": t.get("name_team")} for t in valid_teams],
         "items": items,
     }
+
+
+def mark_action_by_fb_uid(
+    action_type: str,
+    fb_uid: Optional[str] = None,
+    post_url: Optional[str] = None,
+    email_member: Optional[str] = None,
+) -> dict:
+    """Ghi nhận hành động tương tác (Like, Comment, Share) từ Extension hoặc FE vào bảng KPI"""
+    supabase: Client = get_supabase_client()
+    id_member = None
+
+    if email_member:
+        id_member = _get_member_id(email_member)
+
+    if not id_member and fb_uid:
+        # 1. Quét social_accounts theo profile_id hoặc uid
+        acc_res = (
+            supabase.table("social_accounts")
+            .select("id, uid, profile_id")
+            .execute()
+        )
+        for acc in acc_res.data or []:
+            if str(acc.get("uid")) == str(fb_uid) or str(acc.get("profile_id")) == str(fb_uid):
+                # find associated user
+                id_member = acc.get("id")
+                break
+
+        if not id_member:
+            # 2. Quét app_users theo id
+            user_res = supabase.table("app_users").select("id").eq("id", fb_uid).execute()
+            if user_res.data:
+                id_member = user_res.data[0]["id"]
+
+    if not id_member:
+        # Fallback to first available member so record isn't lost
+        users_res = supabase.table("app_users").select("id").limit(1).execute()
+        if users_res.data:
+            id_member = users_res.data[0]["id"]
+
+    if not id_member:
+        raise ValueError("Không tìm thấy thông tin thành viên tương ứng.")
+
+    clean_url = post_url or ""
+    if post_url:
+        try:
+            clean_url = post_url.split("?")[0].rstrip("/")
+        except Exception:
+            clean_url = post_url
+
+    data = {
+        "id_member": id_member,
+        "link_post": clean_url,
+        "action_type": action_type or "like",
+        "status": "success",
+        "profile_id": fb_uid,
+    }
+
+    result = supabase.table("internal_engagement_kpi").insert(data).execute()
+    return result.data[0] if result.data else {}
 
 
 def get_post_team_counts(link_post: str, email: str, team_id: Optional[str] = None) -> dict:
@@ -1375,3 +1693,249 @@ def get_post_team_counts(link_post: str, email: str, team_id: Optional[str] = No
             for tid, name in team_meta.items()
         ],
     }
+
+
+def parse_formatted_number(val: Union[str, int, float, None]) -> int:
+    """
+    Chuyển đổi các chuỗi số tương tác định dạng Facebook/MXH về số nguyên (Integer).
+    - "1,2K" / "1.2k" -> 1200
+    - "1.5 Tr" / "1.5M" -> 1500000
+    - "123.456" / "123,456" -> 123456
+    - "15K lượt thích" -> 15000
+    """
+    if val is None:
+        return 0
+    if isinstance(val, (int, float)):
+        return int(val)
+
+    s = str(val).strip().lower()
+    if not s:
+        return 0
+
+    s = re.sub(
+        r'(lượt thích|bình luận|thảo luận|lượt chia sẻ|chia sẻ|người theo dõi|likes?|comments?|shares?|followers?)',
+        '',
+        s
+    ).strip()
+
+    match_unit = re.search(r'([\d.,]+)\s*(k|m|tr|b)?', s)
+    if not match_unit:
+        return 0
+
+    num_str = match_unit.group(1)
+    unit = match_unit.group(2)
+
+    try:
+        if unit:
+            num_clean = num_str.replace(',', '.')
+            val_float = float(num_clean)
+
+            if unit == 'k':
+                return int(val_float * 1000)
+            elif unit in ('m', 'tr'):
+                return int(val_float * 1000000)
+            elif unit == 'b':
+                return int(val_float * 1000000000)
+
+        if re.match(r'^\d{1,3}([.,]\d{3})+$', num_str):
+            num_clean = re.sub(r'[.,]', '', num_str)
+            return int(num_clean)
+
+        num_clean = num_str.replace(',', '.')
+        return int(float(num_clean))
+    except Exception:
+        return 0
+
+
+def extract_facebook_post_engagement_stats(meta: dict) -> dict:
+    stats = {"likes": 0, "comments": 0, "shares": 0}
+    raw_html = meta.get("raw_html") or ""
+    raw_desc = meta.get("description") or meta.get("og:description") or ""
+
+    # BƯỚC 1: QUÉT JSON REGEX TRƯỚC (Số liệu JSON GraphQL luôn chuẩn xác 100%, không dính text Page)
+    if raw_html:
+        # 1. Mảng quét LIKES / REACTIONS
+        like_pats = [
+            r'"reaction_count"\s*:\s*\{\s*"count"\s*:\s*(\d+)',  # Bài thường
+            r'"i18n_reaction_count"\s*:\s*"([\d.,]+[kKmMbBtrTR]?)"',  # Bài thường (dự phòng)
+            r'"unified_reactors"\s*:\s*\{\s*"count"\s*:\s*(\d+)',  # Reels
+            r'"likers"\s*:\s*\{\s*"count"\s*:\s*(\d+)',  # Reels (dự phòng)
+        ]
+        for pat in like_pats:
+            m = re.search(pat, raw_html)
+            if m:
+                val = parse_formatted_number(m.group(1))
+                if val > 0:
+                    stats["likes"] = val
+                    break
+
+        # 2. Mảng quét COMMENTS
+        comment_pats = [
+            r'"comment_rendering_instance"\s*:\s*\{\s*"comments"\s*:\s*\{\s*"total_count"\s*:\s*(\d+)',  # Bài thường
+            r'"total_comment_count"\s*:\s*(\d+)',  # Reels
+            r'"comments"\s*:\s*\{\s*"total_count"\s*:\s*(\d+)',
+            r'"comment_count"\s*:\s*\{\s*"total_count"\s*:\s*(\d+)',
+        ]
+        for pat in comment_pats:
+            m = re.search(pat, raw_html)
+            if m:
+                val = parse_formatted_number(m.group(1))
+                if val > 0:
+                    stats["comments"] = val
+                    break
+
+        # 3. Mảng quét SHARES
+        share_pats = [
+            r'"share_count"\s*:\s*\{\s*"count"\s*:\s*(\d+)',  # Bài thường
+            r'"i18n_share_count"\s*:\s*"([\d.,]+[kKmMbBtrTR]?)"',  # Bài thường (dự phòng)
+            r'"share_count_reduced"\s*:\s*"([\d.,]+[kKmMbBtrTR]?)"',  # Reels
+            r'"share_count_reduced"\s*:\s*(\d+)',
+        ]
+        for pat in share_pats:
+            m = re.search(pat, raw_html)
+            if m:
+                val = parse_formatted_number(m.group(1))
+                if val > 0:
+                    stats["shares"] = val
+                    break
+
+    # BƯỚC 2: FALLBACK SANG META DESCRIPTION NẾU JSON TRẢ VỀ 0
+    desc_text = html.unescape(raw_desc or "")
+    if not desc_text and raw_html:
+        m_desc = re.search(r'<meta\s+name=["\']description["\']\s+content=["\']([^"\']+)["\']', raw_html, re.IGNORECASE) or \
+                 re.search(r'<meta\s+property=["\']og:description["\']\s+content=["\']([^"\']+)["\']', raw_html, re.IGNORECASE)
+        if m_desc:
+            desc_text = html.unescape(m_desc.group(1))
+
+    if desc_text:
+        # TIỀN XỬ LÝ: Xóa bỏ các cụm số liệu của Fanpage ở đầu chuỗi (Followers, Page Likes, Đang nói về...)
+        clean_desc = re.sub(
+            r'[\d.,]+\s*[kKmMbBtrTR]?\s*(?:người theo dõi|lượt thích trang|followers|page likes|đang nói về|lượt đăng ký)',
+            '',
+            desc_text,
+            flags=re.IGNORECASE
+        )
+
+        if stats["likes"] == 0:
+            like_matches = re.findall(r'([\d.,]+\s*(?:k|m|tr|b)?)\s*(?:lượt thích|thích|likes?|reactions?)', clean_desc, re.IGNORECASE)
+            if like_matches:
+                stats["likes"] = parse_formatted_number(like_matches[-1])
+
+        if stats["comments"] == 0:
+            comment_matches = re.findall(r'([\d.,]+\s*(?:k|m|tr|b)?)\s*(?:bình luận|thảo luận|comments?)', clean_desc, re.IGNORECASE)
+            if comment_matches:
+                stats["comments"] = parse_formatted_number(comment_matches[-1])
+
+        if stats["shares"] == 0:
+            share_matches = re.findall(r'([\d.,]+\s*(?:k|m|tr|b)?)\s*(?:lượt chia sẻ|chia sẻ|shares?)', clean_desc, re.IGNORECASE)
+            if share_matches:
+                stats["shares"] = parse_formatted_number(share_matches[-1])
+
+    return stats
+
+
+def sync_linkedin_post_engagement_db(
+    post_id: str,
+    likes: Optional[int] = None,
+    comments: Optional[int] = None,
+    shares: Optional[int] = None,
+) -> dict:
+    """
+    Cập nhật đè 3 chỉ số Like/Comment/Share cho bài LinkedIn. Khác với bản Facebook,
+    LinkedIn không thể tự cào server-side (cần đăng nhập) — số liệu do FE cào được qua
+    extension (session LinkedIn thật của user) rồi gửi lên đây để lưu, không tự fetch lại.
+    Chỉ số nào không được truyền (None) thì giữ nguyên giá trị cũ trong DB, KHÔNG ép về 0
+    — tránh caller chỉ gửi 1 phần (vd chỉ likes) lại vô tình xoá mất comments/shares đã có.
+    """
+    supabase: Client = get_supabase_client()
+
+    post_res = (
+        supabase.table("internal_engagement_custom_posts")
+        .select("*")
+        .eq("id", post_id)
+        .execute()
+    )
+    if not post_res.data:
+        raise Exception("Không tìm thấy bài viết hoặc bài viết đã bị xóa.")
+
+    post = post_res.data[0]
+    if post.get("is_deleted"):
+        raise Exception("Bài viết này đã bị xóa khỏi hệ thống.")
+
+    final_likes = likes if likes is not None else (post.get("fb_total_likes") or 0)
+    final_comments = comments if comments is not None else (post.get("fb_total_comments") or 0)
+    final_shares = shares if shares is not None else (post.get("fb_total_shares") or 0)
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    update_data: dict = {
+        "fb_total_likes": final_likes,
+        "fb_total_comments": final_comments,
+        "fb_total_shares": final_shares,
+        "last_synced_at": now_iso,
+        "updated_at": now_iso,
+    }
+
+    res = (
+        supabase.table("internal_engagement_custom_posts")
+        .update(update_data)
+        .eq("id", post_id)
+        .execute()
+    )
+
+    result_data = res.data[0] if res.data else {**post, **update_data}
+    result_data["public_likes"] = result_data.get("fb_total_likes", final_likes)
+    result_data["public_comments"] = result_data.get("fb_total_comments", final_comments)
+    result_data["public_shares"] = result_data.get("fb_total_shares", final_shares)
+    result_data["synced_at"] = result_data.get("last_synced_at", now_iso)
+    return result_data
+
+
+def sync_facebook_post_engagement_db(post_id: str, cookie: Optional[str] = None) -> dict:
+    """
+    Cào lại dữ liệu Like, Comment, Share từ Facebook và cập nhật đè 4 trường dữ liệu vào DB.
+    """
+    supabase: Client = get_supabase_client()
+    
+    post_res = (
+        supabase.table("internal_engagement_custom_posts")
+        .select("*")
+        .eq("id", post_id)
+        .execute()
+    )
+
+    if not post_res.data:
+        raise Exception("Không tìm thấy bài viết hoặc bài viết đã bị xóa.")
+
+    post = post_res.data[0]
+    if post.get("is_deleted"):
+        raise Exception("Bài viết này đã bị xóa khỏi hệ thống.")
+
+    link_post = post.get("link_post")
+    if not link_post:
+        raise Exception("Bài viết không có link liên kết Facebook hợp lệ.")
+
+    meta = fetch_facebook_post_metadata(link_post, cookie=cookie)
+    stats = extract_facebook_post_engagement_stats(meta)
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    update_data: dict = {
+        "fb_total_likes": stats["likes"],
+        "fb_total_comments": stats["comments"],
+        "fb_total_shares": stats["shares"],
+        "last_synced_at": now_iso,
+        "updated_at": now_iso,
+    }
+
+    res = (
+        supabase.table("internal_engagement_custom_posts")
+        .update(update_data)
+        .eq("id", post_id)
+        .execute()
+    )
+
+    result_data = res.data[0] if res.data else {**post, **update_data}
+    result_data["public_likes"] = result_data.get("fb_total_likes", stats["likes"])
+    result_data["public_comments"] = result_data.get("fb_total_comments", stats["comments"])
+    result_data["public_shares"] = result_data.get("fb_total_shares", stats["shares"])
+    result_data["synced_at"] = result_data.get("last_synced_at", now_iso)
+    return result_data

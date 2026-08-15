@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { FaFacebook, FaLinkedin, FaYoutube, FaTiktok, FaLink } from "react-icons/fa6";
 import { useAppAuth } from "@/contexts/AppAuthContext";
 import { API_BASE_URL } from "@/lib/env";
 import {
@@ -19,9 +20,50 @@ import type {
 } from "@/types/unified.types";
 import { useQuickCommentLibrary } from "@/components/all-platform/components/use-quick-comment-library";
 import { TeamPerformancePanel } from "@/components/all-platform/internal-engagement/TeamPerformancePanel";
+import { pingLiExtension, fetchLinkedInPostInfo } from "@/lib/li-ext-bridge";
+import { extractLinkedInMetadata, sanitizeLinkedInUrl } from "@/lib/linkedin-metadata";
 
 type TaskStatusTab = "all" | "need" | "received" | "completed";
 type SourceTab = "markee" | "custom";
+
+const getPlatformIcon = (url?: string) => {
+  if (!url) {
+    return (
+      <div className="w-8 h-8 rounded-full bg-gray-100 text-gray-500 grid place-items-center shrink-0 shadow-xs" title="Link">
+        <FaLink className="w-4 h-4" />
+      </div>
+    );
+  }
+  const lowerUrl = url.toLowerCase();
+  if (lowerUrl.includes("linkedin.com") || lowerUrl.includes("lnkd.in")) {
+    return (
+      <div className="w-8 h-8 rounded-full bg-[#0a66c2] text-white grid place-items-center shrink-0 shadow-xs" title="LinkedIn">
+        <FaLinkedin className="w-4 h-4" />
+      </div>
+    );
+  }
+  if (lowerUrl.includes("youtube.com") || lowerUrl.includes("youtu.be")) {
+    return (
+      <div className="w-8 h-8 rounded-full bg-[#ff0000] text-white grid place-items-center shrink-0 shadow-xs" title="YouTube">
+        <FaYoutube className="w-4 h-4" />
+      </div>
+    );
+  }
+  if (lowerUrl.includes("tiktok.com")) {
+    return (
+      <div className="w-8 h-8 rounded-full bg-black text-white grid place-items-center shrink-0 shadow-xs" title="TikTok">
+        <FaTiktok className="w-4 h-4" />
+      </div>
+    );
+  }
+  return (
+    <div className="w-8 h-8 rounded-full bg-[#1877f2] text-white grid place-items-center shrink-0 shadow-xs" title="Facebook">
+      <FaFacebook className="w-4 h-4" />
+    </div>
+  );
+};
+
+const isLinkedInUrl = (url: string): boolean => /linkedin\.com|lnkd\.in/i.test(url);
 
 function fmtRelativeTime(iso?: string): string {
   if (!iso) return "";
@@ -39,9 +81,9 @@ function fmtRelativeTime(iso?: string): string {
  * So sánh ngày deadline với 00:00:00 của ngày hiện tại để xác định khoảng cách.
  */
 function fmtDeadline(isoDeadline?: string | null): string {
-  if (!isoDeadline) return "Đang thực hiện";
+  if (!isoDeadline) return "Không giới hạn";
   const deadlineDate = new Date(isoDeadline);
-  if (Number.isNaN(deadlineDate.getTime())) return "Đang thực hiện";
+  if (Number.isNaN(deadlineDate.getTime())) return "Không giới hạn";
 
   const now = new Date();
   const timeLabel = deadlineDate.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
@@ -49,7 +91,7 @@ function fmtDeadline(isoDeadline?: string | null): string {
   // Đã quá hạn
   if (deadlineDate < now) {
     const d = deadlineDate;
-    const dateStr = `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+    const dateStr = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
     return `Đã quá hạn (${timeLabel} ${dateStr})`;
   }
 
@@ -151,6 +193,12 @@ export default function InternalEngagementPage() {
   // Task Creation Modal State (Thêm bài viết Seeding)
   const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
   const [taskLink, setTaskLink] = useState("");
+  const [taskLinkedInContent, setTaskLinkedInContent] = useState("");
+  const [taskLinkedInAuthor, setTaskLinkedInAuthor] = useState("");
+  const [isFetchingLiInfo, setIsFetchingLiInfo] = useState(false);
+  // 'idle': chưa thử | 'fetching': đang cào ngầm | 'success': đã tự lấy được, không cần hiện bảng
+  // nhập tay | 'failed': tự cào lỗi (thường do chưa đăng nhập LinkedIn) -> hiện bảng nhập tay.
+  const [liAutoFetchStatus, setLiAutoFetchStatus] = useState<"idle" | "fetching" | "success" | "failed">("idle");
   const [taskCampaignId, setTaskCampaignId] = useState("");
   const [taskDeadline, setTaskDeadline] = useState("");
   const [taskAssignedTeams, setTaskAssignedTeams] = useState<string[]>([]);
@@ -166,6 +214,7 @@ export default function InternalEngagementPage() {
   const [commentText, setCommentText] = useState("");
   const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
   const [isExtensionReady, setIsExtensionReady] = useState(false);
+  const [isLiExtensionReady, setIsLiExtensionReady] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [runProgress, setRunProgress] = useState<string | null>(null);
 
@@ -177,6 +226,132 @@ export default function InternalEngagementPage() {
   // Link thủ công
   const [customLink, setCustomLink] = useState("");
   const [isSubmittingLink, setIsSubmittingLink] = useState(false);
+
+  // Sync Public Metrics State
+  const [syncingPostId, setSyncingPostId] = useState<string | null>(null);
+
+  // Dùng chung cho cả 3 nhánh đồng bộ (FB server-side, LinkedIn qua Playwright, LinkedIn qua
+  // Extension) — patch state 2 mảng posts/customPosts để số nhảy ngay trên UI, không cần F5.
+  const applyMetricsToState = (postId: string, updatedData: any) => {
+    const newLikes = updatedData?.public_likes ?? updatedData?.fb_total_likes ?? 0;
+    const newComments = updatedData?.public_comments ?? updatedData?.fb_total_comments ?? 0;
+    const newShares = updatedData?.public_shares ?? updatedData?.fb_total_shares ?? 0;
+    const newSyncedAt = updatedData?.synced_at ?? updatedData?.last_synced_at ?? new Date().toISOString();
+
+    const updatePostItem = (p: InternalEngagementPost) =>
+      p.id === postId
+        ? ({
+          ...p,
+          public_likes: newLikes,
+          public_comments: newComments,
+          public_shares: newShares,
+          fb_total_likes: newLikes,
+          fb_total_comments: newComments,
+          fb_total_shares: newShares,
+          synced_at: newSyncedAt,
+          last_synced_at: newSyncedAt,
+          updated_at: newSyncedAt,
+        } as any)
+        : p;
+
+    setPosts((prev) => prev.map(updatePostItem));
+    setCustomPosts((prev) => prev.map(updatePostItem));
+
+    return { newLikes, newComments, newShares };
+  };
+
+  const handleSyncPostMetrics = async (post: InternalEngagementPost) => {
+    setSyncingPostId(post.id);
+    try {
+      const res = await internalEngagementService.syncPostMetrics(post.id);
+      if (res && res.success) {
+        const { newLikes, newComments, newShares } = applyMetricsToState(post.id, res.data);
+        showToast(
+          `Đã đồng bộ chỉ số Facebook gốc thành công! (${formatCompactNumber(newLikes)} Likes, ${formatCompactNumber(newComments)} Comments, ${formatCompactNumber(newShares)} Shares)`,
+          "success"
+        );
+      } else {
+        showToast(res?.message || "Không thể cào dữ liệu từ bài viết Facebook này.", "error");
+      }
+    } catch (err: any) {
+      const errorMsg = err?.response?.data?.message || err?.message || "Có lỗi xảy ra khi đồng bộ bài viết Facebook.";
+      showToast(errorMsg, "error");
+    } finally {
+      setSyncingPostId(null);
+    }
+  };
+
+  const handleSyncLinkedInMetrics = async (post: InternalEngagementPost) => {
+    const link = post.permalink_url || (post as any).link_post;
+    if (!link) return showToast("Bài viết không có link LinkedIn hợp lệ.", "error");
+
+    setSyncingPostId(post.id);
+    try {
+      // Ưu tiên đồng bộ hoàn toàn server-side (Playwright + account LinkedIn đã đăng ký) —
+      // không cần Extension, không mở cửa sổ nào, giống hệt cách Facebook đang chạy.
+      try {
+        const serverRes = await internalEngagementService.syncLinkedInPlaywright(post.id);
+        if (serverRes?.success) {
+          const { newLikes, newComments, newShares } = applyMetricsToState(post.id, serverRes.data);
+          showToast(
+            `Đã tự động đồng bộ (server, không cần Extension) thành công! (${formatCompactNumber(newLikes)} Likes, ${formatCompactNumber(newComments)} Comments, ${formatCompactNumber(newShares)} Shares)`,
+            "success"
+          );
+          return;
+        }
+        // success:false (vd NO_LINKEDIN_ACCOUNT) -> rơi xuống thử qua Extension bên dưới.
+      } catch {
+        // Lỗi mạng/server -> cũng rơi xuống thử qua Extension, không chặn hẳn người dùng.
+      }
+
+      const ping = await pingLiExtension();
+      if (!ping.installed) {
+        return showToast(
+          "Chưa tự đồng bộ được qua server (chưa có tài khoản LinkedIn liên kết) và cũng chưa cài LinkedIn Extension — vui lòng thêm tài khoản LinkedIn tại trang Quản lý tài khoản, hoặc cài Extension để đồng bộ qua trình duyệt.",
+          "error"
+        );
+      }
+      const fetched = await fetchLinkedInPostInfo(link);
+      if (!fetched.success) {
+        return showToast(fetched.error || "Không lấy được số liệu bài viết LinkedIn này.", "error");
+      }
+
+      const res = await internalEngagementService.syncPostMetrics(post.id, {
+        likes: fetched.likes || 0,
+        comments: fetched.comments || 0,
+        shares: fetched.shares || 0,
+      });
+      if (res && res.success) {
+        const { newLikes, newComments, newShares } = applyMetricsToState(post.id, res.data);
+        showToast(
+          `Đã đồng bộ chỉ số LinkedIn thành công (qua Extension)! (${formatCompactNumber(newLikes)} Likes, ${formatCompactNumber(newComments)} Comments, ${formatCompactNumber(newShares)} Shares)`,
+          "success"
+        );
+      } else {
+        showToast(res?.message || "Không thể lưu số liệu bài viết LinkedIn này.", "error");
+      }
+    } catch (err: any) {
+      const errorMsg = err?.response?.data?.message || err?.message || "Có lỗi xảy ra khi đồng bộ bài viết LinkedIn.";
+      showToast(errorMsg, "error");
+    } finally {
+      setSyncingPostId(null);
+    }
+  };
+
+  function formatCompactNumber(num: number | string | undefined | null): string {
+    if (num === undefined || num === null) return "0";
+    const n = Number(num);
+    if (isNaN(n)) return "0";
+    if (n >= 1000000) {
+      const val = (n / 1000000).toFixed(1).replace(".", ",");
+      return val.endsWith(",0") ? val.slice(0, -2) + "M" : val + "M";
+    }
+    if (n >= 1000) {
+      const val = (n / 1000).toFixed(1).replace(".", ",");
+      return val.endsWith(",0") ? val.slice(0, -2) + "K" : val + "K";
+    }
+    return n.toLocaleString("vi-VN");
+  }
 
   // Team visibility
   const canSeeTeamInteractions = user?.role === "admin" || user?.role === "leader";
@@ -201,6 +376,7 @@ export default function InternalEngagementPage() {
   const [editCampaignId, setEditCampaignId] = useState("");
   const [editDeadline, setEditDeadline] = useState("");
   const [editTargetComments, setEditTargetComments] = useState<number>(32);
+  const [editAssignedTeams, setEditAssignedTeams] = useState<string[]>([]);
   const [isUpdatingPost, setIsUpdatingPost] = useState(false);
 
   // Delete Confirm Modal State
@@ -235,9 +411,22 @@ export default function InternalEngagementPage() {
     }
     setEditDeadline(formattedDeadline);
 
-    // Bắt mọi thể loại tên của Target KPI, nếu mất hút thì về 32
-    const targetComm = Number((post as any).target_comments) || Number((post as any).targetComments) || 32;
-    setEditTargetComments(targetComm > 0 ? targetComm : 32);
+    // Bind danh sách team đã được phân công từ trước
+    const rawAssigned = (post as any).assigned_team_ids || (post as any).assignedTeamIds || (post as any).team_ids || (post as any).teamIds || [];
+    const assignedList = Array.isArray(rawAssigned) ? rawAssigned : [];
+    setEditAssignedTeams(assignedList);
+
+    // Bắt mọi thể loại tên của Target KPI, nếu mất hút thì tự tính theo team đã gán
+    const targetComm = Number((post as any).target_comments) || Number((post as any).targetComments) || 0;
+    if (targetComm > 0) {
+      setEditTargetComments(targetComm);
+    } else {
+      const initialCalc = dbTeams.reduce((sum, t) => {
+        const isSelected = assignedList.includes(t.id) || assignedList.includes(t.name_team);
+        return sum + (isSelected ? (t.member_count || 0) : 0);
+      }, 0);
+      setEditTargetComments(initialCalc);
+    }
   };
 
   const openDeleteConfirmModal = (post: InternalEngagementPost) => {
@@ -247,9 +436,36 @@ export default function InternalEngagementPage() {
 
   const handleSaveEdit = async () => {
     if (!editingPost || !user?.email) return;
+
+    if (editAssignedTeams.length === 0) {
+      return showToast("Vui lòng chọn ít nhất một Team thực hiện!", "error");
+    }
+
+    const targetComm = Number(editTargetComments);
+    if (isNaN(targetComm) || targetComm <= 0 || targetComm > editTotalSelectedMembers) {
+      return showToast(
+        `Số lượng Target Comment phải từ 1 đến tối đa ${editTotalSelectedMembers} (tương ứng tổng số thành viên đã chọn)!`,
+        "error"
+      );
+    }
+
     setIsUpdatingPost(true);
     try {
       const selectedCamp = campaigns.find((c) => c.id === editCampaignId);
+
+      const resolvedEditTeamUUIDs = editAssignedTeams
+        .map((val) => {
+          const match = dbTeams.find(
+            (t) =>
+              t.id === val ||
+              t.name_team === val ||
+              t.name_team.toLowerCase().includes(val.toLowerCase()) ||
+              val.toLowerCase().includes(t.name_team.toLowerCase())
+          );
+          return match ? match.id : val;
+        })
+        .filter((id) => Boolean(id) && id.length > 20);
+
       const payload = {
         email: user.email,
         fanpage_name: editFanpageName.trim() || undefined,
@@ -258,7 +474,8 @@ export default function InternalEngagementPage() {
         campaign_id: editCampaignId || undefined,
         campaign_name: selectedCamp?.name || undefined,
         deadline: editDeadline ? new Date(editDeadline).toISOString() : undefined,
-        target_comments: Number(editTargetComments) || 32,
+        target_comments: targetComm,
+        assigned_team_ids: resolvedEditTeamUUIDs,
       };
 
       let res = await internalEngagementService.updateCustomPost(editingPost.id, payload);
@@ -294,13 +511,13 @@ export default function InternalEngagementPage() {
 
       if (res && res.success) {
         showToast("Đã xóa/ẩn bài viết thành công!", "success");
-        
+
         // Optimistic Update: Immediately filter out the deleted post from state so it disappears from UI
         const deletedId = deletingPost.id;
         setCustomPosts((prev) => prev.filter((p) => p.id !== deletedId));
         setPosts((prev) => prev.filter((p) => p.id !== deletedId));
         setDeletingPost(null);
-        
+
         // Refresh from server in background to keep totals and pagination consistent
         await loadPosts();
       } else {
@@ -313,7 +530,7 @@ export default function InternalEngagementPage() {
     }
   };
 
-  const { libraryItems: commentTemplates } = useQuickCommentLibrary("facebook");
+  const { libraryItems: commentTemplates } = useQuickCommentLibrary(modalPost?.platform || "facebook");
   const commentTemplateGroups = useMemo(() => {
     const groups = new Map<string, { label: string; templates: typeof commentTemplates }>();
     commentTemplates.forEach((item) => {
@@ -531,8 +748,44 @@ export default function InternalEngagementPage() {
     setTaskTargetComments(totalSelectedMembers);
   }, [totalSelectedMembers]);
 
+  // Dynamic Target KPI Calculation for Edit Modal
+  const editTotalSelectedMembers = useMemo(() => {
+    if (editAssignedTeams.length === 0) return 0;
+    if (dbTeams.length > 0) {
+      return dbTeams.reduce((sum, t) => {
+        const isSelected = editAssignedTeams.includes(t.id) || editAssignedTeams.includes(t.name_team);
+        return sum + (isSelected ? (t.member_count || 0) : 0);
+      }, 0);
+    }
+    return editAssignedTeams.length * 5;
+  }, [editAssignedTeams, dbTeams]);
+
+  useEffect(() => {
+    if (editingPost) {
+      setEditTargetComments(editTotalSelectedMembers);
+    }
+  }, [editTotalSelectedMembers]);
+
+  const isAllEditTeamsSelected = useMemo(() => {
+    if (dbTeams.length === 0) return false;
+    return dbTeams.every((t) => editAssignedTeams.includes(t.id) || editAssignedTeams.includes(t.name_team));
+  }, [dbTeams, editAssignedTeams]);
+
+  const toggleSelectAllEditTeams = () => {
+    if (isAllEditTeamsSelected) {
+      setEditAssignedTeams([]);
+    } else {
+      setEditAssignedTeams(dbTeams.map((t) => t.id));
+    }
+  };
+
   const openCreateTaskModal = () => {
     setTaskLink("");
+    setTaskLinkedInContent("");
+    setTaskLinkedInAuthor("");
+    setLiAutoFetchStatus("idle");
+    lastAutoFetchedLiLinkRef.current = null;
+    taskLinkedInMetricsRef.current = {};
     setTaskCampaignId("");
     setTaskDeadline("");
     setTaskAssignedTeams([]);
@@ -618,15 +871,73 @@ export default function InternalEngagementPage() {
     }
   };
 
-  const handleCreateTaskSubmit = async () => {
-    const fbRegex = /^(https?:\/\/)?(www\.|m\.|mobile\.|web\.)?(facebook\.com|fb\.com|fb\.watch)\/.+$/i;
+  const lastAutoFetchedLiLinkRef = useRef<string | null>(null);
+  const taskLinkedInMetricsRef = useRef<{ likes?: number; comments?: number; shares?: number }>({});
 
-    if (!taskLink.trim()) {
+  const autoFetchLiInfo = async (link: string, opts?: { silent?: boolean }) => {
+    const cleanLink = sanitizeLinkedInUrl(link);
+    const isStale = () => lastAutoFetchedLiLinkRef.current !== link && lastAutoFetchedLiLinkRef.current !== cleanLink;
+
+    setIsFetchingLiInfo(true);
+    setLiAutoFetchStatus("fetching");
+    try {
+      const res = await internalEngagementService.debugFetchMeta(cleanLink);
+      if (isStale()) return;
+
+      if (res && res.success && res.data) {
+        const extracted = extractLinkedInMetadata(res.data);
+        if (extracted.content) setTaskLinkedInContent(extracted.content);
+        if (extracted.author_name) setTaskLinkedInAuthor(extracted.author_name);
+        setLiAutoFetchStatus("success");
+        if (!opts?.silent) {
+          showToast("Đã tự động lấy nội dung bài viết LinkedIn thành công!", "success");
+        }
+      } else {
+        setLiAutoFetchStatus("failed");
+      }
+    } catch (err) {
+      if (!isStale()) {
+        setLiAutoFetchStatus("failed");
+      }
+    } finally {
+      if (!isStale()) setIsFetchingLiInfo(false);
+    }
+  };
+
+  const handleAutoFetchLiInfo = () => {
+    const trimmed = sanitizeLinkedInUrl(taskLink.trim());
+    if (!trimmed) return showToast("Vui lòng dán link bài viết LinkedIn trước.", "error");
+    lastAutoFetchedLiLinkRef.current = trimmed;
+    autoFetchLiInfo(trimmed);
+  };
+
+  // Tự động lấy nội dung ngay khi dán/gõ xong link LinkedIn — debounce 600ms, chỉ chạy lại khi link thực sự đổi.
+  useEffect(() => {
+    if (!isCreateTaskModalOpen) return;
+    const trimmed = sanitizeLinkedInUrl(taskLink.trim());
+    const isLinkedIn = isLinkedInUrl(trimmed);
+    if (!isLinkedIn || !trimmed) return;
+    if (lastAutoFetchedLiLinkRef.current === trimmed) return;
+
+    const timer = window.setTimeout(() => {
+      lastAutoFetchedLiLinkRef.current = trimmed;
+      autoFetchLiInfo(trimmed, { silent: true });
+    }, 600);
+
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskLink, isCreateTaskModalOpen]);
+
+  const handleCreateTaskSubmit = async () => {
+    const socialRegex = /^(https?:\/\/)?([\w-]+\.)*(facebook\.com|fb\.com|fb\.watch|youtube\.com|youtu\.be|tiktok\.com|linkedin\.com|lnkd\.in)\/.+$/i;
+
+    const rawLink = taskLink.trim();
+    if (!rawLink) {
       return showToast("Vui lòng nhập link bài viết!", "error");
     }
 
-    if (!fbRegex.test(taskLink.trim())) {
-      return showToast("Vui lòng nhập đường link Facebook hợp lệ (facebook.com).", "error");
+    if (!socialRegex.test(rawLink)) {
+      return showToast("Vui lòng nhập đường link hợp lệ (Facebook, YouTube, TikTok, LinkedIn).", "error");
     }
 
     if (taskAssignedTeams.length === 0) {
@@ -643,6 +954,13 @@ export default function InternalEngagementPage() {
 
     if (!user?.email) {
       return showToast("Chưa xác định được tài khoản đăng nhập.", "error");
+    }
+
+    const isLinkedInLink = isLinkedInUrl(rawLink);
+    const finalCleanLink = isLinkedInLink ? sanitizeLinkedInUrl(rawLink) : rawLink;
+
+    if (isLinkedInLink && liAutoFetchStatus === "fetching") {
+      return showToast("Đang tự động lấy nội dung bài viết, vui lòng đợi vài giây...", "error");
     }
 
     setIsSubmittingTask(true);
@@ -663,8 +981,14 @@ export default function InternalEngagementPage() {
         .filter((id) => Boolean(id) && id.length > 20);
 
       const payload = {
-        link: taskLink.trim(),
+        link: finalCleanLink,
         email: user.email,
+        platform: isLinkedInLink ? "linkedin" : "facebook",
+        content: isLinkedInLink ? taskLinkedInContent.trim() : undefined,
+        fanpage_name: isLinkedInLink ? taskLinkedInAuthor.trim() || undefined : undefined,
+        likes: isLinkedInLink ? taskLinkedInMetricsRef.current.likes : undefined,
+        comments: isLinkedInLink ? taskLinkedInMetricsRef.current.comments : undefined,
+        shares: isLinkedInLink ? taskLinkedInMetricsRef.current.shares : undefined,
         campaign_id: taskCampaignId.trim() || undefined,
         campaign_name: selectedCamp?.name || undefined,
         deadline: taskDeadline ? new Date(taskDeadline).toISOString() : undefined,
@@ -678,6 +1002,11 @@ export default function InternalEngagementPage() {
         showToast("Đã thêm bài viết Seeding mới thành công!", "success");
         setIsCreateTaskModalOpen(false);
         setTaskLink("");
+        setTaskLinkedInContent("");
+        setTaskLinkedInAuthor("");
+        setLiAutoFetchStatus("idle");
+        lastAutoFetchedLiLinkRef.current = null;
+    taskLinkedInMetricsRef.current = {};
         setTaskCampaignId("");
         setTaskDeadline("");
         setTaskAssignedTeams([]);
@@ -732,12 +1061,18 @@ export default function InternalEngagementPage() {
     }
   };
 
-  // Combine all posts into a single unified list (no separate source tabs)
+  // Combine all posts into a single unified list sorted by newest creation time (created_at DESC)
   const allCombinedPosts = useMemo(() => {
     const map = new Map<string, InternalEngagementPost>();
     posts.forEach((p) => map.set(p.id, p));
     customPosts.forEach((p) => map.set(p.id, p));
-    return Array.from(map.values());
+    const list = Array.from(map.values());
+
+    return list.sort((a, b) => {
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return timeB - timeA;
+    });
   }, [posts, customPosts]);
 
   const realStats = useMemo(() => {
@@ -942,6 +1277,26 @@ export default function InternalEngagementPage() {
       const action = event.data?.action;
       if (action === "COMMENT_EXTENSION_READY") {
         setIsExtensionReady(true);
+      } else if (action === "LI_EXTENSION_READY") {
+        setIsLiExtensionReady(true);
+      } else if (action === "LI_COMMENT_STARTED") {
+        setIsRunning(true);
+        setRunProgress("Đang mở bài viết LinkedIn...");
+        lastResultRef.current = null;
+      } else if (action === "LI_COMMENT_PROGRESS") {
+        setRunProgress(event.data.payload?.status || null);
+      } else if (action === "LI_COMMENT_DONE") {
+        const result = event.data.payload?.result;
+        setIsRunning(false);
+        setRunProgress(null);
+        setModalPost(null);
+        setCommentText("");
+        if (result && result.success === false) {
+          showToast(`Comment thất bại: ${result.error || "Lỗi không xác định"}`);
+        } else {
+          showToast("Đã gửi comment thành công. Hệ thống đã ghi nhận KPI.");
+        }
+        loadPosts();
       } else if (action === "BULK_COMMENT_STARTED") {
         setIsRunning(true);
         setRunProgress("Đang mở bài viết...");
@@ -969,6 +1324,7 @@ export default function InternalEngagementPage() {
     window.addEventListener("message", handleMessage);
     const interval = window.setInterval(() => {
       if (!isExtensionReady) window.postMessage({ action: "PING_COMMENT_EXTENSION" }, "*");
+      if (!isLiExtensionReady) window.postMessage({ action: "PING_LI_EXTENSION" }, "*");
     }, 1000);
 
     return () => {
@@ -976,7 +1332,7 @@ export default function InternalEngagementPage() {
       window.clearInterval(interval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isExtensionReady]);
+  }, [isExtensionReady, isLiExtensionReady]);
 
   const PAGE_SIZE = 10;
   const [currentPage, setCurrentPage] = useState(1);
@@ -1012,24 +1368,35 @@ export default function InternalEngagementPage() {
   const sendComment = () => {
     if (!modalPost?.permalink_url) return;
     if (!commentText.trim()) return showToast("Vui lòng nhập nội dung comment.");
-    if (!isExtensionReady) return showToast("Chưa kết nối được Extension. Vui lòng cài đặt và tải lại trang.");
     if (!user?.email) {
       return showToast("Chưa xác định được tài khoản đăng nhập — tải lại trang trước khi comment (nếu không KPI sẽ không được ghi nhận).");
     }
+
+    const isLinkedIn = modalPost.platform === "linkedin" || Boolean(modalPost.permalink_url && (modalPost.permalink_url.includes("linkedin.com") || modalPost.permalink_url.includes("lnkd.in")));
+    const isReady = isLinkedIn ? (isLiExtensionReady || isExtensionReady) : isExtensionReady;
+    if (!isReady) return showToast("Chưa kết nối được Extension. Vui lòng cài đặt và tải lại trang.");
+
+    const rawPostLink = modalPost.permalink_url || (modalPost as any).link_post;
+    const targetLink = isLinkedIn ? sanitizeLinkedInUrl(rawPostLink) : rawPostLink;
 
     window.postMessage(
       {
         action: "START_BULK_COMMENT",
         payload: {
-          url: modalPost.permalink_url || (modalPost as any).link_post,
-          content: commentText,
-          text: commentText,
+          url: targetLink,
+          content: commentText.trim(),
+          text: commentText.trim(),
           posts: [
             {
-              url: modalPost.permalink_url || (modalPost as any).link_post,
+              url: targetLink,
+              fanpage_id: (modalPost as any).fanpage_id,
+              fanpage_name: (modalPost as any).fanpage_name,
             },
           ],
-          verifyConfig: buildVerifyConfig(),
+          verifyConfig: {
+            ...buildVerifyConfig(),
+            id_platform: isLinkedIn ? 3 : ((modalPost as any).platform === "youtube" ? 2 : 1),
+          },
         },
       },
       "*",
@@ -1459,7 +1826,7 @@ export default function InternalEngagementPage() {
                   </span>
                 </div>
               ) : (
-               pagedPosts.map((post) => {
+                pagedPosts.map((post) => {
                   const status = marks[post.permalink_url || ""] || "need";
                   const isSelected = selectedIds.has(post.id);
 
@@ -1467,7 +1834,7 @@ export default function InternalEngagementPage() {
                   const postCampId = (post as any).campaign_id || (post as any).campaignId;
                   const matchedCamp = campaigns.find((c) => c.id === postCampId);
                   const campaignName = matchedCamp?.name || (post as any).campaign_name || (post as any).campaignName || null;
-const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode || "#fff1f2";
+                  const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode || "#fff1f2";
                   const rawTarget = (post as any).target_comments || (post as any).targetComments;
                   const rawDeadline = (post as any).deadline || (post as any).due_date || (post as any).dueDate;
 
@@ -1494,7 +1861,7 @@ const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode
 
                   const progressPercent = Math.min(100, Math.round((interactedCount / Math.max(1, targetTotal)) * 100));
                   const pendingCount = Math.max(0, targetTotal - interactedCount);
-                  
+
                   const commentActual = interactedCount;
                   const completedCount = interactedCount;
 
@@ -1503,31 +1870,28 @@ const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode
                   const isCompleted = targetTotal > 0 && interactedCount >= targetTotal;
                   const isOverdue = rawDeadline && new Date(rawDeadline) < new Date() && !isCompleted;
 
+                  const postUrl = post.permalink_url || (post as any).link_post || (post as any).link || "";
+                  const isLinkedInPost = post.platform === "linkedin" || Boolean(postUrl && (postUrl.includes('linkedin.com') || postUrl.includes('lnkd.in')));
+                  const isFacebookPost = !isLinkedInPost && Boolean(postUrl && (postUrl.includes('facebook.com') || postUrl.includes('fb.watch') || postUrl.includes('fb.com')));
+
                   return (
                     <article
                       key={post.id}
-                      className={`border rounded-2xl p-4 md:p-5 mb-4 bg-white transition relative flex flex-col md:flex-row gap-4 md:gap-5 ${
-                        isSelected ? "border-[#c71f4d] bg-[#fff8f9] shadow-md" : "border-[#e7e9ef] hover:border-rose-200 shadow-sm"
-                      }`}
+                      className={`border rounded-2xl mb-4 bg-white transition relative flex flex-col md:flex-row overflow-hidden ${isSelected ? "border-[#c71f4d] bg-[#fff8f9] shadow-md" : "border-[#e7e9ef] hover:border-rose-200 shadow-xs"
+                        }`}
                     >
-                      {/* BANNER CHIẾN DỊCH BÊN TRÁI */}
+                      {/* DẢI CAMPAIGN BÊN TRÁI (LEFT SIDEBAR) - STRETCH CẢ CARD */}
                       <div
-                        style={{ backgroundColor: campaignName ? (campaignColor || '#fff1f2') : '#f8fafc' }}
-                        className="w-full md:w-32 rounded-xl p-3 flex flex-col items-center justify-center text-center shrink-0 min-h-[100px] border border-gray-100 transition-colors"
+                        style={{ backgroundColor: campaignName ? (campaignColor || '#eef3fb') : '#eef3fb' }}
+                        className="w-full md:w-32 self-stretch p-4 flex items-center justify-center text-center shrink-0 border-b md:border-b-0 md:border-r border-gray-100 transition-colors"
                       >
-                        {campaignName ? (
-                          <span className="font-extrabold text-[#be123c] text-xs tracking-wider uppercase leading-tight">
-                            {campaignName}
-                          </span>
-                        ) : (
-                          <span className="font-semibold text-gray-400 text-[10px] uppercase tracking-wider">
-                            (Tự do)
-                          </span>
-                        )}
+                        <span className="font-extrabold text-[#1e40af] text-xs md:text-sm tracking-wider uppercase leading-tight">
+                          {campaignName || "TỰ DO"}
+                        </span>
                       </div>
 
                       {/* CHI TIẾT VÀ TIẾN ĐỘ BÊN PHẢI */}
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 p-4 md:p-5 flex flex-col justify-between">
                         {/* Header Row */}
                         <div className="flex items-start justify-between gap-3 mb-2">
                           <div className="flex items-center gap-2.5">
@@ -1536,22 +1900,18 @@ const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode
                                 type="checkbox"
                                 checked={isSelected}
                                 onChange={() => toggleSelected(post.id)}
-                                className="w-4 h-4 text-rose-600 rounded"
+                                className="w-4 h-4 text-rose-600 rounded cursor-pointer"
                               />
                             ) : null}
 
-                            {/* FACEBOOK SOCIAL ICON */}
-                            <div
-                              className="w-8 h-8 rounded-full bg-[#1877f2] text-white grid place-items-center font-bold text-sm shrink-0 shadow-sm"
-                              title="Facebook"
-                            >
-                              f
-                            </div>
+                            {/* MULTI-PLATFORM SOCIAL ICON */}
+                            {getPlatformIcon(post.permalink_url || (post as any).link_post || (post as any).link)}
 
                             <div>
-                              <div className="font-bold text-sm text-gray-900">{post.fanpage_name || "MARKee AI Marketing"}</div>
+                              <div className="font-bold text-sm text-gray-900">
+                                {post.fanpage_name || (postUrl.toLowerCase().includes("youtube.com") || postUrl.toLowerCase().includes("youtu.be") ? "Kênh YouTube" : "Markee Agency")}
+                              </div>
                               <div className="text-xs text-gray-400 font-medium">
-                                {/* Bug 5 Fix: dùng fmtDeadline thay vì hardcode 'hôm nay' */}
                                 {fmtRelativeTime(post.created_at)} · {fmtDeadline(rawDeadline)}
                               </div>
                             </div>
@@ -1559,13 +1919,12 @@ const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode
 
                           <div className="flex items-center gap-2">
                             <span
-                              className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                                isCompleted
+                              className={`px-3 py-1 rounded-full text-xs font-bold ${isCompleted
                                   ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
                                   : isOverdue
-                                  ? "bg-red-50 text-red-600 border border-red-200"
-                                  : "bg-amber-50 text-amber-700 border border-amber-200"
-                              }`}
+                                    ? "bg-red-50 text-red-600 border border-red-200"
+                                    : "bg-amber-50 text-amber-700 border border-amber-200"
+                                }`}
                             >
                               {isCompleted ? "Đã hoàn thành" : isOverdue ? "Quá hạn" : "Đang thực hiện"}
                             </span>
@@ -1610,30 +1969,95 @@ const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode
                           📌 {post.content || "(Bài viết không có nội dung văn bản)"}
                         </div>
 
+                        {/* KHỐI TƯƠNG TÁC BÀI GỐC (PUBLIC METRICS BOX) - Facebook hoặc LinkedIn */}
+                        {isFacebookPost || isLinkedInPost ? (
+                          <div className="mb-3.5 p-3 border border-dashed border-gray-200 rounded-2xl bg-white flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5 text-xs">
+                            {/* Thông số bên trái */}
+                            <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap text-gray-700">
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="w-2 h-2 rounded-full bg-rose-500 inline-block animate-pulse"></span>
+                                <span className="font-extrabold text-[11px] text-gray-600 uppercase tracking-wider">
+                                  TƯƠNG TÁC BÀI GỐC
+                                </span>
+                              </div>
+
+                              <div className="hidden sm:block h-3.5 w-px bg-gray-200" />
+
+                              {/* Metrics Row */}
+                              <div className="flex items-center gap-2.5 text-xs text-gray-500">
+                                {/* Like */}
+                                <div className="flex items-center gap-1">
+                                  <svg className="w-3.5 h-3.5 text-gray-400 stroke-[1.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+                                  </svg>
+                                  <span className="font-bold text-gray-900">{formatCompactNumber((post as any).public_likes ?? (post as any).fb_total_likes ?? (post as any).likes ?? 0)}</span>
+                                  <span className="text-gray-400 text-[11px]">like</span>
+                                </div>
+
+                                <span className="text-gray-300">|</span>
+
+                                {/* Comment */}
+                                <div className="flex items-center gap-1">
+                                  <svg className="w-3.5 h-3.5 text-gray-400 stroke-[1.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 0 1-.923 1.785A5.969 5.969 0 0 0 6 21c1.282 0 2.47-.402 3.445-1.087.51-.358 1.155-.41 1.705-.224A8.948 8.948 0 0 0 12 20.25z" />
+                                  </svg>
+                                  <span className="font-bold text-gray-900">{formatCompactNumber((post as any).public_comments ?? (post as any).fb_total_comments ?? (post as any).comments_count ?? 0)}</span>
+                                  <span className="text-gray-400 text-[11px]">bình luận</span>
+                                </div>
+
+                                <span className="text-gray-300">|</span>
+
+                                {/* Share */}
+                                <div className="flex items-center gap-1">
+                                  <svg className="w-3.5 h-3.5 text-gray-400 stroke-[1.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 8.25H7.5a2.25 2.25 0 0 0-2.25 2.25v9a2.25 2.25 0 0 0 2.25 2.25h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25H15m0-3-3-3m0 0-3 3m3-3V15" />
+                                  </svg>
+                                  <span className="font-bold text-gray-900">{formatCompactNumber((post as any).public_shares ?? (post as any).fb_total_shares ?? (post as any).shares_count ?? 0)}</span>
+                                  <span className="text-gray-400 text-[11px]">chia sẻ</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Bên phải: Thời gian & Nút Đồng bộ */}
+                            <div className="flex items-center gap-2 shrink-0 ml-auto sm:ml-0">
+                              <span className="text-gray-400 text-[11px]">Cập nhật {fmtRelativeTime((post as any).synced_at ?? (post as any).last_synced_at ?? (post as any).updated_at ?? post.created_at)}</span>
+                              <button
+                                type="button"
+                                onClick={() => (isLinkedInPost ? handleSyncLinkedInMetrics(post) : handleSyncPostMetrics(post))}
+                                disabled={syncingPostId === post.id}
+                                className="flex items-center gap-1 px-3 py-1 border border-gray-300 rounded-full text-xs font-semibold text-gray-700 hover:bg-gray-50 transition bg-white shadow-2xs cursor-pointer"
+                              >
+                                <span className={syncingPostId === post.id ? "animate-spin inline-block" : ""}>🔄</span>
+                                <span>{syncingPostId === post.id ? "Đang đồng bộ..." : "Đồng bộ"}</span>
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
+
                         {/* Progress Bar */}
                         <div className="mb-3.5">
                           <div className="flex justify-between text-xs font-bold mb-1.5">
                             <span className="text-gray-700">{interactedCount}/{targetTotal} thành viên đã tương tác</span>
-                            <span className="text-[#be123c]">{progressPercent}%</span>
+                            <span className="text-[#BE123C]">{progressPercent}%</span>
                           </div>
                           <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                            <div style={{ width: `${progressPercent}%` }} className="bg-[#be123c] h-full rounded-full transition-all duration-300" />
+                            <div style={{ width: `${progressPercent}%` }} className="bg-[#BE123C] h-full rounded-full transition-all duration-300" />
                           </div>
                         </div>
 
-                        {/* 3 KPI SUB-BOXES GRID (THUẦN COMMENT) */}
+                        {/* 3 KPI SUB-BOXES GRID (ĐÃ ĐỔI THÀNH "ĐÃ TƯƠNG TÁC") */}
                         <div className="grid grid-cols-3 gap-2.5 mb-4">
-                          <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100">
-                            <span className="text-[11px] text-gray-500 font-semibold block">💬 Comment</span>
-                            <span className="text-sm font-bold text-gray-900">{commentActual}/{targetTotal}</span>
+                          <div className="bg-[#f8fafc] p-3 rounded-xl border border-gray-100">
+                            <span className="text-[11px] text-gray-500 font-semibold block mb-1">Đã tương tác</span>
+                            <span className="text-sm md:text-base font-bold text-gray-900">{interactedCount}/{targetTotal}</span>
                           </div>
-                          <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100">
-                            <span className="text-[11px] text-emerald-600 font-semibold block">✅ Hoàn thành</span>
-                            <span className="text-sm font-bold text-emerald-700">{completedCount}</span>
+                          <div className="bg-[#f8fafc] p-3 rounded-xl border border-gray-100">
+                            <span className="text-[11px] text-emerald-600 font-semibold block mb-1">✓ Hoàn thành</span>
+                            <span className="text-sm md:text-base font-bold text-emerald-600">{completedCount}</span>
                           </div>
-                          <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100">
-                            <span className="text-[11px] text-amber-600 font-semibold block">⏳ Chưa làm</span>
-                            <span className="text-sm font-bold text-amber-700">{pendingCount}</span>
+                          <div className="bg-[#f8fafc] p-3 rounded-xl border border-gray-100">
+                            <span className="text-[11px] text-amber-600 font-semibold block mb-1">⏱ Chưa làm</span>
+                            <span className="text-sm md:text-base font-bold text-amber-600">{pendingCount}</span>
                           </div>
                         </div>
 
@@ -1643,32 +2067,61 @@ const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode
                             <button
                               type="button"
                               onClick={() => openInteractionsModal(post)}
-                              className="text-xs font-bold text-rose-600 hover:underline text-left"
+                              className="text-xs font-bold text-[#be123c] hover:underline text-left flex items-center gap-1"
                             >
                               Xem tương tác thành viên →
                             </button>
-                            <a
-                              href={post.permalink_url || (post as any).link_post || "#"}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1"
-                            >
-                              Xem bài viết gốc ↗
-                            </a>
+
+                            {/* Nút Xem bài viết gốc có Tooltip */}
+                            <div className="relative group inline-block">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const postUrl = post.permalink_url || (post as any).link_post || "";
+                                  if (!postUrl) return;
+                                  // Đồng bộ email_member vào Extension storage trước khi mở tab Facebook
+                                  // để graphql-sniffer có thể ghi nhận Like/Share thủ công
+                                  const currentOrigin = typeof window !== "undefined" ? window.location.origin : "https://seeding.markeeai.com";
+                                  const fanpageId = (post as any).fanpage_id || (post as any).fanpageId || "";
+                                  const fanpageName = (post as any).fanpage_name || (post as any).fanpageName || "";
+                                  const facebookPostId = (post as any).facebook_post_id || (post as any).id_post || (post as any).facebookPostId || post.id || "unknown";
+
+                                  window.postMessage({
+                                    type: "SYNC_ACTIVE_MEMBER",
+                                    action: "SYNC_ACTIVE_MEMBER",
+                                    payload: {
+                                      email_member: user?.email || "",
+                                      apiBase: currentOrigin,
+                                      fanpage_id: fanpageId,
+                                      fanpage_name: fanpageName,
+                                      facebook_post_id: facebookPostId,
+                                      target_link: postUrl,
+                                    },
+                                  }, "*");
+                                  // Delay nhẹ để Extension kịp xử lý storage rồi mới mở tab
+                                  setTimeout(() => { window.open(postUrl, "_blank"); }, 200);
+                                }}
+                                className="text-xs font-medium text-gray-500 hover:text-blue-600 hover:underline flex items-center gap-1 text-left transition-colors cursor-pointer"
+                              >
+                                Xem bài viết gốc ↗
+                              </button>
+
+                              {/* Tooltip hiển thị khi Hover - Chỉ dành cho Facebook */}
+                              {isFacebookPost ? (
+                                <div className="absolute bottom-full left-0 mb-1 hidden group-hover:block w-max z-10 pointer-events-none">
+                                  <div className="bg-gray-800 text-white text-xs rounded py-1 px-2 shadow-lg">
+                                    Bấm vào xem bài viết gốc để Like & Share thủ công
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
                           </div>
 
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
-                              onClick={() => handleRemindMembers(post)}
-                              className="px-3.5 py-1.5 border border-rose-200 text-rose-600 bg-rose-50/40 hover:bg-rose-50 rounded-xl text-xs font-bold transition"
-                            >
-                              Nhắc người chưa làm
-                            </button>
-                            <button
-                              type="button"
                               onClick={() => openModal(post)}
-                              className="px-4 py-1.5 bg-[#be123c] hover:bg-[#9f1239] text-white rounded-xl text-xs font-bold shadow-sm transition"
+                              className="px-5 py-2 bg-[#BE123C] hover:bg-[#9F1239] text-white rounded-full text-xs font-bold shadow-sm transition"
                             >
                               Comment ngay
                             </button>
@@ -1721,22 +2174,45 @@ const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode
               <div className="flex justify-between items-center p-4 border-b border-[#e7e9ef]">
                 <div>
                   <b className="text-base">Comment vào bài viết</b>
-                  <div className="text-[12px] text-[#777] mt-1">Thực hiện qua Chrome Extension trên tài khoản Facebook đang đăng nhập</div>
+                  <div className="text-[12px] text-[#777] mt-1">
+                    {modalPost.platform === "linkedin"
+                      ? "Thực hiện qua LinkedIn Extension trên tài khoản LinkedIn đang đăng nhập"
+                      : "Thực hiện qua Chrome Extension trên tài khoản Facebook đang đăng nhập"}
+                  </div>
                 </div>
                 <button type="button" className="border-0 bg-[#f2f3f6] rounded-lg px-2.5 py-1.75" onClick={closeModal} aria-label="close">✕</button>
               </div>
 
               <div className="p-5">
-                <div
-                  className={`p-3 rounded-xl border text-[12px] mb-4 flex items-center gap-2 ${isExtensionReady ? "bg-green-50 border-green-200 text-green-700" : "bg-amber-50 border-amber-200 text-amber-700"
-                    }`}
-                >
-                  {isExtensionReady ? "Extension đã sẵn sàng." : "Đang chờ kết nối Extension. Vui lòng cài đặt và F5 lại trang."}
-                </div>
+                {(() => {
+                  const modalIsLinkedIn = modalPost.platform === "linkedin";
+                  const ready = modalIsLinkedIn ? isLiExtensionReady : isExtensionReady;
+                  return (
+                    <div
+                      className={`p-3 rounded-xl border text-[12px] mb-4 flex items-center justify-between gap-2 ${ready ? "bg-green-50 border-green-200 text-green-700" : "bg-amber-50 border-amber-200 text-amber-700"
+                        }`}
+                    >
+                      <span>
+                        {ready
+                          ? `Extension${modalIsLinkedIn ? " LinkedIn" : ""} đã sẵn sàng.`
+                          : `Đang chờ kết nối ${modalIsLinkedIn ? "LinkedIn " : ""}Extension. Vui lòng cài đặt và F5 lại trang.`}
+                      </span>
+                      {!ready && modalIsLinkedIn ? (
+                        <a
+                          href="/linkedin-group-crawler-extension.zip"
+                          download
+                          className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-amber-300 bg-white hover:bg-amber-100 text-amber-800 text-[11px] font-bold whitespace-nowrap"
+                        >
+                          Tải Extension
+                        </a>
+                      ) : null}
+                    </div>
+                  );
+                })()}
 
                 <div className="text-[13px] text-[#5d616c] mb-3 line-clamp-3">{modalPost.content}</div>
 
-                {socialAccounts.length > 0 ? (
+                {socialAccounts.length > 0 && modalPost.platform !== "linkedin" ? (
                   <div className="mb-3">
                     <label className="text-[12px] font-extrabold block mb-2">Tài khoản Facebook dùng để comment:</label>
                     <select
@@ -1816,7 +2292,7 @@ const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode
                   type="button"
                   className="bg-[#c71f4d] text-white border border-[#c71f4d] rounded-xl px-4 py-2 font-extrabold disabled:opacity-50"
                   onClick={sendComment}
-                  disabled={isRunning || !isExtensionReady || !commentText.trim()}
+                  disabled={isRunning || !(modalPost.platform === "linkedin" ? isLiExtensionReady : isExtensionReady) || !commentText.trim()}
                 >
                   {isRunning ? "Đang gửi..." : "Gửi comment qua Extension"}
                 </button>
@@ -1882,14 +2358,6 @@ const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode
                       ))}
                   </select>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => handleRemindMembers(interactionsPost)}
-                  className="px-3.5 py-1.5 border border-rose-200 text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl text-xs font-bold transition shadow-sm"
-                >
-                  Nhắc người chưa hoàn thành
-                </button>
               </div>
 
               {/* TABLE HIỂN THỊ CHI TIẾT */}
@@ -1904,7 +2372,9 @@ const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode
                           <th className="pb-2.5">Thành viên</th>
                           <th className="pb-2.5">Team</th>
                           <th className="pb-2.5">Trạng thái</th>
-                          <th className="pb-2.5 text-center">Comment</th>
+                          <th className="pb-2.5 text-center">👍 Like</th>
+                          <th className="pb-2.5 text-center">💬 Comment</th>
+                          <th className="pb-2.5 text-center">↗️ Share</th>
                           <th className="pb-2.5 text-right">Thời gian</th>
                         </tr>
                       </thead>
@@ -1947,7 +2417,7 @@ const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode
                           if (filteredRoster.length === 0) {
                             return (
                               <tr>
-                                <td colSpan={5} className="py-8 text-center text-gray-400 font-medium">
+                                <td colSpan={7} className="py-8 text-center text-gray-400 font-medium">
                                   Không tìm thấy thành viên nào khớp với bộ lọc.
                                 </td>
                               </tr>
@@ -1962,20 +2432,59 @@ const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode
                               </td>
                               <td className="py-3">
                                 <span
-                                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${m.status === "completed"
+                                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                                    m.status === "completed"
                                       ? "bg-emerald-50 text-emerald-700"
                                       : m.status === "received"
                                         ? "bg-blue-50 text-blue-700"
                                         : "bg-red-50 text-red-700"
-                                    }`}
+                                  }`}
                                 >
                                   {m.statusLabel}
                                 </span>
                               </td>
+                              {/* 👍 Like */}
                               <td className="py-3 text-center">
-                                {m.comment ? <span className="text-emerald-600 font-bold">✓</span> : <span className="text-gray-300">—</span>}
+                                {m.like
+                                  ? <span
+                                      style={{ color: "#10b981" }}
+                                      className="font-bold text-sm cursor-default"
+                                      title={m.like_time ? `Đã like lúc: ${formatMemberTime(m.like_time)}` : "Đã like"}
+                                    >✓</span>
+                                  : <span style={{ color: "#9ca3af" }}>—</span>}
                               </td>
-                              <td className="py-3 text-right text-gray-500">{formatMemberTime(m.raw_created_at, m.time)}</td>
+                              {/* 💬 Comment */}
+                              <td className="py-3 text-center">
+                                {m.comment
+                                  ? <span
+                                      style={{ color: "#10b981" }}
+                                      className="font-bold text-sm cursor-default"
+                                      title={m.comment_time ? `Đã comment lúc: ${formatMemberTime(m.comment_time)}` : "Đã comment"}
+                                    >✓</span>
+                                  : <span style={{ color: "#9ca3af" }}>—</span>}
+                              </td>
+                              {/* ↗️ Share */}
+                              <td className="py-3 text-center">
+                                {m.share
+                                  ? <span
+                                      style={{ color: "#10b981" }}
+                                      className="font-bold text-sm cursor-default"
+                                      title={m.share_time ? `Đã share lúc: ${formatMemberTime(m.share_time)}` : "Đã share"}
+                                    >✓</span>
+                                  : <span style={{ color: "#9ca3af" }}>—</span>}
+                              </td>
+                              {/* Thời gian: lấy mốc gần nhất trong 3 hành động */}
+                              <td className="py-3 text-right text-gray-500">
+                                {(() => {
+                                  const candidates = [m.like_time, m.comment_time, m.share_time, m.raw_created_at]
+                                    .filter(Boolean)
+                                    .map((t: string) => new Date(t).getTime())
+                                    .filter((n: number) => !Number.isNaN(n));
+                                  if (candidates.length === 0) return m.time || "—";
+                                  const latestTs = Math.max(...candidates);
+                                  return formatMemberTime(new Date(latestTs).toISOString(), m.time);
+                                })()}
+                              </td>
                             </tr>
                           ));
                         })()}
@@ -2043,6 +2552,78 @@ const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode
                       onChange={(e) => setEditDeadline(e.target.value)}
                       className="w-full border border-[#dde0e7] rounded-xl px-3 py-2 text-xs outline-none focus:border-[#be123c]"
                     />
+                  </div>
+                </div>
+
+                {/* Phân công Teams thực hiện */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-bold text-[#334155] block">
+                      Phân công Teams thực hiện:
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs font-bold cursor-pointer text-rose-600 hover:text-rose-700">
+                      <input
+                        type="checkbox"
+                        checked={isAllEditTeamsSelected}
+                        onChange={toggleSelectAllEditTeams}
+                        className="w-4 h-4 text-rose-600 rounded cursor-pointer"
+                      />
+                      <span>{isAllEditTeamsSelected ? "Bỏ chọn tất cả" : "Chọn tất cả Teams"}</span>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 flex-wrap pt-1">
+                    {dbTeams.length > 0
+                      ? dbTeams.map((team) => {
+                        const isChecked = editAssignedTeams.includes(team.id) || editAssignedTeams.includes(team.name_team);
+                        return (
+                          <label
+                            key={team.id}
+                            className={`flex items-center gap-1.5 text-xs font-medium cursor-pointer border px-3 py-1.5 rounded-xl transition ${isChecked
+                              ? "bg-rose-50 border-rose-200 text-rose-900 font-bold shadow-xs"
+                              : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
+                              }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                setEditAssignedTeams((prev) =>
+                                  isChecked
+                                    ? prev.filter((t) => t !== team.id && t !== team.name_team)
+                                    : [...prev, team.id]
+                                );
+                              }}
+                              className="w-4 h-4 text-rose-600 rounded"
+                            />
+                            <span>{team.name_team} ({team.member_count})</span>
+                          </label>
+                        );
+                      })
+                      : ["Sale", "Marketing", "Presale", "Operation"].map((team) => {
+                        const isChecked = editAssignedTeams.includes(team);
+                        return (
+                          <label
+                            key={team}
+                            className={`flex items-center gap-1.5 text-xs font-medium cursor-pointer border px-3 py-1.5 rounded-xl transition ${isChecked
+                              ? "bg-rose-50 border-rose-200 text-rose-900 font-bold shadow-xs"
+                              : "bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100"
+                              }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                setEditAssignedTeams((prev) =>
+                                  isChecked ? prev.filter((t) => t !== team) : [...prev, team]
+                                );
+                              }}
+                              className="w-4 h-4 text-rose-600 rounded"
+                            />
+                            <span>{team}</span>
+                          </label>
+                        );
+                      })}
                   </div>
                 </div>
 
@@ -2279,6 +2860,21 @@ const campaignColor = matchedCamp?.color_code || (matchedCamp as any)?.colorCode
                     placeholder="Dán link bài viết (Facebook, YouTube, TikTok, LinkedIn...)"
                   />
                 </div>
+
+                {(() => {
+                  const isLinkedInTaskLink = isLinkedInUrl(taskLink.trim());
+                  return (
+                    <>
+                      {isLinkedInTaskLink && liAutoFetchStatus === "fetching" ? (
+                        <p className="text-[11px] text-[#0a66c2] font-semibold">⏳ Đang tự động lấy nội dung bài viết LinkedIn...</p>
+                      ) : null}
+
+                      {isLinkedInTaskLink && liAutoFetchStatus === "success" ? (
+                        <p className="text-[11px] text-green-700 font-semibold">✓ Đã tự động lấy nội dung bài viết LinkedIn.</p>
+                      ) : null}
+                    </>
+                  );
+                })()}
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>

@@ -10,7 +10,7 @@ class QuickCommentAddRequest(BaseModel):
     title: str
     label: str = "Khác"
     content: str
-    platform: str = "all"  # all | facebook | linkedin
+    platform: str = "all"  # all | facebook | linkedin | youtube
     id_member: Optional[str] = None
 
 

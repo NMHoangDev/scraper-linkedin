@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "FB Bulk Comment Extension",
-  "version": "1.0",
-  "description": "Seeding Comment hàng loạt trên Facebook",
+  "name": "Facebook, YouTube & LinkedIn Bulk Comment Extension",
+  "version": "1.1",
+  "description": "Seeding Comment hàng loạt trên Facebook, YouTube và LinkedIn",
   "permissions": [
     "activeTab",
     "scripting",
@@ -11,6 +11,9 @@
   ],
   "host_permissions": [
     "*://*.facebook.com/*",
+    "*://*.youtube.com/*",
+    "*://youtube.com/*",
+    "*://*.linkedin.com/*",
     "http://localhost:*/*",
     "http://127.0.0.1:*/*",
     "*://seeding.markeeai.com/*",
@@ -32,6 +35,21 @@
     {
       "matches": ["*://*.facebook.com/*"],
       "js": ["content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "*://*.youtube.com/*",
+        "*://youtube.com/*"
+      ],
+      "js": ["platforms/youtube/youtube-handler.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "*://*.linkedin.com/*"
+      ],
+      "js": ["platforms/linkedin/content.js"],
       "run_at": "document_idle"
     },
     {
