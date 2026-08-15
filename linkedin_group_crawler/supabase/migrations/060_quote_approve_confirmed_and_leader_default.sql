@@ -1,5 +1,7 @@
 -- 1) quote_approve trước đây chỉ cho chuyển 'draft' -> 'approved'. Báo giá cũ
---    (tạo trước migration 053) có status='confirmed' — sửa được (quote_update
+--    (tạo trước migration 059 — quote_approval_workflow, đổi số từ 053 khi merge
+--    dev vào main để tránh trùng với migration 053 của dev) có status='confirmed'
+--    — sửa được (quote_update
 --    không chặn 'confirmed') nhưng KHÔNG duyệt được vì bị RPC từ chối, dù CRM
 --    card đã coi 'confirmed' là "chưa duyệt, sửa được" (xem DetailDrawer.tsx).
 --    Cho phép duyệt cả từ 'confirmed', không chỉ 'draft'.
