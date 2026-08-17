@@ -70,6 +70,19 @@ export interface QuoteForm {
   shareUrl?: string;
 }
 
+export interface BundleSnapshotComponent {
+  componentId: string;
+  sku?: string;
+  name?: string;
+  description?: string;
+  unit?: string;
+  quantity: number;
+  computedQuantity: number;
+  displayText: string;
+  unitPriceVnd: number;
+  sortOrder?: number;
+}
+
 export interface QuoteItem {
   id?: string;
   quoteId?: string;
@@ -88,6 +101,13 @@ export interface QuoteItem {
   totalAmount?: number;
   sortOrder?: number;
   children?: QuoteItem[];
+  /** Danh mục dịch vụ: truy vết + snapshot USD/VND/tỷ giá đông cứng lúc chọn dịch vụ. */
+  catalogItemId?: string;
+  bundleSnapshot?: BundleSnapshotComponent[];
+  listPriceUsd?: number;
+  unitPriceUsd?: number;
+  exchangeRate?: number;
+  unitPriceVnd?: number;
   [key: string]: unknown;
 }
 

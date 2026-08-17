@@ -1,6 +1,7 @@
 'use client';
 
-import type { QuoteData, QuoteField, QuoteItem, QuoteSchema, VillaSolutionItem } from '../types';
+import { useEffect, useState } from 'react';
+import type { BundleSnapshotComponent, QuoteData, QuoteField, QuoteItem, QuoteSchema, VillaSolutionItem } from '../types';
 import {
   calculateItemAfterDiscount,
   calculateItemDiscount,
@@ -13,6 +14,8 @@ import {
   formatVnd,
   sanitizeMoneyInput,
 } from '../utils/quoteCalculations';
+import { seedingQuoteRepository } from '../repositories/SeedingQuoteRepository';
+import type { ServiceCatalogItem, ServiceCatalogOptions } from '../../service-catalog/types';
 
 export interface QuoteFillValue {
   data: QuoteData;
@@ -24,6 +27,7 @@ interface Props {
   schema: QuoteSchema;
   value: QuoteFillValue;
   onChange: (next: QuoteFillValue) => void;
+  quoteFormId?: string;
 }
 
 type RowRecord = Record<string, unknown>;
@@ -64,7 +68,7 @@ function coercePercent(value: string) {
   return clampDiscountPercent(Number(value) || 0);
 }
 
-export function QuoteFormFiller({ schema, value, onChange }: Props) {
+export function QuoteFormFiller({ schema, value, onChange, quoteFormId }: Props) {
   const layoutType = schema.layoutType;
   const sections = schema.sections || [];
   const totals =
@@ -89,7 +93,11 @@ export function QuoteFormFiller({ schema, value, onChange }: Props) {
                 <h4>{section.title}</h4>
               </div>
               {isQuoteItemsTable ? (
-                <QuoteItemsEditor items={value.items} onChange={items => onChange({ ...value, items })} />
+                <QuoteItemsEditor
+                  items={value.items}
+                  onChange={items => onChange({ ...value, items })}
+                  quoteFormId={quoteFormId}
+                />
               ) : (
                 <RepeaterTable
                   columns={repeaterField.config?.columns || []}
@@ -274,7 +282,164 @@ function FieldInput({
   );
 }
 
-function QuoteItemsEditor({ items, onChange }: { items: QuoteItem[]; onChange: (items: QuoteItem[]) => void }) {
+/** "SKU – Tên" nhưng bỏ phần SKU nếu trùng hệt tên (vd bundle SZ-VPS đặt tên
+ * cũng là "SZ-VPS" — hiển thị "SZ-VPS – SZ-VPS" bị lặp thừa, chỉ cần "SZ-VPS"). */
+function formatSkuName(sku: string | undefined, name: string): string {
+  if (!sku || sku.trim().toLowerCase() === name.trim().toLowerCase()) return name;
+  return `${sku} – ${name}`;
+}
+
+/** Nhãn ngắn cho dropdown — nhiều tên dịch vụ (vd SZ-SSD, SZ-BW...) nhét luôn mô
+ * tả dài phía sau dấu "-" khiến option tràn ngang màn hình. Chỉ cắt phần hiển
+ * thị trong dropdown, không đụng tới dữ liệu thật lưu vào báo giá. */
+function shortDropdownLabel(name: string): string {
+  const dashIndex = name.indexOf(' - ');
+  const short = dashIndex === -1 ? name : name.slice(0, dashIndex);
+  return short.length > 60 ? `${short.slice(0, 60)}…` : short;
+}
+
+function bundleToQuoteItem(bundle: ServiceCatalogItem): QuoteItem {
+  const components = bundle.components || [];
+  const description = components
+    .map(component => (component.description ? `${component.displayText} - ${component.description}` : component.displayText))
+    .join('\n');
+  const bundleSnapshot: BundleSnapshotComponent[] = components.map(component => ({
+    componentId: component.componentId,
+    sku: component.sku,
+    name: component.name,
+    description: component.description,
+    unit: component.unit,
+    quantity: component.quantity,
+    computedQuantity: component.computedQuantity,
+    displayText: component.displayText,
+    unitPriceVnd: component.unitPriceVnd,
+    sortOrder: component.sortOrder,
+  }));
+  return {
+    serviceDescription: formatSkuName(bundle.sku, bundle.name),
+    description,
+    unit: bundle.unit || '',
+    quantity: 1,
+    unitPrice: bundle.defaultUnitPriceVnd,
+    discountPercent: bundle.defaultDiscountPercent || 0,
+    vatRate: bundle.defaultVatRate || 0,
+    children: [],
+    catalogItemId: bundle.id,
+    bundleSnapshot,
+    listPriceUsd: bundle.listPriceUsd,
+    unitPriceUsd: bundle.unitPriceUsd,
+    exchangeRate: bundle.exchangeRateSnapshot,
+    unitPriceVnd: bundle.defaultUnitPriceVnd,
+  };
+}
+
+function componentToQuoteItem(component: ServiceCatalogItem): QuoteItem {
+  return {
+    serviceDescription: formatSkuName(component.sku, component.name),
+    description: component.description || '',
+    unit: component.unit || '',
+    quantity: 1,
+    unitPrice: component.defaultUnitPriceVnd,
+    discountPercent: component.defaultDiscountPercent || 0,
+    vatRate: component.defaultVatRate || 0,
+    children: [],
+    catalogItemId: component.id,
+    listPriceUsd: component.listPriceUsd,
+    unitPriceUsd: component.unitPriceUsd,
+    exchangeRate: component.exchangeRateSnapshot,
+    unitPriceVnd: component.defaultUnitPriceVnd,
+  };
+}
+
+function CatalogItemPicker({
+  options,
+  onPick,
+}: {
+  options: ServiceCatalogOptions;
+  onPick: (item: QuoteItem) => void;
+}) {
+  const [selected, setSelected] = useState('');
+  if (!options.bundles.length && !options.components.length) return null;
+
+  function handleChange(value: string) {
+    setSelected(value);
+    if (!value) return;
+    const [kind, id] = value.split(':');
+    if (kind === 'bundle') {
+      const bundle = options.bundles.find(b => b.id === id);
+      if (bundle) onPick(bundleToQuoteItem(bundle));
+    } else if (kind === 'component') {
+      const component = options.components.find(c => c.id === id);
+      if (component) onPick(componentToQuoteItem(component));
+    }
+    setSelected('');
+  }
+
+  return (
+    <div className="quote-catalog-picker">
+      <div className="quote-catalog-picker-head">
+        <span className="quote-catalog-picker-icon">📦</span>
+        <div>
+          <strong>Chọn gói hoặc hạng mục từ Danh mục dịch vụ</strong>
+          <p>Chọn 1 gói (vd SZ-VPS) hoặc 1 hạng mục lẻ — hệ thống tự điền mô tả, đơn giá, VAT vào 1 dòng báo giá.</p>
+        </div>
+      </div>
+      <select value={selected} onChange={event => handleChange(event.target.value)}>
+        <option value="">-- Chọn gói VPS hoặc hạng mục --</option>
+        {options.bundles.length ? (
+          <optgroup label="🎁 Gói">
+            {options.bundles.map(bundle => (
+              <option key={bundle.id} value={`bundle:${bundle.id}`}>
+                {formatSkuName(bundle.sku, shortDropdownLabel(bundle.name))} ({formatVnd(bundle.defaultUnitPriceVnd)})
+              </option>
+            ))}
+          </optgroup>
+        ) : null}
+        {options.components.length ? (
+          <optgroup label="🔧 Hạng mục lẻ">
+            {options.components.map(component => (
+              <option key={component.id} value={`component:${component.id}`}>
+                {formatSkuName(component.sku, shortDropdownLabel(component.name))} (
+                {formatVnd(component.defaultUnitPriceVnd)})
+              </option>
+            ))}
+          </optgroup>
+        ) : null}
+      </select>
+    </div>
+  );
+}
+
+function QuoteItemsEditor({
+  items,
+  onChange,
+  quoteFormId,
+}: {
+  items: QuoteItem[];
+  onChange: (items: QuoteItem[]) => void;
+  quoteFormId?: string;
+}) {
+  const [catalogOptions, setCatalogOptions] = useState<ServiceCatalogOptions | null>(null);
+
+  useEffect(() => {
+    if (!quoteFormId) {
+      setCatalogOptions(null);
+      return;
+    }
+    let cancelled = false;
+    seedingQuoteRepository
+      .getServiceCatalogOptions(quoteFormId)
+      .then(options => {
+        if (!cancelled) setCatalogOptions(options);
+      })
+      .catch(() => {
+        if (!cancelled) setCatalogOptions(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [quoteFormId]);
+
   function updateParent(index: number, patch: Partial<QuoteItem>) {
     onChange(items.map((item, i) => (i === index ? { ...item, ...patch } : item)));
   }
@@ -315,18 +480,32 @@ function QuoteItemsEditor({ items, onChange }: { items: QuoteItem[]; onChange: (
     updateParent(parentIndex, { children });
   }
 
+  // Mẫu có liên kết Danh mục dịch vụ (vd VPS): mỗi dòng là 1 gói (SZ-VPS) hoặc 1
+  // hạng mục lẻ, KHÔNG dùng khái niệm "dịch vụ cha/con" của mẫu cũ (Douyin) — cấu
+  // hình/thành phần của gói đã nằm gọn trong Description Items của chính dòng đó
+  // (xem bundleToQuoteItem), không tách thành dòng con riêng. Ẩn hẳn nút "+ Thêm
+  // dịch vụ con" trong chế độ này để tránh tạo cấu trúc lồng không cần thiết.
+  const useFlatTerms = Boolean(catalogOptions);
+
   return (
     <div className="quote-items-editor">
+      {catalogOptions ? (
+        <CatalogItemPicker options={catalogOptions} onPick={item => onChange([...items, item])} />
+      ) : null}
       {items.length === 0 ? (
-        <div className="empty-row quote-items-empty">Chưa có dòng dịch vụ. Bấm &quot;Thêm dịch vụ cha&quot; để bắt đầu.</div>
+        <div className="empty-row quote-items-empty">
+          {useFlatTerms
+            ? 'Chưa có dòng báo giá. Chọn gói hoặc thêm hạng mục để bắt đầu.'
+            : <>Chưa có dòng dịch vụ. Bấm &quot;Thêm dịch vụ cha&quot; để bắt đầu.</>}
+        </div>
       ) : null}
       {items.map((item, index) => (
         <div key={item.id || index} className="quote-parent-item">
           <div className="quote-item-toolbar">
             <div className="quote-item-title">
               <span>{index + 1}</span>
-              <strong>Dịch vụ cha</strong>
-              {(item.children || []).length ? <em>{(item.children || []).length} dịch vụ con</em> : null}
+              <strong>{useFlatTerms ? 'Dòng báo giá' : 'Dịch vụ cha'}</strong>
+              {!useFlatTerms && (item.children || []).length ? <em>{(item.children || []).length} dịch vụ con</em> : null}
             </div>
             <div className="quote-item-actions">
               <button type="button" onClick={() => moveParent(index, -1)} disabled={index === 0}>↑</button>
@@ -335,7 +514,7 @@ function QuoteItemsEditor({ items, onChange }: { items: QuoteItem[]; onChange: (
             </div>
           </div>
           <QuoteItemFields item={item} prefix="parent" onChange={patch => updateParent(index, patch)} />
-          {(item.children || []).length ? (
+          {!useFlatTerms && (item.children || []).length ? (
             <div className="quote-child-list">
               {(item.children || []).map((child, childIndex) => (
                 <div key={child.id || childIndex} className="quote-child-item">
@@ -356,18 +535,21 @@ function QuoteItemsEditor({ items, onChange }: { items: QuoteItem[]; onChange: (
             </div>
           ) : null}
           <div className="quote-item-footer">
-            <button type="button" className="quote-add-child-button" onClick={() => addChild(index)}>
-              + Thêm dịch vụ con
-            </button>
+            {useFlatTerms ? null : (
+              <button type="button" className="quote-add-child-button" onClick={() => addChild(index)}>
+                + Thêm dịch vụ con
+              </button>
+            )}
             <div className="quote-group-subtotal">
-              <span>Tạm tính nhóm</span>
+              <span>{useFlatTerms ? 'Tạm tính dòng' : 'Tạm tính nhóm'}</span>
               <strong>{formatVnd([item, ...(item.children || [])].reduce((sum, row) => sum + calculateItemTotal(row), 0))}</strong>
             </div>
           </div>
         </div>
       ))}
+      {catalogOptions ? <div className="quote-items-divider">hoặc</div> : null}
       <button type="button" className="quote-add-parent-button" onClick={addParent}>
-        + Thêm dịch vụ cha
+        {useFlatTerms ? '+ Thêm hạng mục ngoài danh mục' : '+ Thêm dịch vụ cha'}
       </button>
     </div>
   );

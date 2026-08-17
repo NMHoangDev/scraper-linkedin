@@ -93,11 +93,13 @@ function splitLegacyServiceText(raw: unknown): { name: string; rest: string } {
 /** Mô tả nhiều gạch đầu dòng ("• Ý 1. • Ý 2. ...") đang bị dồn thành 1 đoạn
  * dính liền, khó đọc. Tách mỗi "•" thành 1 dòng riêng, bỏ dấu chấm cuối câu
  * thừa (đã có xuống dòng phân tách rồi, không cần chấm câu nữa). Không có
- * "•" thì giữ nguyên 1 dòng, chỉ bỏ dấu chấm cuối. */
+ * "•" thì tách theo xuống dòng thật ("\n") — đúng định dạng Description Items
+ * tự sinh từ Danh mục dịch vụ (mỗi thành phần gói là 1 dòng, xem
+ * render_bundle_description phía backend). Không có cả hai thì giữ 1 dòng. */
 function formatDescriptionLines(raw: unknown): string[] {
   const text = textValue(raw).replace(/^"+|"+$/g, '').trim();
   if (!text) return [];
-  const parts = text.includes('•') ? text.split('•') : [text];
+  const parts = text.includes('•') ? text.split('•') : text.split('\n');
   return parts
     .map(part => part.trim().replace(/\.+\s*$/, ''))
     .filter(Boolean);
@@ -132,13 +134,35 @@ export function QuoteDocumentRenderer({
     if (value !== undefined && value !== null && value !== '') return value;
     return findField(key).defaultValue || '';
   };
-  const visibleColumns =
+  const baseColumns =
     findField('quoteItems').config?.columns?.filter(column => column.visible !== false) || [];
+  // Chỉ báo giá dùng dịch vụ chọn từ Danh mục dịch vụ mới có giá USD/VND/tỷ giá lưu
+  // sẵn trên từng dòng - chèn thêm 3 cột hiển thị tham khảo ngay khi phát hiện, không
+  // sửa cấu hình cột lưu trong schema_json (tránh ảnh hưởng các mẫu báo giá khác).
+  const hasCatalogPricing = flattenQuoteItems(quoteItems).some(item => item.catalogItemId);
+  const catalogPricingColumns: QuoteField[] = [
+    { key: 'listPriceUsd', label: 'List price USD', type: 'text', visible: true },
+    { key: 'unitPriceUsd', label: 'Unit Price USD', type: 'text', visible: true },
+    { key: 'unitPriceVnd', label: 'Unit price VND', type: 'text', visible: true },
+  ];
+  const unitPriceIndex = baseColumns.findIndex(column => column.key === 'unitPrice');
+  const visibleColumns = hasCatalogPricing
+    ? unitPriceIndex >= 0
+      ? [
+          ...baseColumns.slice(0, unitPriceIndex),
+          ...catalogPricingColumns,
+          ...baseColumns.slice(unitPriceIndex),
+        ]
+      : [...catalogPricingColumns, ...baseColumns]
+    : baseColumns;
 
   const renderCell = (item: QuoteItem, column: QuoteField, index: number) => {
     if (column.type === 'auto-number' || column.key === 'order') return String(index + 1);
     if (column.key === 'subtotal') return formatVnd(calculateItemSubtotal(item));
     if (column.key === 'vatAmount') return formatVnd(calculateItemVat(item));
+    if (column.key === 'listPriceUsd') return item.listPriceUsd != null ? `$${item.listPriceUsd.toLocaleString('en-US')}` : '—';
+    if (column.key === 'unitPriceUsd') return item.unitPriceUsd != null ? `$${item.unitPriceUsd.toLocaleString('en-US')}` : '—';
+    if (column.key === 'unitPriceVnd') return item.unitPriceVnd != null ? formatVnd(item.unitPriceVnd) : '—';
     if (column.key === 'total') {
       const discount = calculateItemDiscount(item);
       return discount ? (
@@ -452,44 +476,46 @@ export function QuoteDocumentRenderer({
             <span>Chi phí đề xuất</span>
             <h3>{findSection('quoteItems').title || 'Bảng dịch vụ'}</h3>
           </div>
-          <table className="sheet-items-table">
-            <thead>
-              <tr>
-                {standardColumns.map(column => (
-                  <th key={column.key}>{column.label}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {displayedQuoteRows.length === 0 ? (
+          <div className="sheet-items-table-wrap">
+            <table className="sheet-items-table" style={{ minWidth: Math.max(760, standardColumns.length * 115) }}>
+              <thead>
                 <tr>
-                  <td colSpan={Math.max(standardColumns.length, 1)} className="empty-row">
-                    Chưa có hạng mục báo giá.
-                  </td>
+                  {standardColumns.map(column => (
+                    <th key={column.key}>{column.label}</th>
+                  ))}
                 </tr>
-              ) : (
-                displayedQuoteRows.map((row, index) => (
-                  <tr key={row.item.id || `${row.number}-${index}`} className={row.isChild ? 'quote-item-row quote-item-row--child' : 'quote-item-row quote-item-row--parent'}>
-                    {standardColumns.map(column => (
-                      <td
-                        key={column.key}
-                        className={
-                          column.type === 'currency' ||
-                          ['unitPrice', 'subtotal', 'vatAmount', 'total'].includes(column.key)
-                            ? 'money-cell'
-                            : undefined
-                        }
-                      >
-                        {column.type === 'auto-number' || column.key === 'order'
-                          ? row.number
-                          : renderCell(row.item, column, index)}
-                      </td>
-                    ))}
+              </thead>
+              <tbody>
+                {displayedQuoteRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={Math.max(standardColumns.length, 1)} className="empty-row">
+                      Chưa có hạng mục báo giá.
+                    </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  displayedQuoteRows.map((row, index) => (
+                    <tr key={row.item.id || `${row.number}-${index}`} className={row.isChild ? 'quote-item-row quote-item-row--child' : 'quote-item-row quote-item-row--parent'}>
+                      {standardColumns.map(column => (
+                        <td
+                          key={column.key}
+                          className={
+                            column.type === 'currency' ||
+                            ['unitPrice', 'subtotal', 'vatAmount', 'total'].includes(column.key)
+                              ? 'money-cell'
+                              : undefined
+                          }
+                        >
+                          {column.type === 'auto-number' || column.key === 'order'
+                            ? row.number
+                            : renderCell(row.item, column, index)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <section className="sheet-total-block sheet-total-block--standard">
@@ -527,7 +553,7 @@ export function QuoteDocumentRenderer({
         <footer className="sheet-signatures">
           <div>
             <strong>{findField('companyRepresentative').label || 'Đại diện công ty'}</strong>
-            <span>{String(fieldValue('companyRepresentative'))}</span>
+            <span>{String(fieldValue('companyRepresentative') || '[Đại diện công ty]')}</span>
           </div>
           <div>
             <strong>{findField('customerRepresentative').label || 'Đại diện khách hàng'}</strong>

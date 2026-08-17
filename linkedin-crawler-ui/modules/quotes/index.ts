@@ -1,4 +1,5 @@
 export { QuoteHomePage } from './components/QuoteHomePage';
+export { QuoteHistoryPage } from './components/QuoteHistoryPage';
 export { QuoteFormBuilderPage } from './components/QuoteFormBuilderPage';
 export { QuoteFormPreviewPage } from './components/QuoteFormPreviewPage';
 export { QuoteDetailPage } from './components/QuoteDetailPage';

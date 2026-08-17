@@ -34,6 +34,14 @@ class QuoteItemInput(BaseModel):
     discount_percent: float = Field(default=0, ge=0, le=100)
     vat_rate: float = Field(default=0, ge=0, le=100)
     children: list["QuoteItemInput"] = Field(default_factory=list)
+    # Danh mục dịch vụ: truy vết + snapshot USD/VND/tỷ giá tại thời điểm chọn dịch vụ.
+    # Đông cứng ngay khi tạo/sửa báo giá - sửa catalog sau này không ảnh hưởng số liệu cũ.
+    catalog_item_id: Optional[str] = None
+    bundle_snapshot: Optional[list[dict[str, Any]]] = None
+    list_price_usd: Optional[float] = None
+    unit_price_usd: Optional[float] = None
+    exchange_rate: Optional[float] = None
+    unit_price_vnd: Optional[float] = None
 
 
 class QuoteCreateRequest(BaseModel):

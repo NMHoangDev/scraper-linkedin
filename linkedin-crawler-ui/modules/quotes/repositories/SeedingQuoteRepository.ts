@@ -8,6 +8,7 @@ import type {
   UpdateQuoteInput,
 } from '../types';
 import type { QuoteRepository } from './QuoteRepository';
+import type { ServiceCatalogOptions } from '../../service-catalog/types';
 
 type ApiResponse<T> = {
   success?: boolean;
@@ -24,6 +25,12 @@ type QuoteItemPayload = {
   discount_percent: number;
   vat_rate: number;
   children: QuoteItemPayload[];
+  catalog_item_id?: string | null;
+  bundle_snapshot?: unknown[] | null;
+  list_price_usd?: number | null;
+  unit_price_usd?: number | null;
+  exchange_rate?: number | null;
+  unit_price_vnd?: number | null;
 };
 
 function getDefaultHeaders(): Record<string, string> {
@@ -96,6 +103,12 @@ function toQuoteItemPayload(item: NonNullable<CreateQuoteInput['items']>[number]
     discount_percent: item.discountPercent ?? 0,
     vat_rate: item.vatRate,
     children: (item.children || []).map(toQuoteItemPayload),
+    catalog_item_id: item.catalogItemId ?? null,
+    bundle_snapshot: item.bundleSnapshot ?? null,
+    list_price_usd: item.listPriceUsd ?? null,
+    unit_price_usd: item.unitPriceUsd ?? null,
+    exchange_rate: item.exchangeRate ?? null,
+    unit_price_vnd: item.unitPriceVnd ?? null,
   };
 }
 
@@ -184,6 +197,23 @@ export class SeedingQuoteRepository implements QuoteRepository {
       method: 'POST',
       body: JSON.stringify(toUpdateQuotePayload(input)),
     });
+  }
+
+  async getFormCatalogLinks(formId: string): Promise<string[]> {
+    return apiFetch<string[]>(`/api/all-platform/quote-forms/${encodeURIComponent(formId)}/catalog-links`);
+  }
+
+  async setFormCatalogLinks(formId: string, catalogItemIds: string[]): Promise<string[]> {
+    return apiFetch<string[]>(`/api/all-platform/quote-forms/${encodeURIComponent(formId)}/catalog-links`, {
+      method: 'PUT',
+      body: JSON.stringify({ catalog_item_ids: catalogItemIds }),
+    });
+  }
+
+  async getServiceCatalogOptions(formId: string): Promise<ServiceCatalogOptions> {
+    return apiFetch<ServiceCatalogOptions>(
+      `/api/all-platform/quotes/service-catalog-options?formId=${encodeURIComponent(formId)}`
+    );
   }
 }
 

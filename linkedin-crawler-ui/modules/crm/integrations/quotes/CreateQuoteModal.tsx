@@ -268,7 +268,12 @@ export function CreateQuoteModal({
               />
             ) : null}
             {step === 3 && selectedForm ? (
-              <FillQuoteStep schema={selectedForm.schemaJson} value={quoteDraft} onChange={setQuoteDraft} />
+              <FillQuoteStep
+                schema={selectedForm.schemaJson}
+                value={quoteDraft}
+                onChange={setQuoteDraft}
+                quoteFormId={selectedForm.id}
+              />
             ) : null}
             {step === 3 && !selectedForm && isEditMode ? (
               // Dang cho getForm() tai xong (che do sua) - giu 1 khoi placeholder

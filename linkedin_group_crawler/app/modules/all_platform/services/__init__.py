@@ -76,6 +76,19 @@ from app.modules.all_platform.services.supabase_quote_service import (
     update_and_approve_quote,
     link_quote_to_deal,
 )
+from app.modules.all_platform.services.supabase_service_catalog_service import (
+    list_service_catalog_items,
+    get_service_catalog_item,
+    create_service_catalog_item,
+    update_service_catalog_item,
+    delete_service_catalog_item,
+    reorder_service_catalog_item,
+    set_bundle_components,
+    render_bundle_description,
+    get_quote_form_catalog_links,
+    set_quote_form_catalog_links,
+    get_service_catalog_options_for_form,
+)
 from app.modules.all_platform.services.supabase_sales_asset_service import (
     list_sales_assets,
     get_sales_asset,

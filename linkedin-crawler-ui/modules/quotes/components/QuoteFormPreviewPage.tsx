@@ -11,22 +11,29 @@ interface Props {
   formId: string;
 }
 
+/** Dữ liệu minh hoạ CHUNG cho mọi mẫu báo giá khi chưa có defaultValue riêng
+ * (mẫu mới tạo, quoteItems chưa gán sẵn dữ liệu) — chỉ để xem thử bố cục/cột,
+ * không gắn với nghiệp vụ cụ thể nào, tránh gây hiểu nhầm là dữ liệu thật của
+ * mẫu đang xem (trước đây hard-code nội dung Douyin nên hiện sai ở mẫu khác). */
 function sampleItems(vatRate = 10): QuoteItem[] {
   return [
     {
-      serviceDescription: 'Tải video nguồn',
-      description: 'Nhóm dịch vụ xử lý video đầu vào cho hệ thống chatbot_auto_inbox và lồng tiếng Douyin.',
+      serviceDescription: '[Ví dụ] Tên dịch vụ 1',
+      description: '[Ví dụ] Mô tả dịch vụ 1',
       unit: 'Gói',
       quantity: 1,
       unitPrice: 5000000,
+      discountPercent: 0,
+      vatRate,
+    },
+    {
+      serviceDescription: '[Ví dụ] Tên dịch vụ 2',
+      description: '[Ví dụ] Mô tả dịch vụ 2',
+      unit: 'Cái',
+      quantity: 2,
+      unitPrice: 1000000,
       discountPercent: 10,
       vatRate,
-      children: [
-        { serviceDescription: 'Tải qua relay bot Telegram công khai', description: 'Nhận link và tải qua relay bot.', unit: 'Tác vụ', quantity: 1, unitPrice: 1000000, discountPercent: 0, vatRate },
-        { serviceDescription: 'Tải trực tiếp bằng cookie Douyin', description: 'Dùng cookie hợp lệ để tải trực tiếp.', unit: 'Tác vụ', quantity: 1, unitPrice: 1500000, discountPercent: 50, vatRate },
-        { serviceDescription: 'Tự động làm mới cookie Douyin theo lịch', description: 'Theo dõi và refresh cookie định kỳ.', unit: 'Tháng', quantity: 1, unitPrice: 1200000, discountPercent: 0, vatRate },
-        { serviceDescription: 'Giới hạn thời lượng video nguồn', description: 'Áp rule thời lượng trước khi đưa vào xử lý.', unit: 'Rule', quantity: 1, unitPrice: 800000, discountPercent: 100, vatRate },
-      ],
     },
   ];
 }

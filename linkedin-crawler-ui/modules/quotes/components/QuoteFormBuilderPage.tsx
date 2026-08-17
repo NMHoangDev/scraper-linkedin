@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react';
 import { FORM_STATUS_OPTIONS, LAYOUT_OPTIONS, schemaForLayout } from '../constants/quoteConfig';
 import { seedingQuoteRepository } from '../repositories/SeedingQuoteRepository';
 import type { QuoteField, QuoteForm, QuoteLayoutType, QuoteSchema } from '../types';
+import { serviceCatalogRepository } from '../../service-catalog/repositories/ServiceCatalogRepository';
+import type { ServiceCatalogItem } from '../../service-catalog/types';
 
 const clone = <T,>(value: T): T => structuredClone(value);
 
@@ -205,6 +207,8 @@ export function QuoteFormBuilderPage({ formId }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [openFieldKey, setOpenFieldKey] = useState('');
+  const [catalogGroups, setCatalogGroups] = useState<ServiceCatalogItem[]>([]);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (!formId) return;
@@ -214,6 +218,25 @@ export function QuoteFormBuilderPage({ formId }: Props) {
       .catch(err => setError(err instanceof Error ? err.message : 'Không tải được mẫu báo giá.'))
       .finally(() => setLoading(false));
   }, [formId]);
+
+  useEffect(() => {
+    serviceCatalogRepository
+      .list()
+      .then(items => setCatalogGroups(items.filter(item => item.itemType === 'group' && item.status === 'active')))
+      .catch(() => setCatalogGroups([]));
+    if (formId) {
+      seedingQuoteRepository
+        .getFormCatalogLinks(formId)
+        .then(setSelectedGroupIds)
+        .catch(() => setSelectedGroupIds([]));
+    }
+  }, [formId]);
+
+  function toggleCatalogGroup(groupId: string) {
+    setSelectedGroupIds(current =>
+      current.includes(groupId) ? current.filter(id => id !== groupId) : [...current, groupId]
+    );
+  }
 
   function updateForm(patch: Partial<QuoteForm>) {
     setForm(current => (current ? { ...current, ...patch } : current));
@@ -251,6 +274,7 @@ export function QuoteFormBuilderPage({ formId }: Props) {
     setSaving(true);
     setError('');
     try {
+      let savedFormId = formId;
       if (formId) {
         await seedingQuoteRepository.updateForm(formId, {
           name: form.name,
@@ -260,7 +284,7 @@ export function QuoteFormBuilderPage({ formId }: Props) {
           schemaJson: form.schemaJson,
         });
       } else {
-        await seedingQuoteRepository.createForm({
+        const created = await seedingQuoteRepository.createForm({
           name: form.name,
           description: form.description,
           status: form.status,
@@ -268,6 +292,10 @@ export function QuoteFormBuilderPage({ formId }: Props) {
           schemaJson: form.schemaJson,
           layoutType: form.schemaJson.layoutType,
         });
+        savedFormId = created.id;
+      }
+      if (savedFormId) {
+        await seedingQuoteRepository.setFormCatalogLinks(savedFormId, selectedGroupIds);
       }
       router.push('/all-platform/quotes');
     } catch (err) {
@@ -350,6 +378,31 @@ export function QuoteFormBuilderPage({ formId }: Props) {
             </div>
           </article>
         ))}
+
+        <article className="quote-section-card">
+          <div className="quote-section-head">
+            <h4>Danh mục dịch vụ áp dụng</h4>
+          </div>
+          <p style={{ fontSize: 13, color: '#667085', marginTop: 0 }}>
+            Chọn các nhóm dịch vụ trong Danh mục dịch vụ được phép chọn khi điền báo giá theo mẫu này.
+          </p>
+          {catalogGroups.length === 0 ? (
+            <span style={{ fontSize: 13, color: '#667085' }}>Chưa có nhóm dịch vụ nào trong Danh mục dịch vụ.</span>
+          ) : (
+            <div className="quote-builder-checkbox-row">
+              {catalogGroups.map(group => (
+                <label key={group.id}>
+                  <input
+                    type="checkbox"
+                    checked={selectedGroupIds.includes(group.id)}
+                    onChange={() => toggleCatalogGroup(group.id)}
+                  />
+                  {group.name}
+                </label>
+              ))}
+            </div>
+          )}
+        </article>
       </section>
     </main>
   );

@@ -273,6 +273,16 @@
   overflow-x: auto;
 }
 
+.quote-history-extra {
+  color: #94a3b8;
+  font-size: 0.8em;
+}
+
+.quote-history-link-cell {
+  display: flex;
+  gap: 6px;
+}
+
 .quote-table {
   width: 100%;
   border-collapse: collapse;
@@ -383,6 +393,66 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.quote-catalog-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1.5px solid #93c5fd;
+  border-radius: 10px;
+  background: #eff6ff;
+}
+
+.quote-catalog-picker-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.quote-catalog-picker-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.quote-catalog-picker-head strong {
+  display: block;
+  color: #1e3a8a;
+  font-size: 14px;
+}
+
+.quote-catalog-picker-head p {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: #475569;
+}
+
+.quote-catalog-picker select {
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1px solid #93c5fd;
+  background: #fff;
+  font-size: 13.5px;
+}
+
+.quote-items-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #94a3b8;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.quote-items-divider::before,
+.quote-items-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #e2e8f0;
 }
 
 .quote-items-empty {
@@ -1265,6 +1335,10 @@
   margin: 0;
 }
 
+.sheet-items-table-wrap {
+  overflow-x: auto;
+}
+
 .sheet-items-table,
 .villa-table {
   width: 100%;
@@ -1272,7 +1346,6 @@
   table-layout: fixed;
 }
 
-.sheet-items-table th,
 .sheet-items-table td,
 .villa-table th,
 .villa-table td {
@@ -1281,6 +1354,16 @@
   text-align: left;
   vertical-align: top;
   overflow-wrap: anywhere;
+}
+
+/* Header chỉ ngắt dòng ở khoảng trắng (overflow-wrap mặc định), KHÔNG ngắt
+ * giữa từ - "anywhere" ở cột hẹp làm chữ vỡ kiểu "THÀN/H" rất khó đọc. */
+.sheet-items-table th {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0.72rem;
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
 }
 
 .sheet-items-table th,
