@@ -17,6 +17,7 @@ import type {
   DealStage,
   OutcomeInfo,
   PaymentStatus,
+  QuoteReference,
   RevenueRow,
   StageHistory,
   StageTransitionInput,
@@ -97,6 +98,7 @@ type CustomerLeadRow = {
   quote_number?: string | null;
   quote_total_amount?: number | string | null;
   quote_public_url?: string | null;
+  quote_status?: string | null;
 };
 
 type CustomerLeadList = {
@@ -391,6 +393,7 @@ function rowToDeal(row: CustomerLeadRow, history: StageHistory[] = []): Deal {
           url: asText(row.quote_public_url) || attachmentUrl || undefined,
           number: asText(row.quote_number) || attachmentName || undefined,
           totalAmount: quoteTotal,
+          status: (asText(row.quote_status) || undefined) as QuoteReference['status'],
         }
       : undefined,
     assignment: {
@@ -623,6 +626,7 @@ export class SeedingCrmRepository implements CrmRepository {
     const transitionPayload = {
       to_stage: stage,
       note: payload.note || payload.pauseReason || outcome?.reasonText || outcome?.rootCause || undefined,
+      attachment_url: payload.attachmentUrl || undefined,
       follow_up_date: payload.followUpDate || undefined,
       decision_maker: payload.decisionMaker || undefined,
       estimated_budget: payload.estimatedBudget,

@@ -59,7 +59,7 @@ BASE_COLUMNS = (
     "position, crm_package, zalo, facebook, telegram, pause_reason, closed_at, outcome_detail, quote_id, "
     "leaded_by_name_hint, sdr_name_hint, team_id, "
     "created_at, updated_at, leader:leaded_by(name), sdr:sdr_id(name), "
-    "quote:quote_id(quote_number, total_amount, public_token), "
+    "quote:quote_id(quote_number, total_amount, public_token, status), "
     "team:team_id(name_team, team_type)"
 )
 
@@ -84,6 +84,10 @@ def _normalize_row(row: Dict[str, Any]) -> Dict[str, Any]:
         row["quote_total_amount"] = row["quote"].get("total_amount")
         public_token = row["quote"].get("public_token")
         row["quote_public_url"] = f"/public/quotes/{public_token}" if public_token else None
+        # Trang thai LIVE lay thang tu bang quotes qua JOIN (khong denormalize
+        # cot rieng tren customer_leads) - card CRM dung field nay de hien tag
+        # Chua duyet/Da duyet + doi hanh vi nut "Mo bao gia"/"Chinh sua".
+        row["quote_status"] = row["quote"].get("status")
         row.pop("quote", None)
     if row.get("team"):
         row["team_name"] = row["team"].get("name_team")

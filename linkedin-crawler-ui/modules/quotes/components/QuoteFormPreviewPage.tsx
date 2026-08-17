@@ -11,14 +11,28 @@ interface Props {
   formId: string;
 }
 
+/** Dữ liệu minh hoạ CHUNG cho mọi mẫu báo giá khi chưa có defaultValue riêng
+ * (mẫu mới tạo, quoteItems chưa gán sẵn dữ liệu) — chỉ để xem thử bố cục/cột,
+ * không gắn với nghiệp vụ cụ thể nào, tránh gây hiểu nhầm là dữ liệu thật của
+ * mẫu đang xem (trước đây hard-code nội dung Douyin nên hiện sai ở mẫu khác). */
 function sampleItems(vatRate = 10): QuoteItem[] {
   return [
     {
-      serviceDescription: 'Dịch vụ tư vấn Demo',
-      description: 'Nội dung demo để kiểm tra renderer.',
+      serviceDescription: '[Ví dụ] Tên dịch vụ 1',
+      description: '[Ví dụ] Mô tả dịch vụ 1',
       unit: 'Gói',
       quantity: 1,
       unitPrice: 5000000,
+      discountPercent: 0,
+      vatRate,
+    },
+    {
+      serviceDescription: '[Ví dụ] Tên dịch vụ 2',
+      description: '[Ví dụ] Mô tả dịch vụ 2',
+      unit: 'Cái',
+      quantity: 2,
+      unitPrice: 1000000,
+      discountPercent: 10,
       vatRate,
     },
   ];
@@ -48,10 +62,12 @@ export function QuoteFormPreviewPage({ formId }: Props) {
   );
   quoteData.quoteDate ||= new Date().toISOString().slice(0, 10);
   quoteData.quoteNumber ||= 'Sẽ sinh khi lưu';
-  const solutionItems = (form.schemaJson.sections
-    .flatMap(section => section.fields)
-    .find(field => field.key === 'solutionItems')?.defaultValue || []) as VillaSolutionItem[];
-  const items = sampleItems(Number(quoteData.defaultVatRate || 10));
+  const fields = form.schemaJson.sections.flatMap(section => section.fields);
+  const solutionItems = (fields.find(field => field.key === 'solutionItems')?.defaultValue || []) as VillaSolutionItem[];
+  const defaultQuoteItems = fields.find(field => field.key === 'quoteItems')?.defaultValue;
+  const items = Array.isArray(defaultQuoteItems)
+    ? (defaultQuoteItems as QuoteItem[])
+    : sampleItems(Number(quoteData.defaultVatRate || 10));
   const totals =
     form.schemaJson.layoutType === 'villa_solution_package'
       ? calculateVillaTotals(solutionItems)

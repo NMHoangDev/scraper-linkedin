@@ -29,13 +29,11 @@ export function PublicQuoteFormPage({ token }: Props) {
   if (loading) return <main className="public-form-page"><section className="quote-state">Đang tải mẫu báo giá...</section></main>;
   if (error || !form) return <main className="public-form-page"><section className="quote-state quote-state--error">{error || 'Không tìm thấy mẫu báo giá.'}</section></main>;
 
-  const quoteData = Object.fromEntries(
-    form.schemaJson.sections.flatMap(section => section.fields).map(field => [field.key, field.defaultValue || ''])
-  );
-  const items: QuoteItem[] = [];
-  const solutionItems = (form.schemaJson.sections
-    .flatMap(section => section.fields)
-    .find(field => field.key === 'solutionItems')?.defaultValue || []) as VillaSolutionItem[];
+  const fields = form.schemaJson.sections.flatMap(section => section.fields);
+  const quoteData = Object.fromEntries(fields.map(field => [field.key, field.defaultValue || '']));
+  const defaultQuoteItems = fields.find(field => field.key === 'quoteItems')?.defaultValue;
+  const items = (Array.isArray(defaultQuoteItems) ? defaultQuoteItems : []) as QuoteItem[];
+  const solutionItems = (fields.find(field => field.key === 'solutionItems')?.defaultValue || []) as VillaSolutionItem[];
   const totals =
     form.schemaJson.layoutType === 'villa_solution_package'
       ? calculateVillaTotals(solutionItems)

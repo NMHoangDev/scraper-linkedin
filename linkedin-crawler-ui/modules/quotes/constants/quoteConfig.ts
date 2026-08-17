@@ -1,10 +1,29 @@
 import type { QuoteField, QuoteFormStatus, QuoteLayoutType, QuoteSchema } from '../types';
 
 export const QUOTE_STATUS_LABELS: Record<string, string> = {
-  draft: 'Bản nháp',
+  draft: '🟠 Chưa duyệt',
   confirmed: 'Đã xác nhận',
+  approved: '🟢 Đã duyệt',
   cancelled: 'Đã hủy',
 };
+
+/** Dùng cho các màn hình NỘI BỘ (trang chi tiết báo giá, card CRM...) - khác
+ * QUOTE_STATUS_LABELS ở chỗ 'confirmed' (báo giá cũ tạo trước luồng duyệt)
+ * hiển thị "Chưa duyệt" thay vì "Đã xác nhận", khớp đúng luồng duyệt mới:
+ * confirmed vẫn sửa/duyệt được, không nên trông như đã khoá. Trang public
+ * (khách xem) vẫn dùng QUOTE_STATUS_LABELS nguyên bản vì với khách thì
+ * confirmed/approved đều là đã nhận được báo giá thật. */
+export function internalQuoteStatusLabel(status: string): string {
+  if (status === 'approved') return '🟢 Đã duyệt';
+  if (status === 'cancelled') return 'Đã hủy';
+  return '🟠 Chưa duyệt';
+}
+
+export function internalQuoteStatusClass(status: string): string {
+  if (status === 'approved') return 'status-approved';
+  if (status === 'cancelled') return 'status-cancelled';
+  return 'status-draft';
+}
 
 export const FORM_STATUS_LABELS: Record<QuoteFormStatus, string> = {
   active: 'Đang hoạt động',
@@ -134,6 +153,7 @@ export const serviceColumns: QuoteField[] = [
   ['unit', 'ĐVT', 'text', 'Ví dụ: Gói, Tháng, Người dùng', 'Nhập đơn vị tính phù hợp với dịch vụ.'],
   ['quantity', 'Số lượng', 'number', 'Ví dụ: 1', 'Nhập số lượng khách đăng ký.'],
   ['unitPrice', 'Đơn giá', 'currency', 'Ví dụ: 15000000', 'Nhập giá cho một đơn vị, chưa gồm VAT.'],
+  ['discountPercent', 'Giảm giá (%)', 'number', 'Ví dụ: 10', 'Nhập phần trăm giảm giá riêng cho dòng này, từ 0 đến 100.'],
   ['vatRate', 'VAT', 'number', 'Ví dụ: 10', 'Nhập phần trăm thuế, ví dụ 10.'],
 ].map(([key, label, type, placeholder, helpText]) => ({
   key,

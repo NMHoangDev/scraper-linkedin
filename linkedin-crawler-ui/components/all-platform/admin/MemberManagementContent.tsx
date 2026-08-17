@@ -172,6 +172,20 @@ export function MemberManagementContent() {
     }
   }
 
+  async function handleRowToggleQuoteApprover(account: AppUserProfile, canApprove: boolean) {
+    if (!isAdmin) return; // /update-quote-approver: chỉ admin
+    setSavingUserId(account.id);
+    try {
+      const res = await usersService.updateQuoteApprover(account.email, canApprove);
+      if (!res.success) throw new Error(res.message || "Không cập nhật được quyền duyệt báo giá");
+      await loadAppUsers();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Không cập nhật được quyền duyệt báo giá");
+    } finally {
+      setSavingUserId(null);
+    }
+  }
+
   async function handleRowToggleActive(account: AppUserProfile) {
     const nextActive = !(account.is_active !== false);
     if (!nextActive && !confirm(`Vô hiệu hóa tài khoản "${account.email}"? Người này sẽ bị đăng xuất và không đăng nhập lại được.`)) {
@@ -458,17 +472,31 @@ export function MemberManagementContent() {
                       </td>
                       <td className="py-3 px-4">
                         {account ? (
-                          <select
-                            value={account.role || "member"}
-                            disabled={!isAdmin || savingUserId === account.id}
-                            onChange={e => handleRowRoleChange(account, e.target.value)}
-                            className="px-2 py-1 bg-surface-container-low border border-outline-variant rounded-lg text-xs cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                            title={isAdmin ? undefined : "Chỉ admin mới đổi role tài khoản có sẵn"}
-                          >
-                            <option value="member">member</option>
-                            <option value="leader">leader</option>
-                            <option value="admin">admin</option>
-                          </select>
+                          <div className="flex flex-col gap-1.5">
+                            <select
+                              value={account.role || "member"}
+                              disabled={!isAdmin || savingUserId === account.id}
+                              onChange={e => handleRowRoleChange(account, e.target.value)}
+                              className="px-2 py-1 bg-surface-container-low border border-outline-variant rounded-lg text-xs cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                              title={isAdmin ? undefined : "Chỉ admin mới đổi role tài khoản có sẵn"}
+                            >
+                              <option value="member">member</option>
+                              <option value="leader">leader</option>
+                              <option value="admin">admin</option>
+                            </select>
+                            <label
+                              className="flex items-center gap-1.5 text-[10px] text-on-surface-variant cursor-pointer disabled:cursor-not-allowed"
+                              title={isAdmin ? "Cho phép tài khoản này duyệt Báo giá (admin luôn duyệt được dù không bật)" : "Chỉ admin mới đổi được quyền này"}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={Boolean(account.can_approve_quotes) || account.role === "admin"}
+                                disabled={!isAdmin || savingUserId === account.id || account.role === "admin"}
+                                onChange={e => handleRowToggleQuoteApprover(account, e.target.checked)}
+                              />
+                              Được duyệt báo giá
+                            </label>
+                          </div>
                         ) : (
                           <span className="text-on-surface-variant">—</span>
                         )}

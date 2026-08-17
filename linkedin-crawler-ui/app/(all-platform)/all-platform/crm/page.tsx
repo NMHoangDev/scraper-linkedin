@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { CrmShell } from "@/modules/crm";
 import { Metadata } from "next";
 
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function CrmRoute() {
-  return <CrmShell />;
+  return (
+    <Suspense fallback={null}>
+      <CrmShell />
+    </Suspense>
+  );
 }

@@ -248,6 +248,21 @@
   box-shadow: 0 0 0 3px rgba(190, 30, 75, 0.12);
 }
 
+.crm-field input[readonly],
+.crm-field textarea[readonly] {
+  cursor: default;
+  background: #f8fafc;
+  color: #475569;
+  border-color: #dbe3ef;
+  box-shadow: none;
+}
+
+.crm-field input[readonly]:focus,
+.crm-field textarea[readonly]:focus {
+  border-color: #dbe3ef;
+  box-shadow: none;
+}
+
 .crm-filter-select,
 .crm-analytics-filter-select {
   position: relative;
@@ -2097,14 +2112,20 @@
 }
 
 .crm-quote-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.75rem;
-  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
   border: 1px solid #e2e8f0;
   border-radius: 0.7rem;
   background: #ffffff;
   padding: 0.7rem 0.8rem;
+}
+
+.crm-quote-row-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
 .crm-quote-row b,
@@ -2145,6 +2166,45 @@
 .crm-quote-btn--disabled {
   opacity: 0.58;
   pointer-events: none;
+}
+
+.crm-quote-btn--danger {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #dc2626;
+}
+
+.crm-quote-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.crm-quote-btn {
+  cursor: pointer;
+}
+
+.crm-quote-tag {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 700 !important;
+  margin-top: 0.2rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  width: fit-content;
+}
+
+.crm-quote-tag--draft {
+  background: #fff7ed;
+  color: #c2410c !important;
+}
+
+.crm-quote-tag--approved {
+  background: #ecfdf5;
+  color: #047857 !important;
 }
 
 .crm-section-head-row {
@@ -3386,4 +3446,25 @@
 
 .crm-wizard-modal .crm-save-button--large {
   min-width: 11rem;
+}
+
+/* Chế độ sửa báo giá: 2 nút khác màu để phân biệt rõ - "Cập nhật" (trung
+   tính, không khoá gì) vs "Duyệt" (giữ màu chính, hành động khoá vĩnh viễn). */
+.crm-wizard-modal .crm-save-button--update {
+  background: #334155;
+  box-shadow: 0 10px 20px rgba(51, 65, 85, 0.18);
+}
+
+.crm-wizard-modal .crm-save-button--approve {
+  background: #be1e4b;
+  box-shadow: 0 10px 20px rgba(190, 30, 75, 0.16);
+}
+
+.crm-wizard-loading-placeholder {
+  min-height: 22rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  font-size: 0.85rem;
 }

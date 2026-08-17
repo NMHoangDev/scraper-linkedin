@@ -422,6 +422,9 @@ export interface AppUser {
   /** true nếu user thuộc 1 team có team_type='sale' (migration 049) — được
    * nâng quyền ngang leader cho riêng Pipeline + Phân tích CRM. */
   is_sale?: boolean;
+  /** true nếu được cấp quyền duyệt Báo giá (migration 053) — admin luôn duyệt
+   * được dù cờ này false. */
+  can_approve_quotes?: boolean;
 }
 
 export interface AuthLoginResponse {

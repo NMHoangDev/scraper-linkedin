@@ -4,16 +4,33 @@ import type {
   CreateQuoteInput,
   Quote,
   QuoteForm,
-  QuoteReference,
   UpdateQuoteFormInput,
   UpdateQuoteInput,
 } from '../types';
 import type { QuoteRepository } from './QuoteRepository';
+import type { ServiceCatalogOptions } from '../../service-catalog/types';
 
 type ApiResponse<T> = {
   success?: boolean;
   message?: string;
   data?: T;
+};
+
+type QuoteItemPayload = {
+  description: string;
+  service_description: string | null;
+  unit?: string;
+  quantity: number;
+  unit_price: number;
+  discount_percent: number;
+  vat_rate: number;
+  children: QuoteItemPayload[];
+  catalog_item_id?: string | null;
+  bundle_snapshot?: unknown[] | null;
+  list_price_usd?: number | null;
+  unit_price_usd?: number | null;
+  exchange_rate?: number | null;
+  unit_price_vnd?: number | null;
 };
 
 function getDefaultHeaders(): Record<string, string> {
@@ -65,21 +82,33 @@ function toCreateQuotePayload(input: CreateQuoteInput) {
     deal_id: input.dealId,
     quote_form_id: input.quoteFormId,
     data: input.data,
-    items: (input.items || []).map(item => ({
-      description: item.description ?? item.serviceDescription,
-      unit: item.unit,
-      quantity: item.quantity,
-      unit_price: item.unitPrice,
-      vat_rate: item.vatRate,
-    })),
+    items: (input.items || []).map(toQuoteItemPayload),
   };
 }
 
 function toUpdateQuotePayload(input: UpdateQuoteInput) {
   return {
-    status: input.status,
     data: input.data,
-    public_enabled: input.publicEnabled,
+    items: input.items?.map(toQuoteItemPayload),
+  };
+}
+
+function toQuoteItemPayload(item: NonNullable<CreateQuoteInput['items']>[number]): QuoteItemPayload {
+  return {
+    description: item.description ?? '',
+    service_description: item.serviceDescription ?? null,
+    unit: item.unit,
+    quantity: item.quantity,
+    unit_price: item.unitPrice,
+    discount_percent: item.discountPercent ?? 0,
+    vat_rate: item.vatRate,
+    children: (item.children || []).map(toQuoteItemPayload),
+    catalog_item_id: item.catalogItemId ?? null,
+    bundle_snapshot: item.bundleSnapshot ?? null,
+    list_price_usd: item.listPriceUsd ?? null,
+    unit_price_usd: item.unitPriceUsd ?? null,
+    exchange_rate: item.exchangeRate ?? null,
+    unit_price_vnd: item.unitPriceVnd ?? null,
   };
 }
 
@@ -157,10 +186,34 @@ export class SeedingQuoteRepository implements QuoteRepository {
     await apiFetch<unknown>(`/api/all-platform/quotes/${encodeURIComponent(id)}`, { method: 'DELETE' });
   }
 
-  async publishQuote(id: string): Promise<QuoteReference> {
-    return apiFetch<QuoteReference>(`/api/all-platform/quotes/${encodeURIComponent(id)}/publish`, {
+  async approveQuote(id: string): Promise<Quote> {
+    return apiFetch<Quote>(`/api/all-platform/quotes/${encodeURIComponent(id)}/approve`, {
       method: 'POST',
     });
+  }
+
+  async updateAndApproveQuote(id: string, input: UpdateQuoteInput): Promise<Quote> {
+    return apiFetch<Quote>(`/api/all-platform/quotes/${encodeURIComponent(id)}/update-and-approve`, {
+      method: 'POST',
+      body: JSON.stringify(toUpdateQuotePayload(input)),
+    });
+  }
+
+  async getFormCatalogLinks(formId: string): Promise<string[]> {
+    return apiFetch<string[]>(`/api/all-platform/quote-forms/${encodeURIComponent(formId)}/catalog-links`);
+  }
+
+  async setFormCatalogLinks(formId: string, catalogItemIds: string[]): Promise<string[]> {
+    return apiFetch<string[]>(`/api/all-platform/quote-forms/${encodeURIComponent(formId)}/catalog-links`, {
+      method: 'PUT',
+      body: JSON.stringify({ catalog_item_ids: catalogItemIds }),
+    });
+  }
+
+  async getServiceCatalogOptions(formId: string): Promise<ServiceCatalogOptions> {
+    return apiFetch<ServiceCatalogOptions>(
+      `/api/all-platform/quotes/service-catalog-options?formId=${encodeURIComponent(formId)}`
+    );
   }
 }
 

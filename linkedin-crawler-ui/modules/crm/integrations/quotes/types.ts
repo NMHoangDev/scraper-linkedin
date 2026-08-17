@@ -1,4 +1,4 @@
-import type { QuoteData, QuoteForm, QuoteItem, VillaSolutionItem } from '@/modules/quotes';
+import type { Quote, QuoteData, QuoteForm, QuoteItem, VillaSolutionItem } from '@/modules/quotes';
 import type { DealFormState } from '../../components/DealFormFields';
 
 export type WizardStep = 1 | 2 | 3 | 4;
@@ -24,6 +24,10 @@ export function quoteDraftFromForm(form: QuoteForm, dealDraft?: DealFormState): 
   const solutionItems = Array.isArray(solutionField?.defaultValue)
     ? (solutionField?.defaultValue as VillaSolutionItem[])
     : [];
+  const quoteItemsField = fields.find(field => field.key === 'quoteItems');
+  const quoteItems = Array.isArray(quoteItemsField?.defaultValue)
+    ? (JSON.parse(JSON.stringify(quoteItemsField.defaultValue)) as QuoteItem[])
+    : [];
 
   if (fields.some(field => field.key === 'quoteDate') && !data.quoteDate) {
     data.quoteDate = new Date().toISOString().slice(0, 10);
@@ -41,5 +45,16 @@ export function quoteDraftFromForm(form: QuoteForm, dealDraft?: DealFormState): 
     });
   }
 
-  return { data, items: [], solutionItems };
+  return { data, items: quoteItems, solutionItems };
+}
+
+/** Dựng lại QuoteDraft từ 1 báo giá đã tồn tại (chế độ sửa) - để prefill wizard
+ * đúng dữ liệu đã lưu, không phải giá trị mặc định của mẫu. */
+export function quoteDraftFromExistingQuote(quote: Quote): QuoteDraft {
+  const { solutionItems, ...data } = quote.data || {};
+  return {
+    data,
+    items: quote.items || [],
+    solutionItems: Array.isArray(solutionItems) ? solutionItems : [],
+  };
 }
