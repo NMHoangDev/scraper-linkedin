@@ -73,6 +73,12 @@ def _row_to_item(row: dict) -> dict:
         "vatAmount": float(row.get("vat_amount") or 0),
         "totalAmount": float(row.get("total_amount") or 0),
         "sortOrder": row.get("sort_order") or 0,
+        "catalogItemId": row.get("catalog_item_id"),
+        "bundleSnapshot": row.get("bundle_snapshot"),
+        "listPriceUsd": row.get("list_price_usd"),
+        "unitPriceUsd": row.get("unit_price_usd"),
+        "exchangeRate": row.get("exchange_rate"),
+        "unitPriceVnd": row.get("unit_price_vnd"),
         "children": [],
     }
 
@@ -472,6 +478,12 @@ def create_quote(payload: dict, created_by: str | None) -> dict:
             "vat_amount": item["vat"],
             "total_amount": item["total"],
             "sort_order": item["sort_order"],
+            "catalog_item_id": item.get("catalog_item_id") or None,
+            "bundle_snapshot": item.get("bundle_snapshot"),
+            "list_price_usd": item.get("list_price_usd"),
+            "unit_price_usd": item.get("unit_price_usd"),
+            "exchange_rate": item.get("exchange_rate"),
+            "unit_price_vnd": item.get("unit_price_vnd"),
         }
         inserted = supabase.table(ITEMS_TABLE).insert(row).execute().data[0]
         inserted_items.append(inserted)

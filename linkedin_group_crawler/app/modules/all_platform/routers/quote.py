@@ -15,6 +15,7 @@ from app.modules.all_platform.schemas import (
     QuoteFormCreateRequest,
     QuoteFormUpdateRequest,
     QuoteUpdateRequest,
+    QuoteFormCatalogLinksSetRequest,
 )
 from app.modules.all_platform.services import (
     approve_quote,
@@ -33,6 +34,9 @@ from app.modules.all_platform.services import (
     update_and_approve_quote,
     update_quote,
     update_quote_form,
+    get_quote_form_catalog_links,
+    set_quote_form_catalog_links,
+    get_service_catalog_options_for_form,
 )
 from app.modules.all_platform.services.crm_permission_service import can_approve_quote, can_edit_quote
 from app.modules.all_platform.services.customer_lead_service import get_customer_lead_by_id
@@ -116,6 +120,25 @@ def quote_forms_share(form_id: str, enabled: bool = True, _user: dict = Depends(
         return BaseResponse(success=False, message=str(e))
 
 
+@quote_forms_router.get("/{form_id}/catalog-links")
+def quote_forms_get_catalog_links(form_id: str, _user: dict = Depends(get_current_user)) -> BaseResponse:
+    try:
+        return BaseResponse(success=True, data=get_quote_form_catalog_links(form_id))
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@quote_forms_router.put("/{form_id}/catalog-links")
+def quote_forms_set_catalog_links(
+    form_id: str, payload: QuoteFormCatalogLinksSetRequest, _user: dict = Depends(get_current_user)
+) -> BaseResponse:
+    try:
+        data = set_quote_form_catalog_links(form_id, payload.catalog_item_ids)
+        return BaseResponse(success=True, message="Đã lưu danh mục dịch vụ áp dụng", data=data)
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
 # ── Quotes ─────────────────────────────────────────────────────────────────
 
 @quotes_router.get("")
@@ -131,6 +154,17 @@ def quotes_get_public(token: str) -> BaseResponse:
     try:
         return BaseResponse(success=True, data=get_public_quote(token))
     except ValueError as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@quotes_router.get("/service-catalog-options")
+def quotes_service_catalog_options(form_id: str = Query(..., alias="formId"), _user: dict = Depends(get_current_user)) -> BaseResponse:
+    """Danh sách gói (bundle) + dịch vụ thành phần (component) khả dụng cho 1 mẫu
+    báo giá, dùng dựng dropdown khi điền báo giá. Phải đăng ký TRƯỚC /{quote_id}
+    để không bị FastAPI khớp nhầm "service-catalog-options" thành quote_id."""
+    try:
+        return BaseResponse(success=True, data=get_service_catalog_options_for_form(form_id))
+    except Exception as e:
         return BaseResponse(success=False, message=str(e))
 
 

@@ -52,6 +52,14 @@ from app.modules.all_platform.schemas.quote import (
     QuoteCreateRequest,
     QuoteUpdateRequest,
 )
+from app.modules.all_platform.schemas.service_catalog import (
+    ServiceCatalogItemCreateRequest,
+    ServiceCatalogItemUpdateRequest,
+    ServiceCatalogReorderRequest,
+    BundleComponentInput,
+    BundleComponentsSetRequest,
+    QuoteFormCatalogLinksSetRequest,
+)
 from app.modules.all_platform.schemas.sales_asset import (
     SalesAssetCreateRequest,
     SalesAssetUpdateRequest,
