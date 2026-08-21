@@ -182,6 +182,14 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       label: "Tương tác nội bộ",
       matchStartsWith: ["/all-platform/internal-engagement"],
     },
+    {
+      type: "item",
+      id: "quick-comments",
+      href: "/all-platform/quick-comments",
+      icon: "chat_bubble",
+      label: "Thư viện mẫu câu",
+      matchStartsWith: ["/all-platform/quick-comments"],
+    },
   ];
 
   const channelItems: NavLeafItem[] = [

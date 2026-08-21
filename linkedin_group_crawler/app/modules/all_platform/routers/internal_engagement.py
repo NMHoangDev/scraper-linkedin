@@ -368,6 +368,7 @@ def mark_action_endpoint(payload: MarkActionRequest) -> BaseResponse:
             fb_uid=payload.fb_uid,
             post_url=payload.post_url,
             email_member=payload.email_member,
+            content=payload.content,
         )
         return BaseResponse(
             success=True,
