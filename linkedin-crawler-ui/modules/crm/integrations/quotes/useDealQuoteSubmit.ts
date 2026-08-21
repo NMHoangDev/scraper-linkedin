@@ -39,9 +39,10 @@ export function useDealQuoteSubmit() {
       });
       createdQuoteId = quote.id;
 
-      // publishQuote gắn quote_id + last_attachment_* thẳng lên customer_leads (backend
-      // auto-link) — không cần gọi updateDeal riêng, chỉ cần đọc lại deal cho đúng dữ liệu mới.
-      await seedingQuoteRepository.publishQuote(quote.id);
+      // createQuote đã tự gắn quote_id thẳng lên customer_leads (backend auto-link,
+      // xem create_quote()) - báo giá luôn tạo ra ở trạng thái "draft" (chưa duyệt,
+      // chưa có link public), không còn tự publish ngay sau khi tạo nữa. Đọc lại
+      // deal để card hiện đúng dữ liệu mới (tag "Chưa duyệt").
       return await seedingCrmRepository.getDeal(deal.id);
     } catch (err) {
       if (createdQuoteId) await seedingQuoteRepository.deleteQuote(createdQuoteId).catch(() => {});

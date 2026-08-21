@@ -115,6 +115,26 @@
   color: #334155;
 }
 
+.quote-back--breadcrumb {
+  display: inline-flex;
+  margin-bottom: 0.85rem;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  min-height: 0;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.quote-back--breadcrumb:hover {
+  color: #334155;
+}
+
+.quote-detail-header p .quote-badge {
+  margin: 0 0.4rem;
+  vertical-align: middle;
+}
+
 .quote-state {
   border: 1px solid #e2e8f0;
   border-radius: 0.7rem;
@@ -141,12 +161,18 @@
 .quote-builder-sidebar,
 .quote-section-card,
 .quote-field-row,
-.public-toolbar,
-.quote-detail-header {
+.public-toolbar {
   border: 1px solid #e2e8f0;
   border-radius: 0.75rem;
   background: #ffffff;
   box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+}
+
+/* Header phẳng, không đóng khung trắng riêng nữa - chỉ 1 gạch chân nhẹ phân
+   cách với nội dung bên dưới, đỡ tạo thêm 1 lớp "box" thừa cạnh box body. */
+.quote-detail-header {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .quote-public-toolbar {
@@ -221,9 +247,15 @@
 }
 
 .status-draft {
-  border-color: #bfdbfe;
-  background: #eff6ff;
-  color: #1d4ed8;
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.status-approved {
+  border-color: #86efac;
+  background: #ecfdf5;
+  color: #047857;
 }
 
 .status-cancelled {
@@ -239,6 +271,16 @@
 
 .quote-table-wrap {
   overflow-x: auto;
+}
+
+.quote-history-extra {
+  color: #94a3b8;
+  font-size: 0.8em;
+}
+
+.quote-history-link-cell {
+  display: flex;
+  gap: 6px;
 }
 
 .quote-table {
@@ -314,6 +356,10 @@
   padding-top: 0.5rem;
 }
 
+.quote-total-row--discount {
+  color: #b91c1c;
+}
+
 .quote-table--editable td input,
 .quote-table--editable td select {
   width: 100%;
@@ -341,6 +387,306 @@
 .quote-row-actions button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.quote-items-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.quote-catalog-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1.5px solid #93c5fd;
+  border-radius: 10px;
+  background: #eff6ff;
+}
+
+.quote-catalog-picker-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.quote-catalog-picker-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.quote-catalog-picker-head strong {
+  display: block;
+  color: #1e3a8a;
+  font-size: 14px;
+}
+
+.quote-catalog-picker-head p {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: #475569;
+}
+
+.quote-catalog-picker select {
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1px solid #93c5fd;
+  background: #fff;
+  font-size: 13.5px;
+}
+
+.quote-items-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #94a3b8;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.quote-items-divider::before,
+.quote-items-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #e2e8f0;
+}
+
+.quote-items-empty {
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 14px;
+  color: #64748b;
+  background: #f8fafc;
+}
+
+.quote-parent-item {
+  overflow: hidden;
+  border: 1px solid #d7e0ec;
+  border-radius: 8px;
+  background: #fbfdff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.quote-child-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 8px 14px 12px 18px;
+  padding-left: 12px;
+  border-left: 2px solid #c7d2fe;
+}
+
+.quote-child-item {
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.quote-item-toolbar,
+.quote-item-actions,
+.quote-item-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quote-item-toolbar {
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: #f1f5f9;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.quote-item-toolbar--child {
+  padding: 10px 12px;
+  background: #ffffff;
+}
+
+.quote-item-title span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 28px;
+  border-radius: 999px;
+  background: #0f172a;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.quote-item-title--child span {
+  min-width: 38px;
+  background: #4f46e5;
+}
+
+.quote-item-title strong {
+  color: #0f172a;
+  font-size: 15px;
+}
+
+.quote-item-title em {
+  color: #64748b;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.quote-item-toolbar button {
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #0f172a;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.quote-item-toolbar .quote-danger-button {
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.quote-item-toolbar button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.quote-item-fields {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.1fr) minmax(90px, 0.7fr) minmax(120px, 1fr) minmax(110px, 0.85fr) minmax(95px, 0.75fr);
+  gap: 10px;
+  padding: 14px;
+  align-items: start;
+}
+
+.quote-item-fields .crm-field--full {
+  grid-column: span 5;
+}
+
+.quote-item-fields .crm-field span {
+  font-size: 12px;
+}
+
+.quote-item-fields textarea {
+  min-height: 58px;
+  resize: vertical;
+}
+
+.quote-item-fields input,
+.quote-item-fields textarea {
+  background: #ffffff;
+}
+
+.quote-item-calculation {
+  grid-column: span 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 30px;
+  padding: 7px 9px;
+  border-radius: 7px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 13px;
+}
+
+.quote-item-calculation span,
+.quote-item-calculation strong {
+  white-space: nowrap;
+}
+
+.quote-item-calculation strong {
+  color: #0f172a;
+}
+
+.quote-item-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-top: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.quote-add-child-button,
+.quote-add-parent-button {
+  border: 1px dashed #94a3b8;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #334155;
+  font-weight: 800;
+  padding: 9px 12px;
+}
+
+.quote-add-child-button:hover,
+.quote-add-parent-button:hover {
+  border-color: #c2185b;
+  color: #c2185b;
+  background: #fff7fb;
+}
+
+.quote-add-parent-button {
+  width: 100%;
+  border-style: solid;
+  background: #f8fafc;
+}
+
+.quote-group-subtotal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  color: #475569;
+  font-size: 13px;
+}
+
+.quote-group-subtotal {
+  margin-left: auto;
+}
+
+.quote-group-subtotal strong {
+  color: #0f172a;
+}
+
+@media (max-width: 900px) {
+  .quote-item-fields .crm-field--full,
+  .quote-item-calculation {
+    grid-column: 1 / -1;
+  }
+
+  .quote-item-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .quote-item-toolbar,
+  .quote-item-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .quote-item-actions {
+    width: 100%;
+  }
+
+  .quote-child-list {
+    margin-left: 8px;
+  }
+
+  .quote-item-fields {
+    grid-template-columns: 1fr;
+  }
 }
 
 .quote-builder-grid {
@@ -782,7 +1128,7 @@
 }
 
 .sheet-brand-block {
-  max-width: 68%;
+  max-width: 80%;
 }
 
 .sheet-brand-mark {
@@ -989,6 +1335,10 @@
   margin: 0;
 }
 
+.sheet-items-table-wrap {
+  overflow-x: auto;
+}
+
 .sheet-items-table,
 .villa-table {
   width: 100%;
@@ -996,7 +1346,6 @@
   table-layout: fixed;
 }
 
-.sheet-items-table th,
 .sheet-items-table td,
 .villa-table th,
 .villa-table td {
@@ -1005,6 +1354,16 @@
   text-align: left;
   vertical-align: top;
   overflow-wrap: anywhere;
+}
+
+/* Header chỉ ngắt dòng ở khoảng trắng (overflow-wrap mặc định), KHÔNG ngắt
+ * giữa từ - "anywhere" ở cột hẹp làm chữ vỡ kiểu "THÀN/H" rất khó đọc. */
+.sheet-items-table th {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0.72rem;
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
 }
 
 .sheet-items-table th,
@@ -1022,6 +1381,41 @@
   font-size: 0.82rem;
 }
 
+.sheet-items-table th:nth-child(2),
+.sheet-items-table td:nth-child(2),
+.sheet-items-table th:nth-child(3),
+.sheet-items-table td:nth-child(3) {
+  min-width: 180px;
+}
+
+.quote-item-row--parent td {
+  font-weight: 700;
+}
+
+.quote-item-row--child td {
+  background: #f8fafc;
+}
+
+.quote-item-row--child td:first-child {
+  padding-left: 1.4rem;
+}
+
+.quote-price-stack {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-end;
+}
+
+.quote-price-stack s {
+  color: #94a3b8;
+  font-size: 0.78rem;
+}
+
+.quote-price-stack b {
+  color: #0f172a;
+}
+
 .empty-row {
   color: #94a3b8 !important;
   text-align: center !important;
@@ -1030,6 +1424,14 @@
 .money-cell {
   text-align: right !important;
   white-space: nowrap;
+}
+
+.quote-desc-line {
+  text-align: left;
+}
+
+.quote-desc-line + .quote-desc-line {
+  margin-top: 0.4rem;
 }
 
 .sheet-total-block {
@@ -1058,6 +1460,14 @@
   background: #ffffff;
   color: #111827;
   font-size: 1rem;
+}
+
+.sheet-total-row--discount {
+  color: #b91c1c;
+}
+
+.sheet-total-row--discount strong {
+  color: #b91c1c;
 }
 
 .sheet-note {

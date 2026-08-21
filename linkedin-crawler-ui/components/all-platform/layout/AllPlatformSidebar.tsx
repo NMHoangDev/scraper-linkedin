@@ -288,6 +288,22 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
     },
     {
       type: "item",
+      id: "service-catalog",
+      href: "/all-platform/service-catalog",
+      icon: "category",
+      label: "Danh mục dịch vụ",
+      matchStartsWith: ["/all-platform/service-catalog"],
+    },
+    {
+      type: "item",
+      id: "quote-history",
+      href: "/all-platform/quote-history",
+      icon: "history",
+      label: "Lịch sử báo giá",
+      matchStartsWith: ["/all-platform/quote-history"],
+    },
+    {
+      type: "item",
       id: "vps-monitor",
       href: "/all-platform/vps-vnc-ssh-rdp",
       icon: "monitoring",

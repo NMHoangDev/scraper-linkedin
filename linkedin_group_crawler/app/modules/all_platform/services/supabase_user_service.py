@@ -52,7 +52,7 @@ def _is_transient_supabase_error(exc: Exception) -> bool:
     return any(part in msg for part in ("server disconnected", "remoteprotocolerror", "timed out", "timeout"))
 
 
-_SAFE_USER_COLUMNS = "id, email, name, role, is_active, created_at, updated_at"
+_SAFE_USER_COLUMNS = "id, email, name, role, is_active, can_approve_quotes, created_at, updated_at"
 
 
 def get_user(email: str) -> dict:
@@ -111,10 +111,34 @@ def update_user_role(email: str, role: str) -> dict:
     """Update a user's role."""
     supabase: Client = get_supabase_client()
 
+    update_data: dict[str, Any] = {"role": role, "updated_at": "now()"}
+    # Leader mac dinh duoc duyet Bao gia (giong admin) - tu bat co nay ngay
+    # luc thang role, khong bat leader moi phai vao Quan ly thanh vien bat tay
+    # (migration 054 lo backfill cho leader co san tu truoc). Admin luon duyet
+    # duoc qua nhanh rieng (can_approve_quote()), khong can cot nay.
+    if role.strip().lower() == "leader":
+        update_data["can_approve_quotes"] = True
+
     result = (
         supabase.table("app_users")
-        .update({"role": role, "updated_at": "now()"})
+        .update(update_data)
         .eq("email", email)
+        .execute()
+    )
+    _clear_people_caches()
+    _clear_auth_cache(email=email)
+    return result.data[0] if result.data else {}
+
+
+def update_user_quote_approver(email: str, can_approve_quotes: bool) -> dict:
+    """Admin-only: bật/tắt quyền duyệt Báo giá cho 1 tài khoản (migration 053).
+    Admin luôn duyệt được dù cờ này tắt (xem crm_permission_service.can_approve_quote)."""
+    supabase: Client = get_supabase_client()
+
+    result = (
+        supabase.table("app_users")
+        .update({"can_approve_quotes": can_approve_quotes, "updated_at": "now()"})
+        .eq("email", email.lower().strip())
         .execute()
     )
     _clear_people_caches()

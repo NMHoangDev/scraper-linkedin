@@ -15,6 +15,7 @@ from app.modules.all_platform.services import (
     update_user_slug,
     update_user_role,
     update_user_active_status,
+    update_user_quote_approver,
     get_team_members,
     add_team_member,
     get_all_users,
@@ -87,6 +88,20 @@ def users_set_active(payload: dict, _admin: dict = Depends(require_admin_or_lead
             return BaseResponse(success=False, message="email and is_active are required")
         data = update_user_active_status(email, bool(is_active))
         return BaseResponse(success=True, message="Đã cập nhật trạng thái", data=data)
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@router.post("/update-quote-approver")
+def users_update_quote_approver(payload: dict, _admin: dict = Depends(require_admin)) -> BaseResponse:
+    """Admin-only: bật/tắt quyền duyệt Báo giá cho 1 tài khoản (migration 053)."""
+    try:
+        email = payload.get("email")
+        can_approve_quotes = payload.get("can_approve_quotes")
+        if not email or can_approve_quotes is None:
+            return BaseResponse(success=False, message="email and can_approve_quotes are required")
+        data = update_user_quote_approver(email, bool(can_approve_quotes))
+        return BaseResponse(success=True, message="Đã cập nhật quyền duyệt báo giá", data=data)
     except Exception as e:
         return BaseResponse(success=False, message=str(e))
 

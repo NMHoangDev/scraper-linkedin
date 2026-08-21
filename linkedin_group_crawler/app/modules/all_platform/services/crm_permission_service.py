@@ -96,3 +96,39 @@ def can_write_deal(user: dict[str, Any] | None, lead: dict[str, Any] | None) -> 
     if not uid:
         return False
     return str(lead.get("leaded_by") or "") == uid or str(lead.get("sdr_id") or "") == uid
+
+
+def can_approve_quote(user: dict[str, Any] | None) -> bool:
+    """True neu user duoc duyet bao gia: admin luon duoc (khong doi qua UI).
+    Leader/member deu di qua co app_users.can_approve_quotes (migration 053) -
+    leader mac dinh duoc bat co nay (backfill migration 054 + tu dong bat khi
+    thang role len leader, xem update_user_role()), nhung admin van tuy chinh
+    tat duoc cho tung leader cu the qua UI Quan ly thanh vien neu can."""
+    if not user:
+        return False
+    role = str(user.get("role") or "").strip().lower()
+    if role == "admin":
+        return True
+    return bool(user.get("can_approve_quotes"))
+
+
+def can_edit_quote(user: dict[str, Any] | None, quote: dict[str, Any] | None, lead: dict[str, Any] | None) -> bool:
+    """True neu user duoc xem/sua 1 bao gia CHUA duyet: nguoi tao bao gia,
+    nguoi quan ly/phu trach deal gan voi bao gia (leaded_by/sdr_id), nguoi co
+    full CRM access (admin/leader/sale-team), hoac nguoi co quyen duyet bao gia
+    (can duoc xem/sua truoc khi quyet dinh duyet). KHONG tu dong cho phep chi
+    vi la nguoi tao deal khac - phai gan dung deal cua bao gia nay."""
+    if not user:
+        return False
+    if has_full_crm_access(user):
+        return True
+    if can_approve_quote(user):
+        return True
+    uid = str(user.get("id") or "")
+    if not uid:
+        return False
+    if quote and str(quote.get("created_by") or quote.get("createdById") or "") == uid:
+        return True
+    if lead and (str(lead.get("leaded_by") or "") == uid or str(lead.get("sdr_id") or "") == uid):
+        return True
+    return False

@@ -8,14 +8,21 @@ import type {
   VillaSolutionItem,
 } from '../types';
 import {
+  calculateItemAfterDiscount,
+  calculateItemDiscount,
   calculateItemSubtotal,
   calculateItemTotal,
   calculateItemVat,
   formatVnd,
+  flattenQuoteItems,
 } from '../utils/quoteCalculations';
 
 interface Totals {
   subtotalAmount: number;
+  /** Tiền giảm giá (đã tính sẵn = subtotalAmount * discountPercent / 100) - optional
+   * để không phá các nơi gọi cũ (villa layout, quote đã lưu trước khi có tính năng
+   * giảm giá) chưa truyền field này. */
+  discountAmount?: number;
   totalVatAmount: number;
   totalAmount: number;
 }
@@ -72,6 +79,32 @@ function cleanDocumentText(value: unknown): string {
     .trim();
 }
 
+/** Dữ liệu cũ (trước khi có cột riêng cho "Tên dịch vụ") chỉ lưu 1 chuỗi
+ * "• Tên ngắn — mô tả dài..." vào field description, không có serviceDescription
+ * riêng. Tách theo dấu gạch ngang "—"/"–" đầu tiên (đúng quy ước đã dùng khi
+ * soạn nội dung) để hiển thị đúng 2 cột thay vì Tên dịch vụ trống/lặp Mô tả. */
+function splitLegacyServiceText(raw: unknown): { name: string; rest: string } {
+  const text = textValue(raw).replace(/^"+|"+$/g, '').trim();
+  const match = text.match(/^•?\s*([^—–]+?)\s*[—–]\s*([\s\S]+)$/);
+  if (!match) return { name: '', rest: text };
+  return { name: match[1].trim(), rest: match[2].trim() };
+}
+
+/** Mô tả nhiều gạch đầu dòng ("• Ý 1. • Ý 2. ...") đang bị dồn thành 1 đoạn
+ * dính liền, khó đọc. Tách mỗi "•" thành 1 dòng riêng, bỏ dấu chấm cuối câu
+ * thừa (đã có xuống dòng phân tách rồi, không cần chấm câu nữa). Không có
+ * "•" thì tách theo xuống dòng thật ("\n") — đúng định dạng Description Items
+ * tự sinh từ Danh mục dịch vụ (mỗi thành phần gói là 1 dòng, xem
+ * render_bundle_description phía backend). Không có cả hai thì giữ 1 dòng. */
+function formatDescriptionLines(raw: unknown): string[] {
+  const text = textValue(raw).replace(/^"+|"+$/g, '').trim();
+  if (!text) return [];
+  const parts = text.includes('•') ? text.split('•') : text.split('\n');
+  return parts
+    .map(part => part.trim().replace(/\.+\s*$/, ''))
+    .filter(Boolean);
+}
+
 export function QuoteDocumentRenderer({
   schemaSnapshot,
   quoteData = {},
@@ -101,21 +134,91 @@ export function QuoteDocumentRenderer({
     if (value !== undefined && value !== null && value !== '') return value;
     return findField(key).defaultValue || '';
   };
-  const visibleColumns =
+  const baseColumns =
     findField('quoteItems').config?.columns?.filter(column => column.visible !== false) || [];
+  // Chỉ báo giá dùng dịch vụ chọn từ Danh mục dịch vụ mới có giá USD/VND/tỷ giá lưu
+  // sẵn trên từng dòng - chèn thêm 3 cột hiển thị tham khảo ngay khi phát hiện, không
+  // sửa cấu hình cột lưu trong schema_json (tránh ảnh hưởng các mẫu báo giá khác).
+  const hasCatalogPricing = flattenQuoteItems(quoteItems).some(item => item.catalogItemId);
+  const catalogPricingColumns: QuoteField[] = [
+    { key: 'listPriceUsd', label: 'List price USD', type: 'text', visible: true },
+    { key: 'unitPriceUsd', label: 'Unit Price USD', type: 'text', visible: true },
+    { key: 'unitPriceVnd', label: 'Unit price VND', type: 'text', visible: true },
+  ];
+  const unitPriceIndex = baseColumns.findIndex(column => column.key === 'unitPrice');
+  const visibleColumns = hasCatalogPricing
+    ? unitPriceIndex >= 0
+      ? [
+          ...baseColumns.slice(0, unitPriceIndex),
+          ...catalogPricingColumns,
+          ...baseColumns.slice(unitPriceIndex),
+        ]
+      : [...catalogPricingColumns, ...baseColumns]
+    : baseColumns;
 
   const renderCell = (item: QuoteItem, column: QuoteField, index: number) => {
     if (column.type === 'auto-number' || column.key === 'order') return String(index + 1);
     if (column.key === 'subtotal') return formatVnd(calculateItemSubtotal(item));
     if (column.key === 'vatAmount') return formatVnd(calculateItemVat(item));
-    if (column.key === 'total') return formatVnd(calculateItemTotal(item));
+    if (column.key === 'listPriceUsd') return item.listPriceUsd != null ? `$${item.listPriceUsd.toLocaleString('en-US')}` : '—';
+    if (column.key === 'unitPriceUsd') return item.unitPriceUsd != null ? `$${item.unitPriceUsd.toLocaleString('en-US')}` : '—';
+    if (column.key === 'unitPriceVnd') return item.unitPriceVnd != null ? formatVnd(item.unitPriceVnd) : '—';
+    if (column.key === 'total') {
+      const discount = calculateItemDiscount(item);
+      return discount ? (
+        <span className="quote-price-stack">
+          <s>{formatVnd(calculateItemSubtotal(item) + calculateItemVat({ ...item, discountPercent: 0 }))}</s>
+          <b>{formatVnd(calculateItemTotal(item))}</b>
+        </span>
+      ) : formatVnd(calculateItemTotal(item));
+    }
     if (column.key === 'unitPrice') return formatVnd(item.unitPrice);
     if (column.key === 'quantity') return String(item.quantity || '');
+    if (column.key === 'discountPercent') return item.discountPercent ? `${item.discountPercent}%` : '—';
+    if (column.key === 'amountAfterDiscount') return formatVnd(calculateItemAfterDiscount(item));
     if (column.key === 'vatRate') return item.vatRate ? `${item.vatRate}%` : '';
-    const value = item[column.key] ?? item.description ?? '';
-    return String(value || '');
+    // "Mô tả" luôn qua tách dòng theo "•" (kể cả du lieu moi da co serviceDescription
+    // rieng) - phai xu ly TRUOC fallback chung ben duoi, khong thi item.description
+    // (luon co gia tri) se bi return thang o do, khien nhanh tach dong o day
+    // thanh dead code khong bao gio chay toi.
+    if (column.key === 'description') {
+      const raw = !item.serviceDescription ? splitLegacyServiceText(item.description).rest : item.description || '';
+      const lines = formatDescriptionLines(raw);
+      if (lines.length <= 1) return lines[0] || '';
+      return (
+        <>
+          {lines.map((line, lineIndex) => (
+            <div key={lineIndex} className="quote-desc-line">{line}</div>
+          ))}
+        </>
+      );
+    }
+    let value = item[column.key];
+    if (column.key === 'serviceDescription' && !value && ('name' in item) && item.name) {
+      value = String(item.name);
+    }
+    if (value !== undefined && value !== null && value !== '') {
+      return String(value);
+    }
+    // item.serviceDescription trống (du lieu cu) -> thu tach tu description
+    // theo quy uoc "Ten — Mo ta" thay vi de trong/lap noi dung.
+    if (column.key === 'serviceDescription' && item.description) {
+      return splitLegacyServiceText(item.description).name;
+    }
+    return '';
   };
 
+  const lineDiscountAmount = flattenQuoteItems(quoteItems).reduce(
+    (sum, item) => sum + calculateItemDiscount(item),
+    0
+  );
+  const discountPercentValue = textValue(quoteData.discountPercent);
+  // Quote mới dùng giảm giá theo từng dòng cha/con. Giữ fallback discountPercent
+  // tổng cho quote cũ đã lưu trước khi có cấu trúc line-level discount.
+  const resolvedDiscountAmount =
+    totals.discountAmount ??
+    (lineDiscountAmount ||
+      (discountPercentValue ? (totals.subtotalAmount * Number(discountPercentValue)) / 100 : 0));
   const notesValue = fieldValue('notes');
   const notesRows = splitLines(notesValue).map(cleanDocumentText).filter(Boolean);
   const commitments = fieldValue('commitments');
@@ -169,7 +272,27 @@ export function QuoteDocumentRenderer({
     { key: 'vatRate', label: 'VAT', type: 'number' as const },
     { key: 'total', label: 'Thành tiền', type: 'currency' as const },
   ];
-  const standardColumns = visibleColumns.length ? visibleColumns : defaultColumns;
+  const standardColumns = (visibleColumns.length ? [...visibleColumns] : [...defaultColumns])
+    .filter(column => !['subtotal', 'vatAmount'].includes(column.key));
+  if (!standardColumns.some(column => column.key === 'order' || column.type === 'auto-number')) {
+    standardColumns.unshift({ key: 'order', label: 'STT', type: 'auto-number' as const });
+  }
+  if (!standardColumns.some(column => column.key === 'description')) {
+    const unitIndex = standardColumns.findIndex(column => column.key === 'unit');
+    standardColumns.splice(unitIndex >= 0 ? unitIndex : 2, 0, { key: 'description', label: 'Mô tả', type: 'textarea' });
+  }
+  if (!standardColumns.some(column => column.key === 'discountPercent')) {
+    const vatIndex = standardColumns.findIndex(column => column.key === 'vatRate');
+    standardColumns.splice(vatIndex >= 0 ? vatIndex : standardColumns.length - 1, 0, { key: 'discountPercent', label: 'Giảm giá', type: 'number' });
+  }
+  const displayedQuoteRows = quoteItems.flatMap((item, parentIndex) => [
+    { item, number: String(parentIndex + 1), isChild: false },
+    ...(item.children || []).map((child, childIndex) => ({
+      item: child,
+      number: `${parentIndex + 1}.${childIndex + 1}`,
+      isChild: true,
+    })),
+  ]);
 
   if (layoutType === 'villa_solution_package') {
     const setupTotal = activeSolutionItems.reduce(
@@ -353,42 +476,46 @@ export function QuoteDocumentRenderer({
             <span>Chi phí đề xuất</span>
             <h3>{findSection('quoteItems').title || 'Bảng dịch vụ'}</h3>
           </div>
-          <table className="sheet-items-table">
-            <thead>
-              <tr>
-                {standardColumns.map(column => (
-                  <th key={column.key}>{column.label}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {quoteItems.length === 0 ? (
+          <div className="sheet-items-table-wrap">
+            <table className="sheet-items-table" style={{ minWidth: Math.max(760, standardColumns.length * 115) }}>
+              <thead>
                 <tr>
-                  <td colSpan={Math.max(standardColumns.length, 1)} className="empty-row">
-                    Chưa có hạng mục báo giá.
-                  </td>
+                  {standardColumns.map(column => (
+                    <th key={column.key}>{column.label}</th>
+                  ))}
                 </tr>
-              ) : (
-                quoteItems.map((item, index) => (
-                  <tr key={item.id || index}>
-                    {standardColumns.map(column => (
-                      <td
-                        key={column.key}
-                        className={
-                          column.type === 'currency' ||
-                          ['unitPrice', 'subtotal', 'vatAmount', 'total'].includes(column.key)
-                            ? 'money-cell'
-                            : undefined
-                        }
-                      >
-                        {renderCell(item, column, index)}
-                      </td>
-                    ))}
+              </thead>
+              <tbody>
+                {displayedQuoteRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={Math.max(standardColumns.length, 1)} className="empty-row">
+                      Chưa có hạng mục báo giá.
+                    </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  displayedQuoteRows.map((row, index) => (
+                    <tr key={row.item.id || `${row.number}-${index}`} className={row.isChild ? 'quote-item-row quote-item-row--child' : 'quote-item-row quote-item-row--parent'}>
+                      {standardColumns.map(column => (
+                        <td
+                          key={column.key}
+                          className={
+                            column.type === 'currency' ||
+                            ['unitPrice', 'subtotal', 'vatAmount', 'total'].includes(column.key)
+                              ? 'money-cell'
+                              : undefined
+                          }
+                        >
+                          {column.type === 'auto-number' || column.key === 'order'
+                            ? row.number
+                            : renderCell(row.item, column, index)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <section className="sheet-total-block sheet-total-block--standard">
@@ -396,6 +523,12 @@ export function QuoteDocumentRenderer({
             <span>{findField('subtotalAmount').label || 'Tổng trước VAT'}</span>
             <strong>{formatVnd(totals.subtotalAmount)}</strong>
           </div>
+          {resolvedDiscountAmount ? (
+            <div className="sheet-total-row sheet-total-row--discount">
+              <span>Giảm giá</span>
+              <strong>-{formatVnd(resolvedDiscountAmount)}</strong>
+            </div>
+          ) : null}
           <div className="sheet-total-row">
             <span>{findField('totalVatAmount').label || 'VAT'}</span>
             <strong>{formatVnd(totals.totalVatAmount)}</strong>
@@ -420,7 +553,7 @@ export function QuoteDocumentRenderer({
         <footer className="sheet-signatures">
           <div>
             <strong>{findField('companyRepresentative').label || 'Đại diện công ty'}</strong>
-            <span>{String(fieldValue('companyRepresentative'))}</span>
+            <span>{String(fieldValue('companyRepresentative') || '[Đại diện công ty]')}</span>
           </div>
           <div>
             <strong>{findField('customerRepresentative').label || 'Đại diện khách hàng'}</strong>

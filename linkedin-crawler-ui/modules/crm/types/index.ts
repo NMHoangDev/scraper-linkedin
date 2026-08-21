@@ -34,6 +34,8 @@ export interface QuoteReference {
   number?: string;
   url?: string;
   totalAmount?: number;
+  /** 'draft' = Chưa duyệt, 'approved' = Đã duyệt, 'confirmed' = báo giá cũ (tương thích ngược). */
+  status?: 'draft' | 'confirmed' | 'approved' | 'cancelled';
 }
 
 export interface Contact {
@@ -210,6 +212,7 @@ export type UpdateDealInput = Partial<CreateDealInput> & {
 export interface StageTransitionInput {
   note?: string;
   pauseReason?: string;
+  attachmentUrl?: string;
   decisionMaker?: string;
   estimatedBudget?: number;
   followUpDate?: string;

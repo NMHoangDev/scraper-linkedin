@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class QuoteFormCreateRequest(BaseModel):
@@ -27,10 +27,21 @@ class QuoteFormUpdateRequest(BaseModel):
 
 class QuoteItemInput(BaseModel):
     description: str = ""
+    service_description: Optional[str] = None
     unit: Optional[str] = None
     quantity: float = 0
     unit_price: float = 0
-    vat_rate: float = 0
+    discount_percent: float = Field(default=0, ge=0, le=100)
+    vat_rate: float = Field(default=0, ge=0, le=100)
+    children: list["QuoteItemInput"] = Field(default_factory=list)
+    # Danh mục dịch vụ: truy vết + snapshot USD/VND/tỷ giá tại thời điểm chọn dịch vụ.
+    # Đông cứng ngay khi tạo/sửa báo giá - sửa catalog sau này không ảnh hưởng số liệu cũ.
+    catalog_item_id: Optional[str] = None
+    bundle_snapshot: Optional[list[dict[str, Any]]] = None
+    list_price_usd: Optional[float] = None
+    unit_price_usd: Optional[float] = None
+    exchange_rate: Optional[float] = None
+    unit_price_vnd: Optional[float] = None
 
 
 class QuoteCreateRequest(BaseModel):
@@ -41,7 +52,9 @@ class QuoteCreateRequest(BaseModel):
 
 
 class QuoteUpdateRequest(BaseModel):
-    status: Optional[str] = None
+    """status/public_token/public_enabled KHÔNG còn client-settable qua đây -
+    chỉ đổi được qua endpoint /approve (xem quote.py) sau khi qua kiểm tra
+    quyền duyệt riêng."""
+
     data: Optional[dict[str, Any]] = None
     items: Optional[list[QuoteItemInput]] = None
-    public_enabled: Optional[bool] = None

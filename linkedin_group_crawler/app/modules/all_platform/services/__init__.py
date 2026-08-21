@@ -72,8 +72,22 @@ from app.modules.all_platform.services.supabase_quote_service import (
     create_quote,
     update_quote,
     delete_quote,
-    publish_quote,
+    approve_quote,
+    update_and_approve_quote,
     link_quote_to_deal,
+)
+from app.modules.all_platform.services.supabase_service_catalog_service import (
+    list_service_catalog_items,
+    get_service_catalog_item,
+    create_service_catalog_item,
+    update_service_catalog_item,
+    delete_service_catalog_item,
+    reorder_service_catalog_item,
+    set_bundle_components,
+    render_bundle_description,
+    get_quote_form_catalog_links,
+    set_quote_form_catalog_links,
+    get_service_catalog_options_for_form,
 )
 from app.modules.all_platform.services.supabase_sales_asset_service import (
     list_sales_assets,
@@ -114,6 +128,7 @@ from app.modules.all_platform.services.supabase_user_service import (
     update_user_slug,
     update_user_role,
     update_user_active_status,
+    update_user_quote_approver,
     get_team_members,
     add_team_member,
     get_all_users,

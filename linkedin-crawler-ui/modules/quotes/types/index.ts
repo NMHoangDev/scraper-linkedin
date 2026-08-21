@@ -1,5 +1,5 @@
 export type QuoteFormStatus = 'active' | 'inactive' | 'archived';
-export type QuoteStatus = 'draft' | 'confirmed' | 'cancelled';
+export type QuoteStatus = 'draft' | 'confirmed' | 'approved' | 'cancelled';
 export type QuoteLayoutType =
   | 'cloudgate_standard_quote'
   | 'villa_solution_package'
@@ -70,19 +70,44 @@ export interface QuoteForm {
   shareUrl?: string;
 }
 
+export interface BundleSnapshotComponent {
+  componentId: string;
+  sku?: string;
+  name?: string;
+  description?: string;
+  unit?: string;
+  quantity: number;
+  computedQuantity: number;
+  displayText: string;
+  unitPriceVnd: number;
+  sortOrder?: number;
+}
+
 export interface QuoteItem {
   id?: string;
   quoteId?: string;
+  parentItemId?: string;
   description?: string;
   serviceDescription?: string;
   unit?: string;
   quantity: number;
   unitPrice: number;
+  discountPercent?: number;
+  discountAmount?: number;
+  amountAfterDiscount?: number;
   vatRate: number;
   subtotalAmount?: number;
   vatAmount?: number;
   totalAmount?: number;
   sortOrder?: number;
+  children?: QuoteItem[];
+  /** Danh mục dịch vụ: truy vết + snapshot USD/VND/tỷ giá đông cứng lúc chọn dịch vụ. */
+  catalogItemId?: string;
+  bundleSnapshot?: BundleSnapshotComponent[];
+  listPriceUsd?: number;
+  unitPriceUsd?: number;
+  exchangeRate?: number;
+  unitPriceVnd?: number;
   [key: string]: unknown;
 }
 
@@ -125,6 +150,9 @@ export interface Quote {
   createdById?: string;
   createdAt: string;
   updatedAt: string;
+  updatedById?: string;
+  approvedById?: string;
+  approvedAt?: string;
   publicToken?: string;
   publicUrl?: string;
   publicEnabled?: boolean;
@@ -135,6 +163,7 @@ export interface QuoteReference {
   number?: string;
   url?: string;
   totalAmount?: number;
+  status?: QuoteStatus;
 }
 
 export interface CreateQuoteFormInput {
@@ -157,8 +186,6 @@ export interface CreateQuoteInput {
 }
 
 export interface UpdateQuoteInput {
-  status?: QuoteStatus;
   data?: QuoteData;
   items?: QuoteItem[];
-  publicEnabled?: boolean;
 }
