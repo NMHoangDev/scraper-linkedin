@@ -513,6 +513,7 @@ async def upsert_zalo_account(
     avatar_url: Optional[str] = None,
     is_active: bool = True,
     id_member: Optional[str] = None,
+    is_shared_with_all: Optional[bool] = None,
 ) -> None:
     if not is_supabase_configured():
         return
@@ -532,6 +533,8 @@ async def upsert_zalo_account(
     }
     if id_member:
         payload["id_member"] = id_member
+    if is_shared_with_all is not None:
+        payload["is_shared_with_all"] = is_shared_with_all
     if status == "confirmed":
         payload["last_login_at"] = now
 
@@ -572,14 +575,16 @@ async def list_zalo_accounts(
 
     # id_member có thể là string (1 user) hoặc list[str] (leader + team members).
     # owner_id là fallback cho các account cũ chưa có id_member.
+    # Luôn OR thêm is_shared_with_all=true: tài khoản Zalo dùng chung toàn công ty
+    # phải hiện ra cho MỌI người gọi, không phụ thuộc owner/id_member/role.
     if id_member is not None:
         if isinstance(id_member, list):
             if id_member:
-                params["id_member"] = f"in.({','.join(id_member)})"
+                params["or"] = f"(id_member.in.({','.join(id_member)}),is_shared_with_all.eq.true)"
         else:
-            params["id_member"] = f"eq.{id_member}"
+            params["or"] = f"(id_member.eq.{id_member},is_shared_with_all.eq.true)"
     elif owner_id:
-        params["owner_id"] = f"eq.{owner_id}"
+        params["or"] = f"(owner_id.eq.{owner_id},is_shared_with_all.eq.true)"
 
     try:
         return await _rest("GET", "zalo_accounts", params=params) or []

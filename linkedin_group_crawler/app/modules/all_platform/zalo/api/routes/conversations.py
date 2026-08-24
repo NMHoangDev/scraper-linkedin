@@ -106,7 +106,7 @@ async def check_caller_conversation_access(
         "GET",
         "zalo_accounts",
         params={
-            "select": "owner_id",
+            "select": "owner_id,is_shared_with_all",
             "account_id": f"eq.{account_id}",
             "limit": "1",
         },
@@ -117,6 +117,11 @@ async def check_caller_conversation_access(
 
     # 3. Nếu là chủ sở hữu, cho phép xem toàn bộ
     if owner_user_id and caller_user_id == owner_user_id:
+        return None
+
+    # 3b. Tài khoản đánh dấu "dùng chung toàn công ty" -> mọi nhân viên đều full quyền,
+    # không cần là owner/admin/leader hay được share riêng từng hội thoại.
+    if account_rows and bool(account_rows[0].get("is_shared_with_all")):
         return None
 
     # 4. Nếu không phải chủ sở hữu, chỉ admin và leader được xem (nhưng bị giới hạn bởi các chat được share)
