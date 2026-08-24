@@ -62,6 +62,7 @@ class MarkActionRequest(BaseModel):
     fb_uid: str | None = None
     post_url: str | None = None
     email_member: str | None = None
+    content: str | None = None
 
 
 class InternalEngagementSummaryRequest(BaseModel):

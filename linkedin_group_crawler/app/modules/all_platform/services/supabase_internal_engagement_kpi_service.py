@@ -1572,6 +1572,7 @@ def mark_action_by_fb_uid(
     fb_uid: Optional[str] = None,
     post_url: Optional[str] = None,
     email_member: Optional[str] = None,
+    content: Optional[str] = None,
 ) -> dict:
     """Ghi nhận hành động tương tác (Like, Comment, Share) từ Extension hoặc FE vào bảng KPI"""
     supabase: Client = get_supabase_client()
@@ -1619,6 +1620,7 @@ def mark_action_by_fb_uid(
         "id_member": id_member,
         "link_post": clean_url,
         "action_type": action_type or "like",
+        "content": content if content else None,
         "status": "success",
         "profile_id": fb_uid,
     }

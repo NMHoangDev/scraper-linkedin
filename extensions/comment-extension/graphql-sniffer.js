@@ -8,13 +8,14 @@
 
     // Dispatch CustomEvent để content.js (ISOLATED world) bắt và kiểm tra session / target_link
     // trước khi ghi nhận KPI và hiển thị Toast thông báo cho người dùng.
-    function dispatchActionCaptured(actionType, fbUid, postUrl, delayMs = 0) {
+    function dispatchActionCaptured(actionType, fbUid, postUrl, delayMs = 0, content = "") {
         document.dispatchEvent(new CustomEvent("markee-action-captured", {
             detail: {
                 actionType: actionType,
                 fbUid: fbUid || "",
                 postUrl: postUrl || window.location.href,
                 delayMs: delayMs || 0,
+                content: content || "",
             },
         }));
     }
@@ -42,6 +43,7 @@
                 let postUrl = window.location.href;
                 let fbUid = "unknown";
                 let delayMs = 0;
+                let content = "";
 
                 // 1. NGHE HÀNH ĐỘNG LIKE (CometUFIFeedbackReactMutation / Reel Like)
                 const fbReact = responseData && responseData.data && (responseData.data.feedback_react || responseData.data.feedback_reaction);
@@ -75,7 +77,6 @@
                 }
 
                 // 3. NGHE HÀNH ĐỘNG SHARE REEL (Bắt qua xfb_fb_shorts_seen_state_mutation hoặc fb_shorts_seen_state_mutation)
-                // Lấy fbUid từ viewer.actor.id ("100044659656204") và hoãn 3 giây trước khi thông báo & bắn về DB
                 if (!actionType && responseData && responseData.data) {
                     const shortsMutation = responseData.data.xfb_fb_shorts_seen_state_mutation || responseData.data.fb_shorts_seen_state_mutation;
                     const actorId = shortsMutation && shortsMutation.viewer && shortsMutation.viewer.actor && shortsMutation.viewer.actor.id;
@@ -87,8 +88,28 @@
                     }
                 }
 
+                // 4. NGHE HÀNH ĐỘNG COMMENT THỦ CÔNG (bắt qua json.data.comment_create)
+                if (!actionType && responseData && responseData.data && responseData.data.comment_create) {
+                    const commentCreate = responseData.data.comment_create;
+                    actionType = "comment";
+                    let commentText = "";
+                    try {
+                        commentText = commentCreate.feedback_comment_edge?.node?.body?.text || "";
+                    } catch (e) {}
+
+                    fbUid = (commentCreate.feedback_comment_edge && commentCreate.feedback_comment_edge.node && commentCreate.feedback_comment_edge.node.author && commentCreate.feedback_comment_edge.node.author.id)
+                        || (commentCreate.feedback && commentCreate.feedback.viewer_actor && commentCreate.feedback.viewer_actor.id)
+                        || "unknown";
+
+                    postUrl = (commentCreate.feedback_comment_edge && commentCreate.feedback_comment_edge.node && commentCreate.feedback_comment_edge.node.url)
+                        || (commentCreate.feedback && commentCreate.feedback.url)
+                        || window.location.href;
+
+                    content = commentText;
+                }
+
                 if (actionType) {
-                    dispatchActionCaptured(actionType, fbUid, postUrl, delayMs);
+                    dispatchActionCaptured(actionType, fbUid, postUrl, delayMs, content);
                 }
             } catch (e) {}
         }

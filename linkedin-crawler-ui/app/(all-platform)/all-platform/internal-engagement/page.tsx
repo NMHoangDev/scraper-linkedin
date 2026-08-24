@@ -151,6 +151,7 @@ export default function InternalEngagementPage() {
   const [toast, setToast] = useState<ToastMessage | null>(null);
 
   // Tabs
+  const [mainTab, setMainTab] = useState<"overview" | "feed">("overview");
   const [tab, setTab] = useState<TaskStatusTab>("all");
   const [sourceTab, setSourceTab] = useState<SourceTab>("markee");
   const [search, setSearch] = useState("");
@@ -531,6 +532,78 @@ export default function InternalEngagementPage() {
   };
 
   const { libraryItems: commentTemplates } = useQuickCommentLibrary(modalPost?.platform || "facebook");
+  const { libraryItems: allQuickComments } = useQuickCommentLibrary();
+
+  const handleDoTask = async (post: InternalEngagementPost) => {
+    const postUrl = post.permalink_url || (post as any).link_post || "";
+    if (!postUrl) return;
+
+    // Random 1 mẫu câu từ thư viện mẫu câu khả dụng
+    if (allQuickComments && allQuickComments.length > 0) {
+      const postPlatform = post.platform || (postUrl.includes("linkedin.com") ? "linkedin" : postUrl.includes("youtube.com") ? "youtube" : "facebook");
+      const matchingTemplates = allQuickComments.filter(
+        (t) => t.platform === "all" || t.platform === postPlatform
+      );
+      const candidateList = matchingTemplates.length > 0 ? matchingTemplates : allQuickComments;
+      const randomItem = candidateList[Math.floor(Math.random() * candidateList.length)];
+
+      if (randomItem && randomItem.content) {
+        try {
+          await navigator.clipboard.writeText(randomItem.content);
+          showToast("Đã copy mẫu câu. Hãy dán (Ctrl+V) vào bình luận nhé!", "success");
+        } catch (err) {
+          console.warn("Clipboard write failed:", err);
+        }
+      }
+    }
+
+    // Gửi message cho Extension và mở Tab bài viết
+    const currentOrigin = typeof window !== "undefined" ? window.location.origin : "https://seeding.markeeai.com";
+    const fanpageId = (post as any).fanpage_id || (post as any).fanpageId || "";
+    const fanpageName = (post as any).fanpage_name || (post as any).fanpageName || "";
+    const facebookPostId = (post as any).facebook_post_id || (post as any).id_post || (post as any).facebookPostId || post.id || "unknown";
+
+    window.postMessage({
+      type: "SYNC_ACTIVE_MEMBER",
+      action: "SYNC_ACTIVE_MEMBER",
+      payload: {
+        email_member: user?.email || "",
+        apiBase: currentOrigin,
+        fanpage_id: fanpageId,
+        fanpage_name: fanpageName,
+        facebook_post_id: facebookPostId,
+        target_link: postUrl,
+      },
+    }, "*");
+
+    setTimeout(() => { window.open(postUrl, "_blank"); }, 200);
+  };
+
+  const handleOpenOriginalPost = (post: InternalEngagementPost) => {
+    const postUrl = post.permalink_url || (post as any).link_post || "";
+    if (!postUrl) return;
+
+    const currentOrigin = typeof window !== "undefined" ? window.location.origin : "https://seeding.markeeai.com";
+    const fanpageId = (post as any).fanpage_id || (post as any).fanpageId || "";
+    const fanpageName = (post as any).fanpage_name || (post as any).fanpageName || "";
+    const facebookPostId = (post as any).facebook_post_id || (post as any).id_post || (post as any).facebookPostId || post.id || "unknown";
+
+    window.postMessage({
+      type: "SYNC_ACTIVE_MEMBER",
+      action: "SYNC_ACTIVE_MEMBER",
+      payload: {
+        email_member: user?.email || "",
+        apiBase: currentOrigin,
+        fanpage_id: fanpageId,
+        fanpage_name: fanpageName,
+        facebook_post_id: facebookPostId,
+        target_link: postUrl,
+      },
+    }, "*");
+
+    setTimeout(() => { window.open(postUrl, "_blank"); }, 200);
+  };
+
   const commentTemplateGroups = useMemo(() => {
     const groups = new Map<string, { label: string; templates: typeof commentTemplates }>();
     commentTemplates.forEach((item) => {
@@ -1477,13 +1550,12 @@ export default function InternalEngagementPage() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="border border-[#e7e9ef] bg-white rounded-xl p-2"
+              className="border border-[#e7e9ef] bg-white rounded-xl p-2 cursor-pointer hover:bg-gray-50 transition"
               aria-label="refresh"
               onClick={() => loadPosts()}
             >
               🔄
             </button>
-            <div className="w-8.5 h-8.5 rounded-full bg-[#f1d4dc] grid place-items-center text-[#c71f4d] font-extrabold">M</div>
           </div>
         </div>
 
@@ -1496,6 +1568,12 @@ export default function InternalEngagementPage() {
               </p>
             </div>
             <div className="flex items-center gap-3">
+              <a
+                href="/all-platform/quick-comments"
+                className="px-4 py-2.5 border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl text-[13px] font-bold shadow-sm transition flex items-center gap-2"
+              >
+                <span>📚</span> Thư viện mẫu câu
+              </a>
               <button
                 type="button"
                 onClick={() => setIsCampaignModalOpen(true)}
@@ -1506,20 +1584,9 @@ export default function InternalEngagementPage() {
               <button
                 type="button"
                 onClick={openCreateTaskModal}
-                className="px-4 py-2.5 bg-[#be123c] hover:bg-[#9f1239] text-white rounded-xl text-[13px] font-bold shadow-sm transition flex items-center gap-2"
+                className="px-4 py-2.5 bg-[#be123c] hover:bg-[#9f1239] text-white rounded-xl text-[13px] font-bold shadow-sm transition flex items-center gap-2 cursor-pointer"
               >
                 <span className="text-base font-bold">+</span> Thêm bài viết Seeding
-              </button>
-              <button
-                type="button"
-                className={`px-3.5 py-2.5 rounded-xl font-bold text-[13px] border ${selectMode ? "bg-[#c71f4d] text-white border-[#c71f4d]" : "bg-white border-[#e7e9ef] text-[#3a3d47]"
-                  }`}
-                onClick={() => {
-                  setSelectMode((v) => !v);
-                  setSelectedIds(new Set());
-                }}
-              >
-                {selectMode ? "Thoát chọn nhiều" : "Chọn nhiều để comment"}
               </button>
             </div>
           </div>
@@ -1530,181 +1597,214 @@ export default function InternalEngagementPage() {
             </div>
           ) : null}
 
-          {/* 5 Stats Cards tính toán dữ liệu thật từ DB */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5 mb-6">
-            <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-              <span className="text-xs font-semibold text-gray-500 block">Tổng Seeder</span>
-              <div className="text-2xl font-black text-gray-900 mt-1">{realStats.totalSeeder}</div>
-              <span className="text-[11px] text-gray-400 font-medium">Thành viên đang hoạt động</span>
-            </div>
-            <div className="border border-rose-100 rounded-2xl p-4 bg-rose-50/20 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-              <span className="text-xs font-semibold text-rose-600 block">Bài viết đang chạy</span>
-              <div className="text-2xl font-black text-rose-950 mt-1">{realStats.activePosts}</div>
-              <span className="text-[11px] text-rose-500 font-medium">Bài viết Seeding hiện tại</span>
-            </div>
-            <div className="border border-emerald-100 rounded-2xl p-4 bg-emerald-50/20 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-              <span className="text-xs font-semibold text-emerald-600 block">Tiến độ KPI Comment</span>
-              <div className="text-2xl font-black text-emerald-950 mt-1">
-                {realStats.totalCompletedComments} / {realStats.totalTargetComments}
-              </div>
-              <span className="text-[11px] text-emerald-500 font-medium">
-                {Math.round((realStats.totalCompletedComments / Math.max(1, realStats.totalTargetComments)) * 100)}% mục tiêu
-              </span>
-            </div>
-            <div className="border border-amber-100 rounded-2xl p-4 bg-amber-50/20 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-              <span className="text-xs font-semibold text-amber-600 block">Seeder đã tham gia</span>
-              <div className="text-2xl font-black text-amber-950 mt-1">{realStats.activeUniqueMembers}</div>
-              <span className="text-[11px] text-amber-500 font-medium">
-                {Math.round((realStats.activeUniqueMembers / Math.max(1, realStats.totalSeeder)) * 100)}% tổng Seeder
-              </span>
-            </div>
-            <div className="border border-blue-200 rounded-2xl p-4 bg-blue-50/30 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-              <span className="text-xs font-semibold text-blue-600 block">Hoàn thành 100%</span>
-              <div className="text-2xl font-black text-blue-950 mt-1">{realStats.perfectMembers}</div>
-              <span className="text-[11px] text-blue-500 font-medium">Đã xong tất cả bài được giao</span>
-            </div>
+          {/* MAIN TABS SWITCHER */}
+          <div className="flex items-center gap-2 border-b border-gray-200 mb-6 bg-white p-2.5 rounded-2xl shadow-xs">
+            <button
+              type="button"
+              onClick={() => setMainTab("overview")}
+              className={`px-5 py-2.5 text-xs font-extrabold rounded-xl transition cursor-pointer flex items-center gap-2 ${
+                mainTab === "overview"
+                  ? "bg-[#be123c] text-white shadow-sm"
+                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              }`}
+            >
+              <span>📊</span> Tổng quan báo cáo
+            </button>
+            <button
+              type="button"
+              onClick={() => setMainTab("feed")}
+              className={`px-5 py-2.5 text-xs font-extrabold rounded-xl transition cursor-pointer flex items-center gap-2 ${
+                mainTab === "feed"
+                  ? "bg-[#be123c] text-white shadow-sm"
+                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              }`}
+            >
+              <span>⚡</span> Hoạt động seeding
+            </button>
           </div>
 
-          {/* DANH SÁCH CHIẾN DỊCH SEEDING ĐANG DIỄN RA */}
-          {campaigns.length > 0 ? (
-            <div className="mb-6 bg-white rounded-2xl p-4 border border-gray-100 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
-                  <span>🚩</span> Chiến dịch Seeding đang diễn ra ({campaigns.length})
-                </span>
-                {selectedCampaignId !== "all" ? (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedCampaignId("all")}
-                    className="text-xs text-rose-600 hover:underline font-semibold"
-                  >
-                    Xem tất cả bài viết
-                  </button>
-                ) : null}
+          {/* TAB 1: TỔNG QUAN BÁO CÁO */}
+          {mainTab === "overview" ? (
+            <div className="space-y-6">
+              {/* 5 Stats Cards tính toán dữ liệu thật từ DB */}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
+                <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+                  <span className="text-xs font-semibold text-gray-500 block">Tổng Seeder</span>
+                  <div className="text-2xl font-black text-gray-900 mt-1">{realStats.totalSeeder}</div>
+                  <span className="text-[11px] text-gray-400 font-medium">Thành viên đang hoạt động</span>
+                </div>
+                <div className="border border-rose-100 rounded-2xl p-4 bg-rose-50/20 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+                  <span className="text-xs font-semibold text-rose-600 block">Bài viết đang chạy</span>
+                  <div className="text-2xl font-black text-rose-950 mt-1">{realStats.activePosts}</div>
+                  <span className="text-[11px] text-rose-500 font-medium">Bài viết Seeding hiện tại</span>
+                </div>
+                <div className="border border-emerald-100 rounded-2xl p-4 bg-emerald-50/20 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+                  <span className="text-xs font-semibold text-emerald-600 block">Tiến độ KPI Comment</span>
+                  <div className="text-2xl font-black text-emerald-950 mt-1">
+                    {realStats.totalCompletedComments} / {realStats.totalTargetComments}
+                  </div>
+                  <span className="text-[11px] text-emerald-500 font-medium">
+                    {Math.round((realStats.totalCompletedComments / Math.max(1, realStats.totalTargetComments)) * 100)}% mục tiêu
+                  </span>
+                </div>
+                <div className="border border-amber-100 rounded-2xl p-4 bg-amber-50/20 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+                  <span className="text-xs font-semibold text-amber-600 block">Seeder đã tham gia</span>
+                  <div className="text-2xl font-black text-amber-950 mt-1">{realStats.activeUniqueMembers}</div>
+                  <span className="text-[11px] text-amber-500 font-medium">
+                    {Math.round((realStats.activeUniqueMembers / Math.max(1, realStats.totalSeeder)) * 100)}% tổng Seeder
+                  </span>
+                </div>
+                <div className="border border-blue-200 rounded-2xl p-4 bg-blue-50/30 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+                  <span className="text-xs font-semibold text-blue-600 block">Hoàn thành 100%</span>
+                  <div className="text-2xl font-black text-blue-950 mt-1">{realStats.perfectMembers}</div>
+                  <span className="text-[11px] text-blue-500 font-medium">Đã xong tất cả bài được giao</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2.5 overflow-x-auto pb-1">
-                <button
-                  type="button"
-                  onClick={() => setSelectedCampaignId("all")}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition shrink-0 border ${selectedCampaignId === "all"
-                    ? "bg-gray-900 text-white border-gray-900 shadow-sm"
-                    : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
-                    }`}
-                >
-                  Tất cả chiến dịch
-                </button>
-                {campaigns.map((camp) => {
-                  const isSelected = selectedCampaignId === camp.id;
-                  const color = camp.color_code || "#fff1f2";
-                  return (
-                    <div
-                      key={camp.id}
-                      style={{ backgroundColor: isSelected ? undefined : color }}
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition shrink-0 border flex items-center gap-2 ${isSelected
-                        ? "bg-[#be123c] text-white border-[#be123c] shadow-sm"
-                        : "text-gray-800 border-gray-200 hover:shadow-sm"
-                        }`}
-                    >
+
+              {/* DANH SÁCH CHIẾN DỊCH SEEDING ĐANG DIỄN RA */}
+              {campaigns.length > 0 ? (
+                <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>🚩</span> Chiến dịch Seeding đang diễn ra ({campaigns.length})
+                    </span>
+                    {selectedCampaignId !== "all" ? (
                       <button
                         type="button"
-                        onClick={() => setSelectedCampaignId(isSelected ? "all" : camp.id)}
-                        className="flex items-center gap-2 text-left outline-none"
+                        onClick={() => setSelectedCampaignId("all")}
+                        className="text-xs text-rose-600 hover:underline font-semibold cursor-pointer"
                       >
-                        <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
-                        <span>{camp.name}</span>
-                        {camp.start_date ? (
-                          <span className="text-[10px] opacity-75 font-normal">
-                            ({new Date(camp.start_date).toLocaleDateString("vi-VN")}
-                            {camp.end_date ? ` - ${new Date(camp.end_date).toLocaleDateString("vi-VN")}` : ""})
-                          </span>
-                        ) : null}
+                        Xem tất cả bài viết
                       </button>
-
-                      {/* Nút Xóa Chiến Dịch dành cho Admin / Leader */}
-                      {canManagePost ? (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteCampaignClick(camp.id, camp.name);
-                          }}
-                          className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] transition ${isSelected
-                            ? "bg-white/20 hover:bg-white/40 text-white"
-                            : "bg-red-100/80 hover:bg-red-200 text-red-700"
-                            }`}
-                          title="Xóa chiến dịch này"
-                        >
-                          🗑️
-                        </button>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
-
-          {/* Gamification Leaderboard Component */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                <span>🏆</span> Xếp hạng Seeder nổi bật
-              </h2>
-              <button onClick={() => { setIsLeaderboardModalOpen(true); setLeaderboardCurrentPage(1); }} className="text-xs text-[#be123c] hover:underline font-semibold">
-                Xem tất cả →
-              </button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                    <th className="pb-3 pl-2">Hạng</th>
-                    <th className="pb-3">Thành viên</th>
-                    <th className="pb-3 text-center">Được giao</th>
-                    <th className="pb-3 text-center">Hoàn thành</th>
-                    <th className="pb-3 text-center">Đúng hạn</th>
-                    <th className="pb-3 text-center">Tỷ lệ</th>
-                    <th className="pb-3 text-right pr-2">Điểm</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {activeLeaderboard.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="py-6 text-center text-gray-400 text-xs">
-                        Đang cập nhật dữ liệu bảng xếp hạng...
-                      </td>
-                    </tr>
-                  ) : (
-                    activeLeaderboard.slice(0, 5).map((item, idx) => {
-                      const rank = idx + 1;
-                      const badgeBg = rank === 1 ? "bg-amber-100 text-amber-800 border-amber-300" : rank === 2 ? "bg-slate-100 text-slate-700 border-slate-300" : rank === 3 ? "bg-orange-100 text-orange-800 border-orange-300" : "bg-gray-50 text-gray-600 border-gray-200";
-                      const rankIcon = rank === 1 ? "🥇 1" : rank === 2 ? "🥈 2" : rank === 3 ? "🥉 3" : rank;
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-2.5 overflow-x-auto pb-1">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCampaignId("all")}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-bold transition shrink-0 border cursor-pointer ${selectedCampaignId === "all"
+                        ? "bg-gray-900 text-white border-gray-900 shadow-sm"
+                        : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
+                        }`}
+                    >
+                      Tất cả chiến dịch
+                    </button>
+                    {campaigns.map((camp) => {
+                      const isSelected = selectedCampaignId === camp.id;
+                      const color = camp.color_code || "#fff1f2";
                       return (
-                        <tr key={item.user_id || idx} className="hover:bg-gray-50/60 transition-colors">
-                          <td className="py-3.5 pl-2">
-                            <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-bold border ${badgeBg}`}>
-                              {rankIcon}
-                            </span>
-                          </td>
-                          <td className="py-3.5">
-                            <div className="font-bold text-gray-900">{item.member_name}</div>
-                            <div className="text-xs text-gray-400 font-normal">{item.team_name}</div>
-                          </td>
-                          <td className="py-3.5 text-center text-gray-700 font-medium">{item.total_assigned}</td>
-                          <td className="py-3.5 text-center text-emerald-600 font-bold">{item.total_completed}</td>
-                          <td className="py-3.5 text-center text-blue-600 font-medium">{item.total_ontime}</td>
-                          <td className="py-3.5 text-center text-gray-700 font-medium">{item.completion_rate}%</td>
-                          <td className="py-3.5 text-right pr-2 font-black text-emerald-600 text-base">{item.score}</td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                        <div
+                          key={camp.id}
+                          style={{ backgroundColor: isSelected ? undefined : color }}
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition shrink-0 border flex items-center gap-2 ${isSelected
+                            ? "bg-[#be123c] text-white border-[#be123c] shadow-sm"
+                            : "text-gray-800 border-gray-200 hover:shadow-sm"
+                            }`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCampaignId(isSelected ? "all" : camp.id)}
+                            className="flex items-center gap-2 text-left outline-none cursor-pointer"
+                          >
+                            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
+                            <span>{camp.name}</span>
+                            {camp.start_date ? (
+                              <span className="text-[10px] opacity-75 font-normal">
+                                ({new Date(camp.start_date).toLocaleDateString("vi-VN")}
+                                {camp.end_date ? ` - ${new Date(camp.end_date).toLocaleDateString("vi-VN")}` : ""})
+                              </span>
+                            ) : null}
+                          </button>
 
-          {canSeeTeamInteractions ? <TeamPerformancePanel email={user?.email} /> : null}
+                          {/* Nút Xóa Chiến Dịch dành cho Admin / Leader */}
+                          {canManagePost ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteCampaignClick(camp.id, camp.name);
+                              }}
+                              className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] transition cursor-pointer ${isSelected
+                                ? "bg-white/20 hover:bg-white/40 text-white"
+                                : "bg-red-100/80 hover:bg-red-200 text-red-700"
+                                }`}
+                              title="Xóa chiến dịch này"
+                            >
+                              🗑️
+                            </button>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Gamification Leaderboard Component */}
+              <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                    <span>🏆</span> Xếp hạng Seeder nổi bật
+                  </h2>
+                  <button onClick={() => { setIsLeaderboardModalOpen(true); setLeaderboardCurrentPage(1); }} className="text-xs text-[#be123c] hover:underline font-semibold cursor-pointer">
+                    Xem tất cả →
+                  </button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        <th className="pb-3 pl-2">Hạng</th>
+                        <th className="pb-3">Thành viên</th>
+                        <th className="pb-3 text-center">Được giao</th>
+                        <th className="pb-3 text-center">Hoàn thành</th>
+                        <th className="pb-3 text-center">Đúng hạn</th>
+                        <th className="pb-3 text-center">Tỷ lệ</th>
+                        <th className="pb-3 text-right pr-2">Điểm</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {activeLeaderboard.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="py-6 text-center text-gray-400 text-xs">
+                            Đang cập nhật dữ liệu bảng xếp hạng...
+                          </td>
+                        </tr>
+                      ) : (
+                        activeLeaderboard.slice(0, 5).map((item, idx) => {
+                          const rank = idx + 1;
+                          const badgeBg = rank === 1 ? "bg-amber-100 text-amber-800 border-amber-300" : rank === 2 ? "bg-slate-100 text-slate-700 border-slate-300" : rank === 3 ? "bg-orange-100 text-orange-800 border-orange-300" : "bg-gray-50 text-gray-600 border-gray-200";
+                          const rankIcon = rank === 1 ? "🥇 1" : rank === 2 ? "🥈 2" : rank === 3 ? "🥉 3" : rank;
+                          return (
+                            <tr key={item.user_id || idx} className="hover:bg-gray-50/60 transition-colors">
+                              <td className="py-3.5 pl-2">
+                                <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-bold border ${badgeBg}`}>
+                                  {rankIcon}
+                                </span>
+                              </td>
+                              <td className="py-3.5">
+                                <div className="font-bold text-gray-900">{item.member_name}</div>
+                                <div className="text-xs text-gray-400 font-normal">{item.team_name}</div>
+                              </td>
+                              <td className="py-3.5 text-center text-gray-700 font-medium">{item.total_assigned}</td>
+                              <td className="py-3.5 text-center text-emerald-600 font-bold">{item.total_completed}</td>
+                              <td className="py-3.5 text-center text-blue-600 font-medium">{item.total_ontime}</td>
+                              <td className="py-3.5 text-center text-gray-700 font-medium">{item.completion_rate}%</td>
+                              <td className="py-3.5 text-right pr-2 font-black text-emerald-600 text-base">{item.score}</td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {canSeeTeamInteractions ? <TeamPerformancePanel email={user?.email} /> : null}
+            </div>
+          ) : (
+            /* TAB 2: HOẠT ĐỘNG SEEDING (POST FEED) */
+            <div>
 
           {/* Bulk action bar */}
           {selectMode ? (
@@ -2063,65 +2163,45 @@ export default function InternalEngagementPage() {
 
                         {/* BỐ CỤC FOOTER ACTION BUTTONS */}
                         <div className="flex items-center justify-between gap-3 pt-2.5 border-t border-gray-100 flex-wrap">
-                          <div className="flex flex-col gap-1">
-                            <button
-                              type="button"
-                              onClick={() => openInteractionsModal(post)}
-                              className="text-xs font-bold text-[#be123c] hover:underline text-left flex items-center gap-1"
-                            >
-                              Xem tương tác thành viên →
-                            </button>
+                          <button
+                            type="button"
+                            onClick={() => openInteractionsModal(post)}
+                            className="text-xs font-bold text-[#be123c] hover:underline text-left flex items-center gap-1"
+                          >
+                            Xem tương tác thành viên →
+                          </button>
 
-                            {/* Nút Xem bài viết gốc có Tooltip */}
-                            <div className="relative group inline-block">
+                          <div className="flex items-center justify-end gap-2">
+                            {/* Nút theo nền tảng: Facebook (Làm Nhiệm Vụ ↗ + Copy Mẫu câu) vs Nền tảng khác (Xem bài viết gốc ↗) */}
+                            {((post.platform || "").toLowerCase() === "facebook" || (post.platform || "").toLowerCase() === "fb") ? (
+                              <div className="relative group inline-block">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDoTask(post)}
+                                  className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-[#be123c] border border-rose-200 rounded-full text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-2xs"
+                                >
+                                  ⚡ Làm Nhiệm Vụ ↗
+                                </button>
+                                <div className="absolute bottom-full right-0 mb-1.5 hidden group-hover:block w-max z-10 pointer-events-none">
+                                  <div className="bg-gray-900 text-white text-[11px] font-medium rounded-lg py-1 px-2.5 shadow-xl">
+                                    Tự động copy mẫu câu &amp; mở bài viết để Like/Comment/Share để tương tác trên FB
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
                               <button
                                 type="button"
-                                onClick={() => {
-                                  const postUrl = post.permalink_url || (post as any).link_post || "";
-                                  if (!postUrl) return;
-                                  // Đồng bộ email_member vào Extension storage trước khi mở tab Facebook
-                                  // để graphql-sniffer có thể ghi nhận Like/Share thủ công
-                                  const currentOrigin = typeof window !== "undefined" ? window.location.origin : "https://seeding.markeeai.com";
-                                  const fanpageId = (post as any).fanpage_id || (post as any).fanpageId || "";
-                                  const fanpageName = (post as any).fanpage_name || (post as any).fanpageName || "";
-                                  const facebookPostId = (post as any).facebook_post_id || (post as any).id_post || (post as any).facebookPostId || post.id || "unknown";
-
-                                  window.postMessage({
-                                    type: "SYNC_ACTIVE_MEMBER",
-                                    action: "SYNC_ACTIVE_MEMBER",
-                                    payload: {
-                                      email_member: user?.email || "",
-                                      apiBase: currentOrigin,
-                                      fanpage_id: fanpageId,
-                                      fanpage_name: fanpageName,
-                                      facebook_post_id: facebookPostId,
-                                      target_link: postUrl,
-                                    },
-                                  }, "*");
-                                  // Delay nhẹ để Extension kịp xử lý storage rồi mới mở tab
-                                  setTimeout(() => { window.open(postUrl, "_blank"); }, 200);
-                                }}
-                                className="text-xs font-medium text-gray-500 hover:text-blue-600 hover:underline flex items-center gap-1 text-left transition-colors cursor-pointer"
+                                onClick={() => handleOpenOriginalPost(post)}
+                                className="px-3.5 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-full text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-2xs"
                               >
                                 Xem bài viết gốc ↗
                               </button>
+                            )}
 
-                              {/* Tooltip hiển thị khi Hover - Chỉ dành cho Facebook */}
-                              {isFacebookPost ? (
-                                <div className="absolute bottom-full left-0 mb-1 hidden group-hover:block w-max z-10 pointer-events-none">
-                                  <div className="bg-gray-800 text-white text-xs rounded py-1 px-2 shadow-lg">
-                                    Bấm vào xem bài viết gốc để Like & Share thủ công
-                                  </div>
-                                </div>
-                              ) : null}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2">
                             <button
                               type="button"
                               onClick={() => openModal(post)}
-                              className="px-5 py-2 bg-[#BE123C] hover:bg-[#9F1239] text-white rounded-full text-xs font-bold shadow-sm transition"
+                              className="px-5 py-2 bg-[#BE123C] hover:bg-[#9F1239] text-white rounded-full text-xs font-bold shadow-sm transition cursor-pointer"
                             >
                               Comment ngay
                             </button>
@@ -2160,6 +2240,8 @@ export default function InternalEngagementPage() {
               </div>
             ) : null}
           </div>
+        </div>
+      )}
         </div>
 
         {/* Comment modal */}

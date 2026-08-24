@@ -184,7 +184,7 @@ export interface QuickCommentTemplate {
   title: string;
   label: string;
   content: string;
-  platform: "all" | "facebook" | "linkedin";
+  platform: "all" | "facebook" | "linkedin" | "youtube" | string;
   order_index: number;
   created_by?: string;
   created_at?: string;
