@@ -2444,3 +2444,5 @@ export const customerLeadsService = {
     return requestJson("/customer-leads/" + id, { method: "DELETE" });
   },
 };
+
+export type { QuickCommentTemplate } from "@/types/unified.types";

@@ -136,7 +136,7 @@ let reelShareTimer = null;
 // Lắng nghe sự kiện Like/Share bắt được từ graphql-sniffer.js (MAIN world)
 document.addEventListener("markee-action-captured", (evt) => {
   try {
-    const { actionType, fbUid, postUrl, delayMs } = evt.detail || {};
+    const { actionType, fbUid, postUrl, delayMs, content } = evt.detail || {};
     if (!actionType) return;
 
     const executeRecordAction = () => {
@@ -152,7 +152,8 @@ document.addEventListener("markee-action-captured", (evt) => {
         if (!emailMember) return;
 
         // ĐÚNG TAB MỤC TIÊU ĐƯỢC CẤP QUYỀN -> Hiển thị Toast thông báo xanh cho người dùng
-        showToastNotification(`✅ Đã ghi nhận ${actionType === "like" ? "Like" : "Share"} thành công!`);
+        const actionLabel = actionType === "like" ? "Like" : (actionType === "comment" ? "Comment" : "Share");
+        showToastNotification(`✅ Đã ghi nhận ${actionLabel} thành công!`);
 
         let apiBase = verifyConfig.apiBase || "https://seeding.markeeai.com";
         if (!apiBase || typeof apiBase !== "string" || !apiBase.startsWith("http")) {
@@ -167,7 +168,7 @@ document.addEventListener("markee-action-captured", (evt) => {
           fanpage_name: verifyConfig.fanpage_name || "",
           facebook_post_id: verifyConfig.facebook_post_id || "unknown",
           action_type: actionType,
-          content: "",          // Like/Share không có content, để rỗng
+          content: content || "",
           profile_id: fbUid || "",
           status: "success",
         };
