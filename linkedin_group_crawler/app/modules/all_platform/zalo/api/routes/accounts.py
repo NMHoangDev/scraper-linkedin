@@ -102,6 +102,7 @@ class ZaloAccountUpdate(BaseModel):
     phone: Optional[str] = None
     status: Optional[str] = None
     email: Optional[str] = None  # dùng để auto-resolve id_member nếu không truyền
+    is_shared_with_all: Optional[bool] = None  # admin-only, xem _require_admin_only bên dưới
 
 
 @router.get("")
@@ -296,6 +297,17 @@ async def update_account(
         if id_member is None:
             id_member = existing.get("id_member")
 
+    # is_shared_with_all cấp quyền xem/gửi cho TOÀN BỘ nhân viên -- chỉ admin được đổi cờ này,
+    # khác với các field khác (cho phép cả leader/self qua _require_admin_leader_or_self ở trên).
+    is_shared_with_all = existing.get("is_shared_with_all")
+    if body.is_shared_with_all is not None:
+        if (await get_user_role(caller_email or "")) != "admin":
+            raise HTTPException(
+                status_code=403,
+                detail="Chỉ admin mới được đổi trạng thái dùng chung toàn công ty (is_shared_with_all).",
+            )
+        is_shared_with_all = body.is_shared_with_all
+
     try:
         await upsert_zalo_account(
             safe_account_id,
@@ -304,6 +316,7 @@ async def update_account(
             label=body.label if body.label is not None else existing.get("label") or safe_account_id,
             phone=body.phone if body.phone is not None else existing.get("phone"),
             status=body.status if body.status is not None else existing.get("status") or "unknown",
+            is_shared_with_all=is_shared_with_all,
         )
         await upsert_zalo_user(
             safe_account_id,
