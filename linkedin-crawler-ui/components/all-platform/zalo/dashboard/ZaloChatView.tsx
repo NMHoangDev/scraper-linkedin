@@ -27,6 +27,7 @@ import { ZaloEmptyChat } from "./chat/ZaloEmptyChat";
 import { ZaloConversationListVirtualized } from "./sidebar/ZaloConversationListVirtualized";
 import { ZaloNewChatModal } from "./ZaloNewChatModal";
 import { ZaloKpiPanel } from "./ZaloKpiPanel";
+import { ZaloExtensionLauncher } from "./ZaloExtensionLauncher";
 
 const REFRESH_INTERVAL_MS = 2000;
 const MESSAGE_PAGE_SIZE = 50;
@@ -1282,6 +1283,8 @@ export function ZaloChatView({ flow, onBackToDashboard, fullScreen = false }: Za
     <div
       className="flex-1 h-full w-full bg-surface overflow-hidden min-h-0 flex flex-col"
     >
+      <ZaloExtensionLauncher />
+
       {/* [P2] STATS BAR (Horizontal row at the top) */}
       {flow.isLoggedIn && (
         <section className="grid grid-cols-2 md:grid-cols-4 gap-2.5 px-4 py-1.5 border-b border-outline-variant bg-surface shrink-0 shadow-sm">
