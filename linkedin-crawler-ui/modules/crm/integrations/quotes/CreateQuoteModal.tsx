@@ -32,6 +32,7 @@ export function CreateQuoteModal({
   initialDeal,
   editQuote,
   canApproveQuotes = false,
+  initialQuoteFormId,
   onClose,
   onCreated,
   onUpdated,
@@ -45,6 +46,10 @@ export function CreateQuoteModal({
   /** Nếu có — modal mở ở CHẾ ĐỘ SỬA 1 báo giá đã tồn tại (chưa duyệt) thay vì
    * tạo mới. Load đầy đủ dữ liệu đã lưu, không tạo báo giá mới, không đổi mã. */
   editQuote?: Quote | null;
+  /** Mở từ 1 card "Mẫu dùng nhanh" — chọn sẵn mẫu này, vẫn qua bước 1 (khách
+   * hàng) bình thường rồi nhảy thẳng bước 3, bỏ qua bước 2 (chọn mẫu). Bỏ qua
+   * hoàn toàn nếu đang ở chế độ sửa. */
+  initialQuoteFormId?: string;
   /** User hiện tại có quyền duyệt báo giá không (admin hoặc can_approve_quotes) -
    * quyết định có hiện nút "Duyệt báo giá" trong chế độ sửa hay không. */
   canApproveQuotes?: boolean;
@@ -66,6 +71,23 @@ export function CreateQuoteModal({
   const submitting = submittingAction !== null;
   const [submitError, setSubmitError] = useState('');
 
+  // Tất cả báo giá thật, tự fetch khi mở modal — dùng cho khối thống kê CRM ở
+  // bước 1 (số báo giá/giá trị/đã chốt/tỷ lệ chuyển đổi theo khách hàng).
+  const [allQuotes, setAllQuotes] = useState<Quote[]>([]);
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    seedingQuoteRepository.getQuotes().then(rows => {
+      if (!cancelled) setAllQuotes(rows);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [open]);
+
+  // Báo giá vừa tạo xong (draft) — hiện màn "Đã tạo báo giá thành công" thay vì
+  // đóng modal ngay. null = chưa tạo/đang ở các bước 1-4.
+  const [createdQuote, setCreatedQuote] = useState<Quote | null>(null);
+  const [approveError, setApproveError] = useState('');
+
   // Chế độ sửa: nạp dữ liệu báo giá đã lưu (mẫu + khách hàng liên kết + nội
   // dung) mỗi khi mở modal cho 1 báo giá khác. Không chạy lại khi đóng modal.
   useEffect(() => {
@@ -84,6 +106,17 @@ export function CreateQuoteModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editQuote?.id]);
 
+  // Mở từ "Mẫu dùng nhanh" — chọn sẵn mẫu, quoteDraft dựng lại ở
+  // handleCustomerNext (lúc đó activeCustomer mới có dữ liệu thật).
+  useEffect(() => {
+    if (!open || editQuote || !initialQuoteFormId) return;
+    let cancelled = false;
+    seedingQuoteRepository.getForm(initialQuoteFormId).then(form => {
+      if (!cancelled) setSelectedForm(form);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [open, editQuote, initialQuoteFormId]);
+
   function resetAndClose() {
     if (submitting) return;
     setStep(1);
@@ -92,6 +125,8 @@ export function CreateQuoteModal({
     setPreviewForm(null);
     setQuoteDraft(emptyQuoteDraft());
     setSubmitError('');
+    setCreatedQuote(null);
+    setApproveError('');
     onClose();
   }
 
@@ -119,7 +154,13 @@ export function CreateQuoteModal({
       return;
     }
     setCustomer(activeCustomer);
-    setStep(2);
+    if (selectedForm) {
+      // Mẫu đã chọn sẵn (mở từ "Mẫu dùng nhanh") - bỏ qua bước 2.
+      setQuoteDraft(quoteDraftFromForm(selectedForm, activeCustomer));
+      setStep(3);
+    } else {
+      setStep(2);
+    }
   }
 
   function handleSelectForm(form: QuoteForm) {
@@ -168,7 +209,9 @@ export function CreateQuoteModal({
       });
       createdQuoteId = quote.id;
       onCreated(quote);
-      resetAndClose();
+      // Khong dong modal ngay - hien man "Da tao bao gia thanh cong" (bao gia
+      // van la draft, chua co public link cho toi khi duyet - xem handleApproveNow).
+      setCreatedQuote(quote);
     } catch (err) {
       if (createdQuoteId) await seedingQuoteRepository.deleteQuote(createdQuoteId).catch(() => {});
       if (createdDealId) await seedingCrmRepository.deleteDeal(createdDealId).catch(() => {});
@@ -211,14 +254,44 @@ export function CreateQuoteModal({
     }
   }
 
+  /** Nút "Duyệt ngay" trên màn "Đã tạo báo giá thành công" - duyệt NGAY báo
+   * giá vừa tạo (còn nguyên draft, không có thay đổi chưa lưu vì vừa submit
+   * xong nên chỉ cần approveQuote thường, không cần update+approve gộp). Lỗi
+   * thì giữ nguyên trạng thái draft, không tự chuyển sang "đã duyệt" khi chưa
+   * chắc chắn. Sau khi duyệt xong mà response thiếu publicUrl thì refetch lại
+   * bản đầy đủ - không bao giờ bật nút public bằng dữ liệu rỗng/suy đoán. */
+  async function handleApproveNow() {
+    if (!createdQuote) return;
+    setSubmittingAction('approve');
+    setApproveError('');
+    try {
+      let approved = await seedingQuoteRepository.approveQuote(createdQuote.id);
+      if (!approved.publicUrl) {
+        approved = await seedingQuoteRepository.getQuote(createdQuote.id);
+      }
+      setCreatedQuote(approved);
+      onUpdated?.(approved);
+    } catch (err) {
+      setApproveError(err instanceof Error ? err.message : 'Không thể duyệt báo giá.');
+    } finally {
+      setSubmittingAction(null);
+    }
+  }
+
   return (
     <div className="crm-modal-backdrop" onClick={resetAndClose}>
       <div className="crm-modal crm-wizard-modal" onClick={event => event.stopPropagation()}>
         <header className="crm-modal-header">
           <div>
-            <h2 className="crm-modal-title">{isEditMode ? `Sửa báo giá ${editQuote?.quoteNumber || ''}` : 'Tạo báo giá'}</h2>
+            <h2 className="crm-modal-title">
+              {createdQuote ? 'Đã tạo báo giá thành công' : isEditMode ? `Sửa báo giá ${editQuote?.quoteNumber || ''}` : 'Tạo báo giá'}
+            </h2>
             <p className="crm-modal-subtitle">
-              {isEditMode ? 'Chỉnh sửa nội dung — chưa duyệt thì còn sửa được không giới hạn.' : 'Tạo báo giá độc lập — có thể gắn vào deal hoặc không.'}
+              {createdQuote
+                ? `Báo giá ${createdQuote.quoteNumber} đã được lưu.`
+                : isEditMode
+                  ? 'Chỉnh sửa nội dung — chưa duyệt thì còn sửa được không giới hạn.'
+                  : 'Tạo báo giá độc lập — có thể gắn vào deal hoặc không.'}
             </p>
           </div>
           <button type="button" className="crm-modal-close" onClick={resetAndClose} aria-label="Đóng" disabled={submitting}>
@@ -226,116 +299,217 @@ export function CreateQuoteModal({
           </button>
         </header>
 
-        <div className="crm-wizard-stepper-container">
-          <div className="crm-wizard-stepper-inner">
-            {([1, 2, 3, 4] as CreateQuoteStep[]).map((item, index) => (
-              <div key={item} style={{ display: 'flex', alignItems: 'center' }}>
-                <div
-                  className={`crm-wizard-step-item ${item === step ? 'crm-wizard-step-item--active' : ''} ${item < step ? 'crm-wizard-step-item--done' : ''}`}
-                  onClick={() => item < step && setStep(item)}
-                >
-                  <div className="crm-wizard-step-circle">
-                    {item < step ? <CheckCircle2 className="w-3 h-3" /> : <span>{item}</span>}
+        {createdQuote ? null : (
+          <div className="crm-wizard-stepper-container">
+            <div className="crm-wizard-stepper-inner">
+              {([1, 2, 3, 4] as CreateQuoteStep[]).map((item, index) => (
+                <div key={item} style={{ display: 'flex', alignItems: 'center' }}>
+                  <div
+                    className={`crm-wizard-step-item ${item === step ? 'crm-wizard-step-item--active' : ''} ${item < step ? 'crm-wizard-step-item--done' : ''}`}
+                    onClick={() => item < step && setStep(item)}
+                  >
+                    <div className="crm-wizard-step-circle">
+                      {item < step ? <CheckCircle2 className="w-3 h-3" /> : <span>{item}</span>}
+                    </div>
+                    <span className="crm-wizard-step-label">{STEP_LABELS[item]}</span>
                   </div>
-                  <span className="crm-wizard-step-label">{STEP_LABELS[item]}</span>
+                  {index < 3 ? (
+                    <div className={`crm-wizard-step-line ${item < step ? 'crm-wizard-step-line--done' : ''}`} />
+                  ) : null}
                 </div>
-                {index < 3 ? (
-                  <div className={`crm-wizard-step-line ${item < step ? 'crm-wizard-step-line--done' : ''}`} />
-                ) : null}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="crm-modal-body crm-wizard-body">
           <div className="crm-wizard-content">
-            {step === 1 ? (
-              <SelectCustomerStep
-                deals={deals}
-                customer={activeCustomer}
-                onChangeCustomer={setCustomer}
-                lockedDeal={lockedDealForStep1}
+            {createdQuote ? (
+              <QuoteSuccessPanel
+                quote={createdQuote}
+                canApprove={canApproveQuotes}
+                approving={submittingAction === 'approve'}
+                approveError={approveError}
+                customerEmail={activeCustomer.email}
+                onApproveNow={() => void handleApproveNow()}
               />
-            ) : null}
-            {step === 2 ? (
-              <SelectQuoteFormStep
-                selectedFormId={selectedForm?.id}
-                previewForm={previewForm}
-                onPreview={setPreviewForm}
-                onSelect={handleSelectForm}
-                onSkip={() => {}}
-                hideSkip
-              />
-            ) : null}
-            {step === 3 && selectedForm ? (
-              <FillQuoteStep
-                schema={selectedForm.schemaJson}
-                value={quoteDraft}
-                onChange={setQuoteDraft}
-                quoteFormId={selectedForm.id}
-              />
-            ) : null}
-            {step === 3 && !selectedForm && isEditMode ? (
-              // Dang cho getForm() tai xong (che do sua) - giu 1 khoi placeholder
-              // co chieu cao thay vi de trong, tranh modal "giat" phinh to dot
-              // ngot khi form load xong.
-              <div className="crm-wizard-loading-placeholder">Đang tải báo giá...</div>
-            ) : null}
-            {step === 4 && selectedForm ? <ReviewQuoteStep schema={selectedForm.schemaJson} draft={quoteDraft} /> : null}
-            {submitError ? <p className="crm-error">{submitError}</p> : null}
+            ) : (
+              <>
+                {step === 1 ? (
+                  <SelectCustomerStep
+                    deals={deals}
+                    customer={activeCustomer}
+                    onChangeCustomer={setCustomer}
+                    lockedDeal={lockedDealForStep1}
+                    quotes={allQuotes}
+                    agents={agents}
+                  />
+                ) : null}
+                {step === 2 ? (
+                  <SelectQuoteFormStep
+                    selectedFormId={selectedForm?.id}
+                    previewForm={previewForm}
+                    onPreview={setPreviewForm}
+                    onSelect={handleSelectForm}
+                    onSkip={() => {}}
+                    hideSkip
+                  />
+                ) : null}
+                {step === 3 && selectedForm ? (
+                  <FillQuoteStep
+                    schema={selectedForm.schemaJson}
+                    value={quoteDraft}
+                    onChange={setQuoteDraft}
+                    quoteFormId={selectedForm.id}
+                  />
+                ) : null}
+                {step === 3 && !selectedForm && isEditMode ? (
+                  // Dang cho getForm() tai xong (che do sua) - giu 1 khoi placeholder
+                  // co chieu cao thay vi de trong, tranh modal "giat" phinh to dot
+                  // ngot khi form load xong.
+                  <div className="crm-wizard-loading-placeholder">Đang tải báo giá...</div>
+                ) : null}
+                {step === 4 && selectedForm ? (
+                  <ReviewQuoteStep schema={selectedForm.schemaJson} draft={quoteDraft} onChange={setQuoteDraft} />
+                ) : null}
+                {submitError ? <p className="crm-error">{submitError}</p> : null}
+              </>
+            )}
           </div>
         </div>
 
         <footer className="crm-modal-footer">
-          <div className="crm-footer-left">
-            <button type="button" className="crm-cancel-button" onClick={resetAndClose} disabled={submitting}>
-              Hủy
-            </button>
-          </div>
-          <div className="crm-footer-right">
-            {step > 1 ? (
-              <button
-                type="button"
-                className="crm-cancel-button"
-                disabled={submitting}
-                onClick={() => setStep(current => (current - 1) as CreateQuoteStep)}
-              >
-                Quay lại
+          {createdQuote ? (
+            <div className="crm-footer-right" style={{ marginLeft: 'auto' }}>
+              <button type="button" className="crm-save-button crm-save-button--large" onClick={resetAndClose}>
+                Đóng
               </button>
-            ) : null}
-            {step === 1 ? (
-              <button type="button" className="crm-save-button" onClick={handleCustomerNext}>
-                Tiếp theo
-              </button>
-            ) : null}
-            {step === 3 ? (
-              <button type="button" className="crm-save-button" onClick={() => setStep(4)}>
-                Tiếp theo
-              </button>
-            ) : null}
-            {step === 4 && !isEditMode ? (
-              <button type="button" className="crm-save-button crm-save-button--large" disabled={submitting} onClick={() => void handleSubmit()}>
-                {submittingAction === 'create' ? <Loader2 className="crm-save-spinner" /> : null}
-                {submittingAction === 'create' ? 'Đang tạo...' : 'Tạo báo giá'}
-              </button>
-            ) : null}
-            {step === 4 && isEditMode ? (
-              <>
-                <button type="button" className="crm-save-button crm-save-button--update" disabled={submitting} onClick={() => void handleUpdate()}>
-                  {submittingAction === 'update' ? <Loader2 className="crm-save-spinner" /> : null}
-                  Cập nhật báo giá
+            </div>
+          ) : (
+            <>
+              <div className="crm-footer-left">
+                <button type="button" className="crm-cancel-button" onClick={resetAndClose} disabled={submitting}>
+                  Hủy
                 </button>
-                {canApproveQuotes ? (
-                  <button type="button" className="crm-save-button crm-save-button--large crm-save-button--approve" disabled={submitting} onClick={() => void handleApprove()}>
-                    {submittingAction === 'approve' ? <Loader2 className="crm-save-spinner" /> : null}
-                    Duyệt báo giá
+              </div>
+              <div className="crm-footer-right">
+                {step > 1 ? (
+                  <button
+                    type="button"
+                    className="crm-cancel-button"
+                    disabled={submitting}
+                    onClick={() => setStep(current => (current - 1) as CreateQuoteStep)}
+                  >
+                    Quay lại
                   </button>
                 ) : null}
-              </>
-            ) : null}
-          </div>
+                {step === 1 ? (
+                  <button type="button" className="crm-save-button" onClick={handleCustomerNext}>
+                    Tiếp theo
+                  </button>
+                ) : null}
+                {step === 3 ? (
+                  <button type="button" className="crm-save-button" onClick={() => setStep(4)}>
+                    Tiếp theo
+                  </button>
+                ) : null}
+                {step === 4 && !isEditMode ? (
+                  <button type="button" className="crm-save-button crm-save-button--large" disabled={submitting} onClick={() => void handleSubmit()}>
+                    {submittingAction === 'create' ? <Loader2 className="crm-save-spinner" /> : null}
+                    {submittingAction === 'create' ? 'Đang tạo...' : 'Tạo báo giá'}
+                  </button>
+                ) : null}
+                {step === 4 && isEditMode ? (
+                  <>
+                    <button type="button" className="crm-save-button crm-save-button--update" disabled={submitting} onClick={() => void handleUpdate()}>
+                      {submittingAction === 'update' ? <Loader2 className="crm-save-spinner" /> : null}
+                      Cập nhật báo giá
+                    </button>
+                    {canApproveQuotes ? (
+                      <button type="button" className="crm-save-button crm-save-button--large crm-save-button--approve" disabled={submitting} onClick={() => void handleApprove()}>
+                        {submittingAction === 'approve' ? <Loader2 className="crm-save-spinner" /> : null}
+                        Duyệt báo giá
+                      </button>
+                    ) : null}
+                  </>
+                ) : null}
+              </div>
+            </>
+          )}
         </footer>
       </div>
+    </div>
+  );
+}
+
+function QuoteSuccessPanel({
+  quote,
+  canApprove,
+  approving,
+  approveError,
+  customerEmail,
+  onApproveNow,
+}: {
+  quote: Quote;
+  canApprove: boolean;
+  approving: boolean;
+  approveError: string;
+  customerEmail?: string;
+  onApproveNow: () => void;
+}) {
+  const isApproved = quote.status === 'approved' && Boolean(quote.publicUrl);
+  const publicFullUrl = quote.publicUrl && typeof window !== 'undefined' ? `${window.location.origin}${quote.publicUrl}` : '';
+
+  async function copyLink() {
+    if (!publicFullUrl) return;
+    await navigator.clipboard.writeText(publicFullUrl);
+  }
+  function openPdf() {
+    if (!publicFullUrl) return;
+    window.open(`${publicFullUrl}?print=true`, '_blank', 'noopener');
+  }
+  const mailtoHref = publicFullUrl
+    ? `mailto:${customerEmail || ''}?subject=${encodeURIComponent(`Báo giá ${quote.quoteNumber}`)}&body=${encodeURIComponent(`Kính gửi Quý khách,\n\nMời Quý khách xem báo giá tại: ${publicFullUrl}\n\nTrân trọng.`)}`
+    : undefined;
+
+  return (
+    <div className="crm-quote-success-panel">
+      <div className="crm-quote-success-icon">
+        <CheckCircle2 className="w-6 h-6" />
+      </div>
+      <p className="crm-quote-success-status">
+        {isApproved
+          ? 'Báo giá đã được duyệt — khách hàng có thể xem link công khai.'
+          : 'Báo giá đang ở trạng thái chờ duyệt — link công khai chỉ có sau khi được duyệt.'}
+      </p>
+
+      {!isApproved && canApprove ? (
+        <button type="button" className="crm-save-button crm-save-button--approve" disabled={approving} onClick={onApproveNow}>
+          {approving ? <Loader2 className="crm-save-spinner" /> : null}
+          {approving ? 'Đang duyệt...' : 'Duyệt ngay'}
+        </button>
+      ) : null}
+      {approveError ? <p className="crm-error">{approveError}</p> : null}
+
+      <div className="crm-quote-success-actions">
+        <button type="button" className="crm-cancel-button" disabled={!isApproved} onClick={() => void copyLink()}>
+          Sao chép link
+        </button>
+        <button type="button" className="crm-cancel-button" disabled={!isApproved} onClick={openPdf}>
+          Tải PDF
+        </button>
+        <a
+          className={`crm-cancel-button ${!isApproved ? 'crm-cancel-button--disabled' : ''}`}
+          href={isApproved ? mailtoHref : undefined}
+          aria-disabled={!isApproved}
+          onClick={event => {
+            if (!isApproved) event.preventDefault();
+          }}
+        >
+          Gửi email khách hàng
+        </a>
+      </div>
+      {!isApproved ? <small className="crm-quote-success-hint">Chỉ dùng được sau khi báo giá được duyệt.</small> : null}
     </div>
   );
 }

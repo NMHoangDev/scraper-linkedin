@@ -2300,6 +2300,50 @@
   gap: 0.5rem;
 }
 
+.crm-quote-crm-linked {
+  margin-top: 0.7rem;
+  border: 1px solid #c8eadb;
+  background: #ecf8f3;
+  border-radius: 0.7rem;
+  padding: 0.65rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.crm-quote-crm-linked-badge {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #176a4d;
+  width: fit-content;
+}
+
+.crm-quote-crm-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.6rem;
+  background: #ffffff;
+  border: 1px solid #e3e8ef;
+  border-radius: 0.6rem;
+  padding: 0.6rem 0.7rem;
+}
+
+.crm-quote-crm-stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.crm-quote-crm-stats span {
+  font-size: 0.68rem;
+  color: #7c8797;
+}
+
+.crm-quote-crm-stats strong {
+  font-size: 0.85rem;
+  color: #263247;
+}
+
 .crm-contract-detail-backdrop {
   align-items: center;
 }
@@ -3099,7 +3143,7 @@
 
 /* Deal+Quote wizard — values ported from chatwoot/overrides CrmDealQuoteModal.vue (scoped styles) */
 .crm-wizard-modal {
-  width: min(68rem, 100%);
+  width: min(74rem, 96vw);
 }
 
 .crm-wizard-stepper-container {
@@ -3467,4 +3511,161 @@
   justify-content: center;
   color: #64748b;
   font-size: 0.85rem;
+}
+
+/* Buoc 3 - toolbar "Cot hien thi" + tuy chon gui */
+.crm-quote-review-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.crm-quote-column-picker {
+  position: relative;
+}
+
+.crm-quote-column-count {
+  background: #fff0f4;
+  color: #be1e4b;
+  border-radius: 10px;
+  padding: 1px 7px;
+  font-size: 0.68rem;
+  margin-left: 0.35rem;
+}
+
+.crm-quote-column-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  width: 260px;
+  background: #ffffff;
+  border: 1px solid #dfe4eb;
+  border-radius: 12px;
+  box-shadow: 0 16px 35px rgba(38, 51, 75, 0.15);
+  padding: 12px;
+  z-index: 20;
+}
+
+.crm-quote-column-menu > p {
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: #7a8494;
+  margin: 0 0 0.6rem;
+}
+
+.crm-quote-column-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 3px;
+  border-top: 1px solid #f0f2f5;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #4f5a6c;
+}
+
+.crm-quote-column-menu-foot {
+  display: flex;
+  gap: 6px;
+  padding-top: 8px;
+}
+
+.crm-quote-column-menu-foot button {
+  flex: 1;
+  height: 28px;
+  border: 1px solid #dfe4eb;
+  border-radius: 7px;
+  background: #fff;
+  color: #606b7c;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.crm-quote-send-options {
+  margin-top: 1.1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.8rem;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: #f8fafc;
+}
+
+.crm-quote-send-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: #344054;
+}
+
+.crm-quote-send-option--disabled {
+  color: #98a1af;
+}
+
+.crm-quote-send-option em {
+  font-style: normal;
+  font-size: 0.7rem;
+  color: #98a1af;
+}
+
+.crm-quote-send-hint {
+  font-size: 0.72rem;
+  color: #7c8797;
+  margin: 0.2rem 0 0;
+}
+
+/* Man "Da tao bao gia thanh cong" */
+.crm-quote-success-panel {
+  max-width: 32rem;
+  margin: 2.5rem auto;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.crm-quote-success-icon {
+  width: 3.6rem;
+  height: 3.6rem;
+  border-radius: 50%;
+  background: #e7f8f0;
+  color: #10b981;
+  display: grid;
+  place-items: center;
+}
+
+.crm-quote-success-status {
+  font-size: 0.9rem;
+  color: #475467;
+  margin: 0;
+}
+
+.crm-quote-success-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.4rem;
+}
+
+.crm-quote-success-actions .crm-cancel-button {
+  text-decoration: none;
+}
+
+.crm-cancel-button--disabled,
+.crm-cancel-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.crm-quote-success-hint {
+  font-size: 0.75rem;
+  color: #98a1af;
 }

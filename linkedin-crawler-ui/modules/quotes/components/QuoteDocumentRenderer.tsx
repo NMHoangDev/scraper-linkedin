@@ -34,6 +34,11 @@ interface Props {
   solutionItems?: VillaSolutionItem[];
   totals: Totals;
   mode?: 'preview' | 'detail' | 'public' | 'print';
+  /** Bắt preview (mode='preview') tôn trọng quoteData.visibleColumns giống hệt
+   * bản khách sẽ nhận - dùng ở bước "Xem trước & gửi" khi tạo báo giá để người
+   * tạo thấy đúng bản thật, không phải bản nội bộ đầy đủ cột. Không ảnh hưởng
+   * mode='detail' (trang chi tiết nội bộ luôn hiện đủ cột). */
+  respectVisibleColumns?: boolean;
 }
 
 function emptySchema(): QuoteSchema {
@@ -112,6 +117,7 @@ export function QuoteDocumentRenderer({
   solutionItems = [],
   totals,
   mode = 'preview',
+  respectVisibleColumns = false,
 }: Props) {
   const schema = schemaSnapshot || emptySchema();
   const layoutType = schema.layoutType || 'cloudgate_standard_quote';
@@ -285,6 +291,19 @@ export function QuoteDocumentRenderer({
     const vatIndex = standardColumns.findIndex(column => column.key === 'vatRate');
     standardColumns.splice(vatIndex >= 0 ? vatIndex : standardColumns.length - 1, 0, { key: 'discountPercent', label: 'Giảm giá', type: 'number' });
   }
+  // "Cột hiển thị" nguoi tao chon o buoc Xem truoc & gui (quoteData.visibleColumns) -
+  // chi anh huong ban KHACH nhan (public/print, hoac preview khi respectVisibleColumns
+  // duoc bat tuong minh) - KHONG bao gio anh huong mode='detail' (trang noi bo).
+  const TOGGLEABLE_COLUMN_KEYS = ['description', 'unit', 'quantity', 'unitPrice', 'total'];
+  const applyCustomerColumnFilter =
+    mode === 'public' || mode === 'print' || (mode === 'preview' && respectVisibleColumns);
+  const customerVisibleColumns = Array.isArray(quoteData.visibleColumns) ? quoteData.visibleColumns : null;
+  const finalColumns =
+    applyCustomerColumnFilter && customerVisibleColumns
+      ? standardColumns.filter(
+          column => !TOGGLEABLE_COLUMN_KEYS.includes(column.key) || customerVisibleColumns.includes(column.key)
+        )
+      : standardColumns;
   const displayedQuoteRows = quoteItems.flatMap((item, parentIndex) => [
     { item, number: String(parentIndex + 1), isChild: false },
     ...(item.children || []).map((child, childIndex) => ({
@@ -477,10 +496,10 @@ export function QuoteDocumentRenderer({
             <h3>{findSection('quoteItems').title || 'Bảng dịch vụ'}</h3>
           </div>
           <div className="sheet-items-table-wrap">
-            <table className="sheet-items-table" style={{ minWidth: Math.max(760, standardColumns.length * 115) }}>
+            <table className="sheet-items-table" style={{ minWidth: Math.max(760, finalColumns.length * 115) }}>
               <thead>
                 <tr>
-                  {standardColumns.map(column => (
+                  {finalColumns.map(column => (
                     <th key={column.key}>{column.label}</th>
                   ))}
                 </tr>
@@ -488,14 +507,14 @@ export function QuoteDocumentRenderer({
               <tbody>
                 {displayedQuoteRows.length === 0 ? (
                   <tr>
-                    <td colSpan={Math.max(standardColumns.length, 1)} className="empty-row">
+                    <td colSpan={Math.max(finalColumns.length, 1)} className="empty-row">
                       Chưa có hạng mục báo giá.
                     </td>
                   </tr>
                 ) : (
                   displayedQuoteRows.map((row, index) => (
                     <tr key={row.item.id || `${row.number}-${index}`} className={row.isChild ? 'quote-item-row quote-item-row--child' : 'quote-item-row quote-item-row--parent'}>
-                      {standardColumns.map(column => (
+                      {finalColumns.map(column => (
                         <td
                           key={column.key}
                           className={

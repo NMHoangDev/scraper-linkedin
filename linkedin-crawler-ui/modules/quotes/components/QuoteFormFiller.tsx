@@ -351,61 +351,198 @@ function componentToQuoteItem(component: ServiceCatalogItem): QuoteItem {
   };
 }
 
+/** So khớp không dấu, không phân biệt hoa/thường — tìm "cpu" vẫn ra "SZ-CPU". */
+function normalizeSearch(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+/** Khoá định danh dòng trong panel — phân biệt bundle/component vì 2 bảng khác nhau
+ * nhưng có thể trùng id (id là uuid nên thực tế không trùng, nhưng khoá rõ ràng
+ * giúp code dễ đọc và tránh phụ thuộc ngầm). */
+function pickerKey(kind: 'bundle' | 'component', id: string): string {
+  return `${kind}:${id}`;
+}
+
 function CatalogItemPicker({
   options,
-  onPick,
+  existingCatalogItemIds,
+  onAddMany,
 }: {
   options: ServiceCatalogOptions;
-  onPick: (item: QuoteItem) => void;
+  existingCatalogItemIds: Set<string>;
+  onAddMany: (items: QuoteItem[]) => void;
 }) {
-  const [selected, setSelected] = useState('');
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [groupFilter, setGroupFilter] = useState('');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
   if (!options.bundles.length && !options.components.length) return null;
 
-  function handleChange(value: string) {
-    setSelected(value);
-    if (!value) return;
-    const [kind, id] = value.split(':');
-    if (kind === 'bundle') {
-      const bundle = options.bundles.find(b => b.id === id);
-      if (bundle) onPick(bundleToQuoteItem(bundle));
-    } else if (kind === 'component') {
-      const component = options.components.find(c => c.id === id);
-      if (component) onPick(componentToQuoteItem(component));
+  const term = normalizeSearch(search);
+  const matches = (sku: string | undefined, name: string) =>
+    !term || normalizeSearch(name).includes(term) || normalizeSearch(sku || '').includes(term);
+  const matchesGroup = (groupId: string | undefined) => !groupFilter || groupId === groupFilter;
+  const filteredBundles = options.bundles.filter(bundle => matches(bundle.sku, bundle.name) && matchesGroup(bundle.groupId));
+  const filteredComponents = options.components.filter(
+    component => matches(component.sku, component.name) && matchesGroup(component.groupId)
+  );
+
+  const groupOptions = new Map<string, string>();
+  for (const item of [...options.bundles, ...options.components]) {
+    if (item.groupId && item.groupName) groupOptions.set(item.groupId, item.groupName);
+  }
+
+  function toggleSelect(key: string, alreadyInQuote: boolean) {
+    if (alreadyInQuote) return;
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function closePanel() {
+    setOpen(false);
+    setSearch('');
+    setGroupFilter('');
+    setSelected(new Set());
+  }
+
+  function handleAddSelected() {
+    const toAdd: QuoteItem[] = [];
+    for (const bundle of options.bundles) {
+      if (selected.has(pickerKey('bundle', bundle.id))) toAdd.push(bundleToQuoteItem(bundle));
     }
-    setSelected('');
+    for (const component of options.components) {
+      if (selected.has(pickerKey('component', component.id))) toAdd.push(componentToQuoteItem(component));
+    }
+    if (toAdd.length) onAddMany(toAdd);
+    closePanel();
   }
 
   return (
     <div className="quote-catalog-picker">
-      <div className="quote-catalog-picker-head">
-        <span className="quote-catalog-picker-icon">📦</span>
-        <div>
-          <strong>Chọn gói hoặc hạng mục từ Danh mục dịch vụ</strong>
-          <p>Chọn 1 gói (vd SZ-VPS) hoặc 1 hạng mục lẻ — hệ thống tự điền mô tả, đơn giá, VAT vào 1 dòng báo giá.</p>
+      <button type="button" className="quote-catalog-picker-trigger" onClick={() => setOpen(true)}>
+        + Chọn từ danh mục
+      </button>
+
+      {open ? (
+        <div className="quote-catalog-picker-backdrop" onClick={closePanel}>
+          <div className="quote-catalog-picker-panel" onClick={event => event.stopPropagation()}>
+            <header className="quote-catalog-picker-panel-head">
+              <div>
+                <strong>Chọn từ Danh mục dịch vụ</strong>
+                <p>Tick chọn 1 hoặc nhiều gói/hạng mục rồi bấm &quot;Thêm vào báo giá&quot;.</p>
+              </div>
+              <div className="quote-catalog-picker-head-actions">
+                <a
+                  className="quote-catalog-picker-manage-link"
+                  href="/all-platform/service-catalog"
+                  target="_blank"
+                  rel="noopener"
+                >
+                  Quản lý danh mục
+                </a>
+                <button type="button" className="quote-catalog-picker-close" onClick={closePanel} aria-label="Đóng">
+                  ×
+                </button>
+              </div>
+            </header>
+            <div className="quote-catalog-picker-filters">
+              <input
+                autoFocus
+                className="quote-catalog-picker-search"
+                placeholder="Tìm theo tên hoặc mã..."
+                value={search}
+                onChange={event => setSearch(event.target.value)}
+              />
+              {groupOptions.size > 0 ? (
+                <select value={groupFilter} onChange={event => setGroupFilter(event.target.value)}>
+                  <option value="">Tất cả nhóm</option>
+                  {Array.from(groupOptions.entries()).map(([id, name]) => (
+                    <option key={id} value={id}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+            </div>
+            <div className="quote-catalog-picker-list">
+              {filteredBundles.length === 0 && filteredComponents.length === 0 ? (
+                <div className="quote-catalog-picker-empty">Không tìm thấy dịch vụ phù hợp.</div>
+              ) : null}
+              {filteredBundles.length ? (
+                <>
+                  <h4>🎁 Gói</h4>
+                  {filteredBundles.map(bundle => {
+                    const key = pickerKey('bundle', bundle.id);
+                    const already = existingCatalogItemIds.has(bundle.id);
+                    return (
+                      <label
+                        key={bundle.id}
+                        className={`quote-catalog-picker-row${already ? ' quote-catalog-picker-row--disabled' : ''}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={already || selected.has(key)}
+                          disabled={already}
+                          onChange={() => toggleSelect(key, already)}
+                        />
+                        <span className="quote-catalog-picker-item-name">{formatSkuName(bundle.sku, shortDropdownLabel(bundle.name))}</span>
+                        <span className="quote-catalog-picker-item-meta">{bundle.groupName || ''}</span>
+                        <span className="quote-catalog-picker-item-meta">{bundle.unit || ''}</span>
+                        <span className="quote-catalog-picker-item-meta">{bundle.defaultVatRate ? `${bundle.defaultVatRate}%` : '—'}</span>
+                        <span className="quote-catalog-picker-item-price">{formatVnd(bundle.defaultUnitPriceVnd)}</span>
+                        {already ? <span className="quote-catalog-picker-badge">Đã có trong báo giá</span> : null}
+                      </label>
+                    );
+                  })}
+                </>
+              ) : null}
+              {filteredComponents.length ? (
+                <>
+                  <h4>🔧 Hạng mục lẻ</h4>
+                  {filteredComponents.map(component => {
+                    const key = pickerKey('component', component.id);
+                    const already = existingCatalogItemIds.has(component.id);
+                    return (
+                      <label
+                        key={component.id}
+                        className={`quote-catalog-picker-row${already ? ' quote-catalog-picker-row--disabled' : ''}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={already || selected.has(key)}
+                          disabled={already}
+                          onChange={() => toggleSelect(key, already)}
+                        />
+                        <span className="quote-catalog-picker-item-name">{formatSkuName(component.sku, shortDropdownLabel(component.name))}</span>
+                        <span className="quote-catalog-picker-item-meta">{component.groupName || ''}</span>
+                        <span className="quote-catalog-picker-item-meta">{component.unit || ''}</span>
+                        <span className="quote-catalog-picker-item-meta">{component.defaultVatRate ? `${component.defaultVatRate}%` : '—'}</span>
+                        <span className="quote-catalog-picker-item-price">{formatVnd(component.defaultUnitPriceVnd)}</span>
+                        {already ? <span className="quote-catalog-picker-badge">Đã có trong báo giá</span> : null}
+                      </label>
+                    );
+                  })}
+                </>
+              ) : null}
+            </div>
+            <footer className="quote-catalog-picker-foot">
+              <span>{selected.size > 0 ? `Đã chọn ${selected.size} mục` : 'Tick vào ô để chọn'}</span>
+              <button type="button" className="quote-add-parent-button" disabled={selected.size === 0} onClick={handleAddSelected}>
+                + Thêm vào báo giá
+              </button>
+            </footer>
+          </div>
         </div>
-      </div>
-      <select value={selected} onChange={event => handleChange(event.target.value)}>
-        <option value="">-- Chọn gói VPS hoặc hạng mục --</option>
-        {options.bundles.length ? (
-          <optgroup label="🎁 Gói">
-            {options.bundles.map(bundle => (
-              <option key={bundle.id} value={`bundle:${bundle.id}`}>
-                {formatSkuName(bundle.sku, shortDropdownLabel(bundle.name))} ({formatVnd(bundle.defaultUnitPriceVnd)})
-              </option>
-            ))}
-          </optgroup>
-        ) : null}
-        {options.components.length ? (
-          <optgroup label="🔧 Hạng mục lẻ">
-            {options.components.map(component => (
-              <option key={component.id} value={`component:${component.id}`}>
-                {formatSkuName(component.sku, shortDropdownLabel(component.name))} (
-                {formatVnd(component.defaultUnitPriceVnd)})
-              </option>
-            ))}
-          </optgroup>
-        ) : null}
-      </select>
+      ) : null}
     </div>
   );
 }
@@ -485,27 +622,68 @@ function QuoteItemsEditor({
   // hình/thành phần của gói đã nằm gọn trong Description Items của chính dòng đó
   // (xem bundleToQuoteItem), không tách thành dòng con riêng. Ẩn hẳn nút "+ Thêm
   // dịch vụ con" trong chế độ này để tránh tạo cấu trúc lồng không cần thiết.
-  const useFlatTerms = Boolean(catalogOptions);
+  // LƯU Ý: getServiceCatalogOptions() luôn trả về {bundles:[], components:[]}
+  // (object rỗng, không phải null) khi mẫu KHÔNG liên kết nhóm dịch vụ nào - phải
+  // kiểm tra thật sự có dữ liệu, không chỉ check catalogOptions truthy, không thì
+  // mẫu Douyin (không có catalog) cũng bị coi là "mẫu catalog" oan.
+  const hasCatalogItems = Boolean(catalogOptions && (catalogOptions.bundles.length > 0 || catalogOptions.components.length > 0));
+  const useFlatTerms = hasCatalogItems;
+
+  if (useFlatTerms) {
+    // Mẫu có Danh mục dịch vụ liên kết (vd VPS): bảng compact-row 1 dòng/dịch
+    // vụ, không có cấu trúc cha/con — đúng bố cục mẫu HTML (.product-row).
+    return (
+      <div className="quote-items-editor">
+        {catalogOptions ? (
+          <CatalogItemPicker
+            options={catalogOptions}
+            existingCatalogItemIds={new Set(items.map(item => item.catalogItemId).filter((id): id is string => Boolean(id)))}
+            onAddMany={newItems => onChange([...items, ...newItems])}
+          />
+        ) : null}
+        {items.length === 0 ? (
+          <div className="empty-row quote-items-empty">Chưa có dòng báo giá. Chọn gói hoặc thêm hạng mục để bắt đầu.</div>
+        ) : (
+          <div className="quote-compact-table">
+            <div className="quote-compact-head">
+              <span>Sản phẩm/Dịch vụ</span>
+              <span>Mô tả</span>
+              <span>SL</span>
+              <span>Đơn giá</span>
+              <span>VAT</span>
+              <span>Thành tiền</span>
+              <span />
+            </div>
+            {items.map((item, index) => (
+              <CompactItemRow
+                key={item.id || index}
+                item={item}
+                onChange={patch => updateParent(index, patch)}
+                onRemove={() => removeParent(index)}
+              />
+            ))}
+          </div>
+        )}
+        <div className="quote-items-divider">hoặc</div>
+        <button type="button" className="quote-add-parent-button" onClick={addParent}>
+          + Thêm hạng mục ngoài danh mục
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="quote-items-editor">
-      {catalogOptions ? (
-        <CatalogItemPicker options={catalogOptions} onPick={item => onChange([...items, item])} />
-      ) : null}
       {items.length === 0 ? (
-        <div className="empty-row quote-items-empty">
-          {useFlatTerms
-            ? 'Chưa có dòng báo giá. Chọn gói hoặc thêm hạng mục để bắt đầu.'
-            : <>Chưa có dòng dịch vụ. Bấm &quot;Thêm dịch vụ cha&quot; để bắt đầu.</>}
-        </div>
+        <div className="empty-row quote-items-empty">Chưa có dòng dịch vụ. Bấm &quot;Thêm dịch vụ cha&quot; để bắt đầu.</div>
       ) : null}
       {items.map((item, index) => (
         <div key={item.id || index} className="quote-parent-item">
           <div className="quote-item-toolbar">
             <div className="quote-item-title">
               <span>{index + 1}</span>
-              <strong>{useFlatTerms ? 'Dòng báo giá' : 'Dịch vụ cha'}</strong>
-              {!useFlatTerms && (item.children || []).length ? <em>{(item.children || []).length} dịch vụ con</em> : null}
+              <strong>Dịch vụ cha</strong>
+              {(item.children || []).length ? <em>{(item.children || []).length} dịch vụ con</em> : null}
             </div>
             <div className="quote-item-actions">
               <button type="button" onClick={() => moveParent(index, -1)} disabled={index === 0}>↑</button>
@@ -514,7 +692,7 @@ function QuoteItemsEditor({
             </div>
           </div>
           <QuoteItemFields item={item} prefix="parent" onChange={patch => updateParent(index, patch)} />
-          {!useFlatTerms && (item.children || []).length ? (
+          {(item.children || []).length ? (
             <div className="quote-child-list">
               {(item.children || []).map((child, childIndex) => (
                 <div key={child.id || childIndex} className="quote-child-item">
@@ -535,21 +713,86 @@ function QuoteItemsEditor({
             </div>
           ) : null}
           <div className="quote-item-footer">
-            {useFlatTerms ? null : (
-              <button type="button" className="quote-add-child-button" onClick={() => addChild(index)}>
-                + Thêm dịch vụ con
-              </button>
-            )}
+            <button type="button" className="quote-add-child-button" onClick={() => addChild(index)}>
+              + Thêm dịch vụ con
+            </button>
             <div className="quote-group-subtotal">
-              <span>{useFlatTerms ? 'Tạm tính dòng' : 'Tạm tính nhóm'}</span>
+              <span>Tạm tính nhóm</span>
               <strong>{formatVnd([item, ...(item.children || [])].reduce((sum, row) => sum + calculateItemTotal(row), 0))}</strong>
             </div>
           </div>
         </div>
       ))}
-      {catalogOptions ? <div className="quote-items-divider">hoặc</div> : null}
       <button type="button" className="quote-add-parent-button" onClick={addParent}>
-        {useFlatTerms ? '+ Thêm hạng mục ngoài danh mục' : '+ Thêm dịch vụ cha'}
+        + Thêm dịch vụ cha
+      </button>
+    </div>
+  );
+}
+
+/** 1 dòng gọn (product-row) cho mẫu dùng Danh mục dịch vụ - Sản phẩm/Dịch vụ,
+ * Mô tả, SL, Đơn giá, VAT, Thành tiền, nút xoá. Không có ô Giảm giá trong bảng
+ * này (giảm giá tổng đã tính riêng ở khối Tổng tiền) nhưng KHÔNG đổi công thức
+ * tính - discountPercent của dòng (nếu catalog có set mặc định) vẫn được giữ
+ * nguyên trong dữ liệu và cộng vào tổng như cũ, chỉ không có ô sửa tay ở đây. */
+function CompactItemRow({
+  item,
+  onChange,
+  onRemove,
+}: {
+  item: QuoteItem;
+  onChange: (patch: Partial<QuoteItem>) => void;
+  onRemove: () => void;
+}) {
+  const total = calculateItemTotal(item);
+  return (
+    <div className="quote-compact-row">
+      <span className="quote-compact-cell quote-compact-cell--name">
+        <input
+          value={item.serviceDescription || ''}
+          placeholder="Tên dịch vụ"
+          onChange={event => onChange({ serviceDescription: event.target.value })}
+        />
+      </span>
+      <span className="quote-compact-cell quote-compact-cell--description">
+        <textarea
+          className="quote-compact-description"
+          value={item.description || ''}
+          placeholder="Mô tả"
+          onChange={event => onChange({ description: event.target.value })}
+        />
+      </span>
+      <span className="quote-compact-cell">
+        <input
+          type="number"
+          min={0}
+          className="quote-compact-qty"
+          value={item.quantity || 0}
+          onChange={event => onChange({ quantity: coerceNumber(event.target.value) })}
+        />
+      </span>
+      <span className="quote-compact-cell">
+        <input
+          type="number"
+          min={0}
+          className="quote-compact-price"
+          value={item.unitPrice || 0}
+          onChange={event => onChange({ unitPrice: coerceNumber(event.target.value) })}
+        />
+      </span>
+      <span className="quote-compact-cell">
+        <input
+          type="number"
+          min={0}
+          max={100}
+          className="quote-compact-vat"
+          value={item.vatRate || 0}
+          onChange={event => onChange({ vatRate: coercePercent(event.target.value) })}
+        />
+      </span>
+      <span className="quote-compact-cell quote-compact-cell--total">{formatVnd(total)}</span>
+      <button type="button" className="quote-compact-remove" onClick={onRemove} aria-label="Xoá dòng">
+        ×
       </button>
     </div>
   );
