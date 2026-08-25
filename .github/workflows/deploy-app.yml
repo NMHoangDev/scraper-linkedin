@@ -20,10 +20,18 @@ jobs:
         working-directory: /opt/apps/seeding_markeeai/scraper-linkedin
     steps:
       - name: Pull code theo ref duoc chon
+        # Da gap thuc te (xem docs/INFRASTRUCTURE.md muc 5.1): buoc dong goi
+        # extension zip o duoi day de lai public/*.zip "dirty" tren host sau
+        # moi lan deploy -> lan deploy KE TIEP bi `git pull` tu choi merge vi
+        # file dang bi sua tay, nhung `|| true` nuot loi nay im lang -> job
+        # van bao thanh cong dù code KHONG duoc cap nhat. Fix: xoa rac build
+        # artifact truoc khi pull (an toan, buoc sau tu build lai tu source),
+        # va bo `|| true` de loi pull thuc su duoc bao ro, khong bi nuot.
         run: |
+          git checkout -- linkedin-crawler-ui/public/*.zip || true
           git fetch origin
           git checkout "${{ github.event.inputs.ref }}"
-          git pull origin "${{ github.event.inputs.ref }}" || true
+          git pull origin "${{ github.event.inputs.ref }}"
 
       # Docker build cua frontend chi thay context ./linkedin-crawler-ui nen
       # KHONG thay duoc thu muc ngoai ../extensions -> npm predev/prebuild se
