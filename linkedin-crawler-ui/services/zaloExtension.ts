@@ -232,6 +232,10 @@ export async function checkZaloLoginViaExtension(): Promise<{
 export async function importZaloSessionViaExtension(
   params: ImportZaloSessionParams,
 ): Promise<ImportZaloSessionResult> {
+  // Extension tự chờ cookie xuất hiện tới 50s (đủ thời gian quét QR nếu chưa
+  // đăng nhập) rồi mới POST backend + trả response — timeout ở đây phải lớn
+  // hơn hẳn 50s đó (không phải bằng/nhỏ hơn) để không cắt ngang khi extension
+  // gần xong.
   return await sendViaBridge<ImportZaloSessionResult>(
     "IMPORT_ZALO_SESSION",
     {
@@ -239,7 +243,7 @@ export async function importZaloSessionViaExtension(
       backend_url: params.backend_url || API_BASE_URL,
       api_key: params.api_key ?? API_KEY,
     },
-    60000,
+    70000,
   );
 }
 

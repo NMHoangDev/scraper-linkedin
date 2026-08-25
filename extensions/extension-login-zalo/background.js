@@ -563,17 +563,39 @@ let _lastRawCookieLogAt = 0;
 let _lastCookieReadLogAt = 0;
 let _lastCookieCount = -1;
 
-// Grab bất kỳ cookie zalo.me nào đang có trong trình duyệt, KHÔNG chờ 1 key cụ
-// thể xuất hiện. 2 lần đọc cách nhau vài giây (không phải poll dài) để cho
-// trường hợp vừa mở tab, vài cookie set trễ vài trăm ms/giây kịp xuất hiện —
-// nhưng tổng thời gian tối đa ~5s, không bao giờ kéo dài tới mức "treo".
-async function grabZaloCookies(tabId) {
+// 2026-08-25 (bản 2): 1 lần đọc + retry 3s là quá ngắn — nếu user CHƯA đăng
+// nhập, tab mở lên rồi tắt ngay lập tức trước khi user kịp quét QR. Quay lại
+// poll có chờ (như InvoiceFlowManager) nhưng bỏ hẳn yêu cầu "đúng tên cookie"
+// — điều kiện dừng chỉ là "có ÍT NHẤT 1 cookie zalo.me nào", không quan tâm
+// tên. Bounded ở IMPORT_COOKIE_WAIT_MS để không bao giờ treo vô hạn; nếu hết
+// giờ mà vẫn chưa có cookie, trả về rỗng — caller tự quyết định báo lỗi gì.
+const IMPORT_COOKIE_WAIT_MS = 50000;
+const IMPORT_COOKIE_POLL_INTERVAL_MS = 2000;
+
+async function waitForAnyZaloCookies(timeoutMs = IMPORT_COOKIE_WAIT_MS) {
+  const startedAt = Date.now();
   let cookies = await readZaloCookies();
-  if (cookies.length === 0) {
-    logStep("import.no_cookies_yet_retry", { tabId });
-    await wait(3000);
+  let attempt = 0;
+  let lastLogAt = 0;
+
+  while (cookies.length === 0 && Date.now() - startedAt < timeoutMs) {
+    attempt++;
+    if (attempt === 1 || Date.now() - lastLogAt >= 10000) {
+      lastLogAt = Date.now();
+      logStep("import.waiting_for_cookies", {
+        attempt,
+        elapsedMs: Date.now() - startedAt,
+        remainingMs: timeoutMs - (Date.now() - startedAt),
+      });
+    }
+    await wait(IMPORT_COOKIE_POLL_INTERVAL_MS);
     cookies = await readZaloCookies();
   }
+
+  logStep("import.wait_done", {
+    found: cookies.length,
+    totalMs: Date.now() - startedAt,
+  });
   return cookies;
 }
 
@@ -631,14 +653,16 @@ async function importZaloSession(data) {
     tabIdToClose = tab?.id || null;
     lastZaloTabId = tabIdToClose;
 
-    // 2. Lấy cookie hiện có — không chờ key cụ thể nào, lấy được gì dùng gì.
-    const cookies = await grabZaloCookies(tabIdToClose);
+    // 2. Chờ cookie xuất hiện — nếu user CHƯA đăng nhập, tab vẫn mở để họ kịp
+    //    quét QR (bounded ~50s, không phải chờ vô hạn). Không yêu cầu đúng
+    //    tên key cụ thể — hễ có ÍT NHẤT 1 cookie zalo.me là coi như đủ.
+    const cookies = await waitForAnyZaloCookies();
     const context = tabIdToClose ? await getZaloPageContext(tabIdToClose) : {};
     logStep("import.cookies_grabbed", { count: cookies.length, keys: cookieKeys(cookies) });
 
     if (cookies.length === 0) {
       throw new Error(
-        "Không tìm thấy cookie Zalo nào trên trình duyệt. Hãy đăng nhập Zalo Web trong tab vừa mở rồi bấm 'Đăng nhập lại' lần nữa.",
+        "Hết thời gian chờ mà chưa đăng nhập Zalo Web. Hãy mở lại và quét QR / đăng nhập, sau đó bấm 'Đăng nhập lại' lần nữa.",
       );
     }
 

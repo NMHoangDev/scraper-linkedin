@@ -1552,7 +1552,7 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
               user_id: userId,
               owner_id: userId,
             }),
-            45000,
+            75000,
             "Import session",
           );
           if (result.backend && result.backend.status === "confirmed") {
