@@ -339,6 +339,21 @@ export function ZaloInboxAdminShell() {
   const accountLabel = inbox.selectedAccountInfo
     ? inbox.selectedAccountInfo.label ?? inbox.selectedAccountInfo.phone ?? inbox.selectedAccountId
     : "";
+  // Ai được phép bấm "Đăng nhập lại"/gọi extension cho account đang xem — trước đây
+  // CHỈ cho phép khi ownerEmail khớp đúng email người gọi (owner_id resolve đúng
+  // group của họ), nên admin/leader hoặc bất kỳ ai xem 1 account is_shared_with_all
+  // (KHÔNG thuộc team mình, ownerEmail resolve rỗng) không hề thấy nút này — đúng
+  // y bug "chưa login mà không có nút nào để gọi extension đăng nhập" report ngày
+  // 2026-08-25. Giờ mở rộng: chủ sở hữu thật HOẶC admin/leader HOẶC account đã
+  // đánh dấu dùng chung toàn công ty.
+  const isOwnAccount = Boolean(
+    ownerEmail && inbox.leaderEmail && ownerEmail.toLowerCase() === inbox.leaderEmail.toLowerCase()
+  );
+  const canManageAccountAuth =
+    isOwnAccount ||
+    inbox.role === "admin" ||
+    inbox.role === "leader" ||
+    Boolean(inbox.selectedAccountInfo?.is_shared_with_all);
   const accountStatus = inbox.selectedAccountId ? inbox.getAccountStatus(inbox.selectedAccountId) : "offline";
 
   // Sync edit account values
@@ -795,11 +810,11 @@ export function ZaloInboxAdminShell() {
             <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center justify-between text-xs text-amber-800 flex-shrink-0 animate-fade-in">
               <span className="flex items-center gap-1.5 font-semibold">
                 <MaterialIcon name="warning" className="text-amber-500 text-base" />
-                {ownerEmail && inbox.leaderEmail && ownerEmail.toLowerCase() === inbox.leaderEmail.toLowerCase()
-                  ? "Tài khoản của bạn đang offline / hết phiên. Vui lòng đăng nhập lại."
+                {canManageAccountAuth
+                  ? "Tài khoản này chưa đăng nhập hoặc đã hết phiên. Vui lòng đăng nhập lại."
                   : "Tài khoản của nhân viên đang offline / hết phiên. Bạn đang xem dữ liệu lịch sử."}
               </span>
-              {ownerEmail && inbox.leaderEmail && ownerEmail.toLowerCase() === inbox.leaderEmail.toLowerCase() && (
+              {canManageAccountAuth && (
                 <button
                   onClick={() => setShowAuthModal(true)}
                   className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-2 py-1 rounded text-[10px] transition shadow-sm"
@@ -1664,6 +1679,19 @@ export function ZaloInboxAdminShell() {
                           <span>Listener PID:</span>
                           <span className="font-mono">{inbox.selectedAccountInfo.listener.pid}</span>
                         </div>
+                      )}
+                      {/* Chưa có nút nào gọi extension đăng nhập khi account chưa từng
+                          có session (has_auth=false) — trước đây chỉ có banner phía
+                          trên, và banner đó cũng bị ẩn nếu người xem không phải đúng
+                          owner. Thêm luôn 1 lối vào rõ ràng ngay trong card trạng thái. */}
+                      {!inbox.selectedAccountInfo?.has_auth && canManageAccountAuth && (
+                        <button
+                          onClick={() => setShowAuthModal(true)}
+                          className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 text-[11px] transition shadow-sm mt-1"
+                        >
+                          <MaterialIcon name="login" className="text-[14px]" />
+                          Đăng nhập Zalo (Extension/QR)
+                        </button>
                       )}
                     </div>
 

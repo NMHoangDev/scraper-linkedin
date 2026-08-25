@@ -65,6 +65,7 @@ export interface ZaloAccountInfo {
   status?: string | null;
   is_active?: boolean;
   has_auth?: boolean;
+  is_shared_with_all?: boolean;
   listener?: {
     running: boolean;
     connected: boolean;
