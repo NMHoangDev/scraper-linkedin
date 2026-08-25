@@ -159,6 +159,9 @@ __pycache__/
 scratch/*.xlsx
 scratch/*.png
 scratch/*.html
+scratch/*.sql
+scratch/*.py
+scratch/*.log
 
 # Code review reports
 code-review-report-*.md

@@ -1570,7 +1570,7 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
           }
           // Backend trả về nhưng status != confirmed (ví dụ login failed)
           setWarningMessage(
-            `Extension import trả về: ${JSON.stringify(result.backend?.detail || result.backend?.message || "unknown")}. Thử lại hoặc dùng QR.`,
+            `Extension import trả về: ${JSON.stringify(result.backend?.detail || result.backend?.message || "unknown")}. Hãy đăng nhập Zalo Web trong tab vừa mở rồi bấm 'Đăng nhập lại' lần nữa.`,
           );
         } catch (extErr) {
           const msg =
@@ -1579,27 +1579,15 @@ export function useZaloCrawlerFlow(): ZaloCrawlerFlowValue {
               : extErr instanceof Error
                 ? extErr.message
                 : String(extErr);
-          setWarningMessage(`Extension import thất bại: ${msg}. Fallback về QR...`);
-          // Fall through to QR flow
+          // Đã bỏ hoàn toàn fallback QR (2026-08-25) — chỉ còn 1 con đường
+          // duy nhất là Extension, đúng yêu cầu đơn giản hoá luồng đăng nhập.
+          setWarningMessage(`Extension import thất bại: ${msg}`);
         }
       } else {
         setWarningMessage(
           "⚠️ Chưa cài Chrome Extension lấy Zalo cookies. Mở chrome://extensions/, load unpacked thư mục extension-login-zalo, rồi reload trang web. Sau đó bấm 'Đăng nhập lại' lần nữa.",
         );
       }
-
-      // 3) Fallback: QR flow
-      setFeedbackMessage("📱 Đang tạo QR đăng nhập...");
-      const response = await withTimeout(initZaloAuthSession(userId), 30000, "Init QR session");
-      const qrBase64 = getDisplayableQrBase64(response.status, response.qr_base64);
-      setSessionId(response.session_id);
-      setAuthStatus(response.status);
-      setIsLoggedIn(response.status === "confirmed");
-      setCanCrawl(response.status === "confirmed");
-      setQrBase64(qrBase64);
-      setQrImageUrl(null);
-      setFeedbackMessage(response.status === "confirmed" ? null : MSG_QR_READY);
-      void pollAuthStatus();
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       setWarningMessage(`Lỗi: ${msg}. Vui lòng thử lại.`);

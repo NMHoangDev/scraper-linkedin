@@ -1,11 +1,13 @@
-// Cookie xác thực THẬT mà Zalo Web set sau khi user hoàn thành đăng nhập bằng
-// trình duyệt (quét QR xong). Cần ÍT NHẤT 1 trong 2 key này mới coi là đã login —
-// KHÔNG được để rỗng: một mảng rỗng khiến is_logged_in=true ngay khi vừa mở tab
-// (chỉ cần 1 cookie zalo.me bất kỳ, kể cả cookie tracking không liên quan đăng
-// nhập), khiến tab bị đóng SỚM trước khi user kịp quét QR và cookie rác được gửi
-// lên backend. Tham khảo cách InvoiceFlowManager (extension Zalo ổn định) dùng
-// đúng 2 key này làm điều kiện tối thiểu.
-const REQUIRED_COOKIE_KEYS = ["zpsid", "zpw_sek"];
+// 2026-08-25: đã bỏ hẳn khái niệm "required cookie keys". Trước đây extension
+// chỉ coi là "đã login" khi thấy ÍT NHẤT 1 trong zpsid/zpw_sek, và CHỈ tắt tab
+// sau khi thấy đúng key đó — nhưng nếu Zalo đổi tên cookie (hoặc set cookie
+// khác cho phiên nào đó) thì điều kiện này không bao giờ đúng, extension cứ
+// poll tới hết timeout (90s) rồi bỏ tab lại mở (trông như bị treo). Backend
+// `/auth/import-session` đã không yêu cầu key cụ thể từ lâu ("lấy được bao
+// nhiêu dùng bấy nhiêu") — extension giờ làm đúng như vậy: mở 1 tab Zalo, đợi
+// vài giây cho cookie kịp set, lấy TẤT CẢ cookie zalo.me hiện có (bất kể tên),
+// gửi lên backend, rồi LUÔN tự tắt tab (dù backend nhận hay từ chối) — không
+// có đường nào khiến tab bị treo lại.
 const DEFAULT_BACKEND_URL = "http://localhost:8082";
 const ZALO_URL = "https://chat.zalo.me/";
 
@@ -424,19 +426,15 @@ async function readZaloCookies() {
 
   const result = [...byKey.values()].map(toBackendCookie);
   const names = result.map((c) => c.name).sort();
-  const missing = missingRequiredKeys(names);
 
   // Log ra console với tên cookies đầy đủ (không bị truncate như logStep object)
-  // Throttle: mỗi 10s hoặc khi missing changes
-  const missingStr = missing.join(",");
-  if (!_lastCookieReadLogAt || now - _lastCookieReadLogAt > 10000 || missingStr !== _lastMissingStr) {
+  // Throttle: mỗi 10s hoặc khi số cookie tìm được đổi.
+  if (!_lastCookieReadLogAt || now - _lastCookieReadLogAt > 10000 || names.length !== _lastCookieCount) {
     _lastCookieReadLogAt = now;
-    _lastMissingStr = missingStr;
+    _lastCookieCount = names.length;
     console.log(
       "[zalo-extension] cookies.read",
       `\n  raw=${all.length}  dedup=${result.length}  found=[${names.join(", ")}]`,
-      `\n  required=[${REQUIRED_COOKIE_KEYS.join(", ")}]`,
-      `\n  missing=[${missing.join(", ")}]  is_logged_in=${missing.length === 0}`,
     );
   }
 
@@ -444,9 +442,6 @@ async function readZaloCookies() {
     rawCount: all.length,
     dedupCount: result.length,
     foundCookies: names,
-    required: REQUIRED_COOKIE_KEYS,
-    missingCookies: missing,
-    is_logged_in: missing.length === 0,
   });
 
   return result;
@@ -481,19 +476,6 @@ function normalizeSameSite(value) {
 
 function cookieKeys(cookies) {
   return [...new Set(cookies.map((cookie) => String(cookie.key || cookie.name || "").toLowerCase()).filter(Boolean))].sort();
-}
-
-function missingRequiredKeys(keys) {
-  const set = new Set(keys.map((key) => key.toLowerCase()));
-  return REQUIRED_COOKIE_KEYS.filter((key) => !set.has(key));
-}
-
-// true nếu tìm thấy ÍT NHẤT 1 trong REQUIRED_COOKIE_KEYS — dùng OR (không phải
-// AND như missingRequiredKeys ngụ ý) vì Zalo có thể set 2 cookie này không cùng
-// lúc; chỉ cần 1 cookie xác thực thật là đủ để coi phiên đã đăng nhập.
-function hasAnyRequiredKey(keys) {
-  const set = new Set(keys.map((key) => key.toLowerCase()));
-  return REQUIRED_COOKIE_KEYS.some((key) => set.has(key));
 }
 
 async function getZaloCookiesPayload(options = {}) {
@@ -540,13 +522,10 @@ async function getZaloCookiesPayload(options = {}) {
   const allCookies = [...cookies, ...newCookies];
 
   const keys = cookieKeys(allCookies);
-  const missing = missingRequiredKeys(keys);
-  // is_logged_in = tìm thấy ÍT NHẤT 1 cookie xác thực thật (zpsid/zpw_sek).
-  // KHÔNG dùng "missing.length === 0" (yêu cầu CẢ HAI + dễ bị treo nếu Zalo set
-  // 2 cookie không đồng thời) và KHÔNG dùng "allCookies.length > 0" (bug cũ:
-  // với REQUIRED_COOKIE_KEYS rỗng, 1 cookie tracking bất kỳ cũng đủ để coi là
-  // đã login ngay khi vừa mở tab, trước khi user kịp quét QR).
-  const is_logged_in = hasAnyRequiredKey(keys);
+  // Không còn required keys — lấy được cookie zalo.me nào (bất kể tên) thì
+  // coi là có dữ liệu để dùng, để bên gọi (import) tự quyết định gửi lên
+  // backend hay báo lỗi "chưa có cookie nào".
+  const is_logged_in = allCookies.length > 0;
 
   logStep("getZaloCookies.done", {
     tabId: tab?.id || null,
@@ -555,7 +534,6 @@ async function getZaloCookiesPayload(options = {}) {
     chromeApiCookies: cookies.length,
     docCookies: newCookies.length,
     keysFound: keys,
-    missing,
     is_logged_in,
   });
 
@@ -564,7 +542,7 @@ async function getZaloCookiesPayload(options = {}) {
     keys,
     user_agent: context.user_agent || (typeof navigator !== "undefined" ? navigator.userAgent : ""),
     imei: context.imei || "",
-    missing,
+    missing: [],
     is_logged_in,
   };
 }
@@ -583,54 +561,21 @@ let lastZaloTabId = null;
 let _importInProgress = false;
 let _lastRawCookieLogAt = 0;
 let _lastCookieReadLogAt = 0;
-let _lastMissingStr = "";
+let _lastCookieCount = -1;
 
-async function waitForLoginCookies(timeoutMs = 35000) {
-  logStep("waitLogin.start", { timeoutMs });
-  const startedAt = Date.now();
-
-  // Lần đầu: mở tab mới (openTab: true)
-  let payload = await getZaloCookiesPayload({ openTab: true, active: true });
-
-  const tab = await findZaloTab();
-  if (tab?.id) {
-    lastZaloTabId = tab.id;
+// Grab bất kỳ cookie zalo.me nào đang có trong trình duyệt, KHÔNG chờ 1 key cụ
+// thể xuất hiện. 2 lần đọc cách nhau vài giây (không phải poll dài) để cho
+// trường hợp vừa mở tab, vài cookie set trễ vài trăm ms/giây kịp xuất hiện —
+// nhưng tổng thời gian tối đa ~5s, không bao giờ kéo dài tới mức "treo".
+async function grabZaloCookies(tabId) {
+  let cookies = await readZaloCookies();
+  if (cookies.length === 0) {
+    logStep("import.no_cookies_yet_retry", { tabId });
+    await wait(3000);
+    cookies = await readZaloCookies();
   }
-
-  let attempt = 0;
-  let lastLogAt = 0;
-
-  while (!payload.is_logged_in && Date.now() - startedAt < timeoutMs) {
-    attempt++;
-    const elapsed = Date.now() - startedAt;
-    // Throttle log: mỗi 10s hoặc attempt đầu tiên
-    if (attempt === 1 || Date.now() - lastLogAt >= 10000) {
-      lastLogAt = Date.now();
-      logStep("waitLogin.poll", {
-        attempt,
-        elapsed,
-        remaining: timeoutMs - elapsed,
-        foundCookies: payload.keys,
-        missingCookies: payload.missing,
-      });
-    }
-    await wait(2000);
-    // Chỉ poll, không log — tiết kiệm log noise
-    payload = await getZaloCookiesPayload({ openTab: false });
-  }
-
-  logStep("waitLogin.done", {
-    is_logged_in: payload.is_logged_in,
-    totalAttempts: attempt,
-    totalMs: Date.now() - startedAt,
-    foundCookies: payload.keys,
-    missingCookies: payload.missing,
-  });
-
-  return payload;
+  return cookies;
 }
-
-const DEFAULT_LOGIN_TIMEOUT_MS = 90000;
 
 function makeEndpoint(baseUrl, path) {
   const base = String(baseUrl || DEFAULT_BACKEND_URL).replace(/\/+$/, "");
@@ -676,61 +621,68 @@ async function importZaloSession(data) {
   const backendUrl = data.backend_url || DEFAULT_BACKEND_URL;
   const apiKey = data.api_key || "";
 
-  logStep("import.start", { accountId, backendUrl, loginTimeout: data.login_timeout_ms || DEFAULT_LOGIN_TIMEOUT_MS });
+  logStep("import.start", { accountId, backendUrl });
 
-  const payload = await waitForLoginCookies(Number(data.login_timeout_ms || DEFAULT_LOGIN_TIMEOUT_MS));
+  let tabIdToClose = null;
+  try {
+    // 1. Mở (hoặc tái dùng) tab Zalo Web, đợi tab load xong — bounded ~30s,
+    //    không phải poll chờ "đăng nhập xong" (đã bỏ hoàn toàn hình thức đó).
+    const tab = await getOrOpenZaloTab({ active: true });
+    tabIdToClose = tab?.id || null;
+    lastZaloTabId = tabIdToClose;
 
-  if (!payload.is_logged_in) {
-    logStep("import.login_failed", { missing: payload.missing });
-    throw new Error(
-      `Zalo Web is not logged in or required cookies are missing: ${payload.missing.join(", ")}. Open Zalo Web, finish login, then retry.`,
-    );
-  }
+    // 2. Lấy cookie hiện có — không chờ key cụ thể nào, lấy được gì dùng gì.
+    const cookies = await grabZaloCookies(tabIdToClose);
+    const context = tabIdToClose ? await getZaloPageContext(tabIdToClose) : {};
+    logStep("import.cookies_grabbed", { count: cookies.length, keys: cookieKeys(cookies) });
 
-  logStep("import.cookies_ok", { cookiesCount: payload.cookies.length, keys: payload.keys });
-
-  const body = {
-    account_id: accountId,
-    user_id: data.user_id || accountId,
-    owner_id: data.owner_id || accountId,
-    cookies: payload.cookies,
-    user_agent: payload.user_agent,
-  };
-  if (payload.imei) body.imei = payload.imei;
-
-  const endpoint = makeEndpoint(backendUrl, "/api/all-platform/zalo/auth/import-session");
-  logStep("import.posting_to_backend", { endpoint, cookiesCount: payload.cookies.length });
-
-  const result = await postJson(endpoint, body, apiKey, accountId);
-
-  if (!result.ok) {
-    logStep("import.backend_failed", { status: result.status, error: backendError(result, "unknown") });
-    // KHÔNG đóng tab khi backend từ chối — giữ tab để user thấy lỗi và có thể
-    // retry ngay, thay vì phải mở lại Zalo Web từ đầu (đúng cách InvoiceFlowManager
-    // làm: chỉ auto-close SAU KHI backend xác nhận thành công).
-    throw new Error(`Backend import-session failed (${result.status}): ${backendError(result, "unknown error")}`);
-  }
-
-  logStep("import.success", { status: result.status, cookiesCount: payload.cookies.length });
-
-  // Auto-close Zalo Web tab CHỈ SAU KHI backend đã nhận cookie thành công.
-  const tabIdToClose = lastZaloTabId || (await findZaloTab())?.id;
-  if (tabIdToClose) {
-    try {
-      await chrome.tabs.remove(tabIdToClose);
-      logStep("import.tab_closed", { tabId: tabIdToClose });
-    } catch (e) {
-      logStep("import.tab_close_failed", { tabId: tabIdToClose, error: e?.message });
+    if (cookies.length === 0) {
+      throw new Error(
+        "Không tìm thấy cookie Zalo nào trên trình duyệt. Hãy đăng nhập Zalo Web trong tab vừa mở rồi bấm 'Đăng nhập lại' lần nữa.",
+      );
     }
-  }
-  lastZaloTabId = null;
 
-  return {
-    status: result.status,
-    backend: result.data,
-    cookies_count: payload.cookies.length,
-    keys: payload.keys,
-  };
+    const body = {
+      account_id: accountId,
+      user_id: data.user_id || accountId,
+      owner_id: data.owner_id || accountId,
+      cookies,
+      user_agent: context.user_agent || (typeof navigator !== "undefined" ? navigator.userAgent : ""),
+    };
+    if (context.imei) body.imei = context.imei;
+
+    const endpoint = makeEndpoint(backendUrl, "/api/all-platform/zalo/auth/import-session");
+    logStep("import.posting_to_backend", { endpoint, cookiesCount: cookies.length });
+
+    const result = await postJson(endpoint, body, apiKey, accountId);
+
+    if (!result.ok) {
+      logStep("import.backend_failed", { status: result.status, error: backendError(result, "unknown") });
+      throw new Error(`Backend import-session failed (${result.status}): ${backendError(result, "unknown error")}`);
+    }
+
+    logStep("import.success", { status: result.status, cookiesCount: cookies.length });
+
+    return {
+      status: result.status,
+      backend: result.data,
+      cookies_count: cookies.length,
+      keys: cookieKeys(cookies),
+    };
+  } finally {
+    // Luôn tự tắt tab dù thành công hay lỗi — lấy được cookie nào dùng cookie
+    // đó, không cần đúng key mới tắt, và tuyệt đối không để tab đứng treo lại
+    // chờ 1 điều kiện có thể không bao giờ xảy ra.
+    if (tabIdToClose) {
+      try {
+        await chrome.tabs.remove(tabIdToClose);
+        logStep("import.tab_closed", { tabId: tabIdToClose });
+      } catch (e) {
+        logStep("import.tab_close_failed", { tabId: tabIdToClose, error: e?.message });
+      }
+    }
+    lastZaloTabId = null;
+  }
 }
 
 async function syncZaloDomMessages(data) {

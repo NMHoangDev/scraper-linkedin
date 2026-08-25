@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  initZaloAuthSession,
-  refreshZaloLoginQr,
   getZaloCurrentStatus,
   startZaloManualLogin,
   resumeZaloManualLogin,
@@ -22,12 +20,11 @@ interface Props {
   onSuccess: () => void;
 }
 
-type LoginMethod = "none" | "qr" | "manual" | "extension";
+type LoginMethod = "none" | "manual" | "extension";
 
 export default function ZaloAccountAuthView({ accountId, ownerName, autoTrigger, onSuccess }: Props) {
   const [method, setMethod] = useState<LoginMethod>("none");
   const [loading, setLoading] = useState(false);
-  const [qrBase64, setQrBase64] = useState<string | null>(null);
   const [authStatus, setAuthStatus] = useState<string>("none");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
@@ -58,9 +55,6 @@ export default function ZaloAccountAuthView({ accountId, ownerName, autoTrigger,
     try {
       const res = await getZaloCurrentStatus(accountIdRef.current);
       setAuthStatus(res.status || "none");
-      if (res.qr_base64) {
-        setQrBase64(res.qr_base64);
-      }
       if (res.is_logged_in && res.can_crawl) {
         setFeedback("Đăng nhập thành công! Đang tải lại hội thoại...");
         clearPolling();
@@ -72,31 +66,6 @@ export default function ZaloAccountAuthView({ accountId, ownerName, autoTrigger,
       // ignore check error
     }
   }, [clearPolling, onSuccess]);
-
-  const startQrLogin = useCallback(async () => {
-    setLoading(true);
-    setWarning(null);
-    setFeedback(null);
-    setMethod("qr");
-    clearPolling();
-
-    try {
-      const res = await initZaloAuthSession(accountId);
-      setQrBase64(res.qr_base64 || null);
-      setAuthStatus(res.status || "waiting_scan");
-      setFeedback("Đã tạo mã QR đăng nhập thành công");
-
-      // Start polling
-      pollIntervalRef.current = setInterval(() => {
-        void pollAuthStatus();
-      }, 3000);
-    } catch (e) {
-      setWarning(e instanceof Error ? e.message : "Không thể khởi tạo phiên đăng nhập QR");
-      setMethod("none");
-    } finally {
-      setLoading(false);
-    }
-  }, [accountId, clearPolling, pollAuthStatus, setWarning]);
 
   const startManualLogin = useCallback(async () => {
     setLoading(true);
@@ -251,14 +220,6 @@ export default function ZaloAccountAuthView({ accountId, ownerName, autoTrigger,
               Tải extension Zalo (giải nén rồi Load unpacked ở chrome://extensions)
             </a>
             <button
-              onClick={startQrLogin}
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#E3000F] hover:bg-[#C40009] text-white font-bold py-3 text-sm transition shadow-sm"
-            >
-              <MaterialIcon name="qr_code_scanner" className="text-[18px]" />
-              Đăng nhập qua quét mã QR (Mã quét)
-            </button>
-            <button
               onClick={startManualLogin}
               disabled={loading}
               className="w-full flex items-center justify-center gap-2 rounded-xl bg-white border border-slate-200 hover:border-[#E3000F] text-slate-700 font-bold py-3 text-sm transition shadow-sm"
@@ -287,62 +248,6 @@ export default function ZaloAccountAuthView({ accountId, ownerName, autoTrigger,
             >
               Hủy bỏ / Quay lại
             </button>
-          </div>
-        )}
-
-        {method === "qr" && (
-          <div className="flex flex-col items-center w-full">
-            {loading ? (
-              <div className="h-44 w-44 flex items-center justify-center border border-dashed border-slate-200 rounded-xl bg-slate-50">
-                <div className="h-8 w-8 rounded-full border-4 border-[#E3000F] border-t-transparent animate-spin" />
-              </div>
-            ) : qrBase64 ? (
-              <div className="p-2 border border-slate-200 rounded-2xl bg-white shadow-inner mb-4">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`data:image/png;base64,${qrBase64}`}
-                  alt="Zalo Login QR"
-                  className="h-44 w-44 object-contain"
-                />
-              </div>
-            ) : (
-              <div className="h-44 w-44 flex items-center justify-center bg-slate-100 rounded-xl mb-4 text-xs text-slate-400">
-                Chưa có ảnh QR Code
-              </div>
-            )}
-
-            <p className="text-[12px] text-slate-600 font-semibold mb-2 text-center">
-              Trạng thái:{" "}
-              <span className="text-[#E3000F] uppercase">
-                {authStatus === "waiting_scan"
-                  ? "Chờ quét mã"
-                  : authStatus === "scanned"
-                  ? "Đã quét, chờ xác nhận"
-                  : authStatus}
-              </span>
-            </p>
-
-            <p className="text-[11px] text-slate-400 text-center max-w-[280px] leading-relaxed mb-6">
-              Vui lòng chụp màn hình gửi mã QR này cho nhân sự quét trên ứng dụng Zalo trên điện thoại để hoàn tất đăng nhập.
-            </p>
-
-            <div className="flex gap-2 w-full">
-              <button
-                onClick={() => void startQrLogin()}
-                className="flex-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 text-xs transition"
-              >
-                Tạo mã mới
-              </button>
-              <button
-                onClick={() => {
-                  setMethod("none");
-                  clearPolling();
-                }}
-                className="flex-1 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-500 font-bold py-2.5 text-xs transition"
-              >
-                Quay lại
-              </button>
-            </div>
           </div>
         )}
 
