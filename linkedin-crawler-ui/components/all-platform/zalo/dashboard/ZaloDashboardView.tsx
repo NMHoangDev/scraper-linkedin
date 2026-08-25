@@ -2,9 +2,10 @@
 
 import { MaterialIcon } from "@/components/ui";
 import type { ZaloCrawlerFlowValue } from "@/hooks/useZaloCrawlerFlow";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { ZaloKpiPanel } from "./ZaloKpiPanel";
+import { isZaloExtensionAvailable } from "@/services/zaloExtension";
 
 interface ZaloDashboardViewProps {
   flow: ZaloCrawlerFlowValue;
@@ -48,6 +49,28 @@ export function ZaloDashboardView({ flow, onEnterChat }: ZaloDashboardViewProps)
   const [editPhone, setEditPhone] = useState("");
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
+  // Extension đã cài chưa — dùng để disable nút "Tải extension" (không cho tải
+  // lại vô nghĩa nếu đã có). Check lại khi tab được focus lại (vd sau khi user
+  // vừa cài xong ở chrome://extensions rồi quay lại tab này) để không cần F5.
+  const [extensionAvailable, setExtensionAvailable] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const check = () => {
+      void isZaloExtensionAvailable().then((available) => {
+        if (!cancelled) setExtensionAvailable(available);
+      });
+    };
+    check();
+    window.addEventListener("focus", check);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", check);
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, []);
+
   async function handleCreateAccount() {
     const label = newAccountLabel.trim();
     if (!label) return;
@@ -88,6 +111,25 @@ export function ZaloDashboardView({ flow, onEnterChat }: ZaloDashboardViewProps)
               className="border border-outline-variant bg-surface rounded-lg py-1.5 pl-8 pr-3 text-[13px] w-[220px] focus:border-primary focus:ring-2 focus:ring-primary/15 focus:outline-none transition-all placeholder:text-on-surface-variant"
             />
           </div>
+          {extensionAvailable ? (
+            <span
+              className="bg-emerald-50 border border-emerald-200 inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold text-emerald-700 cursor-default"
+              title="Chrome Extension lấy Zalo cookies đã được cài trên trình duyệt này"
+            >
+              <MaterialIcon name="check_circle" className="text-[16px]" />
+              Đã cài Extension
+            </span>
+          ) : (
+            <a
+              href="/extension-login-zalo.zip"
+              download
+              className="bg-surface border border-outline-variant inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-low hover:border-outline-variant transition"
+              title="Giải nén rồi Load unpacked ở chrome://extensions"
+            >
+              <MaterialIcon name="download" className="text-[16px]" />
+              Tải extension Zalo
+            </a>
+          )}
           <button className="bg-surface border border-outline-variant inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold text-on-surface hover:bg-surface-container-low hover:border-outline-variant transition">
             <MaterialIcon name="group_add" className="text-[16px]" />
             Gộp TK
@@ -305,14 +347,17 @@ export function ZaloDashboardView({ flow, onEnterChat }: ZaloDashboardViewProps)
                   <>
                     <button
                       onClick={() => {
-                        // Chuyển sang account này rồi gọi startSession (QR login)
+                        // Chuyển sang account này rồi gọi restartSession — hàm này TỰ
+                        // gọi Chrome Extension để mở tab Zalo Web lấy cookie đăng nhập
+                        // trước (ổn định, dùng chung cơ chế lấy tin nhắn/gửi tin), chỉ
+                        // fallback về QR quét mã nếu extension chưa cài hoặc lỗi.
                         if (account.account_id !== flow.userId) {
                           flow.switchAccount(account.account_id);
                         }
-                        void flow.startSession();
+                        void flow.restartSession();
                       }}
                       className="flex-1 h-8 bg-primary text-white flex items-center justify-center gap-1 rounded-lg text-[12px] font-semibold transition-all duration-200 hover:bg-[#C2000D] hover:shadow-sm shadow-red-500/20 active:scale-95 animate-pulse"
-                      title="Phiên đã hết hạn — bấm để đăng nhập lại bằng QR"
+                      title="Phiên đã hết hạn — bấm để đăng nhập lại qua Extension (fallback QR nếu chưa cài)"
                     >
                       <MaterialIcon name="login" className="text-[14px]" />
                       Đăng nhập lại

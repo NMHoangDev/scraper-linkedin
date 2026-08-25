@@ -771,6 +771,14 @@ async def send_message_to_conversation(
       hiển thị ngay trong lịch sử chat (kể cả khi listener chưa kịp echo về).
     """
     user_id = _normalize_user_id(account_id or x_user_id)
+    # Check access permission
+    allowed_conv_ids = await check_caller_conversation_access(user_id, x_caller_email)
+    if allowed_conv_ids is not None and conversation_id.strip() not in allowed_conv_ids:
+        raise HTTPException(
+            status_code=403,
+            detail="Cuộc trò chuyện này ở chế độ riêng tư và chưa được chia sẻ với bạn."
+        )
+
     auth = await load_zca_auth(user_id)
     if not auth:
         raise HTTPException(

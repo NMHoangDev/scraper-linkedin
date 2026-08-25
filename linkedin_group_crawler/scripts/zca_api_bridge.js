@@ -894,6 +894,9 @@ async function main() {
         has_userAgent: Boolean(auth.userAgent),
         has_zaloId: Boolean(auth.zaloId),
       },
+      // Chẩn đoán lỗi 404 getGroupChatHistory (mục 3.1 trong docs/ZALO_FIX_PROGRESS_2026-08-25.md):
+      // nghi vấn zpwServiceMap.group rỗng/thiếu — in ra để xác nhận.
+      zpw_service_map: api.zpwServiceMap || null,
     }, 0);
     return;
   }

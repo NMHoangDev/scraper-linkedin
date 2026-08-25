@@ -4,6 +4,6 @@
   "type": "commonjs",
   "dependencies": {
     "image-size": "^2.0.2",
-    "zca-js": "^2.1.2"
+    "zca-js": "file:vendor/zca-js"
   }
 }

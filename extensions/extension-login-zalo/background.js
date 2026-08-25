@@ -1,4 +1,11 @@
-const REQUIRED_COOKIE_KEYS = [];
+// Cookie xác thực THẬT mà Zalo Web set sau khi user hoàn thành đăng nhập bằng
+// trình duyệt (quét QR xong). Cần ÍT NHẤT 1 trong 2 key này mới coi là đã login —
+// KHÔNG được để rỗng: một mảng rỗng khiến is_logged_in=true ngay khi vừa mở tab
+// (chỉ cần 1 cookie zalo.me bất kỳ, kể cả cookie tracking không liên quan đăng
+// nhập), khiến tab bị đóng SỚM trước khi user kịp quét QR và cookie rác được gửi
+// lên backend. Tham khảo cách InvoiceFlowManager (extension Zalo ổn định) dùng
+// đúng 2 key này làm điều kiện tối thiểu.
+const REQUIRED_COOKIE_KEYS = ["zpsid", "zpw_sek"];
 const DEFAULT_BACKEND_URL = "http://localhost:8082";
 const ZALO_URL = "https://chat.zalo.me/";
 
@@ -481,6 +488,14 @@ function missingRequiredKeys(keys) {
   return REQUIRED_COOKIE_KEYS.filter((key) => !set.has(key));
 }
 
+// true nếu tìm thấy ÍT NHẤT 1 trong REQUIRED_COOKIE_KEYS — dùng OR (không phải
+// AND như missingRequiredKeys ngụ ý) vì Zalo có thể set 2 cookie này không cùng
+// lúc; chỉ cần 1 cookie xác thực thật là đủ để coi phiên đã đăng nhập.
+function hasAnyRequiredKey(keys) {
+  const set = new Set(keys.map((key) => key.toLowerCase()));
+  return REQUIRED_COOKIE_KEYS.some((key) => set.has(key));
+}
+
 async function getZaloCookiesPayload(options = {}) {
   logStep("getZaloCookies.start", { options });
   let tab = null;
@@ -526,13 +541,12 @@ async function getZaloCookiesPayload(options = {}) {
 
   const keys = cookieKeys(allCookies);
   const missing = missingRequiredKeys(keys);
-  // Fix 2026-07-04: REQUIRED_COOKIE_KEYS bi de trong (mang rong) o mot ban sua
-  // truoc day - "missing.length === 0" tren mang rong luon dung, nghia la
-  // is_logged_in luon = true KE CA KHI CHUA CO 1 COOKIE ZALO NAO CA (tab moi
-  // mo, chua dang nhap). Ket qua: waitForLoginCookies() coi la dang nhap xong
-  // ngay lap tuc o vong lap dau tien, dong tab + gui cookie RONG len backend.
-  // Them dieu kien toi thieu: phai tim thay it nhat 1 cookie zalo.me that.
-  const is_logged_in = missing.length === 0 && allCookies.length > 0;
+  // is_logged_in = tìm thấy ÍT NHẤT 1 cookie xác thực thật (zpsid/zpw_sek).
+  // KHÔNG dùng "missing.length === 0" (yêu cầu CẢ HAI + dễ bị treo nếu Zalo set
+  // 2 cookie không đồng thời) và KHÔNG dùng "allCookies.length > 0" (bug cũ:
+  // với REQUIRED_COOKIE_KEYS rỗng, 1 cookie tracking bất kỳ cũng đủ để coi là
+  // đã login ngay khi vừa mở tab, trước khi user kịp quét QR).
+  const is_logged_in = hasAnyRequiredKey(keys);
 
   logStep("getZaloCookies.done", {
     tabId: tab?.id || null,
@@ -675,18 +689,6 @@ async function importZaloSession(data) {
 
   logStep("import.cookies_ok", { cookiesCount: payload.cookies.length, keys: payload.keys });
 
-  // Auto-close Zalo Web tab immediately after successful login detection to avoid session/reload conflicts
-  const tabIdToClose = lastZaloTabId || (await findZaloTab())?.id;
-  if (tabIdToClose) {
-    try {
-      await chrome.tabs.remove(tabIdToClose);
-      logStep("import.tab_closed", { tabId: tabIdToClose });
-    } catch (e) {
-      logStep("import.tab_close_failed", { tabId: tabIdToClose, error: e?.message });
-    }
-  }
-  lastZaloTabId = null;
-
   const body = {
     account_id: accountId,
     user_id: data.user_id || accountId,
@@ -703,10 +705,26 @@ async function importZaloSession(data) {
 
   if (!result.ok) {
     logStep("import.backend_failed", { status: result.status, error: backendError(result, "unknown") });
+    // KHÔNG đóng tab khi backend từ chối — giữ tab để user thấy lỗi và có thể
+    // retry ngay, thay vì phải mở lại Zalo Web từ đầu (đúng cách InvoiceFlowManager
+    // làm: chỉ auto-close SAU KHI backend xác nhận thành công).
     throw new Error(`Backend import-session failed (${result.status}): ${backendError(result, "unknown error")}`);
   }
 
   logStep("import.success", { status: result.status, cookiesCount: payload.cookies.length });
+
+  // Auto-close Zalo Web tab CHỈ SAU KHI backend đã nhận cookie thành công.
+  const tabIdToClose = lastZaloTabId || (await findZaloTab())?.id;
+  if (tabIdToClose) {
+    try {
+      await chrome.tabs.remove(tabIdToClose);
+      logStep("import.tab_closed", { tabId: tabIdToClose });
+    } catch (e) {
+      logStep("import.tab_close_failed", { tabId: tabIdToClose, error: e?.message });
+    }
+  }
+  lastZaloTabId = null;
+
   return {
     status: result.status,
     backend: result.data,

@@ -204,18 +204,10 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
     },
     {
       type: "item",
-      id: "zalo-crawl",
-      href: "/all-platform/zalo-crawl",
-      icon: "chat",
-      label: "Chat Zalo",
-      matchStartsWith: ["/all-platform/zalo-crawl"],
-    },
-    {
-      type: "item",
       id: "zalo-accounts",
       href: "/all-platform/tai-khoan",
-      icon: "manage_accounts",
-      label: "Tài khoản Zalo",
+      icon: "chat",
+      label: "Zalo Chat",
       matchStartsWith: ["/all-platform/tai-khoan"],
     },
     {

@@ -152,6 +152,15 @@ export function ZaloInboxAdminShell() {
   // khong bat nguoi dung phai tu tim acc nao dang giu no.
   const searchParams = useSearchParams();
   const jumpToConvRef = useRef<string | null>(null);
+  const jumpToAccountRef = useRef<string | null>(null);
+  useEffect(() => {
+    // Từ trang /all-platform/tai-khoan, nút "Mở chat" điều hướng sang đây kèm
+    // ?account=<id> để tự chọn đúng tài khoản, không bắt người dùng tự tìm lại.
+    const targetAccount = searchParams.get("account");
+    if (!targetAccount || jumpToAccountRef.current === targetAccount) return;
+    jumpToAccountRef.current = targetAccount;
+    inbox.onSelectAccount(targetAccount);
+  }, [searchParams, inbox]);
   useEffect(() => {
     const targetConv = searchParams.get("conv");
     if (!targetConv || jumpToConvRef.current === targetConv) return;

@@ -18,7 +18,6 @@ from app.modules.all_platform.zalo.services.supabase_service import (
 from app.modules.all_platform.zalo.config import settings
 from app.modules.all_platform.zalo.services.zca_api_bridge import (
     get_zca_group_history,
-    get_zca_user_history,
     list_zca_groups,
     list_zca_friends,
 )
@@ -537,20 +536,19 @@ class ZcaPersistentListenerManager:
                     if not state.desired or not state.connected:
                         break
                     try:
-                        is_group = group_id.strip().startswith("g")
+                        # get_zca_group_history hoạt động cho CẢ group và DM khi truyền
+                        # đúng thread id (đã dùng thống nhất kiểu này trong first_time_sync
+                        # ở zca_api_bridge.js — xem comment "ZCA getGroupChatHistory cũng
+                        # dùng được cho DM"). KHÔNG dùng get_zca_user_history/suy đoán type
+                        # từ tiền tố "g" — ID zca-js là số nguyên trần, không có tiền tố đó
+                        # (đó là convention riêng của DOM scraping cũ), nên heuristic cũ
+                        # luôn coi mọi thread là "user" và gọi sai hàm, gây lỗi 404 từ Zalo.
                         async with _ZALO_API_SEMAPHORE:
-                            if is_group:
-                                messages = await get_zca_group_history(
-                                    state.auth or {},
-                                    group_id,
-                                    count=_STARTUP_SYNC_MESSAGE_COUNT,
-                                )
-                            else:
-                                messages = await get_zca_user_history(
-                                    state.auth or {},
-                                    group_id,
-                                    count=_STARTUP_SYNC_MESSAGE_COUNT,
-                                )
+                            messages = await get_zca_group_history(
+                                state.auth or {},
+                                group_id,
+                                count=_STARTUP_SYNC_MESSAGE_COUNT,
+                            )
 
                         messages = _sort_messages_old_to_new(messages)
 
@@ -669,8 +667,6 @@ class ZcaPersistentListenerManager:
                     )
                     break
 
-                is_group = group_id.strip().startswith("g")
-
                 if (idx + 1) % 20 == 0:
                     logger.info(
                         f"Backfill progress [{idx + 1}/{len(group_ids)}] "
@@ -683,19 +679,14 @@ class ZcaPersistentListenerManager:
                     if not state.desired or not state.connected:
                         break
                     try:
+                        # Xem giải thích ở _sync_recent_groups_after_connect:
+                        # get_zca_group_history dùng chung cho group + DM.
                         async with _ZALO_API_SEMAPHORE:
-                            if is_group:
-                                messages = await get_zca_group_history(
-                                    state.auth or {},
-                                    group_id,
-                                    count=30,
-                                )
-                            else:
-                                messages = await get_zca_user_history(
-                                    state.auth or {},
-                                    group_id,
-                                    count=30,
-                                )
+                            messages = await get_zca_group_history(
+                                state.auth or {},
+                                group_id,
+                                count=30,
+                            )
 
                         messages = _sort_messages_old_to_new(messages)
                         if messages:

@@ -9,11 +9,9 @@ export function ZaloAccountsPageContent() {
   const router = useRouter();
 
   function handleEnterChat(accountId: string) {
-    if (accountId !== flow.userId) {
-      flow.switchAccount(accountId);
-    }
-    // Navigate tới trang chat full-screen (không có sidebar menu)
-    router.push("/zalo-chat");
+    // Điều hướng sang trang quản lý inbox chính (có sidebar hội thoại, gán
+    // nhãn, share leader...) thay vì trang /zalo-chat full-screen cũ.
+    router.push(`/all-platform/zalo-inbox?account=${encodeURIComponent(accountId)}`);
   }
 
   return (
