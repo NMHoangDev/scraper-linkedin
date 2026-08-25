@@ -164,3 +164,6 @@ scratch/*.html
 code-review-report-*.md
 
 scraper-linkedin
+
+# Chua mat khau host thuc (plaintext) - chi dung local, khong duoc push
+docs/INFRASTRUCTURE.md
