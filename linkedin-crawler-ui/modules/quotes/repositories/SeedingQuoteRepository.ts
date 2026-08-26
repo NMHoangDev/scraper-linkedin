@@ -1,9 +1,13 @@
 import { API_BASE_URL, API_KEY } from '@/lib/env';
 import type {
+  CreateIssuerCompanyInput,
   CreateQuoteFormInput,
   CreateQuoteInput,
+  IssuerCompany,
   Quote,
   QuoteForm,
+  QuoteTelegramLog,
+  UpdateIssuerCompanyInput,
   UpdateQuoteFormInput,
   UpdateQuoteInput,
 } from '../types';
@@ -63,6 +67,7 @@ function toCreateFormPayload(input: CreateQuoteFormInput) {
     layout_type: input.layoutType,
     schema_version: input.schemaVersion,
     schema_json: input.schemaJson,
+    issuer_company_id: input.issuerCompanyId,
   };
 }
 
@@ -74,6 +79,25 @@ function toUpdateFormPayload(input: UpdateQuoteFormInput) {
     layout_type: input.layoutType,
     schema_version: input.schemaVersion,
     schema_json: input.schemaJson,
+    issuer_company_id: input.issuerCompanyId,
+  };
+}
+
+function toIssuerCompanyPayload(input: CreateIssuerCompanyInput | UpdateIssuerCompanyInput) {
+  return {
+    code: input.code,
+    legal_name: input.legalName,
+    brand_name: input.brandName,
+    address: input.address,
+    contact_name: input.contactName,
+    phone: input.phone,
+    email: input.email,
+    website: input.website,
+    tax_code: input.taxCode,
+    logo_url: input.logoUrl,
+    default_quote_form_id: input.defaultQuoteFormId,
+    status: input.status,
+    sort_order: input.sortOrder,
   };
 }
 
@@ -81,6 +105,7 @@ function toCreateQuotePayload(input: CreateQuoteInput) {
   return {
     deal_id: input.dealId,
     quote_form_id: input.quoteFormId,
+    issuer_company_id: input.issuerCompanyId ?? null,
     data: input.data,
     items: (input.items || []).map(toQuoteItemPayload),
   };
@@ -90,6 +115,7 @@ function toUpdateQuotePayload(input: UpdateQuoteInput) {
   return {
     data: input.data,
     items: input.items?.map(toQuoteItemPayload),
+    issuer_company_id: input.issuerCompanyId ?? null,
   };
 }
 
@@ -214,6 +240,36 @@ export class SeedingQuoteRepository implements QuoteRepository {
     return apiFetch<ServiceCatalogOptions>(
       `/api/all-platform/quotes/service-catalog-options?formId=${encodeURIComponent(formId)}`
     );
+  }
+
+  async getIssuerCompanies(includeInactive = false): Promise<IssuerCompany[]> {
+    return apiFetch<IssuerCompany[]>(
+      `/api/all-platform/quotes/issuer-companies${includeInactive ? '?include_inactive=true' : ''}`
+    );
+  }
+
+  async createIssuerCompany(input: CreateIssuerCompanyInput): Promise<IssuerCompany> {
+    return apiFetch<IssuerCompany>('/api/all-platform/quotes/issuer-companies', {
+      method: 'POST',
+      body: JSON.stringify(toIssuerCompanyPayload(input)),
+    });
+  }
+
+  async updateIssuerCompany(id: string, input: UpdateIssuerCompanyInput): Promise<IssuerCompany> {
+    return apiFetch<IssuerCompany>(`/api/all-platform/quotes/issuer-companies/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(toIssuerCompanyPayload(input)),
+    });
+  }
+
+  async sendQuoteTelegram(quoteId: string): Promise<QuoteTelegramLog> {
+    return apiFetch<QuoteTelegramLog>(`/api/all-platform/quotes/${encodeURIComponent(quoteId)}/send-telegram`, {
+      method: 'POST',
+    });
+  }
+
+  async getQuoteTelegramLog(quoteId: string): Promise<QuoteTelegramLog[]> {
+    return apiFetch<QuoteTelegramLog[]>(`/api/all-platform/quotes/${encodeURIComponent(quoteId)}/telegram-log`);
   }
 }
 

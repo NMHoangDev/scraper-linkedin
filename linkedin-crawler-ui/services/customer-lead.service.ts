@@ -615,7 +615,7 @@ export const customerLeadService = {
    */
   uploadAttachment: async (
     file: File,
-    prefix: "brief" | "proposal" | "contract",
+    prefix: "brief" | "proposal" | "contract" | "logo",
     customerId?: string,
   ): Promise<{ url: string; name: string; size: number; content_type: string }> => {
     const fd = new FormData();

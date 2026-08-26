@@ -123,7 +123,8 @@ export type MaterialSymbolName =
   | "card_giftcard"
   | "shield"
   | "paid"
-  | "track_changes";
+  | "track_changes"
+  | "domain";
 
 export interface MaterialIconProps {
   name: MaterialSymbolName;

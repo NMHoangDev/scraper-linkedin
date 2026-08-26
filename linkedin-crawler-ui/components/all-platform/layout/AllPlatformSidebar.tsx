@@ -260,6 +260,14 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
     },
     {
       type: "item",
+      id: "issuer-companies",
+      href: "/all-platform/issuer-companies",
+      icon: "domain",
+      label: "Đơn vị phát hành",
+      matchStartsWith: ["/all-platform/issuer-companies"],
+    },
+    {
+      type: "item",
       id: "sales-assets",
       href: "/all-platform/sales-assets",
       icon: "campaign",

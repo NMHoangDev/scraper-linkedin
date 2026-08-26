@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FORM_STATUS_LABELS } from '../constants/quoteConfig';
 import { seedingQuoteRepository } from '../repositories/SeedingQuoteRepository';
-import type { QuoteForm } from '../types';
+import type { IssuerCompany, QuoteForm } from '../types';
 
 function formatDate(value: string) {
   const date = new Date(value);
@@ -20,6 +20,8 @@ function formatDate(value: string) {
 
 export function QuoteHomePage() {
   const [forms, setForms] = useState<QuoteForm[]>([]);
+  const [companies, setCompanies] = useState<IssuerCompany[]>([]);
+  const [companyFilter, setCompanyFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -27,8 +29,12 @@ export function QuoteHomePage() {
     setLoading(true);
     setError('');
     try {
-      const formRows = await seedingQuoteRepository.getForms();
+      const [formRows, companyRows] = await Promise.all([
+        seedingQuoteRepository.getForms(),
+        seedingQuoteRepository.getIssuerCompanies(true),
+      ]);
       setForms(formRows);
+      setCompanies(companyRows);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không tải được dữ liệu báo giá.');
     } finally {
@@ -39,6 +45,9 @@ export function QuoteHomePage() {
   useEffect(() => {
     void load();
   }, []);
+
+  const companyById = useMemo(() => new Map(companies.map(c => [c.id, c])), [companies]);
+  const visibleForms = companyFilter ? forms.filter(f => f.issuerCompanyId === companyFilter) : forms;
 
   async function copyFormLink(form: QuoteForm) {
     const updated = await seedingQuoteRepository.shareForm(form.id, true);
@@ -69,6 +78,14 @@ export function QuoteHomePage() {
           <p>Quản lý form, preview, public link, quote detail và renderer độc lập.</p>
         </div>
         <div className="quote-head-actions">
+          <select className="quote-input" value={companyFilter} onChange={event => setCompanyFilter(event.target.value)}>
+            <option value="">Tất cả công ty</option>
+            {companies.map(company => (
+              <option key={company.id} value={company.id}>
+                {company.brandName || company.legalName}
+              </option>
+            ))}
+          </select>
           <button type="button" className="quote-button quote-button--secondary" onClick={() => void load()}>
             Làm mới
           </button>
@@ -83,10 +100,10 @@ export function QuoteHomePage() {
 
       {!loading && !error ? (
         <section className="quote-grid">
-          {forms.length === 0 ? (
+          {visibleForms.length === 0 ? (
             <div className="quote-state">Chưa có mẫu báo giá nào.</div>
           ) : (
-            forms.map(form => (
+            visibleForms.map(form => (
               <article key={form.id} className="quote-card">
                 <div className="quote-card__main">
                   <div>
@@ -95,6 +112,13 @@ export function QuoteHomePage() {
                       <span className={`quote-badge ${form.status === 'active' ? 'quote-badge--active' : ''}`}>
                         {FORM_STATUS_LABELS[form.status]}
                       </span>
+                      {form.issuerCompanyId ? (
+                        <span className="quote-badge quote-badge--company">
+                          {(companyById.get(form.issuerCompanyId)?.brandName) || companyById.get(form.issuerCompanyId)?.legalName || 'Công ty'}
+                        </span>
+                      ) : (
+                        <span className="quote-badge">Trung tính (mọi công ty)</span>
+                      )}
                     </div>
                     <p>{form.description}</p>
                   </div>

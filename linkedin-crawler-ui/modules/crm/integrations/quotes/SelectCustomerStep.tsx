@@ -64,6 +64,10 @@ export function SelectCustomerStep({
   const [pickedDeal, setPickedDeal] = useState<Deal | null>(null);
   const pickedExisting = Boolean(pickedDeal);
   const referenceDeal = lockedDeal || pickedDeal;
+  // Khach da co san tu CRM thi chi can hien tom tat - bam "Sua thong tin" moi mo
+  // du 6 o nhap. Khach moi (chua co trong CRM) van hien du luon vi kieu gi cung
+  // phai go tay.
+  const [editingFields, setEditingFields] = useState(false);
 
   const searchResults = useMemo(() => {
     const q = normalize(search);
@@ -103,12 +107,14 @@ export function SelectCustomerStep({
     onChangeCustomer(dealFormFromDeal(deal));
     setPickedDeal(deal);
     setSearch('');
+    setEditingFields(false);
   }
 
   function startNewCustomer() {
     onChangeCustomer(emptyDealForm());
     setPickedDeal(null);
     setSearch('');
+    setEditingFields(false);
   }
 
   const hasCustomer = Boolean(customer.customerName.trim() || customer.phone.trim() || customer.email.trim());
@@ -170,9 +176,16 @@ export function SelectCustomerStep({
                 {customer.companyName ? <span> · {customer.companyName}</span> : null}
                 {pickedExisting ? <span className="crm-quote-customer-tag">Đã có</span> : <span className="crm-quote-customer-tag crm-quote-customer-tag--new">Khách mới</span>}
               </div>
-              <button type="button" className="crm-secondary-inline" onClick={startNewCustomer}>
-                Đổi khách khác
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                {pickedExisting && !editingFields ? (
+                  <button type="button" className="crm-secondary-inline" onClick={() => setEditingFields(true)}>
+                    Sửa thông tin
+                  </button>
+                ) : null}
+                <button type="button" className="crm-secondary-inline" onClick={startNewCustomer}>
+                  Đổi khách khác
+                </button>
+              </div>
             </div>
           ) : null}
         </>
@@ -204,6 +217,7 @@ export function SelectCustomerStep({
         </div>
       ) : null}
 
+      {!pickedExisting || editingFields ? (
       <div className="crm-wizard-form-card-grid" style={{ marginTop: '0.85rem' }}>
         <label className="crm-field">
           <span>Tên khách hàng *</span>
@@ -241,6 +255,7 @@ export function SelectCustomerStep({
           )}
         </label>
       </div>
+      ) : null}
     </section>
   );
 }

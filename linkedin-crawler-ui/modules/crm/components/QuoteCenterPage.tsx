@@ -376,19 +376,19 @@ export function QuoteCenterPage() {
                       ) : (
                         saleRows.map(row => (
                           <tr key={row.key}>
-                            <td>
+                            <td data-label="Sale">
                               <div className="qc-sale-cell">
                                 <span className="qc-avatar">{initialsOf(row.name)}</span>
                                 <strong>{row.name}</strong>
                               </div>
                             </td>
-                            <td>{row.dealIds.size}</td>
-                            <td>{row.quotes}</td>
-                            <td>{row.sent}</td>
-                            <td>{row.won}</td>
-                            <td>{row.quotes ? Math.round((row.won / row.quotes) * 1000) / 10 : 0}%</td>
-                            <td>{formatMoney(row.value)}</td>
-                            <td>{formatMoney(row.wonValue)}</td>
+                            <td data-label="KH đã BG">{row.dealIds.size}</td>
+                            <td data-label="Báo giá">{row.quotes}</td>
+                            <td data-label="Đã gửi">{row.sent}</td>
+                            <td data-label="Đã chốt">{row.won}</td>
+                            <td data-label="Tỷ lệ chốt">{row.quotes ? Math.round((row.won / row.quotes) * 1000) / 10 : 0}%</td>
+                            <td data-label="Giá trị BG">{formatMoney(row.value)}</td>
+                            <td data-label="Giá trị chốt">{formatMoney(row.wonValue)}</td>
                           </tr>
                         ))
                       )}
@@ -526,35 +526,35 @@ export function QuoteCenterPage() {
                   const saleName = deal?.assignment.sdrName || deal?.assignment.leadName || 'Chưa gán';
                   return (
                     <tr key={quote.id}>
-                      <td>
+                      <td data-label="Mã báo giá">
                         <Link href={`/all-platform/quotes/${quote.id}`} className="qc-row-link">
                           {quote.quoteNumber}
                         </Link>
                       </td>
-                      <td>
+                      <td data-label="Khách hàng CRM">
                         <Link href={`/all-platform/crm?openDeal=${deal?.id}`} className="qc-row-link">
                           {deal?.customerName}
                         </Link>
                         {deal?.companyName ? <div className="qc-row-sub">{deal.companyName}</div> : null}
                       </td>
-                      <td>
+                      <td data-label="Cơ hội CRM">
                         <Link href={`/all-platform/crm?openDeal=${deal?.id}`} className="qc-row-link">
                           {deal?.servicePackage || deal?.package || 'Cơ hội CRM'}
                         </Link>
                         <div className="qc-row-sub">{deal?.dealId}</div>
                       </td>
-                      <td>{formatMoney(quote.totalAmount)}</td>
-                      <td>
+                      <td data-label="Giá trị">{formatMoney(quote.totalAmount)}</td>
+                      <td data-label="Phụ trách">
                         <div className="qc-sale-cell">
                           <span className="qc-avatar qc-avatar-sm">{initialsOf(saleName)}</span>
                           {saleName}
                         </div>
                       </td>
-                      <td>
+                      <td data-label="Trạng thái">
                         <span className={`qc-badge ${status.className}`}>{status.label}</span>
                       </td>
-                      <td>{relativeTime(quote.updatedAt || quote.createdAt)}</td>
-                      <td>
+                      <td data-label="Cập nhật">{relativeTime(quote.updatedAt || quote.createdAt)}</td>
+                      <td data-label="">
                         <Link href={`/all-platform/quotes/${quote.id}`} className="qc-row-action" aria-label="Mở báo giá">
                           →
                         </Link>

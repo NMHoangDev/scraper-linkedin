@@ -1,18 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { QuoteDocumentRenderer, calculateQuoteTotals, calculateVillaTotals } from '@/modules/quotes';
 import type { QuoteSchema } from '@/modules/quotes';
-import { DEFAULT_VISIBLE_QUOTE_COLUMNS } from './types';
+import { resolveToggleableColumns } from '@/modules/quotes/utils/quoteColumns';
 import type { QuoteDraft } from './types';
-
-const COLUMN_TOGGLE_OPTIONS: Array<{ key: string; label: string }> = [
-  { key: 'description', label: 'Mô tả' },
-  { key: 'unit', label: 'Đơn vị tính' },
-  { key: 'quantity', label: 'Số lượng' },
-  { key: 'unitPrice', label: 'Đơn giá' },
-  { key: 'total', label: 'Thành tiền' },
-];
 
 export function ReviewQuoteStep({
   schema,
@@ -26,14 +18,18 @@ export function ReviewQuoteStep({
   onChange?: (next: QuoteDraft) => void;
 }) {
   const [columnMenuOpen, setColumnMenuOpen] = useState(false);
-  const totals =
-    schema.layoutType === 'villa_solution_package'
-      ? calculateVillaTotals(draft.solutionItems)
-      : calculateQuoteTotals(draft.items, draft.data.discountPercent);
+  const isVilla = schema.layoutType === 'villa_solution_package';
+  const totals = isVilla
+    ? calculateVillaTotals(draft.solutionItems)
+    : calculateQuoteTotals(draft.items, draft.data.discountPercent);
 
-  const visibleColumns = Array.isArray(draft.data.visibleColumns)
-    ? draft.data.visibleColumns
-    : DEFAULT_VISIBLE_QUOTE_COLUMNS;
+  // Danh sach checkbox "Cot hien thi" phai an theo dung cot THAT cua MAU nay
+  // (schema.quoteItems.config.columns), khong phai danh sach co dinh - moi mau
+  // khac nhau se hien dung tung checkbox tuong ung, dung chung logic voi
+  // QuoteDocumentRenderer (xem utils/quoteColumns.ts) de khong bao gio lech nhau.
+  const columnToggleOptions = useMemo(() => resolveToggleableColumns(schema, draft.items), [schema, draft.items]);
+  const defaultVisibleColumns = useMemo(() => columnToggleOptions.map(column => column.key), [columnToggleOptions]);
+  const visibleColumns = Array.isArray(draft.data.visibleColumns) ? draft.data.visibleColumns : defaultVisibleColumns;
 
   function setVisibleColumns(next: string[]) {
     onChange?.({ ...draft, data: { ...draft.data, visibleColumns: next } });
@@ -50,36 +46,50 @@ export function ReviewQuoteStep({
         <div className="crm-quote-review-toolbar">
           <div>
             <h3 className="crm-wizard-form-title">Bản xem trước gửi khách hàng</h3>
-            <p className="crm-wizard-form-description">Tuỳ chỉnh cột hiển thị trước khi gửi.</p>
+            <p className="crm-wizard-form-description">
+              {isVilla ? 'Mẫu này dùng bảng giải pháp riêng, không tuỳ chỉnh cột được.' : 'Tuỳ chỉnh cột hiển thị trước khi gửi.'}
+            </p>
           </div>
-          <div className="crm-quote-column-picker">
-            <button type="button" className="crm-cancel-button" onClick={() => setColumnMenuOpen(open => !open)}>
-              Cột hiển thị <span className="crm-quote-column-count">{visibleColumns.length}/{COLUMN_TOGGLE_OPTIONS.length}</span>
-            </button>
-            {columnMenuOpen ? (
-              <div className="crm-quote-column-menu">
-                <p>Chỉ ảnh hưởng bản gửi khách, không xoá dữ liệu nội bộ.</p>
-                {COLUMN_TOGGLE_OPTIONS.map(option => (
-                  <label key={option.key} className="crm-quote-column-option">
-                    <input
-                      type="checkbox"
-                      checked={visibleColumns.includes(option.key)}
-                      onChange={() => toggleColumn(option.key)}
-                    />
-                    {option.label}
-                  </label>
-                ))}
-                <div className="crm-quote-column-menu-foot">
-                  <button type="button" onClick={() => setVisibleColumns([...DEFAULT_VISIBLE_QUOTE_COLUMNS])}>
-                    Hiện tất cả
-                  </button>
-                  <button type="button" onClick={() => setVisibleColumns(['description'])}>
-                    Ẩn thông tin giá
-                  </button>
+          {/* Layout Villa (GIẢI PHÁP/BẠN NHẬN ĐƯỢC/BAO GỒM...) dùng bảng cột
+              hoàn toàn khác, không đọc visibleColumns - ẩn hẳn panel này đi để
+              tránh hiện checkbox không có tác dụng gì (đánh lừa người dùng). */}
+          {!isVilla ? (
+            <div className="crm-quote-column-picker">
+              <button type="button" className="crm-cancel-button" onClick={() => setColumnMenuOpen(open => !open)}>
+                Cột hiển thị <span className="crm-quote-column-count">{visibleColumns.length}/{columnToggleOptions.length}</span>
+              </button>
+              {columnMenuOpen ? (
+                <div className="crm-quote-column-menu">
+                  <p>Chỉ ảnh hưởng bản gửi khách, không xoá dữ liệu nội bộ.</p>
+                  {columnToggleOptions.map(option => (
+                    <label key={option.key} className="crm-quote-column-option">
+                      <input
+                        type="checkbox"
+                        checked={visibleColumns.includes(option.key)}
+                        onChange={() => toggleColumn(option.key)}
+                      />
+                      {option.label}
+                    </label>
+                  ))}
+                  <div className="crm-quote-column-menu-foot">
+                    <button type="button" onClick={() => setVisibleColumns([...defaultVisibleColumns])}>
+                      Hiện tất cả
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setVisibleColumns(
+                          columnToggleOptions.filter(column => column.type !== 'number' && column.type !== 'currency').map(column => column.key)
+                        )
+                      }
+                    >
+                      Ẩn thông tin giá
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ) : null}
-          </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -90,7 +100,7 @@ export function ReviewQuoteStep({
         solutionItems={draft.solutionItems}
         totals={totals}
         mode="preview"
-        respectVisibleColumns={Boolean(onChange)}
+        respectVisibleColumns={Boolean(onChange) && !isVilla}
       />
 
       {onChange ? (

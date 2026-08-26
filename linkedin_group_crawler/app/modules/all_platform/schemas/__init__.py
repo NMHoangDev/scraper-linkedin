@@ -51,6 +51,8 @@ from app.modules.all_platform.schemas.quote import (
     QuoteItemInput,
     QuoteCreateRequest,
     QuoteUpdateRequest,
+    IssuerCompanyCreateRequest,
+    IssuerCompanyUpdateRequest,
 )
 from app.modules.all_platform.schemas.service_catalog import (
     ServiceCatalogItemCreateRequest,

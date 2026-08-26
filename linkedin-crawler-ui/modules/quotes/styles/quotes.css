@@ -11,13 +11,6 @@
   padding-bottom: 5rem;
 }
 
-.quote-preview-page,
-.quote-detail-page,
-.public-form-page,
-.quote-public-page {
-  background: #f1f5f9;
-}
-
 .quote-head,
 .quote-action-bar,
 .quote-detail-header,
@@ -61,6 +54,27 @@
   gap: 0.55rem;
 }
 
+.telegram-send-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+}
+
+.telegram-send-status {
+  font-size: 11.5px;
+  color: #64748b;
+  max-width: 260px;
+}
+
+.telegram-send-status--failed {
+  color: #dc2626;
+}
+
+.telegram-send-status--success {
+  color: #16a34a;
+}
+
 .quote-button,
 .quote-link-button,
 .quote-back {
@@ -73,6 +87,16 @@
   font-weight: 700;
   text-decoration: none;
   padding: 0 0.9rem;
+}
+
+.quote-input {
+  min-height: 2.35rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.55rem;
+  padding: 0 0.7rem;
+  font-size: 0.86rem;
+  color: #334155;
+  background: #ffffff;
 }
 
 .quote-button {
@@ -244,6 +268,12 @@
   border-color: #86efac;
   background: #ecfdf5;
   color: #047857;
+}
+
+.quote-badge--company {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1e40af;
 }
 
 .status-draft {
@@ -652,7 +682,7 @@
 .quote-compact-table {
   border: 1px solid #e2e8f0;
   border-radius: 12px;
-  overflow: hidden;
+  overflow-x: auto;
 }
 
 .quote-compact-head,
@@ -992,6 +1022,67 @@
 
   .quote-item-fields {
     grid-template-columns: 1fr;
+  }
+
+  /* Popup "+ Chon tu danh muc" (Buoc 2) - full man hinh thay vi panel noi
+   * giua trang, tranh bi cat/qua nho tren dien thoai. */
+  .quote-catalog-picker-backdrop {
+    padding: 0;
+  }
+
+  .quote-catalog-picker-panel {
+    width: 100vw;
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+  }
+
+  .quote-catalog-picker-panel-head {
+    padding: 14px 16px 12px;
+  }
+
+  .quote-catalog-picker-panel-head p {
+    max-width: none;
+  }
+
+  .quote-catalog-picker-filters {
+    flex-wrap: wrap;
+    margin: 12px 16px 0;
+  }
+
+  .quote-catalog-picker-filters select {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .quote-catalog-picker-search {
+    flex: 1 1 100%;
+  }
+
+  .quote-catalog-picker-list {
+    padding: 10px 16px 14px;
+  }
+
+  .quote-catalog-picker-row,
+  .quote-catalog-picker-item {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .quote-catalog-picker-item-name {
+    flex: 1 1 100%;
+  }
+
+  .quote-catalog-picker-item-meta {
+    white-space: normal;
+    flex: 0 1 auto;
+  }
+
+  .quote-catalog-picker-foot {
+    position: sticky;
+    bottom: 0;
+    padding: 10px 16px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom));
   }
 }
 
@@ -1437,6 +1528,13 @@
   max-width: 80%;
 }
 
+.sheet-brand-logo {
+  max-width: 140px;
+  max-height: 56px;
+  object-fit: contain;
+  margin-bottom: 0.5rem;
+}
+
 .sheet-brand-mark {
   margin: 0 0 0.35rem;
   color: #111827;
@@ -1448,10 +1546,6 @@
 
 .sheet-doc-code {
   min-width: 9.5rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
-  background: #ffffff;
-  padding: 0.72rem 0.9rem;
   text-align: right;
 }
 
@@ -1552,25 +1646,32 @@
 }
 
 .sheet-quote-meta--cards {
-  align-items: stretch;
-  gap: 0.5rem;
+  align-items: center;
+  gap: 0;
+  border-top: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0.6rem 0;
 }
 
 .sheet-quote-meta--cards span {
-  min-width: 8.8rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
-  background: #ffffff;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
   color: #111827;
-  padding: 0.55rem 0.72rem;
+  padding: 0 0.9rem;
   text-align: left;
+  border-left: 1px solid #e5e7eb;
+}
+
+.sheet-quote-meta--cards span:first-child {
+  border-left: none;
+  padding-left: 0;
 }
 
 .sheet-quote-meta--cards b {
-  display: block;
-  margin-bottom: 0.18rem;
   color: #6b7280;
   font-size: 0.65rem;
+  font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
 }
@@ -1824,7 +1925,7 @@
 }
 
 .sheet-signatures span {
-  margin-top: 4rem;
+  margin-top: 1.8rem;
   color: #475569;
 }
 
@@ -1992,5 +2093,59 @@
     border: 0 !important;
     box-shadow: none !important;
     page-break-after: always;
+  }
+
+  /* Ban in/PDF: bo het scroll ngang (khong scroll duoc khi in, chi bi cat
+   * mat/hien thanh cuon vo nghia trong ban in that) - table phai TU CO lai
+   * vua trang giay thay vi tran ra ngoai. GIU table-layout:fixed (KHONG doi
+   * sang auto - auto de trinh duyet tinh theo do rong "tu nhien" cua noi dung,
+   * min-content cua so/nhan tien te khong wrap duoc lam bang tran ra ngoai bat
+   * ke overflow-wrap). Fixed layout ep DUNG 100% chieu rong .quote-sheet (210mm),
+   * chia deu cho moi cot, noi dung dai thi tu xuong dong ben trong o (nho
+   * overflow-wrap:anywhere co san) thay vi day ca bang rong ra. Bo het
+   * min-width co dinh (180px tren man hinh) vi do la nguyen nhan chinh khien
+   * bang bi day rong hon trang giay. */
+  .sheet-items-table-wrap {
+    overflow-x: visible !important;
+    width: 100% !important;
+  }
+
+  .sheet-items-table {
+    table-layout: fixed !important;
+    width: 100% !important;
+    font-size: 0.68rem !important;
+  }
+
+  .sheet-items-table th,
+  .sheet-items-table td {
+    padding: 0.35rem 0.3rem !important;
+    min-width: 0 !important;
+    width: auto !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  .sheet-items-table th:nth-child(2),
+  .sheet-items-table td:nth-child(2),
+  .sheet-items-table th:nth-child(3),
+  .sheet-items-table td:nth-child(3) {
+    min-width: 0 !important;
+  }
+
+  /* Cot dau (STT) luon chi la so 1-2 ky tu - danh rieng chieu rong nho, nhuong
+   * lai khong gian cho cac cot con lai (Ten/Mo ta...) thay vi chia deu 1/N nhu
+   * moi cot khac (fixed layout mac dinh se chia deu neu khong ghi width). */
+  .sheet-items-table th:first-child,
+  .sheet-items-table td:first-child {
+    width: 22px !important;
+  }
+
+  /* Lap lai header bang o moi trang khi bang bi ngat trang, va khong de 1
+   * dong bi cat lam doi giua 2 trang (rat kho doc). */
+  .sheet-items-table thead {
+    display: table-header-group;
+  }
+
+  .sheet-items-table tr {
+    page-break-inside: avoid;
   }
 }
