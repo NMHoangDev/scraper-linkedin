@@ -3,6 +3,10 @@ import type { DealFormState } from '../../components/DealFormFields';
 
 export type WizardStep = 1 | 2 | 3 | 4;
 
+/** Cột bảng dịch vụ mặc định hiện cho khách khi tạo báo giá mới — khớp đúng 5
+ * checkbox "Cột hiển thị" ở bước Xem trước & gửi. */
+export const DEFAULT_VISIBLE_QUOTE_COLUMNS = ['description', 'unit', 'quantity', 'unitPrice', 'total'];
+
 export interface QuoteDraft {
   data: QuoteData;
   items: QuoteItem[];
@@ -32,6 +36,9 @@ export function quoteDraftFromForm(form: QuoteForm, dealDraft?: DealFormState): 
   if (fields.some(field => field.key === 'quoteDate') && !data.quoteDate) {
     data.quoteDate = new Date().toISOString().slice(0, 10);
   }
+  if (!data.visibleColumns) {
+    data.visibleColumns = [...DEFAULT_VISIBLE_QUOTE_COLUMNS];
+  }
 
   if (dealDraft) {
     Object.assign(data, {
@@ -52,6 +59,11 @@ export function quoteDraftFromForm(form: QuoteForm, dealDraft?: DealFormState): 
  * đúng dữ liệu đã lưu, không phải giá trị mặc định của mẫu. */
 export function quoteDraftFromExistingQuote(quote: Quote): QuoteDraft {
   const { solutionItems, ...data } = quote.data || {};
+  // Bao gia luu truoc khi co tinh nang "Cot hien thi" se khong co visibleColumns
+  // trong data da luu - mac dinh hien du (khop hanh vi cu, khong bi rot cot).
+  if (!data.visibleColumns) {
+    data.visibleColumns = [...DEFAULT_VISIBLE_QUOTE_COLUMNS];
+  }
   return {
     data,
     items: quote.items || [],

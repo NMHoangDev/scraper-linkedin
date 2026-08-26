@@ -19,6 +19,10 @@ export interface ServiceCatalogItem {
   id: string;
   itemType: ServiceCatalogItemType;
   parentId?: string;
+  /** Chỉ có khi lấy qua getServiceCatalogOptions() (bước điền báo giá) — tên
+   * nhóm cha, dùng để lọc theo nhóm trong popup chọn sản phẩm. */
+  groupId?: string;
+  groupName?: string;
   sku?: string;
   name: string;
   description?: string;

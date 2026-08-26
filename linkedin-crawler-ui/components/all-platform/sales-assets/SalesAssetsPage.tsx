@@ -420,7 +420,7 @@ export function SalesAssetsPage() {
                       <td className="px-4 py-4 font-semibold text-slate-700">{asset.version || "-"}</td>
                       <td className="px-4 py-4 text-slate-600">{getSalesAssetSourceLabel(asset.sourceType)}</td>
                       <td className="px-4 py-4">
-                        <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold", asset.status === "active" ? "bg-emerald-100 text-emerald-700" : asset.status === "inactive" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-500")}>
+                        <span className={cn("whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold", asset.status === "active" ? "bg-emerald-100 text-emerald-700" : asset.status === "inactive" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-500")}>
                           {getSalesAssetStatusLabel(asset.status)}
                         </span>
                       </td>

@@ -214,6 +214,15 @@ def delete_service_catalog_item(item_id: str) -> dict:
             names = ", ".join(b["name"] for b in bundles)
             raise ValueError(f"Dịch vụ đang được dùng trong gói: {names}. Không thể xoá.")
 
+    # Không xoá cứng dịch vụ đã từng được chọn trong 1 báo giá (kể cả báo giá cũ) -
+    # quote_items lưu snapshot riêng nên xoá không phá dữ liệu báo giá cũ, nhưng vẫn
+    # chặn theo đúng yêu cầu nghiệp vụ: dùng "Ngưng kinh doanh" (đổi status) thay vì xoá.
+    used_in_quotes = (
+        supabase.table("quote_items").select("id").eq("catalog_item_id", item_id).limit(1).execute().data or []
+    )
+    if used_in_quotes:
+        raise ValueError("Dịch vụ đã được dùng trong báo giá, không thể xoá — chuyển sang Ngưng kinh doanh.")
+
     supabase.table(ITEMS_TABLE).delete().eq("id", item_id).execute()
     return {"deleted": True}
 
@@ -309,10 +318,15 @@ def get_service_catalog_options_for_form(quote_form_id: str) -> dict:
         .data
         or []
     )
+    group_rows = supabase.table(ITEMS_TABLE).select("id,name").in_("id", group_ids).execute().data or []
+    group_names = {g["id"]: g["name"] for g in group_rows}
+
     bundles = []
     components = []
     for row in rows:
         item = _row_to_item(row)
+        item["groupId"] = row.get("parent_id")
+        item["groupName"] = group_names.get(row.get("parent_id"))
         if item["itemType"] == "bundle":
             item["components"] = _bundle_components(item["id"])
             bundles.append(item)

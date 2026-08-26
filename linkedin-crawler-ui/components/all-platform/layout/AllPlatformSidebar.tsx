@@ -236,11 +236,27 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       : []),
     {
       type: "item",
+      id: "quote-center",
+      href: "/all-platform/quote-center",
+      icon: "request_quote",
+      label: "Báo giá",
+      matchStartsWith: ["/all-platform/quote-center"],
+    },
+    {
+      type: "item",
       id: "quotes",
       href: "/all-platform/quotes",
       icon: "star",
       label: "Mẫu báo giá",
       matchStartsWith: ["/all-platform/quotes"],
+    },
+    {
+      type: "item",
+      id: "service-catalog",
+      href: "/all-platform/service-catalog",
+      icon: "category",
+      label: "Sản phẩm & dịch vụ",
+      matchStartsWith: ["/all-platform/service-catalog"],
     },
     {
       type: "item",
@@ -277,14 +293,6 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       icon: "database",
       label: "Quản lý VPS",
       matchStartsWith: ["/all-platform/quan-ly-vps"],
-    },
-    {
-      type: "item",
-      id: "service-catalog",
-      href: "/all-platform/service-catalog",
-      icon: "category",
-      label: "Danh mục dịch vụ",
-      matchStartsWith: ["/all-platform/service-catalog"],
     },
     {
       type: "item",

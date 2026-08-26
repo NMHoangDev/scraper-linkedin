@@ -126,6 +126,10 @@ export interface QuoteData {
   validityDays?: number;
   currency?: string;
   solutionItems?: VillaSolutionItem[];
+  /** Cột bảng dịch vụ hiện cho KHÁCH (public link/PDF) — không có nghĩa là
+   * undefined = hiện hết. Nội bộ (preview/detail) luôn hiện đủ cột, không bị
+   * ảnh hưởng bởi field này. Xem QuoteDocumentRenderer (mode==='public'). */
+  visibleColumns?: string[];
   [key: string]: unknown;
 }
 
