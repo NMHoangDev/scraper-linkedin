@@ -20,6 +20,7 @@ import {
   deleteZaloAccountFull,
   createZaloAccount,
   createZaloBroadcast,
+  createZaloUserThread,
   updateZaloLibraryMessage,
 } from "@/services/zaloCrawlerService";
 import type { ZaloBroadcastTarget } from "@/types/zalo-api";
@@ -126,6 +127,10 @@ export function ZaloInboxAdminShell() {
   const [editPhone, setEditPhone] = useState("");
   const [isSavingAccount, setIsSavingAccount] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  // UID người gửi đang được mở hội thoại riêng (loading state cho icon "Nhắn riêng"
+  // trên tin nhắn nhóm) — không cần đã kết bạn, chỉ cần biết user_id + tên hiển thị
+  // lấy sẵn từ chính tin nhắn nhóm đó (giống luồng "Nhắn tin cho người lạ" đã có).
+  const [startingDmSenderId, setStartingDmSenderId] = useState<string | null>(null);
 
   // States for creating new account
   const [isCreatingAccount, setIsCreatingAccount] = useState(true);
@@ -410,6 +415,32 @@ export function ZaloInboxAdminShell() {
       cancelled = true;
     };
   }, [inbox.openConv]);
+
+  // Nhắn riêng cho 1 người từng nhắn trong nhóm — KHÔNG cần đã kết bạn/tìm SĐT,
+  // vì user_id + tên hiển thị đã có sẵn ngay trong tin nhắn nhóm (sender_id/
+  // sender_name, do listener lưu lại khi nhận tin). Dùng lại đúng endpoint
+  // "Nhắn tin cho người lạ" (POST /conversations/users) — tạo/mở thread cá nhân
+  // rồi chuyển sang đó để nhắn liền.
+  const handleMessageSenderPrivately = async (senderId: string, senderName: string) => {
+    if (!inbox.selectedAccountId || !senderId || startingDmSenderId) return;
+    setStartingDmSenderId(senderId);
+    try {
+      const res = await createZaloUserThread(inbox.selectedAccountId, {
+        user_id: senderId,
+        display_name: senderName || `User ${senderId}`,
+      });
+      await inbox.refreshConversations();
+      inbox.openChat(res.conversation_id);
+      inbox.showToast(`Đã mở hội thoại riêng với ${senderName || senderId}`, true);
+    } catch (e) {
+      inbox.showToast(
+        e instanceof Error ? e.message : "Không thể mở hội thoại riêng với người này",
+        false,
+      );
+    } finally {
+      setStartingDmSenderId(null);
+    }
+  };
 
   const handleSuggestKpi = async () => {
     if (!inbox.selectedAccountId || !ownerEmail) return;
@@ -979,7 +1010,27 @@ export function ZaloInboxAdminShell() {
 
                           <div className={cn("max-w-[75%]", isSent ? "text-right" : "text-left")}>
                             {!isSent && msg.sender_name && (
-                              <div className="text-[10px] text-[#A0A0A0] mb-0.5 px-1">{msg.sender_name}</div>
+                              <div className="flex items-center gap-1 mb-0.5 px-1">
+                                <span className="text-[10px] text-[#A0A0A0]">{msg.sender_name}</span>
+                                {/* Chỉ hiện icon "Nhắn riêng" khi sender KHÁC với hội
+                                    thoại đang mở (tức đây là tin trong NHÓM) — nếu
+                                    sender_id === conv_id thì đang mở đúng ngay hội
+                                    thoại riêng với người này rồi, không cần nút nữa. */}
+                                {msg.sender_id && msg.sender_id !== inbox.openConv && (
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleMessageSenderPrivately(msg.sender_id!, msg.sender_name || "")}
+                                    disabled={startingDmSenderId === msg.sender_id}
+                                    title={`Nhắn riêng cho ${msg.sender_name || "người này"}`}
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity text-[#A0A0A0] hover:text-[#E3000F] disabled:opacity-60 disabled:cursor-wait shrink-0"
+                                  >
+                                    <MaterialIcon
+                                      name={startingDmSenderId === msg.sender_id ? "sync" : "send"}
+                                      className={cn("text-[11px]", startingDmSenderId === msg.sender_id && "animate-spin")}
+                                    />
+                                  </button>
+                                )}
+                              </div>
                             )}
                             {msg.content && (
                               <div
