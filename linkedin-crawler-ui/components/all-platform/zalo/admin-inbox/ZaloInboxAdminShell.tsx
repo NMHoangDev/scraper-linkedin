@@ -7,7 +7,7 @@ import ZaloTeamAccountTree from "./ZaloTeamAccountTree";
 import ZaloAccountAuthView from "./ZaloAccountAuthView";
 import { CrmCustomerModal } from "@/components/all-platform/components/CrmCustomerModal";
 import { SalesAssetPickerModal } from "@/components/all-platform/sales-assets/SalesAssetPickerModal";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { resolveZaloConversationAccount } from "@/services/zaloCrawlerService";
 import { KpiProgressCard } from "@/components/all-platform/components/kpi-progress-card";
 import { MaterialIcon } from "@/components/ui";
@@ -150,6 +150,7 @@ export function ZaloInboxAdminShell() {
   // do tim dung acc Zalo dang giu hoi thoai nay (qua API resolve-account, da co san
   // kiem tra quyen theo team/leader/admin) roi tu chon acc + nhay thang toi hoi thoai,
   // khong bat nguoi dung phai tu tim acc nao dang giu no.
+  const router = useRouter();
   const searchParams = useSearchParams();
   const jumpToConvRef = useRef<string | null>(null);
   const jumpToAccountRef = useRef<string | null>(null);
@@ -556,6 +557,14 @@ export function ZaloInboxAdminShell() {
       {/* ── Header ── */}
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3 flex-shrink-0">
         <div>
+          <button
+            type="button"
+            onClick={() => router.push("/all-platform/tai-khoan")}
+            className="mb-2 inline-flex items-center gap-1 rounded-lg border border-[#E5E5E5] bg-white px-2.5 py-1 text-xs font-bold text-[#666666] transition hover:border-[#E3000F] hover:text-[#E3000F]"
+          >
+            <MaterialIcon name="arrow_back" className="text-[16px]" />
+            Quay lại Tài khoản
+          </button>
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-[#E3000F] to-red-700 flex items-center justify-center shadow-sm">
               <MaterialIcon name="chat" className="text-white text-[18px]" />
