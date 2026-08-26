@@ -386,8 +386,15 @@ async function cmdSendMessage(api, args) {
   if (!threadId) throw new Error("Missing --thread-id");
   const { ThreadType } = require("zca-js");
   const threadType = Number(type) === 0 ? ThreadType.User : ThreadType.Group;
-  const result = await api.sendMessage({ msg: text }, String(threadId), threadType);
-  return { ok: true, result };
+  const response = await api.sendMessage({ msg: text }, String(threadId), threadType);
+  // QUAN TRỌNG: key PHẢI là "response" (khớp với zca_api_bridge.js's
+  // `emitAndExit({ ok: true, response })`) — Python (_persist_outgoing_message
+  // -> _build_outgoing_message_id) luôn đọc result.get("response") để lấy
+  // msgId thật từ { message: { msgId } }. Worker pool này trước đây trả về
+  // key "result" (không khớp) -> Python luôn đọc None -> luôn dùng ID tạm
+  // "local-..." -> khi Zalo echo tin về với msgId thật, DB coi là 2 tin khác
+  // nhau -> hiển thị lặp trên UI mỗi lần gửi (dù Zalo chỉ nhận 1 tin thật).
+  return { ok: true, response };
 }
 
 async function cmdRemoveUnread(api, args) {
@@ -470,8 +477,9 @@ const COMMANDS = {
     const text = (payload || {}).text || "";
     const { ThreadType } = require("zca-js");
     const threadType = Number(type) === 0 ? ThreadType.User : ThreadType.Group;
-    const result = await api.sendAttachment({ filePaths, msg: text }, String(threadId), threadType);
-    return { ok: true, result };
+    const response = await api.sendAttachment({ filePaths, msg: text }, String(threadId), threadType);
+    // Cung bug + fix nhu cmdSendMessage phia tren - xem comment o do.
+    return { ok: true, response };
   },
   "remove-unread": cmdRemoveUnread,
   "find-user-by-phone": cmdFindUserByPhone,

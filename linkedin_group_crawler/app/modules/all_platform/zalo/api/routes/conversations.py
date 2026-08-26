@@ -806,7 +806,10 @@ async def send_message_to_conversation(
 
     # Persist sent message vào Supabase — zca-js chỉ trả về msgId (không có sender/timestamp)
     # nên ta tạo Message tối thiểu với is_sent=True, listener sẽ tự merge khi echo về.
-    api_payload = result.get("response") if isinstance(result, dict) else None
+    # "response" là key chuẩn (zca_api_bridge.js + zca_api_server.js, đã đồng bộ
+    # 2026-08-26); vẫn thử "result" phòng hộ nếu 1 worker cũ chưa restart kịp
+    # còn trả key cũ — tránh lại rơi vào fallback ID tạm gây lặp tin.
+    api_payload = result.get("response") or result.get("result") if isinstance(result, dict) else None
     await _persist_outgoing_message(
         user_id,
         conversation_id.strip(),
@@ -915,7 +918,10 @@ async def send_media_to_conversation(
             logger.warning(f"Could not import supabase helpers for media upload: {exc}")
 
         # Lưu message đã gửi vào Supabase
-        api_payload = result.get("response") if isinstance(result, dict) else None
+        # "response" là key chuẩn (zca_api_bridge.js + zca_api_server.js, đã đồng bộ
+        # 2026-08-26); vẫn thử "result" phòng hộ nếu 1 worker cũ chưa restart kịp
+        # còn trả key cũ — tránh lại rơi vào fallback ID tạm gây lặp tin.
+        api_payload = result.get("response") or result.get("result") if isinstance(result, dict) else None
         await _persist_outgoing_message(
             user_id,
             conversation_id.strip(),
