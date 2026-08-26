@@ -1499,9 +1499,22 @@ async def import_session_from_extension(
             detail="user_agent bắt buộc và phải là Chrome thật (có 'Mozilla'). Hãy gửi navigator.userAgent của trình duyệt.",
         )
 
-    # ── IMEI: yêu cầu, nếu thiếu thì tự sinh (vẫn pass) ───────────────
+    # ── IMEI: PHẢI ổn định qua nhiều lần import cho cùng 1 account ────
+    # Zalo coi cookie zpsid/zpw_sek là "session key" gắn với đúng 1 imei lúc
+    # phát hành — nếu mỗi lần import sinh uuid.uuid4() MỚI (như code cũ) thì
+    # imei gửi lên không bao giờ khớp với imei mà Zalo thực sự gắn cho phiên
+    # đó, khiến loginCookie() luôn bị Zalo trả error_code 102 "session key
+    # improperly submitted" dù cookie lấy đúng 100%. Ưu tiên imei extension
+    # gửi lên (đã tự cache ổn định phía extension từ 2026-08-25); nếu không
+    # có, tái dùng đúng imei đã lưu từ lần import trước cho account này —
+    # CHỈ sinh UUID mới khi account này chưa từng có imei nào được lưu.
     import uuid
-    imei = (body.get("imei") or "").strip() or str(uuid.uuid4())
+    imei = (body.get("imei") or "").strip()
+    if not imei:
+        existing_auth = await load_zca_auth(user_id)
+        imei = (existing_auth or {}).get("imei") or ""
+    if not imei:
+        imei = str(uuid.uuid4())
 
     # ── Build a ZCA-compatible auth dict from extension cookies ──────
     # ZCA expects cookies as either array or {cookies: [...]} object.

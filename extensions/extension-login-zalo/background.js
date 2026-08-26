@@ -638,6 +638,26 @@ function backendError(result, fallback) {
   }
 }
 
+// Ưu tiên imei content script tìm được từ localStorage Zalo (đúng nhất, do
+// chính Zalo cấp). Nếu không tìm được, dùng 1 giá trị TỰ SINH nhưng LƯU LẠI
+// trong chrome.storage.local để dùng lại y nguyên cho mọi lần sau — tuyệt đối
+// không sinh UUID random mới mỗi lần gọi (đó là bug cũ ở backend, xem comment
+// trong importZaloSession).
+async function getStableImei(contentScriptImei) {
+  if (contentScriptImei) {
+    await chrome.storage.local.set({ cachedImei: contentScriptImei });
+    return contentScriptImei;
+  }
+  const stored = await chrome.storage.local.get(["cachedImei"]);
+  if (stored.cachedImei) return stored.cachedImei;
+  const generated =
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  await chrome.storage.local.set({ cachedImei: generated });
+  return generated;
+}
+
 async function importZaloSession(data) {
   const accountId = String(data.account_id || data.user_id || "default").trim() || "default";
   const backendUrl = data.backend_url || DEFAULT_BACKEND_URL;
@@ -666,14 +686,24 @@ async function importZaloSession(data) {
       );
     }
 
+    // imei PHẢI ổn định qua nhiều lần gọi — Zalo coi zpsid/zpw_sek là "session
+    // key" gắn với 1 imei cụ thể lúc phát hành; nếu mỗi lần import gửi 1 imei
+    // KHÁC nhau (trước đây: content script cố đoán imei từ localStorage,
+    // thường không tìm được -> backend tự sinh uuid.uuid4() MỚI mỗi lần gọi),
+    // Zalo sẽ luôn từ chối với "session key improperly submitted" dù cookie
+    // đúng 100% - đây là nguyên nhân thực tế của lỗi login_failed lặp lại,
+    // không phải lỗi đơn vị thời gian (đã kiểm tra kỹ: normalizeCookieJar
+    // *1000 đúng, tough-cookie parse đúng, giờ hệ thống container đúng).
+    const imei = await getStableImei(context.imei);
+
     const body = {
       account_id: accountId,
       user_id: data.user_id || accountId,
       owner_id: data.owner_id || accountId,
       cookies,
       user_agent: context.user_agent || (typeof navigator !== "undefined" ? navigator.userAgent : ""),
+      imei,
     };
-    if (context.imei) body.imei = context.imei;
 
     const endpoint = makeEndpoint(backendUrl, "/api/all-platform/zalo/auth/import-session");
     logStep("import.posting_to_backend", { endpoint, cookiesCount: cookies.length });
