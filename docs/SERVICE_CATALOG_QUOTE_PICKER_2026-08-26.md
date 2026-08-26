@@ -92,12 +92,21 @@ Tổng: 19 file, +3381/-446 dòng. Chi tiết mapping field báo giá ↔ CRM xe
   deploy này — vẫn còn nguyên trạng thái dang dở, đọc `docs/ZALO_FIX_PROGRESS_2026-08-25.md`
   trước khi làm tiếp phần đó.
 
-## 4. Cần làm tiếp / kiểm chứng
+## 4. Đã kiểm chứng deploy (2026-08-26)
 
-- [ ] Xác nhận run "Deploy App (Production)" ở mục 2.5 kết thúc `success` (không chỉ tin
-  vào workflow xanh — theo kinh nghiệm cũ với Deploy Dev, workflow xanh không chắc code
-  mới đã thực sự lên; nên tự tay mở `https://seeding.markeeai.com/all-platform/service-catalog`
-  và `/all-platform/quote-center` sau khi deploy xong để xác nhận UI 3-tab/Trung tâm báo
-  giá mới đã hiện đúng).
-- [ ] Nếu cần rollback: `git revert -m 1 63b2eb73` trên `main` rồi dispatch lại
-  `deploy-app.yml`.
+- [x] Run `32937978220` ("Deploy App (Production)") kết thúc `status=completed`,
+  `conclusion=success`.
+- [x] Không chỉ tin workflow xanh (theo kinh nghiệm cũ với Deploy Dev — xem memory
+  "Deploy Dev green but stale") — đã tự curl kiểm tra thật:
+  - `GET /all-platform/service-catalog` → 200.
+  - `GET /all-platform/quote-center` → 200 (route CHỈ tồn tại từ nhánh này trở đi, nên
+    200 ở đây tự nó xác nhận code mới đã lên, không phải cache/route cũ).
+  - Route bịa `GET /all-platform/this-route-does-not-exist-xyz123` → 404, xác nhận
+    routing Next.js thật (không phải SPA catch-all trả 200 cho mọi route khiến 2 test
+    trên vô nghĩa).
+  - `GET /api/all-platform/auth/me` → 200 (backend cũng sống bình thường sau deploy).
+
+## 5. Nếu cần rollback
+
+`git revert -m 1 63b2eb73` trên `main`, push, rồi dispatch lại `deploy-app.yml`
+(workflow id `307924044`, `ref=main`).
