@@ -7,8 +7,7 @@ QuoteReference phía frontend (modules/quotes) — tránh phải map lại 2 l�
 from __future__ import annotations
 
 import secrets
-from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from supabase import Client
@@ -19,7 +18,10 @@ FORMS_TABLE = "quote_forms"
 QUOTES_TABLE = "quotes"
 ITEMS_TABLE = "quote_items"
 ISSUER_COMPANIES_TABLE = "quote_issuer_companies"
-VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
+# Việt Nam không có giờ mùa hè (DST) nên offset cố định +7 tương đương
+# "Asia/Ho_Chi_Minh" và không cần dữ liệu tzdata của hệ điều hành (image
+# production thiếu tzdata -> ZoneInfo() crash toàn bộ backend khi import).
+VN_TZ = timezone(timedelta(hours=7))
 
 
 def _now_iso() -> str:
