@@ -1384,8 +1384,18 @@ async def import_session_from_extension(
     owner_id = _normalize_user_id(body.get("owner_id") or x_user_id)
     id_member = _normalize_user_id(body.get("id_member") or owner_id)
 
-    # Nếu user_id không bắt đầu bằng "zl_" (ví dụ là email), tự động tìm kiếm zalo_account tương ứng
+    # Nếu user_id không bắt đầu bằng "zl_" (ví dụ là email), tự động tìm kiếm zalo_account tương ứng.
+    # QUAN TRỌNG: nếu KHÔNG resolve được (DB lỗi hoặc không có account nào gắn
+    # với email này), PHẢI raise lỗi rõ ràng — trước đây code chỉ log warning
+    # rồi tiếp tục với user_id = email gốc, khiến hệ thống lưu 1 "account" ảo
+    # keyed bằng chuỗi email (vd "admin123-gmail.com") — vẫn chạy được (listener
+    # + zalo_groups/zalo_messages chỉ khoá theo user_id text, không cần row
+    # trong zalo_accounts) NHƯNG không có RBAC/ownership/hiển thị đúng trong
+    # trang quản lý tài khoản. Chặn ngay từ đầu thay vì để lặp lại tình trạng
+    # này với người dùng khác — ai gặp lỗi này cần tạo tài khoản Zalo thật
+    # trước (Thêm tài khoản mới) rồi mới đăng nhập qua Extension.
     if not user_id.startswith("zl_"):
+        resolved_account_id: Optional[str] = None
         try:
             from app.modules.all_platform.zalo.services.supabase_service import _rest
             db_accounts = await _rest(
@@ -1408,11 +1418,25 @@ async def import_session_from_extension(
                         break
                 if not target_account:
                     target_account = zl_accounts[0]
-                
-                logger.info(f"Auto-resolved email user_id={user_id} to Zalo account_id={target_account['account_id']}")
-                user_id = target_account["account_id"]
+                resolved_account_id = target_account["account_id"]
         except Exception as resolve_exc:
             logger.warning(f"Could not auto-resolve email user_id={user_id} to account_id: {resolve_exc}")
+            raise HTTPException(
+                status_code=503,
+                detail=f"Không thể tra cứu tài khoản Zalo cho '{user_id}' lúc này (lỗi DB). Thử lại sau.",
+            )
+
+        if not resolved_account_id:
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"Không tìm thấy tài khoản Zalo nào gắn với '{user_id}'. "
+                    "Hãy vào trang Tài khoản Zalo, bấm 'Thêm tài khoản mới' trước, "
+                    "rồi mới đăng nhập qua Extension."
+                ),
+            )
+        logger.info(f"Auto-resolved email user_id={user_id} to Zalo account_id={resolved_account_id}")
+        user_id = resolved_account_id
 
     # ── Parse cookies: accept 4 formats ────────────────────────────────
     #   1. List of {key, value, domain, ...}  (Chrome extension native format)

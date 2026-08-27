@@ -34,6 +34,7 @@ linkedin_group_crawler/.venv/
 linkedin_group_crawler/venv/
 linkedin_group_crawler/.pytest_cache/
 linkedin_group_crawler/.env
+linkedin_group_crawler/.env.local
 linkedin_group_crawler/*.env.dev
 linkedin_group_crawler/backend_*.log
 linkedin_group_crawler/backend_*.err.log
@@ -162,6 +163,9 @@ scratch/*.html
 scratch/*.sql
 scratch/*.py
 scratch/*.log
+scratch/**/*.js
+scratch/**/package.json
+scratch/**/package-lock.json
 
 # Code review reports
 code-review-report-*.md
