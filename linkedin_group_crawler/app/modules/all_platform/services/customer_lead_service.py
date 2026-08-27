@@ -56,7 +56,7 @@ BASE_COLUMNS = (
     "warranty_expires_at, care_note, last_care_at, "
     "payment_due_date, payment_status, "
     "tags, has_budget, note, reject_reason, reject_reason_type, review_result, "
-    "position, crm_package, zalo, facebook, telegram, pause_reason, closed_at, outcome_detail, quote_id, "
+    "position, crm_package, zalo, facebook, telegram, pause_reason, next_step, closed_at, outcome_detail, quote_id, "
     "leaded_by_name_hint, sdr_name_hint, team_id, "
     "created_at, updated_at, leader:leaded_by(name), sdr:sdr_id(name), "
     "quote:quote_id(quote_number, total_amount, public_token, status), "

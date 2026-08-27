@@ -122,6 +122,7 @@ class CustomerLeadCreate(BaseModel):
     facebook: Optional[str] = None
     telegram: Optional[str] = None
     pause_reason: Optional[str] = None
+    next_step: Optional[str] = None
     closed_at: Optional[datetime] = None
     outcome_detail: Optional[dict] = None
     quote_id: Optional[str] = None
@@ -195,6 +196,7 @@ class CustomerLeadUpdate(BaseModel):
     facebook: Optional[str] = None
     telegram: Optional[str] = None
     pause_reason: Optional[str] = None
+    next_step: Optional[str] = None
     closed_at: Optional[datetime] = None
     outcome_detail: Optional[dict] = None
     quote_id: Optional[str] = None
@@ -263,6 +265,7 @@ class CustomerLeadResponse(BaseModel):
     facebook: Optional[str] = None
     telegram: Optional[str] = None
     pause_reason: Optional[str] = None
+    next_step: Optional[str] = None
     closed_at: Optional[datetime] = None
     outcome_detail: Optional[dict] = None
     quote_id: Optional[str] = None

@@ -17,6 +17,11 @@ from app.modules.all_platform.services.crm_attachment_service import (
     allowed_mime,
     MAX_FILE_SIZE_BYTES,
 )
+from app.modules.all_platform.services.deal_ai_parse_service import (
+    is_ai_configured,
+    parse_deal_text,
+)
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -260,6 +265,36 @@ async def upload_crm_attachment(
     except Exception as e:
         logger.exception("upload_crm_attachment failed")
         return BaseResponse(success=False, message=f"Upload thất bại: {e}")
+
+
+# ---------------------------------------------------------------------------
+# AI điền nhanh (popup "Thêm deal") — tiện ích phụ, không phải phụ thuộc cứng.
+# ---------------------------------------------------------------------------
+class DealAiParseRequest(BaseModel):
+    text: str
+
+
+@router.get("/ai-parse-deal/status", response_model=BaseResponse)
+def get_ai_parse_deal_status(current_user: Any = Depends(get_current_user)):
+    return BaseResponse(success=True, data={"configured": is_ai_configured()})
+
+
+@router.post("/ai-parse-deal", response_model=BaseResponse)
+async def post_ai_parse_deal(
+    payload: DealAiParseRequest,
+    current_user: Any = Depends(get_current_user),
+):
+    text = (payload.text or "").strip()
+    if not text:
+        return BaseResponse(success=False, message="Vui lòng dán nội dung trước khi bấm AI điền nhanh.")
+    try:
+        result = await parse_deal_text(text)
+        return BaseResponse(success=True, data=result)
+    except RuntimeError as e:
+        return BaseResponse(success=False, message=str(e))
+    except Exception:
+        logger.exception("ai_parse_deal failed")
+        return BaseResponse(success=False, message="AI điền nhanh thất bại, vui lòng thử lại hoặc nhập tay.")
 
 
 # ---------------------------------------------------------------------------
