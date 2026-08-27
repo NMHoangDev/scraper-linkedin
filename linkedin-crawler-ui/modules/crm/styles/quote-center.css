@@ -750,3 +750,116 @@
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 640px) {
+  .qc-page {
+    padding: 16px;
+    overflow-x: hidden;
+  }
+
+  .qc-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  /* Banner "Bat dau bao gia moi" - padding gon, heading khong qua to, 2 nut
+   * xep doc chiem full ngang, 3 buoc xep thanh hang gon (khong con canh phai
+   * ep vao 1 dong 336px+ khien chu bi cat nhu anh). */
+  .qc-quick {
+    padding: 20px 16px;
+  }
+
+  .qc-quick h2 {
+    font-size: 22px;
+  }
+
+  .qc-quick-buttons {
+    flex-direction: column;
+  }
+
+  .qc-quick-buttons .qc-btn {
+    width: 100%;
+  }
+
+  .qc-quick-steps {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+
+  .qc-quick-step {
+    min-width: 0;
+  }
+
+  .qc-quick-steps > i {
+    flex: 0 0 16px;
+  }
+
+  /* An mo ta phu (huong dan chi tiet) tren mobile de giam chieu dai trang -
+   * tieu de + so lieu chinh van du de hieu, khong can doan van dai. */
+  .qc-quick p {
+    display: none;
+  }
+
+  /* Bang nhieu cot (Hieu suat theo Sale / Bao gia da lien ket CRM) khong con
+   * vua man hinh du cuon ngang duoc (van phai cuon ca trang, kho dung) - doi
+   * sang dang the/box: moi dong thanh 1 the doc, nhan data-label lam nhan cho
+   * tung gia tri (xem thead an di, td hien nhan qua ::before). */
+  .qc-team-table thead,
+  .qc-linked-table thead {
+    display: none;
+  }
+
+  .qc-team-table,
+  .qc-linked-table,
+  .qc-team-table tbody,
+  .qc-linked-table tbody,
+  .qc-team-table tr,
+  .qc-linked-table tr,
+  .qc-team-table td,
+  .qc-linked-table td {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .qc-team-table tr,
+  .qc-linked-table tr {
+    border: 1px solid var(--color-outline, #e5e5e5);
+    border-radius: 12px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+  }
+
+  .qc-team-table td,
+  .qc-linked-table td {
+    border: none !important;
+    padding: 6px 0 !important;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    text-align: right;
+  }
+
+  .qc-team-table td[data-label]::before,
+  .qc-linked-table td[data-label]::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    color: #9099a7;
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    text-align: left;
+  }
+
+  .qc-team-table td[data-label=""]::before,
+  .qc-linked-table td[data-label=""]::before {
+    content: none;
+  }
+
+  .qc-team-table td .qc-sale-cell,
+  .qc-linked-table td .qc-sale-cell {
+    justify-content: flex-end;
+  }
+}

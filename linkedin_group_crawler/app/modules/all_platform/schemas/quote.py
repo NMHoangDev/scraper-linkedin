@@ -14,6 +14,7 @@ class QuoteFormCreateRequest(BaseModel):
     layout_type: str = "cloudgate_standard_quote"
     schema_version: int = 1
     schema_json: dict[str, Any]
+    issuer_company_id: Optional[str] = None
 
 
 class QuoteFormUpdateRequest(BaseModel):
@@ -23,6 +24,39 @@ class QuoteFormUpdateRequest(BaseModel):
     layout_type: Optional[str] = None
     schema_version: Optional[int] = None
     schema_json: Optional[dict[str, Any]] = None
+    issuer_company_id: Optional[str] = None
+
+
+class IssuerCompanyCreateRequest(BaseModel):
+    code: str
+    legal_name: str
+    brand_name: Optional[str] = None
+    address: Optional[str] = None
+    contact_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    website: Optional[str] = None
+    tax_code: Optional[str] = None
+    logo_url: Optional[str] = None
+    default_quote_form_id: Optional[str] = None
+    status: str = "active"
+    sort_order: int = 0
+
+
+class IssuerCompanyUpdateRequest(BaseModel):
+    code: Optional[str] = None
+    legal_name: Optional[str] = None
+    brand_name: Optional[str] = None
+    address: Optional[str] = None
+    contact_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    website: Optional[str] = None
+    tax_code: Optional[str] = None
+    logo_url: Optional[str] = None
+    default_quote_form_id: Optional[str] = None
+    status: Optional[str] = None
+    sort_order: Optional[int] = None
 
 
 class QuoteItemInput(BaseModel):
@@ -47,6 +81,7 @@ class QuoteItemInput(BaseModel):
 class QuoteCreateRequest(BaseModel):
     deal_id: Optional[str] = None
     quote_form_id: str
+    issuer_company_id: Optional[str] = None
     data: dict[str, Any] = {}
     items: list[QuoteItemInput] = []
 
@@ -58,3 +93,4 @@ class QuoteUpdateRequest(BaseModel):
 
     data: Optional[dict[str, Any]] = None
     items: Optional[list[QuoteItemInput]] = None
+    issuer_company_id: Optional[str] = None

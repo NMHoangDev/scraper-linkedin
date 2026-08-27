@@ -16,6 +16,7 @@ import {
   formatVnd,
   flattenQuoteItems,
 } from '../utils/quoteCalculations';
+import { resolveQuoteItemColumns, resolveToggleableColumns } from '../utils/quoteColumns';
 
 interface Totals {
   subtotalAmount: number;
@@ -140,28 +141,6 @@ export function QuoteDocumentRenderer({
     if (value !== undefined && value !== null && value !== '') return value;
     return findField(key).defaultValue || '';
   };
-  const baseColumns =
-    findField('quoteItems').config?.columns?.filter(column => column.visible !== false) || [];
-  // Chỉ báo giá dùng dịch vụ chọn từ Danh mục dịch vụ mới có giá USD/VND/tỷ giá lưu
-  // sẵn trên từng dòng - chèn thêm 3 cột hiển thị tham khảo ngay khi phát hiện, không
-  // sửa cấu hình cột lưu trong schema_json (tránh ảnh hưởng các mẫu báo giá khác).
-  const hasCatalogPricing = flattenQuoteItems(quoteItems).some(item => item.catalogItemId);
-  const catalogPricingColumns: QuoteField[] = [
-    { key: 'listPriceUsd', label: 'List price USD', type: 'text', visible: true },
-    { key: 'unitPriceUsd', label: 'Unit Price USD', type: 'text', visible: true },
-    { key: 'unitPriceVnd', label: 'Unit price VND', type: 'text', visible: true },
-  ];
-  const unitPriceIndex = baseColumns.findIndex(column => column.key === 'unitPrice');
-  const visibleColumns = hasCatalogPricing
-    ? unitPriceIndex >= 0
-      ? [
-          ...baseColumns.slice(0, unitPriceIndex),
-          ...catalogPricingColumns,
-          ...baseColumns.slice(unitPriceIndex),
-        ]
-      : [...catalogPricingColumns, ...baseColumns]
-    : baseColumns;
-
   const renderCell = (item: QuoteItem, column: QuoteField, index: number) => {
     if (column.type === 'auto-number' || column.key === 'order') return String(index + 1);
     if (column.key === 'subtotal') return formatVnd(calculateItemSubtotal(item));
@@ -269,35 +248,27 @@ export function QuoteDocumentRenderer({
   ]
     .map(([key, label]) => ({ key, label, value: textValue(fieldValue(key)) }))
     .filter(row => row.value);
-  const defaultColumns: QuoteField[] = [
-    { key: 'order', label: 'STT', type: 'auto-number' as const },
-    { key: 'serviceDescription', label: 'Hạng mục', type: 'text' as const },
-    { key: 'unit', label: 'ĐVT', type: 'text' as const },
-    { key: 'quantity', label: 'SL', type: 'number' as const },
-    { key: 'unitPrice', label: 'Đơn giá', type: 'currency' as const },
-    { key: 'vatRate', label: 'VAT', type: 'number' as const },
-    { key: 'total', label: 'Thành tiền', type: 'currency' as const },
-  ];
-  const standardColumns = (visibleColumns.length ? [...visibleColumns] : [...defaultColumns])
-    .filter(column => !['subtotal', 'vatAmount'].includes(column.key));
-  if (!standardColumns.some(column => column.key === 'order' || column.type === 'auto-number')) {
-    standardColumns.unshift({ key: 'order', label: 'STT', type: 'auto-number' as const });
-  }
-  if (!standardColumns.some(column => column.key === 'description')) {
-    const unitIndex = standardColumns.findIndex(column => column.key === 'unit');
-    standardColumns.splice(unitIndex >= 0 ? unitIndex : 2, 0, { key: 'description', label: 'Mô tả', type: 'textarea' });
-  }
-  if (!standardColumns.some(column => column.key === 'discountPercent')) {
-    const vatIndex = standardColumns.findIndex(column => column.key === 'vatRate');
-    standardColumns.splice(vatIndex >= 0 ? vatIndex : standardColumns.length - 1, 0, { key: 'discountPercent', label: 'Giảm giá', type: 'number' });
-  }
+  // Cot bang hang muc THAT cua mau nay (tu schema.quoteItems.config.columns),
+  // khong phai danh sach co dinh - dung chung logic voi checkbox "Cot hien thi"
+  // o ReviewQuoteStep (xem utils/quoteColumns.ts) de 2 noi luon khop nhau, tu
+  // dong doi theo tung mau bao gia (VD Villa co bo cot rieng khac han standard).
+  const standardColumns = resolveQuoteItemColumns(schema, quoteItems);
   // "Cột hiển thị" nguoi tao chon o buoc Xem truoc & gui (quoteData.visibleColumns) -
   // chi anh huong ban KHACH nhan (public/print, hoac preview khi respectVisibleColumns
   // duoc bat tuong minh) - KHONG bao gio anh huong mode='detail' (trang noi bo).
-  const TOGGLEABLE_COLUMN_KEYS = ['description', 'unit', 'quantity', 'unitPrice', 'total'];
+  const TOGGLEABLE_COLUMN_KEYS = resolveToggleableColumns(schema, quoteItems).map(column => column.key);
   const applyCustomerColumnFilter =
     mode === 'public' || mode === 'print' || (mode === 'preview' && respectVisibleColumns);
-  const customerVisibleColumns = Array.isArray(quoteData.visibleColumns) ? quoteData.visibleColumns : null;
+  // "vatRate" moi duoc them vao danh sach toggle - bao gia CU (luu truoc khi co
+  // toggle nay) co the co san mang visibleColumns nhung khong biet gi ve
+  // 'vatRate' -> phai tu bo sung vao de KHONG lam VAT bi an mat khoi bao gia cu
+  // (truoc day VAT luon hien, khong toggle duoc). Bao gia MOI tu gio deu di qua
+  // resolveToggleableColumns() (da co san 'vatRate') nen khong bi anh huong.
+  const rawCustomerVisibleColumns = Array.isArray(quoteData.visibleColumns) ? quoteData.visibleColumns : null;
+  const customerVisibleColumns =
+    rawCustomerVisibleColumns && !rawCustomerVisibleColumns.includes('vatRate')
+      ? [...rawCustomerVisibleColumns, 'vatRate']
+      : rawCustomerVisibleColumns;
   const finalColumns =
     applyCustomerColumnFilter && customerVisibleColumns
       ? standardColumns.filter(
@@ -435,6 +406,9 @@ export function QuoteDocumentRenderer({
       <section className="quote-sheet quote-sheet--standard">
         <header className="sheet-company sheet-company--standard">
           <div className="sheet-brand-block">
+            {fieldValue('sellerLogo') ? (
+              <img className="sheet-brand-logo" src={String(fieldValue('sellerLogo'))} alt={String(fieldValue('sellerCompanyName') || '')} />
+            ) : null}
             <div className="sheet-brand-mark">{String(fieldValue('sellerCompanyName') || 'MARKEE')}</div>
             <p>{String(fieldValue('sellerAddress'))}</p>
             <p>

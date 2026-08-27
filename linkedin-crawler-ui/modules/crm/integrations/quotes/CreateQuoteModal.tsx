@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import type { QuoteForm } from '@/modules/quotes';
-import { seedingQuoteRepository } from '@/modules/quotes';
+import { useEffect, useMemo, useState } from 'react';
+import type { IssuerCompany, QuoteForm } from '@/modules/quotes';
+import { seedingQuoteRepository, TelegramSendButton } from '@/modules/quotes';
 import type { Quote } from '@/modules/quotes';
 import { buildDealPayload, dealFormFromDeal, emptyDealForm } from '../../components/DealFormFields';
 import type { DealFormState } from '../../components/DealFormFields';
@@ -10,19 +10,18 @@ import { CheckCircle2, Loader2, X } from '../../components/icons';
 import { seedingCrmRepository } from '../../repositories/SeedingCrmRepository';
 import type { CreateDealInput, CrmUserOption, Deal } from '../../types';
 import { FillQuoteStep } from './FillQuoteStep';
+import { IssuerCompanySection } from './IssuerCompanySection';
 import { ReviewQuoteStep } from './ReviewQuoteStep';
 import { SelectCustomerStep } from './SelectCustomerStep';
-import { SelectQuoteFormStep } from './SelectQuoteFormStep';
-import { emptyQuoteDraft, quoteDraftFromExistingQuote, quoteDraftFromForm } from './types';
+import { applyIssuerCompanySnapshot, emptyQuoteDraft, quoteDraftFromExistingQuote, quoteDraftFromForm } from './types';
 import type { QuoteDraft } from './types';
 
-type CreateQuoteStep = 1 | 2 | 3 | 4;
+type CreateQuoteStep = 1 | 2 | 3;
 
 const STEP_LABELS: Record<CreateQuoteStep, string> = {
   1: 'Khách hàng',
-  2: 'Chọn mẫu',
-  3: 'Báo giá',
-  4: 'Xác nhận',
+  2: 'Hạng mục báo giá',
+  3: 'Xác nhận',
 };
 
 export function CreateQuoteModal({
@@ -62,8 +61,48 @@ export function CreateQuoteModal({
   const [step, setStep] = useState<CreateQuoteStep>(1);
   const [customer, setCustomer] = useState<DealFormState>(emptyDealForm);
   const [selectedForm, setSelectedForm] = useState<QuoteForm | null>(null);
-  const [previewForm, setPreviewForm] = useState<QuoteForm | null>(null);
   const [quoteDraft, setQuoteDraft] = useState<QuoteDraft>(emptyQuoteDraft);
+
+  // Đơn vị phát hành báo giá (bên bán) — dropdown Bước 1. Danh sách công ty +
+  // toàn bộ mẫu báo giá (để tìm mẫu mặc định chuẩn khi công ty chưa gán mẫu
+  // riêng) fetch 1 lần khi mở modal.
+  const [issuerCompanies, setIssuerCompanies] = useState<IssuerCompany[]>([]);
+  const [selectedIssuerCompany, setSelectedIssuerCompany] = useState<IssuerCompany | null>(null);
+  const [allForms, setAllForms] = useState<QuoteForm[]>([]);
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    seedingQuoteRepository.getIssuerCompanies().then(rows => {
+      if (!cancelled) setIssuerCompanies(rows);
+    }).catch(() => {});
+    seedingQuoteRepository.getForms().then(rows => {
+      if (!cancelled) setAllForms(rows);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [open]);
+
+  // Che do sua: gan lai cong ty phat hanh da luu (theo issuerCompanyId) mot khi
+  // danh sach cong ty da fetch xong, de Buoc 1 hien dung cong ty dang dung. Ghi
+  // de cac field hien thi bang dung SNAPSHOT da luu trong quoteDraft.data (co the
+  // khac voi du lieu cong ty hien tai neu ai do da sua danh muc sau khi tao bao
+  // gia nay) - chi dung ban ghi cong ty de biet dong nao dang chon trong dropdown.
+  useEffect(() => {
+    if (!open || !editQuote?.issuerCompanyId || !issuerCompanies.length) return;
+    const match = issuerCompanies.find(c => c.id === editQuote.issuerCompanyId);
+    if (!match) return;
+    setSelectedIssuerCompany({
+      ...match,
+      legalName: (quoteDraft.data.sellerCompanyName as string) || match.legalName,
+      taxCode: (quoteDraft.data.sellerTaxCode as string) || match.taxCode,
+      address: (quoteDraft.data.sellerAddress as string) || match.address,
+      contactName: (quoteDraft.data.sellerContactName as string) || match.contactName,
+      phone: (quoteDraft.data.sellerPhone as string) || match.phone,
+      email: (quoteDraft.data.sellerEmail as string) || match.email,
+      website: (quoteDraft.data.sellerWebsite as string) || match.website,
+      logoUrl: (quoteDraft.data.sellerLogo as string) || match.logoUrl,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editQuote?.issuerCompanyId, issuerCompanies]);
   // Theo dõi ĐÚNG nút nào đang chạy (không dùng 1 boolean chung) - trước đây
   // 1 boolean khiến cả 2 nút "Cập nhật báo giá"/"Duyệt báo giá" cùng xoay
   // spinner dù chỉ bấm 1 nút, nhìn rất kỳ.
@@ -93,7 +132,7 @@ export function CreateQuoteModal({
   useEffect(() => {
     if (!open || !editQuote) return;
     let cancelled = false;
-    setStep(3);
+    setStep(2);
     setQuoteDraft(quoteDraftFromExistingQuote(editQuote));
     seedingQuoteRepository.getForm(editQuote.quoteFormId).then(form => {
       if (!cancelled) setSelectedForm(form);
@@ -106,23 +145,57 @@ export function CreateQuoteModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editQuote?.id]);
 
-  // Mở từ "Mẫu dùng nhanh" — chọn sẵn mẫu, quoteDraft dựng lại ở
-  // handleCustomerNext (lúc đó activeCustomer mới có dữ liệu thật).
+  // Mở từ "Mẫu dùng nhanh" — chỉ lưu mẫu vào initialForm, KHÔNG set thẳng
+  // selectedForm nữa. Mẫu này chỉ thực sự được dùng nếu đúng công ty phát hành
+  // sẽ chọn ở Bước 1 (xem effect chọn mẫu theo công ty bên dưới) - nếu người
+  // dùng chọn công ty KHÁC công ty sở hữu mẫu này thì bỏ qua, không âm thầm
+  // dùng nhầm mẫu của công ty khác.
+  const [initialForm, setInitialForm] = useState<QuoteForm | null>(null);
   useEffect(() => {
     if (!open || editQuote || !initialQuoteFormId) return;
     let cancelled = false;
     seedingQuoteRepository.getForm(initialQuoteFormId).then(form => {
-      if (!cancelled) setSelectedForm(form);
+      if (!cancelled) setInitialForm(form);
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [open, editQuote, initialQuoteFormId]);
+
+  // Mau bao gia thuoc dung cong ty phat hanh dang chon - loc tu allForms.
+  const companyForms = useMemo(
+    () => (selectedIssuerCompany ? allForms.filter(f => f.issuerCompanyId === selectedIssuerCompany.id) : []),
+    [allForms, selectedIssuerCompany]
+  );
+
+  // Tu chon mau theo dung thu tu uu tien: initialQuoteFormId (neu dung cong ty)
+  // -> mau mac dinh cua cong ty -> mau dau tien cua cong ty -> Mau bao gia
+  // chuan toan he thong. Chay lai MOI KHI doi cong ty (id doi) - reset lua chon
+  // mau cu, nap lai danh sach mau cua cong ty moi, dung y "khong duoc am tham
+  // dung nham mau cong ty khac".
+  useEffect(() => {
+    if (!open || isEditMode || !selectedIssuerCompany) return;
+    const companyId = selectedIssuerCompany.id;
+    const scopedForms = allForms.filter(f => f.issuerCompanyId === companyId);
+    const globalDefault = allForms.find(f => f.isDefaultTemplate) || null;
+    let resolved: QuoteForm | null = null;
+    if (initialForm && initialForm.issuerCompanyId === companyId) {
+      resolved = initialForm;
+    } else if (scopedForms.length === 1) {
+      resolved = scopedForms[0];
+    } else if (scopedForms.length > 1) {
+      resolved = scopedForms.find(f => f.id === selectedIssuerCompany.defaultQuoteFormId) || scopedForms[0];
+    } else {
+      resolved = globalDefault;
+    }
+    setSelectedForm(resolved);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, isEditMode, selectedIssuerCompany?.id, allForms, initialForm]);
 
   function resetAndClose() {
     if (submitting) return;
     setStep(1);
     setCustomer(emptyDealForm());
     setSelectedForm(null);
-    setPreviewForm(null);
+    setSelectedIssuerCompany(null);
     setQuoteDraft(emptyQuoteDraft());
     setSubmitError('');
     setCreatedQuote(null);
@@ -149,28 +222,44 @@ export function CreateQuoteModal({
   const activeLinkedDealId = initialDeal?.id || '';
 
   function handleCustomerNext() {
+    setSubmitError('');
     if (!activeCustomer.customerName.trim()) {
       window.alert('Vui lòng nhập tên khách hàng.');
       return;
     }
-    setCustomer(activeCustomer);
-    if (selectedForm) {
-      // Mẫu đã chọn sẵn (mở từ "Mẫu dùng nhanh") - bỏ qua bước 2.
-      setQuoteDraft(quoteDraftFromForm(selectedForm, activeCustomer));
-      setStep(3);
-    } else {
-      setStep(2);
+    if (!isEditMode && !selectedIssuerCompany) {
+      window.alert('Vui lòng chọn công ty báo giá (đơn vị phát hành).');
+      return;
     }
-  }
+    setCustomer(activeCustomer);
 
-  function handleSelectForm(form: QuoteForm) {
-    // Che do sua: KHONG cho doi mau - backend chua ho tro doi quote_form_id/
-    // form_snapshot sau khi da tao. Van cho xem lai step nay, chi khong ap
-    // dung lua chon moi.
-    if (isEditMode) { setStep(3); return; }
-    setSelectedForm(form);
-    setQuoteDraft(quoteDraftFromForm(form, activeCustomer));
-    setStep(3);
+    if (isEditMode) {
+      // Che do sua: KHONG doi mau (backend chua ho tro doi quote_form_id/
+      // form_snapshot sau khi da tao) - selectedForm da duoc nap san o effect
+      // rieng. Neu nguoi dung doi/sua cong ty phat hanh o Buoc 1 (con sua duoc
+      // vi bao gia chua approved), ghi snapshot moi vao quoteDraft.data truoc
+      // khi sang buoc 2 - KHONG dung, khong doi gi neu khong chon cong ty nao.
+      if (selectedIssuerCompany) {
+        setQuoteDraft(current => {
+          const nextData = { ...current.data };
+          applyIssuerCompanySnapshot(nextData, selectedIssuerCompany);
+          return { ...current, data: nextData };
+        });
+      }
+      setStep(2);
+      return;
+    }
+
+    // selectedForm da duoc tu chon ngam theo dung cong ty (xem effect resolve
+    // mau theo cong ty o tren) - o day chi con validate + dung mau do dung
+    // snapshot, khong tu resolve lai lan nua.
+    if (!selectedForm) {
+      setSubmitError('Chưa cấu hình mẫu báo giá mặc định — liên hệ admin.');
+      return;
+    }
+
+    setQuoteDraft(quoteDraftFromForm(selectedForm, activeCustomer, selectedIssuerCompany || undefined));
+    setStep(2);
   }
 
   function buildDraftPayload() {
@@ -205,6 +294,7 @@ export function CreateQuoteModal({
       const quote = await seedingQuoteRepository.createQuote({
         quoteFormId: selectedForm.id,
         dealId,
+        issuerCompanyId: selectedIssuerCompany?.id,
         ...buildDraftPayload(),
       });
       createdQuoteId = quote.id;
@@ -226,7 +316,10 @@ export function CreateQuoteModal({
     setSubmittingAction('update');
     setSubmitError('');
     try {
-      const updated = await seedingQuoteRepository.updateQuote(editQuote.id, buildDraftPayload());
+      const updated = await seedingQuoteRepository.updateQuote(editQuote.id, {
+        ...buildDraftPayload(),
+        issuerCompanyId: selectedIssuerCompany?.id,
+      });
       onUpdated?.(updated);
       resetAndClose();
     } catch (err) {
@@ -244,7 +337,10 @@ export function CreateQuoteModal({
     try {
       // Luu thay doi cuoi + duyet ATOMIC trong 1 request (khong tach 2 lenh
       // rieng - tranh nua voi khi 1 trong 2 buoc loi).
-      const approved = await seedingQuoteRepository.updateAndApproveQuote(editQuote.id, buildDraftPayload());
+      const approved = await seedingQuoteRepository.updateAndApproveQuote(editQuote.id, {
+        ...buildDraftPayload(),
+        issuerCompanyId: selectedIssuerCompany?.id,
+      });
       onUpdated?.(approved);
       resetAndClose();
     } catch (err) {
@@ -302,7 +398,7 @@ export function CreateQuoteModal({
         {createdQuote ? null : (
           <div className="crm-wizard-stepper-container">
             <div className="crm-wizard-stepper-inner">
-              {([1, 2, 3, 4] as CreateQuoteStep[]).map((item, index) => (
+              {([1, 2, 3] as CreateQuoteStep[]).map((item, index) => (
                 <div key={item} style={{ display: 'flex', alignItems: 'center' }}>
                   <div
                     className={`crm-wizard-step-item ${item === step ? 'crm-wizard-step-item--active' : ''} ${item < step ? 'crm-wizard-step-item--done' : ''}`}
@@ -313,7 +409,7 @@ export function CreateQuoteModal({
                     </div>
                     <span className="crm-wizard-step-label">{STEP_LABELS[item]}</span>
                   </div>
-                  {index < 3 ? (
+                  {index < 2 ? (
                     <div className={`crm-wizard-step-line ${item < step ? 'crm-wizard-step-line--done' : ''}`} />
                   ) : null}
                 </div>
@@ -336,26 +432,29 @@ export function CreateQuoteModal({
             ) : (
               <>
                 {step === 1 ? (
-                  <SelectCustomerStep
-                    deals={deals}
-                    customer={activeCustomer}
-                    onChangeCustomer={setCustomer}
-                    lockedDeal={lockedDealForStep1}
-                    quotes={allQuotes}
-                    agents={agents}
-                  />
+                  <div className="crm-wizard-step1-layout">
+                    <IssuerCompanySection
+                      companies={issuerCompanies}
+                      selected={selectedIssuerCompany}
+                      onSelect={setSelectedIssuerCompany}
+                      companyForms={companyForms}
+                      selectedFormId={selectedForm?.id}
+                      onSelectForm={formId => setSelectedForm(companyForms.find(f => f.id === formId) || null)}
+                    />
+                    <SelectCustomerStep
+                      deals={deals}
+                      customer={activeCustomer}
+                      onChangeCustomer={setCustomer}
+                      lockedDeal={lockedDealForStep1}
+                      quotes={allQuotes}
+                      agents={agents}
+                    />
+                    <p className="crm-wizard-step1-hint">
+                      Thông tin được tự động điền từ danh mục công ty và CRM, vẫn có thể chỉnh sửa cho báo giá này.
+                    </p>
+                  </div>
                 ) : null}
-                {step === 2 ? (
-                  <SelectQuoteFormStep
-                    selectedFormId={selectedForm?.id}
-                    previewForm={previewForm}
-                    onPreview={setPreviewForm}
-                    onSelect={handleSelectForm}
-                    onSkip={() => {}}
-                    hideSkip
-                  />
-                ) : null}
-                {step === 3 && selectedForm ? (
+                {step === 2 && selectedForm ? (
                   <FillQuoteStep
                     schema={selectedForm.schemaJson}
                     value={quoteDraft}
@@ -363,13 +462,13 @@ export function CreateQuoteModal({
                     quoteFormId={selectedForm.id}
                   />
                 ) : null}
-                {step === 3 && !selectedForm && isEditMode ? (
+                {step === 2 && !selectedForm && isEditMode ? (
                   // Dang cho getForm() tai xong (che do sua) - giu 1 khoi placeholder
                   // co chieu cao thay vi de trong, tranh modal "giat" phinh to dot
                   // ngot khi form load xong.
                   <div className="crm-wizard-loading-placeholder">Đang tải báo giá...</div>
                 ) : null}
-                {step === 4 && selectedForm ? (
+                {step === 3 && selectedForm ? (
                   <ReviewQuoteStep schema={selectedForm.schemaJson} draft={quoteDraft} onChange={setQuoteDraft} />
                 ) : null}
                 {submitError ? <p className="crm-error">{submitError}</p> : null}
@@ -408,18 +507,18 @@ export function CreateQuoteModal({
                     Tiếp theo
                   </button>
                 ) : null}
-                {step === 3 ? (
-                  <button type="button" className="crm-save-button" onClick={() => setStep(4)}>
+                {step === 2 ? (
+                  <button type="button" className="crm-save-button" onClick={() => setStep(3)}>
                     Tiếp theo
                   </button>
                 ) : null}
-                {step === 4 && !isEditMode ? (
+                {step === 3 && !isEditMode ? (
                   <button type="button" className="crm-save-button crm-save-button--large" disabled={submitting} onClick={() => void handleSubmit()}>
                     {submittingAction === 'create' ? <Loader2 className="crm-save-spinner" /> : null}
                     {submittingAction === 'create' ? 'Đang tạo...' : 'Tạo báo giá'}
                   </button>
                 ) : null}
-                {step === 4 && isEditMode ? (
+                {step === 3 && isEditMode ? (
                   <>
                     <button type="button" className="crm-save-button crm-save-button--update" disabled={submitting} onClick={() => void handleUpdate()}>
                       {submittingAction === 'update' ? <Loader2 className="crm-save-spinner" /> : null}
@@ -508,6 +607,7 @@ function QuoteSuccessPanel({
         >
           Gửi email khách hàng
         </a>
+        <TelegramSendButton quoteId={quote.id} status={quote.status} className="crm-cancel-button" />
       </div>
       {!isApproved ? <small className="crm-quote-success-hint">Chỉ dùng được sau khi báo giá được duyệt.</small> : null}
     </div>

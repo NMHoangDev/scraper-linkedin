@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { FORM_STATUS_OPTIONS, LAYOUT_OPTIONS, schemaForLayout } from '../constants/quoteConfig';
 import { seedingQuoteRepository } from '../repositories/SeedingQuoteRepository';
-import type { QuoteField, QuoteForm, QuoteLayoutType, QuoteSchema } from '../types';
+import type { IssuerCompany, QuoteField, QuoteForm, QuoteLayoutType, QuoteSchema } from '../types';
 import { serviceCatalogRepository } from '../../service-catalog/repositories/ServiceCatalogRepository';
 import type { ServiceCatalogItem } from '../../service-catalog/types';
 
@@ -34,24 +34,23 @@ function defaultToText(value: unknown) {
 
 function validateSchema(form: QuoteForm | null, schema: QuoteSchema) {
   if (!form?.name?.trim()) return 'Tên mẫu bắt buộc.';
+  // Thong tin cong ty (ten/dia chi/lien he...) gio tu dong dien tu Cong ty phat
+  // hanh chon o Buoc 1 wizard, khong con go tay/luu san trong schema field nua
+  // - chi con bat buoc phai gan DUNG cong ty so huu mau, khong con kiem tra
+  // sellerCompanyName/sellerBrandName default value nhu truoc.
+  // Mau flag "isDefaultTemplate" (Mau bao gia chuan) la ngoai le duy nhat duoc
+  // phep khong gan cong ty - no dung lam fallback trung tinh dung chung cho moi
+  // cong ty chua co mau rieng, khong the "thuoc ve" 1 cong ty cu the.
+  if (!form.issuerCompanyId && !form.isDefaultTemplate) return 'Vui lòng chọn công ty sở hữu mẫu.';
   let sellerEmail = '';
-  let sellerCompanyName = '';
-  // Mẫu Villa dùng "sellerBrandName" (Thương hiệu) thay cho "sellerCompanyName" —
-  // schema Cloudgate mới có field này, không phải mọi layout đều có.
-  let sellerBrandName = '';
   let defaultVatRate = 0;
   let validityDays = 0;
   for (const section of schema.sections) {
     for (const field of section.fields) {
-      if (field.key === 'sellerCompanyName') sellerCompanyName = String(field.defaultValue || '');
-      if (field.key === 'sellerBrandName') sellerBrandName = String(field.defaultValue || '');
       if (field.key === 'sellerEmail') sellerEmail = String(field.defaultValue || '');
       if (field.key === 'defaultVatRate') defaultVatRate = Number(field.defaultValue || 0);
       if (field.key === 'validityDays') validityDays = Number(field.defaultValue || 0);
     }
-  }
-  if (schema.layoutType !== 'blank_quote' && !sellerCompanyName.trim() && !sellerBrandName.trim()) {
-    return 'Tên công ty / thương hiệu bắt buộc.';
   }
   if (sellerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sellerEmail)) {
     return 'Email công ty không đúng định dạng.';
@@ -209,6 +208,7 @@ export function QuoteFormBuilderPage({ formId }: Props) {
   const [openFieldKey, setOpenFieldKey] = useState('');
   const [catalogGroups, setCatalogGroups] = useState<ServiceCatalogItem[]>([]);
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+  const [companies, setCompanies] = useState<IssuerCompany[]>([]);
 
   useEffect(() => {
     if (!formId) return;
@@ -218,6 +218,10 @@ export function QuoteFormBuilderPage({ formId }: Props) {
       .catch(err => setError(err instanceof Error ? err.message : 'Không tải được mẫu báo giá.'))
       .finally(() => setLoading(false));
   }, [formId]);
+
+  useEffect(() => {
+    seedingQuoteRepository.getIssuerCompanies(true).then(setCompanies).catch(() => setCompanies([]));
+  }, []);
 
   useEffect(() => {
     serviceCatalogRepository
@@ -282,6 +286,7 @@ export function QuoteFormBuilderPage({ formId }: Props) {
           status: form.status,
           schemaVersion: form.schemaVersion,
           schemaJson: form.schemaJson,
+          issuerCompanyId: form.issuerCompanyId,
         });
       } else {
         const created = await seedingQuoteRepository.createForm({
@@ -291,6 +296,7 @@ export function QuoteFormBuilderPage({ formId }: Props) {
           schemaVersion: form.schemaVersion,
           schemaJson: form.schemaJson,
           layoutType: form.schemaJson.layoutType,
+          issuerCompanyId: form.issuerCompanyId,
         });
         savedFormId = created.id;
       }
@@ -350,6 +356,24 @@ export function QuoteFormBuilderPage({ formId }: Props) {
                 </select>
               </label>
             ) : null}
+            <label className="crm-field">
+              <span>Công ty sở hữu mẫu {form.isDefaultTemplate ? '' : <b>*</b>}</span>
+              <select
+                value={form.issuerCompanyId || ''}
+                disabled={Boolean(form.isDefaultTemplate)}
+                onChange={event => updateForm({ issuerCompanyId: event.target.value || undefined })}
+              >
+                <option value="">-- Chọn công ty --</option>
+                {companies.map(company => (
+                  <option key={company.id} value={company.id}>
+                    {company.brandName || company.legalName}
+                  </option>
+                ))}
+              </select>
+              {form.isDefaultTemplate ? (
+                <small className="crm-help-text">Mẫu mặc định chuẩn — dùng chung cho mọi công ty, không gán riêng.</small>
+              ) : null}
+            </label>
             <label className="crm-field crm-field--full">
               <span>Mô tả</span>
               <textarea value={form.description} onChange={event => updateForm({ description: event.target.value })} />

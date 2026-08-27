@@ -16,6 +16,8 @@ from app.modules.all_platform.schemas import (
     QuoteFormUpdateRequest,
     QuoteUpdateRequest,
     QuoteFormCatalogLinksSetRequest,
+    IssuerCompanyCreateRequest,
+    IssuerCompanyUpdateRequest,
 )
 from app.modules.all_platform.services import (
     approve_quote,
@@ -37,6 +39,11 @@ from app.modules.all_platform.services import (
     get_quote_form_catalog_links,
     set_quote_form_catalog_links,
     get_service_catalog_options_for_form,
+    list_issuer_companies,
+    create_issuer_company,
+    update_issuer_company,
+    send_quote_to_telegram,
+    get_quote_telegram_log,
 )
 from app.modules.all_platform.services.crm_permission_service import can_approve_quote, can_edit_quote
 from app.modules.all_platform.services.customer_lead_service import get_customer_lead_by_id
@@ -168,6 +175,41 @@ def quotes_service_catalog_options(form_id: str = Query(..., alias="formId"), _u
         return BaseResponse(success=False, message=str(e))
 
 
+@quotes_router.get("/issuer-companies")
+def quotes_issuer_companies(
+    include_inactive: bool = Query(False), _user: dict = Depends(get_current_user)
+) -> BaseResponse:
+    """Danh sách công ty phát hành báo giá (bên bán) dùng ở Bước 1 wizard tạo báo
+    giá (mặc định chỉ active) và trang quản trị danh mục (include_inactive=true).
+    Phải đăng ký TRƯỚC /{quote_id} để không bị FastAPI khớp nhầm thành quote_id."""
+    try:
+        return BaseResponse(success=True, data=list_issuer_companies(include_inactive))
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@quotes_router.post("/issuer-companies")
+def quotes_issuer_companies_create(
+    payload: IssuerCompanyCreateRequest, _user: dict = Depends(get_current_user)
+) -> BaseResponse:
+    try:
+        data = create_issuer_company(payload.model_dump())
+        return BaseResponse(success=True, message="Đã tạo công ty phát hành", data=data)
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@quotes_router.put("/issuer-companies/{company_id}")
+def quotes_issuer_companies_update(
+    company_id: str, payload: IssuerCompanyUpdateRequest, _user: dict = Depends(get_current_user)
+) -> BaseResponse:
+    try:
+        data = update_issuer_company(company_id, payload.model_dump(exclude_none=True))
+        return BaseResponse(success=True, message="Đã lưu công ty phát hành", data=data)
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
 def _load_quote_and_lead(quote_id: str) -> tuple[dict, dict | None]:
     quote = get_quote(quote_id)
     lead = get_customer_lead_by_id(quote["dealId"]) if quote.get("dealId") else None
@@ -257,6 +299,34 @@ def quotes_update_and_approve(quote_id: str, payload: QuoteUpdateRequest, user: 
             return BaseResponse(success=False, message="Không có quyền chỉnh sửa báo giá này")
         data = update_and_approve_quote(quote_id, payload.model_dump(exclude_none=True), user.get("id"))
         return BaseResponse(success=True, message="Đã duyệt báo giá", data=data)
+    except ValueError as e:
+        return BaseResponse(success=False, message=str(e))
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@quotes_router.get("/{quote_id}/telegram-log")
+def quotes_get_telegram_log(quote_id: str, user: dict = Depends(get_current_user)) -> BaseResponse:
+    try:
+        quote, lead = _load_quote_and_lead(quote_id)
+        if quote["status"] not in ("approved", "confirmed") and not can_edit_quote(user, quote, lead):
+            return BaseResponse(success=False, message="Không có quyền xem báo giá này")
+        return BaseResponse(success=True, data=get_quote_telegram_log(quote_id))
+    except Exception as e:
+        return BaseResponse(success=False, message=str(e))
+
+
+@quotes_router.post("/{quote_id}/send-telegram")
+def quotes_send_telegram(quote_id: str, user: dict = Depends(get_current_user)) -> BaseResponse:
+    """Gửi báo giá đã duyệt qua Telegram (group "Markee Team", topic "Báo giá"
+    cố định — xem quote_telegram_service.py). Ai xem được báo giá thì gửi
+    được (đúng logic quyền xem đã dùng cho GET /{quote_id})."""
+    try:
+        quote, lead = _load_quote_and_lead(quote_id)
+        if quote["status"] not in ("approved", "confirmed") and not can_edit_quote(user, quote, lead):
+            return BaseResponse(success=False, message="Không có quyền gửi báo giá này")
+        data = send_quote_to_telegram(quote_id, user.get("id"))
+        return BaseResponse(success=True, message="Đã gửi báo giá qua Telegram", data=data)
     except ValueError as e:
         return BaseResponse(success=False, message=str(e))
     except Exception as e:

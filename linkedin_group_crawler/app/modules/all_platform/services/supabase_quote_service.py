@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import secrets
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from typing import Any
 
 from supabase import Client
@@ -17,6 +18,8 @@ from app.core.supabase_client import get_supabase_client
 FORMS_TABLE = "quote_forms"
 QUOTES_TABLE = "quotes"
 ITEMS_TABLE = "quote_items"
+ISSUER_COMPANIES_TABLE = "quote_issuer_companies"
+VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
 
 def _now_iso() -> str:
@@ -43,6 +46,8 @@ def _row_to_form(row: dict) -> dict:
         "name": row["name"],
         "description": row.get("description") or "",
         "status": row["status"],
+        "isDefaultTemplate": row.get("is_default_template") or False,
+        "issuerCompanyId": row.get("issuer_company_id"),
         "schemaVersion": row["schema_version"],
         "schemaJson": schema_json,
         "createdAt": row.get("created_at"),
@@ -88,6 +93,7 @@ def _row_to_quote(row: dict, items: list[dict] | None = None) -> dict:
         "id": row["id"],
         "dealId": row.get("deal_id"),
         "quoteFormId": row["quote_form_id"],
+        "issuerCompanyId": row.get("issuer_company_id"),
         "quoteNumber": row["quote_number"],
         "status": row["status"],
         "formSchemaVersion": row["form_schema_version"],
@@ -110,6 +116,73 @@ def _row_to_quote(row: dict, items: list[dict] | None = None) -> dict:
         "publicUrl": f"/public/quotes/{row['public_token']}" if row.get("public_token") else None,
         "publicEnabled": row.get("public_enabled") if row.get("public_enabled") is not None else True,
     }
+
+
+def _row_to_issuer_company(row: dict) -> dict:
+    return {
+        "id": row["id"],
+        "code": row["code"],
+        "legalName": row["legal_name"],
+        "brandName": row.get("brand_name"),
+        "address": row.get("address"),
+        "contactName": row.get("contact_name"),
+        "phone": row.get("phone"),
+        "email": row.get("email"),
+        "website": row.get("website"),
+        "taxCode": row.get("tax_code"),
+        "logoUrl": row.get("logo_url"),
+        "defaultQuoteFormId": row.get("default_quote_form_id"),
+        "status": row.get("status") or "active",
+    }
+
+
+def list_issuer_companies(include_inactive: bool = False) -> list[dict]:
+    """Danh sách công ty phát hành báo giá (bên bán). Mặc định chỉ trả company
+    active (dùng cho dropdown Bước 1 wizard) - trang quản trị mới cần cả
+    inactive nên truyền include_inactive=True."""
+    supabase: Client = get_supabase_client()
+    query = supabase.table(ISSUER_COMPANIES_TABLE).select("*")
+    if not include_inactive:
+        query = query.eq("status", "active")
+    result = query.order("sort_order").execute()
+    return [_row_to_issuer_company(row) for row in (result.data or [])]
+
+
+def create_issuer_company(payload: dict) -> dict:
+    supabase: Client = get_supabase_client()
+    insert_data = {
+        "code": payload["code"],
+        "legal_name": payload["legal_name"],
+        "brand_name": payload.get("brand_name"),
+        "address": payload.get("address"),
+        "contact_name": payload.get("contact_name"),
+        "phone": payload.get("phone"),
+        "email": payload.get("email"),
+        "website": payload.get("website"),
+        "tax_code": payload.get("tax_code"),
+        "logo_url": payload.get("logo_url"),
+        "default_quote_form_id": payload.get("default_quote_form_id"),
+        "status": payload.get("status") or "active",
+        "sort_order": payload.get("sort_order") or 0,
+    }
+    result = supabase.table(ISSUER_COMPANIES_TABLE).insert(insert_data).execute()
+    return _row_to_issuer_company(result.data[0])
+
+
+def update_issuer_company(company_id: str, payload: dict) -> dict:
+    supabase: Client = get_supabase_client()
+    field_map = {
+        "code": "code", "legal_name": "legal_name", "brand_name": "brand_name",
+        "address": "address", "contact_name": "contact_name", "phone": "phone",
+        "email": "email", "website": "website", "tax_code": "tax_code",
+        "logo_url": "logo_url", "default_quote_form_id": "default_quote_form_id",
+        "status": "status", "sort_order": "sort_order",
+    }
+    update_data = {field_map[k]: v for k, v in payload.items() if k in field_map and v is not None}
+    # logo_url/website/... rong "" (xoa logo/field) van phai ap dung duoc - chi
+    # loai None (khong gui field do len), khong loai chuoi rong.
+    result = supabase.table(ISSUER_COMPANIES_TABLE).update(update_data).eq("id", company_id).execute()
+    return _row_to_issuer_company(result.data[0])
 
 
 def _quote_items(quote_id: str) -> list[dict]:
@@ -166,23 +239,32 @@ def _unique_code(base_name: str, ignore_id: str | None = None) -> str:
 
 
 def _next_quote_number() -> str:
+    """Số báo giá = giờ tạo (giờ Việt Nam) dạng YYYYMMDDHHMM, vd "202608262135".
+    Không có hậu tố nếu là báo giá đầu tiên tạo trong phút đó; nếu trùng phút với
+    báo giá khác thì mới thêm hậu tố "-02", "-03"... (đếm từ 2, không phải từ 1 -
+    báo giá đầu tiên trong phút luôn hiện số trần, không có "-01")."""
     supabase: Client = get_supabase_client()
-    year = datetime.now(timezone.utc).year
-    prefix = f"BG/{year}/"
+    base = datetime.now(VN_TZ).strftime("%Y%m%d%H%M")
     result = (
         supabase.table(QUOTES_TABLE)
         .select("quote_number")
-        .like("quote_number", f"{prefix}%")
+        .or_(f"quote_number.eq.{base},quote_number.like.{base}-%")
         .execute()
     )
-    max_seq = 0
-    for row in result.data or []:
+    rows = result.data or []
+    if not rows:
+        return base
+    max_seq = 1
+    for row in rows:
+        number = row["quote_number"]
+        if number == base:
+            continue
         try:
-            seq = int(row["quote_number"].split("/")[-1])
+            seq = int(number.rsplit("-", 1)[-1])
             max_seq = max(max_seq, seq)
         except (ValueError, IndexError):
             continue
-    return f"{prefix}{max_seq + 1:04d}"
+    return f"{base}-{max_seq + 1:02d}"
 
 
 def _validate_percent(value: Any, field_name: str) -> float:
@@ -323,6 +405,7 @@ def create_quote_form(payload: dict) -> dict:
         "layout_type": payload.get("layout_type") or "cloudgate_standard_quote",
         "schema_version": payload.get("schema_version") or 1,
         "schema_json": payload["schema_json"],
+        "issuer_company_id": payload.get("issuer_company_id"),
     }
     result = supabase.table(FORMS_TABLE).insert(insert_data).execute()
     return _row_to_form(result.data[0])
@@ -442,6 +525,7 @@ def create_quote(payload: dict, created_by: str | None) -> dict:
     insert_data = {
         "deal_id": payload.get("deal_id"),
         "quote_form_id": form["id"],
+        "issuer_company_id": payload.get("issuer_company_id"),
         "quote_number": quote_number,
         "status": "draft",
         "form_schema_version": form["schema_version"],
@@ -530,6 +614,7 @@ def update_quote(quote_id: str, payload: dict, actor_id: str | None) -> dict:
             "p_data": payload.get("data"),
             "p_items": [item for item in items] if items is not None else [],
             "p_changes": changes,
+            "p_issuer_company_id": payload.get("issuer_company_id"),
         }).execute()
     except Exception as exc:
         _raise_friendly_rpc_error(exc)
@@ -573,6 +658,7 @@ def update_and_approve_quote(quote_id: str, payload: dict, actor_id: str | None)
             "p_items": [item for item in items] if items is not None else [],
             "p_changes": changes,
             "p_public_token": secrets.token_urlsafe(16),
+            "p_issuer_company_id": payload.get("issuer_company_id"),
         }).execute()
     except Exception as exc:
         _raise_friendly_rpc_error(exc)

@@ -75,6 +75,9 @@ from app.modules.all_platform.services.supabase_quote_service import (
     approve_quote,
     update_and_approve_quote,
     link_quote_to_deal,
+    list_issuer_companies,
+    create_issuer_company,
+    update_issuer_company,
 )
 from app.modules.all_platform.services.supabase_service_catalog_service import (
     list_service_catalog_items,
@@ -88,6 +91,10 @@ from app.modules.all_platform.services.supabase_service_catalog_service import (
     get_quote_form_catalog_links,
     set_quote_form_catalog_links,
     get_service_catalog_options_for_form,
+)
+from app.modules.all_platform.services.quote_telegram_service import (
+    send_quote_to_telegram,
+    get_quote_telegram_log,
 )
 from app.modules.all_platform.services.supabase_sales_asset_service import (
     list_sales_assets,

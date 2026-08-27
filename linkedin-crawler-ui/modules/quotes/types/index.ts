@@ -59,6 +59,15 @@ export interface QuoteForm {
   name: string;
   description: string;
   status: QuoteFormStatus;
+  /** Mẫu dùng làm fallback khi công ty phát hành (IssuerCompany) chưa gán
+   * defaultQuoteFormId riêng — chỉ đúng 1 mẫu active được set true (unique index
+   * ở DB). Xem CreateQuoteModal bước "Khách hàng". */
+  isDefaultTemplate?: boolean;
+  /** Công ty sở hữu mẫu này — 1 công ty có thể có nhiều mẫu, nhưng 1 mẫu chỉ
+   * thuộc đúng 1 công ty (không dùng chung giữa các công ty). undefined/null =
+   * mẫu trung tính (vd "Mẫu báo giá chuẩn"), dùng chung cho công ty chưa có mẫu
+   * riêng. Xem dropdown "Mẫu báo giá" ở Bước 1 wizard tạo báo giá. */
+  issuerCompanyId?: string;
   schemaVersion: number;
   schemaJson: QuoteSchema;
   createdAt: string;
@@ -68,6 +77,42 @@ export interface QuoteForm {
   shareToken?: string;
   shareEnabled?: boolean;
   shareUrl?: string;
+}
+
+export type TelegramSendStatus = 'pending' | 'success' | 'failed';
+
+/** 1 lần gửi báo giá qua Telegram (group "Markee Team", topic "Báo giá" cố
+ * định) — append-only, mỗi lần bấm gửi/gửi lại tạo 1 dòng mới. */
+export interface QuoteTelegramLog {
+  id: string;
+  quoteId: string;
+  chatId: string;
+  messageThreadId?: string;
+  telegramMessageId?: string;
+  status: TelegramSendStatus;
+  errorMessage?: string;
+  sentById?: string;
+  sentAt: string;
+}
+
+/** Đơn vị phát hành báo giá (bên bán) — vd SecurityZone/Cloudgate/Markee. Tách biệt
+ * với khách hàng CRM (bên nhận). Chọn ở Bước 1 wizard tạo báo giá; thông tin được
+ * SNAPSHOT thẳng vào QuoteData lúc chọn (xem quoteDraftFromForm) — sửa công ty ở
+ * danh mục sau này không ảnh hưởng báo giá đã tạo. */
+export interface IssuerCompany {
+  id: string;
+  code: string;
+  legalName: string;
+  brandName?: string;
+  address?: string;
+  contactName?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  taxCode?: string;
+  logoUrl?: string;
+  defaultQuoteFormId?: string;
+  status: 'active' | 'inactive';
 }
 
 export interface BundleSnapshotComponent {
@@ -139,6 +184,9 @@ export interface Quote {
   contactId?: string;
   dealId?: string;
   quoteFormId: string;
+  /** Chỉ dùng để truy vết nguồn gốc — thông tin bên bán hiển thị luôn đọc từ `data`
+   * (snapshot lúc tạo/sửa), KHÔNG bao giờ live-join lại quote_issuer_companies. */
+  issuerCompanyId?: string;
   quoteNumber: string;
   status: QuoteStatus;
   formSchemaVersion: number;
@@ -177,13 +225,33 @@ export interface CreateQuoteFormInput {
   layoutType?: QuoteLayoutType;
   schemaVersion?: number;
   schemaJson: QuoteSchema;
+  issuerCompanyId?: string;
 }
 
 export type UpdateQuoteFormInput = Partial<CreateQuoteFormInput>;
 
+export interface CreateIssuerCompanyInput {
+  code: string;
+  legalName: string;
+  brandName?: string;
+  address?: string;
+  contactName?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  taxCode?: string;
+  logoUrl?: string;
+  defaultQuoteFormId?: string;
+  status?: 'active' | 'inactive';
+  sortOrder?: number;
+}
+
+export type UpdateIssuerCompanyInput = Partial<CreateIssuerCompanyInput>;
+
 export interface CreateQuoteInput {
   quoteFormId: string;
   dealId?: string;
+  issuerCompanyId?: string;
   status?: QuoteStatus;
   data: QuoteData;
   items?: QuoteItem[];
@@ -192,4 +260,5 @@ export interface CreateQuoteInput {
 export interface UpdateQuoteInput {
   data?: QuoteData;
   items?: QuoteItem[];
+  issuerCompanyId?: string;
 }

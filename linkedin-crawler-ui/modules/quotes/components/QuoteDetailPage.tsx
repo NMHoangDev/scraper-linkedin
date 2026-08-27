@@ -7,6 +7,7 @@ import { internalQuoteStatusClass, internalQuoteStatusLabel } from '../constants
 import { seedingQuoteRepository } from '../repositories/SeedingQuoteRepository';
 import type { Quote } from '../types';
 import { QuoteDocumentRenderer } from './QuoteDocumentRenderer';
+import { TelegramSendButton } from './TelegramSendButton';
 
 interface Props {
   quoteId: string;
@@ -67,6 +68,7 @@ export function QuoteDetailPage({ quoteId }: Props) {
           ) : (
             <span className="quote-badge status-draft">Chưa có link công khai gửi khách</span>
           )}
+          <TelegramSendButton quoteId={quote.id} status={quote.status} />
         </div>
       </header>
       <div className="quote-print-root">

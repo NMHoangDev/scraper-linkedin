@@ -3294,6 +3294,38 @@
   gap: 0.8rem;
 }
 
+.crm-wizard-step1-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.crm-wizard-step1-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 0.75rem;
+  color: #1e40af;
+  font-size: 0.8rem;
+  padding: 0.75rem 1rem;
+}
+
+.crm-issuer-logo-preview {
+  max-width: 96px;
+  max-height: 48px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.crm-issuer-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
 .crm-wizard-form-card {
   border: 1px solid #e2e8f0;
   border-radius: 0.75rem;
@@ -3390,6 +3422,178 @@
   }
 }
 
+@media (max-width: 640px) {
+  .crm-modal-backdrop {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  /* Modal full man hinh THAT - dung dvh (khong phai vh) de tinh dung chieu cao
+   * kha dung tren mobile (vh tinh sai khi thanh dia chi/toolbar trinh duyet
+   * an/hien), khong de khoang trong nao ngoai modal. */
+  .crm-wizard-modal {
+    width: 100vw;
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+  }
+
+  .crm-wizard-modal .crm-modal-header {
+    padding: 14px 16px;
+  }
+
+  .crm-wizard-modal .crm-modal-title {
+    font-size: 18px;
+  }
+
+  .crm-wizard-modal .crm-modal-subtitle {
+    font-size: 12px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Step header gon: ~46px cao, chi hien so; ten buoc chi hien o buoc DANG lam
+   * (active) - 2 buoc con lai chi con so tron, khong choan cho ngang. */
+  .crm-wizard-stepper-container {
+    padding: 0.5rem 0.75rem;
+    min-height: 46px;
+    display: flex;
+    align-items: center;
+  }
+
+  .crm-wizard-step-label {
+    display: none;
+  }
+
+  .crm-wizard-step-item--active .crm-wizard-step-label {
+    display: inline;
+    font-size: 0.72rem;
+  }
+
+  .crm-wizard-step-line {
+    margin: 0 0.35rem;
+  }
+
+  .crm-wizard-modal .crm-wizard-body {
+    padding: 12px;
+  }
+
+  .crm-wizard-form-section {
+    margin-bottom: 1rem;
+  }
+
+  /* Card (section "Don vi phat hanh", "Khach hang"...) - padding gon lai,
+   * khoang cach giua cac field thu gon dung 10-12px thay vi khoang cach desktop. */
+  .crm-wizard-form-card-grid,
+  .crm-panel-grid {
+    gap: 10px;
+  }
+
+  .crm-issuer-logo-preview {
+    max-width: 64px;
+    max-height: 32px;
+  }
+
+  /* Sau khi chon cong ty tren mobile: CHI hien logo nho + ten + nut Sua, an
+   * bot dia chi/nguoi lien he trong dong tom tat (van con day du khi bam "Sua
+   * thong tin" mo rong ra). */
+  .crm-issuer-summary-extra {
+    display: none;
+  }
+
+  /* Chu/khoang trang trong wizard qua to tren man hinh hep - thu gon tieu de
+   * section, tieu de 15-16px, mo ta/label 12px. Nut "Quan ly danh muc" gon lai
+   * thanh link nho, KHONG choan ca 1 hang rieng. */
+  .crm-wizard-form-title {
+    font-size: 15px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .crm-wizard-form-description {
+    font-size: 12px;
+  }
+
+  .crm-wizard-section-head {
+    gap: 0.5rem;
+  }
+
+  .crm-wizard-section-head > div:first-child {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .crm-wizard-section-head > a.crm-secondary-inline {
+    flex-shrink: 0;
+    font-size: 11px;
+    padding: 0.3rem 0.55rem;
+    white-space: nowrap;
+  }
+
+  .crm-field > span {
+    font-size: 12px;
+  }
+
+  .crm-field input,
+  .crm-field select,
+  .crm-field textarea,
+  .crm-wizard-modal select,
+  .crm-wizard-modal .crm-input {
+    width: 100%;
+    min-height: 42px;
+    font-size: 14px;
+  }
+
+  /* Footer sticky gon, tinh them safe-area day man hinh cho iPhone (notch/
+   * home indicator) de nut khong bi thanh gesture che mat. */
+  .crm-wizard-modal .crm-modal-footer {
+    position: sticky;
+    bottom: 0;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 10px 14px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .crm-wizard-modal .crm-cancel-button,
+  .crm-wizard-modal .crm-save-button {
+    flex: 1;
+    min-height: 42px;
+  }
+
+  /* Buoc 3 "Cot hien thi" - toolbar xep doc thay vi ep nut vao khoang hep khien
+   * chu "Cot hien thi" bi vo dong xau (Cot/hien/thi tung dong). */
+  .crm-quote-review-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .crm-quote-column-picker {
+    width: 100%;
+  }
+
+  .crm-quote-column-picker > button {
+    width: 100%;
+    white-space: nowrap;
+  }
+
+  .crm-quote-column-menu {
+    left: 0;
+    right: 0;
+    width: auto;
+  }
+
+  .crm-quote-success-actions {
+    flex-direction: column;
+  }
+
+  .crm-quote-success-actions > * {
+    width: 100%;
+  }
+}
+
 .crm-wizard-modal .crm-modal-footer {
   justify-content: space-between;
 }
@@ -3405,7 +3609,7 @@
    not a dense admin settings panel. Scoped to avoid changing the rest of CRM. */
 .crm-wizard-modal {
   width: min(76rem, calc(100vw - 2rem));
-  max-height: calc(100vh - 2.5rem);
+  max-height: min(90dvh, 960px);
   border-radius: 1.15rem;
 }
 

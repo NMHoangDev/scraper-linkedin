@@ -1,11 +1,8 @@
-import type { Quote, QuoteData, QuoteForm, QuoteItem, VillaSolutionItem } from '@/modules/quotes';
+import type { IssuerCompany, Quote, QuoteData, QuoteForm, QuoteItem, VillaSolutionItem } from '@/modules/quotes';
+import { resolveToggleableColumns } from '@/modules/quotes/utils/quoteColumns';
 import type { DealFormState } from '../../components/DealFormFields';
 
 export type WizardStep = 1 | 2 | 3 | 4;
-
-/** Cột bảng dịch vụ mặc định hiện cho khách khi tạo báo giá mới — khớp đúng 5
- * checkbox "Cột hiển thị" ở bước Xem trước & gửi. */
-export const DEFAULT_VISIBLE_QUOTE_COLUMNS = ['description', 'unit', 'quantity', 'unitPrice', 'total'];
 
 export interface QuoteDraft {
   data: QuoteData;
@@ -17,7 +14,7 @@ export function emptyQuoteDraft(): QuoteDraft {
   return { data: {}, items: [], solutionItems: [] };
 }
 
-export function quoteDraftFromForm(form: QuoteForm, dealDraft?: DealFormState): QuoteDraft {
+export function quoteDraftFromForm(form: QuoteForm, dealDraft?: DealFormState, issuerCompany?: IssuerCompany): QuoteDraft {
   const fields = form.schemaJson.sections.flatMap(section => section.fields);
   const data: QuoteData = {};
   fields.forEach(field => {
@@ -37,7 +34,9 @@ export function quoteDraftFromForm(form: QuoteForm, dealDraft?: DealFormState): 
     data.quoteDate = new Date().toISOString().slice(0, 10);
   }
   if (!data.visibleColumns) {
-    data.visibleColumns = [...DEFAULT_VISIBLE_QUOTE_COLUMNS];
+    // Mac dinh hien TAT CA cot toggle duoc CUA DUNG MAU nay (khong phai danh
+    // sach co dinh) - tu dong khop voi bang hang muc thuc te cua mau.
+    data.visibleColumns = resolveToggleableColumns(form.schemaJson, quoteItems).map(column => column.key);
   }
 
   if (dealDraft) {
@@ -52,7 +51,26 @@ export function quoteDraftFromForm(form: QuoteForm, dealDraft?: DealFormState): 
     });
   }
 
+  if (issuerCompany) applyIssuerCompanySnapshot(data, issuerCompany);
+
   return { data, items: quoteItems, solutionItems };
+}
+
+/** Đơn vị phát hành báo giá (bên bán) - SNAPSHOT thẳng vào data (mutate in place),
+ * không lưu tham chiếu sống. Sửa công ty trong danh mục sau này không ảnh hưởng
+ * báo giá đã tạo/sửa từ snapshot này. Dùng cả lúc dựng QuoteDraft mới
+ * (quoteDraftFromForm) lẫn khi đổi công ty phát hành ở chế độ sửa (Bước 1). */
+export function applyIssuerCompanySnapshot(data: QuoteData, issuerCompany: IssuerCompany): void {
+  Object.assign(data, {
+    sellerCompanyName: issuerCompany.legalName,
+    sellerTaxCode: issuerCompany.taxCode || '',
+    sellerAddress: issuerCompany.address || '',
+    sellerContactName: issuerCompany.contactName || '',
+    sellerPhone: issuerCompany.phone || '',
+    sellerEmail: issuerCompany.email || '',
+    sellerWebsite: issuerCompany.website || '',
+    sellerLogo: issuerCompany.logoUrl || '',
+  });
 }
 
 /** Dựng lại QuoteDraft từ 1 báo giá đã tồn tại (chế độ sửa) - để prefill wizard
@@ -60,9 +78,15 @@ export function quoteDraftFromForm(form: QuoteForm, dealDraft?: DealFormState): 
 export function quoteDraftFromExistingQuote(quote: Quote): QuoteDraft {
   const { solutionItems, ...data } = quote.data || {};
   // Bao gia luu truoc khi co tinh nang "Cot hien thi" se khong co visibleColumns
-  // trong data da luu - mac dinh hien du (khop hanh vi cu, khong bi rot cot).
+  // trong data da luu - mac dinh hien du (khop hanh vi cu, khong bi rot cot),
+  // tinh theo dung cot cua mau bao gia nay (khong phai danh sach co dinh).
   if (!data.visibleColumns) {
-    data.visibleColumns = [...DEFAULT_VISIBLE_QUOTE_COLUMNS];
+    data.visibleColumns = resolveToggleableColumns(quote.formSnapshot, quote.items || []).map(column => column.key);
+  } else if (Array.isArray(data.visibleColumns) && !data.visibleColumns.includes('vatRate')) {
+    // "vatRate" moi them vao danh sach toggle - bao gia da luu visibleColumns
+    // TRUOC do khong biet field nay, phai tu bo sung de checkbox VAT hien dung
+    // trang thai (truoc day VAT luon hien, khong toggle duoc).
+    data.visibleColumns = [...data.visibleColumns, 'vatRate'];
   }
   return {
     data,

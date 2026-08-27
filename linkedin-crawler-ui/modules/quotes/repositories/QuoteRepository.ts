@@ -1,8 +1,12 @@
 import type {
+  CreateIssuerCompanyInput,
   CreateQuoteFormInput,
   CreateQuoteInput,
+  IssuerCompany,
   Quote,
   QuoteForm,
+  QuoteTelegramLog,
+  UpdateIssuerCompanyInput,
   UpdateQuoteFormInput,
   UpdateQuoteInput,
 } from '../types';
@@ -34,4 +38,16 @@ export interface QuoteRepository {
   setFormCatalogLinks(formId: string, catalogItemIds: string[]): Promise<string[]>;
   /** Gói bán + dịch vụ thành phần khả dụng cho 1 mẫu báo giá, dùng dựng dropdown khi điền báo giá. */
   getServiceCatalogOptions(formId: string): Promise<ServiceCatalogOptions>;
+
+  /** Danh sách công ty phát hành báo giá (bên bán) — dropdown "Đơn vị phát hành
+   * báo giá" ở Bước 1 wizard tạo báo giá. includeInactive=true dùng cho trang
+   * quản trị danh mục công ty. */
+  getIssuerCompanies(includeInactive?: boolean): Promise<IssuerCompany[]>;
+  createIssuerCompany(input: CreateIssuerCompanyInput): Promise<IssuerCompany>;
+  updateIssuerCompany(id: string, input: UpdateIssuerCompanyInput): Promise<IssuerCompany>;
+
+  /** Gửi 1 báo giá ĐÃ DUYỆT qua Telegram (group/topic cố định, cấu hình ở backend). */
+  sendQuoteTelegram(quoteId: string): Promise<QuoteTelegramLog>;
+  /** Lịch sử gửi Telegram của 1 báo giá, mới nhất trước. */
+  getQuoteTelegramLog(quoteId: string): Promise<QuoteTelegramLog[]>;
 }

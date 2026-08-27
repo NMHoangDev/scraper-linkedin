@@ -12,6 +12,8 @@ adapted to the plain JSON shape consumed by modules/quotes on the frontend.
 import sys
 from pathlib import Path
 
+import copy
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.supabase_client import get_supabase_client  # noqa: E402
@@ -147,6 +149,36 @@ def standard_schema():
             ]),
         ],
     }
+
+
+def default_standard_schema():
+    """Mẫu báo giá chuẩn, tối giản — dùng làm fallback khi công ty phát hành chưa
+    gán defaultQuoteFormId (xem quote_issuer_companies, migration 069). Tái dùng
+    đúng cấu trúc section của standard_schema() (Cloudgate), chỉ đổi khối "seller"
+    thành trống (giờ được autofill từ công ty phát hành chọn ở Bước 1 wizard, không
+    còn hardcode "CLOUDGATE"/"Dương Thị Mai" nữa) và thêm 2 field mới sellerTaxCode/
+    sellerLogo mà bản Cloudgate cũ chưa có."""
+    schema = copy.deepcopy(standard_schema())
+    for section_data in schema["sections"]:
+        if section_data["key"] == "seller":
+            section_data["fields"] = [
+                field("sellerCompanyName", "Tên pháp lý", "text", required=True),
+                field("sellerTaxCode", "Mã số thuế", "text"),
+                field("sellerAddress", "Địa chỉ công ty", "textarea"),
+                field("sellerContactName", "Người liên hệ", "text"),
+                field("sellerPhone", "SĐT", "phone"),
+                field("sellerEmail", "Email", "email"),
+                field("sellerWebsite", "Website", "text"),
+                field("sellerLogo", "Logo", "text", visible=False,
+                      help_text="URL logo, tự điền từ công ty phát hành, không hiện dạng field nhập tay."),
+            ]
+        elif section_data["key"] == "representatives":
+            # standard_schema() hardcode san "DUONG THI MAI" (dai dien Cloudgate)
+            # lam default - mau chuan phai de trong, khong gan san ten 1 nguoi cu the.
+            for f in section_data["fields"]:
+                if f["key"] == "companyRepresentative":
+                    f.pop("defaultValue", None)
+    return schema
 
 
 def chatbot_douyin_quote_items():
@@ -351,6 +383,17 @@ def villa_schema():
 
 
 TEMPLATES = [
+    {
+        "code": "STANDARD_DEFAULT_QUOTE_FORM",
+        "name": "Mẫu báo giá chuẩn",
+        "description": "Mẫu mặc định dùng khi công ty phát hành báo giá chưa gán mẫu riêng (xem quote_issuer_companies).",
+        "status": "active",
+        "schema_version": 1,
+        "layout_type": "cloudgate_standard_quote",
+        "schema_json": default_standard_schema(),
+        "is_default_template": True,
+        "force_update": True,
+    },
     {
         "code": "STANDARD_QUOTE_FORM",
         "name": "Mẫu báo giá Cloudgate",

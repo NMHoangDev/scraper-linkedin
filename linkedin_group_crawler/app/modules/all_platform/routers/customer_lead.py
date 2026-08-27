@@ -171,7 +171,7 @@ def get_activity_log(
 # ---------------------------------------------------------------------------
 # Attachment upload (lên Supabase Storage bucket `crm-attachments`)
 # ---------------------------------------------------------------------------
-_ALLOWED_UPLOAD_PREFIXES = {"brief", "proposal", "contract"}
+_ALLOWED_UPLOAD_PREFIXES = {"brief", "proposal", "contract", "logo"}
 
 
 @router.post("/upload", response_model=BaseResponse)
@@ -213,11 +213,22 @@ async def upload_crm_attachment(
                 ),
             )
 
+        # Logo cong ty phat hanh: rieng PNG/JPG/WebP, toi da 2MB - chat hon gioi
+        # han chung (25MB, moi loai file) o duoi.
+        LOGO_MIME_TYPES = {"image/png", "image/jpeg", "image/jpg", "image/webp"}
+        LOGO_MAX_BYTES = 2 * 1024 * 1024
+        if prefix == "logo" and content_type not in LOGO_MIME_TYPES:
+            return BaseResponse(
+                success=False,
+                message=f"Logo chỉ nhận PNG/JPG/WebP, không nhận '{content_type}'.",
+            )
+
         # Đọc tối đa MAX_FILE_SIZE_BYTES — tránh RAM spike với file khổng lồ.
         # FastAPI không tự giới hạn kích thước UploadFile.
         raw = await file.read()
-        if len(raw) > MAX_FILE_SIZE_BYTES:
-            mb = MAX_FILE_SIZE_BYTES // (1024 * 1024)
+        max_bytes = LOGO_MAX_BYTES if prefix == "logo" else MAX_FILE_SIZE_BYTES
+        if len(raw) > max_bytes:
+            mb = max_bytes // (1024 * 1024)
             return BaseResponse(
                 success=False,
                 message=f"File quá lớn (> {mb} MB). Vui lòng nén lại.",
