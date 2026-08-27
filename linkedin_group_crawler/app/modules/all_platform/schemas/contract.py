@@ -15,6 +15,10 @@ class ContractClauseInput(BaseModel):
 
 class ContractCreateRequest(BaseModel):
     deal_id: Optional[str] = None
+    # Ten khach hang nhap tay - dung khi khong chon deal_id (hop dong ko bat
+    # buoc gan CRM). Neu co deal_id thi FE nen bo trong, dealCustomerName tu
+    # deal se duoc uu tien hien thi.
+    manual_customer_name: Optional[str] = None
     quote_id: Optional[str] = None
     title: str
     template_type: str = "service"
@@ -35,6 +39,7 @@ class ContractCreateRequest(BaseModel):
 
 class ContractUpdateRequest(BaseModel):
     title: Optional[str] = None
+    manual_customer_name: Optional[str] = None
     template_type: Optional[str] = None
     contract_value: Optional[float] = None
     currency: Optional[str] = None
@@ -55,11 +60,16 @@ class ContractStatusUpdateRequest(BaseModel):
 
 
 class ContractGenerateRequest(BaseModel):
-    deal_id: str
+    # Optional — hop dong khong bat buoc gan CRM (yeu cau tu Mylife: "hop dong
+    # thi ko lien quan crm lam"). AI van soan duoc chi voi mau tham chieu +
+    # yeu cau them, khong can chon khach hang/bao gia.
+    deal_id: Optional[str] = None
+    manual_customer_name: Optional[str] = None
     quote_id: Optional[str] = None
     template_type: str = "service"
     detail_level: str = "standard"
     extra_prompt: Optional[str] = None
+    reference_template_id: Optional[str] = None
 
 
 class ContractReviewRequest(BaseModel):

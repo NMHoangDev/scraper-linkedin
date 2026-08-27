@@ -170,7 +170,9 @@ export function ContractDetailPage({ contractId }: { contractId: string }) {
           <h1>{contract.contractNumber}</h1>
           <p>
             {contract.title} · {formatVnd(contract.contractValue)}
-            {contract.dealCustomerName ? ` · ${contract.dealCustomerName}${contract.dealCompanyName ? ` (${contract.dealCompanyName})` : ''}` : ''}
+            {contract.dealCustomerName || contract.manualCustomerName
+              ? ` · ${contract.dealCustomerName || contract.manualCustomerName}${contract.dealCompanyName ? ` (${contract.dealCompanyName})` : ''}`
+              : ''}
             {contract.ownerName ? ` · Phụ trách: ${contract.ownerName}` : ''}
           </p>
         </div>

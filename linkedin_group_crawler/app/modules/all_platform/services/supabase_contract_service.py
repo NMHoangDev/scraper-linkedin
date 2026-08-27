@@ -36,6 +36,7 @@ def _row_to_contract(row: dict) -> dict:
         "dealId": row.get("deal_id"),
         "dealCustomerName": deal.get("customer_name"),
         "dealCompanyName": deal.get("company_name"),
+        "manualCustomerName": row.get("manual_customer_name"),
         "quoteId": row.get("quote_id"),
         "title": row["title"],
         "templateType": row.get("template_type") or "service",
@@ -124,6 +125,7 @@ def create_contract(payload: dict, created_by: str | None) -> dict:
     insert_data = {
         "contract_number": _next_contract_number(),
         "deal_id": payload.get("deal_id"),
+        "manual_customer_name": payload.get("manual_customer_name"),
         "quote_id": payload.get("quote_id"),
         "title": payload["title"],
         "template_type": payload.get("template_type") or "service",
@@ -155,6 +157,7 @@ def update_contract(contract_id: str, payload: dict, actor_id: str | None) -> di
     for key in (
         "title", "template_type", "contract_value", "currency", "start_date", "end_date",
         "payment_terms", "progress_percent", "payment_collected_percent", "owner_id",
+        "manual_customer_name",
     ):
         if payload.get(key) is not None:
             update_data[key] = payload[key]

@@ -28,6 +28,7 @@ export function ManualContractModal({
   const [users, setUsers] = useState<UserOption[]>([]);
 
   const [dealId, setDealId] = useState('');
+  const [manualCustomerName, setManualCustomerName] = useState('');
   const [quoteId, setQuoteId] = useState('');
   const [title, setTitle] = useState('');
   const [templateType, setTemplateType] = useState<ContractTemplateType>('service');
@@ -68,6 +69,7 @@ export function ManualContractModal({
 
   function reset() {
     setDealId('');
+    setManualCustomerName('');
     setQuoteId('');
     setTitle('');
     setTemplateType('service');
@@ -98,6 +100,7 @@ export function ManualContractModal({
     try {
       const contract = await seedingContractRepository.createContract({
         dealId: dealId || undefined,
+        manualCustomerName: dealId ? undefined : manualCustomerName.trim() || undefined,
         quoteId: quoteId || undefined,
         title: title.trim(),
         templateType,
@@ -160,6 +163,17 @@ export function ManualContractModal({
                   ))}
                 </select>
               </label>
+              {!dealId ? (
+                <label style={labelStyle}>
+                  Tên khách hàng (nhập tay)
+                  <input
+                    style={inputStyle}
+                    value={manualCustomerName}
+                    onChange={e => setManualCustomerName(e.target.value)}
+                    placeholder="Không chọn CRM ở trên thì nhập tên ở đây"
+                  />
+                </label>
+              ) : null}
               <label style={labelStyle}>
                 Báo giá liên quan
                 <select style={inputStyle} value={quoteId} onChange={e => setQuoteId(e.target.value)} disabled={!dealId}>
