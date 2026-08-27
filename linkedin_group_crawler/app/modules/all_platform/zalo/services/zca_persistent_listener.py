@@ -431,6 +431,14 @@ class ZcaPersistentListenerManager:
             return self.status(user_id)
 
     async def start_persisted_listeners(self) -> None:
+        # LƯU Ý (2026-08-27): đã thử thêm check "chỉ start nếu có row active
+        # trong zalo_accounts" ở đây, nhưng phải revert — điều tra thực tế
+        # trên production cho thấy có account (vd "zl_7035a34c",
+        # "admin123-gmail.com") ĐANG hoạt động thật (nhận tin nhắn thật, được
+        # frontend poll liên tục) dù KHÔNG có row nào trong zalo_accounts.
+        # zalo_groups/zalo_messages chỉ khoá theo user_id (text), không có FK
+        # tới zalo_accounts, nên listener vẫn chạy tốt độc lập với bảng đó.
+        # Thêm check tồn tại sẽ làm gãy các phiên đang chạy thật kiểu này.
         for user_id in await list_zca_auth_users():
             auth = await load_zca_auth(user_id)
             if not auth:
