@@ -96,3 +96,12 @@ from app.modules.all_platform.schemas.auth import (
     CheckEmailRequest,
     ResetPasswordRequest,
 )
+from app.modules.all_platform.schemas.contract import (
+    ContractClauseInput,
+    ContractCreateRequest,
+    ContractUpdateRequest,
+    ContractStatusUpdateRequest,
+    ContractGenerateRequest,
+    ContractReviewRequest,
+    ContractRefineRequest,
+)

@@ -268,6 +268,14 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
     },
     {
       type: "item",
+      id: "contracts",
+      href: "/all-platform/contracts",
+      icon: "description",
+      label: "Hợp đồng",
+      matchStartsWith: ["/all-platform/contracts"],
+    },
+    {
+      type: "item",
       id: "sales-assets",
       href: "/all-platform/sales-assets",
       icon: "campaign",
