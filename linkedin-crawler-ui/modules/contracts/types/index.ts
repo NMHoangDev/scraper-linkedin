@@ -29,6 +29,8 @@ export interface Contract {
   dealId?: string | null;
   dealCustomerName?: string | null;
   dealCompanyName?: string | null;
+  /** Tên khách hàng nhập tay — dùng khi hợp đồng không gắn deal CRM. */
+  manualCustomerName?: string | null;
   quoteId?: string | null;
   title: string;
   templateType: ContractTemplateType;
@@ -69,6 +71,7 @@ export interface ContractDashboardStats {
 
 export interface CreateContractInput {
   dealId?: string | null;
+  manualCustomerName?: string | null;
   quoteId?: string | null;
   title: string;
   templateType?: ContractTemplateType;
@@ -89,6 +92,7 @@ export interface CreateContractInput {
 
 export interface UpdateContractInput {
   title?: string;
+  manualCustomerName?: string | null;
   templateType?: ContractTemplateType;
   contractValue?: number;
   currency?: string;
@@ -104,11 +108,16 @@ export interface UpdateContractInput {
 }
 
 export interface GenerateContractDraftInput {
-  dealId: string;
+  /** Không bắt buộc — hợp đồng không nhất thiết phải gắn CRM. */
+  dealId?: string;
+  /** Tên khách hàng nhập tay — dùng khi không chọn dealId. */
+  manualCustomerName?: string;
   quoteId?: string | null;
   templateType?: ContractTemplateType;
   detailLevel?: string;
   extraPrompt?: string;
+  /** Mẫu hợp đồng tham chiếu (từ modules/contract-templates) — AI bám văn phong/cấu trúc mẫu này. */
+  referenceTemplateId?: string;
 }
 
 export interface ReviewContractRiskInput {

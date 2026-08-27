@@ -7,7 +7,10 @@ import { contractStatusClass, contractStatusLabel } from '../constants/contractC
 import { formatVnd } from '@/modules/quotes/utils/quoteCalculations';
 import { ContractAIWizard } from '@/modules/crm/integrations/contracts';
 import { ManualContractModal } from './ManualContractModal';
+import { ContractTemplatesPanel } from '@/modules/contract-templates';
 import type { Contract, ContractDashboardStats } from '../types';
+
+type ContractTab = 'contracts' | 'templates';
 
 function formatDate(value?: string | null) {
   if (!value) return '—';
@@ -40,6 +43,7 @@ export function ContractHomePage() {
   const [search, setSearch] = useState('');
   const [wizardOpen, setWizardOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<ContractTab>('contracts');
 
   async function load() {
     setLoading(true);
@@ -70,6 +74,7 @@ export function ContractHomePage() {
       contract.contractNumber.toLowerCase().includes(q) ||
       contract.title.toLowerCase().includes(q) ||
       (contract.dealCustomerName || '').toLowerCase().includes(q) ||
+      (contract.manualCustomerName || '').toLowerCase().includes(q) ||
       (contract.dealCompanyName || '').toLowerCase().includes(q)
     );
   });
@@ -77,7 +82,7 @@ export function ContractHomePage() {
   function exportCsv() {
     const header = ['Số hợp đồng', 'Tiêu đề', 'Khách hàng', 'Công ty', 'Giá trị', 'Bắt đầu', 'Kết thúc', 'Tiến độ %', 'Đã thu %', 'Phụ trách', 'Trạng thái'];
     const rows = filtered.map(c => [
-      c.contractNumber, c.title, c.dealCustomerName || '', c.dealCompanyName || '',
+      c.contractNumber, c.title, c.dealCustomerName || c.manualCustomerName || '', c.dealCompanyName || '',
       String(c.contractValue), c.startDate || '', c.endDate || '',
       String(c.progressPercent), String(c.paymentCollectedPercent), c.ownerName || '', contractStatusLabel(c.status),
     ]);
@@ -106,18 +111,35 @@ export function ContractHomePage() {
           <button type="button" className="contract-button contract-button--secondary" onClick={() => void load()}>
             Làm mới
           </button>
-          <button type="button" className="contract-button contract-button--secondary" onClick={exportCsv} disabled={filtered.length === 0}>
-            ↓ Xuất dữ liệu
+          {activeTab === 'contracts' ? (
+            <button type="button" className="contract-button contract-button--secondary" onClick={exportCsv} disabled={filtered.length === 0}>
+              ↓ Xuất dữ liệu
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="contract-button contract-button--secondary"
+            onClick={() => setActiveTab(activeTab === 'contracts' ? 'templates' : 'contracts')}
+          >
+            {activeTab === 'contracts' ? '📎 Mẫu hợp đồng' : '← Danh sách hợp đồng'}
           </button>
-          <button type="button" className="contract-button contract-button--secondary" onClick={() => setManualOpen(true)}>
-            ＋ Tạo hợp đồng
-          </button>
-          <button type="button" className="contract-button contract-button--primary" onClick={() => setWizardOpen(true)}>
-            ✦ Soạn hợp đồng bằng AI
-          </button>
+          {activeTab === 'contracts' ? (
+            <>
+              <button type="button" className="contract-button contract-button--secondary" onClick={() => setManualOpen(true)}>
+                ＋ Tạo hợp đồng
+              </button>
+              <button type="button" className="contract-button contract-button--primary" onClick={() => setWizardOpen(true)}>
+                ✦ Soạn hợp đồng bằng AI
+              </button>
+            </>
+          ) : null}
         </div>
       </header>
 
+      {activeTab === 'templates' ? <ContractTemplatesPanel /> : null}
+
+      {activeTab === 'contracts' ? (
+      <>
       <section className="contract-ai-hero">
         <div>
           <span style={{ fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.1em', opacity: 0.75 }}>
@@ -225,7 +247,7 @@ export function ContractHomePage() {
                       <div style={{ color: '#94a3b8', fontSize: '0.78rem' }}>{contract.title}</div>
                     </td>
                     <td>
-                      <strong>{contract.dealCustomerName || '—'}</strong>
+                      <strong>{contract.dealCustomerName || contract.manualCustomerName || '—'}</strong>
                       {contract.dealCompanyName ? <div style={{ color: '#94a3b8', fontSize: '0.76rem' }}>{contract.dealCompanyName}</div> : null}
                     </td>
                     <td>{formatVnd(contract.contractValue)}</td>
@@ -261,6 +283,8 @@ export function ContractHomePage() {
             </tbody>
           </table>
         </div>
+      ) : null}
+      </>
       ) : null}
 
       <ContractAIWizard

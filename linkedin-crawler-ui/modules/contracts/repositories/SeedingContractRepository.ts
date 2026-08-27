@@ -46,6 +46,7 @@ function toClausePayload(clause: ContractClause) {
 function toCreatePayload(input: CreateContractInput) {
   return {
     deal_id: input.dealId,
+    manual_customer_name: input.manualCustomerName,
     quote_id: input.quoteId,
     title: input.title,
     template_type: input.templateType,
@@ -68,6 +69,7 @@ function toCreatePayload(input: CreateContractInput) {
 function toUpdatePayload(input: UpdateContractInput) {
   return {
     title: input.title,
+    manual_customer_name: input.manualCustomerName,
     template_type: input.templateType,
     contract_value: input.contractValue,
     currency: input.currency,
@@ -130,10 +132,12 @@ export class SeedingContractRepository implements ContractRepository {
       method: 'POST',
       body: JSON.stringify({
         deal_id: input.dealId,
+        manual_customer_name: input.manualCustomerName,
         quote_id: input.quoteId,
         template_type: input.templateType,
         detail_level: input.detailLevel,
         extra_prompt: input.extraPrompt,
+        reference_template_id: input.referenceTemplateId,
       }),
     });
   }

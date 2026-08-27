@@ -201,6 +201,12 @@ from app.modules.all_platform.services.contract_ai_service import (
     review_contract_risk,
     refine_contract_draft,
 )
+from app.modules.all_platform.services.contract_template_service import (
+    list_contract_templates,
+    get_contract_template,
+    create_contract_template,
+    delete_contract_template,
+)
 from app.modules.all_platform.services.crm_permission_service import (
     is_sale_member,
     has_full_crm_access,

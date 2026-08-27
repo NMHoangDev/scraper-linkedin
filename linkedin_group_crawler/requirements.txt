@@ -29,4 +29,7 @@ google-generativeai
 # Import Excel danh sách thành viên
 openpyxl
 beautifulsoup4
+# Trich xuat text tu file mau hop dong (.docx/.pdf) cho AI Contract Copilot tham chieu
+python-docx
+pdfplumber
 

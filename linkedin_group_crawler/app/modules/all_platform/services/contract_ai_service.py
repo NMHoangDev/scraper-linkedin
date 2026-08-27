@@ -153,18 +153,26 @@ async def generate_contract_draft(
     template_type: str,
     detail_level: str,
     extra_prompt: str | None,
+    reference_template_text: str | None = None,
 ) -> list[dict]:
     template_labels = {
         "service": "Hợp đồng cung cấp dịch vụ CNTT",
         "principle": "Hợp đồng nguyên tắc",
         "marketing": "Hợp đồng dịch vụ Marketing",
     }
+    reference_section = (
+        f"=== MẪU HỢP ĐỒNG THAM CHIẾU (bám theo văn phong/cấu trúc câu chữ của mẫu này, "
+        f"KHÔNG copy nguyên văn số liệu/tên riêng trong mẫu) ===\n{reference_template_text[:8000]}\n\n"
+        if reference_template_text
+        else ""
+    )
     user_content = (
         f"Loại hợp đồng: {template_labels.get(template_type, template_type)}\n"
         f"Mức độ chi tiết: {detail_level}\n\n"
         f"=== THÔNG TIN KHÁCH HÀNG (CRM) ===\n{_format_deal_context(deal)}\n\n"
         f"=== BÁO GIÁ ĐÃ CHỐT ===\n{_format_quote_context(quote)}\n\n"
         f"=== ĐIỀU KHOẢN CHUẨN CÔNG TY (tham chiếu, không copy nguyên văn) ===\n{_STANDARD_TERMS}\n\n"
+        f"{reference_section}"
         f"=== YÊU CẦU THÊM TỪ SALE ===\n{extra_prompt or '(không có)'}"
     )
     result = await _call_chat_json(_DRAFT_SYSTEM_PROMPT, user_content)

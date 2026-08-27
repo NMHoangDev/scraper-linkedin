@@ -28,6 +28,7 @@ from app.modules.all_platform.services import (
     generate_contract_draft,
     review_contract_risk,
     refine_contract_draft,
+    get_contract_template,
     get_quote,
 )
 from app.modules.all_platform.services.crm_permission_service import can_edit_contract
@@ -134,9 +135,16 @@ def contracts_delete(contract_id: str, user: dict = Depends(get_current_user)) -
 async def contracts_generate_draft(payload: ContractGenerateRequest, _user: dict = Depends(get_current_user)) -> BaseResponse:
     """AI soạn thảo — KHÔNG tạo row DB, chỉ trả clauses tạm để FE review trước khi Lưu."""
     try:
-        deal = get_customer_lead_by_id(payload.deal_id)
+        deal = get_customer_lead_by_id(payload.deal_id) if payload.deal_id else None
+        if not deal and payload.manual_customer_name:
+            deal = {"customer_name": payload.manual_customer_name}
         quote = get_quote(payload.quote_id) if payload.quote_id else None
-        clauses = await generate_contract_draft(deal, quote, payload.template_type, payload.detail_level, payload.extra_prompt)
+        reference_text = None
+        if payload.reference_template_id:
+            reference_text = get_contract_template(payload.reference_template_id, include_text=True).get("extractedText")
+        clauses = await generate_contract_draft(
+            deal, quote, payload.template_type, payload.detail_level, payload.extra_prompt, reference_text
+        )
         return BaseResponse(success=True, data={"clauses": clauses})
     except RuntimeError as e:
         return BaseResponse(success=False, message=str(e))

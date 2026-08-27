@@ -8,6 +8,8 @@ import type { Quote } from '@/modules/quotes';
 import { seedingContractRepository } from '@/modules/contracts/repositories/SeedingContractRepository';
 import { CONTRACT_TEMPLATE_OPTIONS } from '@/modules/contracts/constants/contractConfig';
 import type { ContractClause, ContractTemplateType } from '@/modules/contracts/types';
+import { seedingContractTemplateRepository } from '@/modules/contract-templates';
+import type { ContractTemplate } from '@/modules/contract-templates';
 import { formatVnd } from '@/modules/quotes/utils/quoteCalculations';
 import { DEAL_STAGE_META } from '../../constants/crmConfig';
 import type { DealStage } from '../../types';
@@ -37,9 +39,14 @@ export function ContractAIWizard({
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loadingSource, setLoadingSource] = useState(false);
   const [dealId, setDealId] = useState('');
+  const [manualCustomerName, setManualCustomerName] = useState('');
   const [quoteId, setQuoteId] = useState('');
-  const [templateType, setTemplateType] = useState<ContractTemplateType>('service');
+  // Khong con cho chon "Loai hop dong" tren UI (trung y voi "Mau hop dong" -
+  // gay nham lan), luon mac dinh 'service'; AI van soan du 7 dieu khoan chuan.
+  const templateType: ContractTemplateType = 'service';
   const [detailLevel, setDetailLevel] = useState('standard');
+  const [referenceTemplates, setReferenceTemplates] = useState<ContractTemplate[]>([]);
+  const [referenceTemplateId, setReferenceTemplateId] = useState('');
   const [extraPrompt, setExtraPrompt] = useState(
     'Thanh toán 50% khi ký, 40% khi bàn giao và 10% sau nghiệm thu. Thời gian triển khai 45 ngày.'
   );
@@ -58,6 +65,16 @@ export function ContractAIWizard({
   const [createdContractId, setCreatedContractId] = useState('');
   const [createdContractNumber, setCreatedContractNumber] = useState('');
   const [statusActionMessage, setStatusActionMessage] = useState('');
+  const [refreshingTemplates, setRefreshingTemplates] = useState(false);
+
+  function loadReferenceTemplates() {
+    setRefreshingTemplates(true);
+    return seedingContractTemplateRepository
+      .getTemplates()
+      .then(setReferenceTemplates)
+      .catch(() => setReferenceTemplates([]))
+      .finally(() => setRefreshingTemplates(false));
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -67,6 +84,7 @@ export function ContractAIWizard({
       .then(res => setDeals(res.items))
       .catch(() => setDeals([]))
       .finally(() => setLoadingSource(false));
+    void loadReferenceTemplates();
   }, [open]);
 
   useEffect(() => {
@@ -89,8 +107,9 @@ export function ContractAIWizard({
     if (generating || saving) return;
     setStep(1);
     setDealId('');
+    setManualCustomerName('');
     setQuoteId('');
-    setTemplateType('service');
+    setReferenceTemplateId('');
     setClauses([]);
     setAiScore(null);
     setAiFindings([]);
@@ -108,24 +127,24 @@ export function ContractAIWizard({
   const selectedQuote = quotes.find(q => q.id === quoteId) || null;
 
   async function handleGenerate() {
-    if (!dealId) {
-      setError('Vui lòng chọn khách hàng CRM.');
-      return;
-    }
     setError('');
     setStep(2);
     setGenerating(true);
     try {
       const draft = await seedingContractRepository.generateDraft({
-        dealId,
+        dealId: dealId || undefined,
+        manualCustomerName: dealId ? undefined : manualCustomerName.trim() || undefined,
         quoteId: quoteId || undefined,
         templateType,
         detailLevel,
         extraPrompt,
+        referenceTemplateId: referenceTemplateId || undefined,
       });
       setClauses(draft.clauses);
       setGeneratedAt(new Date());
-      setTitle(`${CONTRACT_TEMPLATE_OPTIONS.find(o => o.value === templateType)?.label} — ${selectedDeal?.customer_name || ''}`);
+      const templateLabel = CONTRACT_TEMPLATE_OPTIONS.find(o => o.value === templateType)?.label || '';
+      const customerName = selectedDeal?.customer_name || manualCustomerName.trim();
+      setTitle(customerName ? `${templateLabel} — ${customerName}` : templateLabel);
       setGenerating(false);
       setReviewing(true);
       const review = await seedingContractRepository.reviewRisk({
@@ -178,7 +197,8 @@ export function ContractAIWizard({
     setError('');
     try {
       const contract = await seedingContractRepository.createContract({
-        dealId,
+        dealId: dealId || undefined,
+        manualCustomerName: dealId ? undefined : manualCustomerName.trim() || undefined,
         quoteId: quoteId || undefined,
         title: title || 'Hợp đồng cung cấp dịch vụ',
         templateType,
@@ -312,9 +332,9 @@ export function ContractAIWizard({
                   <p>Chọn một giao dịch, AI sẽ tự lấy dữ liệu đã có thay vì yêu cầu Sale nhập lại.</p>
                   <div className="contract-form">
                     <label>
-                      Khách hàng CRM *
+                      Khách hàng CRM (tuỳ chọn)
                       <select value={dealId} onChange={event => setDealId(event.target.value)} disabled={loadingSource}>
-                        <option value="">-- Chọn khách hàng --</option>
+                        <option value="">-- Không gắn CRM --</option>
                         {deals.map(deal => (
                           <option key={deal.id} value={deal.id}>
                             {deal.customer_name}{deal.company_name ? ` — ${deal.company_name}` : ''}
@@ -322,6 +342,17 @@ export function ContractAIWizard({
                         ))}
                       </select>
                     </label>
+                    {!dealId ? (
+                      <label>
+                        Tên khách hàng (nhập tay)
+                        <input
+                          type="text"
+                          value={manualCustomerName}
+                          onChange={event => setManualCustomerName(event.target.value)}
+                          placeholder="Không chọn khách hàng CRM ở trên thì nhập tên ở đây"
+                        />
+                      </label>
+                    ) : null}
 
                     <div className="two">
                       <label>
@@ -355,24 +386,54 @@ export function ContractAIWizard({
                       </p>
                     ) : null}
 
-                    <div className="two">
-                      <label>
-                        Mẫu hợp đồng
-                        <select value={templateType} onChange={event => setTemplateType(event.target.value as ContractTemplateType)}>
-                          {CONTRACT_TEMPLATE_OPTIONS.map(option => (
-                            <option key={option.value} value={option.value}>{option.label}</option>
+                    <label>
+                      Mức độ chi tiết
+                      <select value={detailLevel} onChange={event => setDetailLevel(event.target.value)}>
+                        {DETAIL_LEVEL_OPTIONS.map(option => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label>
+                      Mẫu hợp đồng (tuỳ chọn)
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.3rem' }}>
+                        <select
+                          value={referenceTemplateId}
+                          onChange={event => setReferenceTemplateId(event.target.value)}
+                          style={{ flex: 1, marginTop: 0 }}
+                        >
+                          <option value="">-- Không dùng mẫu nào --</option>
+                          {referenceTemplates.map(t => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
                           ))}
                         </select>
-                      </label>
-                      <label>
-                        Mức độ chi tiết
-                        <select value={detailLevel} onChange={event => setDetailLevel(event.target.value)}>
-                          {DETAIL_LEVEL_OPTIONS.map(option => (
-                            <option key={option.value} value={option.value}>{option.label}</option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
+                        <button
+                          type="button"
+                          className="contract-button contract-button--secondary"
+                          style={{ whiteSpace: 'nowrap' }}
+                          disabled={refreshingTemplates}
+                          onClick={() => void loadReferenceTemplates()}
+                          title="Tải lại danh sách mẫu (vd. sau khi vừa upload mẫu mới)"
+                        >
+                          {refreshingTemplates ? '...' : '🔄 Làm mới'}
+                        </button>
+                        <a
+                          href="/all-platform/contract-templates"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="contract-button contract-button--secondary"
+                          style={{ whiteSpace: 'nowrap' }}
+                        >
+                          Quản lý mẫu →
+                        </a>
+                      </div>
+                    </label>
+                    {referenceTemplates.length === 0 ? (
+                      <p style={{ color: '#8791a0', fontSize: '0.68rem', margin: 0 }}>
+                        Chưa có mẫu nào — bấm "Quản lý mẫu →" ở trên để tải lên (mở tab mới, không mất dữ liệu đang nhập).
+                      </p>
+                    ) : null}
 
                     <label>
                       Yêu cầu thêm cho AI
@@ -388,9 +449,9 @@ export function ContractAIWizard({
                       <b className="ai-context-row-icon">♙</b>
                       <span>
                         <strong>Hồ sơ pháp lý khách hàng</strong>
-                        <small>{selectedDeal ? selectedDeal.customer_name : 'Chưa chọn khách hàng'}</small>
+                        <small>{selectedDeal?.customer_name || manualCustomerName.trim() || 'Chưa có tên khách hàng'}</small>
                       </span>
-                      <em>{selectedDeal ? 'Đủ' : '—'}</em>
+                      <em>{selectedDeal || manualCustomerName.trim() ? 'Đủ' : '—'}</em>
                     </div>
                     <div className={`ai-context-row ${selectedQuote ? '' : 'warn'}`}>
                       <b className="ai-context-row-icon">▤</b>
@@ -539,7 +600,7 @@ export function ContractAIWizard({
           </div>
           <div className="crm-footer-right">
             {step === 1 ? (
-              <button type="button" className="crm-save-button" disabled={!dealId} onClick={() => void handleGenerate()}>
+              <button type="button" className="crm-save-button" onClick={() => void handleGenerate()}>
                 ✦ AI soạn hợp đồng
               </button>
             ) : null}
