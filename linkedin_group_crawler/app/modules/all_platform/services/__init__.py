@@ -187,6 +187,20 @@ from app.modules.all_platform.services.supabase_linkedin_account_service import 
 from app.modules.all_platform.services.platforms_service import (
     get_all_platforms,
 )
+from app.modules.all_platform.services.supabase_contract_service import (
+    list_contracts,
+    get_contract,
+    create_contract,
+    update_contract,
+    update_contract_status,
+    delete_contract,
+    get_contracts_dashboard_stats,
+)
+from app.modules.all_platform.services.contract_ai_service import (
+    generate_contract_draft,
+    review_contract_risk,
+    refine_contract_draft,
+)
 from app.modules.all_platform.services.crm_permission_service import (
     is_sale_member,
     has_full_crm_access,

@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import "@/modules/crm/styles/crm.css";
 import "@/modules/quotes/styles/quotes.css";
+import "@/modules/contracts/styles/contracts.css";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/components/facebook-crawler/shared/components/contexts/AuthContext";
 import { AppAuthProvider } from "@/contexts/AppAuthContext";

@@ -132,3 +132,21 @@ def can_edit_quote(user: dict[str, Any] | None, quote: dict[str, Any] | None, le
     if lead and (str(lead.get("leaded_by") or "") == uid or str(lead.get("sdr_id") or "") == uid):
         return True
     return False
+
+
+def can_edit_contract(user: dict[str, Any] | None, contract: dict[str, Any] | None, lead: dict[str, Any] | None) -> bool:
+    """True neu user duoc xem/sua 1 hop dong: nguoi tao hop dong, nguoi quan
+    ly/phu trach deal gan voi hop dong nay (leaded_by/sdr_id), hoac nguoi co
+    full CRM access (admin/leader/sale-team). Cung logic can_edit_quote."""
+    if not user:
+        return False
+    if has_full_crm_access(user):
+        return True
+    uid = str(user.get("id") or "")
+    if not uid:
+        return False
+    if contract and str(contract.get("createdById") or "") == uid:
+        return True
+    if lead and (str(lead.get("leaded_by") or "") == uid or str(lead.get("sdr_id") or "") == uid):
+        return True
+    return False
