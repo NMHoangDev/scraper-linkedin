@@ -92,6 +92,7 @@ type CustomerLeadRow = {
   facebook?: string | null;
   telegram?: string | null;
   pause_reason?: string | null;
+  next_step?: string | null;
   closed_at?: string | null;
   outcome_detail?: Record<string, unknown> | null;
   quote_id?: string | null;
@@ -408,6 +409,7 @@ function rowToDeal(row: CustomerLeadRow, history: StageHistory[] = []): Deal {
       assignedUserId: asText(row.sdr_id),
     },
     note: asText(row.note),
+    nextStep: asText(row.next_step),
     pauseReason: asText(row.pause_reason) || (stage === 'on_hold' ? asText(row.note) : ''),
     closedAt: asText(row.closed_at) || (stage === 'won' || stage === 'lost' ? fallbackDate(row.customer_since, row.updated_at) : ''),
     closedReason: asText(row.closed_reason),
@@ -450,6 +452,7 @@ function toCustomerPayload(input: CreateDealInput | UpdateDealInput): Partial<Cu
   if ('billingType' in input) payload.billing_type = input.billingType;
   if ('followUpDate' in input) payload.follow_up_date = cleanDateValue(input.followUpDate);
   if ('note' in input) payload.note = input.note;
+  if ('nextStep' in input) payload.next_step = input.nextStep;
   if ('pauseReason' in input) payload.pause_reason = input.pauseReason;
   if ('closedAt' in input) payload.closed_at = cleanDateValue(input.closedAt);
   if ('teamId' in input) payload.team_id = input.teamId || null;
@@ -611,6 +614,30 @@ export class SeedingCrmRepository implements CrmRepository {
   async deleteDeal(id: string): Promise<void> {
     await apiFetch<unknown>(`/api/all-platform/customer-leads/${encodeURIComponent(id)}`, {
       method: 'DELETE',
+    });
+  }
+
+  /** true nếu backend đã cấu hình AI thật (OPENAI_API_KEY) — gọi 1 lần lúc mount để quyết
+   * định có hiện khối "AI điền nhanh" hay không, không gọi thử AI thật để check. */
+  async getAiParseDealStatus(): Promise<boolean> {
+    try {
+      const data = await apiFetch<{ configured: boolean }>('/api/all-platform/customer-leads/ai-parse-deal/status');
+      return Boolean(data?.configured);
+    } catch {
+      return false;
+    }
+  }
+
+  /** Dán văn bản khách hàng → AI trích field cho popup "Thêm deal". Trả về đúng camelCase
+   * khớp DealFormState (customerName/companyName/phone/email/servicePackage/
+   * estimatedBudget/nextStep/note) — field không suy ra được là null. */
+  async parseDealText(text: string): Promise<Partial<Record<
+    'customerName' | 'companyName' | 'phone' | 'email' | 'servicePackage' | 'estimatedBudget' | 'nextStep' | 'note',
+    string | number | null
+  >>> {
+    return apiFetch('/api/all-platform/customer-leads/ai-parse-deal', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
     });
   }
 

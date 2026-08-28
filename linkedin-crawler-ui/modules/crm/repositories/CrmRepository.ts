@@ -16,6 +16,11 @@ export interface CrmRepository {
   createDeal(input: CreateDealInput): Promise<Deal>;
   updateDeal(id: string, input: UpdateDealInput): Promise<Deal>;
   deleteDeal(id: string): Promise<void>;
+  getAiParseDealStatus(): Promise<boolean>;
+  parseDealText(text: string): Promise<Partial<Record<
+    'customerName' | 'companyName' | 'phone' | 'email' | 'servicePackage' | 'estimatedBudget' | 'nextStep' | 'note',
+    string | number | null
+  >>>;
   moveDeal(
     id: string,
     stage: DealStage,

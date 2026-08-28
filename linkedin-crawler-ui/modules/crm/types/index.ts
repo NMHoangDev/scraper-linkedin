@@ -151,6 +151,8 @@ export interface Deal {
   /** Loại thanh toán: một lần / theo tháng / theo năm (migration 052). */
   billingType?: BillingType;
   followUpDate?: string;
+  /** Việc cần làm tiếp theo cho deal này — bắt buộc lúc tạo mới trong popup gọn. */
+  nextStep?: string;
   contract: ContractInfo;
   outcome: OutcomeInfo;
   quote?: QuoteReference;

@@ -488,6 +488,266 @@
 .stage-badge-emerald { border-color: #a7f3d0; background: #ecfdf5; color: #047857; }
 .stage-badge-red { border-color: #fecaca; background: #fef2f2; color: #b91c1c; }
 
+/* Chip "đã chọn" — dùng ở picker Giai đoạn của popup "Thêm deal" nhanh (khác .crm-stage-pill
+ * mặc định/--idle dùng cho bộ lọc, ở đây là 1 LỰA CHỌN đơn, không phải filter). Màu nền lấy
+ * từ DEAL_STAGE_META[stage].color qua inline style, chỉ định nghĩa layout/typo ở đây. */
+.crm-stage-pill--selected {
+  cursor: pointer;
+  font-weight: 700;
+}
+.crm-stage-pill--idle {
+  cursor: pointer;
+}
+
+/* Popup "Thêm deal nhanh" — modal rộng hơn .crm-modal mặc định, dùng cho cả tạo mới lẫn
+ * sửa deal. Header/footer đã sticky sẵn nhờ .crm-modal { display:flex; overflow:hidden } +
+ * .crm-modal-body { overflow-y:auto } — chỉ cần đổi kích thước ở đây. */
+.crm-modal--deal-compact {
+  width: min(960px, calc(100vw - 32px));
+  max-height: min(90vh, 780px);
+}
+.crm-modal--deal-compact .crm-modal-body {
+  padding-bottom: 1.75rem;
+}
+
+.crm-form-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+.crm-form-title-row .crm-form-title {
+  margin-bottom: 0;
+}
+
+.crm-optional-hint {
+  font-style: normal;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: #94a3b8;
+  font-size: 0.75rem;
+}
+
+/* Cặp SĐT/Email dùng chung 1 label "Liên hệ *" — 2 ô nằm cạnh nhau bên trong 1 Field full. */
+.crm-inline-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+/* Next step ở chế độ gõ tự do — input + nút quay lại danh sách preset. */
+.crm-inline-with-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.crm-inline-with-link input {
+  flex: 1;
+  min-width: 0;
+}
+.crm-inline-link-btn {
+  flex-shrink: 0;
+  border: 0;
+  background: transparent;
+  color: #2563eb;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* 2 card ngang "Deal Health" / "Người phụ trách" dưới khối Giai đoạn. */
+.crm-deal-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+.crm-deal-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.85rem;
+  background: #f8fafc;
+  padding: 0.85rem 1rem;
+}
+.crm-deal-card-label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  margin-bottom: 0.35rem;
+}
+.crm-deal-card-score {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #1e3a8a;
+}
+.crm-deal-card-desc {
+  margin: 0.3rem 0 0;
+  font-size: 0.76rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+.crm-deal-card-select {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #0f172a;
+  cursor: pointer;
+}
+.crm-deal-card--health-good .crm-deal-card-score { color: #047857; }
+.crm-deal-card--health-fair .crm-deal-card-score { color: #1d4ed8; }
+.crm-deal-card--health-warning .crm-deal-card-score { color: #b45309; }
+.crm-deal-card--health-risk .crm-deal-card-score { color: #b91c1c; }
+
+.crm-ai-fill {
+  margin-bottom: 1.35rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.85rem;
+  background: #ffffff;
+}
+.crm-ai-fill-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+.crm-ai-fill-textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: 3.4rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.6rem;
+  background: #ffffff;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.85rem;
+  resize: vertical;
+}
+.crm-ai-fill-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.6rem;
+  background: #ffffff;
+  color: #1e293b;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.65rem 1rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.crm-ai-fill-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.crm-ai-fill-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+.crm-ai-fill-error {
+  margin: 0.4rem 0 0;
+  font-size: 0.78rem;
+}
+
+.crm-advanced {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed #e2e8f0;
+}
+.crm-advanced-toggle {
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  color: #2563eb;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.2rem 0;
+  cursor: pointer;
+}
+.crm-advanced-toggle:hover {
+  text-decoration: underline;
+}
+.crm-advanced-body {
+  margin-top: 0.9rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed #e2e8f0;
+}
+
+.crm-deal-continue-toast {
+  margin: 0 0 0.9rem;
+  padding: 0.55rem 0.8rem;
+  border-radius: 0.6rem;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.crm-modal-footer--deal {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+.crm-deal-footer-hint {
+  margin: 0;
+  font-size: 0.72rem;
+  font-style: italic;
+  color: #94a3b8;
+}
+.crm-deal-footer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+/* Modal "Thêm deal" rộng hơn (736-960px) nên vẫn đủ chỗ cho 2 cột ở tablet — ghi đè rule
+ * dùng chung .crm-form-grid { grid-template-columns:1fr } ở @media(max-width:900px) phía
+ * dưới (rule đó nhắm modal cũ hẹp hơn, KHÔNG áp cho modal này). Selector 2 lớp để thắng
+ * đúng độ đặc hiệu, không phụ thuộc thứ tự khai báo trong file. */
+@media (min-width: 641px) {
+  .crm-modal--deal-compact .crm-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .crm-modal--deal-compact {
+    width: 100vw;
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+  }
+  .crm-modal--deal-compact .crm-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .crm-deal-cards {
+    grid-template-columns: 1fr;
+  }
+  .crm-inline-pair {
+    grid-template-columns: 1fr;
+  }
+  .crm-ai-fill-row {
+    flex-direction: column;
+  }
+  .crm-ai-fill-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 .crm-content-section {
   margin-top: 1.35rem;
 }
