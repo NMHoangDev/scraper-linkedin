@@ -1,44 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { dealFormFromDeal, emptyDealForm } from '../../components/DealFormFields';
+import { useEffect, useMemo, useState } from 'react';
+import { emptyDealForm } from '../../components/DealFormFields';
 import type { DealFormState } from '../../components/DealFormFields';
-import type { CrmUserOption, Deal } from '../../types';
+import { seedingCrmRepository } from '../../repositories/SeedingCrmRepository';
+import type { CrmCustomerSummary, CrmUserOption, Deal } from '../../types';
 import type { Quote } from '@/modules/quotes';
-
-function normalize(value: string) {
-  return value.trim().toLowerCase();
-}
-
-/** Khoá gộp khách hàng dùng chung cho search step 1 lẫn thống kê lịch sử báo
- * giá — ưu tiên contactId (định danh CRM thật) > email > SĐT > cuối cùng mới
- * ghép tên + công ty (dễ trùng nếu 2 khách khác nhau cùng tên, chỉ dùng khi
- * không còn dữ liệu định danh nào khác). */
-export function customerDedupeKey(deal: Deal): string {
-  if (deal.contactId) return `contact:${deal.contactId}`;
-  const email = normalize(deal.email || '');
-  if (email) return `email:${email}`;
-  const phone = normalize(deal.phone || '');
-  if (phone) return `phone:${phone}`;
-  return `name:${normalize(deal.customerName)}|${normalize(deal.companyName || '')}`;
-}
-
-/** 1 khách có thể đứng tên nhiều deal (mỗi lần tạo báo giá độc lập lại ra 1 deal
- * mới) — không có bảng khách hàng riêng nên phải tự gộp lại theo customerDedupeKey,
- * không thì search ra cùng 1 khách lặp lại N lần (N = số deal của khách đó). */
-function dedupeByCustomer(matches: Deal[]): Array<Deal & { dealCount: number }> {
-  const byKey = new Map<string, Deal & { dealCount: number }>();
-  for (const deal of matches) {
-    const key = customerDedupeKey(deal);
-    const existing = byKey.get(key);
-    if (!existing) {
-      byKey.set(key, { ...deal, dealCount: 1 });
-    } else {
-      existing.dealCount += 1;
-    }
-  }
-  return [...byKey.values()];
-}
 
 export function SelectCustomerStep({
   deals,
@@ -61,30 +28,53 @@ export function SelectCustomerStep({
   agents?: CrmUserOption[];
 }) {
   const [search, setSearch] = useState('');
-  const [pickedDeal, setPickedDeal] = useState<Deal | null>(null);
-  const pickedExisting = Boolean(pickedDeal);
-  const referenceDeal = lockedDeal || pickedDeal;
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<CrmCustomerSummary[]>([]);
+  const [pickedCustomer, setPickedCustomer] = useState<CrmCustomerSummary | null>(null);
+  const pickedExisting = Boolean(pickedCustomer) || Boolean(lockedDeal);
+  // customerId thuc cua khach dang chon - dung de tra thong ke lich su bao gia
+  // (thay cho customerDedupeKey cu, vi contactId luon = deal.id nen khong bao
+  // gio gop dung duoc nhieu deal cua cung 1 khach - da xac nhan la dead code).
+  const referenceCustomerId = lockedDeal?.customerId || pickedCustomer?.id || '';
   // Khach da co san tu CRM thi chi can hien tom tat - bam "Sua thong tin" moi mo
   // du 6 o nhap. Khach moi (chua co trong CRM) van hien du luon vi kieu gi cung
   // phai go tay.
   const [editingFields, setEditingFields] = useState(false);
 
-  const searchResults = useMemo(() => {
-    const q = normalize(search);
-    if (!q) return [];
-    const matches = deals.filter(deal =>
-      [deal.customerName, deal.companyName, deal.phone, deal.email].some(value => normalize(String(value || '')).includes(q))
-    );
-    return dedupeByCustomer(matches).slice(0, 8);
-  }, [deals, search]);
+  const searchQueryReady = searchOpen && search.trim().length >= 2;
 
-  // Thống kê lịch sử báo giá của khách này — gộp TẤT CẢ deal cùng khoá với
-  // referenceDeal (1 khách có thể đứng tên nhiều deal), không chỉ riêng deal
-  // đang chọn.
+  useEffect(() => {
+    const keyword = search.trim();
+    if (!searchQueryReady) {
+      return;
+    }
+    let alive = true;
+    const timer = window.setTimeout(() => {
+      if (!alive) return;
+      setSearchLoading(true);
+      void seedingCrmRepository.quickSearchCustomers(keyword, 8)
+        .then(result => {
+          if (alive) setSearchResults(result);
+        })
+        .catch(() => {
+          if (alive) setSearchResults([]);
+        })
+        .finally(() => {
+          if (alive) setSearchLoading(false);
+        });
+    }, 300);
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+    };
+  }, [search, searchOpen, searchQueryReady]);
+
+  // Thống kê lịch sử báo giá của khách này — gộp TẤT CẢ deal có cùng customerId
+  // thật (1 khách có thể đứng tên nhiều deal), không chỉ riêng deal đang chọn.
   const customerStats = useMemo(() => {
-    if (!referenceDeal || !quotes) return null;
-    const key = customerDedupeKey(referenceDeal);
-    const sameCustomerDealIds = new Set(deals.filter(deal => customerDedupeKey(deal) === key).map(deal => deal.id));
+    if (!referenceCustomerId || !quotes) return null;
+    const sameCustomerDealIds = new Set(deals.filter(deal => deal.customerId === referenceCustomerId).map(deal => deal.id));
     const relatedQuotes = quotes.filter(quote => quote.dealId && sameCustomerDealIds.has(quote.dealId));
     const won = relatedQuotes.filter(quote => {
       const deal = deals.find(item => item.id === quote.dealId);
@@ -97,22 +87,32 @@ export function SelectCustomerStep({
       wonCount: won.length,
       conversionRate: relatedQuotes.length ? Math.round((won.length / relatedQuotes.length) * 1000) / 10 : 0,
     };
-  }, [referenceDeal, quotes, deals]);
+  }, [referenceCustomerId, quotes, deals]);
 
-  function pickExistingCustomer(deal: Deal) {
-    // Chỉ lấy lại THÔNG TIN khách (tên/SĐT/email/công ty...) để đỡ gõ tay lại
-    // — KHÔNG gắn báo giá mới vào deal cũ đó. Deal cũ có thể đã ở giai đoạn
-    // khác, đã có báo giá riêng, gắn đại vào sẽ ghi đè/gây nhầm lẫn dữ liệu
-    // deal cũ. Báo giá mới luôn ra 1 deal mới riêng (tự tạo ở bước submit).
-    onChangeCustomer(dealFormFromDeal(deal));
-    setPickedDeal(deal);
+  function pickExistingCustomer(found: CrmCustomerSummary) {
+    // Chi lay lai THONG TIN khach (ten/SDT/email/cong ty...) de do go tay lai -
+    // KHONG gan bao gia moi vao deal cu nao. Bao gia moi luon ra 1 deal moi
+    // rieng (tu tao o buoc submit), gan customerId that de deal moi lien ket
+    // dung ve 1 ho so khach hang duy nhat (thay vi chi copy snapshot roi mat
+    // lien ket nhu truoc).
+    onChangeCustomer({
+      ...emptyDealForm(),
+      customerId: found.id,
+      customerName: found.customerName || '',
+      companyName: found.companyName || '',
+      phone: found.phone || '',
+      email: found.email || '',
+      sourcePlatform: found.source || 'Manual',
+    });
+    setPickedCustomer(found);
     setSearch('');
+    setSearchOpen(false);
     setEditingFields(false);
   }
 
   function startNewCustomer() {
     onChangeCustomer(emptyDealForm());
-    setPickedDeal(null);
+    setPickedCustomer(null);
     setSearch('');
     setEditingFields(false);
   }
@@ -144,22 +144,27 @@ export function SelectCustomerStep({
                 className="crm-input"
                 placeholder="Tìm theo tên, SĐT, email, công ty..."
                 value={search}
-                onChange={event => setSearch(event.target.value)}
+                onChange={event => {
+                  setSearch(event.target.value);
+                  setSearchOpen(true);
+                }}
+                onFocus={() => setSearchOpen(true)}
                 autoComplete="off"
               />
-              {search.trim() ? (
+              {searchQueryReady ? (
                 <div className="crm-quote-customer-results">
-                  {searchResults.length === 0 ? (
+                  {searchLoading ? <div className="crm-quote-customer-empty">Đang tìm...</div> : null}
+                  {!searchLoading && searchResults.length === 0 ? (
                     <div className="crm-quote-customer-empty">Không tìm thấy khách hàng nào khớp.</div>
                   ) : (
-                    searchResults.map(deal => (
-                      <button type="button" key={deal.id} className="crm-quote-customer-option" onClick={() => pickExistingCustomer(deal)}>
+                    searchResults.map(found => (
+                      <button type="button" key={found.id} className="crm-quote-customer-option" onClick={() => pickExistingCustomer(found)}>
                         <span className="crm-quote-customer-tag">Đã có</span>
                         <span>
-                          <b>{deal.customerName}</b>
-                          {deal.companyName ? ` · ${deal.companyName}` : ''}
-                          {deal.phone ? ` · ${deal.phone}` : ''}
-                          {deal.dealCount > 1 ? ` · ${deal.dealCount} deal` : ''}
+                          <b>{found.customerName}</b>
+                          {found.companyName ? ` · ${found.companyName}` : ''}
+                          {found.phone ? ` · ${found.phone}` : ''}
+                          {found.dealCount ? ` · ${found.dealCount} deal` : ''}
                         </span>
                       </button>
                     ))
@@ -191,7 +196,7 @@ export function SelectCustomerStep({
         </>
       )}
 
-      {referenceDeal ? (
+      {referenceCustomerId ? (
         <div className="crm-quote-crm-linked">
           <span className="crm-quote-crm-linked-badge">✓ Đã liên kết CRM</span>
           {customerStats ? (
@@ -241,8 +246,8 @@ export function SelectCustomerStep({
         </label>
         <label className="crm-field">
           <span>Sale phụ trách</span>
-          {referenceDeal ? (
-            <input value={referenceDeal.assignment.sdrName || referenceDeal.assignment.leadName || 'Chưa gán'} disabled readOnly />
+          {lockedDeal ? (
+            <input value={lockedDeal.assignment.sdrName || lockedDeal.assignment.leadName || 'Chưa gán'} disabled readOnly />
           ) : (
             <select value={customer.sdrId} onChange={event => onChangeCustomer({ ...customer, sdrId: event.target.value })}>
               <option value="">-- Chưa chọn --</option>

@@ -35,6 +35,7 @@ from app.modules.all_platform.routers.websocket import router as websocket_route
 from app.modules.all_platform.routers.fb_inbox_accounts import router as fb_inbox_accounts_router
 from app.modules.all_platform.routers.crawl_fb_dashboard import router as crawl_fb_dashboard_router
 from app.modules.all_platform.routers.customer_lead import router as customer_lead_router
+from app.modules.all_platform.routers.crm_customer import router as crm_customer_router
 from app.modules.all_platform.routers.quote import quote_forms_router, quotes_router
 from app.modules.all_platform.routers.contract import contracts_router
 from app.modules.all_platform.routers.contract_template import contract_templates_router
@@ -277,6 +278,11 @@ all_platform_router.include_router(
 all_platform_router.include_router(
     customer_lead_router,
     tags=["Customer Leads"]
+)
+all_platform_router.include_router(
+    crm_customer_router,
+    prefix="/crm/customers",
+    tags=["All-Platform CRM Customers"],
 )
 
 # ── Quote Forms + Quotes ───────────────────────────────────────────────────────

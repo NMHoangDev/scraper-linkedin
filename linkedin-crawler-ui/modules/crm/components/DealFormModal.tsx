@@ -3,6 +3,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useState } from 'react';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import {
   DealFormFields,
   buildDealPayload,
@@ -49,6 +50,7 @@ export function DealFormModal({
   packageOptions,
   industryOptions,
   currentUser = null,
+  initialCustomer = null,
 }: {
   open: boolean;
   loading?: boolean;
@@ -65,11 +67,16 @@ export function DealFormModal({
   packageOptions?: Array<{ value: string; label: string }>;
   industryOptions?: Array<{ value: string; label: string }>;
   currentUser?: AppUser | null;
+  /** Prefill khi mở "Thêm deal nhanh" từ trang Hồ sơ khách hàng (nút "+ Deal"/"+ Tạo deal
+   * mới") — CHỈ áp dụng lúc tạo mới (bỏ qua khi đang sửa deal có sẵn). Không tạo 1 form
+   * tạo-deal riêng, chỉ prefill vào đúng form nhanh hiện có. */
+  initialCustomer?: { id: string; name: string; companyName?: string; phone?: string; email?: string } | null;
 }) {
   const isCreate = !deal;
   const [form, setForm] = useState<DealFormState>(emptyDealForm);
   const [savingContinue, setSavingContinue] = useState(false);
   const [continueMessage, setContinueMessage] = useState('');
+  useBodyScrollLock(open);
 
   useEffect(() => {
     if (!open) return;
@@ -78,10 +85,23 @@ export function DealFormModal({
       setForm(dealFormFromDeal(deal));
       return;
     }
+    if (initialCustomer) {
+      setForm({
+        ...emptyDealForm(),
+        customerId: initialCustomer.id,
+        customerProfileCanEdit: false,
+        customerName: initialCustomer.name || '',
+        companyName: initialCustomer.companyName || '',
+        phone: initialCustomer.phone || '',
+        email: initialCustomer.email || '',
+      });
+      return;
+    }
     // Merge với default để draft cũ (lưu từ trước khi có field mới như nextStep) không
     // thiếu key — tránh input bị undefined.
     setForm({ ...emptyDealForm(), ...(loadDealDraft() || {}) });
-  }, [deal, open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deal, open, initialCustomer?.id]);
 
   // Chỉ lưu nháp khi đang TẠO MỚI (không phải sửa deal có sẵn) — tránh
   // nháp cũ ghi đè lên dữ liệu deal thật khi mở form sửa.

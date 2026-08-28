@@ -11,6 +11,7 @@ import type {
   ContractStatus,
   CreateDealInput,
   CrmAnalytics,
+  CrmCustomerSummary,
   CrmUserOption,
   Deal,
   DealFilters,
@@ -37,6 +38,7 @@ type ValidationErrorPayload = {
 
 type CustomerLeadRow = {
   id: string;
+  customer_id?: string | null;
   customer_name?: string | null;
   company_name?: string | null;
   phone?: string | null;
@@ -109,6 +111,29 @@ type CustomerLeadList = {
   page_size?: number;
 };
 
+type CrmCustomerRow = {
+  id: string;
+  customer_name?: string | null;
+  company_name?: string | null;
+  position?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  source?: string | null;
+  status?: CrmCustomerSummary['status'] | null;
+  owner_id?: string | null;
+  can_edit?: boolean | null;
+  deal_count?: number | null;
+  total_value?: number | string | null;
+  last_deal_at?: string | null;
+};
+
+type CreateCustomerWithDealResponse = {
+  customer?: CrmCustomerRow;
+  deal?: CustomerLeadRow;
+  partial?: boolean;
+  partial_message?: string;
+};
+
 type ActivityLogRow = {
   id: string;
   action: string;
@@ -149,7 +174,7 @@ function getDefaultHeaders(): Record<string, string> {
   return headers;
 }
 
-async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+async function apiRequest<T>(path: string, options?: RequestInit): Promise<ApiResponse<T>> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     credentials: 'include',
     headers: getDefaultHeaders(),
@@ -168,6 +193,11 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   if (body.success === false) {
     throw new Error(body.message || 'Khong thuc hien duoc yeu cau CRM.');
   }
+  return body;
+}
+
+async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const body = await apiRequest<T>(path, options);
   return body.data as T;
 }
 
@@ -349,6 +379,7 @@ function rowToDeal(row: CustomerLeadRow, history: StageHistory[] = []): Deal {
     id: row.id,
     contactId: row.id,
     dealId: row.id,
+    customerId: asText(row.customer_id),
     position: asText(row.position),
     customerName: asText(row.customer_name) || 'Khách hàng chưa tên',
     companyName: asText(row.company_name),
@@ -419,6 +450,36 @@ function rowToDeal(row: CustomerLeadRow, history: StageHistory[] = []): Deal {
     teamType: asText(row.team_type),
     createdAt,
     updatedAt,
+  };
+}
+
+function rowToCustomer(row: CrmCustomerRow): CrmCustomerSummary {
+  return {
+    id: row.id,
+    customerName: asText(row.customer_name),
+    companyName: asText(row.company_name),
+    position: asText(row.position),
+    phone: asText(row.phone),
+    email: asText(row.email),
+    source: asText(row.source),
+    status: row.status || undefined,
+    ownerId: asText(row.owner_id),
+    canEdit: Boolean(row.can_edit),
+    dealCount: Number(row.deal_count || 0),
+    totalValue: asNumber(row.total_value),
+    lastDealAt: asText(row.last_deal_at),
+  };
+}
+
+function toCrmCustomerPayload(input: CreateDealInput): Partial<CrmCustomerRow> {
+  return {
+    customer_name: input.customerName,
+    company_name: input.companyName,
+    position: input.position,
+    phone: input.phone,
+    email: input.email,
+    source: input.sourcePlatform || 'Manual',
+    owner_id: input.assignment?.sdrId || input.assignment?.leadedById || undefined,
   };
 }
 
@@ -594,12 +655,24 @@ export class SeedingCrmRepository implements CrmRepository {
   }
 
   async createDeal(input: CreateDealInput): Promise<Deal> {
-    const payload = toCustomerPayload(input);
-    const row = await apiFetch<CustomerLeadRow>('/api/all-platform/customer-leads', {
+    const dealPayload = toCustomerPayload(input);
+    const body = await apiRequest<CreateCustomerWithDealResponse>('/api/all-platform/crm/customers/with-deal', {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        customer_id: input.customerId || undefined,
+        update_customer_profile: Boolean(input.updateCustomerProfile),
+        idempotency_key: input.idempotencyKey || (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : undefined),
+        customer: toCrmCustomerPayload(input),
+        deal: dealPayload,
+      }),
     });
-    return rowToDeal(row);
+    const row = body.data?.deal;
+    if (!row) throw new Error('Backend khong tra ve deal vua tao.');
+    return {
+      ...rowToDeal(row),
+      customerId: asText(body.data?.customer?.id) || asText(row.customer_id),
+      customerProfileMessage: body.data?.partial_message || body.message,
+    };
   }
 
   async updateDeal(id: string, input: UpdateDealInput): Promise<Deal> {
@@ -747,6 +820,12 @@ export class SeedingCrmRepository implements CrmRepository {
       name: row.name || row.id,
       role: row.role,
     }));
+  }
+
+  async quickSearchCustomers(query: string, limit = 8): Promise<CrmCustomerSummary[]> {
+    const qs = new URLSearchParams({ q: query, limit: String(limit) });
+    const rows = await apiFetch<CrmCustomerRow[]>(`/api/all-platform/crm/customers/quick-search?${qs.toString()}`);
+    return (rows || []).map(rowToCustomer);
   }
 }
 

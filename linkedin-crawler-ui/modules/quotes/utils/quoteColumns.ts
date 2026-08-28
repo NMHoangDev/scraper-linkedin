@@ -20,14 +20,39 @@ const CATALOG_PRICING_COLUMNS: QuoteField[] = [
   { key: 'unitPriceVnd', label: 'Unit price VND', type: 'text' },
 ];
 
-/** Cột bảng hạng mục thật của MẪU này (đọc từ schema.quoteItems.config.columns,
- * không phải danh sách cố định) — dùng chung cho cả QuoteDocumentRenderer (khi
- * render) và ReviewQuoteStep (khi dựng checkbox "Cột hiển thị"), để 2 nơi luôn
- * khớp nhau. quoteItems truyền vào chỉ để biết có dùng Danh mục dịch vụ hay
- * không (chèn thêm 3 cột giá USD/VND tham khảo), không đổi cột theo TỪNG dòng. */
+/** Tìm field bảng hạng mục THẬT của mẫu báo giá — không còn hardcode key
+ * 'quoteItems'. Ưu tiên field key đúng 'quoteItems' nếu có (giữ nguyên hành vi
+ * cũ tuyệt đối cho SecurityZone/Cloudgate/standard), nếu không có thì lấy field
+ * repeater-table ĐẦU TIÊN tìm thấy trong schema (vd 'solutionItems' của mẫu
+ * villa_solution_package). Tất cả mẫu hiện có (đã kiểm tra seed_quote_forms.py)
+ * chỉ khai báo TỐI ĐA 1 field repeater-table mỗi schema, nên "đầu tiên tìm
+ * thấy" không có rủi ro nhập nhằng thực tế — nếu sau này có mẫu khai 2 bảng
+ * repeater-table, field xuất hiện trước trong danh sách section sẽ thắng. */
+function findItemTableField(schema: QuoteSchema): QuoteField | undefined {
+  const allFields = schema.sections.flatMap(section => section.fields);
+  return allFields.find(field => field.key === 'quoteItems') || allFields.find(field => field.type === 'repeater-table');
+}
+
+/** Cột bảng hạng mục thật của MẪU này (đọc từ schema, không phải danh sách cố
+ * định) — dùng chung cho cả QuoteDocumentRenderer (khi render) và
+ * ReviewQuoteStep (khi dựng checkbox "Cột hiển thị"), để 2 nơi luôn khớp nhau.
+ * quoteItems truyền vào chỉ để biết có dùng Danh mục dịch vụ hay không (chèn
+ * thêm 3 cột giá USD/VND tham khảo), không đổi cột theo TỪNG dòng. */
 export function resolveQuoteItemColumns(schema: QuoteSchema, quoteItems: QuoteItem[] = []): QuoteField[] {
-  const quoteItemsField = schema.sections.flatMap(section => section.fields).find(field => field.key === 'quoteItems');
-  const baseColumns = quoteItemsField?.config?.columns?.filter(column => column.visible !== false) || [];
+  const itemField = findItemTableField(schema);
+  const isQuoteItemsField = !itemField || itemField.key === 'quoteItems';
+
+  if (!isQuoteItemsField) {
+    // Bảng hạng mục KHÔNG phải quoteItems (vd solutionItems của villa) - cấu
+    // trúc cột hoàn toàn khác (không có unitPrice/unit/vatRate/description...),
+    // nên KHÔNG áp các phép bổ sung riêng của quoteItems bên dưới (catalog
+    // pricing/description/discountPercent auto-insert) - trả đúng cột đã khai
+    // báo trong schema, filter chỉ ẩn cột visible:false rõ ràng.
+    const declaredColumns = itemField.config?.columns?.filter(column => column.visible !== false) || [];
+    return declaredColumns.length ? declaredColumns : [...FALLBACK_COLUMNS];
+  }
+
+  const baseColumns = itemField?.config?.columns?.filter(column => column.visible !== false) || [];
   const hasCatalogPricing = flattenQuoteItems(quoteItems).some(item => item.catalogItemId);
   const unitPriceIndex = baseColumns.findIndex(column => column.key === 'unitPrice');
   const withCatalogColumns = hasCatalogPricing
@@ -53,15 +78,51 @@ export function resolveQuoteItemColumns(schema: QuoteSchema, quoteItems: QuoteIt
   return columns;
 }
 
-/** Cột nào không bao giờ được ẩn khỏi khách (cấu trúc bảng/tên hạng mục/giảm
- * giá — giữ nguyên hành vi cũ: giảm giá luôn hiện, không cho toggle để tránh
- * vỡ tương thích ngược với báo giá cũ đã lưu visibleColumns trước khi có field
- * này). Còn lại — MỌI cột thật sự khai báo trong schema của mẫu — đều toggle
- * được, tự động đổi theo từng mẫu, không phải danh sách cố định. */
-const NEVER_TOGGLE_KEYS = new Set(['order', 'serviceDescription', 'discountPercent']);
+/** Cột "khoá" (STT + tên hạng mục chính) không bao giờ được ẩn khỏi khách —
+ * quy tắc nghiệp vụ đã chốt: CHỈ khoá STT + 1 cột tên hạng mục, KHÔNG suy theo
+ * cờ required:true trong schema (vd solutionItems có customerBenefit/
+ * includedFeatures/offerPrice đều required:true ở nghĩa "bắt buộc điền form"
+ * nhưng vẫn phải toggle được bình thường khi gửi khách — required:true chỉ
+ * kiểm soát validate lúc điền form, không liên quan hiển thị/ẩn cột lúc gửi).
+ * Khoá theo field key của BẢNG hạng mục (xem findItemTableField), không phải
+ * danh sách cố định toàn cục — mẫu mới thêm bảng khác cần khai thêm 1 dòng ở
+ * đây (mặc định fallback chỉ khoá 'order' nếu không khai). */
+const LOCKED_COLUMN_KEYS_BY_ITEM_FIELD_KEY: Record<string, string[]> = {
+  quoteItems: ['order', 'serviceDescription'],
+  solutionItems: ['order', 'solutionName'],
+};
+
+/** Cột ẩn hẳn khỏi khối "Cột hiển thị" (không phải khoá bắt buộc, cũng không
+ * phải tuỳ chọn — đơn giản không hiện trong picker) - giữ nguyên hành vi cũ:
+ * discountPercent của bảng quoteItems luôn hiện trong bảng, không cho
+ * toggle/không hiện checkbox, tránh vỡ tương thích ngược với báo giá cũ đã lưu
+ * visibleColumns trước khi có field này. */
+const HIDDEN_FROM_PICKER_KEYS_BY_ITEM_FIELD_KEY: Record<string, string[]> = {
+  quoteItems: ['discountPercent'],
+};
+
+/** Key của field bảng hạng mục thật của mẫu này ('quoteItems'/'solutionItems'/
+ * ... ) - dùng để tra LOCKED_COLUMN_KEYS_BY_ITEM_FIELD_KEY ở cả quoteColumns.ts
+ * và ReviewQuoteStep.tsx (khối "Cột hiển thị"), tránh trùng lặp logic. */
+export function getItemTableFieldKey(schema: QuoteSchema): string {
+  return findItemTableField(schema)?.key || 'quoteItems';
+}
+
+/** Cột khoá (STT + tên hạng mục) của mẫu này - dùng để hiện dòng 🔒 "Bắt buộc"
+ * trong khối "Cột hiển thị" (ReviewQuoteStep.tsx). */
+export function getLockedColumnKeys(schema: QuoteSchema): string[] {
+  return LOCKED_COLUMN_KEYS_BY_ITEM_FIELD_KEY[getItemTableFieldKey(schema)] || ['order'];
+}
 
 export function resolveToggleableColumns(schema: QuoteSchema, quoteItems: QuoteItem[] = []): QuoteField[] {
+  const itemFieldKey = getItemTableFieldKey(schema);
+  const lockedKeys = new Set(LOCKED_COLUMN_KEYS_BY_ITEM_FIELD_KEY[itemFieldKey] || ['order']);
+  const hiddenKeys = new Set(HIDDEN_FROM_PICKER_KEYS_BY_ITEM_FIELD_KEY[itemFieldKey] || []);
   return resolveQuoteItemColumns(schema, quoteItems).filter(
-    column => !NEVER_TOGGLE_KEYS.has(column.key) && column.type !== 'auto-number' && column.type !== 'calculated'
+    column =>
+      !lockedKeys.has(column.key) &&
+      !hiddenKeys.has(column.key) &&
+      column.type !== 'auto-number' &&
+      column.type !== 'calculated'
   );
 }

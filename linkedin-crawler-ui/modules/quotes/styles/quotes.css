@@ -87,6 +87,8 @@
   font-weight: 700;
   text-decoration: none;
   padding: 0 0.9rem;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .quote-input {
@@ -175,9 +177,18 @@
   color: #b91c1c;
 }
 
+/* Danh sach mau bao gia: 1 cot o laptop/tablet (card can du rong de 2 nut +
+ * ActionMenu khong bi bop), 2 cot chi tu man rat rong (>=1440px). */
 .quote-grid {
   display: grid;
-  gap: 0.85rem;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+@media (min-width: 1440px) {
+  .quote-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .quote-card,
@@ -203,17 +214,72 @@
   background: transparent;
 }
 
+/* Card mau bao gia - xep doc 3 vung (tieu de / badge / footer), KHONG dung
+ * grid 2 cot hay position:absolute cho cum thao tac nua. Ly do doi han: grid
+ * 2 cot (info | actions, align-items:center hoac start) van de cum nut de
+ * len tieu de/mo ta trong nhieu truong hop thuc te (ten mau dai, mo ta 2
+ * dong, man laptop hep) - dung 1 cot doc thi cum thao tac luon nam o FOOTER,
+ * duoi cung, trong normal flow, khong bao gio chong len vung tren. */
 .quote-card {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 1rem;
-  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.9rem 1rem;
+  height: 100%;
 }
 
-.quote-card__title-row {
+.quote-card__title {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1rem;
+  font-weight: 700;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.quote-card__badges {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.4rem;
+}
+
+.quote-card__desc {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.quote-card__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding-top: 0.6rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.quote-card__updated {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+/* Man hep - cum thao tac tu wrap xuong duoi ngay cap nhat neu khong du cho,
+ * van trong normal flow (khong bao gio de len noi dung khac). */
+@media (max-width: 480px) {
+  .quote-card__footer {
+    align-items: flex-start;
+  }
 }
 
 .quote-card h2,
@@ -254,6 +320,9 @@
   display: inline-flex;
   align-items: center;
   min-height: 1.45rem;
+  /* Bo max-width+ellipsis - badge phai luon hien nguyen chu, khong bao gio bi
+   * cat (yeu cau tuong minh). Container .quote-card__badges da co
+   * flex-wrap:wrap nen badge dai tu xuong hang, khong can cat chu de vua. */
   border: 1px solid #cbd5e1;
   border-radius: 999px;
   background: #f8fafc;
@@ -261,6 +330,8 @@
   font-size: 0.75rem;
   font-weight: 700;
   padding: 0 0.55rem;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .quote-badge--active,
@@ -310,6 +381,8 @@
 
 .quote-history-link-cell {
   display: flex;
+  align-items: center;
+  justify-content: flex-end;
   gap: 6px;
 }
 
@@ -324,6 +397,112 @@
   padding: 0.85rem;
   text-align: left;
   white-space: nowrap;
+}
+
+/* Bang Lich su bao gia — table-layout:fixed voi cot % co dinh de KHONG BAO GIO
+ * bi tran ngang (khong con overflow-x tren .quote-table-wrap boc no nua),
+ * du "Don vi phat hanh" (ten phap ly cong ty) dai bao nhieu. Moi cot ellipsis
+ * 1 dong thay vi day bang rong ra - xem quy tac chung trong crm.css. */
+.quote-history-table {
+  table-layout: fixed;
+}
+
+.quote-history-table th,
+.quote-history-table td {
+  padding: 0.65rem 0.85rem;
+  white-space: normal;
+  vertical-align: middle;
+}
+
+.quote-history-table .qh-col-number { width: 13%; }
+.quote-history-table .qh-col-customer { width: 18%; }
+.quote-history-table .qh-col-issuer { width: 21%; }
+.quote-history-table .qh-col-amount { width: 12%; text-align: right; }
+.quote-history-table .qh-col-date { width: 11%; }
+.quote-history-table .qh-col-status { width: 10%; text-align: center; }
+.quote-history-table .qh-col-actions { width: 15%; text-align: right; }
+
+.quote-history-table td.qh-col-number,
+.quote-history-table td.qh-col-customer,
+.quote-history-table td.qh-col-issuer,
+.quote-history-table td.qh-col-date {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quote-history-table td.qh-col-status {
+  text-align: center;
+}
+
+/* Man hinh hep (mobile/tablet nho): table nhieu cot khong con vua - doi sang
+ * dang the/card xep doc thay vi ep bang desktop vao khung nho (chu bi chong
+ * chit, cot Thao tac bi cat nhu phat hien tu QA thuc te). */
+/* 900px (khong phai 700px) - 7 cot bang khong the vua o dung do rong tablet
+ * 768px (xac nhan qua QA thuc te: header/badge chong chit khi ep dang bang) -
+ * chuyen sang dang the/card ca o breakpoint tablet, khong chi mobile hep. */
+@media (max-width: 900px) {
+  .quote-history-table thead {
+    display: none;
+  }
+
+  .quote-history-table,
+  .quote-history-table tbody,
+  .quote-history-table tr {
+    display: block;
+    width: 100%;
+  }
+
+  .quote-history-table tr {
+    border: 1px solid #e2e8f0;
+    border-radius: 0.65rem;
+    padding: 0.6rem 0.75rem;
+    margin-bottom: 0.6rem;
+  }
+
+  /* Ghi de specificity cao hon cac selector .qh-col-xxx desktop (von co
+   * overflow:hidden/ellipsis/nowrap) - neu khong nhan/gia tri se bi cat chu
+   * ("SỐ BÁ" thay vi "SỐ BÁO GIÁ") du da o trong media query nay. */
+  .quote-history-table td.qh-col-number,
+  .quote-history-table td.qh-col-customer,
+  .quote-history-table td.qh-col-issuer,
+  .quote-history-table td.qh-col-amount,
+  .quote-history-table td.qh-col-date,
+  .quote-history-table td.qh-col-status,
+  .quote-history-table td.qh-col-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    width: 100%;
+    overflow: visible;
+    border-bottom: 0 !important;
+    padding: 0.3rem 0 !important;
+    text-align: right;
+    white-space: normal;
+    text-overflow: clip;
+  }
+
+  .quote-history-table td[data-label]::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    max-width: 40%;
+    color: #94a3b8;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    text-align: left;
+    white-space: normal;
+  }
+
+  .quote-history-table td[data-label=""]::before {
+    content: none;
+  }
+
+  .quote-history-table .qh-col-actions {
+    justify-content: flex-end;
+  }
 }
 
 .quote-table th {
@@ -1763,14 +1942,18 @@
   overflow-wrap: anywhere;
 }
 
-/* Header chỉ ngắt dòng ở khoảng trắng (overflow-wrap mặc định), KHÔNG ngắt
- * giữa từ - "anywhere" ở cột hẹp làm chữ vỡ kiểu "THÀN/H" rất khó đọc. */
+/* Header duoc phep xuong dong khi cot hep (nhieu cot dang hien cung luc) -
+ * truoc day "nowrap" ep header luon 1 dong, buoc bang phai phinh rong hon can
+ * thiet, la 1 phan nguyen nhan gay tran ngang khong dang co. Van chi ngat o
+ * khoang trang (overflow-wrap mac dinh), KHONG ngat giua tu ("anywhere" o cot
+ * hep lam chu vo kieu "THAN/H" kho doc). */
 .sheet-items-table th {
   border-bottom: 1px solid #e5e7eb;
   padding: 0.72rem;
   text-align: left;
   vertical-align: top;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: normal;
 }
 
 .sheet-items-table th,
@@ -1788,11 +1971,15 @@
   font-size: 0.82rem;
 }
 
+/* Nhuong them chut khong gian cho 2 cot dau (thuong la Ten/Mo ta, can nhieu
+ * chu hon cot so/tien) - giam tu 180px (co dinh, gay tran ngang khi hien
+ * nhieu cot cung luc) xuong muc vua du de doc, van cho header xuong dong bu
+ * lai phan con thieu thay vi ep ca bang phinh rong. */
 .sheet-items-table th:nth-child(2),
 .sheet-items-table td:nth-child(2),
 .sheet-items-table th:nth-child(3),
 .sheet-items-table td:nth-child(3) {
-  min-width: 180px;
+  min-width: 110px;
 }
 
 .quote-item-row--parent td {
@@ -2122,6 +2309,13 @@
     min-width: 0 !important;
     width: auto !important;
     overflow-wrap: anywhere !important;
+  }
+
+  /* Giu nguyen hanh vi in/PDF cu (header khong xuong dong, chi vo tu khi qua
+   * dai nho overflow-wrap ben tren) - khong de thay doi "cho phep header xuong
+   * dong" tren man hinh (xem base .sheet-items-table th) lam anh huong ban in. */
+  .sheet-items-table th {
+    white-space: nowrap !important;
   }
 
   .sheet-items-table th:nth-child(2),

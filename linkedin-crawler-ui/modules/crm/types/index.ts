@@ -124,6 +124,7 @@ export interface Deal {
   id: string;
   contactId: string;
   dealId: string;
+  customerId?: string;
   customerName: string;
   position?: string;
   companyName?: string;
@@ -168,6 +169,102 @@ export interface Deal {
   teamId?: string;
   teamName?: string;
   teamType?: string;
+  customerProfileMessage?: string;
+}
+
+export type CrmCustomerStatus = 'new_lead' | 'following' | 'current_customer' | 'not_fit';
+
+export interface CrmCustomerSummary {
+  id: string;
+  customerName: string;
+  companyName?: string;
+  position?: string;
+  phone?: string;
+  email?: string;
+  source?: string;
+  status?: CrmCustomerStatus;
+  ownerId?: string;
+  canEdit?: boolean;
+  dealCount?: number;
+  totalValue?: number;
+  lastDealAt?: string;
+}
+
+/**
+ * Hồ sơ khách hàng đầy đủ (khớp CrmCustomerResponse ở backend
+ * app/modules/all_platform/schemas/crm_customer.py) — dùng cho trang danh
+ * sách/chi tiết hồ sơ khách hàng (`crm_customers`, KHÁC `customer_leads`/Deal).
+ * Mở rộng CrmCustomerSummary (không phá vỡ chỗ đang dùng CrmCustomerSummary
+ * cho combobox chọn khách hàng lúc tạo deal).
+ */
+export interface CrmCustomerRow extends CrmCustomerSummary {
+  zalo?: string;
+  facebook?: string;
+  telegram?: string;
+  website?: string;
+  taxCode?: string;
+  address?: string;
+  city?: string;
+  industry?: string;
+  note?: string;
+  phoneNormalized?: string;
+  emailNormalized?: string;
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CrmCustomerKpi {
+  total: number;
+  new_lead: number;
+  following: number;
+  current_customer: number;
+  not_fit: number;
+}
+
+export interface CrmCustomerListResult {
+  items: CrmCustomerRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  kpi: CrmCustomerKpi;
+}
+
+export interface CrmRelatedDeal {
+  id: string;
+  customerName?: string;
+  dealStage?: string;
+  estimatedBudget?: number;
+  lifetimeValue?: number;
+  updatedAt?: string;
+}
+
+export interface CrmRelatedQuote {
+  id: string;
+  quoteNumber?: string;
+  status?: string;
+  totalAmount?: number;
+  dealId?: string;
+}
+
+export interface CrmRelatedContract {
+  id: string;
+  contractNumber?: string;
+  status?: string;
+  dealId?: string;
+}
+
+export interface CrmCustomerRelated {
+  customer: CrmCustomerRow | null;
+  deals: CrmRelatedDeal[];
+  quotes: CrmRelatedQuote[];
+  contracts: CrmRelatedContract[];
+  kpi: {
+    dealCount: number;
+    quoteCount: number;
+    contractCount: number;
+    totalValue: number;
+  };
 }
 
 export interface DealFilters {
@@ -200,6 +297,9 @@ export type CreateDealInput = Omit<
   | 'outcome'
   | 'assignment'
 > & {
+  customerId?: string;
+  updateCustomerProfile?: boolean;
+  idempotencyKey?: string;
   contract?: ContractInfo;
   outcome?: OutcomeInfo;
   assignment?: Assignment;

@@ -91,10 +91,6 @@ export function ServiceCatalogPage() {
 
   return (
     <div className="sc-page">
-      <div className="sc-header">
-        <h1>Thư viện sản phẩm & dịch vụ</h1>
-      </div>
-
       <div className="sc-tabs">
         <button type="button" className={tab === 'products' ? 'active' : ''} onClick={() => setTab('products')}>
           Sản phẩm & dịch vụ
@@ -364,12 +360,14 @@ function ProductsTab({
                   <tr key={product.id}>
                     <td>
                       <div className="sc-cell-title">
-                        {formatSkuName(product.sku, product.name)}
+                        <span className="sc-cell-title-text" title={formatSkuName(product.sku, product.name)}>
+                          {formatSkuName(product.sku, product.name)}
+                        </span>
                         {product.itemType === 'bundle' ? <span className="sc-badge sc-badge-bundle">Gói</span> : null}
                       </div>
                     </td>
                     <td>{product.groupName}</td>
-                    <td className="sc-cell-desc">{product.description || '—'}</td>
+                    <td className="sc-cell-desc" title={product.description || undefined}>{product.description || '—'}</td>
                     <td>{product.unit || '—'}</td>
                     <td>{formatVnd(product.defaultUnitPriceVnd)}</td>
                     <td>{product.defaultVatRate ? `${product.defaultVatRate}%` : '—'}</td>

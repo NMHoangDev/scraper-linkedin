@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { FORM_STATUS_LABELS } from '../constants/quoteConfig';
 import { seedingQuoteRepository } from '../repositories/SeedingQuoteRepository';
 import type { IssuerCompany, QuoteForm } from '../types';
+import { ActionMenu } from '../../crm/components/ActionMenu';
 
 function formatDate(value: string) {
   const date = new Date(value);
@@ -103,48 +104,52 @@ export function QuoteHomePage() {
           {visibleForms.length === 0 ? (
             <div className="quote-state">Chưa có mẫu báo giá nào.</div>
           ) : (
-            visibleForms.map(form => (
-              <article key={form.id} className="quote-card">
-                <div className="quote-card__main">
-                  <div>
-                    <div className="quote-card__title-row">
-                      <h2>{form.name}</h2>
-                      <span className={`quote-badge ${form.status === 'active' ? 'quote-badge--active' : ''}`}>
-                        {FORM_STATUS_LABELS[form.status]}
-                      </span>
-                      {form.issuerCompanyId ? (
-                        <span className="quote-badge quote-badge--company">
-                          {(companyById.get(form.issuerCompanyId)?.brandName) || companyById.get(form.issuerCompanyId)?.legalName || 'Công ty'}
-                        </span>
-                      ) : (
-                        <span className="quote-badge">Trung tính (mọi công ty)</span>
-                      )}
-                    </div>
-                    <p>{form.description}</p>
+            visibleForms.map(form => {
+              const companyLabel = form.issuerCompanyId
+                ? (companyById.get(form.issuerCompanyId)?.brandName) || companyById.get(form.issuerCompanyId)?.legalName || 'Công ty'
+                : 'Trung tính (mọi công ty)';
+              return (
+                <article key={form.id} className="quote-card">
+                  {/* Vung 1: tieu de - toi da 2 dong, khong ellipsis 1 dong nua de
+                   * khong bi cat ten mau dai. */}
+                  <h2 className="quote-card__title" title={form.name}>{form.name}</h2>
+                  {/* Vung 2: badge trang thai + don vi phat hanh - wrap tu nhien,
+                   * khong bao gio bi cat/de. */}
+                  <div className="quote-card__badges">
+                    <span className={`quote-badge ${form.status === 'active' ? 'quote-badge--active' : ''}`}>
+                      {FORM_STATUS_LABELS[form.status]}
+                    </span>
+                    <span className={`quote-badge ${form.issuerCompanyId ? 'quote-badge--company' : ''}`} title={companyLabel}>
+                      {companyLabel}
+                    </span>
                   </div>
-                  <dl className="quote-meta">
-                    <div>
-                      <dt>Cập nhật lần cuối</dt>
-                      <dd>{formatDate(form.updatedAt)}</dd>
+                  <p className="quote-card__desc">{form.description}</p>
+                  {/* Vung 3: footer - ngay cap nhat ben trai, cum thao tac ben
+                   * phai, CUNG mot hang trong normal flow (khong absolute, khong
+                   * de len vung 1/2 o tren). Bo dong "Cau truc: X nhom Y truong" -
+                   * thong tin ky thuat khong giup chon mau, chi gay chat card. */}
+                  <div className="quote-card__footer">
+                    <span className="quote-card__updated">Cập nhật {formatDate(form.updatedAt)}</span>
+                    <div className="quote-actions">
+                      <Link href={`/all-platform/quotes/${form.id}/edit`} className="quote-button quote-button--secondary" title="Chỉnh sửa">Chỉnh sửa</Link>
+                      <Link href={`/all-platform/quotes/${form.id}/preview`} className="quote-button quote-button--secondary" title="Xem thử">Xem thử</Link>
+                      <ActionMenu
+                        items={[
+                          { key: 'copy-link', label: 'Copy link', onSelect: () => void copyFormLink(form) },
+                          {
+                            key: 'toggle-share',
+                            label: form.shareEnabled ? 'Tắt public' : 'Bật public',
+                            onSelect: () => void toggleFormShare(form),
+                          },
+                          { key: 'duplicate', label: 'Nhân bản', onSelect: () => void duplicateForm(form) },
+                          { key: 'delete', label: 'Xóa', danger: true, onSelect: () => void deleteForm(form) },
+                        ]}
+                      />
                     </div>
-                    <div>
-                      <dt>Cấu trúc</dt>
-                      <dd>{form.sectionCount} nhóm · {form.fieldCount} trường</dd>
-                    </div>
-                  </dl>
-                </div>
-                <div className="quote-actions">
-                  <Link href={`/all-platform/quotes/${form.id}/edit`} className="quote-button quote-button--secondary">Chỉnh sửa</Link>
-                  <Link href={`/all-platform/quotes/${form.id}/preview`} className="quote-button quote-button--secondary">Xem thử</Link>
-                  <button type="button" className="quote-button quote-button--secondary" onClick={() => void copyFormLink(form)}>Copy Link</button>
-                  <button type="button" className="quote-button quote-button--secondary" onClick={() => void toggleFormShare(form)}>
-                    {form.shareEnabled ? 'Tắt public' : 'Bật public'}
-                  </button>
-                  <button type="button" className="quote-button quote-button--secondary" onClick={() => void duplicateForm(form)}>Nhân bản</button>
-                  <button type="button" className="quote-button quote-button--danger" onClick={() => void deleteForm(form)}>Xóa</button>
-                </div>
-              </article>
-            ))
+                  </div>
+                </article>
+              );
+            })
           )}
         </section>
       ) : null}

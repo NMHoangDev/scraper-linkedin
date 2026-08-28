@@ -35,7 +35,7 @@ def _serialize_datetimes(payload: Dict[str, Any]) -> Dict[str, Any]:
 # Cột UUID nullable trên customer_leads — frontend (vd wizard "Thêm deal và báo giá"
 # khi chưa chọn Leader/SDR) có thể gửi "" thay vì null, Postgres reject với
 # "invalid input syntax for type uuid" nếu insert/update thẳng chuỗi rỗng.
-_NULLABLE_UUID_COLUMNS = ("leaded_by", "sdr_id", "quote_id", "team_id")
+_NULLABLE_UUID_COLUMNS = ("leaded_by", "sdr_id", "quote_id", "team_id", "customer_id")
 
 
 def _normalize_uuid_fields(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -48,7 +48,7 @@ def _normalize_uuid_fields(payload: Dict[str, Any]) -> Dict[str, Any]:
 # `days_in_stage` KHÔNG có trên table — nó được tính ở `_normalize_row()`
 # dựa vào `stage_entered_at`. Đừng select nó từ table.
 BASE_COLUMNS = (
-    "id, customer_name, company_name, phone, email, address, city, website, industry, tax_code, "
+    "id, customer_id, customer_name, company_name, phone, email, address, city, website, industry, tax_code, "
     "leaded_by, conv_id, source_platform, is_assigned, sdr_id, status, activity_status, "
     "deal_stage, prev_stage, follow_up_date, decision_maker, estimated_budget, stage_entered_at, "
     "last_attachment_url, last_attachment_name, closed_reason, "

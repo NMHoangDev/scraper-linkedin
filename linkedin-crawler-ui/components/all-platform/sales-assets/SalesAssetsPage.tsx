@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Archive, Copy, Edit3, FileText, Plus, Search, Trash2, Upload, X } from "lucide-react";
+import { Copy, FileText, Plus, Search, Upload, X } from "lucide-react";
+import { ActionMenu } from "@/modules/crm/components/ActionMenu";
 
 import {
   getSalesAssetSourceLabel,
@@ -308,19 +309,11 @@ export function SalesAssetsPage() {
             <p className="text-sm text-slate-500">Lưu link Proposal, Sale Kit theo khách hàng, dự án và phiên bản.</p>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => openCreate("upload")}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"
-            >
+            <button type="button" onClick={() => openCreate("upload")} className="crm-secondary-button">
               <Upload size={17} />
               Tải lên
             </button>
-            <button
-              type="button"
-              onClick={() => openCreate("link")}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-rose-600/20 hover:bg-rose-700"
-            >
+            <button type="button" onClick={() => openCreate("link")} className="crm-primary-button">
               <Plus size={17} />
               Thêm link
             </button>
@@ -328,8 +321,10 @@ export function SalesAssetsPage() {
         </header>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="grid gap-3 xl:grid-cols-[1fr_220px_190px_160px_170px_auto]">
-            <label className="relative">
+          {/* flex-wrap thay vi grid cot co dinh - moi input co min-width rieng, tu
+             xuong hang 2 khi khong du cho o man laptop thay vi bi bop het chu. */}
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="relative min-w-[220px] flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input
                 value={search}
@@ -341,23 +336,23 @@ export function SalesAssetsPage() {
                 className="h-11 w-full rounded-xl border border-slate-200 pl-9 pr-3 text-sm outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-100"
               />
             </label>
-            <select value={customerFilter} onChange={(event) => setCustomerFilter(event.target.value)} className="h-11 rounded-xl border border-slate-200 px-3 text-sm outline-none">
+            <select value={customerFilter} onChange={(event) => setCustomerFilter(event.target.value)} className="h-11 min-w-[160px] flex-1 rounded-xl border border-slate-200 px-3 text-sm outline-none">
               <option value="">Tất cả khách hàng</option>
               {uniqueCustomers.map((customer) => <option key={customer.id} value={customer.id}>{customerLabel(customer)}</option>)}
             </select>
-            <select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)} className="h-11 rounded-xl border border-slate-200 px-3 text-sm outline-none">
+            <select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)} className="h-11 min-w-[150px] flex-1 rounded-xl border border-slate-200 px-3 text-sm outline-none">
               <option value="">Tất cả dự án</option>
               {projectOptions.map((project) => <option key={project} value={project}>{project}</option>)}
             </select>
-            <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as SalesAssetType | "")} className="h-11 rounded-xl border border-slate-200 px-3 text-sm outline-none">
+            <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as SalesAssetType | "")} className="h-11 min-w-[130px] flex-1 rounded-xl border border-slate-200 px-3 text-sm outline-none">
               <option value="">Tất cả loại</option>
               {SALES_ASSET_TYPE_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
             </select>
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as SalesAssetStatus | "")} className="h-11 rounded-xl border border-slate-200 px-3 text-sm outline-none">
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as SalesAssetStatus | "")} className="h-11 min-w-[140px] flex-1 rounded-xl border border-slate-200 px-3 text-sm outline-none">
               <option value="">Tất cả trạng thái</option>
               {SALES_ASSET_STATUS_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
             </select>
-            <button type="button" onClick={() => void loadAssets()} className="rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-700 hover:bg-slate-50">
+            <button type="button" onClick={() => void loadAssets()} className="crm-primary-button h-11 shrink-0">
               Tìm kiếm
             </button>
           </div>
@@ -366,7 +361,64 @@ export function SalesAssetsPage() {
         {notice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{notice}</div> : null}
         {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{error}</div> : null}
 
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        {/* Man hinh hep: the/card doc thay vi bang nhieu cot cuon ngang trong 1
+           container be (kho doc, cot bi cat) - xem yeu cau "mobile/tablet". */}
+        <section className="md:hidden space-y-2.5">
+          {loading ? (
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">Đang tải tài liệu...</div>
+          ) : assets.length === 0 ? (
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">Chưa có link Proposal / Sale Kit.</div>
+          ) : (
+            assets.map((asset) => (
+              <div key={asset.id} className={cn("rounded-2xl border border-slate-200 bg-white p-4 shadow-sm", asset.status === "archived" && "bg-slate-50 text-slate-400")}>
+                <div className="flex items-start justify-between gap-2">
+                  {asset.shareUrl ? (
+                    <a href={asset.shareUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 font-bold text-slate-950 hover:text-rose-600">
+                      <FileText size={16} className="shrink-0 text-slate-400" />
+                      {asset.title}
+                    </a>
+                  ) : (
+                    <div className="flex items-center gap-2 font-bold text-slate-950">
+                      <FileText size={16} className="shrink-0 text-slate-400" />
+                      {asset.title}
+                    </div>
+                  )}
+                  <span className={cn("shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-bold", asset.status === "active" ? "bg-emerald-100 text-emerald-700" : asset.status === "inactive" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-500")}>
+                    {getSalesAssetStatusLabel(asset.status)}
+                  </span>
+                </div>
+                <div className="mt-1 text-xs text-slate-500">
+                  {asset.customerName || "-"}{asset.projectName ? ` · ${asset.projectName}` : ""}
+                </div>
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+                  <span>{getSalesAssetTypeLabel(asset.type)}</span>
+                  <span>{asset.version || "-"}</span>
+                  <span>{getSalesAssetSourceLabel(asset.sourceType)}</span>
+                  <span>{formatDate(asset.updatedAt)}</span>
+                </div>
+                <div className="mt-3 flex items-center justify-end gap-1 border-t border-slate-100 pt-2">
+                  <button type="button" onClick={() => void copyLink(asset)} disabled={!asset.shareUrl} className="crm-icon-action" title="Copy link">
+                    <Copy size={16} />
+                  </button>
+                  <ActionMenu
+                    items={[
+                      { key: "edit", label: "Chỉnh sửa", onSelect: () => openEdit(asset) },
+                      {
+                        key: "archive",
+                        label: "Lưu trữ",
+                        disabled: asset.status === "archived",
+                        onSelect: () => void archive(asset),
+                      },
+                      { key: "delete", label: "Xóa", danger: true, onSelect: () => void remove(asset) },
+                    ]}
+                  />
+                </div>
+              </div>
+            ))
+          )}
+        </section>
+
+        <section className="hidden md:block overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
@@ -426,19 +478,22 @@ export function SalesAssetsPage() {
                       </td>
                       <td className="px-4 py-4 text-slate-500">{formatDate(asset.updatedAt)}</td>
                       <td className="px-4 py-4">
-                        <div className="flex justify-end gap-1.5">
-                          <button type="button" onClick={() => void copyLink(asset)} disabled={!asset.shareUrl} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-40" title="Copy link">
+                        <div className="flex justify-end items-center gap-1">
+                          <button type="button" onClick={() => void copyLink(asset)} disabled={!asset.shareUrl} className="crm-icon-action" title="Copy link">
                             <Copy size={16} />
                           </button>
-                          <button type="button" onClick={() => openEdit(asset)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" title="Chỉnh sửa">
-                            <Edit3 size={16} />
-                          </button>
-                          <button type="button" onClick={() => void archive(asset)} disabled={asset.status === "archived"} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-40" title="Lưu trữ">
-                            <Archive size={16} />
-                          </button>
-                          <button type="button" onClick={() => void remove(asset)} className="rounded-lg p-2 text-red-500 hover:bg-red-50" title="Xóa">
-                            <Trash2 size={16} />
-                          </button>
+                          <ActionMenu
+                            items={[
+                              { key: "edit", label: "Chỉnh sửa", onSelect: () => openEdit(asset) },
+                              {
+                                key: "archive",
+                                label: "Lưu trữ",
+                                disabled: asset.status === "archived",
+                                onSelect: () => void archive(asset),
+                              },
+                              { key: "delete", label: "Xóa", danger: true, onSelect: () => void remove(asset) },
+                            ]}
+                          />
                         </div>
                       </td>
                     </tr>

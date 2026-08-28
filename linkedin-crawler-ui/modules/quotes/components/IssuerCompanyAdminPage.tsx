@@ -61,6 +61,7 @@ export function IssuerCompanyAdminPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   async function load() {
     setLoading(true);
@@ -87,6 +88,14 @@ export function IssuerCompanyAdminPage() {
     () => forms.filter(f => editTarget?.id && f.issuerCompanyId === editTarget.id),
     [forms, editTarget]
   );
+
+  const filteredCompanies = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return companies;
+    return companies.filter(
+      c => c.legalName.toLowerCase().includes(term) || c.code.toLowerCase().includes(term)
+    );
+  }, [companies, searchTerm]);
 
   function openAdd() {
     setEditTarget({ mode: 'add' });
@@ -159,9 +168,6 @@ export function IssuerCompanyAdminPage() {
 
   return (
     <div className="sc-page">
-      <div className="sc-header">
-        <h1>Danh mục công ty phát hành báo giá</h1>
-      </div>
       <p className="sc-tab-note">
         Công ty đứng tên phát hành báo giá (bên bán) — chọn ở Bước 1 wizard tạo báo giá. Sửa thông tin/logo ở đây chỉ
         áp dụng cho báo giá tạo mới sau đó, không đổi ngược báo giá đã lưu.
@@ -173,7 +179,14 @@ export function IssuerCompanyAdminPage() {
       {!loading ? (
         <div className="sc-tab-panel">
           <div className="sc-toolbar">
-            <button type="button" className="sc-btn sc-btn-primary" onClick={openAdd}>
+            <input
+              type="text"
+              className="sc-search"
+              placeholder="Tìm theo tên công ty hoặc mã..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+            <button type="button" className="sc-btn sc-btn-primary" onClick={openAdd} style={{ marginLeft: 'auto' }}>
               + Công ty mới
             </button>
           </div>
@@ -299,14 +312,14 @@ export function IssuerCompanyAdminPage() {
                 </tr>
               </thead>
               <tbody>
-                {companies.length === 0 ? (
+                {filteredCompanies.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="sc-empty">
-                      Chưa có công ty phát hành nào.
+                      {searchTerm.trim() ? 'Không tìm thấy công ty phù hợp.' : 'Chưa có công ty phát hành nào.'}
                     </td>
                   </tr>
                 ) : (
-                  companies.map(company => (
+                  filteredCompanies.map(company => (
                     <tr key={company.id}>
                       <td>
                         {company.logoUrl ? (

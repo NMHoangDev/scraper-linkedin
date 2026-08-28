@@ -1,6 +1,7 @@
 import type { IssuerCompany, Quote, QuoteData, QuoteForm, QuoteItem, VillaSolutionItem } from '@/modules/quotes';
 import { resolveToggleableColumns } from '@/modules/quotes/utils/quoteColumns';
 import type { DealFormState } from '../../components/DealFormFields';
+import { loadVisibleColumnsDraft } from './quoteColumnsDraft';
 
 export type WizardStep = 1 | 2 | 3 | 4;
 
@@ -34,9 +35,17 @@ export function quoteDraftFromForm(form: QuoteForm, dealDraft?: DealFormState, i
     data.quoteDate = new Date().toISOString().slice(0, 10);
   }
   if (!data.visibleColumns) {
-    // Mac dinh hien TAT CA cot toggle duoc CUA DUNG MAU nay (khong phai danh
-    // sach co dinh) - tu dong khop voi bang hang muc thuc te cua mau.
-    data.visibleColumns = resolveToggleableColumns(form.schemaJson, quoteItems).map(column => column.key);
+    const toggleableKeys = resolveToggleableColumns(form.schemaJson, quoteItems).map(column => column.key);
+    // Uu tien khoi phuc nhap "Cot hien thi" da luu (localStorage, theo dung
+    // mau nay - xem quoteColumnsDraft.ts) TRUOC KHI dung mac dinh "hien tat
+    // ca" - vd nguoi dung tung tao bao gia dung mau nay, tick/bo tick vai cot,
+    // roi refresh trang/dong modal giua chung chua kip luu - lan tao bao gia
+    // MOI cung mau nay se tu khoi phuc dung lua chon cu thay vi luon reset ve
+    // hien het. Loc lai theo dung tap cot THAT SU cua mau (phong khi mau doi
+    // schema sau khi luu nhap), rong thi coi nhu khong co nhap hop le, dung
+    // mac dinh hien tat ca.
+    const draftColumns = loadVisibleColumnsDraft(form.id)?.filter(key => toggleableKeys.includes(key));
+    data.visibleColumns = draftColumns && draftColumns.length ? draftColumns : toggleableKeys;
   }
 
   if (dealDraft) {

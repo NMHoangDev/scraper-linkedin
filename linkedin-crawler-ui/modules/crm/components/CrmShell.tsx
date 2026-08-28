@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import { ContractDetailModal } from './ContractDetailModal';
 import { CrmKanbanBoard } from './CrmKanbanBoard';
 import { CrmTableView } from './CrmTableView';
@@ -90,16 +91,12 @@ export function CrmShell() {
 
   // Khoá scroll của trang nền khi có modal/drawer nào đang mở — nếu không, cuộn
   // chuột bên trong popup (vd DetailDrawer) vẫn kéo theo cuộn cả trang phía sau.
-  const anyOverlayOpen =
-    detailOpen || Boolean(contractDeal) || createOpen || quoteModal.open || Boolean(editingDeal) || Boolean(stageData) || Boolean(reviewData);
-  useEffect(() => {
-    if (!anyOverlayOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [anyOverlayOpen]);
+  // createOpen/editingDeal (DealFormModal) tu khoa rieng qua useBodyScrollLock
+  // trong chinh no roi - khong dua lai vao day, tranh 2 noi doc lap cung khoa
+  // 1 tai nguyen (bug thuc te gap phai: body ket o overflow:hidden vinh vien
+  // vi thu tu cleanup cua 2 effect rieng biet khong dong bo voi nhau).
+  const anyOverlayOpen = detailOpen || Boolean(contractDeal) || quoteModal.open || Boolean(stageData) || Boolean(reviewData);
+  useBodyScrollLock(anyOverlayOpen);
 
   const sourceOptions = useMemo(() => {
     const fromData = deals.map(deal => deal.sourcePlatform || 'Manual').filter(Boolean);
@@ -183,10 +180,28 @@ export function CrmShell() {
   // không thêm history) để F5/back sau đó không mở lại lặp lại.
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [initialCustomer, setInitialCustomer] = useState<{ id: string; name: string; companyName?: string; phone?: string; email?: string } | null>(null);
   useEffect(() => {
     const openDealId = searchParams.get('openDeal');
     if (!openDealId) return;
-    void openDetailById(openDealId);
+    // "?openDeal=new&customerId=...": tới từ nút "+ Deal"/"+ Tạo deal mới" ở trang Hồ sơ
+    // khách hàng — mở popup "Thêm deal nhanh" có sẵn, prefill khách hàng đã chọn, KHÔNG
+    // dựng 1 form tạo-deal riêng cho luồng này.
+    if (openDealId === 'new') {
+      const customerId = searchParams.get('customerId');
+      if (customerId) {
+        setInitialCustomer({
+          id: customerId,
+          name: searchParams.get('customerName') || '',
+          companyName: searchParams.get('companyName') || undefined,
+          phone: searchParams.get('phone') || undefined,
+          email: searchParams.get('email') || undefined,
+        });
+        setCreateOpen(true);
+      }
+    } else {
+      void openDetailById(openDealId);
+    }
     router.replace('/all-platform/crm', { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -196,8 +211,10 @@ export function CrmShell() {
       const deal = await createDeal(input);
       clearDealDraft();
       setCreateOpen(false);
+      setInitialCustomer(null);
       setSelectedDeal(deal);
       setDetailOpen(true);
+      if (deal.customerProfileMessage) setToast(deal.customerProfileMessage);
     } catch (err) {
       window.alert(err instanceof Error ? humanizeCrmError(err.message) : 'Không tạo được deal. Vui lòng kiểm tra lại thông tin.');
     }
@@ -208,6 +225,7 @@ export function CrmShell() {
    * form đang nhập khi lỗi) thay vì tự alert rồi nuốt luôn ở đây. */
   async function handleCreateAndContinue(input: CreateDealInput) {
     const deal = await createDeal(input);
+    if (deal.customerProfileMessage) setToast(deal.customerProfileMessage);
     void deal; // không cần mở chi tiết/chọn deal — chỉ tạo xong là xong, Sale tiếp tục nhập deal mới
   }
 
@@ -513,11 +531,13 @@ export function CrmShell() {
         onClose={() => {
           setCreateOpen(false);
           setEditingDeal(null);
+          setInitialCustomer(null);
         }}
         onCreate={handleCreate}
         onCreateAndContinue={handleCreateAndContinue}
         onUpdate={handleUpdate}
         currentUser={user}
+        initialCustomer={initialCustomer}
       />
       <ContractDetailModal deal={contractDeal} open={Boolean(contractDeal)} onClose={() => setContractDeal(null)} />
     </div>

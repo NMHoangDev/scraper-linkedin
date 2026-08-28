@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useMembers } from '@/hooks/useMembers';
 import { teamsService, type TeamRow } from '@/services/all-platform.service';
 import { SearchableSelect } from './SearchableSelect';
@@ -18,13 +18,16 @@ import {
   SOURCE_OPTIONS,
   parseMoney,
 } from '../constants/crmConfig';
-import type { CreateDealInput, CrmUserOption, Deal, UpdateDealInput } from '../types';
+import type { CreateDealInput, CrmCustomerSummary, CrmUserOption, Deal, UpdateDealInput } from '../types';
 import { seedingCrmRepository } from '../repositories/SeedingCrmRepository';
 import type { AppUser } from '@/types/unified.types';
 
 const DEFAULT_INDUSTRY_OPTIONS = INDUSTRY_OPTIONS.map(value => ({ value, label: value }));
 
 export type DealFormState = {
+  customerId: string;
+  updateCustomerProfile: boolean;
+  customerProfileCanEdit: boolean;
   customerName: string;
   position: string;
   companyName: string;
@@ -73,6 +76,9 @@ export type DealFormState = {
 
 export function emptyDealForm(): DealFormState {
   return {
+    customerId: '',
+    updateCustomerProfile: false,
+    customerProfileCanEdit: false,
     customerName: '',
     position: '',
     companyName: '',
@@ -131,6 +137,9 @@ function toDateTimeInput(value?: string) {
 export function dealFormFromDeal(deal: Deal): DealFormState {
   return {
     ...emptyDealForm(),
+    customerId: deal.customerId || '',
+    updateCustomerProfile: false,
+    customerProfileCanEdit: false,
     customerName: deal.customerName,
     position: deal.position || '',
     companyName: deal.companyName || '',
@@ -257,6 +266,8 @@ export function buildDealPayload(form: DealFormState, _agents: CrmUserOption[] =
         }
       : undefined;
   return {
+    customerId: form.customerId || undefined,
+    updateCustomerProfile: form.updateCustomerProfile,
     customerName: form.customerName.trim(),
     position: form.position.trim(),
     companyName: form.companyName.trim(),
@@ -309,6 +320,192 @@ export function buildDealPayload(form: DealFormState, _agents: CrmUserOption[] =
       leadedByNameHint: form.leadedByNameHint,
     },
   };
+}
+
+function CustomerProfileCombobox({
+  form,
+  setValue,
+  disabled = false,
+}: {
+  form: DealFormState;
+  setValue: <K extends keyof DealFormState>(key: K, value: DealFormState[K]) => void;
+  disabled?: boolean;
+}) {
+  const [query, setQuery] = useState(form.customerName);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [items, setItems] = useState<CrmCustomerSummary[]>([]);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const keyword = query.trim();
+    if (!open || keyword.length < 2) {
+      return;
+    }
+    let alive = true;
+    const timer = window.setTimeout(() => {
+      if (!alive) return;
+      setLoading(true);
+      void seedingCrmRepository.quickSearchCustomers(keyword, 8)
+        .then(result => {
+          if (alive) {
+            setItems(result);
+            setActiveIndex(-1);
+          }
+        })
+        .catch(() => {
+          if (alive) setItems([]);
+        })
+        .finally(() => {
+          if (alive) setLoading(false);
+        });
+    }, 300);
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+    };
+  }, [open, query]);
+
+  // Click ben ngoai combobox -> dong menu (khong xoa lua chon dang co).
+  useEffect(() => {
+    if (!open) return;
+    function handlePointerDown(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [open]);
+
+  // Xoa sach du lieu lien he da autofill tu khach hang truoc do (cong ty/chuc
+  // vu/SDT/email/nguon) - tranh cong don du lieu cua khach A khi doi sang go
+  // ten khach moi hoac bam "Doi".
+  function clearAutofilledContact() {
+    setValue('companyName', '');
+    setValue('position', '');
+    setValue('phone', '');
+    setValue('email', '');
+  }
+
+  function typeName(value: string) {
+    setQuery(value);
+    setOpen(true);
+    setValue('customerName', value);
+    if (form.customerId) {
+      setValue('customerId', '');
+      setValue('updateCustomerProfile', false);
+      setValue('customerProfileCanEdit', false);
+      clearAutofilledContact();
+    }
+  }
+
+  function pick(customer: CrmCustomerSummary) {
+    setValue('customerId', customer.id);
+    setValue('customerProfileCanEdit', Boolean(customer.canEdit));
+    setValue('updateCustomerProfile', false);
+    setValue('customerName', customer.customerName || '');
+    setValue('companyName', customer.companyName || '');
+    setValue('position', customer.position || '');
+    setValue('phone', customer.phone || '');
+    setValue('email', customer.email || '');
+    setValue('sourcePlatform', customer.source || form.sourcePlatform || 'Manual');
+    setQuery(customer.customerName || '');
+    setOpen(false);
+    setActiveIndex(-1);
+  }
+
+  function clearPickedCustomer() {
+    setValue('customerId', '');
+    setValue('updateCustomerProfile', false);
+    setValue('customerProfileCanEdit', false);
+    setValue('customerName', '');
+    clearAutofilledContact();
+    setQuery('');
+    setOpen(false);
+    setActiveIndex(-1);
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (!open || !items.length) return;
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setActiveIndex(index => (index + 1) % items.length);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setActiveIndex(index => (index <= 0 ? items.length - 1 : index - 1));
+    } else if (event.key === 'Enter') {
+      if (activeIndex >= 0 && activeIndex < items.length) {
+        event.preventDefault();
+        pick(items[activeIndex]);
+      }
+    } else if (event.key === 'Escape') {
+      setOpen(false);
+      setActiveIndex(-1);
+    }
+  }
+
+  return (
+    <div className="crm-customer-combobox" ref={containerRef}>
+      <div className="crm-customer-combobox-row">
+        <input
+          id="crm-deal-customer-name"
+          value={open ? query : form.customerName}
+          onFocus={() => {
+            setQuery(form.customerName);
+            setOpen(true);
+          }}
+          onChange={event => typeName(event.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={disabled}
+          placeholder="Nguyễn Văn A"
+          autoComplete="off"
+          role="combobox"
+          aria-expanded={open}
+          aria-autocomplete="list"
+          aria-controls="crm-deal-customer-combobox-menu"
+        />
+        {form.customerId ? (
+          <button type="button" className="crm-inline-link-btn" onClick={clearPickedCustomer}>
+            Đổi
+          </button>
+        ) : null}
+      </div>
+      {open && query.trim().length >= 2 ? (
+        <div className="crm-customer-combobox-menu" id="crm-deal-customer-combobox-menu" role="listbox">
+          {loading ? <p>Đang tìm...</p> : null}
+          {!loading && !items.length ? <p>Không tìm thấy hồ sơ phù hợp</p> : null}
+          {items.map((customer, index) => (
+            <button
+              type="button"
+              key={customer.id}
+              role="option"
+              aria-selected={index === activeIndex}
+              className={index === activeIndex ? 'is-active' : ''}
+              onMouseEnter={() => setActiveIndex(index)}
+              onMouseDown={event => event.preventDefault()}
+              onClick={() => pick(customer)}
+            >
+              <strong>{customer.customerName || 'Khách hàng chưa tên'}</strong>
+              <span>{[customer.companyName, customer.phone, customer.email].filter(Boolean).join(' · ') || 'Chưa có liên hệ'}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {form.customerId ? (
+        <label className={`crm-customer-profile-checkbox ${!form.customerProfileCanEdit ? 'is-disabled' : ''}`}>
+          <input
+            type="checkbox"
+            checked={form.updateCustomerProfile}
+            disabled={!form.customerProfileCanEdit}
+            onChange={event => setValue('updateCustomerProfile', event.target.checked)}
+          />
+          <span>Cập nhật thông tin này vào hồ sơ khách hàng</span>
+        </label>
+      ) : null}
+    </div>
+  );
 }
 
 export function DealFormFields({
@@ -518,7 +715,7 @@ export function DealFormFields({
         <h3 className="crm-form-title">1. Khách hàng &amp; Cơ hội</h3>
         <div className="crm-form-grid">
           <Field label="Tên khách hàng" required>
-            <input id="crm-deal-customer-name" value={form.customerName} onChange={event => setValue('customerName', event.target.value)} placeholder="Nguyễn Văn A" />
+            <CustomerProfileCombobox form={form} setValue={setValue} />
           </Field>
           <Field label="Công ty" hint="tùy chọn">
             <input value={form.companyName} onChange={event => setValue('companyName', event.target.value)} placeholder="Công ty TNHH ABC" />

@@ -458,16 +458,25 @@ export function QuoteCenterPage() {
           <div className="qc-templates">
             {forms.map((form, index) => (
               <article key={form.id} className="qc-template" onClick={() => openTemplateModal(form)}>
-                <div className={`qc-template-icon ${TEMPLATE_ICON_CLASSES[index % TEMPLATE_ICON_CLASSES.length]}`}>
-                  {index % 3 === 2 ? <MessageCircle className="qc-icon" /> : <FileText className="qc-icon" />}
+                <div className="qc-template-top">
+                  <div className={`qc-template-icon ${TEMPLATE_ICON_CLASSES[index % TEMPLATE_ICON_CLASSES.length]}`}>
+                    {index % 3 === 2 ? <MessageCircle className="qc-icon" /> : <FileText className="qc-icon" />}
+                  </div>
+                  <div className="qc-template-body">
+                    <h3 title={form.name}>{form.name}</h3>
+                    <p>{form.description || 'Mẫu báo giá chuẩn hoá'}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3>{form.name}</h3>
-                  <p>{form.description || 'Mẫu báo giá chuẩn hoá'}</p>
-                  <span>{form.fieldCount} trường dữ liệu</span>
-                </div>
-                <button type="button" aria-label="Dùng mẫu này">
-                  →
+                <span className="qc-template-fieldcount">{form.fieldCount} trường dữ liệu</span>
+                <button
+                  type="button"
+                  className="qc-template-cta"
+                  onClick={event => {
+                    event.stopPropagation();
+                    openTemplateModal(form);
+                  }}
+                >
+                  Tạo báo giá
                 </button>
               </article>
             ))}
@@ -526,22 +535,21 @@ export function QuoteCenterPage() {
                   const saleName = deal?.assignment.sdrName || deal?.assignment.leadName || 'Chưa gán';
                   return (
                     <tr key={quote.id}>
-                      <td data-label="Mã báo giá">
+                      <td data-label="Mã báo giá" title={quote.quoteNumber}>
                         <Link href={`/all-platform/quotes/${quote.id}`} className="qc-row-link">
                           {quote.quoteNumber}
                         </Link>
                       </td>
-                      <td data-label="Khách hàng CRM">
+                      <td data-label="Khách hàng CRM" title={`${deal?.customerName || ''}${deal?.companyName ? ` · ${deal.companyName}` : ''}`}>
                         <Link href={`/all-platform/crm?openDeal=${deal?.id}`} className="qc-row-link">
                           {deal?.customerName}
                         </Link>
                         {deal?.companyName ? <div className="qc-row-sub">{deal.companyName}</div> : null}
                       </td>
-                      <td data-label="Cơ hội CRM">
+                      <td data-label="Cơ hội CRM" title={deal?.servicePackage || deal?.package || 'Cơ hội CRM'}>
                         <Link href={`/all-platform/crm?openDeal=${deal?.id}`} className="qc-row-link">
                           {deal?.servicePackage || deal?.package || 'Cơ hội CRM'}
                         </Link>
-                        <div className="qc-row-sub">{deal?.dealId}</div>
                       </td>
                       <td data-label="Giá trị">{formatMoney(quote.totalAmount)}</td>
                       <td data-label="Phụ trách">

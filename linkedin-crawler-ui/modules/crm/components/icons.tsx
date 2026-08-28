@@ -61,6 +61,10 @@ export const CheckCircle2 = makeIcon([
 ]);
 export const ChevronDown = makeIcon([{ d: 'm6 9 6 6 6-6' }]);
 export const ChevronUp = makeIcon([{ d: 'm18 15-6-6-6 6' }]);
+export const Eye = makeIcon([
+  { d: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z' },
+  { tag: 'circle', cx: 12, cy: 12, r: 3 },
+]);
 export const Clock = makeIcon([
   { tag: 'circle', cx: 12, cy: 12, r: 10 },
   { d: 'M12 6v6l4 2' },
