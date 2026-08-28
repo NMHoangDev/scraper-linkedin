@@ -1,12 +1,24 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { ApiExtensionLauncher } from "@/components/all-platform/components/api-extension-launcher";
 import { useAppAuth } from "@/contexts/AppAuthContext";
-import { FilterBar, type FilterState } from "@/components/all-platform/components/filter-bar";
+import {
+  FilterBar,
+  type FilterState,
+} from "@/components/all-platform/components/filter-bar";
 import { PostCard } from "@/components/all-platform/components/post-card";
 import { toast } from "sonner";
 import { allPlatformPostsDeleteService } from "@/services/all-platform-posts-delete.service";
@@ -20,8 +32,19 @@ import { SeedingActivityPanel } from "@/components/all-platform/feed/SeedingActi
 import { ScheduleCommentModal } from "@/components/all-platform/feed/ScheduleCommentModal";
 import { ScheduledCommentsPanel } from "@/components/all-platform/feed/ScheduledCommentsPanel";
 import { PostFeedSkeleton } from "@/components/all-platform/feed/PostFeedSkeleton";
-import { allPlatformPostsService, allPlatformCategoriesService, teamsService, socialAccountsService } from "@/services/all-platform.service";
-import type { UnifiedPost, UnifiedStats, Category, FeedPlatform, SocialAccount } from "@/types/unified.types";
+import {
+  allPlatformPostsService,
+  allPlatformCategoriesService,
+  teamsService,
+  socialAccountsService,
+} from "@/services/all-platform.service";
+import type {
+  UnifiedPost,
+  UnifiedStats,
+  Category,
+  FeedPlatform,
+  SocialAccount,
+} from "@/types/unified.types";
 
 // â”€â”€â”€ Retry helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function fetchWithRetry<T>(
@@ -35,7 +58,8 @@ async function fetchWithRetry<T>(
       return await fn();
     } catch (err) {
       lastError = err;
-      if (attempt < retries) await new Promise((r) => setTimeout(r, delay * (attempt + 1)));
+      if (attempt < retries)
+        await new Promise((r) => setTimeout(r, delay * (attempt + 1)));
     }
   }
   throw lastError;
@@ -129,26 +153,30 @@ function StatCard({
   let barColor = "bg-muted-foreground/60";
 
   if (accent === "blue") {
-    iconCls = "bg-blue-50/80 text-blue-500 dark:bg-blue-950/20 dark:text-blue-400";
+    iconCls =
+      "bg-blue-50/80 text-blue-500 dark:bg-blue-950/20 dark:text-blue-400";
     barColor = "bg-blue-500";
   } else if (accent === "green") {
-    iconCls = "bg-emerald-50/80 text-emerald-500 dark:bg-emerald-950/20 dark:text-emerald-400";
+    iconCls =
+      "bg-emerald-50/80 text-emerald-500 dark:bg-emerald-950/20 dark:text-emerald-400";
     barColor = "bg-emerald-500";
   } else if (accent === "amber") {
-    iconCls = "bg-amber-50/80 text-amber-500 dark:bg-amber-950/20 dark:text-amber-400";
+    iconCls =
+      "bg-amber-50/80 text-amber-500 dark:bg-amber-950/20 dark:text-amber-400";
     barColor = "bg-amber-500";
   } else if (accent === "indigo") {
-    iconCls = "bg-indigo-50/80 text-indigo-500 dark:bg-indigo-950/20 dark:text-indigo-400";
+    iconCls =
+      "bg-indigo-50/80 text-indigo-500 dark:bg-indigo-950/20 dark:text-indigo-400";
     barColor = "bg-indigo-500";
   }
 
   return (
-    <div
-      className="bg-card border border-border p-4 rounded-xl shadow-none flex flex-col justify-between relative overflow-hidden group select-none"
-    >
+    <div className="bg-card border border-border p-4 rounded-xl shadow-none flex flex-col justify-between relative overflow-hidden group select-none">
       <div className="flex justify-between items-start">
         <div className="space-y-1">
-          <p className="text-[10px] font-bold text-muted-foreground capitalize">{label}</p>
+          <p className="text-[10px] font-bold text-muted-foreground capitalize">
+            {label}
+          </p>
           <h3 className="text-xl font-bold text-foreground tracking-tight mt-1">
             {typeof value === "number" ? value.toLocaleString("vi-VN") : value}
           </h3>
@@ -180,7 +208,10 @@ function StatCard({
           <div className="flex-1 max-w-[140px]">
             <div className="w-full bg-muted h-1.5 rounded-full overflow-hidden">
               <div
-                className={cn("h-full rounded-full transition-all duration-500", barColor)}
+                className={cn(
+                  "h-full rounded-full transition-all duration-500",
+                  barColor,
+                )}
                 style={{ width: `${progress.value}%` }}
               />
             </div>
@@ -189,7 +220,9 @@ function StatCard({
             </span>
           </div>
         ) : sub ? (
-          <span className="text-[10px] text-muted-foreground font-medium leading-none">{sub}</span>
+          <span className="text-[10px] text-muted-foreground font-medium leading-none">
+            {sub}
+          </span>
         ) : null}
       </div>
     </div>
@@ -205,28 +238,75 @@ function StatCard({
 // khop TU KHOA (khong phai danh sach ten co dinh) de tu dong nhan dien danh
 // muc moi duoc them sau nay ma khong can sua code lai.
 type ServiceAreaKey = "all" | "tech" | "hospitality" | "other";
-const SERVICE_AREA_TABS: { key: ServiceAreaKey; label: string; keywords?: string[] }[] = [
+const SERVICE_AREA_TABS: {
+  key: ServiceAreaKey;
+  label: string;
+  keywords?: string[];
+}[] = [
   { key: "all", label: "Tất cả" },
-  { key: "tech", label: "CNTT / Công nghệ", keywords: ["it", "software", "công nghệ", "cong nghe", "ai", "artificial intelligence", "phần mềm", "phan mem", "tech"] },
-  { key: "hospitality", label: "Lưu trú / Hotel", keywords: ["hotel", "khách sạn", "khach san", "lưu trú", "luu tru", "resort", "du lịch", "du lich", "nhà nghỉ", "nha nghi", "homestay"] },
+  {
+    key: "tech",
+    label: "CNTT / Công nghệ",
+    keywords: [
+      "it",
+      "software",
+      "công nghệ",
+      "cong nghe",
+      "ai",
+      "artificial intelligence",
+      "phần mềm",
+      "phan mem",
+      "tech",
+    ],
+  },
+  {
+    key: "hospitality",
+    label: "Lưu trú / Hotel",
+    keywords: [
+      "hotel",
+      "khách sạn",
+      "khach san",
+      "lưu trú",
+      "luu tru",
+      "resort",
+      "du lịch",
+      "du lich",
+      "nhà nghỉ",
+      "nha nghi",
+      "homestay",
+    ],
+  },
   { key: "other", label: "Khác" },
 ];
 
-function matchesServiceArea(industry: string | undefined, area: ServiceAreaKey): boolean {
+function matchesServiceArea(
+  industry: string | undefined,
+  area: ServiceAreaKey,
+): boolean {
   if (area === "all") return true;
   const name = (industry || "").toLowerCase();
   if (area === "other") {
     // "Khac" = khong khop tech VA khong khop hospitality
-    const techKw = SERVICE_AREA_TABS.find(t => t.key === "tech")?.keywords || [];
-    const hospKw = SERVICE_AREA_TABS.find(t => t.key === "hospitality")?.keywords || [];
-    return !techKw.some(k => name.includes(k)) && !hospKw.some(k => name.includes(k));
+    const techKw =
+      SERVICE_AREA_TABS.find((t) => t.key === "tech")?.keywords || [];
+    const hospKw =
+      SERVICE_AREA_TABS.find((t) => t.key === "hospitality")?.keywords || [];
+    return (
+      !techKw.some((k) => name.includes(k)) &&
+      !hospKw.some((k) => name.includes(k))
+    );
   }
-  const keywords = SERVICE_AREA_TABS.find(t => t.key === area)?.keywords || [];
-  return keywords.some(k => name.includes(k));
+  const keywords =
+    SERVICE_AREA_TABS.find((t) => t.key === area)?.keywords || [];
+  return keywords.some((k) => name.includes(k));
 }
 
 // â”€â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boolean }) {
+export function UnifiedDashboardHomeContent({
+  hideHeader,
+}: {
+  hideHeader?: boolean;
+}) {
   const { user } = useAppAuth();
   const CURRENT_USER_EMAIL = user?.email || "";
 
@@ -234,15 +314,25 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
   const [serviceArea, setServiceArea] = useState<ServiceAreaKey>("all");
   const [showBulkCommentModal, setShowBulkCommentModal] = useState(false);
 
-  const [detailModalPost, setDetailModalPost] = useState<UnifiedPost | null>(null);
-  const [verifyModalPost, setVerifyModalPost] = useState<UnifiedPost | null>(null);
-  const [scheduleModalPost, setScheduleModalPost] = useState<UnifiedPost | null>(null);
+  const [detailModalPost, setDetailModalPost] = useState<UnifiedPost | null>(
+    null,
+  );
+  const [verifyModalPost, setVerifyModalPost] = useState<UnifiedPost | null>(
+    null,
+  );
+  const [scheduleModalPost, setScheduleModalPost] =
+    useState<UnifiedPost | null>(null);
   const [scheduleRefreshKey, setScheduleRefreshKey] = useState(0);
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]);
 
   // Result Modals
   const [showCrawlResultModal, setShowCrawlResultModal] = useState(false);
-  const [crawlResultsSummary, setCrawlResultsSummary] = useState<{ totalPosts: number, groups: { groupUrl: string, count: number }[], launchedGroups: string[], crawledPostUrls: string[] }>({ totalPosts: 0, groups: [], launchedGroups: [], crawledPostUrls: [] });
+  const [crawlResultsSummary, setCrawlResultsSummary] = useState<{
+    totalPosts: number;
+    groups: { groupUrl: string; count: number }[];
+    launchedGroups: string[];
+    crawledPostUrls: string[];
+  }>({ totalPosts: 0, groups: [], launchedGroups: [], crawledPostUrls: [] });
   const [showSeedingResultModal, setShowSeedingResultModal] = useState(false);
   const [recentlySeededUrls, setRecentlySeededUrls] = useState<string[]>([]);
 
@@ -297,7 +387,8 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
         allPlatformCategoriesService.getAll(),
         teamsService.getAll(),
       ]);
-      if (catRes.success && catRes.data) setCategories(catRes.data as Category[]);
+      if (catRes.success && catRes.data)
+        setCategories(catRes.data as Category[]);
       if (teamRes.success && teamRes.data) {
         const seen = new Set<string>();
         const list: { id: string; name: string }[] = [];
@@ -378,7 +469,7 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
           sort: filters.sort,
           page,
           page_size: 15,
-        })
+        }),
       );
 
       if (res.success && res.data) {
@@ -394,17 +485,23 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
             }
             if (filters.seeding_status === "verified") {
               return seedings.some(
-                (s) => s.verify_status === "yes" && !s.link_comment?.startsWith("Bị từ chối"),
+                (s) =>
+                  s.verify_status === "yes" &&
+                  !s.link_comment?.startsWith("Bị từ chối"),
               );
             }
             if (filters.seeding_status === "pending") {
               return seedings.some(
-                (s) => s.verify_status !== "yes" && !s.link_comment?.startsWith("Bị từ chối"),
+                (s) =>
+                  s.verify_status !== "yes" &&
+                  !s.link_comment?.startsWith("Bị từ chối"),
               );
             }
             if (filters.seeding_status === "rejected") {
               return seedings.some(
-                (s) => s.link_comment?.startsWith("Bị từ chối") || s.verify_status === "no",
+                (s) =>
+                  s.link_comment?.startsWith("Bị từ chối") ||
+                  s.verify_status === "no",
               );
             }
             return true;
@@ -414,13 +511,16 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
         // FE-side sort by seeding (backend chưa hỗ trợ sort=most_seeded/verified_first)
         if (filters.sort === "most_seeded") {
           posts = [...posts].sort(
-            (a, b) => (b.all_seedings?.length ?? 0) - (a.all_seedings?.length ?? 0),
+            (a, b) =>
+              (b.all_seedings?.length ?? 0) - (a.all_seedings?.length ?? 0),
           );
         } else if (filters.sort === "verified_first") {
           posts = [...posts].sort((a, b) => {
-            const verCount = (p: typeof posts[0]) =>
+            const verCount = (p: (typeof posts)[0]) =>
               (p.all_seedings ?? []).filter(
-                (s) => s.verify_status === "yes" && !s.link_comment?.startsWith("Bị từ chối"),
+                (s) =>
+                  s.verify_status === "yes" &&
+                  !s.link_comment?.startsWith("Bị từ chối"),
               ).length;
             return verCount(b) - verCount(a);
           });
@@ -429,7 +529,11 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
         setPosts(posts);
         setTotalCount(res.data.total || 0);
         // Khi filter seeding: totalPages = 1 vì FE-side filter không có pagination thực
-        setTotalPages(filters.seeding_status && filters.seeding_status !== "all" ? 1 : res.data.total_pages || 1);
+        setTotalPages(
+          filters.seeding_status && filters.seeding_status !== "all"
+            ? 1
+            : res.data.total_pages || 1,
+        );
         // Phase 6: ưu tiên quick_stats từ response (1 round-trip), fallback /stats nếu thiếu
         if (res.data.quick_stats) {
           setStats(res.data.quick_stats as UnifiedStats);
@@ -441,7 +545,9 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
         setPostsError(res.message || "Không thể tải bài viết.");
       }
     } catch (err) {
-      setPostsError(err instanceof Error ? err.message : "Lỗi khi tải bài viết.");
+      setPostsError(
+        err instanceof Error ? err.message : "Lỗi khi tải bài viết.",
+      );
     } finally {
       setIsLoadingPosts(false);
     }
@@ -451,7 +557,9 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
   // co so hom nay, theo yeu cau Thanh: "cần thêm dashboard để biết tổng
 
   // comment, inbox... các ngày ra sao".
-  const [dailyTrend, setDailyTrend] = useState<Array<{ date: string; posts: number; comments: number; inbox: number }>>([]);
+  const [dailyTrend, setDailyTrend] = useState<
+    Array<{ date: string; posts: number; comments: number; inbox: number }>
+  >([]);
   // Cung ly do voi isLoadingPosts o tren: fetchDailyTrend cung guard
   // !CURRENT_USER_EMAIL nen phai khoi tao true, khong la false.
   const [isLoadingTrend, setIsLoadingTrend] = useState(true);
@@ -495,9 +603,12 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
 
   useEffect(() => {
     if (!CURRENT_USER_EMAIL) return;
-    socialAccountsService.getAll().then((res) => {
-      if (res.success) setSocialAccounts(res.data || []);
-    }).catch(() => {});
+    socialAccountsService
+      .getAll()
+      .then((res) => {
+        if (res.success) setSocialAccounts(res.data || []);
+      })
+      .catch(() => {});
   }, [CURRENT_USER_EMAIL]);
 
   const handleFilter = useCallback((f: FilterState) => {
@@ -544,7 +655,8 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
       team: params.get("team") || "",
       sort: (params.get("sort") as typeof prev.sort) || "latest",
       dateRange: params.get("date") || "",
-      seeding_status: (params.get("seeding") as typeof prev.seeding_status) || "all",
+      seeding_status:
+        (params.get("seeding") as typeof prev.seeding_status) || "all",
     }));
   }, []);
 
@@ -552,8 +664,12 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
   const industries = categories.filter((c) => c.category_type === "industry");
   const tiers = categories.filter((c) => c.category_type === "tier");
   const icps = categories.filter((c) => c.category_type === "icp");
-  const contentTypes = categories.filter((c) => c.category_type === "content_type");
-  const productSeedings = categories.filter((c) => c.category_type === "product_seeding");
+  const contentTypes = categories.filter(
+    (c) => c.category_type === "content_type",
+  );
+  const productSeedings = categories.filter(
+    (c) => c.category_type === "product_seeding",
+  );
   const teamCategories: Category[] = teams.map((t) => ({
     id: t.id,
     code: t.name,
@@ -580,7 +696,9 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
       setTotalCount((c) => Math.max(0, c - 1));
 
       try {
-        const res = await allPlatformPostsDeleteService.deleteFacebookPost({ id: post.id });
+        const res = await allPlatformPostsDeleteService.deleteFacebookPost({
+          id: post.id,
+        });
         if (!res?.success) {
           throw new Error(res?.message || "Xóa thất bại");
         }
@@ -596,13 +714,12 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
     [posts, totalCount],
   );
 
-
   // Loc client-side theo mang dich vu da chon (xem SERVICE_AREA_TABS o dau
   // file) - khong doi lai backend/pagination, chi an/hien trong trang hien
   // tai. Neu can loc dung tren toan bo du lieu (khong chi trang dang xem),
   // viec nay nen chuyen xuong backend (them tham so service_area) o phien sau.
   const visiblePosts = useMemo(
-    () => posts.filter(p => matchesServiceArea(p.industry, serviceArea)),
+    () => posts.filter((p) => matchesServiceArea(p.industry, serviceArea)),
     [posts, serviceArea],
   );
 
@@ -611,7 +728,9 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
       {!hideHeader && (
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="space-y-1">
-            <h1 className="text-2xl font-bold text-foreground tracking-tight">Unified Post Feed</h1>
+            <h1 className="text-2xl font-bold text-foreground tracking-tight">
+              Unified Post Feed
+            </h1>
             <p className="text-sm text-muted-foreground">
               Quản lý và theo dõi bài viết đa nền tảng với trí tuệ nhân tạo.
             </p>
@@ -619,14 +738,19 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
 
           <div className="flex flex-wrap items-center gap-3 shrink-0">
             <div className="bg-muted p-0.5 rounded-lg flex gap-0.5">
-              {([
-                { key: "facebook", label: "Facebook" },
-                { key: "linkedin", label: "LinkedIn" },
-              ] as const).map((t) => (
+              {(
+                [
+                  { key: "facebook", label: "Facebook" },
+                  { key: "linkedin", label: "LinkedIn" },
+                ] as const
+              ).map((t) => (
                 <button
                   key={t.key}
                   type="button"
-                  onClick={() => { setFeedPlatform(t.key); setPage(1); }}
+                  onClick={() => {
+                    setFeedPlatform(t.key);
+                    setPage(1);
+                  }}
                   className={cn(
                     "px-4 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer",
                     feedPlatform === t.key
@@ -688,18 +812,30 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
       <div className="bg-card border border-border rounded-2xl p-5 mb-4">
         <div className="mb-3 flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-bold text-foreground">Xu hướng 14 ngày gần nhất</h3>
-            <p className="text-xs text-muted-foreground">Tổng bài cào được · Comment đã verify · Inbox nhận được, theo từng ngày.</p>
+            <h3 className="text-sm font-bold text-foreground">
+              Xu hướng 14 ngày gần nhất
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Tổng bài cào được · Comment đã verify · Inbox nhận được, theo từng
+              ngày.
+            </p>
           </div>
-          {isLoadingTrend && <span className="text-xs text-muted-foreground">Đang tải...</span>}
+          {isLoadingTrend && (
+            <span className="text-xs text-muted-foreground">Đang tải...</span>
+          )}
         </div>
         {dailyTrend.length === 0 ? (
           <div className="flex h-[220px] items-center justify-center text-sm text-muted-foreground">
-            {isLoadingTrend ? "Đang tải dữ liệu xu hướng..." : "Chưa có dữ liệu xu hướng."}
+            {isLoadingTrend
+              ? "Đang tải dữ liệu xu hướng..."
+              : "Chưa có dữ liệu xu hướng."}
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={dailyTrend} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+            <AreaChart
+              data={dailyTrend}
+              margin={{ top: 4, right: 8, left: -20, bottom: 0 }}
+            >
               <defs>
                 <linearGradient id="colorPosts" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#2563eb" stopOpacity={0.35} />
@@ -714,7 +850,11 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
                   <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5e5" />
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="#e5e5e5"
+              />
               <XAxis
                 dataKey="date"
                 tickFormatter={(d: string) => d.slice(5).replace("-", "/")}
@@ -722,27 +862,59 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
                 axisLine={{ stroke: "#e5e5e5" }}
                 tickLine={false}
               />
-              <YAxis tick={{ fontSize: 11, fill: "#737373" }} axisLine={false} tickLine={false} allowDecimals={false} />
+              <YAxis
+                tick={{ fontSize: 11, fill: "#737373" }}
+                axisLine={false}
+                tickLine={false}
+                allowDecimals={false}
+              />
               <Tooltip
-                labelFormatter={(d) => `Ngày ${String(d ?? "").slice(5).replace("-", "/")}`}
-                contentStyle={{ borderRadius: 8, fontSize: 12, border: "1px solid #e5e5e5" }}
+                labelFormatter={(d) =>
+                  `Ngày ${String(d ?? "")
+                    .slice(5)
+                    .replace("-", "/")}`
+                }
+                contentStyle={{
+                  borderRadius: 8,
+                  fontSize: 12,
+                  border: "1px solid #e5e5e5",
+                }}
               />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Area type="monotone" dataKey="posts" name="Tổng bài" stroke="#2563eb" fill="url(#colorPosts)" strokeWidth={2} />
-              <Area type="monotone" dataKey="comments" name="Comment" stroke="#16a34a" fill="url(#colorComments)" strokeWidth={2} />
-              <Area type="monotone" dataKey="inbox" name="Inbox" stroke="#f59e0b" fill="url(#colorInbox)" strokeWidth={2} />
+              <Area
+                type="monotone"
+                dataKey="posts"
+                name="Tổng bài"
+                stroke="#2563eb"
+                fill="url(#colorPosts)"
+                strokeWidth={2}
+              />
+              <Area
+                type="monotone"
+                dataKey="comments"
+                name="Comment"
+                stroke="#16a34a"
+                fill="url(#colorComments)"
+                strokeWidth={2}
+              />
+              <Area
+                type="monotone"
+                dataKey="inbox"
+                name="Inbox"
+                stroke="#f59e0b"
+                fill="url(#colorInbox)"
+                strokeWidth={2}
+              />
             </AreaChart>
           </ResponsiveContainer>
         )}
       </div>
 
       {/* Phase 6: KPI personal progress — hiển thị cho cả member VÀ leader */}
-      {CURRENT_USER_EMAIL && (user?.role === "member" || user?.role === "leader") && (
-        <KpiProgressCard
-          email={CURRENT_USER_EMAIL}
-          type="comment"
-        />
-      )}
+      {CURRENT_USER_EMAIL &&
+        (user?.role === "member" || user?.role === "leader") && (
+          <KpiProgressCard email={CURRENT_USER_EMAIL} type="comment" />
+        )}
       {CURRENT_USER_EMAIL && user?.role === "member" && (
         <MemberKpiRewardOverview />
       )}
@@ -765,20 +937,35 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
             onComplete={(totalPosts) => {
               fetchPosts();
               fetchStats();
-              setCrawlResultsSummary(prev => {
-                const realTotal = prev.groups.reduce((sum, g) => sum + g.count, 0);
-                return { ...prev, totalPosts: realTotal > 0 ? realTotal : (totalPosts || 0) };
+              setCrawlResultsSummary((prev) => {
+                const realTotal = prev.groups.reduce(
+                  (sum, g) => sum + g.count,
+                  0,
+                );
+                return {
+                  ...prev,
+                  totalPosts: realTotal > 0 ? realTotal : totalPosts || 0,
+                };
               });
               setShowCrawlResultModal(true);
             }}
             onCrawlSaved={(data) => {
-              setCrawlResultsSummary(prev => {
-                const exists = prev.groups.find(g => g.groupUrl === data.groupUrl);
+              setCrawlResultsSummary((prev) => {
+                const exists = prev.groups.find(
+                  (g) => g.groupUrl === data.groupUrl,
+                );
                 let newGroups = prev.groups;
                 if (exists) {
-                  newGroups = prev.groups.map(g => g.groupUrl === data.groupUrl ? { ...g, count: g.count + data.count } : g);
+                  newGroups = prev.groups.map((g) =>
+                    g.groupUrl === data.groupUrl
+                      ? { ...g, count: g.count + data.count }
+                      : g,
+                  );
                 } else {
-                  newGroups = [...prev.groups, { groupUrl: data.groupUrl, count: data.count }];
+                  newGroups = [
+                    ...prev.groups,
+                    { groupUrl: data.groupUrl, count: data.count },
+                  ];
                 }
                 return { ...prev, groups: newGroups };
               });
@@ -849,18 +1036,18 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
         <>
           <div className="flex flex-col gap-4">
             {visiblePosts.map((post) => (
-                <PostCard
-                  key={post.id || post.post_url}
-                  post={post}
-                  userRole={user?.role}
-                  seeded={!!post.verify_status && post.verify_status !== "no"}
-                  verifyStatus={post.verify_status as "pending" | "yes" | "no"}
-                  onSeeding={() => {}}
-                  onVerify={() => {}}
-                  onSchedule={(post) => setScheduleModalPost(post)}
-                  onViewDetail={(post) => setDetailModalPost(post)}
-                  onDelete={(p) => void handleDeletePost(p)}
-                />
+              <PostCard
+                key={post.id || post.post_url}
+                post={post}
+                userRole={user?.role}
+                seeded={!!post.verify_status && post.verify_status !== "no"}
+                verifyStatus={post.verify_status as "pending" | "yes" | "no"}
+                onSeeding={() => {}}
+                onVerify={() => {}}
+                onSchedule={(post) => setScheduleModalPost(post)}
+                onViewDetail={(post) => setDetailModalPost(post)}
+                onDelete={(p) => void handleDeletePost(p)}
+              />
             ))}
           </div>
 
@@ -920,55 +1107,71 @@ export function UnifiedDashboardHomeContent({ hideHeader }: { hideHeader?: boole
       />
 
       {/* MODAL KẾT QUẢ CÀO */}
-      {showCrawlResultModal && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-card rounded-2xl shadow-xl w-[400px] max-w-[90vw] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-6 text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="material-symbols-outlined text-green-600 text-3xl">check_circle</span>
-              </div>
-              <h3 className="text-xl font-black text-foreground mb-2">Hoàn tất cào dữ liệu!</h3>
-              <p className="text-sm text-muted-foreground mb-6">
-                Đã cào thành công tổng cộng <strong className="text-green-600">{crawlResultsSummary.totalPosts}</strong> bài viết mới.
-              </p>
+      {showCrawlResultModal &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-card rounded-2xl shadow-xl w-[400px] max-w-[90vw] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+              <div className="p-6 text-center">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <span className="material-symbols-outlined text-green-600 text-3xl">
+                    check_circle
+                  </span>
+                </div>
+                <h3 className="text-xl font-black text-foreground mb-2">
+                  Hoàn tất cào dữ liệu!
+                </h3>
+                <p className="text-sm text-muted-foreground mb-6">
+                  Đã cào thành công tổng cộng{" "}
+                  <strong className="text-green-600">
+                    {crawlResultsSummary.totalPosts}
+                  </strong>{" "}
+                  bài viết mới.
+                </p>
 
-              <button
-                onClick={() => window.location.reload()}
-                className="w-full py-3 bg-primary hover:bg-primary/90 text-white rounded-xl font-bold shadow-md transition-all active:scale-95"
-              >
-                Đồng ý & Tải lại trang
-              </button>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="w-full py-3 bg-primary hover:bg-primary/90 text-white rounded-xl font-bold shadow-md transition-all active:scale-95"
+                >
+                  Đồng ý & Tải lại trang
+                </button>
+              </div>
             </div>
-          </div>
-        </div>,
-        document.body
-      )}
+          </div>,
+          document.body,
+        )}
 
       {/* MODAL KẾT QUẢ SEEDING */}
-      {showSeedingResultModal && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-card rounded-2xl shadow-xl w-[400px] max-w-[90vw] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-6 text-center">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="material-symbols-outlined text-blue-600 text-3xl">task_alt</span>
+      {showSeedingResultModal &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-card rounded-2xl shadow-xl w-[400px] max-w-[90vw] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+              <div className="p-6 text-center">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <span className="material-symbols-outlined text-blue-600 text-3xl">
+                    task_alt
+                  </span>
+                </div>
+                <h3 className="text-xl font-black text-foreground mb-2">
+                  Hoàn tất Seeding!
+                </h3>
+                <p className="text-sm text-muted-foreground mb-6">
+                  Tiến trình seeding comment ngầm đã kết thúc. Các bài viết đã
+                  được cập nhật trạng thái mới nhất.
+                </p>
+
+                <button
+                  onClick={() => window.location.reload()}
+                  className="w-full py-3 bg-primary hover:bg-primary/90 text-white rounded-xl font-bold shadow-md transition-all active:scale-95"
+                >
+                  Đồng ý & Tải lại trang
+                </button>
               </div>
-              <h3 className="text-xl font-black text-foreground mb-2">Hoàn tất Seeding!</h3>
-              <p className="text-sm text-muted-foreground mb-6">
-                Tiến trình seeding comment ngầm đã kết thúc. Các bài viết đã được cập nhật trạng thái mới nhất.
-              </p>
-              
-              <button
-                onClick={() => window.location.reload()}
-                className="w-full py-3 bg-primary hover:bg-primary/90 text-white rounded-xl font-bold shadow-md transition-all active:scale-95"
-              >
-                Đồng ý & Tải lại trang
-              </button>
             </div>
-          </div>
-        </div>,
-        document.body
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
-

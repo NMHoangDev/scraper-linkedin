@@ -5,9 +5,21 @@ import { FaSearch } from "react-icons/fa";
 import { cn } from "@/lib/utils";
 import type { Category } from "@/types/unified.types";
 
-export type SortOption = "latest" | "score_high" | "score_low" | "comments_high" | "crawler" | "most_seeded" | "verified_first";
+export type SortOption =
+  | "latest"
+  | "score_high"
+  | "score_low"
+  | "comments_high"
+  | "crawler"
+  | "most_seeded"
+  | "verified_first";
 
-export type SeedingStatusFilter = "all" | "seeded" | "verified" | "pending" | "rejected";
+export type SeedingStatusFilter =
+  | "all"
+  | "seeded"
+  | "verified"
+  | "pending"
+  | "rejected";
 
 interface FilterBarProps {
   intents: Category[];
@@ -57,7 +69,11 @@ const DATE_OPTIONS = [
   { value: "30days", label: "30 ngày" },
 ];
 
-const SEEDING_STATUS_OPTIONS: { value: SeedingStatusFilter; label: string; color: string }[] = [
+const SEEDING_STATUS_OPTIONS: {
+  value: SeedingStatusFilter;
+  label: string;
+  color: string;
+}[] = [
   { value: "all", label: "Tất cả", color: "slate" },
   { value: "seeded", label: "Đã seeding", color: "emerald" },
   { value: "verified", label: "Đã verify", color: "green" },
@@ -65,7 +81,18 @@ const SEEDING_STATUS_OPTIONS: { value: SeedingStatusFilter; label: string; color
   { value: "rejected", label: "Bị từ chối", color: "red" },
 ];
 
-export function FilterBar({ intents, industries, teams, tiers, icps, contentTypes = [], productSeedings = [], members = [], onFilter, isLoading }: FilterBarProps) {
+export function FilterBar({
+  intents,
+  industries,
+  teams,
+  tiers,
+  icps,
+  contentTypes = [],
+  productSeedings = [],
+  members = [],
+  onFilter,
+  isLoading,
+}: FilterBarProps) {
   const [search, setSearch] = useState("");
   const [intent, setIntent] = useState("");
   const [industry, setIndustry] = useState("");
@@ -78,7 +105,8 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
   const [sort, setSort] = useState<SortOption>("latest");
   const [dateRange, setDateRange] = useState("");
   // Phase 6: seeding status filter (admin/leader)
-  const [seedingStatus, setSeedingStatus] = useState<SeedingStatusFilter>("all");
+  const [seedingStatus, setSeedingStatus] =
+    useState<SeedingStatusFilter>("all");
 
   const handleChange = (updates: Partial<FilterState>) => {
     const s = updates.search !== undefined ? updates.search : search;
@@ -87,12 +115,19 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
     const t = updates.team !== undefined ? updates.team : team;
     const ti = updates.tier !== undefined ? updates.tier : tier;
     const ic = updates.icp !== undefined ? updates.icp : icp;
-    const ct = updates.content_type !== undefined ? updates.content_type : contentType;
-    const ps = updates.product_seeding !== undefined ? updates.product_seeding : productSeeding;
+    const ct =
+      updates.content_type !== undefined ? updates.content_type : contentType;
+    const ps =
+      updates.product_seeding !== undefined
+        ? updates.product_seeding
+        : productSeeding;
     const m = updates.member !== undefined ? updates.member : member;
     const so = updates.sort !== undefined ? updates.sort : sort;
     const dr = updates.dateRange !== undefined ? updates.dateRange : dateRange;
-    const ss = updates.seeding_status !== undefined ? updates.seeding_status : seedingStatus;
+    const ss =
+      updates.seeding_status !== undefined
+        ? updates.seeding_status
+        : seedingStatus;
 
     onFilter({
       search: s,
@@ -140,8 +175,8 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
   };
 
   return (
-    <div className="bg-[#F5F5F5]/50 flex flex-wrap items-center gap-3 rounded-2xl border border-[#E5E5E5] p-4 shadow-[0_4px_20px_rgba(0,0,0,0.015)]">
-      <div className="relative min-w-[200px] flex-1">
+    <div className="bg-[#F5F5F5]/50 grid grid-cols-2 gap-3 rounded-2xl border border-[#E5E5E5] p-4 shadow-[0_4px_20px_rgba(0,0,0,0.015)] sm:flex sm:flex-wrap sm:items-center">
+      <div className="relative col-span-2 sm:min-w-[200px] sm:flex-1">
         <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A0A0A0] text-sm" />
         <input
           type="text"
@@ -161,7 +196,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
           setDateRange(e.target.value);
           handleChange({ dateRange: e.target.value });
         }}
-        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[110px]"
+        className="w-full border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm sm:w-auto sm:min-w-[110px]"
       >
         {DATE_OPTIONS.map((o) => (
           <option key={o.value} value={o.value}>
@@ -176,7 +211,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
           setSort(e.target.value as SortOption);
           handleChange({ sort: e.target.value as SortOption });
         }}
-        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
+        className="w-full border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm sm:w-auto sm:min-w-[130px]"
       >
         {SORT_OPTIONS.map((o) => (
           <option key={o.value} value={o.value}>
@@ -193,7 +228,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
           setSeedingStatus(val);
           handleChange({ seeding_status: val });
         }}
-        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
+        className="w-full border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm sm:w-auto sm:min-w-[130px]"
         title="Lọc theo trạng thái seeding"
       >
         {SEEDING_STATUS_OPTIONS.map((o) => (
@@ -209,7 +244,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
           setIntent(e.target.value);
           handleChange({ intent: e.target.value });
         }}
-        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[120px]"
+        className="w-full border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm sm:w-auto sm:min-w-[120px]"
       >
         <option value="">Tất cả Lĩnh vực</option>
         {intents.map((i) => (
@@ -225,7 +260,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
           setIndustry(e.target.value);
           handleChange({ industry: e.target.value });
         }}
-        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[120px]"
+        className="w-full border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm sm:w-auto sm:min-w-[120px]"
       >
         <option value="">Tất cả Ngành</option>
         {industries.map((i) => (
@@ -241,7 +276,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
           setTeam(e.target.value);
           handleChange({ team: e.target.value });
         }}
-        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[120px]"
+        className="w-full border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm sm:w-auto sm:min-w-[120px]"
       >
         <option value="">Tất cả Team</option>
         {teams.map((t) => (
@@ -257,7 +292,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
           setTier(e.target.value);
           handleChange({ tier: e.target.value });
         }}
-        className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[110px]"
+        className="w-full border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm sm:w-auto sm:min-w-[110px]"
       >
         <option value="">Tất cả Tier</option>
         {tiers.map((t) => (
@@ -274,7 +309,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
             setIcp(e.target.value);
             handleChange({ icp: e.target.value });
           }}
-          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[110px]"
+          className="w-full border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm sm:w-auto sm:min-w-[110px]"
         >
           <option value="">Tất cả ICP</option>
           {icps.map((c) => (
@@ -292,7 +327,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
             setContentType(e.target.value);
             handleChange({ content_type: e.target.value });
           }}
-          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[120px]"
+          className="w-full border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm sm:w-auto sm:min-w-[120px]"
         >
           <option value="">Loại nội dung</option>
           {contentTypes.map((c) => (
@@ -310,7 +345,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
             setProductSeeding(e.target.value);
             handleChange({ product_seeding: e.target.value });
           }}
-          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
+          className="w-full border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm sm:w-auto sm:min-w-[130px]"
         >
           <option value="">Sản phẩm Seeding</option>
           {productSeedings.map((c) => (
@@ -328,7 +363,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
             setMember(e.target.value);
             handleChange({ member: e.target.value });
           }}
-          className="border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm min-w-[130px]"
+          className="w-full border border-[#E5E5E5] bg-[#FFFFFF] hover:bg-[#F5F5F5] focus:border-[#E3000F] focus:ring-2 focus:ring-[#E3000F]/20 rounded-xl px-3 py-2 text-xs font-bold text-[#1A1A1A] outline-none transition cursor-pointer shadow-sm sm:w-auto sm:min-w-[130px]"
         >
           <option value="">Tất cả Thành viên</option>
           {members.map((m) => (
@@ -344,7 +379,7 @@ export function FilterBar({ intents, industries, teams, tiers, icps, contentType
         type="button"
         onClick={clearFilters}
         disabled={isLoading}
-        className="ml-auto rounded-xl bg-white border border-[#E5E5E5] px-4 py-2 text-xs font-bold text-[#E3000F] hover:bg-[#E3000F]/5 hover:border-[#E3000F]/30 transition shadow-sm cursor-pointer disabled:opacity-50"
+        className="col-span-2 rounded-xl bg-white border border-[#E5E5E5] px-4 py-2 text-xs font-bold text-[#E3000F] hover:bg-[#E3000F]/5 hover:border-[#E3000F]/30 transition shadow-sm cursor-pointer disabled:opacity-50 sm:col-span-1 sm:ml-auto sm:w-auto"
       >
         Xóa lọc
       </button>

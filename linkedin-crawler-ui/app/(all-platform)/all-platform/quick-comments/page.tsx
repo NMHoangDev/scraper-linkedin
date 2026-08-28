@@ -2,9 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import {
-  allPlatformQuickCommentService,
-} from "@/services/all-platform.service";
+import { allPlatformQuickCommentService } from "@/services/all-platform.service";
 import { QuickCommentTemplate } from "@/types/unified.types";
 
 export default function QuickCommentsPage() {
@@ -23,7 +21,8 @@ export default function QuickCommentsPage() {
 
   // Modal State - Add / Edit
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<QuickCommentTemplate | null>(null);
+  const [editingTemplate, setEditingTemplate] =
+    useState<QuickCommentTemplate | null>(null);
   const [formData, setFormData] = useState({
     title: "",
     label: "Khen ngợi",
@@ -33,11 +32,15 @@ export default function QuickCommentsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Modal State - Delete
-  const [deletingTemplate, setDeletingTemplate] = useState<QuickCommentTemplate | null>(null);
+  const [deletingTemplate, setDeletingTemplate] =
+    useState<QuickCommentTemplate | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Toast Notification
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
 
   const showToast = (message: string, type: "success" | "error") => {
     setToast({ message, type });
@@ -78,7 +81,11 @@ export default function QuickCommentsPage() {
   const filteredTemplates = useMemo(() => {
     return templates.filter((t) => {
       // Filter platform
-      if (activePlatform !== "all" && t.platform !== "all" && t.platform !== activePlatform) {
+      if (
+        activePlatform !== "all" &&
+        t.platform !== "all" &&
+        t.platform !== activePlatform
+      ) {
         return false;
       }
       // Filter label
@@ -105,9 +112,15 @@ export default function QuickCommentsPage() {
   }, [activePlatform, searchQuery, selectedLabel]);
 
   // Paginated Data
-  const totalPages = Math.max(1, Math.ceil(filteredTemplates.length / ITEMS_PER_PAGE));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredTemplates.length / ITEMS_PER_PAGE),
+  );
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, filteredTemplates.length);
+  const endIndex = Math.min(
+    startIndex + ITEMS_PER_PAGE,
+    filteredTemplates.length,
+  );
   const paginatedTemplates = useMemo(() => {
     return filteredTemplates.slice(startIndex, startIndex + ITEMS_PER_PAGE);
   }, [filteredTemplates, startIndex]);
@@ -186,7 +199,9 @@ export default function QuickCommentsPage() {
     if (!deletingTemplate) return;
     setIsDeleting(true);
     try {
-      const res = await allPlatformQuickCommentService.delete(deletingTemplate.id);
+      const res = await allPlatformQuickCommentService.delete(
+        deletingTemplate.id,
+      );
       if (res && res.success) {
         showToast("Đã xóa mẫu câu thành công!", "success");
         setDeletingTemplate(null);
@@ -223,23 +238,40 @@ export default function QuickCommentsPage() {
   const getPlatformBadge = (platform?: string) => {
     switch (platform) {
       case "facebook":
-        return <span className="inline-block whitespace-nowrap px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Facebook</span>;
+        return (
+          <span className="inline-block whitespace-nowrap px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+            Facebook
+          </span>
+        );
       case "linkedin":
-        return <span className="inline-block whitespace-nowrap px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200">LinkedIn</span>;
+        return (
+          <span className="inline-block whitespace-nowrap px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
+            LinkedIn
+          </span>
+        );
       case "youtube":
-        return <span className="inline-block whitespace-nowrap px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-red-50 text-red-700 border border-red-200">YouTube</span>;
+        return (
+          <span className="inline-block whitespace-nowrap px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-red-50 text-red-700 border border-red-200">
+            YouTube
+          </span>
+        );
       default:
-        return <span className="inline-block whitespace-nowrap px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">Tất cả nền tảng</span>;
+        return (
+          <span className="inline-block whitespace-nowrap px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+            Tất cả nền tảng
+          </span>
+        );
     }
   };
 
   return (
-    <div className="w-full bg-[#f7f8fb] text-[#252733] min-h-screen">
+    <div className="w-full max-w-full overflow-x-hidden bg-[#f7f8fb] text-[#252733] min-h-screen">
       {/* Toast Alert */}
       {toast ? (
         <div
-          className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-xl text-xs font-bold text-white transition-all transform animate-bounce ${toast.type === "success" ? "bg-emerald-600" : "bg-rose-600"
-            }`}
+          className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-xl text-xs font-bold text-white transition-all transform animate-bounce ${
+            toast.type === "success" ? "bg-emerald-600" : "bg-rose-600"
+          }`}
         >
           {toast.type === "success" ? "✅ " : "❌ "}
           {toast.message}
@@ -247,18 +279,21 @@ export default function QuickCommentsPage() {
       ) : null}
 
       {/* HEADER */}
-      <div className="sticky top-0 z-10 bg-white border-b border-[#e7e9ef] h-14.5 flex items-center justify-between px-6">
-        <div className="flex items-center gap-3">
+      <div className="sticky top-0 z-10 bg-white border-b border-[#e7e9ef] min-h-14.5 flex flex-wrap items-center justify-between gap-2 px-3 py-2 sm:px-6 sm:py-0">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <Link
             href="/all-platform/internal-engagement"
-            className="px-3.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 shadow-2xs"
+            className="flex shrink-0 items-center gap-1.5 rounded-xl bg-gray-100 px-2.5 py-1.5 text-xs font-extrabold text-gray-700 shadow-2xs transition hover:bg-gray-200 sm:px-3.5"
           >
-            <span>⬅</span> Trở về Tương tác nội bộ
+            <span>⬅</span>{" "}
+            <span className="hidden sm:inline">Trở về Tương tác nội bộ</span>
           </Link>
-          <span className="text-gray-300">|</span>
-          <div className="font-black text-[17px] text-gray-900">Thư viện mẫu câu</div>
+          <span className="hidden text-gray-300 sm:inline">|</span>
+          <div className="truncate font-black text-[15px] text-gray-900 sm:text-[17px]">
+            Thư viện mẫu câu
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
             className="border border-[#e7e9ef] bg-white hover:bg-gray-50 rounded-xl p-2 transition cursor-pointer"
@@ -270,13 +305,16 @@ export default function QuickCommentsPage() {
         </div>
       </div>
 
-      <div className="max-w-425 mx-auto p-5">
+      <div className="max-w-425 mx-auto overflow-x-hidden p-3 sm:p-5">
         {/* TOP TITLE & ACTIONS */}
         <div className="flex flex-col sm:flex-row justify-between gap-4 sm:items-center mb-6">
           <div>
-            <h1 className="text-[24px] m-0 mb-[4px] font-extrabold text-[#0f172a]">Thư viện mẫu câu (Quick Comments)</h1>
+            <h1 className="text-[24px] m-0 mb-[4px] font-extrabold text-[#0f172a]">
+              Thư viện mẫu câu (Quick Comments)
+            </h1>
             <p className="m-0 text-[#64748b] text-[14px]">
-              Quản lý danh sách mẫu bình luận nhanh cho nhân viên seeding trên Facebook, LinkedIn và YouTube.
+              Quản lý danh sách mẫu bình luận nhanh cho nhân viên seeding trên
+              Facebook, LinkedIn và YouTube.
             </p>
           </div>
           <div className="flex items-center gap-3 shrink-0">
@@ -293,37 +331,67 @@ export default function QuickCommentsPage() {
         {/* STATS CARDS */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 mb-6">
           <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.03)]">
-            <span className="text-xs font-semibold text-gray-500 block">Tổng mẫu câu</span>
-            <div className="text-2xl font-black text-gray-900 mt-1">{templates.length}</div>
-            <span className="text-[11px] text-gray-400 font-medium">Mẫu câu khả dụng</span>
+            <span className="text-xs font-semibold text-gray-500 block">
+              Tổng mẫu câu
+            </span>
+            <div className="text-2xl font-black text-gray-900 mt-1">
+              {templates.length}
+            </div>
+            <span className="text-[11px] text-gray-400 font-medium">
+              Mẫu câu khả dụng
+            </span>
           </div>
           <div className="bg-white border border-blue-100 rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.03)]">
-            <span className="text-xs font-semibold text-blue-600 block">Facebook</span>
+            <span className="text-xs font-semibold text-blue-600 block">
+              Facebook
+            </span>
             <div className="text-2xl font-black text-blue-950 mt-1">
-              {templates.filter((t) => t.platform === "all" || t.platform === "facebook").length}
+              {
+                templates.filter(
+                  (t) => t.platform === "all" || t.platform === "facebook",
+                ).length
+              }
             </div>
-            <span className="text-[11px] text-blue-500 font-medium">Dùng cho Facebook</span>
+            <span className="text-[11px] text-blue-500 font-medium">
+              Dùng cho Facebook
+            </span>
           </div>
           <div className="bg-white border border-sky-100 rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.03)]">
-            <span className="text-xs font-semibold text-sky-600 block">LinkedIn</span>
+            <span className="text-xs font-semibold text-sky-600 block">
+              LinkedIn
+            </span>
             <div className="text-2xl font-black text-sky-950 mt-1">
-              {templates.filter((t) => t.platform === "all" || t.platform === "linkedin").length}
+              {
+                templates.filter(
+                  (t) => t.platform === "all" || t.platform === "linkedin",
+                ).length
+              }
             </div>
-            <span className="text-[11px] text-sky-500 font-medium">Dùng cho LinkedIn</span>
+            <span className="text-[11px] text-sky-500 font-medium">
+              Dùng cho LinkedIn
+            </span>
           </div>
           <div className="bg-white border border-red-100 rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.03)]">
-            <span className="text-xs font-semibold text-red-600 block">YouTube</span>
+            <span className="text-xs font-semibold text-red-600 block">
+              YouTube
+            </span>
             <div className="text-2xl font-black text-red-950 mt-1">
-              {templates.filter((t) => t.platform === "all" || t.platform === "youtube").length}
+              {
+                templates.filter(
+                  (t) => t.platform === "all" || t.platform === "youtube",
+                ).length
+              }
             </div>
-            <span className="text-[11px] text-red-500 font-medium">Dùng cho YouTube</span>
+            <span className="text-[11px] text-red-500 font-medium">
+              Dùng cho YouTube
+            </span>
           </div>
         </div>
 
         {/* FILTERS & SEARCH BAR */}
         <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-6 shadow-[0_2px_8px_rgba(0,0,0,0.03)] flex flex-wrap items-center justify-between gap-4">
           {/* Platform Tabs */}
-          <div className="flex items-center gap-1.5 bg-gray-100/80 p-1 rounded-xl shrink-0">
+          <div className="flex max-w-full items-center gap-1.5 overflow-x-auto rounded-xl bg-gray-100/80 p-1 shrink-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {[
               { id: "all", label: "Tất cả nền tảng" },
               { id: "facebook", label: "Facebook" },
@@ -334,17 +402,18 @@ export default function QuickCommentsPage() {
                 key={tab.id}
                 type="button"
                 onClick={() => setActivePlatform(tab.id)}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${activePlatform === tab.id
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+                  activePlatform === tab.id
                     ? "bg-white text-gray-900 shadow-xs"
                     : "text-gray-500 hover:text-gray-800 hover:bg-white/50"
-                  }`}
+                }`}
               >
                 {tab.label}
               </button>
             ))}
           </div>
 
-          <div className="flex items-center gap-3 w-full md:w-auto shrink-0 ml-auto">
+          <div className="flex w-full flex-wrap items-center gap-3 md:ml-auto md:w-auto md:flex-nowrap md:shrink-0">
             <div className="relative w-full md:w-75">
               <input
                 type="text"
@@ -353,14 +422,16 @@ export default function QuickCommentsPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-3 py-1.5 border border-gray-200 rounded-xl text-xs font-medium focus:outline-none focus:border-rose-500 transition"
               />
-              <span className="absolute left-3 top-2 text-gray-400 text-xs">🔍</span>
+              <span className="absolute left-3 top-2 text-gray-400 text-xs">
+                🔍
+              </span>
             </div>
 
             {/* Label Filter */}
             <select
               value={selectedLabel}
               onChange={(e) => setSelectedLabel(e.target.value)}
-              className="px-3 py-1.5 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 bg-white focus:outline-none cursor-pointer shrink-0"
+              className="w-full px-3 py-1.5 border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 bg-white focus:outline-none cursor-pointer shrink-0 md:w-auto"
             >
               <option value="all">Tất cả nhãn</option>
               {availableLabels.map((lbl) => (
@@ -375,12 +446,17 @@ export default function QuickCommentsPage() {
         {/* MAIN TABLE CONTENT */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-[0_2px_8px_rgba(0,0,0,0.03)] overflow-hidden">
           {isLoading ? (
-            <div className="p-12 text-center text-gray-500 text-xs font-medium">Đang tải danh sách mẫu câu...</div>
+            <div className="p-12 text-center text-gray-500 text-xs font-medium">
+              Đang tải danh sách mẫu câu...
+            </div>
           ) : loadError ? (
-            <div className="p-8 text-center text-rose-600 text-xs font-bold bg-rose-50/50">{loadError}</div>
+            <div className="p-8 text-center text-rose-600 text-xs font-bold bg-rose-50/50">
+              {loadError}
+            </div>
           ) : filteredTemplates.length === 0 ? (
             <div className="p-12 text-center text-gray-400 text-xs font-medium">
-              Chưa có mẫu câu nào phù hợp với bộ lọc. Bấm &quot;Thêm mẫu câu mới&quot; để tạo ngay.
+              Chưa có mẫu câu nào phù hợp với bộ lọc. Bấm &quot;Thêm mẫu câu
+              mới&quot; để tạo ngay.
             </div>
           ) : (
             <>
@@ -388,22 +464,41 @@ export default function QuickCommentsPage() {
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="border-b border-gray-100 bg-gray-50/50 text-gray-400 font-semibold uppercase tracking-wider">
-                      <th className="py-3 px-4 w-12 text-center whitespace-nowrap">STT</th>
-                      <th className="py-3 px-4 min-w-36 whitespace-nowrap">Tiêu đề mẫu câu</th>
-                      <th className="py-3 px-4 min-w-35 whitespace-nowrap">Nhãn (Label)</th>
+                      <th className="py-3 px-4 w-12 text-center whitespace-nowrap">
+                        STT
+                      </th>
+                      <th className="py-3 px-4 min-w-36 whitespace-nowrap">
+                        Tiêu đề mẫu câu
+                      </th>
+                      <th className="py-3 px-4 min-w-35 whitespace-nowrap">
+                        Nhãn (Label)
+                      </th>
                       <th className="py-3 px-4 min-w-80">Nội dung mẫu câu</th>
-                      <th className="py-3 px-4 min-w-35 whitespace-nowrap">Nền tảng</th>
-                      <th className="py-3 px-4 w-24 text-center whitespace-nowrap">Thứ tự</th>
-                      <th className="py-3 px-4 w-28 text-right whitespace-nowrap">Thao tác</th>
+                      <th className="py-3 px-4 min-w-35 whitespace-nowrap">
+                        Nền tảng
+                      </th>
+                      <th className="py-3 px-4 w-24 text-center whitespace-nowrap">
+                        Thứ tự
+                      </th>
+                      <th className="py-3 px-4 w-28 text-right whitespace-nowrap">
+                        Thao tác
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 text-gray-700 font-medium">
                     {paginatedTemplates.map((item, idx) => {
                       const realIndex = startIndex + idx;
                       return (
-                        <tr key={item.id} className="hover:bg-gray-50/80 transition">
-                          <td className="py-3 px-4 text-center font-bold text-gray-400">{realIndex + 1}</td>
-                          <td className="py-3 px-4 font-bold text-gray-900">{item.title}</td>
+                        <tr
+                          key={item.id}
+                          className="hover:bg-gray-50/80 transition"
+                        >
+                          <td className="py-3 px-4 text-center font-bold text-gray-400">
+                            {realIndex + 1}
+                          </td>
+                          <td className="py-3 px-4 font-bold text-gray-900">
+                            {item.title}
+                          </td>
                           <td className="py-3 px-4">
                             <span className="inline-block whitespace-nowrap px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-700 border border-gray-200">
                               🏷️ {item.label || "Khác"}
@@ -414,7 +509,9 @@ export default function QuickCommentsPage() {
                               {item.content}
                             </div>
                           </td>
-                          <td className="py-3 px-4">{getPlatformBadge(item.platform)}</td>
+                          <td className="py-3 px-4">
+                            {getPlatformBadge(item.platform)}
+                          </td>
                           <td className="py-3 px-4 text-center">
                             <div className="flex items-center justify-center gap-1">
                               <button
@@ -429,7 +526,9 @@ export default function QuickCommentsPage() {
                               <button
                                 type="button"
                                 onClick={() => handleReorder(item.id, "down")}
-                                disabled={realIndex === filteredTemplates.length - 1}
+                                disabled={
+                                  realIndex === filteredTemplates.length - 1
+                                }
                                 className="p-1 hover:bg-gray-100 rounded text-gray-500 disabled:opacity-30 cursor-pointer"
                                 title="Chuyển xuống dưới"
                               >
@@ -465,9 +564,17 @@ export default function QuickCommentsPage() {
               {/* PAGINATION FOOTER */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-gray-100 bg-gray-50/50 text-xs font-medium text-gray-600">
                 <div>
-                  Hiển thị từ <span className="font-bold text-gray-900">{startIndex + 1}</span> đến{" "}
-                  <span className="font-bold text-gray-900">{endIndex}</span> trong tổng số{" "}
-                  <span className="font-bold text-gray-900">{filteredTemplates.length}</span> mẫu câu
+                  Hiển thị từ{" "}
+                  <span className="font-bold text-gray-900">
+                    {startIndex + 1}
+                  </span>{" "}
+                  đến{" "}
+                  <span className="font-bold text-gray-900">{endIndex}</span>{" "}
+                  trong tổng số{" "}
+                  <span className="font-bold text-gray-900">
+                    {filteredTemplates.length}
+                  </span>{" "}
+                  mẫu câu
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -484,7 +591,9 @@ export default function QuickCommentsPage() {
                   <button
                     type="button"
                     disabled={currentPage >= totalPages}
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    }
                     className="px-3.5 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-bold text-gray-700 hover:bg-gray-50 transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-2xs"
                   >
                     Trang sau →
@@ -507,7 +616,9 @@ export default function QuickCommentsPage() {
           <div className="w-[min(560px,100%)] bg-white rounded-2xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
               <h3 className="font-extrabold text-base text-gray-900">
-                {editingTemplate ? "✏️ Chỉnh sửa mẫu câu" : "➕ Thêm mẫu câu mới"}
+                {editingTemplate
+                  ? "✏️ Chỉnh sửa mẫu câu"
+                  : "➕ Thêm mẫu câu mới"}
               </h3>
               <button
                 type="button"
@@ -521,13 +632,16 @@ export default function QuickCommentsPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Tiêu đề gợi nhớ mẫu câu <span className="text-rose-500">*</span>
+                  Tiêu đề gợi nhớ mẫu câu{" "}
+                  <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
                   placeholder="Ví dụ: Khen ngợi bài viết hay, Hỏi tư vấn giá..."
                   value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, title: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-medium focus:outline-none focus:border-rose-500 transition"
                   required
                 />
@@ -535,10 +649,14 @@ export default function QuickCommentsPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Nhãn nhóm (Label)</label>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Nhãn nhóm (Label)
+                  </label>
                   <select
                     value={formData.label}
-                    onChange={(e) => setFormData({ ...formData, label: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, label: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-medium bg-white focus:outline-none focus:border-rose-500 transition cursor-pointer"
                   >
                     <option value="Khen ngợi">Khen ngợi</option>
@@ -550,10 +668,14 @@ export default function QuickCommentsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Áp dụng nền tảng</label>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Áp dụng nền tảng
+                  </label>
                   <select
                     value={formData.platform}
-                    onChange={(e) => setFormData({ ...formData, platform: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, platform: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-medium bg-white focus:outline-none focus:border-rose-500 transition cursor-pointer"
                   >
                     <option value="all">Tất cả nền tảng</option>
@@ -566,13 +688,16 @@ export default function QuickCommentsPage() {
 
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">
-                  Nội dung mẫu câu chi tiết <span className="text-rose-500">*</span>
+                  Nội dung mẫu câu chi tiết{" "}
+                  <span className="text-rose-500">*</span>
                 </label>
                 <textarea
                   rows={4}
                   placeholder="Nhập nội dung mẫu câu comment sẽ được tự động điền khi bấm seeding..."
                   value={formData.content}
-                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, content: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-medium focus:outline-none focus:border-rose-500 transition leading-relaxed"
                   required
                 />
@@ -616,7 +741,9 @@ export default function QuickCommentsPage() {
         >
           <div className="w-[min(460px,100%)] bg-white rounded-2xl p-6 shadow-2xl relative my-auto">
             <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
-              <h3 className="font-extrabold text-base text-rose-600">🗑️ Xác nhận xóa mẫu câu</h3>
+              <h3 className="font-extrabold text-base text-rose-600">
+                🗑️ Xác nhận xóa mẫu câu
+              </h3>
               <button
                 type="button"
                 onClick={() => setDeletingTemplate(null)}
@@ -626,7 +753,11 @@ export default function QuickCommentsPage() {
               </button>
             </div>
             <p className="text-xs text-gray-700 font-medium mb-4 leading-relaxed">
-              Bạn có chắc chắn muốn xóa mẫu câu &quot;<strong className="text-gray-900">{deletingTemplate.title}</strong>&quot; này không? Hành động này không thể hoàn tác.
+              Bạn có chắc chắn muốn xóa mẫu câu &quot;
+              <strong className="text-gray-900">
+                {deletingTemplate.title}
+              </strong>
+              &quot; này không? Hành động này không thể hoàn tác.
             </p>
             <div className="flex items-center justify-end gap-3 pt-2">
               <button

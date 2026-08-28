@@ -29,7 +29,7 @@
   --color-tertiary-fixed-dim: #c4c7c9;
   --color-primary-container: #d94a6c;
   --color-primary: #ba244a;
-  --color-outline: #E5E5E5;
+  --color-outline: #e5e5e5;
   --color-on-secondary: #ffffff;
   --color-on-error: #ffffff;
   --color-on-primary-fixed-variant: #8f1936;
@@ -55,14 +55,14 @@
   --color-tertiary: #565a5b;
   --color-surface-container-low: #f5f5f5;
   --color-primary-fixed: #d94a6c;
-  --color-on-surface: #1A1A1A;
+  --color-on-surface: #1a1a1a;
   --color-on-secondary-fixed: #00210e;
-  --color-surface-container-highest: #E5E5E5;
+  --color-surface-container-highest: #e5e5e5;
   --color-on-tertiary-container: #f5f8fa;
-  --color-surface-container-high: #E5E5E5;
+  --color-surface-container-high: #e5e5e5;
   --color-tertiary-container: #6e7274;
   --color-surface-tint: #ba244a;
-  --color-outline-variant: #E5E5E5;
+  --color-outline-variant: #e5e5e5;
   --color-surface-container: #f5f5f5;
   --color-on-primary-fixed: #ffffff;
   --color-on-tertiary: #ffffff;
@@ -224,7 +224,6 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-
     .rx-webhook-overlay--in,
     .rx-webhook-overlay--out,
     .rx-webhook-dialog--in,
@@ -308,7 +307,7 @@ body {
   text-align: left;
 }
 
-.tippy-box[data-placement^="right"]>.tippy-arrow {
+.tippy-box[data-placement^="right"] > .tippy-arrow {
   position: absolute;
   width: 12px;
   height: 12px;
@@ -321,7 +320,7 @@ body {
 }
 
 /* Mũi tên trắng cho placement 'top' / 'bottom' */
-.tippy-box[data-placement^="top"]>.tippy-arrow {
+.tippy-box[data-placement^="top"] > .tippy-arrow {
   width: 12px;
   height: 12px;
   bottom: 0;
@@ -332,7 +331,7 @@ body {
   border-bottom: 1px solid #e2e8f0;
 }
 
-.tippy-box[data-placement^="bottom"]>.tippy-arrow {
+.tippy-box[data-placement^="bottom"] > .tippy-arrow {
   width: 12px;
   height: 12px;
   top: 0;
@@ -464,4 +463,61 @@ body {
 
 .zalo-messages-container {
   padding-top: 8px !important;
+}
+
+/* ==========================================================================
+   Mobile responsiveness safety net
+   Only affects <= 767px. Desktop styles remain unchanged.
+   ========================================================================== */
+@media (max-width: 767px) {
+  [data-all-platform-content] {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  [data-all-platform-content] [class*="grid-cols-["] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  [data-all-platform-content] [class~="grid-cols-4"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  [data-all-platform-content] [class~="grid-cols-5"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  [data-all-platform-content] [class~="grid-cols-6"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  [data-all-platform-content] [class~="grid-cols-7"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  [data-all-platform-content] [class*="min-w-["] {
+    min-width: 0 !important;
+  }
+
+  [data-all-platform-content] [class*="w-["] {
+    max-width: 100% !important;
+  }
+
+  [data-all-platform-content] [class~="flex-nowrap"] {
+    flex-wrap: wrap !important;
+  }
+
+  [data-all-platform-content] input,
+  [data-all-platform-content] select,
+  [data-all-platform-content] textarea {
+    max-width: 100%;
+  }
+
+  [data-all-platform-content] img,
+  [data-all-platform-content] video,
+  [data-all-platform-content] iframe {
+    max-width: 100%;
+  }
 }

@@ -1,7 +1,17 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Archive, Copy, Edit3, FileText, Plus, Search, Trash2, Upload, X } from "lucide-react";
+import {
+  Archive,
+  Copy,
+  Edit3,
+  FileText,
+  Plus,
+  Search,
+  Trash2,
+  Upload,
+  X,
+} from "lucide-react";
 
 import {
   getSalesAssetSourceLabel,
@@ -17,7 +27,10 @@ import {
   type SalesAssetStatus,
   type SalesAssetType,
 } from "@/services/sales-asset.service";
-import { customerLeadService, type Customer } from "@/services/customer-lead.service";
+import {
+  customerLeadService,
+  type Customer,
+} from "@/services/customer-lead.service";
 import { cn } from "@/lib/utils";
 
 type FormState = SalesAssetInput & {
@@ -39,12 +52,21 @@ const emptyForm: FormState = {
 };
 
 function customerKey(customer: Customer): string {
-  return (customer.phone || customer.email || customer.customer_name || customer.id).trim().toLowerCase();
+  return (
+    customer.phone ||
+    customer.email ||
+    customer.customer_name ||
+    customer.id
+  )
+    .trim()
+    .toLowerCase();
 }
 
 function customerLabel(customer?: Customer | null) {
   if (!customer) return "";
-  return [customer.customer_name, customer.company_name].filter(Boolean).join(" - ");
+  return [customer.customer_name, customer.company_name]
+    .filter(Boolean)
+    .join(" - ");
 }
 
 function dealProjectName(deal?: Customer | null) {
@@ -94,7 +116,11 @@ function toInput(form: FormState): SalesAssetInput {
 
 function formatDate(value?: string | null) {
   if (!value) return "";
-  return new Date(value).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return new Date(value).toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }
 
 function isValidUrl(value: string) {
@@ -137,16 +163,25 @@ export function SalesAssetsPage() {
   }, [customers]);
 
   const selectedCustomer = useMemo(
-    () => customers.find((customer) => customer.id === form.customerLeadId) || null,
+    () =>
+      customers.find((customer) => customer.id === form.customerLeadId) || null,
     [customers, form.customerLeadId],
   );
-  const selectedCustomerKey = selectedCustomer ? customerKey(selectedCustomer) : "";
+  const selectedCustomerKey = selectedCustomer
+    ? customerKey(selectedCustomer)
+    : "";
   const dealOptions = useMemo(
-    () => customers.filter((customer) => selectedCustomerKey && customerKey(customer) === selectedCustomerKey),
+    () =>
+      customers.filter(
+        (customer) =>
+          selectedCustomerKey && customerKey(customer) === selectedCustomerKey,
+      ),
     [customers, selectedCustomerKey],
   );
   const projectOptions = useMemo(
-    () => [...new Set(assets.map((asset) => asset.projectName).filter(Boolean))],
+    () => [
+      ...new Set(assets.map((asset) => asset.projectName).filter(Boolean)),
+    ],
     [assets],
   );
 
@@ -173,10 +208,17 @@ export function SalesAssetsPage() {
   useEffect(() => {
     void Promise.resolve().then(async () => {
       try {
-        const response = await customerLeadService.getAll({ page: 1, page_size: 500 });
+        const response = await customerLeadService.getAll({
+          page: 1,
+          page_size: 500,
+        });
         setCustomers(response.items || []);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Không tải được danh sách khách hàng CRM.");
+        setError(
+          e instanceof Error
+            ? e.message
+            : "Không tải được danh sách khách hàng CRM.",
+        );
       }
     });
   }, []);
@@ -211,7 +253,10 @@ export function SalesAssetsPage() {
       if (uploadFile) {
         setUploading(true);
         try {
-          const uploaded = await salesAssetService.upload(uploadFile, editing?.id);
+          const uploaded = await salesAssetService.upload(
+            uploadFile,
+            editing?.id,
+          );
           fileUrl = uploaded.url;
         } catch (e) {
           setError(e instanceof Error ? e.message : "Tải file lên thất bại.");
@@ -239,10 +284,16 @@ export function SalesAssetsPage() {
       }
       if (editing) {
         await salesAssetService.update(editing.id, input);
-        setNotice(mode === "upload" ? "Đã lưu tài liệu tải lên." : "Đã lưu link tài liệu.");
+        setNotice(
+          mode === "upload"
+            ? "Đã lưu tài liệu tải lên."
+            : "Đã lưu link tài liệu.",
+        );
       } else {
         await salesAssetService.create(input);
-        setNotice(mode === "upload" ? "Đã tải lên tài liệu." : "Đã thêm link tài liệu.");
+        setNotice(
+          mode === "upload" ? "Đã tải lên tài liệu." : "Đã thêm link tài liệu.",
+        );
       }
       setFormOpen(false);
       await loadAssets();
@@ -265,7 +316,8 @@ export function SalesAssetsPage() {
   };
 
   const remove = async (asset: SalesAsset) => {
-    if (!window.confirm(`Xóa vĩnh viễn "${asset.title}"? Không thể hoàn tác.`)) return;
+    if (!window.confirm(`Xóa vĩnh viễn "${asset.title}"? Không thể hoàn tác.`))
+      return;
     try {
       await salesAssetService.remove(asset.id);
       setNotice("Đã xóa tài liệu.");
@@ -305,7 +357,9 @@ export function SalesAssetsPage() {
       <div className="mx-auto w-full max-w-none space-y-5">
         <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-sm text-slate-500">Lưu link Proposal, Sale Kit theo khách hàng, dự án và phiên bản.</p>
+            <p className="text-sm text-slate-500">
+              Lưu link Proposal, Sale Kit theo khách hàng, dự án và phiên bản.
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -330,7 +384,10 @@ export function SalesAssetsPage() {
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="grid gap-3 xl:grid-cols-[1fr_220px_190px_160px_170px_auto]">
             <label className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                size={16}
+              />
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
@@ -341,124 +398,371 @@ export function SalesAssetsPage() {
                 className="h-11 w-full rounded-xl border border-slate-200 pl-9 pr-3 text-sm outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-100"
               />
             </label>
-            <select value={customerFilter} onChange={(event) => setCustomerFilter(event.target.value)} className="h-11 rounded-xl border border-slate-200 px-3 text-sm outline-none">
+            <select
+              value={customerFilter}
+              onChange={(event) => setCustomerFilter(event.target.value)}
+              className="h-11 rounded-xl border border-slate-200 px-3 text-sm outline-none"
+            >
               <option value="">Tất cả khách hàng</option>
-              {uniqueCustomers.map((customer) => <option key={customer.id} value={customer.id}>{customerLabel(customer)}</option>)}
+              {uniqueCustomers.map((customer) => (
+                <option key={customer.id} value={customer.id}>
+                  {customerLabel(customer)}
+                </option>
+              ))}
             </select>
-            <select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)} className="h-11 rounded-xl border border-slate-200 px-3 text-sm outline-none">
+            <select
+              value={projectFilter}
+              onChange={(event) => setProjectFilter(event.target.value)}
+              className="h-11 rounded-xl border border-slate-200 px-3 text-sm outline-none"
+            >
               <option value="">Tất cả dự án</option>
-              {projectOptions.map((project) => <option key={project} value={project}>{project}</option>)}
+              {projectOptions.map((project) => (
+                <option key={project} value={project}>
+                  {project}
+                </option>
+              ))}
             </select>
-            <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as SalesAssetType | "")} className="h-11 rounded-xl border border-slate-200 px-3 text-sm outline-none">
+            <select
+              value={typeFilter}
+              onChange={(event) =>
+                setTypeFilter(event.target.value as SalesAssetType | "")
+              }
+              className="h-11 rounded-xl border border-slate-200 px-3 text-sm outline-none"
+            >
               <option value="">Tất cả loại</option>
-              {SALES_ASSET_TYPE_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+              {SALES_ASSET_TYPE_OPTIONS.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
             </select>
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as SalesAssetStatus | "")} className="h-11 rounded-xl border border-slate-200 px-3 text-sm outline-none">
+            <select
+              value={statusFilter}
+              onChange={(event) =>
+                setStatusFilter(event.target.value as SalesAssetStatus | "")
+              }
+              className="h-11 rounded-xl border border-slate-200 px-3 text-sm outline-none"
+            >
               <option value="">Tất cả trạng thái</option>
-              {SALES_ASSET_STATUS_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+              {SALES_ASSET_STATUS_OPTIONS.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
             </select>
-            <button type="button" onClick={() => void loadAssets()} className="rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-700 hover:bg-slate-50">
+            <button
+              type="button"
+              onClick={() => void loadAssets()}
+              className="rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
+            >
               Tìm kiếm
             </button>
           </div>
         </section>
 
-        {notice ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">{notice}</div> : null}
-        {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{error}</div> : null}
+        {notice ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+            {notice}
+          </div>
+        ) : null}
+        {error ? (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+            {error}
+          </div>
+        ) : null}
 
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
-                <tr>
-                  <th className="px-4 py-3">Khách hàng</th>
-                  <th className="px-4 py-3">Dự án</th>
-                  <th className="px-4 py-3">Tên tài liệu</th>
-                  <th className="px-4 py-3">Loại</th>
-                  <th className="px-4 py-3">Phiên bản</th>
-                  <th className="px-4 py-3">Nguồn</th>
-                  <th className="px-4 py-3">Trạng thái</th>
-                  <th className="px-4 py-3">Cập nhật</th>
-                  <th className="px-4 py-3 text-right">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {loading ? (
-                  <tr><td colSpan={9} className="px-4 py-12 text-center text-slate-500">Đang tải tài liệu...</td></tr>
-                ) : assets.length === 0 ? (
-                  <tr><td colSpan={9} className="px-4 py-12 text-center text-slate-500">Chưa có link Proposal / Sale Kit.</td></tr>
-                ) : (
-                  assets.map((asset) => (
-                    <tr key={asset.id} className={cn(asset.status === "archived" && "bg-slate-50 text-slate-400")}>
-                      <td className="px-4 py-4">
-                        <div className="font-bold text-slate-950">{asset.customerName || "-"}</div>
-                        {asset.customerCompanyName ? <div className="text-xs text-slate-500">{asset.customerCompanyName}</div> : null}
-                      </td>
-                      <td className="px-4 py-4 text-slate-700">{asset.projectName || "-"}</td>
-                      <td className="px-4 py-4">
+          {loading ? (
+            <div className="px-4 py-12 text-center text-slate-500 text-sm">
+              Đang tải tài liệu...
+            </div>
+          ) : assets.length === 0 ? (
+            <div className="px-4 py-12 text-center text-slate-500 text-sm">
+              Chưa có link Proposal / Sale Kit.
+            </div>
+          ) : (
+            <>
+              {/* Mobile: card list (bảng 9 cột không phù hợp màn hình nhỏ) */}
+              <div className="flex flex-col gap-3 p-3 sm:hidden">
+                {assets.map((asset) => (
+                  <div
+                    key={asset.id}
+                    className={cn(
+                      "rounded-xl border border-slate-200 p-3",
+                      asset.status === "archived" &&
+                        "bg-slate-50 text-slate-400",
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
                         {asset.shareUrl ? (
                           <a
                             href={asset.shareUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(event) => event.stopPropagation()}
-                            className="flex items-center gap-2 font-bold text-slate-950 hover:text-rose-600 hover:underline"
-                            title="Bấm để mở link tài liệu"
+                            className="flex items-center gap-1.5 font-bold text-slate-950 hover:text-rose-600 hover:underline"
                           >
-                            <FileText size={16} className="text-slate-400" />
-                            {asset.title}
+                            <FileText
+                              size={15}
+                              className="shrink-0 text-slate-400"
+                            />
+                            <span className="truncate">{asset.title}</span>
                           </a>
                         ) : (
-                          <div className="flex items-center gap-2 font-bold text-slate-950">
-                            <FileText size={16} className="text-slate-400" />
-                            {asset.title}
+                          <div className="flex items-center gap-1.5 font-bold text-slate-950">
+                            <FileText
+                              size={15}
+                              className="shrink-0 text-slate-400"
+                            />
+                            <span className="truncate">{asset.title}</span>
                           </div>
                         )}
-                        {asset.description ? <div className="mt-1 line-clamp-1 text-xs text-slate-500">{asset.description}</div> : null}
-                      </td>
-                      <td className="px-4 py-4 font-semibold">{getSalesAssetTypeLabel(asset.type)}</td>
-                      <td className="px-4 py-4 font-semibold text-slate-700">{asset.version || "-"}</td>
-                      <td className="px-4 py-4 text-slate-600">{getSalesAssetSourceLabel(asset.sourceType)}</td>
-                      <td className="px-4 py-4">
-                        <span className={cn("whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold", asset.status === "active" ? "bg-emerald-100 text-emerald-700" : asset.status === "inactive" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-500")}>
-                          {getSalesAssetStatusLabel(asset.status)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-slate-500">{formatDate(asset.updatedAt)}</td>
-                      <td className="px-4 py-4">
-                        <div className="flex justify-end gap-1.5">
-                          <button type="button" onClick={() => void copyLink(asset)} disabled={!asset.shareUrl} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-40" title="Copy link">
-                            <Copy size={16} />
-                          </button>
-                          <button type="button" onClick={() => openEdit(asset)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" title="Chỉnh sửa">
-                            <Edit3 size={16} />
-                          </button>
-                          <button type="button" onClick={() => void archive(asset)} disabled={asset.status === "archived"} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-40" title="Lưu trữ">
-                            <Archive size={16} />
-                          </button>
-                          <button type="button" onClick={() => void remove(asset)} className="rounded-lg p-2 text-red-500 hover:bg-red-50" title="Xóa">
-                            <Trash2 size={16} />
-                          </button>
+                        <div className="mt-0.5 text-xs text-slate-500 truncate">
+                          {asset.customerName || "-"}
+                          {asset.customerCompanyName
+                            ? ` · ${asset.customerCompanyName}`
+                            : ""}
                         </div>
-                      </td>
+                      </div>
+                      <span
+                        className={cn(
+                          "shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold",
+                          asset.status === "active"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : asset.status === "inactive"
+                              ? "bg-amber-100 text-amber-700"
+                              : "bg-slate-100 text-slate-500",
+                        )}
+                      >
+                        {getSalesAssetStatusLabel(asset.status)}
+                      </span>
+                    </div>
+
+                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+                      <span>
+                        Dự án:{" "}
+                        <b className="text-slate-700">
+                          {asset.projectName || "-"}
+                        </b>
+                      </span>
+                      <span>
+                        Loại:{" "}
+                        <b className="text-slate-700">
+                          {getSalesAssetTypeLabel(asset.type)}
+                        </b>
+                      </span>
+                      <span>
+                        Bản:{" "}
+                        <b className="text-slate-700">{asset.version || "-"}</b>
+                      </span>
+                      <span>
+                        Nguồn:{" "}
+                        <b className="text-slate-700">
+                          {getSalesAssetSourceLabel(asset.sourceType)}
+                        </b>
+                      </span>
+                      <span>
+                        Cập nhật:{" "}
+                        <b className="text-slate-700">
+                          {formatDate(asset.updatedAt)}
+                        </b>
+                      </span>
+                    </div>
+
+                    <div className="mt-2.5 flex justify-end gap-1.5 border-t border-slate-100 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => void copyLink(asset)}
+                        disabled={!asset.shareUrl}
+                        className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-40"
+                        title="Copy link"
+                      >
+                        <Copy size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openEdit(asset)}
+                        className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                        title="Chỉnh sửa"
+                      >
+                        <Edit3 size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void archive(asset)}
+                        disabled={asset.status === "archived"}
+                        className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-40"
+                        title="Lưu trữ"
+                      >
+                        <Archive size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void remove(asset)}
+                        className="rounded-lg p-2 text-red-500 hover:bg-red-50"
+                        title="Xóa"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop / tablet: bảng đầy đủ */}
+              <div className="hidden overflow-x-auto sm:block">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+                    <tr>
+                      <th className="px-4 py-3">Khách hàng</th>
+                      <th className="px-4 py-3">Dự án</th>
+                      <th className="px-4 py-3">Tên tài liệu</th>
+                      <th className="px-4 py-3">Loại</th>
+                      <th className="px-4 py-3">Phiên bản</th>
+                      <th className="px-4 py-3">Nguồn</th>
+                      <th className="px-4 py-3">Trạng thái</th>
+                      <th className="px-4 py-3">Cập nhật</th>
+                      <th className="px-4 py-3 text-right">Thao tác</th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {assets.map((asset) => (
+                      <tr
+                        key={asset.id}
+                        className={cn(
+                          asset.status === "archived" &&
+                            "bg-slate-50 text-slate-400",
+                        )}
+                      >
+                        <td className="px-4 py-4">
+                          <div className="font-bold text-slate-950">
+                            {asset.customerName || "-"}
+                          </div>
+                          {asset.customerCompanyName ? (
+                            <div className="text-xs text-slate-500">
+                              {asset.customerCompanyName}
+                            </div>
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-4 text-slate-700">
+                          {asset.projectName || "-"}
+                        </td>
+                        <td className="px-4 py-4">
+                          {asset.shareUrl ? (
+                            <a
+                              href={asset.shareUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(event) => event.stopPropagation()}
+                              className="flex items-center gap-2 font-bold text-slate-950 hover:text-rose-600 hover:underline"
+                              title="Bấm để mở link tài liệu"
+                            >
+                              <FileText size={16} className="text-slate-400" />
+                              {asset.title}
+                            </a>
+                          ) : (
+                            <div className="flex items-center gap-2 font-bold text-slate-950">
+                              <FileText size={16} className="text-slate-400" />
+                              {asset.title}
+                            </div>
+                          )}
+                          {asset.description ? (
+                            <div className="mt-1 line-clamp-1 text-xs text-slate-500">
+                              {asset.description}
+                            </div>
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-4 font-semibold">
+                          {getSalesAssetTypeLabel(asset.type)}
+                        </td>
+                        <td className="px-4 py-4 font-semibold text-slate-700">
+                          {asset.version || "-"}
+                        </td>
+                        <td className="px-4 py-4 text-slate-600">
+                          {getSalesAssetSourceLabel(asset.sourceType)}
+                        </td>
+                        <td className="px-4 py-4">
+                          <span
+                            className={cn(
+                              "whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold",
+                              asset.status === "active"
+                                ? "bg-emerald-100 text-emerald-700"
+                                : asset.status === "inactive"
+                                  ? "bg-amber-100 text-amber-700"
+                                  : "bg-slate-100 text-slate-500",
+                            )}
+                          >
+                            {getSalesAssetStatusLabel(asset.status)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-slate-500">
+                          {formatDate(asset.updatedAt)}
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => void copyLink(asset)}
+                              disabled={!asset.shareUrl}
+                              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-40"
+                              title="Copy link"
+                            >
+                              <Copy size={16} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openEdit(asset)}
+                              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                              title="Chỉnh sửa"
+                            >
+                              <Edit3 size={16} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void archive(asset)}
+                              disabled={asset.status === "archived"}
+                              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-40"
+                              title="Lưu trữ"
+                            >
+                              <Archive size={16} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void remove(asset)}
+                              className="rounded-lg p-2 text-red-500 hover:bg-red-50"
+                              title="Xóa"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </section>
       </div>
 
       {formOpen ? (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/35 p-4">
-          <form onSubmit={submit} className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+          <form
+            onSubmit={submit}
+            className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+          >
             <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
               <div>
                 <h2 className="text-lg font-bold">
                   {mode === "upload"
-                    ? editing ? "Chỉnh sửa tài liệu tải lên" : "Tải lên tài liệu"
-                    : editing ? "Chỉnh sửa link tài liệu" : "Thêm link tài liệu"}
+                    ? editing
+                      ? "Chỉnh sửa tài liệu tải lên"
+                      : "Tải lên tài liệu"
+                    : editing
+                      ? "Chỉnh sửa link tài liệu"
+                      : "Thêm link tài liệu"}
                 </h2>
                 <p className="text-sm text-slate-500">
                   {mode === "upload"
@@ -466,54 +770,142 @@ export function SalesAssetsPage() {
                     : "Gắn link Canva, Docs, Drive hoặc link ngoài với khách hàng và dự án."}
                 </p>
               </div>
-              <button type="button" onClick={() => setFormOpen(false)} className="rounded-full p-2 text-slate-500 hover:bg-slate-100">Đóng</button>
+              <button
+                type="button"
+                onClick={() => setFormOpen(false)}
+                className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
+              >
+                Đóng
+              </button>
             </div>
             <div className="max-h-[68vh] overflow-auto p-5">
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-1.5">
                   <span className="text-sm font-bold">Khách hàng CRM</span>
-                  <select value={form.customerLeadId || ""} onChange={(event) => handleCustomerChange(event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-rose-500">
+                  <select
+                    value={form.customerLeadId || ""}
+                    onChange={(event) =>
+                      handleCustomerChange(event.target.value)
+                    }
+                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-rose-500"
+                  >
                     <option value="">Chọn khách hàng</option>
-                    {uniqueCustomers.map((customer) => <option key={customer.id} value={customer.id}>{customerLabel(customer)}</option>)}
+                    {uniqueCustomers.map((customer) => (
+                      <option key={customer.id} value={customer.id}>
+                        {customerLabel(customer)}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <label className="space-y-1.5">
                   <span className="text-sm font-bold">Deal / dự án có sẵn</span>
-                  <select value={form.dealId || ""} onChange={(event) => handleDealChange(event.target.value)} disabled={!form.customerLeadId} className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-rose-500 disabled:bg-slate-50">
+                  <select
+                    value={form.dealId || ""}
+                    onChange={(event) => handleDealChange(event.target.value)}
+                    disabled={!form.customerLeadId}
+                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-rose-500 disabled:bg-slate-50"
+                  >
                     <option value="">Không gắn deal</option>
-                    {dealOptions.map((deal) => <option key={deal.id} value={deal.id}>{dealProjectName(deal) || deal.id}</option>)}
+                    {dealOptions.map((deal) => (
+                      <option key={deal.id} value={deal.id}>
+                        {dealProjectName(deal) || deal.id}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <label className="space-y-1.5 md:col-span-2">
                   <span className="text-sm font-bold">Tên dự án</span>
-                  <input value={form.projectName || ""} onChange={(event) => setForm({ ...form, projectName: event.target.value })} placeholder="VD: Chatbot CSKH Q3, Website mới..." className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-100" />
+                  <input
+                    value={form.projectName || ""}
+                    onChange={(event) =>
+                      setForm({ ...form, projectName: event.target.value })
+                    }
+                    placeholder="VD: Chatbot CSKH Q3, Website mới..."
+                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-100"
+                  />
                 </label>
                 <label className="space-y-1.5 md:col-span-2">
                   <span className="text-sm font-bold">Tên tài liệu</span>
-                  <input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-100" />
+                  <input
+                    required
+                    value={form.title}
+                    onChange={(event) =>
+                      setForm({ ...form, title: event.target.value })
+                    }
+                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-100"
+                  />
                 </label>
                 <label className="space-y-1.5">
                   <span className="text-sm font-bold">Loại</span>
-                  <select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value as SalesAssetType })} className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none">
-                    {SALES_ASSET_TYPE_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                  <select
+                    value={form.type}
+                    onChange={(event) =>
+                      setForm({
+                        ...form,
+                        type: event.target.value as SalesAssetType,
+                      })
+                    }
+                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none"
+                  >
+                    {SALES_ASSET_TYPE_OPTIONS.map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <label className="space-y-1.5">
                   <span className="text-sm font-bold">Phiên bản</span>
-                  <input value={form.version || ""} onChange={(event) => setForm({ ...form, version: event.target.value })} placeholder="v1, v2, Final" className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-rose-500" />
+                  <input
+                    value={form.version || ""}
+                    onChange={(event) =>
+                      setForm({ ...form, version: event.target.value })
+                    }
+                    placeholder="v1, v2, Final"
+                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-rose-500"
+                  />
                 </label>
                 {mode === "link" ? (
                   <label className="space-y-1.5">
                     <span className="text-sm font-bold">Nguồn</span>
-                    <select value={form.sourceType} onChange={(event) => setForm({ ...form, sourceType: event.target.value as SalesAssetSourceType })} className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none">
-                      {SALES_ASSET_SOURCE_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                    <select
+                      value={form.sourceType}
+                      onChange={(event) =>
+                        setForm({
+                          ...form,
+                          sourceType: event.target
+                            .value as SalesAssetSourceType,
+                        })
+                      }
+                      className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none"
+                    >
+                      {SALES_ASSET_SOURCE_OPTIONS.map((item) => (
+                        <option key={item.value} value={item.value}>
+                          {item.label}
+                        </option>
+                      ))}
                     </select>
                   </label>
                 ) : null}
                 <label className="space-y-1.5">
                   <span className="text-sm font-bold">Trạng thái</span>
-                  <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as SalesAssetStatus })} className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none">
-                    {SALES_ASSET_STATUS_OPTIONS.filter((item) => item.value !== "archived").map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                  <select
+                    value={form.status}
+                    onChange={(event) =>
+                      setForm({
+                        ...form,
+                        status: event.target.value as SalesAssetStatus,
+                      })
+                    }
+                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none"
+                  >
+                    {SALES_ASSET_STATUS_OPTIONS.filter(
+                      (item) => item.value !== "archived",
+                    ).map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 {mode === "upload" ? (
@@ -526,14 +918,20 @@ export function SalesAssetsPage() {
                         <input
                           type="file"
                           className="hidden"
-                          onChange={(event) => setUploadFile(event.target.files?.[0] || null)}
+                          onChange={(event) =>
+                            setUploadFile(event.target.files?.[0] || null)
+                          }
                         />
                       </label>
                       {uploadFile ? (
                         <span className="inline-flex items-center gap-1.5 text-sm text-slate-700">
                           <FileText size={15} className="text-slate-400" />
                           {uploadFile.name}
-                          <button type="button" onClick={() => setUploadFile(null)} className="text-slate-400 hover:text-slate-600">
+                          <button
+                            type="button"
+                            onClick={() => setUploadFile(null)}
+                            className="text-slate-400 hover:text-slate-600"
+                          >
                             <X size={14} />
                           </button>
                         </span>
@@ -543,30 +941,66 @@ export function SalesAssetsPage() {
                           Đã có file - chọn file mới để thay thế
                         </span>
                       ) : (
-                        <span className="text-sm text-slate-400">Chưa chọn file</span>
+                        <span className="text-sm text-slate-400">
+                          Chưa chọn file
+                        </span>
                       )}
                     </div>
                   </label>
                 ) : (
                   <label className="space-y-1.5 md:col-span-2">
                     <span className="text-sm font-bold">Link tài liệu</span>
-                    <input required value={form.sourceUrl || ""} onChange={(event) => setForm({ ...form, sourceUrl: event.target.value })} placeholder="https://www.canva.com/..." className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-rose-500" />
+                    <input
+                      required
+                      value={form.sourceUrl || ""}
+                      onChange={(event) =>
+                        setForm({ ...form, sourceUrl: event.target.value })
+                      }
+                      placeholder="https://www.canva.com/..."
+                      className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-rose-500"
+                    />
                   </label>
                 )}
                 <label className="space-y-1.5 md:col-span-2">
                   <span className="text-sm font-bold">Ghi chú</span>
-                  <textarea rows={3} value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-rose-500" />
+                  <textarea
+                    rows={3}
+                    value={form.note}
+                    onChange={(event) =>
+                      setForm({ ...form, note: event.target.value })
+                    }
+                    className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-rose-500"
+                  />
                 </label>
               </div>
             </div>
             <div className="flex justify-end gap-3 border-t border-slate-200 px-5 py-4">
-              <button type="button" onClick={() => setFormOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">Hủy</button>
+              <button
+                type="button"
+                onClick={() => setFormOpen(false)}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+              >
+                Hủy
+              </button>
               <button
                 type="submit"
-                disabled={saving || uploading || !form.title.trim() || (mode === "link" ? !form.sourceUrl?.trim() : !uploadFile && !form.fileUrl)}
+                disabled={
+                  saving ||
+                  uploading ||
+                  !form.title.trim() ||
+                  (mode === "link"
+                    ? !form.sourceUrl?.trim()
+                    : !uploadFile && !form.fileUrl)
+                }
                 className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {uploading ? "Đang tải file..." : saving ? "Đang lưu..." : mode === "upload" ? "Lưu tài liệu" : "Lưu link"}
+                {uploading
+                  ? "Đang tải file..."
+                  : saving
+                    ? "Đang lưu..."
+                    : mode === "upload"
+                      ? "Lưu tài liệu"
+                      : "Lưu link"}
               </button>
             </div>
           </form>

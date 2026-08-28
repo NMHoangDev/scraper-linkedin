@@ -3,10 +3,17 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAppAuth } from "@/contexts/AppAuthContext";
-import { AppPlatformProvider, useAppPlatform } from "@/components/providers/AppPlatformProvider";
+import {
+  AppPlatformProvider,
+  useAppPlatform,
+} from "@/components/providers/AppPlatformProvider";
 import { AllPlatformSidebarShadcn } from "./AllPlatformSidebarShadcn";
 import { buildEntries, findCurrentPageLabel } from "./AllPlatformSidebar";
-import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import {
+  SidebarProvider,
+  SidebarInset,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { GlobalCrawlNotification } from "../components/global-crawl-notification";
 
@@ -69,8 +76,11 @@ function AllPlatformShellInner({ children }: { children: React.ReactNode }) {
   // Not authenticated — will redirect, render nothing
   if (!isAuthenticated) return null;
 
-  const isChatPage = pathname === "/zalo-chat" || pathname.startsWith("/zalo-chat");
-  const pageTitle = findCurrentPageLabel(ALL_ENTRIES_FOR_TITLE_LOOKUP, pathname) ?? "Marketing Agents";
+  const isChatPage =
+    pathname === "/zalo-chat" || pathname.startsWith("/zalo-chat");
+  const pageTitle =
+    findCurrentPageLabel(ALL_ENTRIES_FOR_TITLE_LOOKUP, pathname) ??
+    "Marketing Agents";
 
   return (
     <SidebarProvider>
@@ -79,13 +89,16 @@ function AllPlatformShellInner({ children }: { children: React.ReactNode }) {
         <header className="sticky top-0 z-20 flex h-12 shrink-0 items-center gap-2 border-b border-border bg-white px-3">
           <SidebarTrigger className="lg:hidden" />
           <Separator orientation="vertical" className="h-4 lg:hidden" />
-          <span className="text-sm font-semibold text-foreground">{pageTitle}</span>
+          <span className="min-w-0 truncate text-sm font-semibold text-foreground">
+            {pageTitle}
+          </span>
         </header>
         <div
+          data-all-platform-content
           className={
             isChatPage
               ? "flex-1 h-[calc(100svh-3rem)] overflow-hidden p-0"
-              : "flex-1 overflow-x-hidden bg-white p-3 sm:p-5 lg:p-8"
+              : "flex-1 min-w-0 overflow-x-clip bg-white p-3 sm:p-5 lg:p-8"
           }
         >
           <GlobalCrawlNotification />
