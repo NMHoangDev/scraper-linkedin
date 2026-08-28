@@ -60,6 +60,8 @@ export function ContractAIWizard({
   const [aiFixApplied, setAiFixApplied] = useState(false);
   const [generatedAt, setGeneratedAt] = useState<Date | null>(null);
   const [title, setTitle] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [createdContractId, setCreatedContractId] = useState('');
@@ -116,6 +118,8 @@ export function ContractAIWizard({
     setAiFixApplied(false);
     setGeneratedAt(null);
     setTitle('');
+    setStartDate('');
+    setEndDate('');
     setError('');
     setCreatedContractId('');
     setCreatedContractNumber('');
@@ -204,6 +208,8 @@ export function ContractAIWizard({
         templateType,
         contractValue: selectedQuote?.totalAmount || 0,
         currency: selectedQuote?.currency || 'VND',
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
         paymentTerms: extraPrompt,
         clauses,
         aiGenerated: true,
@@ -522,6 +528,16 @@ export function ContractAIWizard({
                           {generatedAt.toLocaleDateString('vi-VN')}
                         </p>
                       ) : null}
+                      <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                        <label style={{ fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          Ngày bắt đầu
+                          <input type="date" value={startDate} onChange={event => setStartDate(event.target.value)} />
+                        </label>
+                        <label style={{ fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          Ngày kết thúc
+                          <input type="date" value={endDate} onChange={event => setEndDate(event.target.value)} />
+                        </label>
+                      </div>
                     </header>
                     {clauses.map((clause, index) => (
                       <div key={index} id={`wizard-clause-${index}`} style={{ marginBottom: '0.8rem', scrollMarginTop: '1rem' }}>

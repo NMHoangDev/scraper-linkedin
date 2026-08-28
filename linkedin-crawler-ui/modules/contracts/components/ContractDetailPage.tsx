@@ -77,6 +77,8 @@ export function ContractDetailPage({ contractId }: { contractId: string }) {
   const [reviewing, setReviewing] = useState(false);
   const [progressPercent, setProgressPercent] = useState(0);
   const [paymentCollectedPercent, setPaymentCollectedPercent] = useState(0);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   async function load() {
     setLoading(true);
@@ -87,6 +89,8 @@ export function ContractDetailPage({ contractId }: { contractId: string }) {
       setClauses(data.clauses);
       setProgressPercent(data.progressPercent);
       setPaymentCollectedPercent(data.paymentCollectedPercent);
+      setStartDate(data.startDate || '');
+      setEndDate(data.endDate || '');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không tải được hợp đồng.');
     } finally {
@@ -111,11 +115,15 @@ export function ContractDetailPage({ contractId }: { contractId: string }) {
         clauses,
         progressPercent,
         paymentCollectedPercent,
+        startDate: startDate || null,
+        endDate: endDate || null,
       });
       setContract(updated);
       setClauses(updated.clauses);
       setProgressPercent(updated.progressPercent);
       setPaymentCollectedPercent(updated.paymentCollectedPercent);
+      setStartDate(updated.startDate || '');
+      setEndDate(updated.endDate || '');
     } catch (err) {
       window.alert(err instanceof Error ? err.message : 'Không lưu được thay đổi.');
     } finally {
@@ -192,7 +200,23 @@ export function ContractDetailPage({ contractId }: { contractId: string }) {
         </div>
       </header>
 
-      <section className="contract-stats" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
+      <section className="contract-stats" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
+        <article className="contract-stat">
+          <span>Thời hạn hợp đồng</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.3rem', flexWrap: 'wrap' }}>
+            <input
+              type="date" value={startDate}
+              onChange={e => setStartDate(e.target.value)}
+              style={{ height: '2rem', borderRadius: '0.4rem', border: '1px solid #dce2e9', padding: '0 0.4rem', fontSize: '0.78rem' }}
+            />
+            <span>–</span>
+            <input
+              type="date" value={endDate}
+              onChange={e => setEndDate(e.target.value)}
+              style={{ height: '2rem', borderRadius: '0.4rem', border: '1px solid #dce2e9', padding: '0 0.4rem', fontSize: '0.78rem' }}
+            />
+          </div>
+        </article>
         <article className="contract-stat">
           <span>Tiến độ thực hiện</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.3rem' }}>
