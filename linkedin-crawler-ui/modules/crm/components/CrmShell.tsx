@@ -203,6 +203,14 @@ export function CrmShell() {
     }
   }
 
+  /** "Lưu & thêm tiếp" — tạo deal nhưng KHÔNG đóng modal/mở chi tiết như handleCreate, để
+   * Sale nhập liên tiếp nhiều deal. Ném lỗi ngược lại cho DealFormModal xử lý (giữ nguyên
+   * form đang nhập khi lỗi) thay vì tự alert rồi nuốt luôn ở đây. */
+  async function handleCreateAndContinue(input: CreateDealInput) {
+    const deal = await createDeal(input);
+    void deal; // không cần mở chi tiết/chọn deal — chỉ tạo xong là xong, Sale tiếp tục nhập deal mới
+  }
+
   async function handleUpdate(id: string, input: UpdateDealInput) {
     try {
       const deal = await updateDeal(id, input);
@@ -507,7 +515,9 @@ export function CrmShell() {
           setEditingDeal(null);
         }}
         onCreate={handleCreate}
+        onCreateAndContinue={handleCreateAndContinue}
         onUpdate={handleUpdate}
+        currentUser={user}
       />
       <ContractDetailModal deal={contractDeal} open={Boolean(contractDeal)} onClose={() => setContractDeal(null)} />
     </div>
