@@ -15,9 +15,9 @@
 
 | Thứ | Giá trị |
 |---|---|
-| Host production app | `10.120.60.26`, user `deployseeding`, pass `Poptech@123`. Repo: `/opt/apps/seeding_markeeai/scraper-linkedin` |
+| Host production app | `10.120.60.26`, user `deployseeding`, pass — xem `docs/INFRASTRUCTURE.md` (gitignored, không commit). Repo: `/opt/apps/seeding_markeeai/scraper-linkedin` |
 | DB production THẬT | **Supabase Cloud** `https://rtwpogvficadngtfrcci.supabase.co` (KHÔNG phải self-host `seeding.db.markeeai.com` — đó là thông tin CŨ/SAI còn sót trong `docs/INFRASTRUCTURE.md` và memory cũ) |
-| Host self-host DB (dùng bởi local `.env` để test, KHÔNG liên quan production) | `10.30.194.82`, user `selfhost`, pass `1`. Cần VPN mới SSH được. Chứa NHIỀU project không liên quan (`seeding-trung-nguyen-*`, `kpi-prod-*`, `anhhieudemo-*`) — **CHỈ đụng vào container KHÔNG có prefix** (`supabase-db`, `supabase-rest`, `supabase-pooler`...) — đó mới là project "seeding". |
+| Host self-host DB (dùng bởi local `.env` để test, KHÔNG liên quan production) | `10.30.194.82`, user `selfhost`, pass — xem `docs/INFRASTRUCTURE.md` (gitignored, không commit). Cần VPN mới SSH được. Chứa NHIỀU project không liên quan (`seeding-trung-nguyen-*`, `kpi-prod-*`, `anhhieudemo-*`) — **CHỈ đụng vào container KHÔNG có prefix** (`supabase-db`, `supabase-rest`, `supabase-pooler`...) — đó mới là project "seeding". |
 | Local dev stack | Chạy bằng `docker compose` tại `D:\CrawlDataLinkedin`. Router ở **`http://localhost:18080`** (KHÔNG phải 8080 — port đó bị 1 Apache khác trên máy Windows này chiếm). Cấu hình port này nằm trong `docker-compose.override.yml` (gitignored, chỉ có ở máy này). |
 | Tài khoản Zalo test local | `zl_21f42279`, số `0839108906` ("Hoàng") — tài khoản Zalo THẬT của user, có session sống. Các account khác trong DB test đều đã ẩn (`is_active=false`). |
 | Tài khoản Zalo dùng chung trên production | MarkeeAI, `zl_986934c9`, số `0765055708`. Đã đánh dấu `is_shared_with_all=true`, 10 account khác đã ẩn. **NHƯNG CHƯA từng đăng nhập QR thật** — chưa có session. |
@@ -125,7 +125,8 @@
 1. Kiểm tra xem user đã chạy `apply_rpc_fix_for_user.py` (mục 2.7) chưa / kết quả ra sao. Nếu phiên mới không thấy gì, viết lại script tương tự:
    ```python
    import paramiko
-   HOST, USER, PASS = "10.30.194.82", "selfhost", "1"
+   HOST, USER = "10.30.194.82", "selfhost"
+   PASS = "..."  # xem docs/INFRASTRUCTURE.md (gitignored, không commit)
    with open(r"D:\CrawlDataLinkedin\linkedin_group_crawler\supabase\migrations\067_fn_get_zalo_conversations_shared_with_all.sql", "r", encoding="utf-8") as f:
        sql = f.read()
    client = paramiko.SSHClient()
