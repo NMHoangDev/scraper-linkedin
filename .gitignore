@@ -174,3 +174,6 @@ scraper-linkedin
 
 # Chua mat khau host thuc (plaintext) - chi dung local, khong duoc push
 docs/INFRASTRUCTURE.md
+
+# Doc tien do phien lam viec, phong hua thong tin ha tang nhay cam lot vao sau nay
+docs/QUOTE_ISSUER_COMPANY_WIZARD_2026-08-27.md
