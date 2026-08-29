@@ -56,10 +56,21 @@ jobs:
           curl -sf -o /dev/null http://localhost:8080/ || (echo "Frontend khong phan hoi" && exit 1)
           curl -sf -o /dev/null http://localhost:8080/api/all-platform/auth/me || echo "Luu y: auth/me khong phai 200 (co the do chua dang nhap, khong tinh la loi)"
 
-      # dev.seeding.markeeai.com duoc phuc vu boi stack RIENG (project seeding-dev,
-      # docker-compose.dev.yml, tro DB self-host) - stack default o tren KHONG dung
-      # cho domain. Buoc nay chan doan topology + rebuild stack -dev de code moi
+      # dev.seeding.markeeai.com duoc phuc vu boi 2 container rieng (frontend-dev/
+      # backend-dev, docker-compose.dev.yml) - stack default o tren KHONG dung cho
+      # domain. Buoc nay chan doan topology + rebuild 2 container -dev de code moi
       # thuc su len domain. Tat ca guard bang '|| true' de khong lam do workflow.
+      #
+      # QUAN TRONG: KHONG duoc truyen '-p seeding-dev' (hay bat ky '-p' nao khac
+      # voi ten thu muc). Tren host nay, frontend-dev/backend-dev thuc te thuoc
+      # CHUNG 1 compose project voi stack default - ten project mac dinh la
+      # basename thu muc ("scraper-linkedin"), khong phai "seeding-dev". Neu ep
+      # '-p seeding-dev', "up -d" se dung ten container (seeding-frontend-dev/
+      # seeding-backend-dev) giong het container that dang mang project-label
+      # "scraper-linkedin" -> Docker tu choi tao container trung ten -> lenh loi
+      # nhung bi '|| true' nuot -> deploy bao xanh nhung dev.seeding.markeeai.com
+      # van chay code cu (da xay ra 2 lan: 2026-08-04 va 2026-08-29). Luon de
+      # compose tu suy ra ten project (khong '-p') de khop dung label hien co.
       - name: Chan doan + rebuild stack dev (domain)
         run: |
           echo "===== docker compose ls ====="; docker compose ls || true
@@ -67,12 +78,12 @@ jobs:
           echo "===== compose files ====="; ls -la docker-compose*.yml || true
           echo "===== router server_name -> upstream ====="
           docker exec seeding-router sh -c 'cat /etc/nginx/nginx.conf /etc/nginx/conf.d/*.conf 2>/dev/null' | grep -iE "server_name|proxy_pass|upstream|dev\.seeding" | head -60 || true
-          echo "===== rebuild stack -dev neu co ====="
+          echo "===== rebuild container -dev neu co ====="
           if [ -f docker-compose.dev.yml ]; then
-            docker compose -p seeding-dev -f docker-compose.dev.yml build || true
-            docker compose -p seeding-dev -f docker-compose.dev.yml up -d || true
+            docker compose -f docker-compose.dev.yml build || true
+            docker compose -f docker-compose.dev.yml up -d || true
             docker exec seeding-router nginx -s reload 2>/dev/null || docker compose restart router || true
-            echo "da rebuild + up -d stack seeding-dev"
+            echo "da rebuild + up -d frontend-dev/backend-dev"
           else
             echo "KHONG thay docker-compose.dev.yml o thu muc deploy - domain co the route noi khac"
           fi
