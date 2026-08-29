@@ -446,7 +446,7 @@
 
 .qc-templates {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 16px;
 }
 
@@ -454,13 +454,26 @@
   background: var(--color-surface, #fff);
   border: 1px solid var(--color-outline, #e5e5e5);
   border-radius: 15px;
-  padding: 18px;
-  display: grid;
-  grid-template-columns: 46px 1fr 28px;
-  gap: 13px;
-  align-items: start;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+  min-width: 0;
   cursor: pointer;
   transition: 0.15s;
+}
+
+.qc-template-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.qc-template-body {
+  flex: 1;
+  min-width: 0;
 }
 
 .qc-template:hover {
@@ -495,44 +508,65 @@
 .qc-template h3 {
   font-size: 14px;
   font-weight: 700;
-  margin: 2px 0 6px;
+  margin: 2px 0 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .qc-template p {
   font-size: 11.5px;
   line-height: 1.5;
   color: var(--color-on-surface-variant, #666);
-  margin: 0 0 9px;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.4em;
 }
 
-.qc-template span {
+/* Badge "N truong du lieu" — thong tin ky thuat, khong huu ich voi nguoi dung
+ * cuoi, demote thanh chu nho/nhat mau thay vi pill noi bat nhu truoc. */
+.qc-template-fieldcount {
   font-size: 10px;
-  font-weight: 700;
-  color: #9099a8;
-  background: #f5f6f8;
-  padding: 4px 8px;
-  border-radius: 12px;
+  font-weight: 600;
+  color: #b7bec9;
+  background: none;
+  padding: 0;
+  border-radius: 0;
 }
 
-.qc-template button {
+.qc-template-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   border: 0;
   background: #f6f7f9;
-  width: 28px;
-  height: 28px;
+  width: 100%;
+  min-height: 34px;
   border-radius: 8px;
-  color: #5e6878;
+  color: var(--color-primary, #ba244a);
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
   cursor: pointer;
+}
+
+.qc-template-cta:hover {
+  background: #fff0f4;
 }
 
 .qc-linked-quotes {
   background: var(--color-surface, #fff);
   border: 1px solid var(--color-outline, #e5e5e5);
   border-radius: 16px;
-  padding: 22px;
+  padding: 16px;
 }
 
 .qc-linked-quotes .qc-section-head {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .qc-list-tools {
@@ -563,7 +597,7 @@
 
 .qc-linked-table {
   width: 100%;
-  min-width: 980px;
+  table-layout: fixed;
   border-collapse: collapse;
 }
 
@@ -574,7 +608,7 @@
   font-size: 10.5px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  padding: 11px 14px;
+  padding: 9px 10px;
   border-top: 1px solid var(--color-outline, #e5e5e5);
   border-bottom: 1px solid var(--color-outline, #e5e5e5);
   white-space: nowrap;
@@ -582,10 +616,32 @@
 
 .qc-linked-table td {
   font-size: 12.5px;
-  padding: 13px 14px;
+  padding: 9px 10px;
   border-bottom: 1px solid #eff1f5;
   color: #5b6576;
   vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qc-linked-table th:nth-child(1), .qc-linked-table td:nth-child(1) { width: 13%; }
+.qc-linked-table th:nth-child(2), .qc-linked-table td:nth-child(2) { width: 17%; }
+.qc-linked-table th:nth-child(3), .qc-linked-table td:nth-child(3) { width: 17%; }
+.qc-linked-table th:nth-child(4), .qc-linked-table td:nth-child(4) { width: 13%; }
+.qc-linked-table th:nth-child(5), .qc-linked-table td:nth-child(5) { width: 15%; }
+.qc-linked-table th:nth-child(6), .qc-linked-table td:nth-child(6) { width: 10%; }
+.qc-linked-table th:nth-child(7), .qc-linked-table td:nth-child(7) { width: 10%; }
+.qc-linked-table th:nth-child(8), .qc-linked-table td:nth-child(8) { width: 5%; text-align: right; }
+
+.qc-linked-table td:nth-child(2) .qc-row-link,
+.qc-linked-table td:nth-child(2) .qc-row-sub,
+.qc-linked-table td:nth-child(3) .qc-row-link,
+.qc-linked-table td:nth-child(3) .qc-row-sub {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .qc-row-link {
@@ -799,11 +855,15 @@
   .qc-quick p {
     display: none;
   }
+}
 
-  /* Bang nhieu cot (Hieu suat theo Sale / Bao gia da lien ket CRM) khong con
-   * vua man hinh du cuon ngang duoc (van phai cuon ca trang, kho dung) - doi
-   * sang dang the/box: moi dong thanh 1 the doc, nhan data-label lam nhan cho
-   * tung gia tri (xem thead an di, td hien nhan qua ::before). */
+/* Bang nhieu cot (Hieu suat theo Sale / Bao gia da lien ket CRM) khong con vua
+ * ngay tu do rong tablet 768px (xac nhan qua QA thuc te: header cac cot chong
+ * chit "MÃ BÁO KHÁCH HÀNGCƠ HỘI...") - rieng 2 bang nay doi sang dang the/box
+ * som hon (900px) thay vi cho toi 640px nhu phan layout con lai cua trang.
+ * Moi dong thanh 1 the doc, nhan data-label lam nhan cho tung gia tri (xem
+ * thead an di, td hien nhan qua ::before). */
+@media (max-width: 900px) {
   .qc-team-table thead,
   .qc-linked-table thead {
     display: none;

@@ -15,6 +15,7 @@ import { ReviewQuoteStep } from './ReviewQuoteStep';
 import { SelectCustomerStep } from './SelectCustomerStep';
 import { applyIssuerCompanySnapshot, emptyQuoteDraft, quoteDraftFromExistingQuote, quoteDraftFromForm } from './types';
 import type { QuoteDraft } from './types';
+import { clearVisibleColumnsDraft } from './quoteColumnsDraft';
 
 type CreateQuoteStep = 1 | 2 | 3;
 
@@ -299,6 +300,9 @@ export function CreateQuoteModal({
       });
       createdQuoteId = quote.id;
       onCreated(quote);
+      // Tao thanh cong - xoa nhap "Cot hien thi" cua mau nay (khong con la ban
+      // "dang tao" nua, bao gia that da luu voi visibleColumns rieng cua no).
+      clearVisibleColumnsDraft(selectedForm.id);
       // Khong dong modal ngay - hien man "Da tao bao gia thanh cong" (bao gia
       // van la draft, chua co public link cho toi khi duyet - xem handleApproveNow).
       setCreatedQuote(quote);
@@ -321,6 +325,7 @@ export function CreateQuoteModal({
         issuerCompanyId: selectedIssuerCompany?.id,
       });
       onUpdated?.(updated);
+      if (selectedForm) clearVisibleColumnsDraft(selectedForm.id);
       resetAndClose();
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Không thể cập nhật báo giá.');
@@ -342,6 +347,7 @@ export function CreateQuoteModal({
         issuerCompanyId: selectedIssuerCompany?.id,
       });
       onUpdated?.(approved);
+      if (selectedForm) clearVisibleColumnsDraft(selectedForm.id);
       resetAndClose();
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Không thể duyệt báo giá.');
@@ -469,7 +475,12 @@ export function CreateQuoteModal({
                   <div className="crm-wizard-loading-placeholder">Đang tải báo giá...</div>
                 ) : null}
                 {step === 3 && selectedForm ? (
-                  <ReviewQuoteStep schema={selectedForm.schemaJson} draft={quoteDraft} onChange={setQuoteDraft} />
+                  <ReviewQuoteStep
+                    schema={selectedForm.schemaJson}
+                    draft={quoteDraft}
+                    onChange={setQuoteDraft}
+                    quoteFormId={selectedForm.id}
+                  />
                 ) : null}
                 {submitError ? <p className="crm-error">{submitError}</p> : null}
               </>

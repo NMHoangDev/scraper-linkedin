@@ -2,6 +2,6 @@
 
 import { CategoryManagementContent } from "@/components/features/dashboard/CategoryManagementContent";
 
-export default function AllPlatformQuanLyDanhMucPage() {
-  return <CategoryManagementContent excludeCrm />;
+export default function CrmCategoriesRoute() {
+  return <CategoryManagementContent crmOnly />;
 }

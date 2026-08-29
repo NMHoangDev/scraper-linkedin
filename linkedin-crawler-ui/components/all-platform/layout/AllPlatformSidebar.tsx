@@ -29,9 +29,21 @@ export interface NavGroupItem {
   icon: MaterialSymbolName;
   label: string;
   items: NavLeafItem[];
+  // True = dong header (icon + label, giong het "Quan ly kenh & CSKH") KHONG
+  // BAO GIO to active du co muc con dang active hay khong - dung cho "Quan ly
+  // CRM": ban than dong header khong dieu huong di dau (khong Link, khong
+  // onClick), chi la 1 hang tinh co icon; muc con dau tien ("CRM") moi la
+  // link that toi /all-platform/crm va la muc duy nhat duoc to active o Pipeline.
+  headerNeverActive?: boolean;
 }
 
-export type SidebarEntry = NavLeafItem | NavGroupItem;
+export interface NavSectionItem {
+  type: "section";
+  id: string;
+  label: string;
+}
+
+export type SidebarEntry = NavLeafItem | NavGroupItem | NavSectionItem;
 
 const navBaseClass =
   "group relative flex min-h-[36px] items-center gap-2.5 overflow-hidden rounded-xl px-2.5 py-1.5 text-sm font-medium leading-relaxed transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-markee-primary)]/40";
@@ -210,6 +222,15 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       label: "Zalo Chat",
       matchStartsWith: ["/all-platform/tai-khoan"],
     },
+  ];
+
+  // Space "QUAN LY CRM": dong header co icon (giong het "Quan ly kenh & CSKH")
+  // nhung KHONG dieu huong va KHONG BAO GIO to active (headerNeverActive) -
+  // chot lai sau 2 vong sua truoc. Item con dau tien la "CRM" (link that toi
+  // /all-platform/crm, la muc DUY NHAT duoc to active o Pipeline). Khong
+  // caret/collapse - SidebarMenuSub luon render (xem GroupLinks trong
+  // AllPlatformSidebarShadcn.tsx).
+  const crmChildren: NavLeafItem[] = [
     {
       type: "item",
       id: "crm",
@@ -219,7 +240,7 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       exactMatch: true,
     },
     // Phan tich CRM: theo yeu cau Mylife (22/07) chi leader/admin thay "full"
-    // CRM, member chi thay pipeline ban hang (muc "crm" o tren). Mo rong cho
+    // CRM, member chi thay pipeline ban hang (muc "CRM" o tren). Mo rong cho
     // Sale (team_type='sale', migration 049) - duoc nang quyen ngang leader
     // rieng cho Pipeline + Phan tich CRM.
     ...(isAdmin || isLeader || isSale
@@ -236,6 +257,14 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       : []),
     {
       type: "item",
+      id: "crm-customers",
+      href: "/all-platform/crm/customers",
+      icon: "person_search",
+      label: "Khách hàng",
+      matchStartsWith: ["/all-platform/crm/customers"],
+    },
+    {
+      type: "item",
       id: "quote-center",
       href: "/all-platform/quote-center",
       icon: "request_quote",
@@ -244,27 +273,11 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
     },
     {
       type: "item",
-      id: "quotes",
-      href: "/all-platform/quotes",
-      icon: "star",
-      label: "Mẫu báo giá",
-      matchStartsWith: ["/all-platform/quotes"],
-    },
-    {
-      type: "item",
-      id: "service-catalog",
-      href: "/all-platform/service-catalog",
-      icon: "category",
-      label: "Sản phẩm & dịch vụ",
-      matchStartsWith: ["/all-platform/service-catalog"],
-    },
-    {
-      type: "item",
-      id: "issuer-companies",
-      href: "/all-platform/issuer-companies",
-      icon: "domain",
-      label: "Đơn vị phát hành",
-      matchStartsWith: ["/all-platform/issuer-companies"],
+      id: "quote-history",
+      href: "/all-platform/quote-history",
+      icon: "history",
+      label: "Lịch sử báo giá",
+      matchStartsWith: ["/all-platform/quote-history"],
     },
     {
       type: "item",
@@ -281,6 +294,48 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       icon: "campaign",
       label: "Tài liệu bán hàng",
       matchStartsWith: ["/all-platform/sales-assets"],
+    },
+    {
+      type: "item",
+      id: "service-catalog",
+      href: "/all-platform/service-catalog",
+      icon: "category",
+      label: "Sản phẩm & dịch vụ",
+      matchStartsWith: ["/all-platform/service-catalog"],
+    },
+    {
+      type: "item",
+      id: "quotes",
+      href: "/all-platform/quotes",
+      icon: "star",
+      label: "Mẫu báo giá",
+      matchStartsWith: ["/all-platform/quotes"],
+    },
+    {
+      type: "item",
+      id: "issuer-companies",
+      href: "/all-platform/issuer-companies",
+      icon: "domain",
+      label: "Đơn vị phát hành",
+      matchStartsWith: ["/all-platform/issuer-companies"],
+    },
+    {
+      type: "item",
+      id: "crm-categories",
+      href: "/all-platform/crm/categories",
+      icon: "category",
+      label: "Danh mục CRM",
+      matchStartsWith: ["/all-platform/crm/categories"],
+    },
+  ];
+  const crmEntries: SidebarEntry[] = [
+    {
+      type: "group",
+      id: "crm-group",
+      icon: "folder",
+      label: "Quản lý CRM",
+      headerNeverActive: true,
+      items: crmChildren,
     },
   ];
 
@@ -309,14 +364,6 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       icon: "database",
       label: "Quản lý VPS",
       matchStartsWith: ["/all-platform/quan-ly-vps"],
-    },
-    {
-      type: "item",
-      id: "quote-history",
-      href: "/all-platform/quote-history",
-      icon: "history",
-      label: "Lịch sử báo giá",
-      matchStartsWith: ["/all-platform/quote-history"],
     },
     {
       type: "item",
@@ -374,6 +421,7 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       ...(isAdmin ? [phoneBridgeEntry] : []),
       contentGroup,
       channelGroup,
+      ...crmEntries,
       {
         type: "item",
         id: "fb-accounts-personal",
@@ -405,6 +453,7 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
     },
     contentGroup,
     channelGroupTeam,
+    ...crmEntries,
     ...(isAdmin || isLeader
       ? [
           {
@@ -433,7 +482,7 @@ export function findCurrentPageLabel(entries: SidebarEntry[], pathname: string):
   for (const entry of entries) {
     if (entry.type === "item") {
       if (isLeafActive(pathname, entry)) return entry.label;
-    } else {
+    } else if (entry.type === "group") {
       const child = entry.items.find((item) => isLeafActive(pathname, item));
       if (child) return child.label;
     }
@@ -724,7 +773,9 @@ export function AllPlatformSidebar({
           <ul className="space-y-1">
             {entries.map((entry) => (
               <li key={entry.id}>
-                {entry.type === "group" ? (
+                {entry.type === "section" ? (
+                  <SectionLabel collapsed={isCollapsed}>{entry.label}</SectionLabel>
+                ) : entry.type === "group" ? (
                   <SidebarGroup
                     entry={entry}
                     pathname={pathname}

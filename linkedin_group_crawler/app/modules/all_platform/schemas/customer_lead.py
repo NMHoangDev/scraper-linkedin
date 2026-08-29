@@ -56,6 +56,7 @@ STAGE_REQUIRED_FIELDS: dict[str, dict[str, list[str]]] = {
 # ---------------------------------------------------------------------------
 class CustomerLeadCreate(BaseModel):
     customer_name: str
+    customer_id: Optional[str] = None
 
     company_name: Optional[str] = None
     phone: Optional[str] = None
@@ -132,6 +133,7 @@ class CustomerLeadCreate(BaseModel):
 
 
 class CustomerLeadUpdate(BaseModel):
+    customer_id: Optional[str] = None
     company_name: Optional[str] = None
     customer_name: Optional[str] = None
     phone: Optional[str] = None
@@ -207,6 +209,7 @@ class CustomerLeadUpdate(BaseModel):
 
 class CustomerLeadResponse(BaseModel):
     id: str
+    customer_id: Optional[str] = None
     customer_name: str
     company_name: Optional[str] = None
     phone: Optional[str] = None

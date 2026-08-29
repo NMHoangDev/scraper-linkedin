@@ -18,6 +18,7 @@ import {
   getInitials,
   type NavGroupItem,
   type NavLeafItem,
+  type NavSectionItem,
 } from "./AllPlatformSidebar";
 import {
   Sidebar,
@@ -121,7 +122,7 @@ function GroupLinks({ entry }: { entry: NavGroupItem }) {
       <SidebarGroupContent>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton isActive={hasActiveChild} tooltip={entry.label}>
+            <SidebarMenuButton isActive={entry.headerNeverActive ? false : hasActiveChild} tooltip={entry.label}>
               <Icon />
               <span>{entry.label}</span>
             </SidebarMenuButton>
@@ -151,6 +152,14 @@ function GroupLinks({ entry }: { entry: NavGroupItem }) {
   );
 }
 
+function SectionLinks({ entry }: { entry: NavSectionItem }) {
+  return (
+    <SidebarGroup className="py-1">
+      <SidebarGroupLabel>{entry.label}</SidebarGroupLabel>
+    </SidebarGroup>
+  );
+}
+
 export function AllPlatformSidebarShadcn() {
   const { user, logout } = useAppAuth();
   const router = useRouter();
@@ -159,9 +168,10 @@ export function AllPlatformSidebarShadcn() {
 
   const isAdmin = user?.role === "admin";
   const isLeader = user?.role === "leader";
+  const isSale = Boolean(user?.is_sale);
   const entries = React.useMemo(
-    () => buildEntries(isAdmin, isLeader, workspaceTab),
-    [isAdmin, isLeader, workspaceTab],
+    () => buildEntries(isAdmin, isLeader, workspaceTab, isSale),
+    [isAdmin, isLeader, isSale, workspaceTab],
   );
 
   const handleLogout = async () => {
@@ -206,7 +216,9 @@ export function AllPlatformSidebarShadcn() {
 
       <SidebarContent>
         {entries.map((entry) =>
-          entry.type === "item" ? (
+          entry.type === "section" ? (
+            <SectionLinks key={entry.id} entry={entry} />
+          ) : entry.type === "item" ? (
             <SidebarGroup key={entry.id} className="py-0">
               <SidebarGroupContent>
                 <SidebarMenu>

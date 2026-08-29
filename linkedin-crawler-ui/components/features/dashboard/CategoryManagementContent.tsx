@@ -20,6 +20,7 @@ import {
   PlatformStatCard,
   PlatformStatsRow,
 } from "@/components/features/shared/PlatformStatCard";
+import { ActionMenu } from "@/modules/crm/components/ActionMenu";
 
 // ── TEAM MODAL (Multi-select members, Leader dropdown) ──────────────────────
 function TeamModal({ isOpen, onClose, onSave, editing }: { isOpen: boolean; onClose: () => void; onSave: (p: any) => Promise<void>; editing?: any }) {
@@ -369,10 +370,16 @@ const CRM_SECTIONS: Array<{ key: CategoryType; label: string; description: strin
 function CrmCategorySections({
   categories,
   onChanged,
+  isLoading,
+  errorMsg,
 }: {
   categories: Record<string, Category[]>;
   onChanged: () => Promise<void>;
+  isLoading: boolean;
+  errorMsg: string | null;
 }) {
+  const [activeSection, setActiveSection] = useState<CategoryType>(CRM_SECTIONS[0].key);
+  const [searchTerm, setSearchTerm] = useState("");
   const [modal, setModal] = useState<{
     sectionKey: CategoryType;
     mode: "add" | "edit";
@@ -384,6 +391,16 @@ function CrmCategorySections({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ sectionKey: CategoryType; item: Category } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const activeMeta = CRM_SECTIONS.find(s => s.key === activeSection)!;
+  const sectionItems = categories[activeSection] || [];
+  const filteredItems = useMemo(() => {
+    if (!searchTerm.trim()) return sectionItems;
+    const term = searchTerm.trim().toLowerCase();
+    return sectionItems.filter(
+      item => item.code.toLowerCase().includes(term) || (item.name || "").toLowerCase().includes(term)
+    );
+  }, [sectionItems, searchTerm]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -433,68 +450,142 @@ function CrmCategorySections({
   };
 
   return (
-    <div className="space-y-5">
-      {CRM_SECTIONS.map(section => {
-        const items = categories[section.key] || [];
-        return (
-          <div key={section.key} className="rounded-xl border border-outline-variant bg-surface p-5 space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-bold text-on-surface">{section.label}</h3>
-                <p className="text-[11px] text-on-surface-variant">{section.description}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setModal({ sectionKey: section.key, mode: "add", code: "", name: "" });
-                  setModalError(null);
-                }}
-                className="flex shrink-0 items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white transition hover:bg-on-primary-fixed-variant"
-              >
-                <MaterialIcon name="add" className="text-sm" /> Thêm
-              </button>
-            </div>
+    <div>
+      {/* ── 4 TABS: Lĩnh vực / Nguồn / Danh mục sản phẩm / Gói ── */}
+      <div className="crm-page-tabs">
+        {CRM_SECTIONS.map(section => {
+          const count = categories[section.key]?.length || 0;
+          const isActive = activeSection === section.key;
+          return (
+            <button
+              key={section.key}
+              type="button"
+              onClick={() => {
+                setActiveSection(section.key);
+                setSearchTerm("");
+              }}
+              className={cn("crm-page-tab", isActive && "crm-page-tab--active")}
+            >
+              {section.label}
+              <span className="crm-page-tab-count">{count}</span>
+            </button>
+          );
+        })}
+      </div>
 
-            {items.length === 0 ? (
-              <p className="rounded-lg bg-surface-container-low px-3 py-4 text-center text-xs italic text-on-surface-variant">
-                Chưa có tùy chọn nào.
-              </p>
-            ) : (
-              <div className="divide-y divide-outline-variant rounded-lg border border-outline-variant">
-                {items.map(item => (
-                  <div key={item.id} className="flex items-center justify-between gap-2 px-3 py-2 text-xs">
-                    <div className="min-w-0 truncate">
-                      <span className="font-mono font-semibold text-on-surface">{item.code}</span>
-                      <span className="ml-2 text-on-surface-variant">— {item.name}</span>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setModal({ sectionKey: section.key, mode: "edit", id: item.id, code: item.code, name: item.name || "" });
-                          setModalError(null);
-                        }}
-                        className="rounded p-1 text-on-surface-variant transition hover:bg-surface-container-low"
-                        title="Sửa"
-                      >
-                        <MaterialIcon name="edit" className="text-base" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDeleteTarget({ sectionKey: section.key, item })}
-                        className="rounded p-1 text-red-600 transition hover:bg-red-50"
-                        title="Xóa"
-                      >
-                        <MaterialIcon name="delete" className="text-base" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+      {/* ── TOOLBAR: search + "+ Thêm danh mục" ── */}
+      <div className="crm-toolbar">
+        <div className="crm-toolbar-filters">
+          <div className="crm-toolbar-search">
+            <MaterialIcon name="search" className="text-[20px]" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder={`Tìm theo tên hoặc mã trong "${activeMeta.label}"...`}
+              className="crm-input"
+            />
           </div>
-        );
-      })}
+        </div>
+        <div className="crm-toolbar-actions">
+          <button
+            type="button"
+            onClick={() => {
+              setModal({ sectionKey: activeSection, mode: "add", code: "", name: "" });
+              setModalError(null);
+            }}
+            className="crm-primary-button crm-primary-button--compact"
+          >
+            Thêm danh mục
+          </button>
+        </div>
+      </div>
+      <p className="crm-toolbar-hint" style={{ marginTop: "-0.4rem", marginBottom: "0.9rem" }}>
+        {activeMeta.description}
+      </p>
+
+      {/* ── TABLE ── */}
+      <div className="crm-table-card">
+        <div className="crm-table-scroll">
+          <table className="crm-table" style={{ tableLayout: "auto" }}>
+            <thead>
+              <tr>
+                <th className="crm-th">Tên</th>
+                <th className="crm-th">Mã</th>
+                <th className="crm-th crm-th--right" style={{ width: "7rem" }}>
+                  Thao tác
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={3} className="crm-td" style={{ padding: "2.5rem 0", textAlign: "center" }}>
+                    <span className="crm-muted">Đang tải danh sách...</span>
+                  </td>
+                </tr>
+              ) : errorMsg ? (
+                <tr>
+                  <td colSpan={3} className="crm-td" style={{ padding: "2.5rem 0", textAlign: "center" }}>
+                    <span className="crm-error">{errorMsg}</span>
+                  </td>
+                </tr>
+              ) : filteredItems.length === 0 ? (
+                <tr>
+                  <td colSpan={3}>
+                    <div className="crm-empty-state">
+                      <span className="crm-empty-state-icon">
+                        <MaterialIcon name="inbox" />
+                      </span>
+                      <p className="crm-empty-state-title">
+                        {searchTerm.trim() ? "Không tìm thấy danh mục phù hợp" : `Chưa có "${activeMeta.label}" nào`}
+                      </p>
+                      <p className="crm-empty-state-desc">
+                        {searchTerm.trim()
+                          ? "Thử tìm với từ khóa khác hoặc xóa bộ lọc tìm kiếm."
+                          : `Bấm "Thêm danh mục" để tạo mục ${activeMeta.label.toLowerCase()} đầu tiên.`}
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredItems.map(item => (
+                  <tr key={item.id} className="crm-row">
+                    <td className="crm-td">
+                      <span className="crm-customer-name crm-truncate" title={item.name}>{item.name}</span>
+                    </td>
+                    <td className="crm-td">
+                      <span className="crm-truncate crm-mono-code" title={item.code}>{item.code}</span>
+                    </td>
+                    <td className="crm-td crm-td--right">
+                      <div className="crm-icon-action-group">
+                        <ActionMenu
+                          items={[
+                            {
+                              key: "edit",
+                              label: "Sửa",
+                              onSelect: () => {
+                                setModal({ sectionKey: activeSection, mode: "edit", id: item.id, code: item.code, name: item.name || "" });
+                                setModalError(null);
+                              },
+                            },
+                            {
+                              key: "delete",
+                              label: "Xóa",
+                              danger: true,
+                              onSelect: () => setDeleteTarget({ sectionKey: activeSection, item }),
+                            },
+                          ]}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[1px] animate-in fade-in duration-200">
@@ -586,14 +677,23 @@ function CrmCategorySections({
             </div>
             <div className="space-y-4 p-6">
               <p className="text-xs leading-relaxed text-on-surface">
-                Bạn có chắc chắn muốn xóa <span className="font-semibold">{deleteTarget.item.name}</span> không?
+                Bạn có chắc chắn muốn xóa{" "}
+                <span className="font-semibold">
+                  {deleteTarget.item.name} ({deleteTarget.item.code})
+                </span>{" "}
+                khỏi danh mục &quot;{CRM_SECTIONS.find(s => s.key === deleteTarget.sectionKey)?.label}&quot; không?
               </p>
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] font-medium leading-relaxed text-amber-800">
+                ⚠️ Nếu mã &quot;{deleteTarget.item.code}&quot; đang được dùng ở khách hàng/deal hiện có, các bản ghi đó vẫn giữ
+                nguyên giá trị cũ nhưng sẽ không còn chọn lại được mã này trong form thêm/sửa deal. Hành động này
+                không thể hoàn tác.
+              </div>
             </div>
             <div className="flex justify-end gap-3 border-t border-outline-variant bg-surface-container-low px-6 py-4">
               <button
                 type="button"
                 onClick={() => setDeleteTarget(null)}
-                className="rounded-xl border border-outline-variant px-4 py-2 text-xs font-semibold text-on-surface transition hover:bg-surface-container-low"
+                className="crm-cancel-button"
                 disabled={isDeleting}
               >
                 Hủy bỏ
@@ -602,7 +702,7 @@ function CrmCategorySections({
                 type="button"
                 onClick={() => void handleDelete()}
                 disabled={isDeleting}
-                className="flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700"
+                className="flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-60"
               >
                 {isDeleting ? "Đang xóa..." : "Xác nhận xóa"}
               </button>
@@ -614,7 +714,10 @@ function CrmCategorySections({
   );
 }
 
-export function CategoryManagementContent() {
+export function CategoryManagementContent({
+  crmOnly = false,
+  excludeCrm = false,
+}: { crmOnly?: boolean; excludeCrm?: boolean } = {}) {
   const { platform } = useAppPlatform();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -634,7 +737,7 @@ export function CategoryManagementContent() {
     crm_industry: [],
   });
 
-  const [selectedTab, setSelectedTab] = useState<CategoryType>("intent");
+  const [selectedTab, setSelectedTab] = useState<CategoryType>(crmOnly ? CRM_TAB_KEY : "intent");
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -642,6 +745,19 @@ export function CategoryManagementContent() {
   const currentMetadata = useMemo(() => {
     return CATEGORIES_METADATA.find((m) => m.key === selectedTab)!;
   }, [selectedTab]);
+  const visibleMetadata = useMemo(() => {
+    if (crmOnly) return CATEGORIES_METADATA.filter((meta) => meta.key === CRM_TAB_KEY);
+    if (excludeCrm) return CATEGORIES_METADATA.filter((meta) => meta.key !== CRM_TAB_KEY);
+    return CATEGORIES_METADATA;
+  }, [crmOnly, excludeCrm]);
+
+  // Neu tab CRM dang chon nhung bi loai (excludeCrm) - chuyen ve tab dau tien
+  // con lai, tranh render trang trong/lech voi danh sach tab hien thi.
+  useEffect(() => {
+    if (excludeCrm && selectedTab === CRM_TAB_KEY && visibleMetadata.length) {
+      setSelectedTab(visibleMetadata[0].key);
+    }
+  }, [excludeCrm, selectedTab, visibleMetadata]);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -895,55 +1011,51 @@ export function CategoryManagementContent() {
     return pf;
   };
 
+  // Trang "Danh mục CRM" (crmOnly) đã được thiết kế lại thành 4 tab +
+  // bảng gọn (Part 3) — topbar đã hiện tên trang nên KHÔNG lặp lại hero
+  // header/description/KPI/"Supabase DB" ở đây nữa. Trang chung
+  // "Quản lý danh mục" (excludeCrm, /all-platform/quan-ly-danh-muc) cũng
+  // không cần lặp lại tiêu đề topbar — chỉ giữ lại KPI + tab-selector
+  // vốn có, hữu ích cho use case đó.
   return (
     <div className="w-full min-w-0 space-y-6 font-sans">
-      {/* ── HEADER ──────────────────────────────────────────── */}
-      <div className="flex items-center gap-4">
-        <div className="rounded-xl bg-primary/10 p-3">
-          <MaterialIcon name="category" className="text-primary text-3xl" />
-        </div>
-        <div>
-          <h1 className="text-h1 text-on-background font-semibold flex items-center gap-2">
-            Quản lý danh mục
-          </h1>
-          <p className="text-body-md text-on-surface-variant">
-            Cấu hình các bộ phân loại dùng chung cho nhóm Facebook và LinkedIn trong cơ sở dữ liệu Supabase
-          </p>
-        </div>
-      </div>
+      {!crmOnly && (
+        <>
+          {/* ── STATS ROW ───────────────────────────────────────── */}
+          <PlatformStatsRow>
+            <PlatformStatCard
+              label="Tổng loại danh mục"
+              value={5}
+              hint="Type, Industry, Tier, Team, ICP"
+              accent="primary"
+            />
+            <PlatformStatCard
+              label="Tổng số tùy chọn"
+              value={totalOptionsCount}
+              hint="Đã cấu hình trên toàn hệ thống"
+              accent="success"
+            />
+            <PlatformStatCard
+              label="Tùy chọn hiện tại"
+              value={categories[selectedTab]?.length || 0}
+              hint={`Trong mục "${currentMetadata.label}"`}
+              accent="warning"
+            />
+            <PlatformStatCard
+              label="Kênh đồng bộ"
+              value="Supabase DB"
+              hint="Đồng bộ trực tiếp qua categories hệ thống"
+              accent="primary"
+            />
+          </PlatformStatsRow>
+        </>
+      )}
 
-      {/* ── STATS ROW ───────────────────────────────────────── */}
-      <PlatformStatsRow>
-        <PlatformStatCard
-          label="Tổng loại danh mục"
-          value={5}
-          hint="Type, Industry, Tier, Team, ICP"
-          accent="primary"
-        />
-        <PlatformStatCard
-          label="Tổng số tùy chọn"
-          value={totalOptionsCount}
-          hint="Đã cấu hình trên toàn hệ thống"
-          accent="success"
-        />
-        <PlatformStatCard
-          label="Tùy chọn hiện tại"
-          value={categories[selectedTab]?.length || 0}
-          hint={`Trong mục "${currentMetadata.label}"`}
-          accent="warning"
-        />
-        <PlatformStatCard
-          label="Kênh đồng bộ"
-          value="Supabase DB"
-          hint="Đồng bộ trực tiếp qua categories hệ thống"
-          accent="primary"
-        />
-      </PlatformStatsRow>
-
-      {/* ── TABS SELECTOR ────────────────────────────────────── */}
+      {/* ── TABS SELECTOR (chỉ dùng cho trang chung, không phải CRM) ── */}
+      {!crmOnly && (
       <div className="border-b border-outline-variant overflow-x-auto whitespace-nowrap">
         <div className="flex gap-8 px-2">
-          {CATEGORIES_METADATA.map((meta) => {
+          {visibleMetadata.map((meta) => {
             const isActive = selectedTab === meta.key;
             const count =
               meta.key === CRM_TAB_KEY
@@ -977,10 +1089,16 @@ export function CategoryManagementContent() {
           })}
         </div>
       </div>
+      )}
 
       {/* ── MAIN CRUD CARD ──────────────────────────────────── */}
-      {selectedTab === CRM_TAB_KEY ? (
-        <CrmCategorySections categories={categories} onChanged={fetchCategories} />
+      {crmOnly || selectedTab === CRM_TAB_KEY ? (
+        <CrmCategorySections
+          categories={categories}
+          onChanged={fetchCategories}
+          isLoading={isLoading}
+          errorMsg={errorMsg}
+        />
       ) : (
       <div className="rounded-xl border border-outline-variant bg-surface p-6 shadow-sm space-y-6">
         {/* Description box */}

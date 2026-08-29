@@ -23,6 +23,9 @@ import {
   LayoutTemplate,
   Megaphone,
   Building2,
+  FileSearch,
+  History,
+  FileSignature,
   type LucideIcon,
 } from "lucide-react";
 import type { MaterialSymbolName } from "@/components/ui";
@@ -56,6 +59,9 @@ const MAP: Partial<Record<MaterialSymbolName, LucideIcon>> = {
   star: LayoutTemplate,
   campaign: Megaphone,
   domain: Building2,
+  person_search: FileSearch,
+  description: FileSignature,
+  history: History,
 };
 
 export function materialToLucideIcon(name: MaterialSymbolName): LucideIcon {

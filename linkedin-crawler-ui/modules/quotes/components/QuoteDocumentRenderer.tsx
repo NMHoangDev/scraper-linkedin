@@ -215,10 +215,6 @@ export function QuoteDocumentRenderer({
         ? quoteData.solutionItems
         : [];
 
-  const solutionColumns = (
-    findField('solutionItems').config?.columns?.filter(column => column.visible !== false) || []
-  ) as QuoteField[];
-
   const renderSolutionCell = (item: VillaSolutionItem, column: QuoteField, index: number) => {
     if (column.type === 'auto-number') return String(index + 1);
     const value = (item as unknown as Record<string, unknown>)[column.key];
@@ -248,10 +244,14 @@ export function QuoteDocumentRenderer({
   ]
     .map(([key, label]) => ({ key, label, value: textValue(fieldValue(key)) }))
     .filter(row => row.value);
-  // Cot bang hang muc THAT cua mau nay (tu schema.quoteItems.config.columns),
+  // Cot bang hang muc THAT cua mau nay (doc tu schema, tu dong tim dung field
+  // quoteItems/solutionItems/... - xem findItemTableField trong quoteColumns.ts),
   // khong phai danh sach co dinh - dung chung logic voi checkbox "Cot hien thi"
   // o ReviewQuoteStep (xem utils/quoteColumns.ts) de 2 noi luon khop nhau, tu
-  // dong doi theo tung mau bao gia (VD Villa co bo cot rieng khac han standard).
+  // dong doi theo tung mau bao gia (VD Villa dung bang solutionItems rieng,
+  // cot khac han standard/quoteItems). Ten bien giu "standardColumns" vi ly do
+  // lich su nhung tu gio dung chung cho CA layout villa (xem doan render villa
+  // ben duoi, dung finalColumns thay vi 1 bien solutionColumns rieng truoc day).
   const standardColumns = resolveQuoteItemColumns(schema, quoteItems);
   // "Cột hiển thị" nguoi tao chon o buoc Xem truoc & gui (quoteData.visibleColumns) -
   // chi anh huong ban KHACH nhan (public/print, hoac preview khi respectVisibleColumns
@@ -315,7 +315,7 @@ export function QuoteDocumentRenderer({
             <table className="villa-table">
               <thead>
                 <tr>
-                  {solutionColumns.map(column => (
+                  {finalColumns.map(column => (
                     <th key={column.key}>{column.label}</th>
                   ))}
                 </tr>
@@ -323,7 +323,7 @@ export function QuoteDocumentRenderer({
               <tbody>
                 {activeSolutionItems.map((item, index) => (
                   <tr key={index}>
-                    {solutionColumns.map(column => (
+                    {finalColumns.map(column => (
                       <td
                         key={column.key}
                         className={
@@ -470,7 +470,16 @@ export function QuoteDocumentRenderer({
             <h3>{findSection('quoteItems').title || 'Bảng dịch vụ'}</h3>
           </div>
           <div className="sheet-items-table-wrap">
-            <table className="sheet-items-table" style={{ minWidth: Math.max(760, finalColumns.length * 115) }}>
+            {/* minWidth chi la nguong TOI THIEU de cot con doc duoc tren man
+                hinh hep (wrapper .sheet-items-table-wrap tu cuon ngang rieng,
+                khong lam vo layout modal/trang) - KHONG con nhan tuyen tinh
+                theo so cot nhu truoc (115px/cot khien bang phinh to vo can khi
+                hien nhieu cot, luon can cuon ngang du man hinh du rong). Trong
+                nguong nay, table-layout:fixed + width:100% da tu chia deu cot
+                theo khong gian thuc te co san (cot con lai tu gian ra khi an
+                bot cot khac), header duoc phep xuong dong (xem quotes.css) nen
+                khong can cot rong toi thieu lon nhu truoc. */}
+            <table className="sheet-items-table" style={{ minWidth: Math.min(760, Math.max(420, finalColumns.length * 70)) }}>
               <thead>
                 <tr>
                   {finalColumns.map(column => (

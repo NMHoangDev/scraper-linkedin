@@ -150,3 +150,14 @@ def can_edit_contract(user: dict[str, Any] | None, contract: dict[str, Any] | No
     if lead and (str(lead.get("leaded_by") or "") == uid or str(lead.get("sdr_id") or "") == uid):
         return True
     return False
+
+
+# Luu y: quyen ho so `crm_customers` (sua/xem) KHONG dat o day - da co san,
+# dung, va dang duoc dung that trong crm_customer_service.py
+# (can_edit_customer/can_view_customer/_customer_ids_visible_to), cung logic
+# chot voi sep (admin/leader toan quyen; owner_id duoc sua; Sale chi co deal
+# lien quan duoc XEM khong duoc SUA; created_by chi audit) nhung can 1 truy
+# van DB rieng (_customer_ids_visible_to) de loc danh sach hang loat cho
+# list_customers - khong hop voi chu ky ham (user, customer, linked_deals)
+# dung chung cho deal/quote/contract o file nay. Khong nhan doi 1 ban thu 2
+# khong dung o day de tranh 2 nguon quyen lech nhau theo thoi gian.
