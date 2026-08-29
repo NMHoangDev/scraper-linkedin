@@ -17,6 +17,7 @@ import {
 import { seedingQuoteRepository } from '../repositories/SeedingQuoteRepository';
 import { serviceCatalogRepository } from '../../service-catalog/repositories/ServiceCatalogRepository';
 import type { ServiceCatalogItem, ServiceCatalogOptions } from '../../service-catalog/types';
+import { SearchableSelect } from '../../crm/components/SearchableSelect';
 
 export interface QuoteFillValue {
   data: QuoteData;
@@ -94,11 +95,20 @@ export function QuoteFormFiller({ schema, value, onChange, quoteFormId, showTota
         if (repeaterField) {
           const isSolutionTable = repeaterField.key === 'solutionItems';
           const isQuoteItemsTable = repeaterField.key === 'quoteItems';
+          const itemCount = isQuoteItemsTable ? value.items.length : isSolutionTable ? value.solutionItems.length : 0;
           return (
             <section key={section.key} className="quote-section-card">
               <div className="quote-section-head">
-                <h4>{section.title}</h4>
+                <h4>
+                  {section.title}
+                  {isQuoteItemsTable || isSolutionTable ? <span className="quote-section-count-badge">{itemCount} hạng mục</span> : null}
+                </h4>
               </div>
+              {isQuoteItemsTable || isSolutionTable ? (
+                <p className="quote-section-hint">
+                  Chọn các sản phẩm đang kinh doanh từ danh mục. Giá và mô tả sẽ được sao chép vào báo giá.
+                </p>
+              ) : null}
               {isQuoteItemsTable ? (
                 <QuoteItemsEditor
                   items={value.items}
@@ -525,7 +535,7 @@ function CatalogItemPicker<T>({
   return (
     <div className="quote-catalog-picker">
       <button type="button" className="quote-catalog-picker-trigger" onClick={() => setOpen(true)}>
-        + Chọn từ danh mục
+        + Chọn từ Sản phẩm & dịch vụ
       </button>
 
       {open ? (
@@ -559,14 +569,14 @@ function CatalogItemPicker<T>({
                 onChange={event => setSearch(event.target.value)}
               />
               {groupOptions.size > 0 ? (
-                <select value={groupFilter} onChange={event => setGroupFilter(event.target.value)}>
-                  <option value="">Tất cả nhóm</option>
-                  {Array.from(groupOptions.entries()).map(([id, name]) => (
-                    <option key={id} value={id}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
+                <div className="quote-catalog-picker-group-filter">
+                  <SearchableSelect
+                    value={groupFilter}
+                    onChange={setGroupFilter}
+                    placeholder="Tất cả nhóm"
+                    options={Array.from(groupOptions.entries()).map(([id, name]) => ({ value: id, label: name }))}
+                  />
+                </div>
               ) : null}
             </div>
             <div className="quote-catalog-picker-list">
@@ -725,17 +735,21 @@ function QuoteItemsEditor({
         ) : (
           <div className="quote-compact-table">
             <div className="quote-compact-head">
+              <span className="quote-compact-cell--index">STT</span>
               <span>Sản phẩm/Dịch vụ</span>
-              <span>Mô tả</span>
+              <span className="quote-compact-cell--description">Mô tả</span>
+              <span className="quote-compact-cell--unit">ĐVT</span>
               <span>SL</span>
               <span>Đơn giá</span>
-              <span>VAT</span>
+              <span className="quote-compact-cell--discount">CK</span>
+              <span className="quote-compact-cell--vat">VAT</span>
               <span>Thành tiền</span>
               <span />
             </div>
             {items.map((item, index) => (
               <CompactItemRow
                 key={item.id || index}
+                index={index}
                 item={item}
                 onChange={patch => updateParent(index, patch)}
                 onRemove={() => removeParent(index)}
@@ -747,6 +761,9 @@ function QuoteItemsEditor({
         <button type="button" className="quote-add-parent-button quote-add-parent-button--secondary" onClick={addParent}>
           + Thêm hạng mục ngoài danh mục
         </button>
+        <p className="quote-snapshot-hint">
+          ℹ Dữ liệu sản phẩm được lưu theo báo giá; thay đổi giá trong danh mục không làm thay đổi báo giá đã tạo.
+        </p>
       </div>
     );
   }
@@ -814,24 +831,35 @@ function QuoteItemsEditor({
  * này (giảm giá tổng đã tính riêng ở khối Tổng tiền) nhưng KHÔNG đổi công thức
  * tính - discountPercent của dòng (nếu catalog có set mặc định) vẫn được giữ
  * nguyên trong dữ liệu và cộng vào tổng như cũ, chỉ không có ô sửa tay ở đây. */
+// VAT o VN thuc te chi co vai muc pho bien - dung select thay vi go tay so
+// tuy y, nhung van giu duoc muc khac 0/5/8/10 neu du lieu cu/catalog dat san 1
+// muc khac (vd nhap tay tu truoc) - luc do them option do vao cuoi danh sach,
+// khong lam mat gia tri that su dang luu.
+const VAT_RATE_PRESETS = [0, 5, 8, 10];
+
 function CompactItemRow({
   item,
+  index,
   onChange,
   onRemove,
 }: {
   item: QuoteItem;
+  index: number;
   onChange: (patch: Partial<QuoteItem>) => void;
   onRemove: () => void;
 }) {
   const total = calculateItemTotal(item);
+  const vatOptions = VAT_RATE_PRESETS.includes(item.vatRate || 0) ? VAT_RATE_PRESETS : [...VAT_RATE_PRESETS, item.vatRate || 0];
   return (
     <div className="quote-compact-row">
+      <span className="quote-compact-cell quote-compact-cell--index">{index + 1}</span>
       <span className="quote-compact-cell quote-compact-cell--name">
         <input
           value={item.serviceDescription || ''}
           placeholder="Tên dịch vụ"
           onChange={event => onChange({ serviceDescription: event.target.value })}
         />
+        {item.catalogItemId ? <small className="quote-compact-sku">Từ danh mục dịch vụ</small> : null}
       </span>
       <span className="quote-compact-cell quote-compact-cell--description">
         <textarea
@@ -839,6 +867,14 @@ function CompactItemRow({
           value={item.description || ''}
           placeholder="Mô tả"
           onChange={event => onChange({ description: event.target.value })}
+        />
+      </span>
+      <span className="quote-compact-cell quote-compact-cell--unit">
+        <input
+          className="quote-compact-unit"
+          value={item.unit || ''}
+          placeholder="ĐVT"
+          onChange={event => onChange({ unit: event.target.value })}
         />
       </span>
       <span className="quote-compact-cell">
@@ -859,15 +895,26 @@ function CompactItemRow({
           onChange={event => onChange({ unitPrice: coerceNumber(event.target.value) })}
         />
       </span>
-      <span className="quote-compact-cell">
+      <span className="quote-compact-cell quote-compact-cell--discount">
         <input
           type="number"
           min={0}
           max={100}
+          className="quote-compact-discount"
+          value={item.discountPercent ?? 0}
+          onChange={event => onChange({ discountPercent: coercePercent(event.target.value) })}
+        />
+      </span>
+      <span className="quote-compact-cell quote-compact-cell--vat">
+        <select
           className="quote-compact-vat"
           value={item.vatRate || 0}
           onChange={event => onChange({ vatRate: coercePercent(event.target.value) })}
-        />
+        >
+          {vatOptions.map(rate => (
+            <option key={rate} value={rate}>{rate}%</option>
+          ))}
+        </select>
       </span>
       <span className="quote-compact-cell quote-compact-cell--total">{formatVnd(total)}</span>
       <button type="button" className="quote-compact-remove" onClick={onRemove} aria-label="Xoá dòng">
@@ -934,6 +981,9 @@ function SolutionItemsEditor({
       <button type="button" className="quote-add-parent-button quote-add-parent-button--secondary" onClick={addManualRow}>
         + Thêm hạng mục ngoài danh mục
       </button>
+      <p className="quote-snapshot-hint">
+        ℹ Dữ liệu sản phẩm được lưu theo báo giá; thay đổi giá trong danh mục không làm thay đổi báo giá đã tạo.
+      </p>
     </div>
   );
 }

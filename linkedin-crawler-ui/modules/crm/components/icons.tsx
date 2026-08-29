@@ -137,6 +137,10 @@ export const Trophy = makeIcon([
   { d: 'M5 5H3a2 2 0 0 0 2 4' },
   { d: 'M19 5h2a2 2 0 0 1-2 4' },
 ]);
+export const User = makeIcon([
+  { tag: 'circle', cx: 12, cy: 7, r: 4 },
+  { d: 'M4 21v-2a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v2' },
+]);
 export const UserCog = makeIcon([
   { tag: 'circle', cx: 9, cy: 7, r: 4 },
   { d: 'M3 21v-2a4 4 0 0 1 4-4h3' },

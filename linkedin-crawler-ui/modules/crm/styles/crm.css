@@ -3828,6 +3828,92 @@
   flex-wrap: wrap;
 }
 
+/* Buoc 3 "Hang muc bao gia" - 2 the recap nhac lai Khach hang/Don vi phat hanh
+   da chon o Buoc 1/2 (kem link "Thay doi" nhay ve dung buoc). */
+.crm-quote-recap-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+@media (max-width: 720px) {
+  .crm-quote-recap-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.crm-quote-recap-card {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+  padding: 0.65rem 0.85rem;
+}
+
+.crm-quote-recap-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4338ca;
+  flex-shrink: 0;
+}
+
+.crm-quote-recap-body {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.crm-quote-recap-label {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.crm-quote-recap-value {
+  font-size: 0.85rem;
+  color: #111827;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Buoc 4 "Xac nhan" - checklist tom tat truoc khi tao bao gia. */
+.crm-quote-confirm-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.85rem;
+  background: #f8fafc;
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.crm-quote-confirm-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: #344054;
+}
+
+.crm-quote-confirm-check {
+  width: 1rem;
+  height: 1rem;
+  color: #16a34a;
+  flex-shrink: 0;
+}
+
 .crm-quote-template-card--warning {
   background: #fffbeb;
   border-color: #fde68a;
@@ -4230,6 +4316,19 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
+}
+
+/* Chi thi "Da tu dong luu HH:MM" (wizard tao bao gia) - nam giua Huy/Quay lai,
+   flex:1 de chiem het khoang trong con lai giua 2 nut canh trai/phai. */
+.crm-footer-center {
+  flex: 1;
+  text-align: center;
+}
+
+.crm-quote-autosave-indicator {
+  font-size: 0.78rem;
+  color: #667085;
+  font-weight: 600;
 }
 
 /* Quote wizard polish: make the form-entry step feel like a sales document editor,
