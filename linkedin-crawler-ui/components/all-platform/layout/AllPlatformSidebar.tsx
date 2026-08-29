@@ -230,15 +230,15 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
   // /all-platform/crm, la muc DUY NHAT duoc to active o Pipeline). Khong
   // caret/collapse - SidebarMenuSub luon render (xem GroupLinks trong
   // AllPlatformSidebarShadcn.tsx).
-  // ===== BEGIN Leads/Cơ hội reorder (2026-08-29) =====
+  // ===== BEGIN Leads/Khách hàng/Cơ hội reorder (2026-08-29) =====
   // /all-platform/crm render CrmShell = bảng Pipeline/Kanban (8 giai đoạn,
   // kéo-thả), KHÔNG phải trang tổng quan — đổi nhãn "CRM" -> "Cơ hội" cho
   // đúng thực tế, icon "filter_alt" (phễu) để phân biệt hẳn "group" không
-  // còn dùng ở đâu khác trong CRM. "Leads" (/all-platform/crm/leads, icon
-  // person_add - chưa dùng ở nơi nào khác trong toàn bộ sidebar) đứng TRƯỚC
-  // "Cơ hội" theo đúng luồng nghiệp vụ (Lead -> Convert -> Cơ hội). Thứ tự
-  // 12 mục còn lại giữ nguyên logic cũ, chỉ dời "Phân tích CRM" xuống sau
-  // "Khách hàng" theo đúng thứ tự sản phẩm yêu cầu.
+  // còn dùng ở đâu khác trong CRM. Thứ tự đúng luồng nghiệp vụ: "Leads"
+  // (đầu mối chưa xác minh) -> "Khách hàng" (hồ sơ doanh nghiệp gốc) ->
+  // "Cơ hội" (deal/pipeline). Thứ tự 12 mục còn lại giữ nguyên logic cũ,
+  // chỉ dời "Phân tích CRM" xuống sau "Cơ hội" theo đúng thứ tự sản phẩm
+  // yêu cầu.
   const crmChildren: NavLeafItem[] = [
     {
       type: "item",
@@ -250,19 +250,19 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
     },
     {
       type: "item",
-      id: "crm",
-      href: "/all-platform/crm",
-      icon: "filter_alt",
-      label: "Cơ hội",
-      exactMatch: true,
-    },
-    {
-      type: "item",
       id: "crm-customers",
       href: "/all-platform/crm/customers",
       icon: "person_search",
       label: "Khách hàng",
       matchStartsWith: ["/all-platform/crm/customers"],
+    },
+    {
+      type: "item",
+      id: "crm",
+      href: "/all-platform/crm",
+      icon: "filter_alt",
+      label: "Cơ hội",
+      exactMatch: true,
     },
     // Phan tich CRM: theo yeu cau Mylife (22/07) chi leader/admin thay "full"
     // CRM, member chi thay pipeline ban hang (muc "Co hoi" o tren). Mo rong
@@ -280,7 +280,7 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
           },
         ] as NavLeafItem[])
       : []),
-    // ===== END Leads/Cơ hội reorder =====
+    // ===== END Leads/Khách hàng/Cơ hội reorder =====
     {
       type: "item",
       id: "quote-center",
