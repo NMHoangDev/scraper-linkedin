@@ -12,6 +12,9 @@ class CrmCustomerBase(BaseModel):
     customer_name: str = Field(..., min_length=1)
     company_name: Optional[str] = None
     position: Optional[str] = None
+    # migration 079 — Chuc vu category-driven select (category_type=crm_position).
+    # position_label_snapshot is server-derived only, never trusted from client.
+    position_category_id: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
     zalo: Optional[str] = None
@@ -36,6 +39,7 @@ class CrmCustomerUpdate(BaseModel):
     customer_name: Optional[str] = None
     company_name: Optional[str] = None
     position: Optional[str] = None
+    position_category_id: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
     zalo: Optional[str] = None
@@ -62,6 +66,7 @@ class CrmCustomerWithDealCreate(BaseModel):
 
 class CrmCustomerResponse(CrmCustomerBase):
     id: str
+    position_label_snapshot: Optional[str] = None
     phone_normalized: Optional[str] = None
     email_normalized: Optional[str] = None
     created_by: Optional[str] = None
@@ -70,6 +75,7 @@ class CrmCustomerResponse(CrmCustomerBase):
     deal_count: int = 0
     total_value: float = 0
     last_deal_at: Optional[datetime] = None
+    contact_count: int = 0
 
 
 class CrmCustomerListResponse(BaseModel):

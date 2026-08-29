@@ -152,6 +152,46 @@ def can_edit_contract(user: dict[str, Any] | None, contract: dict[str, Any] | No
     return False
 
 
+def can_write_lead(user: dict[str, Any] | None, lead: dict[str, Any] | None) -> bool:
+    """True neu user duoc sua/xoa 1 Lead (`crm_leads`): co full CRM access
+    (admin/leader/sale-team), hoac la SDR duoc giao lead do (sdr_id). Cung
+    style/quyet dinh voi can_write_deal - chi khac field so sanh (sdr_id thay
+    vi leaded_by/sdr_id, vi Lead luon co dung 1 nguoi phu trach la SDR)."""
+    if not user:
+        return False
+    if has_full_crm_access(user):
+        return True
+    if not lead:
+        return False
+    uid = str(user.get("id") or "")
+    if not uid:
+        return False
+    return str(lead.get("sdr_id") or "") == uid
+
+
+def can_view_lead(user: dict[str, Any] | None, lead: dict[str, Any] | None) -> bool:
+    """True neu user duoc xem 1 Lead: co the sua (xem tu nhien duoc), hoac la
+    AE duoc gan o buoc qualify (qualification_ae_id), hoac la nguoi phu
+    trach/tao deal ma lead nay da duoc convert sang (converted_deal_id ->
+    customer_leads.leaded_by/sdr_id) - Sale/AE nhan deal tu 1 lead van can
+    xem lai lead goc de biet lich su qualify truoc do."""
+    if not user:
+        return False
+    if can_write_lead(user, lead):
+        return True
+    if not lead:
+        return False
+    uid = str(user.get("id") or "")
+    if not uid:
+        return False
+    if str(lead.get("qualification_ae_id") or "") == uid:
+        return True
+    converted_deal = lead.get("_converted_deal")
+    if converted_deal and (str(converted_deal.get("leaded_by") or "") == uid or str(converted_deal.get("sdr_id") or "") == uid):
+        return True
+    return False
+
+
 # Luu y: quyen ho so `crm_customers` (sua/xem) KHONG dat o day - da co san,
 # dung, va dang duoc dung that trong crm_customer_service.py
 # (can_edit_customer/can_view_customer/_customer_ids_visible_to), cung logic

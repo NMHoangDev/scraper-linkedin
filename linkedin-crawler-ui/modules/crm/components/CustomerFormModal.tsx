@@ -7,15 +7,16 @@ import { useMembers } from '@/hooks/useMembers';
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import { CITY_OPTIONS, INDUSTRY_OPTIONS, SOURCE_OPTIONS } from '../constants/crmConfig';
 import { SearchableSelect } from './SearchableSelect';
+import { PositionSelect } from './PositionSelect';
 import { Loader2, X } from './icons';
 import type { AppUser } from '@/types/unified.types';
 import type { CrmCustomerRow, CrmCustomerStatus } from '../types';
 
 const STATUS_OPTIONS: Array<{ value: CrmCustomerStatus; label: string }> = [
-  { value: 'new_lead', label: 'Lead mới' },
-  { value: 'following', label: 'Đang chăm sóc' },
-  { value: 'current_customer', label: 'Khách hàng hiện tại' },
-  { value: 'not_fit', label: 'Không phù hợp' },
+  { value: 'new_lead', label: 'Tiềm năng' },
+  { value: 'following', label: 'Đang bán' },
+  { value: 'current_customer', label: 'Đã mua' },
+  { value: 'not_fit', label: 'Ngừng hoạt động' },
 ];
 
 const SOURCE_SELECT_OPTIONS = SOURCE_OPTIONS;
@@ -25,7 +26,8 @@ const INDUSTRY_SELECT_OPTIONS = INDUSTRY_OPTIONS.map(value => ({ value, label: v
 type FormState = {
   customerName: string;
   companyName: string;
-  position: string;
+  positionCategoryId: string;
+  positionLabel: string;
   phone: string;
   email: string;
   zalo: string;
@@ -46,7 +48,8 @@ function emptyForm(): FormState {
   return {
     customerName: '',
     companyName: '',
-    position: '',
+    positionCategoryId: '',
+    positionLabel: '',
     phone: '',
     email: '',
     zalo: '',
@@ -68,7 +71,8 @@ function formFromCustomer(customer: CrmCustomerRow): FormState {
   return {
     customerName: customer.customerName || '',
     companyName: customer.companyName || '',
-    position: customer.position || '',
+    positionCategoryId: customer.positionCategoryId || '',
+    positionLabel: customer.positionLabelSnapshot || customer.position || '',
     phone: customer.phone || '',
     email: customer.email || '',
     zalo: customer.zalo || '',
@@ -105,6 +109,11 @@ type DuplicateRow = {
   email?: string | null;
 };
 
+// Kể từ khi có CustomerAddDrawer.tsx (luồng tạo mới 4 bước), modal này chỉ còn
+// được CrmCustomersDirectory/CrmCustomerDetailPage gọi ở chế độ SỬA (customer
+// luôn khác null trong thực tế). Nhánh "customer == null" (tạo mới) vẫn được
+// giữ nguyên trong code cho an toàn/không phá vỡ API của component, nhưng
+// không còn đường gọi nào trong UI hiện tại kích hoạt nó nữa.
 export function CustomerFormModal({
   open,
   customer,
@@ -113,7 +122,7 @@ export function CustomerFormModal({
   onSaved,
 }: {
   open: boolean;
-  /** null = tạo mới, có object = sửa hồ sơ đã có. */
+  /** Edit-only trong luồng hiện tại — luôn truyền object khách hàng cần sửa. */
   customer?: CrmCustomerRow | null;
   currentUser: AppUser | null;
   onClose: () => void;
@@ -168,7 +177,7 @@ export function CustomerFormModal({
       const payload: Record<string, unknown> = {
         customer_name: form.customerName.trim(),
         company_name: form.companyName.trim() || null,
-        position: form.position.trim() || null,
+        position_category_id: form.positionCategoryId || null,
         phone: form.phone.trim() || null,
         email: form.email.trim() || null,
         zalo: form.zalo.trim() || null,
@@ -270,7 +279,14 @@ export function CustomerFormModal({
                 <input value={form.companyName} onChange={e => setValue('companyName', e.target.value)} placeholder="Công ty TNHH ABC" />
               </Field>
               <Field label="Chức vụ">
-                <input value={form.position} onChange={e => setValue('position', e.target.value)} placeholder="Giám đốc..." />
+                <PositionSelect
+                  value={form.positionCategoryId}
+                  labelSnapshot={form.positionLabel}
+                  onChange={(id, label) => {
+                    setValue('positionCategoryId', id);
+                    setValue('positionLabel', label);
+                  }}
+                />
               </Field>
               <Field label="Trạng thái">
                 <select value={form.status} onChange={e => setValue('status', e.target.value as CrmCustomerStatus)}>

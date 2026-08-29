@@ -89,6 +89,8 @@ type CustomerLeadRow = {
   leader_name?: string | null;
   sdr_name?: string | null;
   position?: string | null;
+  position_category_id?: string | null;
+  position_label_snapshot?: string | null;
   crm_package?: string | null;
   zalo?: string | null;
   facebook?: string | null;
@@ -116,6 +118,8 @@ type CrmCustomerRow = {
   customer_name?: string | null;
   company_name?: string | null;
   position?: string | null;
+  position_category_id?: string | null;
+  position_label_snapshot?: string | null;
   phone?: string | null;
   email?: string | null;
   source?: string | null;
@@ -145,10 +149,18 @@ type ActivityLogRow = {
   created_at: string;
 };
 
-// Khớp với constraint source_platform ở migration 032_expand_source_platform.sql —
-// đủ 7 giá trị mà dropdown "Nguồn" (SOURCE_OPTIONS trong crmConfig.ts) cho chọn.
+// Ban đầu khớp với CHECK constraint source_platform ở migration
+// 032_expand_source_platform.sql, nhưng migration 056 đã GỠ hẳn constraint đó
+// và giao việc kiểm soát danh mục nguồn hợp lệ cho bảng `categories`
+// (category_type='crm_source') — whitelist cứng dưới đây từ đó đã LỖI THỜI
+// (chặn nhầm mọi nguồn thêm mới qua trang Danh mục hoặc migration data, dù
+// backend/DB đã chấp nhận). Thêm 3 giá trị của "Nguồn cơ hội"
+// (CreateOpportunityDrawer.tsx, migration 080_crm_source_opportunity_values.sql)
+// vào đây — KHÔNG xoá hẳn assertSupportedSource() để giữ nguyên hành vi chặn
+// lỗi gõ tay hiện có, nằm ngoài phạm vi task này.
 const SUPPORTED_SOURCE_PLATFORMS = new Set([
   'Manual', 'FB_Inbox', 'FB_Group', 'Zalo', 'Website', 'Referral', 'MarkeeChat',
+  'Existing_Customer', 'Lead_Convert', 'Upsell',
 ]);
 // Migration 041 mo rong CHECK constraint contract_status ho tro du 7 gia tri
 // cua crm-next (truoc day DB chi nhan 3 gia tri legacy active/completed/
@@ -381,6 +393,8 @@ function rowToDeal(row: CustomerLeadRow, history: StageHistory[] = []): Deal {
     dealId: row.id,
     customerId: asText(row.customer_id),
     position: asText(row.position),
+    positionCategoryId: asText(row.position_category_id),
+    positionLabelSnapshot: asText(row.position_label_snapshot),
     customerName: asText(row.customer_name) || 'Khách hàng chưa tên',
     companyName: asText(row.company_name),
     phone: asText(row.phone),
@@ -459,6 +473,8 @@ function rowToCustomer(row: CrmCustomerRow): CrmCustomerSummary {
     customerName: asText(row.customer_name),
     companyName: asText(row.company_name),
     position: asText(row.position),
+    positionCategoryId: asText(row.position_category_id),
+    positionLabelSnapshot: asText(row.position_label_snapshot),
     phone: asText(row.phone),
     email: asText(row.email),
     source: asText(row.source),
@@ -475,7 +491,7 @@ function toCrmCustomerPayload(input: CreateDealInput): Partial<CrmCustomerRow> {
   return {
     customer_name: input.customerName,
     company_name: input.companyName,
-    position: input.position,
+    position_category_id: input.positionCategoryId,
     phone: input.phone,
     email: input.email,
     source: input.sourcePlatform || 'Manual',
@@ -505,7 +521,7 @@ function toCustomerPayload(input: CreateDealInput | UpdateDealInput): Partial<Cu
   if ('sourcePlatform' in input) payload.source_platform = input.sourcePlatform;
   if ('servicePackage' in input) payload.service_package = input.servicePackage;
   if ('package' in input) payload.crm_package = input.package;
-  if ('position' in input) payload.position = input.position;
+  if ('positionCategoryId' in input) payload.position_category_id = input.positionCategoryId;
   if ('stage' in input) payload.deal_stage = input.stage;
   if ('decisionMaker' in input) payload.decision_maker = input.decisionMaker;
   if ('estimatedBudget' in input) payload.estimated_budget = input.estimatedBudget;

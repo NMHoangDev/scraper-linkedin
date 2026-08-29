@@ -12,6 +12,17 @@ function optionLabel(option: Option): string {
   return typeof option === 'string' ? option : option.label;
 }
 
+// Bỏ dấu tiếng Việt để search không phân biệt dấu (vd gõ "giam doc" vẫn khớp
+// "Giám đốc") — dùng chung cho mọi nơi gọi SearchableSelect, không riêng gì
+// Chức vụ, vì lợi ích này áp dụng tốt như nhau cho Nguồn/Gói/Lĩnh vực.
+function foldDiacritics(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[đĐ]/g, 'd')
+    .toLowerCase();
+}
+
 /** Dropdown <select> tùy biến (trigger + menu tìm kiếm được) — dùng thay cho
  * <select> gốc để mọi dropdown trong form CRM có cùng 1 kiểu hiển thị, không
  * lệ thuộc vào cách mỗi trình duyệt tự vẽ <select>/<option> gốc. */
@@ -20,11 +31,13 @@ export function SearchableSelect({
   onChange,
   options,
   placeholder = '-- Chọn --',
+  disabled = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   options: Option[];
   placeholder?: string;
+  disabled?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -42,7 +55,7 @@ export function SearchableSelect({
   }, []);
 
   const filtered = search.trim()
-    ? options.filter(o => optionLabel(o).toLowerCase().includes(search.trim().toLowerCase()))
+    ? options.filter(o => foldDiacritics(optionLabel(o)).includes(foldDiacritics(search.trim())))
     : options;
 
   const selectedLabel = options.find(o => optionValue(o) === value);
@@ -52,12 +65,13 @@ export function SearchableSelect({
       <button
         type="button"
         className="crm-searchable-select-trigger"
-        onClick={() => setIsOpen(open => !open)}
+        onClick={() => !disabled && setIsOpen(open => !open)}
+        disabled={disabled}
       >
         <span>{selectedLabel ? optionLabel(selectedLabel) : placeholder}</span>
         <span aria-hidden>▾</span>
       </button>
-      {isOpen ? (
+      {isOpen && !disabled ? (
         <div className="crm-searchable-select-menu">
           <input
             autoFocus

@@ -7,6 +7,7 @@ import { useAppAuth } from '@/contexts/AppAuthContext';
 import { formatVND, getStageMeta } from '../constants/crmConfig';
 import type { DealStage } from '../types';
 import { CustomerFormModal } from './CustomerFormModal';
+import { CrmContactsPanel } from './CrmContactsPanel';
 import { Loader2 } from './icons';
 import type { CrmCustomerRow } from '../types';
 
@@ -63,10 +64,10 @@ type RelatedPayload = {
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  new_lead: 'Lead mới',
-  following: 'Đang chăm sóc',
-  current_customer: 'Khách hàng',
-  not_fit: 'Không phù hợp',
+  new_lead: 'Tiềm năng',
+  following: 'Đang bán',
+  current_customer: 'Đã mua',
+  not_fit: 'Ngừng hoạt động',
 };
 
 const STATUS_BADGE_CLASS: Record<string, string> = {
@@ -262,6 +263,8 @@ export function CrmCustomerDetailPage({ customerId }: { customerId: string }) {
             {customer.note ? <InfoItem label="Ghi chú" value={customer.note} full /> : null}
           </section>
         ) : null}
+
+        {customer ? <CrmContactsPanel customerId={customer.id} canEdit={canEdit} /> : null}
 
         <section className="crm-content-section">
           <div className="crm-segment crm-customer-tabs">

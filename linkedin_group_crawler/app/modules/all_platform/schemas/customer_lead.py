@@ -128,6 +128,11 @@ class CustomerLeadCreate(BaseModel):
     outcome_detail: Optional[dict] = None
     quote_id: Optional[str] = None
 
+    # migration 079 — Chuc vu category-driven select (category_type=crm_position).
+    # position_label_snapshot is NEVER trusted from client — service layer
+    # always re-derives it server-side from the resolved category.
+    position_category_id: Optional[str] = None
+
     # migration 050 — Team gan cho deal nay (chon tay trong form deal)
     team_id: Optional[str] = None
 
@@ -203,6 +208,9 @@ class CustomerLeadUpdate(BaseModel):
     outcome_detail: Optional[dict] = None
     quote_id: Optional[str] = None
 
+    # migration 079
+    position_category_id: Optional[str] = None
+
     # migration 050
     team_id: Optional[str] = None
 
@@ -272,6 +280,10 @@ class CustomerLeadResponse(BaseModel):
     closed_at: Optional[datetime] = None
     outcome_detail: Optional[dict] = None
     quote_id: Optional[str] = None
+
+    # migration 079
+    position_category_id: Optional[str] = None
+    position_label_snapshot: Optional[str] = None
 
     created_at: datetime
     updated_at: datetime

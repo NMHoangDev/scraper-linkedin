@@ -3,6 +3,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone, date
 from app.core.supabase_client import get_supabase_client
 from app.modules.all_platform.schemas.customer_lead import STAGE_REQUIRED_FIELDS, is_transition_allowed
+from app.modules.all_platform.services.crm_position_service import apply_position_category
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +57,7 @@ BASE_COLUMNS = (
     "warranty_expires_at, care_note, last_care_at, "
     "payment_due_date, payment_status, "
     "tags, has_budget, note, reject_reason, reject_reason_type, review_result, "
-    "position, crm_package, zalo, facebook, telegram, pause_reason, next_step, closed_at, outcome_detail, quote_id, "
+    "position, position_category_id, position_label_snapshot, crm_package, zalo, facebook, telegram, pause_reason, next_step, closed_at, outcome_detail, quote_id, "
     "leaded_by_name_hint, sdr_name_hint, team_id, "
     "created_at, updated_at, leader:leaded_by(name), sdr:sdr_id(name), "
     "quote:quote_id(quote_number, total_amount, public_token, status), "
@@ -259,6 +260,9 @@ def create_customer_lead(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         # Stamp lần đầu vào stage
         if not data.get("stage_entered_at"):
             data["stage_entered_at"] = datetime.now(timezone.utc).isoformat()
+        # migration 079 — Chuc vu category-driven select (deal la ban ghi
+        # moi nen luon require_active=True).
+        apply_position_category(data)
         # Serialize datetime → ISO string trước khi INSERT (supabase-py không
         # tự handle datetime/date → JSON serialize error).
         data = _serialize_datetimes(data)
@@ -288,8 +292,12 @@ def update_customer_lead(lead_id: str, data: Dict[str, Any]) -> Optional[Dict[st
     """
     try:
         supabase = get_supabase_client()
+        safe_data = dict(data)
+        if "position_category_id" in safe_data:
+            current = get_customer_lead_by_id(lead_id) or {}
+            apply_position_category(safe_data, current_position_category_id=current.get("position_category_id"))
         # Serialize datetime/date → ISO string (supabase-py không tự JSON hóa)
-        safe_data = _serialize_datetimes(dict(data))
+        safe_data = _serialize_datetimes(safe_data)
         safe_data = _normalize_uuid_fields(safe_data)
         res = (
             supabase.table("customer_leads")

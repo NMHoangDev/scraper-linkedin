@@ -127,6 +127,8 @@ export interface Deal {
   customerId?: string;
   customerName: string;
   position?: string;
+  positionCategoryId?: string;
+  positionLabelSnapshot?: string;
   companyName?: string;
   phone?: string;
   email?: string;
@@ -179,6 +181,8 @@ export interface CrmCustomerSummary {
   customerName: string;
   companyName?: string;
   position?: string;
+  positionCategoryId?: string;
+  positionLabelSnapshot?: string;
   phone?: string;
   email?: string;
   source?: string;
@@ -188,6 +192,9 @@ export interface CrmCustomerSummary {
   dealCount?: number;
   totalValue?: number;
   lastDealAt?: string;
+  /** So Contact that thuoc khach hang nay (migration khong can - backend gan
+   * them field nay o _attach_customer_metrics, xem crm_customer_service.py). */
+  contactCount?: number;
 }
 
 /**
@@ -228,6 +235,29 @@ export interface CrmCustomerListResult {
   page: number;
   pageSize: number;
   kpi: CrmCustomerKpi;
+}
+
+/**
+ * Contact (người liên hệ) thuộc 1 hồ sơ khách hàng (`crm_contacts`) — khớp
+ * CrmContactResponse ở backend (app/modules/all_platform/schemas/crm_contact.py).
+ * Khác CrmCustomerRow: hồ sơ khách hàng đại diện cho DOANH NGHIỆP, còn contact
+ * là 1 người cụ thể (có thể có nhiều contact/khách hàng).
+ */
+export interface CrmContact {
+  id: string;
+  customerId: string;
+  name: string;
+  position?: string;
+  positionCategoryId?: string;
+  positionLabelSnapshot?: string;
+  phone?: string;
+  email?: string;
+  zalo?: string;
+  facebook?: string;
+  isPrimary?: boolean;
+  note?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface CrmRelatedDeal {
@@ -326,6 +356,54 @@ export interface RevenueRow {
   value: number;
   percent: number;
   color: string;
+}
+
+// ===== Leads (crm_leads) — trang riêng /all-platform/crm/leads, KHÁC hẳn
+// CrmCustomerRow (crm_customers) và Deal (customer_leads). Khớp
+// CrmLeadResponse ở backend (app/modules/all_platform/schemas/crm_lead.py). =====
+export type CrmLeadStatus = 'new_lead' | 'qualifying' | 'qualified' | 'nurture' | 'converted' | 'disqualified';
+
+export interface CrmLeadRow {
+  id: string;
+  leadName: string;
+  companyName?: string;
+  position?: string;
+  positionCategoryId?: string;
+  positionLabelSnapshot?: string;
+  phone?: string;
+  email?: string;
+  zalo?: string;
+  facebook?: string;
+  telegram?: string;
+  website?: string;
+  source?: string;
+  status: CrmLeadStatus;
+  score?: number | null;
+  sdrId?: string;
+  note?: string;
+  qualificationNeed?: string;
+  qualificationIcpFit?: boolean | null;
+  qualificationEstimatedValue?: number | null;
+  qualificationDecisionMaker?: string;
+  qualificationExpectedTimeline?: string;
+  qualificationAeId?: string;
+  nextStep?: string;
+  followUpDate?: string;
+  convertedCustomerId?: string;
+  convertedContactId?: string;
+  convertedDealId?: string;
+  convertedAt?: string;
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  canWrite?: boolean;
+}
+
+export interface CrmLeadKpi {
+  total: number;
+  new_lead: number;
+  qualifying: number;
+  qualified: number;
 }
 
 export interface CrmAnalytics {

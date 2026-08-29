@@ -124,7 +124,11 @@ export type MaterialSymbolName =
   | "shield"
   | "paid"
   | "track_changes"
-  | "domain";
+  | "domain"
+  // Sidebar CRM: "Cơ hội" (Pipeline/Kanban) — thêm mới cho việc đổi nhãn mục
+  // /all-platform/crm từ "CRM" sang "Cơ hội" kèm icon phễu, phân biệt với
+  // "Leads" (person_add) và các icon còn lại trong nhóm Quản lý CRM.
+  | "filter_alt";
 
 export interface MaterialIconProps {
   name: MaterialSymbolName;

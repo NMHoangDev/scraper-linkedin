@@ -7,11 +7,12 @@ from typing import Optional
 
 
 class CategoryAddRequest(BaseModel):
-    category_type: str  # intent | industry | tier | team | icp
+    category_type: str  # intent | industry | tier | team | icp | crm_position | ...
     code: str
     name: Optional[str] = None
     description: Optional[str] = None
     platform: str = "general"
+    is_active: bool = True
 
 
 class CategoryUpdateRequest(BaseModel):
@@ -20,6 +21,9 @@ class CategoryUpdateRequest(BaseModel):
     code: Optional[str] = None
     name: Optional[str] = None
     description: Optional[str] = None
+    # migration 079 — soft-deactivate toggle (currently only exposed in the
+    # admin UI for category_type='crm_position'; see CrmCategorySections).
+    is_active: Optional[bool] = None
 
 class CategoryDeleteRequest(BaseModel):
     id: str

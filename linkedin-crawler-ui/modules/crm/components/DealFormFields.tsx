@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useMembers } from '@/hooks/useMembers';
 import { teamsService, type TeamRow } from '@/services/all-platform.service';
 import { SearchableSelect } from './SearchableSelect';
+import { PositionSelect } from './PositionSelect';
 import type { MemberProfile } from '@/types/unified.types';
 import {
   CITY_OPTIONS,
@@ -29,7 +30,8 @@ export type DealFormState = {
   updateCustomerProfile: boolean;
   customerProfileCanEdit: boolean;
   customerName: string;
-  position: string;
+  positionCategoryId: string;
+  positionLabel: string;
   companyName: string;
   phone: string;
   email: string;
@@ -80,7 +82,8 @@ export function emptyDealForm(): DealFormState {
     updateCustomerProfile: false,
     customerProfileCanEdit: false,
     customerName: '',
-    position: '',
+    positionCategoryId: '',
+    positionLabel: '',
     companyName: '',
     phone: '',
     email: '',
@@ -141,7 +144,8 @@ export function dealFormFromDeal(deal: Deal): DealFormState {
     updateCustomerProfile: false,
     customerProfileCanEdit: false,
     customerName: deal.customerName,
-    position: deal.position || '',
+    positionCategoryId: deal.positionCategoryId || '',
+    positionLabel: deal.positionLabelSnapshot || deal.position || '',
     companyName: deal.companyName || '',
     phone: deal.phone || '',
     email: deal.email || '',
@@ -269,7 +273,7 @@ export function buildDealPayload(form: DealFormState, _agents: CrmUserOption[] =
     customerId: form.customerId || undefined,
     updateCustomerProfile: form.updateCustomerProfile,
     customerName: form.customerName.trim(),
-    position: form.position.trim(),
+    positionCategoryId: form.positionCategoryId || undefined,
     companyName: form.companyName.trim(),
     phone: form.phone.trim(),
     email: form.email.trim(),
@@ -322,7 +326,7 @@ export function buildDealPayload(form: DealFormState, _agents: CrmUserOption[] =
   };
 }
 
-function CustomerProfileCombobox({
+export function CustomerProfileCombobox({
   form,
   setValue,
   disabled = false,
@@ -384,7 +388,8 @@ function CustomerProfileCombobox({
   // ten khach moi hoac bam "Doi".
   function clearAutofilledContact() {
     setValue('companyName', '');
-    setValue('position', '');
+    setValue('positionCategoryId', '');
+    setValue('positionLabel', '');
     setValue('phone', '');
     setValue('email', '');
   }
@@ -407,7 +412,8 @@ function CustomerProfileCombobox({
     setValue('updateCustomerProfile', false);
     setValue('customerName', customer.customerName || '');
     setValue('companyName', customer.companyName || '');
-    setValue('position', customer.position || '');
+    setValue('positionCategoryId', customer.positionCategoryId || '');
+    setValue('positionLabel', customer.positionLabelSnapshot || customer.position || '');
     setValue('phone', customer.phone || '');
     setValue('email', customer.email || '');
     setValue('sourcePlatform', customer.source || form.sourcePlatform || 'Manual');
@@ -879,7 +885,14 @@ export function DealFormFields({
               <h3 className="crm-form-title">Thông tin liên hệ khác</h3>
               <div className="crm-form-grid">
                 <Field label="Chức vụ">
-                  <input value={form.position} onChange={event => setValue('position', event.target.value)} placeholder="Giám đốc, Chủ doanh nghiệp..." />
+                  <PositionSelect
+                    value={form.positionCategoryId}
+                    labelSnapshot={form.positionLabel}
+                    onChange={(id, label) => {
+                      setValue('positionCategoryId', id);
+                      setValue('positionLabel', label);
+                    }}
+                  />
                 </Field>
                 <Field label="Zalo">
                   <input value={form.zalo} onChange={event => setValue('zalo', event.target.value)} placeholder="Số Zalo hoặc link Zalo" />
@@ -1019,12 +1032,12 @@ export function DealFormFields({
 /** 5 giai đoạn cho chip picker lúc TẠO MỚI — cố ý không gồm on_hold/won/lost (3 stage đó chỉ
  * đạt tới qua kanban/sửa deal, không hợp lý chọn ngay lúc tạo nhanh) và bỏ qua 'requirement'
  * (Lấy yêu cầu) để khớp đúng 5 bước rút gọn của form nhanh. */
-const CREATE_STAGE_CHIPS: Deal['stage'][] = ['new_lead', 'contacted', 'qualified', 'proposal_sent', 'negotiation'];
+export const CREATE_STAGE_CHIPS: Deal['stage'][] = ['new_lead', 'contacted', 'qualified', 'proposal_sent', 'negotiation'];
 
 /** Nhãn hiển thị RIÊNG cho chip picker của form nhanh — khác nhãn dùng chung
  * DEAL_STAGE_META (vd 'new_lead' vẫn là "Khách mới" ở kanban/nơi khác, chỉ ở đây gọi "Lead
  * mới") — cùng 1 giá trị stage lưu xuống DB, chỉ đổi CHỮ hiển thị tại đúng chỗ này. */
-const CREATE_STAGE_LABELS: Partial<Record<Deal['stage'], string>> = {
+export const CREATE_STAGE_LABELS: Partial<Record<Deal['stage'], string>> = {
   new_lead: 'Lead mới',
   contacted: 'Đã liên hệ',
   qualified: 'Đủ điều kiện',
@@ -1033,7 +1046,7 @@ const CREATE_STAGE_LABELS: Partial<Record<Deal['stage'], string>> = {
 };
 
 /** Gợi ý Next step phổ biến — vẫn cho gõ tự do qua "Tuỳ chỉnh...". */
-const NEXT_STEP_PRESETS = [
+export const NEXT_STEP_PRESETS = [
   'Gọi xác nhận nhu cầu',
   'Gửi báo giá',
   'Gửi hợp đồng',

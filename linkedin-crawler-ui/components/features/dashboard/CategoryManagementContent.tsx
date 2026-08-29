@@ -21,6 +21,8 @@ import {
   PlatformStatsRow,
 } from "@/components/features/shared/PlatformStatCard";
 import { ActionMenu } from "@/modules/crm/components/ActionMenu";
+import { invalidatePositionOptionsCache } from "@/modules/crm/components/PositionSelect";
+import { invalidateCrmCategoryCache } from "@/modules/crm/components/CrmCategorySelect";
 
 // ── TEAM MODAL (Multi-select members, Leader dropdown) ──────────────────────
 function TeamModal({ isOpen, onClose, onSave, editing }: { isOpen: boolean; onClose: () => void; onSave: (p: any) => Promise<void>; editing?: any }) {
@@ -365,7 +367,29 @@ const CRM_SECTIONS: Array<{ key: CategoryType; label: string; description: strin
     placeholderCode: "Vd: Goi_vip",
     placeholderName: "Vd: Gói VIP",
   },
+  {
+    key: "crm_position",
+    label: "Chức vụ",
+    description: "Chức vụ của người liên hệ trong deal/khách hàng (vd: Giám đốc, Trưởng phòng Marketing...). Mục này dùng NGỪNG DÙNG thay vì xóa — bản ghi cũ đã chọn 1 chức vụ vẫn hiển thị đúng kể cả sau khi ngừng dùng.",
+    placeholderCode: "Vd: Truong_phong_Kinh_doanh",
+    placeholderName: "Vd: Trưởng phòng Kinh doanh",
+  },
+  {
+    // migration 080 — dropdown "SDR/Sale cần làm gì tiếp" trong drawer
+    // "Xác minh Lead" (LeadDetailDrawer.tsx). Nhãn của mục được chọn lưu
+    // thẳng vào crm_leads.next_step (cột TEXT đã có), không thêm cột mới.
+    key: "crm_next_step",
+    label: "Việc tiếp theo",
+    description: "Việc SDR/Sale cần làm tiếp sau khi xác minh Lead (vd: Gọi lại, Gửi báo giá...).",
+    placeholderCode: "Vd: Gui_bao_gia",
+    placeholderName: "Vd: Gửi báo giá",
+  },
 ];
+
+// Chỉ category_type='crm_position' dùng NGỪNG DÙNG (is_active=false) thay vì
+// xóa — 4 mục kia (Lĩnh vực/Nguồn/Danh mục sản phẩm/Gói) giữ nguyên hành vi
+// xóa cứng đã có từ trước (ngoài phạm vi task này, xem migration 079).
+const DEACTIVATABLE_SECTIONS = new Set<CategoryType>(["crm_position"]);
 
 function CrmCategorySections({
   categories,
@@ -422,6 +446,11 @@ function CrmCategorySections({
         setModalError(res.message || "Lưu thất bại. Vui lòng thử lại.");
         return;
       }
+      if (modal.sectionKey === "crm_position") invalidatePositionOptionsCache();
+      // Combobox danh muc CRM dung chung (vd "Viec tiep theo") cache theo
+      // category_type — xoa cache cua dung muc vua sua de moi dropdown dang
+      // mo load lai ngay, khong can reload trang.
+      invalidateCrmCategoryCache(modal.sectionKey);
       setModal(null);
       await onChanged();
     } catch {
@@ -435,15 +464,25 @@ function CrmCategorySections({
     if (!deleteTarget) return;
     setIsDeleting(true);
     try {
-      const res = await allPlatformCategoriesService.delete(deleteTarget.item.id);
+      // "Chức vụ" (crm_position) không xóa cứng — bản ghi cũ (deal/khách hàng/
+      // contact) đã lưu category này vẫn phải hiển thị đúng tên qua
+      // position_label_snapshot ngay cả sau khi mục này ngừng dùng, nên chỉ
+      // toggle is_active thay vì DELETE (xem migration 079).
+      const isDeactivatable = DEACTIVATABLE_SECTIONS.has(deleteTarget.sectionKey);
+      const nextActive = isDeactivatable ? deleteTarget.item.is_active === false : undefined;
+      const res = isDeactivatable
+        ? await allPlatformCategoriesService.update({ id: deleteTarget.item.id, is_active: nextActive })
+        : await allPlatformCategoriesService.delete(deleteTarget.item.id);
       if (res.success) {
+        if (isDeactivatable) invalidatePositionOptionsCache();
+        invalidateCrmCategoryCache(deleteTarget.sectionKey);
         setDeleteTarget(null);
         await onChanged();
       } else {
-        alert(res.message || "Lỗi khi xóa");
+        alert(res.message || "Lỗi khi thực hiện");
       }
     } catch {
-      alert("Lỗi kết nối khi xóa");
+      alert("Lỗi kết nối khi thực hiện");
     } finally {
       setIsDeleting(false);
     }
@@ -549,10 +588,14 @@ function CrmCategorySections({
                   </td>
                 </tr>
               ) : (
-                filteredItems.map(item => (
+                filteredItems.map(item => {
+                  const isDeactivatable = DEACTIVATABLE_SECTIONS.has(activeSection);
+                  const isInactive = isDeactivatable && item.is_active === false;
+                  return (
                   <tr key={item.id} className="crm-row">
                     <td className="crm-td">
                       <span className="crm-customer-name crm-truncate" title={item.name}>{item.name}</span>
+                      {isInactive ? <span className="crm-badge crm-badge--neutral" style={{ marginLeft: "0.5rem" }}>Đã ngừng dùng</span> : null}
                     </td>
                     <td className="crm-td">
                       <span className="crm-truncate crm-mono-code" title={item.code}>{item.code}</span>
@@ -569,18 +612,26 @@ function CrmCategorySections({
                                 setModalError(null);
                               },
                             },
-                            {
-                              key: "delete",
-                              label: "Xóa",
-                              danger: true,
-                              onSelect: () => setDeleteTarget({ sectionKey: activeSection, item }),
-                            },
+                            isDeactivatable
+                              ? {
+                                  key: "toggle-active",
+                                  label: isInactive ? "Kích hoạt lại" : "Ngừng dùng",
+                                  danger: !isInactive,
+                                  onSelect: () => setDeleteTarget({ sectionKey: activeSection, item }),
+                                }
+                              : {
+                                  key: "delete",
+                                  label: "Xóa",
+                                  danger: true,
+                                  onSelect: () => setDeleteTarget({ sectionKey: activeSection, item }),
+                                },
                           ]}
                         />
                       </div>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -660,12 +711,19 @@ function CrmCategorySections({
         </div>
       )}
 
-      {deleteTarget && (
+      {deleteTarget && (() => {
+        const isDeactivatable = DEACTIVATABLE_SECTIONS.has(deleteTarget.sectionKey);
+        const isCurrentlyActive = deleteTarget.item.is_active !== false;
+        const isReactivate = isDeactivatable && !isCurrentlyActive;
+        const title = isDeactivatable ? (isReactivate ? "Xác nhận kích hoạt lại" : "Xác nhận ngừng dùng") : "Xác nhận xóa";
+        const actionLabel = isDeactivatable ? (isReactivate ? "Kích hoạt lại" : "Ngừng dùng") : "Xác nhận xóa";
+        const busyLabel = isDeactivatable ? "Đang lưu..." : "Đang xóa...";
+        return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[1px] animate-in fade-in duration-200">
           <div style={{ width: "100%", maxWidth: "420px" }} className="overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between border-b border-outline-variant bg-surface-container-low px-6 py-4">
               <h3 className="flex items-center gap-2 font-bold text-on-surface">
-                <span className="text-xl">⚠️</span> Xác nhận xóa
+                <span className="text-xl">⚠️</span> {title}
               </h3>
               <button
                 onClick={() => setDeleteTarget(null)}
@@ -677,16 +735,24 @@ function CrmCategorySections({
             </div>
             <div className="space-y-4 p-6">
               <p className="text-xs leading-relaxed text-on-surface">
-                Bạn có chắc chắn muốn xóa{" "}
+                Bạn có chắc chắn muốn {isDeactivatable ? (isReactivate ? "kích hoạt lại" : "ngừng dùng") : "xóa"}{" "}
                 <span className="font-semibold">
                   {deleteTarget.item.name} ({deleteTarget.item.code})
                 </span>{" "}
                 khỏi danh mục &quot;{CRM_SECTIONS.find(s => s.key === deleteTarget.sectionKey)?.label}&quot; không?
               </p>
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[11px] font-medium leading-relaxed text-amber-800">
-                ⚠️ Nếu mã &quot;{deleteTarget.item.code}&quot; đang được dùng ở khách hàng/deal hiện có, các bản ghi đó vẫn giữ
-                nguyên giá trị cũ nhưng sẽ không còn chọn lại được mã này trong form thêm/sửa deal. Hành động này
-                không thể hoàn tác.
+                {isDeactivatable ? (
+                  isReactivate
+                    ? "⚠️ Mục này sẽ xuất hiện lại trong ô chọn Chức vụ cho các lựa chọn MỚI."
+                    : "⚠️ Các bản ghi đã chọn Chức vụ này vẫn giữ nguyên hiển thị đúng tên cũ, nhưng mục này sẽ KHÔNG còn xuất hiện trong ô chọn Chức vụ cho các lựa chọn mới."
+                ) : (
+                  <>
+                    ⚠️ Nếu mã &quot;{deleteTarget.item.code}&quot; đang được dùng ở khách hàng/deal hiện có, các bản ghi đó vẫn giữ
+                    nguyên giá trị cũ nhưng sẽ không còn chọn lại được mã này trong form thêm/sửa deal. Hành động này
+                    không thể hoàn tác.
+                  </>
+                )}
               </div>
             </div>
             <div className="flex justify-end gap-3 border-t border-outline-variant bg-surface-container-low px-6 py-4">
@@ -704,12 +770,13 @@ function CrmCategorySections({
                 disabled={isDeleting}
                 className="flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-60"
               >
-                {isDeleting ? "Đang xóa..." : "Xác nhận xóa"}
+                {isDeleting ? busyLabel : actionLabel}
               </button>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
@@ -735,6 +802,8 @@ export function CategoryManagementContent({
     crm_service_package: [],
     crm_package: [],
     crm_industry: [],
+    crm_position: [],
+    crm_next_step: [],
   });
 
   const [selectedTab, setSelectedTab] = useState<CategoryType>(crmOnly ? CRM_TAB_KEY : "intent");
@@ -807,6 +876,8 @@ export function CategoryManagementContent({
         crm_service_package: [],
         crm_package: [],
         crm_industry: [],
+        crm_position: [],
+        crm_next_step: [],
       };
 
       list.forEach((item) => {
