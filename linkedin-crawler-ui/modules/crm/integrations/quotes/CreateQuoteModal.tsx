@@ -10,7 +10,7 @@ import { seedingQuoteRepository, TelegramSendButton } from '@/modules/quotes';
 import type { Quote } from '@/modules/quotes';
 import { buildDealPayload, dealFormFromDeal, emptyDealForm } from '../../components/DealFormFields';
 import type { DealFormState } from '../../components/DealFormFields';
-import { Building2, CheckCircle2, Loader2, User, X } from '../../components/icons';
+import { Building2, CheckCircle2, Loader2, Sparkles, User, X } from '../../components/icons';
 import { seedingCrmRepository } from '../../repositories/SeedingCrmRepository';
 import type { CreateDealInput, CrmUserOption, Deal } from '../../types';
 import { FillQuoteStep } from './FillQuoteStep';
@@ -98,6 +98,10 @@ export function CreateQuoteModal({
   const isEditMode = Boolean(editQuote);
   const [step, setStep] = useState<CreateQuoteStep>(1);
   const [customer, setCustomer] = useState<DealFormState>(emptyDealForm);
+  // Co hoi CRM da co san nguoi dung tu chon o Buoc 1 (khoi "Lien ket co hoi
+  // CRM" > "Doi co hoi") cho luong bao gia TU DO (khong bi khoa boi
+  // initialDeal) - null = chua chon, se tu tao co hoi moi luc luu (hanh vi cu).
+  const [manualLinkedDeal, setManualLinkedDeal] = useState<Deal | null>(null);
   const [selectedForm, setSelectedForm] = useState<QuoteForm | null>(null);
   const [quoteDraft, setQuoteDraft] = useState<QuoteDraft>(emptyQuoteDraft);
   // quoteDraftFromForm() chỉ được gọi 1 LẦN cho mỗi lần tạo mới (khi rời Bước 2
@@ -111,6 +115,11 @@ export function CreateQuoteModal({
   // tự khôi phục nháp cũ đè lên ngữ cảnh đang mở.
   const draftEligible = !editQuote && !initialDeal && !initialQuoteFormId;
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  // Nut "Luu nhap" (header) - nhap da tu dong luu san (xem effect autosave
+  // ben duoi) nen bam nut nay chi can XAC NHAN LAI thoi diem luu + doi nhan nut
+  // sang "Da luu" trong chop nhoang, khong goi API rieng.
+  const [draftJustSaved, setDraftJustSaved] = useState(false);
+  const modalBodyRef = useRef<HTMLDivElement>(null);
   const restoredDraftRef = useRef(false);
 
   // Đơn vị phát hành báo giá (bên bán) — dropdown Bước 1. Danh sách công ty +
@@ -180,6 +189,14 @@ export function CreateQuoteModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, draftEligible, step, customer, quoteDraft, selectedIssuerCompany?.id, selectedForm?.id]);
 
+  // Nut "Luu nhap" tren header - nhap da tu dong luu (effect tren) nen chi can
+  // xac nhan lai + doi nhan nut sang "Da luu" 1.5s cho nguoi dung yen tam.
+  function handleSaveDraftNow() {
+    setLastSavedAt(new Date());
+    setDraftJustSaved(true);
+    window.setTimeout(() => setDraftJustSaved(false), 1500);
+  }
+
   // Che do sua: gan lai cong ty phat hanh da luu (theo issuerCompanyId) mot khi
   // danh sach cong ty da fetch xong, de Buoc 1 hien dung cong ty dang dung. Ghi
   // de cac field hien thi bang dung SNAPSHOT da luu trong quoteDraft.data (co the
@@ -224,6 +241,13 @@ export function CreateQuoteModal({
   // Báo giá vừa tạo xong (draft) — hiện màn "Đã tạo báo giá thành công" thay vì
   // đóng modal ngay. null = chưa tạo/đang ở các bước 1-4.
   const [createdQuote, setCreatedQuote] = useState<Quote | null>(null);
+  // Cuon than modal (.crm-modal-body) ve dau moi lan doi buoc/hien man thanh
+  // cong - truoc day scrollTop cu bi giu nguyen khi chuyen buoc (vd cuon het
+  // Buoc 3 roi bam "Tiep theo" se vao Buoc 4 giua chung, khong thay checklist
+  // xac nhan o dau man) - bug thuc te phat hien khi tu kiem tra man hinh.
+  useEffect(() => {
+    modalBodyRef.current?.scrollTo({ top: 0 });
+  }, [step, createdQuote]);
   const [approveError, setApproveError] = useState('');
 
   // Chế độ sửa: nạp dữ liệu báo giá đã lưu (mẫu + khách hàng liên kết + nội
@@ -293,6 +317,7 @@ export function CreateQuoteModal({
     if (submitting) return;
     setStep(1);
     setCustomer(emptyDealForm());
+    setManualLinkedDeal(null);
     setSelectedForm(null);
     setSelectedIssuerCompany(null);
     setQuoteDraft(emptyQuoteDraft());
@@ -318,10 +343,11 @@ export function CreateQuoteModal({
     lockedDealForStep1 && !customer.customerName.trim()
       ? { ...customer, customerName: lockedDealForStep1.customerName, companyName: lockedDealForStep1.companyName || '', phone: lockedDealForStep1.phone || '', email: lockedDealForStep1.email || '', address: lockedDealForStep1.address || '' }
       : customer;
-  // Chỉ gắn deal có sẵn khi mở từ "Tạo báo giá cho deal này" (initialDeal cố
-  // định). Luồng tự do (đứng nút "+ Tạo báo giá") không còn cách nào gắn tay
-  // vào deal cũ nữa — luôn tạo deal mới ở bước submit, tránh ghi đè deal cũ.
-  const activeLinkedDealId = initialDeal?.id || '';
+  // Gan deal co san khi mo tu "Tao bao gia cho deal nay" (initialDeal co
+  // dinh), HOAC khi nguoi dung tu chon 1 co hoi co san qua "Doi co hoi" (Buoc
+  // 1) trong luong tu do - khong chon gi thi van tu tao deal moi o buoc submit
+  // nhu truoc (khong doi hanh vi mac dinh).
+  const activeLinkedDealId = initialDeal?.id || manualLinkedDeal?.id || '';
 
   // Gia tri tom tat dung o Buoc 3 (2 the recap "Khach hang"/"Don vi phat
   // hanh") va Buoc 5 (checklist xac nhan) - tinh 1 lan dung chung 2 noi, tranh
@@ -513,19 +539,27 @@ export function CreateQuoteModal({
         <header className="crm-modal-header">
           <div>
             <h2 className="crm-modal-title">
-              {createdQuote ? 'Đã tạo báo giá thành công' : isEditMode ? `Sửa báo giá ${editQuote?.quoteNumber || ''}` : 'Tạo báo giá'}
+              {!createdQuote && !isEditMode ? <Sparkles className="crm-icon crm-quote-title-sparkle" /> : null}
+              {createdQuote ? 'Đã tạo báo giá thành công' : isEditMode ? `Sửa báo giá ${editQuote?.quoteNumber || ''}` : 'Tạo báo giá nhanh'}
             </h2>
             <p className="crm-modal-subtitle">
               {createdQuote
                 ? `Báo giá ${createdQuote.quoteNumber} đã được lưu.`
                 : isEditMode
                   ? 'Chỉnh sửa nội dung — chưa duyệt thì còn sửa được không giới hạn.'
-                  : 'Tạo báo giá độc lập — có thể gắn vào deal hoặc không.'}
+                  : 'Điền hạng mục trước, các thông tin còn lại đã được tối ưu mặc định.'}
             </p>
           </div>
-          <button type="button" className="crm-modal-close" onClick={resetAndClose} aria-label="Đóng" disabled={submitting}>
-            <X className="crm-icon" />
-          </button>
+          <div className="crm-modal-header-actions">
+            {!createdQuote && draftEligible ? (
+              <button type="button" className="crm-secondary-inline crm-quote-save-draft-button" onClick={handleSaveDraftNow}>
+                {draftJustSaved ? '✓ Đã lưu' : 'Lưu nháp'}
+              </button>
+            ) : null}
+            <button type="button" className="crm-modal-close" onClick={resetAndClose} aria-label="Đóng" disabled={submitting}>
+              <X className="crm-icon" />
+            </button>
+          </div>
         </header>
 
         {createdQuote ? null : (
@@ -551,7 +585,7 @@ export function CreateQuoteModal({
           </div>
         )}
 
-        <div className="crm-modal-body crm-wizard-body">
+        <div className="crm-modal-body crm-wizard-body" ref={modalBodyRef}>
           <div className="crm-wizard-content">
             {createdQuote ? (
               <QuoteSuccessPanel
@@ -573,6 +607,8 @@ export function CreateQuoteModal({
                       lockedDeal={lockedDealForStep1}
                       quotes={allQuotes}
                       agents={agents}
+                      linkedDeal={manualLinkedDeal}
+                      onChangeLinkedDeal={setManualLinkedDeal}
                     />
                   </div>
                 ) : null}
@@ -668,17 +704,17 @@ export function CreateQuoteModal({
                 ) : null}
                 {step === 1 ? (
                   <button type="button" className="crm-save-button" onClick={handleCustomerNext}>
-                    Tiếp theo: {STEP_LABELS[2]}
+                    Tiếp theo →
                   </button>
                 ) : null}
                 {step === 2 ? (
                   <button type="button" className="crm-save-button" onClick={handleIssuerNext}>
-                    Tiếp theo: {STEP_LABELS[3]}
+                    Tiếp theo →
                   </button>
                 ) : null}
                 {step === 3 ? (
                   <button type="button" className="crm-save-button" onClick={() => setStep(4)}>
-                    Tiếp theo: {STEP_LABELS[4]}
+                    Tiếp theo →
                   </button>
                 ) : null}
                 {step === 4 && !isEditMode ? (
