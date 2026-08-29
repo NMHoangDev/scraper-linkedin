@@ -234,19 +234,12 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
   // /all-platform/crm render CrmShell = bảng Pipeline/Kanban (8 giai đoạn,
   // kéo-thả), KHÔNG phải trang tổng quan — đổi nhãn "CRM" -> "Cơ hội" cho
   // đúng thực tế, icon "filter_alt" (phễu) để phân biệt hẳn "group" không
-  // còn dùng ở đâu khác trong CRM. Thêm mới "Leads" (/all-platform/crm/leads,
-  // icon person_add - chưa dùng ở nơi nào khác trong toàn bộ sidebar) ngay
-  // sau đó. Thứ tự 12 mục còn lại giữ nguyên logic cũ, chỉ dời "Phân tích
-  // CRM" xuống sau "Khách hàng" theo đúng thứ tự sản phẩm yêu cầu.
+  // còn dùng ở đâu khác trong CRM. "Leads" (/all-platform/crm/leads, icon
+  // person_add - chưa dùng ở nơi nào khác trong toàn bộ sidebar) đứng TRƯỚC
+  // "Cơ hội" theo đúng luồng nghiệp vụ (Lead -> Convert -> Cơ hội). Thứ tự
+  // 12 mục còn lại giữ nguyên logic cũ, chỉ dời "Phân tích CRM" xuống sau
+  // "Khách hàng" theo đúng thứ tự sản phẩm yêu cầu.
   const crmChildren: NavLeafItem[] = [
-    {
-      type: "item",
-      id: "crm",
-      href: "/all-platform/crm",
-      icon: "filter_alt",
-      label: "Cơ hội",
-      exactMatch: true,
-    },
     {
       type: "item",
       id: "crm-leads",
@@ -254,6 +247,14 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, workspaceTab: 
       icon: "person_add",
       label: "Leads",
       matchStartsWith: ["/all-platform/crm/leads"],
+    },
+    {
+      type: "item",
+      id: "crm",
+      href: "/all-platform/crm",
+      icon: "filter_alt",
+      label: "Cơ hội",
+      exactMatch: true,
     },
     {
       type: "item",
