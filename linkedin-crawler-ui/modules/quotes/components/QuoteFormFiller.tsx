@@ -15,6 +15,7 @@ import {
   sanitizeMoneyInput,
 } from '../utils/quoteCalculations';
 import { seedingQuoteRepository } from '../repositories/SeedingQuoteRepository';
+import { serviceCatalogRepository } from '../../service-catalog/repositories/ServiceCatalogRepository';
 import type { ServiceCatalogItem, ServiceCatalogOptions } from '../../service-catalog/types';
 
 export interface QuoteFillValue {
@@ -28,6 +29,11 @@ interface Props {
   value: QuoteFillValue;
   onChange: (next: QuoteFillValue) => void;
   quoteFormId?: string;
+  /** Ép hiện/ẩn khối Tạm tính/VAT/Tổng cộng bất kể layoutType — dùng khi bước 2
+   * wizard ("Hạng mục báo giá") cần LUÔN hiện khối này kể cả với mẫu villa (mặc
+   * định trước đây villa không hiện khối này ở màn điền, chỉ hiện ở preview).
+   * undefined = giữ hành vi cũ (ẩn với villa, hiện với các mẫu khác). */
+  showTotals?: boolean;
 }
 
 type RowRecord = Record<string, unknown>;
@@ -68,13 +74,14 @@ function coercePercent(value: string) {
   return clampDiscountPercent(Number(value) || 0);
 }
 
-export function QuoteFormFiller({ schema, value, onChange, quoteFormId }: Props) {
+export function QuoteFormFiller({ schema, value, onChange, quoteFormId, showTotals }: Props) {
   const layoutType = schema.layoutType;
   const sections = schema.sections || [];
   const totals =
     layoutType === 'villa_solution_package'
       ? calculateVillaTotals(value.solutionItems)
       : calculateQuoteTotals(value.items);
+  const shouldShowTotals = typeof showTotals === 'boolean' ? showTotals : layoutType !== 'villa_solution_package';
 
   function setData(key: string, fieldValue: unknown) {
     onChange({ ...value, data: { ...value.data, [key]: fieldValue } });
@@ -98,19 +105,19 @@ export function QuoteFormFiller({ schema, value, onChange, quoteFormId }: Props)
                   onChange={items => onChange({ ...value, items })}
                   quoteFormId={quoteFormId}
                 />
+              ) : isSolutionTable ? (
+                <SolutionItemsEditor
+                  items={value.solutionItems}
+                  onChange={solutionItems => onChange({ ...value, solutionItems })}
+                  quoteFormId={quoteFormId}
+                />
               ) : (
                 <RepeaterTable
                   columns={repeaterField.config?.columns || []}
-                  rows={(isSolutionTable ? value.solutionItems : value.items) as unknown as RowRecord[]}
-                  emptyRow={() => (isSolutionTable ? emptySolutionRow() : emptyItemRow()) as unknown as RowRecord}
-                  emptyLabel={isSolutionTable ? 'Chưa có giải pháp nào.' : 'Chưa có dòng dịch vụ.'}
-                  onChange={rows =>
-                    onChange(
-                      isSolutionTable
-                        ? { ...value, solutionItems: rows as unknown as VillaSolutionItem[] }
-                        : { ...value, items: rows as unknown as QuoteItem[] }
-                    )
-                  }
+                  rows={value.items as unknown as RowRecord[]}
+                  emptyRow={() => emptyItemRow() as unknown as RowRecord}
+                  emptyLabel="Chưa có dòng dịch vụ."
+                  onChange={rows => onChange({ ...value, items: rows as unknown as QuoteItem[] })}
                 />
               )}
             </section>
@@ -137,7 +144,7 @@ export function QuoteFormFiller({ schema, value, onChange, quoteFormId }: Props)
         );
       })}
 
-      {layoutType === 'villa_solution_package' ? null : (
+      {!shouldShowTotals ? null : (
         <section className="quote-section-card quote-totals-card">
           <div className="quote-total-row">
             <span>Tạm tính</span>
@@ -351,6 +358,86 @@ function componentToQuoteItem(component: ServiceCatalogItem): QuoteItem {
   };
 }
 
+function bundleToSolutionItem(bundle: ServiceCatalogItem): VillaSolutionItem {
+  const components = bundle.components || [];
+  const description =
+    bundle.description ||
+    components.map(component => (component.description ? `${component.displayText} - ${component.description}` : component.displayText)).join('\n');
+  return {
+    name: formatSkuName(bundle.sku, bundle.name),
+    description,
+    originalPrice: bundle.defaultUnitPriceVnd,
+    offerPrice: bundle.defaultUnitPriceVnd,
+    note: '',
+    catalogItemId: bundle.id,
+  };
+}
+
+function componentToSolutionItem(component: ServiceCatalogItem): VillaSolutionItem {
+  return {
+    name: formatSkuName(component.sku, component.name),
+    description: component.description || '',
+    originalPrice: component.defaultUnitPriceVnd,
+    offerPrice: component.defaultUnitPriceVnd,
+    note: '',
+    catalogItemId: component.id,
+  };
+}
+
+/** Danh mục dịch vụ (cây group/bundle/component từ trang /all-platform/service-catalog,
+ * dùng chung API — không tạo nguồn dữ liệu thứ 2) phẳng hoá thành {bundles,components}
+ * CHỈ gồm item đang "Đang kinh doanh" (status active), gắn kèm groupId/groupName
+ * của group cha gần nhất — cùng hình dạng với getServiceCatalogOptions(formId) để
+ * CatalogItemPicker dùng chung 1 kiểu dữ liệu dù nguồn khác nhau. */
+function flattenActiveCatalogTree(tree: ServiceCatalogItem[]): ServiceCatalogOptions {
+  const bundles: ServiceCatalogItem[] = [];
+  const components: ServiceCatalogItem[] = [];
+  function walk(nodes: ServiceCatalogItem[], groupId?: string, groupName?: string) {
+    for (const node of nodes) {
+      if (node.itemType === 'group') {
+        walk(node.children || [], node.id, node.name);
+        continue;
+      }
+      if (node.status !== 'active') continue;
+      const withGroup = { ...node, groupId, groupName };
+      if (node.itemType === 'bundle') bundles.push(withGroup);
+      else if (node.itemType === 'component') components.push(withGroup);
+    }
+  }
+  walk(tree);
+  return { bundles, components };
+}
+
+/** Danh mục dịch vụ cho popup "+ Chọn từ danh mục" — LUÔN có sẵn cho MỌI mẫu báo
+ * giá, không phụ thuộc mẫu này đã được admin liên kết nhóm dịch vụ nào chưa (xem
+ * quote_form_catalog_links): ưu tiên options đã liên kết riêng cho mẫu (đúng ý đồ
+ * admin đã cấu hình phạm vi hẹp hơn), CHỈ khi mẫu chưa liên kết nhóm nào (rỗng) mới
+ * dùng toàn bộ danh mục đang kinh doanh làm nguồn mặc định — để "chọn từ danh mục"
+ * luôn là luồng chính, không bắt buộc phải cấu hình liên kết trước mới dùng được. */
+function useCatalogOptions(quoteFormId?: string): ServiceCatalogOptions | null {
+  const [options, setOptions] = useState<ServiceCatalogOptions | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      let scoped: ServiceCatalogOptions | null = null;
+      if (quoteFormId) {
+        scoped = await seedingQuoteRepository.getServiceCatalogOptions(quoteFormId).catch(() => null);
+      }
+      if (scoped && (scoped.bundles.length > 0 || scoped.components.length > 0)) {
+        if (!cancelled) setOptions(scoped);
+        return;
+      }
+      const tree = await serviceCatalogRepository.list().catch(() => null);
+      if (!cancelled) setOptions(tree ? flattenActiveCatalogTree(tree) : scoped);
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [quoteFormId]);
+  return options;
+}
+
 /** So khớp không dấu, không phân biệt hoa/thường — tìm "cpu" vẫn ra "SZ-CPU". */
 function normalizeSearch(value: string): string {
   return value
@@ -367,14 +454,23 @@ function pickerKey(kind: 'bundle' | 'component', id: string): string {
   return `${kind}:${id}`;
 }
 
-function CatalogItemPicker({
+function CatalogItemPicker<T>({
   options,
   existingCatalogItemIds,
+  mapBundle,
+  mapComponent,
   onAddMany,
 }: {
   options: ServiceCatalogOptions;
   existingCatalogItemIds: Set<string>;
-  onAddMany: (items: QuoteItem[]) => void;
+  /** Chuyển 1 gói/hạng mục Danh mục dịch vụ thành đúng hình dạng dữ liệu của
+   * mẫu báo giá đang điền (QuoteItem cho quoteItems, VillaSolutionItem cho
+   * solutionItems...) — giữ UI/logic tìm-lọc-chọn của picker này DÙNG CHUNG cho
+   * mọi mẫu, chỉ đổi phần mapping theo từng mẫu (xem bundleToQuoteItem/
+   * bundleToSolutionItem và cặp component tương ứng). */
+  mapBundle: (bundle: ServiceCatalogItem) => T;
+  mapComponent: (component: ServiceCatalogItem) => T;
+  onAddMany: (items: T[]) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -415,12 +511,12 @@ function CatalogItemPicker({
   }
 
   function handleAddSelected() {
-    const toAdd: QuoteItem[] = [];
+    const toAdd: T[] = [];
     for (const bundle of options.bundles) {
-      if (selected.has(pickerKey('bundle', bundle.id))) toAdd.push(bundleToQuoteItem(bundle));
+      if (selected.has(pickerKey('bundle', bundle.id))) toAdd.push(mapBundle(bundle));
     }
     for (const component of options.components) {
-      if (selected.has(pickerKey('component', component.id))) toAdd.push(componentToQuoteItem(component));
+      if (selected.has(pickerKey('component', component.id))) toAdd.push(mapComponent(component));
     }
     if (toAdd.length) onAddMany(toAdd);
     closePanel();
@@ -556,26 +652,7 @@ function QuoteItemsEditor({
   onChange: (items: QuoteItem[]) => void;
   quoteFormId?: string;
 }) {
-  const [catalogOptions, setCatalogOptions] = useState<ServiceCatalogOptions | null>(null);
-
-  useEffect(() => {
-    if (!quoteFormId) {
-      setCatalogOptions(null);
-      return;
-    }
-    let cancelled = false;
-    seedingQuoteRepository
-      .getServiceCatalogOptions(quoteFormId)
-      .then(options => {
-        if (!cancelled) setCatalogOptions(options);
-      })
-      .catch(() => {
-        if (!cancelled) setCatalogOptions(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [quoteFormId]);
+  const catalogOptions = useCatalogOptions(quoteFormId);
 
   function updateParent(index: number, patch: Partial<QuoteItem>) {
     onChange(items.map((item, i) => (i === index ? { ...item, ...patch } : item)));
@@ -638,6 +715,8 @@ function QuoteItemsEditor({
           <CatalogItemPicker
             options={catalogOptions}
             existingCatalogItemIds={new Set(items.map(item => item.catalogItemId).filter((id): id is string => Boolean(id)))}
+            mapBundle={bundleToQuoteItem}
+            mapComponent={componentToQuoteItem}
             onAddMany={newItems => onChange([...items, ...newItems])}
           />
         ) : null}
@@ -665,7 +744,7 @@ function QuoteItemsEditor({
           </div>
         )}
         <div className="quote-items-divider">hoặc</div>
-        <button type="button" className="quote-add-parent-button" onClick={addParent}>
+        <button type="button" className="quote-add-parent-button quote-add-parent-button--secondary" onClick={addParent}>
           + Thêm hạng mục ngoài danh mục
         </button>
       </div>
@@ -791,6 +870,117 @@ function CompactItemRow({
         />
       </span>
       <span className="quote-compact-cell quote-compact-cell--total">{formatVnd(total)}</span>
+      <button type="button" className="quote-compact-remove" onClick={onRemove} aria-label="Xoá dòng">
+        ×
+      </button>
+    </div>
+  );
+}
+
+/** Bảng "Danh sách giải pháp" của mẫu villa (solutionItems) - CHỌN TỪ DANH MỤC
+ * dịch vụ là luồng chính (giống QuoteItemsEditor cho quoteItems), "+ Thêm hạng
+ * mục ngoài danh mục" chỉ là lối phụ, KHÔNG tự tạo dòng trống khi mở component -
+ * người dùng phải chủ động bấm 1 trong 2 nút mới có dòng mới. */
+function SolutionItemsEditor({
+  items,
+  onChange,
+  quoteFormId,
+}: {
+  items: VillaSolutionItem[];
+  onChange: (items: VillaSolutionItem[]) => void;
+  quoteFormId?: string;
+}) {
+  const catalogOptions = useCatalogOptions(quoteFormId);
+
+  function updateRow(index: number, patch: Partial<VillaSolutionItem>) {
+    onChange(items.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+  }
+  function addManualRow() {
+    onChange([...items, emptySolutionRow()]);
+  }
+  function removeRow(index: number) {
+    onChange(items.filter((_, i) => i !== index));
+  }
+
+  return (
+    <div className="quote-items-editor">
+      {catalogOptions ? (
+        <CatalogItemPicker
+          options={catalogOptions}
+          existingCatalogItemIds={new Set(items.map(item => item.catalogItemId).filter((id): id is string => Boolean(id)))}
+          mapBundle={bundleToSolutionItem}
+          mapComponent={componentToSolutionItem}
+          onAddMany={newItems => onChange([...items, ...newItems])}
+        />
+      ) : null}
+      {items.length === 0 ? (
+        <div className="empty-row quote-items-empty">Chưa có giải pháp nào. Chọn từ danh mục hoặc thêm hạng mục ngoài danh mục để bắt đầu.</div>
+      ) : (
+        <div className="quote-compact-table quote-compact-table--solution">
+          <div className="quote-compact-head">
+            <span>Tên giải pháp</span>
+            <span>Mô tả</span>
+            <span>Giá gốc</span>
+            <span>Giá đề xuất</span>
+            <span>Ghi chú</span>
+            <span />
+          </div>
+          {items.map((item, index) => (
+            <CompactSolutionRow key={index} item={item} onChange={patch => updateRow(index, patch)} onRemove={() => removeRow(index)} />
+          ))}
+        </div>
+      )}
+      <div className="quote-items-divider">hoặc</div>
+      <button type="button" className="quote-add-parent-button quote-add-parent-button--secondary" onClick={addManualRow}>
+        + Thêm hạng mục ngoài danh mục
+      </button>
+    </div>
+  );
+}
+
+function CompactSolutionRow({
+  item,
+  onChange,
+  onRemove,
+}: {
+  item: VillaSolutionItem;
+  onChange: (patch: Partial<VillaSolutionItem>) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="quote-compact-row quote-compact-row--solution">
+      <span className="quote-compact-cell quote-compact-cell--name">
+        <input value={item.name || ''} placeholder="Tên giải pháp" onChange={event => onChange({ name: event.target.value })} />
+      </span>
+      <span className="quote-compact-cell quote-compact-cell--description">
+        <textarea
+          className="quote-compact-description"
+          value={item.description || ''}
+          placeholder="Mô tả"
+          onChange={event => onChange({ description: event.target.value })}
+        />
+      </span>
+      <span className="quote-compact-cell">
+        <input
+          type="number"
+          min={0}
+          className="quote-compact-price"
+          value={item.originalPrice || 0}
+          onChange={event => onChange({ originalPrice: coerceNumber(event.target.value) })}
+        />
+      </span>
+      <span className="quote-compact-cell">
+        <input
+          type="number"
+          min={0}
+          className="quote-compact-price"
+          value={item.offerPrice || 0}
+          onChange={event => onChange({ offerPrice: coerceNumber(event.target.value) })}
+        />
+      </span>
+      <span className="quote-compact-cell quote-compact-cell--description">
+        <input value={item.note || ''} placeholder="Ghi chú" onChange={event => onChange({ note: event.target.value })} />
+      </span>
       <button type="button" className="quote-compact-remove" onClick={onRemove} aria-label="Xoá dòng">
         ×
       </button>

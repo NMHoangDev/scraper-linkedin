@@ -952,6 +952,14 @@
   }
 }
 
+/* Bảng "Danh sách giải pháp" (solutionItems, mẫu villa) - 6 cột thay vì 7 (không
+   có VAT/thành tiền riêng, chỉ Giá gốc/Giá đề xuất) - override grid-template-columns
+   của .quote-compact-head/.quote-compact-row dùng chung ở trên. */
+.quote-compact-table--solution .quote-compact-head,
+.quote-compact-row--solution {
+  grid-template-columns: minmax(150px, 1fr) minmax(180px, 1.3fr) 110px 110px minmax(120px, 1fr) 32px;
+}
+
 .quote-items-divider {
   display: flex;
   align-items: center;
@@ -1154,6 +1162,19 @@
   width: 100%;
   border-style: solid;
   background: #f8fafc;
+}
+
+/* Lối phụ "+ Thêm hạng mục ngoài danh mục" - luôn đứng sau "+ Chọn từ danh mục"
+   (nút chính, xem .quote-catalog-picker-trigger), nhỏ/nhạt hơn để không cạnh
+   tranh vị trí chính với nút chọn danh mục. */
+.quote-add-parent-button--secondary {
+  width: auto;
+  align-self: flex-start;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 10px;
+  color: #64748b;
+  background: transparent;
 }
 
 .quote-group-subtotal {

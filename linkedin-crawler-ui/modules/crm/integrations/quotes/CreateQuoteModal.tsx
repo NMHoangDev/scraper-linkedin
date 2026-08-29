@@ -17,12 +17,13 @@ import { applyIssuerCompanySnapshot, emptyQuoteDraft, quoteDraftFromExistingQuot
 import type { QuoteDraft } from './types';
 import { clearVisibleColumnsDraft } from './quoteColumnsDraft';
 
-type CreateQuoteStep = 1 | 2 | 3;
+type CreateQuoteStep = 1 | 2 | 3 | 4;
 
 const STEP_LABELS: Record<CreateQuoteStep, string> = {
   1: 'Khách hàng',
   2: 'Hạng mục báo giá',
-  3: 'Xác nhận',
+  3: 'Thông tin báo giá',
+  4: 'Xác nhận',
 };
 
 export function CreateQuoteModal({
@@ -404,7 +405,7 @@ export function CreateQuoteModal({
         {createdQuote ? null : (
           <div className="crm-wizard-stepper-container">
             <div className="crm-wizard-stepper-inner">
-              {([1, 2, 3] as CreateQuoteStep[]).map((item, index) => (
+              {([1, 2, 3, 4] as CreateQuoteStep[]).map((item, index) => (
                 <div key={item} style={{ display: 'flex', alignItems: 'center' }}>
                   <div
                     className={`crm-wizard-step-item ${item === step ? 'crm-wizard-step-item--active' : ''} ${item < step ? 'crm-wizard-step-item--done' : ''}`}
@@ -415,7 +416,7 @@ export function CreateQuoteModal({
                     </div>
                     <span className="crm-wizard-step-label">{STEP_LABELS[item]}</span>
                   </div>
-                  {index < 2 ? (
+                  {index < 3 ? (
                     <div className={`crm-wizard-step-line ${item < step ? 'crm-wizard-step-line--done' : ''}`} />
                   ) : null}
                 </div>
@@ -466,15 +467,25 @@ export function CreateQuoteModal({
                     value={quoteDraft}
                     onChange={setQuoteDraft}
                     quoteFormId={selectedForm.id}
+                    section="items"
                   />
                 ) : null}
-                {step === 2 && !selectedForm && isEditMode ? (
+                {(step === 2 || step === 3) && !selectedForm && isEditMode ? (
                   // Dang cho getForm() tai xong (che do sua) - giu 1 khoi placeholder
                   // co chieu cao thay vi de trong, tranh modal "giat" phinh to dot
                   // ngot khi form load xong.
                   <div className="crm-wizard-loading-placeholder">Đang tải báo giá...</div>
                 ) : null}
                 {step === 3 && selectedForm ? (
+                  <FillQuoteStep
+                    schema={selectedForm.schemaJson}
+                    value={quoteDraft}
+                    onChange={setQuoteDraft}
+                    quoteFormId={selectedForm.id}
+                    section="info"
+                  />
+                ) : null}
+                {step === 4 && selectedForm ? (
                   <ReviewQuoteStep
                     schema={selectedForm.schemaJson}
                     draft={quoteDraft}
@@ -523,13 +534,18 @@ export function CreateQuoteModal({
                     Tiếp theo
                   </button>
                 ) : null}
-                {step === 3 && !isEditMode ? (
+                {step === 3 ? (
+                  <button type="button" className="crm-save-button" onClick={() => setStep(4)}>
+                    Tiếp theo
+                  </button>
+                ) : null}
+                {step === 4 && !isEditMode ? (
                   <button type="button" className="crm-save-button crm-save-button--large" disabled={submitting} onClick={() => void handleSubmit()}>
                     {submittingAction === 'create' ? <Loader2 className="crm-save-spinner" /> : null}
                     {submittingAction === 'create' ? 'Đang tạo...' : 'Tạo báo giá'}
                   </button>
                 ) : null}
-                {step === 3 && isEditMode ? (
+                {step === 4 && isEditMode ? (
                   <>
                     <button type="button" className="crm-save-button crm-save-button--update" disabled={submitting} onClick={() => void handleUpdate()}>
                       {submittingAction === 'update' ? <Loader2 className="crm-save-spinner" /> : null}

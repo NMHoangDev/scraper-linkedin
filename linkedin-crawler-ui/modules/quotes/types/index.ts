@@ -162,6 +162,12 @@ export interface VillaSolutionItem {
   originalPrice?: number;
   offerPrice: number;
   note?: string;
+  /** Danh mục dịch vụ: truy vết nguồn gốc khi dòng này được chọn từ "+ Chọn từ
+   * danh mục" (giống QuoteItem.catalogItemId) — undefined nếu dòng nhập tay
+   * ("+ Thêm hạng mục ngoài danh mục"). Chỉ là truy vết, KHÔNG live-join lại
+   * Danh mục dịch vụ - giá/tên đã snapshot thẳng vào name/description/offerPrice
+   * lúc chọn, sửa danh mục sau này không ảnh hưởng báo giá đã lưu (data JSONB). */
+  catalogItemId?: string;
 }
 
 export interface QuoteData {
