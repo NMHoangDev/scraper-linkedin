@@ -32,13 +32,19 @@ router = APIRouter()
 @router.get("")
 def categories_get_all(
     category_type: str | None = Query(None),
+    active_only: bool = Query(False),
     _: Any = Depends(get_current_user),
 ) -> BaseResponse:
     """Get all categories, optionally filtered by type. Mọi user đã đăng nhập đều
-    đọc được (form CRM/dashboard cần load danh mục cho tất cả role)."""
+    đọc được (form CRM/dashboard cần load danh mục cho tất cả role).
+
+    active_only=true chỉ có tác dụng khi có category_type — dùng cho ô search
+    chọn giá trị MỚI (vd combobox Chức vụ) để ẩn các danh mục đã bị ngừng
+    dùng; trang quản trị (Danh mục CRM) luôn gọi không kèm active_only để vẫn
+    thấy các mục đã ngừng dùng và bật lại được."""
     try:
         if category_type:
-            data = get_categories_by_type(category_type)
+            data = get_categories_by_type(category_type, active_only=active_only)
         else:
             data = get_all_categories()
         return BaseResponse(success=True, data=data)

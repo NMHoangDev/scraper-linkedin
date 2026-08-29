@@ -486,3 +486,24 @@ export function parseMoney(value: string | number | undefined) {
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
 }
+
+/** Định dạng LIVE cho ô nhập tiền VND: thêm dấu chấm ngăn nghìn ngay khi gõ.
+ *
+ * Dùng chung `parseMoney` ở trên (đúng bộ quy tắc mà mọi ô tiền trong CRM —
+ * `estimatedBudget` của DealFormFields, `budget` của StageModal — đang dùng để
+ * đọc số ra khỏi chuỗi người dùng gõ), nên chuỗi hiển thị và số thật lưu
+ * xuống luôn khớp nhau; không tự bịa 1 bộ regex tiền tệ thứ hai.
+ *
+ * Chuỗi rỗng vẫn trả về rỗng (ô trống ≠ 0) và phần "0" ở cuối khi người dùng
+ * đang gõ dở (vd "50.000.0") được giữ nguyên vì parseMoney đọc nó ra số rồi
+ * format lại — không nuốt ký tự nào của người dùng.
+ */
+export function formatMoneyInput(value: string): string {
+  const raw = String(value ?? '');
+  if (!raw.trim()) return '';
+  const digitsOnly = raw.replace(/[^\d]/g, '');
+  if (!digitsOnly) return '';
+  const numeric = parseMoney(digitsOnly);
+  if (!Number.isFinite(numeric)) return '';
+  return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(numeric);
+}

@@ -1305,21 +1305,25 @@ export const allPlatformPostsService = {
 // ── CATEGORIES ────────────────────────────────────────────────────────────────
 
 export const allPlatformCategoriesService = {
-  getAll: (category_type?: string): Promise<ApiResponse<Category[]>> => {
-    const url = category_type ? `${BASE}/categories?category_type=${encodeURIComponent(category_type)}` : `${BASE}/categories`;
+  getAll: (category_type?: string, options?: { activeOnly?: boolean }): Promise<ApiResponse<Category[]>> => {
+    const params = new URLSearchParams();
+    if (category_type) params.set("category_type", category_type);
+    if (options?.activeOnly) params.set("active_only", "true");
+    const qs = params.toString();
+    const url = qs ? `${BASE}/categories?${qs}` : `${BASE}/categories`;
     // Cache the entire categories list for 30s. Categories rarely change;
     // admin can invalidateTaxonomyCache() after edits.
-    return cachedFetch(`categories:${category_type || "all"}`, 30_000, () => requestJson<Category[]>(url));
+    return cachedFetch(`categories:${category_type || "all"}:${options?.activeOnly ? "active" : "all"}`, 30_000, () => requestJson<Category[]>(url));
   },
 
-  add: (payload: { category_type: string; code: string; name?: string; description?: string; leader?: string; geo?: string; platform?: string }): Promise<ApiResponse<Category>> => {
+  add: (payload: { category_type: string; code: string; name?: string; description?: string; leader?: string; geo?: string; platform?: string; is_active?: boolean }): Promise<ApiResponse<Category>> => {
     return requestJson(`${BASE}/categories/add`, {
       method: "POST",
       body: JSON.stringify(payload),
     });
   },
 
-  update: (payload: { id: string; category_type?: string; code?: string; name?: string; description?: string; leader?: string; geo?: string; platform?: string }): Promise<ApiResponse<Category>> => {
+  update: (payload: { id: string; category_type?: string; code?: string; name?: string; description?: string; leader?: string; geo?: string; platform?: string; is_active?: boolean }): Promise<ApiResponse<Category>> => {
     return requestJson(`${BASE}/categories/update`, {
       method: "PUT",
       body: JSON.stringify(payload),

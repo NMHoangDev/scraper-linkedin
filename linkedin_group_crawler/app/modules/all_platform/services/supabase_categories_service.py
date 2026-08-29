@@ -20,17 +20,17 @@ def get_all_categories() -> list[dict]:
     return result.data or []
 
 
-def get_categories_by_type(category_type: str) -> list[dict]:
-    """Get categories of a specific type."""
+def get_categories_by_type(category_type: str, active_only: bool = False) -> list[dict]:
+    """Get categories of a specific type. active_only=True hides deactivated
+    rows (is_active=false) — used by live-search dropdowns picking a NEW
+    value. Admin management views must keep passing active_only=False (the
+    default) so deactivated rows still show up for reactivation."""
     supabase: Client = get_supabase_client()
 
-    result = (
-        supabase.table("categories")
-        .select("*")
-        .eq("category_type", category_type)
-        .order("code")
-        .execute()
-    )
+    query = supabase.table("categories").select("*").eq("category_type", category_type)
+    if active_only:
+        query = query.eq("is_active", True)
+    result = query.order("code").execute()
     return result.data or []
 
 
@@ -44,6 +44,7 @@ def add_category(payload: dict) -> dict:
         "name": payload.get("name"),
         "description": payload.get("description"),
         "platform": payload.get("platform", "general"),
+        "is_active": payload.get("is_active", True),
     }
 
     result = (

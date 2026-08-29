@@ -8,9 +8,11 @@ from app.core.phone import vn_phone_to_e164
 from app.core.supabase_client import execute_supabase_query, get_supabase_client
 from app.modules.all_platform.services.customer_lead_service import BASE_COLUMNS, _normalize_row
 from app.modules.all_platform.services.supabase_categories_service import get_categories_by_type
+from app.modules.all_platform.services.crm_position_service import apply_position_category
 
 CUSTOMER_COLUMNS = (
-    "id, customer_name, company_name, position, phone, phone_normalized, "
+    "id, customer_name, company_name, position, position_category_id, "
+    "position_label_snapshot, phone, phone_normalized, "
     "email, email_normalized, zalo, facebook, telegram, website, tax_code, "
     "address, city, industry, source, status, owner_id, created_by, note, "
     "created_at, updated_at"
@@ -144,14 +146,22 @@ def _deal_visible_to(user: dict[str, Any], deal: dict[str, Any]) -> bool:
     return bool(uid) and (str(deal.get("leaded_by") or "") == uid or str(deal.get("sdr_id") or "") == uid)
 
 
-def _attach_customer_metrics(customers: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _attach_customer_metrics(customers: list[dict[str, Any]], user: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    """Gan deal_count/total_value/last_deal_at/contact_count cho tung khach hang.
+
+    `user` (neu truyen vao) dung de LOC deal theo dung quyen xem da co san
+    (_deal_visible_to - giong het related_records()) - tranh lo gia tri
+    pipeline/so deal cua nguoi phu trach khac cho sale khong co quyen xem
+    (task yeu cau "khong leak deal value cua owner/team khac"). user=None
+    (vd goi tu noi chua co user, hoac muon giu hanh vi cu) = khong loc gi ca.
+    """
     if not customers:
         return []
     supabase = get_supabase_client()
     ids = [row["id"] for row in customers]
     lead_res = execute_supabase_query(
         lambda: supabase.table("customer_leads")
-        .select("id, customer_id, estimated_budget, lifetime_value, updated_at, created_at")
+        .select("id, customer_id, estimated_budget, lifetime_value, updated_at, created_at, leaded_by, sdr_id")
         .in_("customer_id", ids)
         .execute()
     )
@@ -159,11 +169,25 @@ def _attach_customer_metrics(customers: list[dict[str, Any]]) -> list[dict[str, 
     for lead in lead_res.data or []:
         by_customer.setdefault(lead.get("customer_id"), []).append(lead)
 
+    # So Contact that theo tung khach hang - 1 truy van gop cho ca trang, khong
+    # phai N+1 (khop do phuc tap voi cach lam cua lead_res o tren).
+    contact_res = execute_supabase_query(
+        lambda: supabase.table("crm_contacts").select("id, customer_id").in_("customer_id", ids).execute()
+    )
+    contact_counts: dict[str, int] = {}
+    for contact in contact_res.data or []:
+        cid = contact.get("customer_id")
+        if cid:
+            contact_counts[cid] = contact_counts.get(cid, 0) + 1
+
     for customer in customers:
         leads = by_customer.get(customer["id"], [])
+        if user is not None:
+            leads = [lead for lead in leads if _deal_visible_to(user, lead)]
         customer["deal_count"] = len(leads)
         customer["total_value"] = sum(float(lead.get("estimated_budget") or lead.get("lifetime_value") or 0) for lead in leads)
         customer["last_deal_at"] = max((lead.get("updated_at") or lead.get("created_at") for lead in leads), default=None)
+        customer["contact_count"] = contact_counts.get(customer["id"], 0)
     return customers
 
 
@@ -188,31 +212,91 @@ def list_customers(
     page_size: int = 50,
 ) -> dict[str, Any]:
     supabase = get_supabase_client()
-    query = supabase.table("crm_customers").select(CUSTOMER_COLUMNS)
+
+    def base_query(*, include_status: bool = True):
+        query = supabase.table("crm_customers").select(CUSTOMER_COLUMNS)
+        if include_status and status:
+            query = query.eq("status", status)
+        if source:
+            query = query.eq("source", source)
+        if owner_id:
+            query = query.eq("owner_id", owner_id)
+        return query
+
+    query = base_query()
     if search:
+        # Them tax_code vao cung 1 .or_() nhu cac cot cu (customer_name/
+        # company_name/phone/email) - Supabase ho tro thang, khong can query
+        # rieng.
         query = query.or_(
             f"customer_name.ilike.%{search}%,company_name.ilike.%{search}%,"
-            f"phone.ilike.%{search}%,email.ilike.%{search}%"
+            f"phone.ilike.%{search}%,email.ilike.%{search}%,tax_code.ilike.%{search}%"
         )
-    if status:
-        query = query.eq("status", status)
-    if source:
-        query = query.eq("source", source)
-    if owner_id:
-        query = query.eq("owner_id", owner_id)
-
     res = execute_supabase_query(lambda: query.order("updated_at", desc=True).execute())
     rows = res.data or []
+
+    contact_customer_ids: set[str] = set()
+    if search:
+        # Tim theo ten Contact (crm_contacts.name) KHONG the gop vao 1 .or_()
+        # cung bang crm_customers (khac bang) - chay query rieng lay
+        # customer_id cua cac contact khop, roi gop nhung khach hang CHUA co
+        # trong `rows` (tranh trung), ap lai dung cac filter status/source/
+        # owner_id thu cong vi query nay bo qua chung. Cach nay khong "dep"
+        # nhung dung, dung nhu huong dan task cho phep khi chua co pattern
+        # OR-cross-table san co trong codebase.
+        contact_res = execute_supabase_query(
+            lambda: supabase.table("crm_contacts")
+            .select("customer_id")
+            .ilike("name", f"%{search}%")
+            .execute()
+        )
+        contact_customer_ids = {row["customer_id"] for row in contact_res.data or [] if row.get("customer_id")}
+        existing_ids = {row["id"] for row in rows}
+        missing_ids = list(contact_customer_ids - existing_ids)
+        if missing_ids:
+            extra_res = execute_supabase_query(
+                lambda: base_query().in_("id", missing_ids).execute()
+            )
+            rows = rows + (extra_res.data or [])
+
     visible = _customer_ids_visible_to(user)
     if visible is not None:
         rows = [row for row in rows if row.get("id") in visible]
 
+    # KPI (dem theo tung tab trang thai) phai luon tinh tren TOAN BO tap hop
+    # khop search/source/owner_id, KHONG bi gioi han theo `status` dang chon -
+    # neu khong, bam vao 1 tab se lam cac tab con lai hien 0 (bug thuc te nguoi
+    # dung bao cao: chon "Ngung hoat dong" thi "Tiem nang/Dang ban/Da mua" deu
+    # ve 0 du truoc do co du lieu that). Chi can query lai rieng khi `status`
+    # dang duoc loc - neu khong loc thi `rows` da la dung tap can dem.
+    if status:
+        kpi_query = base_query(include_status=False)
+        if search:
+            kpi_query = kpi_query.or_(
+                f"customer_name.ilike.%{search}%,company_name.ilike.%{search}%,"
+                f"phone.ilike.%{search}%,email.ilike.%{search}%,tax_code.ilike.%{search}%"
+            )
+        kpi_res = execute_supabase_query(lambda: kpi_query.execute())
+        kpi_rows = kpi_res.data or []
+        if search:
+            existing_kpi_ids = {row["id"] for row in kpi_rows}
+            missing_kpi_ids = list(contact_customer_ids - existing_kpi_ids)
+            if missing_kpi_ids:
+                extra_kpi_res = execute_supabase_query(
+                    lambda: base_query(include_status=False).in_("id", missing_kpi_ids).execute()
+                )
+                kpi_rows = kpi_rows + (extra_kpi_res.data or [])
+        if visible is not None:
+            kpi_rows = [row for row in kpi_rows if row.get("id") in visible]
+    else:
+        kpi_rows = rows
+
     total = len(rows)
     start = (page - 1) * page_size
-    page_rows = _attach_customer_metrics(rows[start:start + page_size])
+    page_rows = _attach_customer_metrics(rows[start:start + page_size], user=user)
     for customer in page_rows:
         customer["can_edit"] = can_edit_customer(user, customer)
-    return {"items": page_rows, "total": total, "page": page, "page_size": page_size, "kpi": _kpi(rows)}
+    return {"items": page_rows, "total": total, "page": page, "page_size": page_size, "kpi": _kpi(kpi_rows)}
 
 
 def quick_search_customers(user: dict[str, Any], q: str, limit: int = 8) -> list[dict[str, Any]]:
@@ -235,6 +319,7 @@ def create_customer(payload: dict[str, Any], user: dict[str, Any]) -> dict[str, 
     actor_id = str(user.get("id") or "")
     data = _normalize_payload(payload, actor_id=actor_id)
     _validate_source(data.get("source"))
+    apply_position_category(data)
     matches = _duplicate_query(data.get("email_normalized"), data.get("phone_normalized"))
     if matches:
         raise DuplicateCustomerError(matches)
@@ -256,6 +341,7 @@ def update_customer(customer_id: str, payload: dict[str, Any], user: dict[str, A
         raise PermissionError("Khong co quyen sua ho so khach hang nay.")
     data = _normalize_payload(payload)
     _validate_source(data.get("source"))
+    apply_position_category(data, current_position_category_id=current.get("position_category_id"))
     matches = _duplicate_query(data.get("email_normalized"), data.get("phone_normalized"), exclude_id=customer_id)
     if matches:
         raise DuplicateCustomerError(matches)
@@ -338,7 +424,16 @@ def create_customer_with_deal(payload: dict[str, Any], user: dict[str, Any]) -> 
     if not (_is_admin_or_leader(user) and customer.get("owner_id")):
         customer["owner_id"] = actor_id or None
     _validate_source(customer.get("source"))
+    # migration 079 — resolve + mirror Chuc vu BEFORE the RPC call (both new
+    # rows here, so always require an active category). The RPC's INSERT
+    # statements (migration 077 SQL, not touched by this migration) only know
+    # about the legacy `position` text column, which apply_position_category
+    # already mirrors — the new position_category_id/position_label_snapshot
+    # columns are stamped via an explicit follow-up UPDATE below once the RPC
+    # has created the rows.
+    apply_position_category(customer)
     deal = dict(payload.get("deal") or {})
+    apply_position_category(deal)
     customer_id = _clean_text(payload.get("customer_id"))
     update_customer_profile = bool(payload.get("update_customer_profile"))
     partial = False
@@ -381,4 +476,37 @@ def create_customer_with_deal(payload: dict[str, Any], user: dict[str, Any]) -> 
     data["partial"] = partial
     if partial_message:
         data["partial_message"] = partial_message
+
+    # migration 079 — the RPC (migration 077 SQL, unmodified here) doesn't
+    # know about position_category_id/position_label_snapshot yet, so stamp
+    # them via explicit follow-up updates. Deal row is always brand new
+    # (stamp unconditionally). Customer row is only stamped when it was
+    # actually created/updated by this call — never when an existing
+    # customer_id was picked without update_customer_profile, matching the
+    # RPC's own "don't touch the profile" behavior in that case.
+    new_deal_id = (data.get("deal") or {}).get("id")
+    if new_deal_id and (deal.get("position_category_id") or "position_category_id" in deal):
+        execute_supabase_query(
+            lambda: supabase.table("customer_leads")
+            .update({
+                "position_category_id": deal.get("position_category_id"),
+                "position_label_snapshot": deal.get("position_label_snapshot"),
+            })
+            .eq("id", new_deal_id)
+            .execute()
+        )
+    new_customer_id = (data.get("customer") or {}).get("id")
+    customer_was_written = not customer_id or update_customer_profile
+    if new_customer_id and customer_was_written and (
+        customer.get("position_category_id") or "position_category_id" in customer
+    ):
+        execute_supabase_query(
+            lambda: supabase.table("crm_customers")
+            .update({
+                "position_category_id": customer.get("position_category_id"),
+                "position_label_snapshot": customer.get("position_label_snapshot"),
+            })
+            .eq("id", new_customer_id)
+            .execute()
+        )
     return data
