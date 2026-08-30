@@ -8,6 +8,7 @@ import { SOURCE_OPTIONS } from '../constants/crmConfig';
 import { ActionMenu } from './ActionMenu';
 import { LeadFormDrawer } from './LeadFormDrawer';
 import { LeadDetailDrawer } from './LeadDetailDrawer';
+import { SearchableSelect } from './SearchableSelect';
 import { Loader2, Plus, RotateCcw } from './icons';
 import type { CrmLeadKpi, CrmLeadRow, CrmLeadStatus } from '../types';
 
@@ -341,23 +342,30 @@ export function LeadsDirectory() {
               placeholder="Tìm tên, công ty, SĐT, email..."
               autoComplete="off"
             />
-            <select className="crm-input" value={status} onChange={event => setStatus(event.target.value)}>
-              {STATUS_OPTIONS.map(option => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-            <select className="crm-input" value={source} onChange={event => setSource(event.target.value)}>
-              <option value="">Tất cả nguồn</option>
-              {SOURCE_OPTIONS.map(option => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-            <select className="crm-input" value={sdrId} onChange={event => setSdrId(event.target.value)}>
-              <option value="">Tất cả SDR phụ trách</option>
-              {sdrFilterOptions.map(([id, name]) => (
-                <option key={id} value={id}>{name}</option>
-              ))}
-            </select>
+            <div className="crm-filter-select-wrap">
+              <SearchableSelect
+                value={status}
+                onChange={setStatus}
+                placeholder="Tất cả trạng thái"
+                options={STATUS_OPTIONS.filter(option => option.value !== '')}
+              />
+            </div>
+            <div className="crm-filter-select-wrap">
+              <SearchableSelect
+                value={source}
+                onChange={setSource}
+                placeholder="Tất cả nguồn"
+                options={SOURCE_OPTIONS}
+              />
+            </div>
+            <div className="crm-filter-select-wrap">
+              <SearchableSelect
+                value={sdrId}
+                onChange={setSdrId}
+                placeholder="Tất cả SDR phụ trách"
+                options={sdrFilterOptions.map(([id, name]) => ({ value: id, label: name }))}
+              />
+            </div>
             <div className="crm-icon-action-group" style={{ justifyContent: 'flex-start', gap: '0.5rem' }}>
               {hasFilters ? (
                 <button type="button" className="crm-secondary-button crm-filter-reset" onClick={resetFilters}>

@@ -369,6 +369,21 @@
   width: 100%;
 }
 
+/* Wrapper dung cho SearchableSelect khi dat thay the mot <select> native trong
+ * thanh filter (.crm-filter-grid) - filter dai (SDR/nguoi phu trach/team) truoc
+ * day dung <select> goc nen list option render theo kieu OS mac dinh, khong
+ * dong bo giao dien voi phan con lai (bug thuc te nguoi dung bao cao "may
+ * dropdown ni xau qua"). La grid item binh thuong, chieu cao khop .crm-input
+ * (2.8rem) de thanh hang deu voi cac o loc khac cung dong. */
+.crm-filter-select-wrap {
+  display: flex;
+  min-width: 0;
+}
+
+.crm-filter-select-wrap .crm-searchable-select-trigger {
+  height: 2.8rem;
+}
+
 .crm-searchable-select-trigger {
   display: flex;
   width: 100%;
@@ -6003,6 +6018,25 @@
 
 .crm-lead-paste-box {
   margin-top: 0.6rem;
+}
+
+/* Cot trai cua drawer Them Lead (Kiem tra Lead) hep hon nhieu so voi cac cho
+ * khac dung chung .crm-ai-fill-row (flex-row, textarea + nut ben canh) - o
+ * be rong ~350-400px, bo cuc hang ngang ep textarea qua hep/thap, chu bi cat
+ * dong (bug thuc te nguoi dung bao cao "box qua nho"). Xep doc + tang chieu
+ * cao toi thieu rieng cho ngu canh nay, khong doi hanh vi .crm-ai-fill-row o
+ * noi khac dang dung layout hang ngang binh thuong. */
+.crm-lead-paste-box .crm-ai-fill-row {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.crm-lead-paste-box .crm-ai-fill-textarea {
+  min-height: 5.5rem;
+}
+
+.crm-lead-paste-box .crm-ai-fill-btn {
+  align-self: flex-end;
 }
 
 .crm-lead-duplicate-cards {

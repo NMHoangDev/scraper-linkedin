@@ -11,6 +11,7 @@ import { canApproveQuote } from '../constants/crmConfig';
 import type { Deal } from '../types';
 import { CreateQuoteModal } from '../integrations/quotes';
 import { FileText, MessageCircle, Plus, Wallet } from './icons';
+import { SearchableSelect } from './SearchableSelect';
 import '../styles/quote-center.css';
 
 type RoleScope = 'ceo' | 'lead' | 'personal';
@@ -304,14 +305,14 @@ export function QuoteCenterPage() {
               <option value="year">Năm nay</option>
               <option value="all">Tất cả thời gian</option>
             </select>
-            <select value={teamFilter} onChange={event => setTeamFilter(event.target.value)}>
-              <option value="">Tất cả team</option>
-              {teams.map(team => (
-                <option key={team.id} value={team.id}>
-                  {team.name_team}
-                </option>
-              ))}
-            </select>
+            <div className="crm-filter-select-wrap">
+              <SearchableSelect
+                value={teamFilter}
+                onChange={setTeamFilter}
+                placeholder="Tất cả team"
+                options={teams.map(team => ({ value: team.id, label: team.name_team }))}
+              />
+            </div>
           </div>
         </div>
 

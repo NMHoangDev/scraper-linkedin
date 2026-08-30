@@ -608,13 +608,12 @@ export function LeadFormDrawer({
                       value={pasteText}
                       onChange={event => setPasteText(event.target.value)}
                       placeholder="Dán tin nhắn/email có SĐT + email, hệ thống tự tách ra ô tương ứng..."
-                      rows={2}
+                      rows={4}
                     />
                     <button type="button" className="crm-ai-fill-btn" disabled={!pasteText.trim()} onClick={handleParsePaste}>
                       Phân tích nội dung
                     </button>
                   </div>
-                  <p className="crm-ai-fill-hint">Bóc tách bằng quy tắc (regex SĐT/email) — chạy tức thì, không gọi AI/backend. Sau khi tách sẽ tự động kiểm tra trùng.</p>
                 </div>
               ) : null}
 
