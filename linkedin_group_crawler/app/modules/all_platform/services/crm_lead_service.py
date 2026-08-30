@@ -198,7 +198,12 @@ def get_lead(lead_id: str, user: dict[str, Any]) -> dict[str, Any]:
     return lead
 
 
-def _duplicate_query(email_normalized: str | None, phone_normalized: str | None, exclude_id: str | None = None) -> list[dict[str, Any]]:
+def _duplicate_query(
+    email_normalized: str | None,
+    phone_normalized: str | None,
+    exclude_id: str | None = None,
+    raw_phone_digits: str | None = None,
+) -> list[dict[str, Any]]:
     supabase = get_supabase_client()
     matches: dict[str, dict[str, Any]] = {}
     if email_normalized:
@@ -213,13 +218,30 @@ def _duplicate_query(email_normalized: str | None, phone_normalized: str | None,
         )
         for row in res.data or []:
             matches[row["id"]] = row
+    # Fallback so sanh chuoi so tho (bo het ky tu khong phai chu so) khi SDT
+    # nhap vao KHONG chuan hoa duoc (vn_phone_to_e164 tra None vi sai do dai/
+    # dinh dang) - vd du lieu seed/cu co san bi thieu 1 so ("090303811", 9 ky
+    # tu thay vi 10). Neu chi dua vao phone_normalized, ca 2 ben (SDT vua nhap
+    # va SDT da luu) deu None nen khong bao gio khop duoc, dan den bo lot
+    # trung lap hoan toan am tham (bug thuc te nguoi dung phat hien). Chi chay
+    # khi phone_normalized rong (SDT hop le da duoc query o tren roi) VA co it
+    # nhat vai chu so de tranh quet toan bo bang voi chuoi rong.
+    if not phone_normalized and raw_phone_digits and len(raw_phone_digits) >= 6:
+        res = execute_supabase_query(
+            lambda: supabase.table("crm_leads").select(LEAD_COLUMNS).not_.is_("phone", "null").execute()
+        )
+        for row in res.data or []:
+            stored_digits = "".join(ch for ch in str(row.get("phone") or "") if ch.isdigit())
+            if stored_digits and stored_digits == raw_phone_digits:
+                matches[row["id"]] = row
     if exclude_id:
         matches.pop(exclude_id, None)
     return list(matches.values())
 
 
 def duplicate_check(user: dict[str, Any], phone: str | None, email: str | None) -> list[dict[str, Any]]:
-    matches = _duplicate_query(normalize_email(email), normalize_phone(phone))
+    raw_digits = "".join(ch for ch in str(phone or "") if ch.isdigit())
+    matches = _duplicate_query(normalize_email(email), normalize_phone(phone), raw_phone_digits=raw_digits)
     visible = _visible_lead_ids(user)
     if visible is not None:
         matches = [row for row in matches if row.get("id") in visible]

@@ -11,6 +11,7 @@ import { CustomerFormModal } from './CustomerFormModal';
 import { CustomerAddDrawer } from './CustomerAddDrawer';
 import { CreateOpportunityDrawer } from './CreateOpportunityDrawer';
 import { ActionMenu } from './ActionMenu';
+import { SearchableSelect } from './SearchableSelect';
 import { Loader2, Plus, RotateCcw } from './icons';
 import type { CrmCustomerKpi, CrmCustomerRow } from '../types';
 
@@ -307,12 +308,14 @@ export function CrmCustomersDirectory() {
               placeholder="Tìm tên doanh nghiệp, MST, người liên hệ, SĐT, email..."
               autoComplete="off"
             />
-            <select className="crm-input" value={ownerId} onChange={event => setOwnerId(event.target.value)}>
-              <option value="">Tất cả người phụ trách</option>
-              {ownerFilterOptions.map(([id, name]) => (
-                <option key={id} value={id}>{name}</option>
-              ))}
-            </select>
+            <div className="crm-filter-select-wrap">
+              <SearchableSelect
+                value={ownerId}
+                onChange={setOwnerId}
+                placeholder="Tất cả người phụ trách"
+                options={ownerFilterOptions.map(([id, name]) => ({ value: id, label: name }))}
+              />
+            </div>
             <div className="crm-icon-action-group" style={{ justifyContent: 'flex-start', gap: '0.5rem' }}>
               {hasFilters ? (
                 <button type="button" className="crm-secondary-button crm-filter-reset" onClick={resetFilters}>

@@ -7,6 +7,14 @@ import { seedingCrmRepository } from '../../repositories/SeedingCrmRepository';
 import type { CrmCustomerSummary, CrmUserOption, Deal } from '../../types';
 import type { Quote } from '@/modules/quotes';
 
+/** Chu cai dau (toi da 2 tu) de lam avatar-initials - vd "Nguyen Van An" -> "NA". */
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 export function SelectCustomerStep({
   deals,
   customer,
@@ -19,6 +27,10 @@ export function SelectCustomerStep({
   quotes,
   /** Danh sách Sale để chọn "Sale phụ trách" khi tạo khách mới. */
   agents,
+  /** Cơ hội (deal) đang liên kết thủ công cho báo giá TỰ DO (không phải
+   * lockedDeal) — undefined = chưa gắn, sẽ tự tạo cơ hội mới lúc lưu. */
+  linkedDeal,
+  onChangeLinkedDeal,
 }: {
   deals: Deal[];
   customer: DealFormState;
@@ -26,6 +38,8 @@ export function SelectCustomerStep({
   lockedDeal?: Deal | null;
   quotes?: Quote[];
   agents?: CrmUserOption[];
+  linkedDeal?: Deal | null;
+  onChangeLinkedDeal?: (deal: Deal | null) => void;
 }) {
   const [search, setSearch] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -33,14 +47,10 @@ export function SelectCustomerStep({
   const [searchResults, setSearchResults] = useState<CrmCustomerSummary[]>([]);
   const [pickedCustomer, setPickedCustomer] = useState<CrmCustomerSummary | null>(null);
   const pickedExisting = Boolean(pickedCustomer) || Boolean(lockedDeal);
-  // customerId thuc cua khach dang chon - dung de tra thong ke lich su bao gia
-  // (thay cho customerDedupeKey cu, vi contactId luon = deal.id nen khong bao
-  // gio gop dung duoc nhieu deal cua cung 1 khach - da xac nhan la dead code).
   const referenceCustomerId = lockedDeal?.customerId || pickedCustomer?.id || '';
-  // Khach da co san tu CRM thi chi can hien tom tat - bam "Sua thong tin" moi mo
-  // du 6 o nhap. Khach moi (chua co trong CRM) van hien du luon vi kieu gi cung
-  // phai go tay.
   const [editingFields, setEditingFields] = useState(false);
+  const [dealPickerOpen, setDealPickerOpen] = useState(false);
+  const [dealPickerQuery, setDealPickerQuery] = useState('');
 
   const searchQueryReady = searchOpen && search.trim().length >= 2;
 
@@ -90,11 +100,6 @@ export function SelectCustomerStep({
   }, [referenceCustomerId, quotes, deals]);
 
   function pickExistingCustomer(found: CrmCustomerSummary) {
-    // Chi lay lai THONG TIN khach (ten/SDT/email/cong ty...) de do go tay lai -
-    // KHONG gan bao gia moi vao deal cu nao. Bao gia moi luon ra 1 deal moi
-    // rieng (tu tao o buoc submit), gan customerId that de deal moi lien ket
-    // dung ve 1 ho so khach hang duy nhat (thay vi chi copy snapshot roi mat
-    // lien ket nhu truoc).
     onChangeCustomer({
       ...emptyDealForm(),
       customerId: found.id,
@@ -114,18 +119,36 @@ export function SelectCustomerStep({
     onChangeCustomer(emptyDealForm());
     setPickedCustomer(null);
     setSearch('');
+    setSearchOpen(false);
     setEditingFields(false);
   }
 
   const hasCustomer = Boolean(customer.customerName.trim() || customer.phone.trim() || customer.email.trim());
+
+  // Danh sach co hoi de chon trong "Doi co hoi" (che do bao gia tu do, khong bi
+  // khoa boi lockedDeal) - loc theo tu khoa go tay, gioi han 8 dong dau tien
+  // giong pattern searchResults ben tren, khong can API rieng (deals da la
+  // prop san co, fetch 1 lan o CrmShell).
+  const dealPickerResults = useMemo(() => {
+    const keyword = dealPickerQuery.trim().toLowerCase();
+    const pool = keyword
+      ? deals.filter(d => d.customerName.toLowerCase().includes(keyword) || (d.companyName || '').toLowerCase().includes(keyword))
+      : deals;
+    return pool.slice(0, 8);
+  }, [deals, dealPickerQuery]);
+
+  const activeLinkedDeal = lockedDeal || linkedDeal || null;
 
   return (
     <section className="crm-wizard-form-section">
       <div className="crm-wizard-section-head">
         <div>
           <h3 className="crm-wizard-form-title">Khách hàng</h3>
-          <p className="crm-wizard-form-description">Chọn khách hàng đã có trên hệ thống.</p>
+          <p className="crm-wizard-form-description">Chọn khách hàng đã có trên hệ thống hoặc tạo khách hàng mới.</p>
         </div>
+        <a className="crm-secondary-inline" href="/all-platform/crm/customers" target="_blank" rel="noopener">
+          Quản lý khách hàng
+        </a>
       </div>
 
       {lockedDeal ? (
@@ -139,38 +162,53 @@ export function SelectCustomerStep({
       ) : (
         <>
           {!hasCustomer || !pickedExisting ? (
-            <div className="crm-quote-customer-search">
-              <input
-                className="crm-input"
-                placeholder="Tìm theo tên, SĐT, email, công ty..."
-                value={search}
-                onChange={event => {
-                  setSearch(event.target.value);
-                  setSearchOpen(true);
-                }}
-                onFocus={() => setSearchOpen(true)}
-                autoComplete="off"
-              />
-              {searchQueryReady ? (
-                <div className="crm-quote-customer-results">
-                  {searchLoading ? <div className="crm-quote-customer-empty">Đang tìm...</div> : null}
-                  {!searchLoading && searchResults.length === 0 ? (
-                    <div className="crm-quote-customer-empty">Không tìm thấy khách hàng nào khớp.</div>
-                  ) : (
-                    searchResults.map(found => (
-                      <button type="button" key={found.id} className="crm-quote-customer-option" onClick={() => pickExistingCustomer(found)}>
-                        <span className="crm-quote-customer-tag">Đã có</span>
-                        <span>
-                          <b>{found.customerName}</b>
-                          {found.companyName ? ` · ${found.companyName}` : ''}
-                          {found.phone ? ` · ${found.phone}` : ''}
-                          {found.dealCount ? ` · ${found.dealCount} deal` : ''}
-                        </span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              ) : null}
+            <div className="crm-quote-customer-search-row">
+              <div className="crm-quote-customer-search">
+                <input
+                  className="crm-input"
+                  placeholder="Tìm khách hàng theo tên, SĐT, email, công ty..."
+                  value={search}
+                  onChange={event => {
+                    setSearch(event.target.value);
+                    setSearchOpen(true);
+                  }}
+                  onFocus={() => setSearchOpen(true)}
+                  autoComplete="off"
+                />
+                {searchQueryReady ? (
+                  <div className="crm-quote-customer-results crm-quote-customer-results--cards">
+                    {searchLoading ? <div className="crm-quote-customer-empty">Đang tìm...</div> : null}
+                    {!searchLoading && searchResults.length === 0 ? (
+                      <div className="crm-quote-customer-empty">Không tìm thấy khách hàng nào khớp.</div>
+                    ) : (
+                      searchResults.map(found => {
+                        const isSelected = pickedCustomer?.id === found.id;
+                        return (
+                          <button
+                            type="button"
+                            key={found.id}
+                            className={`crm-quote-customer-card${isSelected ? ' crm-quote-customer-card--selected' : ''}`}
+                            onClick={() => pickExistingCustomer(found)}
+                          >
+                            <span className="crm-quote-customer-card-avatar">{initialsOf(found.customerName)}</span>
+                            <span className="crm-quote-customer-card-body">
+                              <strong>{found.companyName || found.customerName}</strong>
+                              <small>
+                                {found.companyName ? found.customerName : found.position || 'Khách hàng'}
+                                {found.dealCount ? ` · ${found.dealCount} deal` : ''}
+                              </small>
+                              {found.phone ? <small>{found.phone}</small> : null}
+                            </span>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                ) : null}
+              </div>
+              <button type="button" className="crm-quote-new-customer-button" onClick={startNewCustomer}>
+                + Khách hàng mới
+              </button>
             </div>
           ) : null}
 
@@ -223,44 +261,118 @@ export function SelectCustomerStep({
       ) : null}
 
       {!pickedExisting || editingFields ? (
-      <div className="crm-wizard-form-card-grid" style={{ marginTop: '0.85rem' }}>
-        <label className="crm-field">
-          <span>Tên khách hàng *</span>
-          <input value={customer.customerName} onChange={event => onChangeCustomer({ ...customer, customerName: event.target.value })} />
-        </label>
-        <label className="crm-field">
-          <span>Công ty</span>
-          <input value={customer.companyName} onChange={event => onChangeCustomer({ ...customer, companyName: event.target.value })} />
-        </label>
-        <label className="crm-field">
-          <span>Số điện thoại</span>
-          <input value={customer.phone} onChange={event => onChangeCustomer({ ...customer, phone: event.target.value })} />
-        </label>
-        <label className="crm-field">
-          <span>Email</span>
-          <input value={customer.email} onChange={event => onChangeCustomer({ ...customer, email: event.target.value })} />
-        </label>
-        <label className="crm-field crm-field--full">
-          <span>Địa chỉ</span>
-          <input value={customer.address} onChange={event => onChangeCustomer({ ...customer, address: event.target.value })} />
-        </label>
-        <label className="crm-field">
-          <span>Sale phụ trách</span>
-          {lockedDeal ? (
-            <input value={lockedDeal.assignment.sdrName || lockedDeal.assignment.leadName || 'Chưa gán'} disabled readOnly />
-          ) : (
-            <select value={customer.sdrId} onChange={event => onChangeCustomer({ ...customer, sdrId: event.target.value })}>
-              <option value="">-- Chưa chọn --</option>
-              {(agents || []).map(agent => (
-                <option key={agent.id} value={agent.id}>
-                  {agent.name}
-                </option>
-              ))}
-            </select>
-          )}
-        </label>
-      </div>
+        <div className="crm-wizard-form-card-grid" style={{ marginTop: '0.85rem' }}>
+          <label className="crm-field">
+            <span>Tên khách hàng/đơn vị *</span>
+            <input value={customer.companyName || customer.customerName} onChange={event => onChangeCustomer({ ...customer, companyName: event.target.value })} />
+          </label>
+          <label className="crm-field">
+            <span>Mã số thuế</span>
+            <input value={customer.taxCode} onChange={event => onChangeCustomer({ ...customer, taxCode: event.target.value })} />
+          </label>
+          <label className="crm-field crm-field--full">
+            <span>Địa chỉ</span>
+            <input value={customer.address} onChange={event => onChangeCustomer({ ...customer, address: event.target.value })} />
+          </label>
+          <label className="crm-field">
+            <span>Người nhận báo giá *</span>
+            <input value={customer.customerName} onChange={event => onChangeCustomer({ ...customer, customerName: event.target.value })} />
+          </label>
+          <label className="crm-field">
+            <span>SĐT</span>
+            <input value={customer.phone} onChange={event => onChangeCustomer({ ...customer, phone: event.target.value })} />
+          </label>
+          <label className="crm-field">
+            <span>Email nhận báo giá</span>
+            <input value={customer.email} onChange={event => onChangeCustomer({ ...customer, email: event.target.value })} />
+          </label>
+          <label className="crm-field">
+            <span>Sale phụ trách</span>
+            {lockedDeal ? (
+              <input value={lockedDeal.assignment.sdrName || lockedDeal.assignment.leadName || 'Chưa gán'} disabled readOnly />
+            ) : (
+              <select value={customer.sdrId} onChange={event => onChangeCustomer({ ...customer, sdrId: event.target.value })}>
+                <option value="">-- Chưa chọn --</option>
+                {(agents || []).map(agent => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </label>
+        </div>
       ) : null}
+
+      <div className="crm-quote-opportunity-card">
+        <div className="crm-quote-opportunity-body">
+          <span className="crm-quote-opportunity-label">Liên kết cơ hội CRM</span>
+          {activeLinkedDeal ? (
+            <strong>{activeLinkedDeal.customerName}{activeLinkedDeal.companyName ? ` · ${activeLinkedDeal.companyName}` : ''}</strong>
+          ) : (
+            <strong className="crm-quote-opportunity-empty">Chưa gắn — sẽ tự tạo cơ hội mới khi lưu</strong>
+          )}
+        </div>
+        {!lockedDeal && onChangeLinkedDeal ? (
+          <button type="button" className="crm-secondary-inline" onClick={() => setDealPickerOpen(open => !open)}>
+            Đổi cơ hội
+          </button>
+        ) : null}
+        {dealPickerOpen ? (
+          <div className="crm-quote-opportunity-picker">
+            <input
+              className="crm-input"
+              placeholder="Tìm cơ hội theo tên khách/công ty..."
+              value={dealPickerQuery}
+              onChange={event => setDealPickerQuery(event.target.value)}
+              autoFocus
+            />
+            <div className="crm-quote-opportunity-picker-list">
+              {linkedDeal ? (
+                <button
+                  type="button"
+                  className="crm-quote-opportunity-picker-item crm-quote-opportunity-picker-item--clear"
+                  onClick={() => {
+                    onChangeLinkedDeal?.(null);
+                    setDealPickerOpen(false);
+                  }}
+                >
+                  ✕ Bỏ liên kết (tạo cơ hội mới)
+                </button>
+              ) : null}
+              {dealPickerResults.map(deal => (
+                <button
+                  key={deal.id}
+                  type="button"
+                  className="crm-quote-opportunity-picker-item"
+                  onClick={() => {
+                    onChangeLinkedDeal?.(deal);
+                    setDealPickerOpen(false);
+                  }}
+                >
+                  <b>{deal.customerName}</b>
+                  {deal.companyName ? ` · ${deal.companyName}` : ''}
+                </button>
+              ))}
+              {!dealPickerResults.length ? <div className="crm-quote-customer-empty">Không có cơ hội nào khớp.</div> : null}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="crm-quote-smart-suggestion">
+        <span className="crm-quote-smart-suggestion-icon">💡</span>
+        <div>
+          <b>Gợi ý thông minh</b>
+          <p>
+            {customerStats && customerStats.count > 0
+              ? `Khách hàng này đã có ${customerStats.count} báo giá trước đây (tỷ lệ chuyển đổi ${customerStats.conversionRate}%) — cân nhắc mẫu và mức giá đã dùng gần nhất để giữ nhất quán.`
+              : referenceCustomerId
+                ? 'Đây là lần đầu tạo báo giá cho khách hàng này — hệ thống sẽ tự điền thông tin công ty phát hành và mẫu báo giá mặc định ở bước sau.'
+                : 'Tìm hoặc chọn khách hàng đã có trên CRM để tự động điền thông tin liên hệ ở bước này.'}
+          </p>
+        </div>
+      </div>
     </section>
   );
 }

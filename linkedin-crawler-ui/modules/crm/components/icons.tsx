@@ -137,6 +137,20 @@ export const Trophy = makeIcon([
   { d: 'M5 5H3a2 2 0 0 0 2 4' },
   { d: 'M19 5h2a2 2 0 0 1-2 4' },
 ]);
+export const Sparkles = makeIcon([
+  { d: 'M12 3v4' },
+  { d: 'M12 17v4' },
+  { d: 'M3 12h4' },
+  { d: 'M17 12h4' },
+  { d: 'm5.6 5.6 2.8 2.8' },
+  { d: 'm15.6 15.6 2.8 2.8' },
+  { d: 'm18.4 5.6-2.8 2.8' },
+  { d: 'm8.4 15.6-2.8 2.8' },
+]);
+export const User = makeIcon([
+  { tag: 'circle', cx: 12, cy: 7, r: 4 },
+  { d: 'M4 21v-2a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v2' },
+]);
 export const UserCog = makeIcon([
   { tag: 'circle', cx: 9, cy: 7, r: 4 },
   { d: 'M3 21v-2a4 4 0 0 1 4-4h3' },
