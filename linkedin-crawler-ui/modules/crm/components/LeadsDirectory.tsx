@@ -579,6 +579,10 @@ export function LeadsDirectory() {
           setFormOpen(false);
           openQualifyForNewLead(lead);
         }}
+        onOpenExistingLead={lead => {
+          setFormOpen(false);
+          openRow(lead);
+        }}
       />
 
       <LeadDetailDrawer
