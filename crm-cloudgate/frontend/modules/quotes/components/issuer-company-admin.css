@@ -1,0 +1,71 @@
+.issuer-logo-editor {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 0 4px;
+}
+
+.issuer-logo-editor-preview {
+  width: 96px;
+  height: 56px;
+  object-fit: contain;
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.issuer-logo-editor-placeholder {
+  width: 96px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #f9fafb;
+  color: #94a3b8;
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.issuer-logo-editor-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.issuer-logo-editor-actions .sc-btn {
+  cursor: pointer;
+}
+
+.issuer-logo-thumb {
+  width: 44px;
+  height: 28px;
+  object-fit: contain;
+  border-radius: 4px;
+  background: #f9fafb;
+  border: 1px solid #e4e7ec;
+}
+
+.issuer-logo-thumb--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+@media (max-width: 640px) {
+  .issuer-logo-editor {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .issuer-logo-editor-preview,
+  .issuer-logo-editor-placeholder {
+    width: 84px;
+    height: 48px;
+  }
+}

@@ -177,3 +177,31 @@ docs/INFRASTRUCTURE.md
 
 # Doc tien do phien lam viec, phong hua thong tin ha tang nhay cam lot vao sau nay
 docs/QUOTE_ISSUER_COMPANY_WIZARD_2026-08-27.md
+
+# ---- crm-module + crm-cloudgate (module CRM doc lap, FE + BE, 1 instance/host) ----
+crm-module/.env
+crm-module/docker-compose.override.yml
+crm-module/backend/.env
+crm-module/backend/.env.local
+crm-module/backend/.venv
+crm-module/backend/__pycache__
+crm-module/backend/**/__pycache__
+crm-module/frontend/.env*
+crm-module/frontend/node_modules
+crm-module/frontend/.next
+crm-module/frontend/nextdev.log
+crm-module/frontend/npm-install.log
+crm-cloudgate/.env
+crm-cloudgate/docker-compose.override.yml
+crm-cloudgate/backend/.env
+crm-cloudgate/backend/.env.local
+crm-cloudgate/backend/.venv
+crm-cloudgate/backend/__pycache__
+crm-cloudgate/backend/**/__pycache__
+crm-cloudgate/frontend/.env*
+crm-cloudgate/frontend/node_modules
+crm-cloudgate/frontend/.next
+crm-cloudgate/frontend/nextdev.log
+crm-cloudgate/frontend/npm-install.log
+crm-cloudgate/frontend/node_modules
+crm-cloudgate/frontend/.next
