@@ -69,7 +69,7 @@ function AllPlatformShellInner({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated) return null;
 
   const isChatPage = pathname === "/zalo-chat" || pathname.startsWith("/zalo-chat");
-  const pageTitle = findCurrentPageLabel(ALL_ENTRIES_FOR_TITLE_LOOKUP, pathname) ?? "Marketing Agents";
+  const pageTitle = findCurrentPageLabel(ALL_ENTRIES_FOR_TITLE_LOOKUP, pathname) ?? "CloudGate";
 
   return (
     <SidebarProvider>

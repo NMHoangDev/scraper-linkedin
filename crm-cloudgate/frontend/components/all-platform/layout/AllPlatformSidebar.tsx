@@ -428,8 +428,8 @@ export function AllPlatformSidebar({
                 title="Mở rộng"
               >
                 <Image
-                  src="/markeeai_logo.svg"
-                  alt="Marketing Agents"
+                  src="/cloudgate_logo.jpg"
+                  alt="CloudGate"
                   width={40}
                   height={40}
                   className="h-10 w-10 rounded-xl object-contain transition-opacity duration-200 group-hover/logo:opacity-0"
@@ -446,7 +446,7 @@ export function AllPlatformSidebar({
                 onClick={onClose}
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl md:hidden"
               >
-                <Image src="/markeeai_logo.svg" alt="Marketing Agents" width={40} height={40} className="h-10 w-10 rounded-xl object-contain" priority />
+                <Image src="/cloudgate_logo.jpg" alt="CloudGate" width={40} height={40} className="h-10 w-10 rounded-xl object-contain" priority />
               </Link>
             ) : (
               <Link
@@ -455,17 +455,15 @@ export function AllPlatformSidebar({
                 className="flex min-w-0 items-center gap-3 rounded-lg p-1 transition hover:bg-surface-container-low active:scale-[0.98]"
               >
                 <Image
-                  src="/markeeai_logo.svg"
-                  alt="Marketing Agents"
+                  src="/cloudgate_logo.jpg"
+                  alt="CloudGate"
                   width={40}
                   height={40}
                   className="h-10 w-10 shrink-0 rounded-xl object-contain"
                   priority
                 />
                 <span className="text-left text-lg font-semibold leading-5 tracking-tight text-[var(--color-markee-primary)]">
-                  Marketing
-                  <br />
-                  Agents
+                  CloudGate
                 </span>
               </Link>
             )}
