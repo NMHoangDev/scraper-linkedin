@@ -16,12 +16,12 @@ import { QueryProvider } from "@/components/providers/QueryProvider";
 const inter = Inter({ subsets: ["latin", "vietnamese"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "MarkeeAI - CRM",
+  title: "CloudGate - CRM",
   description: "Quản lý Leads, Khách hàng, Cơ hội, Báo giá, Hợp đồng và Sản phẩm & dịch vụ.",
   icons: {
-    icon: "https://markeeai.com/logo.svg",
-    shortcut: "https://markeeai.com/logo.svg",
-    apple: "https://markeeai.com/logo.svg",
+    icon: "/cloudgate_logo.jpg",
+    shortcut: "/cloudgate_logo.jpg",
+    apple: "/cloudgate_logo.jpg",
   },
 };
 

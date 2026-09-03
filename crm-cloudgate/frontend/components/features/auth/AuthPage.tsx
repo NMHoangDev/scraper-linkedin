@@ -264,8 +264,8 @@ export function AuthPage() {
               style={{ transform: "rotate(3deg)", transition: "transform 0.3s" }}
             >
               <Image
-                src="https://markeeai.com/logo.svg"
-                alt="MarkeeAI"
+                src="/cloudgate_logo.jpg"
+                alt="CloudGate"
                 fill
                 sizes="64px"
                 className="object-contain p-2"
@@ -281,7 +281,7 @@ export function AuthPage() {
           {!showPasswordForm && (
             <div className="px-6 py-8 flex flex-col items-center gap-4">
               <p className="text-sm text-on-surface-variant text-center">
-                Đăng nhập bằng tài khoản Google được cấp cho công việc tại Markee.
+                Đăng nhập bằng tài khoản Google được cấp cho công việc tại CloudGate.
               </p>
               <div className="flex justify-center">
                 <GoogleLogin
@@ -541,7 +541,7 @@ export function AuthPage() {
 
         {/* ── System footer ── */}
         <footer className="mt-6 flex flex-col md:flex-row justify-center items-center gap-3 text-white/60 text-xs">
-          <span>© 2026 MarkeeAI. All rights reserved.</span>
+          <span>© 2026 CloudGate. All rights reserved.</span>
           <div className="flex gap-4">
             <a href="#" className="hover:text-white transition-colors">Điều khoản</a>
             <a href="#" className="hover:text-white transition-colors">Chính sách</a>
