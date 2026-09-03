@@ -669,8 +669,7 @@ function CrmCategorySections({
                   placeholder={CRM_SECTIONS.find(s => s.key === modal.sectionKey)?.placeholderCode}
                   value={modal.code}
                   onChange={e => setModal({ ...modal, code: e.target.value })}
-                  disabled={modal.mode === "edit"}
-                  className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-4 py-2 text-xs text-on-surface outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-4 py-2 text-xs text-on-surface outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
                   autoFocus
                 />
               </div>
