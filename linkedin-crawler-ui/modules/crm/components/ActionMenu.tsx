@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MoreVertical } from './icons';
 
@@ -39,6 +39,34 @@ export function ActionMenu({ items, label = 'Thao tác khác' }: { items: Action
     }
     setOpen(true);
   }
+
+  /** Menu render qua Portal voi position:fixed nen KHONG the cuon vao tam
+   * nhin: neu no roi ra ngoai day man hinh thi coi nhu bam khong duoc. Tren
+   * man hep (mobile), nut "⋯" cua the Lead nam sat day trang -> toan bo menu
+   * (ke ca muc "Xóa Lead" o cuoi) nam duoi viewport. Do chieu cao THAT sau khi
+   * render roi lat len tren nut neu khong con cho, va ep menu nam trong man
+   * hinh theo ca 2 chieu. */
+  useLayoutEffect(() => {
+    if (!open || !position) return;
+    const list = listRef.current;
+    const trigger = triggerRef.current;
+    if (!list || !trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const height = list.offsetHeight;
+    const margin = 8;
+    let top = rect.bottom + 4;
+    if (top + height + margin > window.innerHeight) {
+      const above = rect.top - height - 4;
+      top = above >= margin ? above : Math.max(margin, window.innerHeight - height - margin);
+    }
+    const right = Math.min(
+      Math.max(margin, window.innerWidth - rect.right),
+      Math.max(margin, window.innerWidth - list.offsetWidth - margin),
+    );
+    if (Math.abs(top - position.top) > 0.5 || Math.abs(right - position.right) > 0.5) {
+      setPosition({ top, right });
+    }
+  }, [open, position]);
 
   useEffect(() => {
     if (!open) return;

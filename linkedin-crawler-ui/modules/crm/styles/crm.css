@@ -7128,3 +7128,62 @@
     flex: 1;
   }
 }
+
+/* ===== Sửa Lead + Xóa Lead (LeadEditDrawer / hộp xác nhận xóa trong
+ * LeadsDirectory). Tái dùng nguyên .crm-drawer + .crm-modal sẵn có, chỉ bổ
+ * sung những thứ chưa từng cần đến: bề rộng drawer sửa, hộp thoại xác nhận nhỏ
+ * (căn giữa dọc thay vì dính mép trên như modal form dài), và nút hành động
+ * đỏ cho thao tác xóa. ===== */
+.crm-lead-edit-drawer {
+  width: min(720px, 100%);
+}
+
+.crm-modal-backdrop--confirm {
+  align-items: center;
+}
+
+.crm-modal--confirm {
+  width: min(30rem, 100%);
+}
+
+.crm-modal--confirm .crm-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  color: #334155;
+  font-size: 0.9rem;
+  padding: 1.1rem 1.5rem;
+}
+
+.crm-danger-button {
+  display: inline-flex;
+  min-width: 4.2rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: #dc2626;
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 0.65rem 1.25rem;
+  box-shadow: 0 10px 20px rgba(220, 38, 38, 0.18);
+}
+
+.crm-danger-button:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.crm-danger-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Nút "Chỉnh sửa" ở header drawer "Xác minh Lead" — mở đúng LeadEditDrawer. */
+.crm-lead-drawer-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
