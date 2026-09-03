@@ -119,6 +119,7 @@ export function LeadDetailDrawer({
   currentUser,
   onClose,
   onSaved,
+  onEdit,
 }: {
   lead: CrmLeadRow | null;
   open: boolean;
@@ -126,6 +127,10 @@ export function LeadDetailDrawer({
   currentUser: AppUser | null;
   onClose: () => void;
   onSaved: (lead: CrmLeadRow) => void;
+  /** Mở form sửa hồ sơ Lead. Drawer này KHÔNG tự dựng form sửa riêng — nó đẩy
+   * ngược lên LeadsDirectory để mở đúng LeadEditDrawer mà "Sửa nhanh" dùng,
+   * nên chỉ tồn tại duy nhất 1 bản form sửa Lead trong toàn bộ ứng dụng. */
+  onEdit?: (lead: CrmLeadRow) => void;
 }) {
   useBodyScrollLock(open);
   const { members } = useMembers();
@@ -469,9 +474,21 @@ export function LeadDetailDrawer({
             <h2>Xác minh Lead</h2>
             <p>SDR chỉ cần xác nhận vài thông tin then chốt — hệ thống tự chấm điểm và chuẩn bị dữ liệu bàn giao cho Sale.</p>
           </div>
-          <button type="button" className="crm-drawer-close" onClick={onClose} aria-label="Đóng">
-            <X className="crm-icon" />
-          </button>
+          <div className="crm-lead-drawer-header-actions">
+            {onEdit ? (
+              <button
+                type="button"
+                className="crm-secondary-button crm-button-sm"
+                data-testid="lead-detail-edit"
+                onClick={() => onEdit(lead)}
+              >
+                Chỉnh sửa
+              </button>
+            ) : null}
+            <button type="button" className="crm-drawer-close" onClick={onClose} aria-label="Đóng">
+              <X className="crm-icon" />
+            </button>
+          </div>
         </header>
 
         <div className="crm-drawer-body crm-lead-drawer-body crm-verify-body" ref={bodyRef}>
