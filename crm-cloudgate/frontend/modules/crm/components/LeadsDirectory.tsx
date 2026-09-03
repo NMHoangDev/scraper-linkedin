@@ -5,9 +5,10 @@ import { API_BASE_URL, API_KEY } from '@/lib/env';
 import { useAppAuth } from '@/contexts/AppAuthContext';
 import { useMembers } from '@/hooks/useMembers';
 import { SOURCE_OPTIONS } from '../constants/crmConfig';
-import { ActionMenu } from './ActionMenu';
+import { ActionMenu, type ActionMenuItem } from './ActionMenu';
 import { LeadFormDrawer } from './LeadFormDrawer';
 import { LeadDetailDrawer } from './LeadDetailDrawer';
+import { LeadEditDrawer } from './LeadEditDrawer';
 import { SearchableSelect } from './SearchableSelect';
 import { Loader2, Plus, RotateCcw } from './icons';
 import type { CrmLeadKpi, CrmLeadRow, CrmLeadStatus } from '../types';
@@ -148,6 +149,10 @@ export function LeadsDirectory() {
   const [formOpen, setFormOpen] = useState(false);
   const [detailLead, setDetailLead] = useState<CrmLeadRow | null>(null);
   const [detailMode, setDetailMode] = useState<'view' | 'qualify' | 'convert'>('view');
+  const [editLead, setEditLead] = useState<CrmLeadRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CrmLeadRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -250,6 +255,50 @@ export function LeadsDirectory() {
     setDetailLead(lead);
     setDetailMode('view');
   }
+
+  /** Lối vào DUY NHẤT của form sửa Lead (LeadEditDrawer). Cả "Sửa nhanh" ở
+   * menu "⋯" lẫn nút "Chỉnh sửa" trong drawer "Xác minh Lead" đều gọi hàm
+   * này — không có bản form sửa thứ hai ở đâu khác. */
+  function openEdit(lead: CrmLeadRow) {
+    setEditLead(lead);
+  }
+
+  /** Cập nhật NGAY dòng tương ứng trong bảng sau khi lưu (không chờ reload
+   * toàn trang), rồi vẫn nạp lại nền để KPI/thứ tự sắp xếp theo updated_at
+   * khớp với server. */
+  function applyUpdatedLead(updated: CrmLeadRow) {
+    setItems(current => current.map(row => (row.id === updated.id ? updated : row)));
+    setEditLead(current => (current && current.id === updated.id ? updated : current));
+    setDetailLead(current => (current && current.id === updated.id ? updated : current));
+    setReloadTick(tick => tick + 1);
+  }
+
+  async function confirmDelete() {
+    const target = deleteTarget;
+    if (!target || deleting) return;
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/all-platform/crm/leads/${encodeURIComponent(target.id)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: headers(),
+      });
+      const body = await res.json();
+      if (!res.ok || body.success === false) throw new Error(body?.message || `Không xóa được Lead (lỗi ${res.status}).`);
+      // Bỏ dòng khỏi bảng ngay, đồng thời nạp lại để KPI/tổng số về đúng.
+      setItems(current => current.filter(row => row.id !== target.id));
+      setTotal(current => Math.max(0, current - 1));
+      setDeleteTarget(null);
+      if (detailLead?.id === target.id) setDetailLead(null);
+      if (editLead?.id === target.id) setEditLead(null);
+      setReloadTick(tick => tick + 1);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Không xóa được Lead.');
+    } finally {
+      setDeleting(false);
+    }
+  }
   function openQualifyForNewLead(lead: CrmLeadRow) {
     setDetailLead(lead);
     setDetailMode('qualify');
@@ -298,12 +347,13 @@ export function LeadsDirectory() {
     }
   }
 
-  /** Hành động phụ giữ nguyên những gì menu "⋯" đang có: xem/sửa nhanh, và lối
-   * vào tạo cơ hội cho lead chưa convert (nay đi qua checklist trong drawer
-   * thay vì mở thẳng bước xác nhận Convert như trước). */
-  function secondaryActionsOf(lead: CrmLeadRow) {
+  /** Hành động phụ trong menu "⋯": "Sửa nhanh" nay mở FORM SỬA thật
+   * (LeadEditDrawer) thay vì drawer xác minh; lối vào tạo cơ hội cho lead chưa
+   * convert; và "Xóa Lead" (đỏ, luôn ở cuối) — chỉ hiện với người có quyền ghi
+   * Lead đó, tức đúng `can_write` mà backend trả về từ can_write_lead(). */
+  function secondaryActionsOf(lead: CrmLeadRow): ActionMenuItem[] {
     return [
-      { key: 'view', label: 'Sửa nhanh', onSelect: () => openView(lead) },
+      { key: 'edit', label: 'Sửa nhanh', onSelect: () => openEdit(lead) },
       ...(lead.canWrite && lead.status !== 'converted'
         ? [{ key: 'convert', label: 'Tạo cơ hội', onSelect: () => openQualifyForNewLead(lead) }]
         : []),
@@ -313,6 +363,17 @@ export function LeadsDirectory() {
             label: 'Xem khách hàng',
             onSelect: () => {
               window.location.href = `/all-platform/crm/customers/${lead.convertedCustomerId}`;
+            },
+          }]
+        : []),
+      ...(lead.canWrite
+        ? [{
+            key: 'delete',
+            label: 'Xóa Lead',
+            danger: true,
+            onSelect: () => {
+              setDeleteError('');
+              setDeleteTarget(lead);
             },
           }]
         : []),
@@ -603,7 +664,69 @@ export function LeadsDirectory() {
           setDetailLead(updated);
           handleSaved();
         }}
+        onEdit={openEdit}
       />
+
+      <LeadEditDrawer
+        lead={editLead}
+        open={Boolean(editLead)}
+        currentUser={user}
+        onClose={() => setEditLead(null)}
+        onSaved={applyUpdatedLead}
+      />
+
+      {deleteTarget ? (
+        <div
+          className="crm-modal-backdrop crm-modal-backdrop--confirm"
+          onClick={() => (deleting ? undefined : setDeleteTarget(null))}
+        >
+          <div
+            className="crm-modal crm-modal--confirm"
+            role="dialog"
+            aria-modal="true"
+            data-testid="lead-delete-confirm"
+            onClick={event => event.stopPropagation()}
+          >
+            <header className="crm-modal-header">
+              <div>
+                <p className="crm-modal-title">Xóa Lead</p>
+                <p className="crm-modal-subtitle">Hành động này không thể hoàn tác.</p>
+              </div>
+            </header>
+            <div className="crm-modal-body">
+              {deleteError ? <p className="crm-error" data-testid="lead-delete-error">{deleteError}</p> : null}
+              <p>
+                Xóa Lead <b>&ldquo;{deleteTarget.leadName}&rdquo;</b>? Hành động này không thể hoàn tác.
+              </p>
+              <p className="crm-ai-fill-hint">
+                Nếu chỉ muốn ngừng theo dõi, hãy dùng &quot;Sửa nhanh&quot; để chuyển trạng thái sang &quot;Theo dõi
+                sau&quot; hoặc &quot;Không phù hợp&quot; thay vì xóa hẳn.
+              </p>
+            </div>
+            <footer className="crm-modal-footer">
+              <button
+                type="button"
+                className="crm-cancel-button"
+                data-testid="lead-delete-cancel"
+                disabled={deleting}
+                onClick={() => setDeleteTarget(null)}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                className="crm-danger-button"
+                data-testid="lead-delete-confirm-btn"
+                disabled={deleting}
+                onClick={() => void confirmDelete()}
+              >
+                {deleting ? <Loader2 className="crm-save-spinner" /> : null}
+                {deleting ? 'Đang xóa...' : 'Xóa Lead'}
+              </button>
+            </footer>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
