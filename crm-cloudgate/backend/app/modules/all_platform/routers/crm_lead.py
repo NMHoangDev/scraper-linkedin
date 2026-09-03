@@ -13,9 +13,11 @@ from app.modules.all_platform.schemas.crm_lead import (
 )
 from app.modules.all_platform.services.crm_lead_service import (
     DuplicateLeadError,
+    LeadLinkedError,
     company_match,
     convert_lead,
     create_lead,
+    delete_lead,
     duplicate_check,
     get_lead,
     list_leads,
@@ -28,6 +30,10 @@ router = APIRouter()
 def _error(exc: Exception) -> BaseResponse:
     if isinstance(exc, DuplicateLeadError):
         return BaseResponse(success=False, message=str(exc), data={"duplicates": exc.matches})
+    if isinstance(exc, LeadLinkedError):
+        # Tra kem id ho so downstream de UI co the dan nguoi dung sang do thay
+        # vi chi bao "khong xoa duoc".
+        return BaseResponse(success=False, message=str(exc), data={"links": exc.links})
     if isinstance(exc, PermissionError):
         return BaseResponse(success=False, message=str(exc))
     return BaseResponse(success=False, message=str(exc))
@@ -101,6 +107,15 @@ def leads_update(lead_id: str, payload: CrmLeadUpdate, user: dict[str, Any] = De
             message="Da cap nhat lead",
             data=update_lead(lead_id, payload.model_dump(exclude_unset=True), user),
         )
+    except Exception as exc:
+        return _error(exc)
+
+
+@router.delete("/{lead_id}")
+def leads_delete(lead_id: str, user: dict[str, Any] = Depends(get_current_user)) -> BaseResponse:
+    try:
+        delete_lead(lead_id, user)
+        return BaseResponse(success=True, message="Đã xóa Lead")
     except Exception as exc:
         return _error(exc)
 

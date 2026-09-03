@@ -394,6 +394,55 @@ def update_lead(lead_id: str, payload: dict[str, Any], user: dict[str, Any]) -> 
     return res.data[0]
 
 
+class LeadLinkedError(ValueError):
+    """Lead khong duoc phep xoa vi da sinh ra ho so downstream (Khach hang /
+    Lien he / Co hoi). Tach rieng khoi ValueError thuong de router/frontend co
+    the doi xu khac (goi y luu tru thay vi bao loi chung chung)."""
+
+    def __init__(self, message: str, links: dict[str, Any]) -> None:
+        super().__init__(message)
+        self.links = links
+
+
+def delete_lead(lead_id: str, user: dict[str, Any]) -> None:
+    """Xoa han 1 Lead. Cung khuon voi delete_contact() trong
+    crm_contact_service.py: nap ban ghi qua getter (da kiem tra quyen xem), roi
+    kiem tra quyen ghi bang DUNG helper co san can_write_lead() - khong dat ra
+    quy tac phan quyen moi.
+
+    Chan xoa khi Lead da convert. Khong co FK nao tro NGUOC ve crm_leads
+    (migration 078: cac cot converted_* nam TREN crm_leads va deu la ON DELETE
+    SET NULL), nghia la DB se vui ve xoa mat ban ghi goc cua 1 Khach
+    hang/Co hoi da ton tai ma khong bao loi gi. Vi vay chan o day la quy tac
+    NGHIEP VU that su, khong phai chi de dep loi FK."""
+    current = get_lead(lead_id, user)
+    if not can_write_lead(user, current):
+        raise PermissionError("Không có quyền xóa Lead này.")
+
+    links = {
+        "customer_id": current.get("converted_customer_id") or None,
+        "contact_id": current.get("converted_contact_id") or None,
+        "deal_id": current.get("converted_deal_id") or None,
+    }
+    if current.get("status") == "converted" or any(links.values()):
+        raise LeadLinkedError(
+            "Không thể xóa Lead đã được chuyển đổi thành Cơ hội/Khách hàng — "
+            "dữ liệu Khách hàng, Liên hệ và Cơ hội đã tạo từ Lead này sẽ mất "
+            "nguồn gốc. Hãy chuyển Lead sang \"Theo dõi sau\" hoặc \"Không phù "
+            "hợp\" để lưu trữ thay vì xóa.",
+            links,
+        )
+
+    supabase = get_supabase_client()
+    execute_supabase_query(
+        lambda: supabase.table("crm_leads")
+        .delete()
+        .eq("id", lead_id)
+        .eq("instance", settings.crm_instance)
+        .execute()
+    )
+
+
 def _request_hash(payload: dict[str, Any]) -> str:
     return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode("utf-8")).hexdigest()
 
