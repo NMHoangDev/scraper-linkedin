@@ -189,6 +189,10 @@ export interface CrmCustomerSummary {
   status?: CrmCustomerStatus;
   ownerId?: string;
   canEdit?: boolean;
+  externalSystem?: string;
+  externalId?: string;
+  externalPayload?: Record<string, unknown>;
+  syncedAt?: string;
   dealCount?: number;
   totalValue?: number;
   lastDealAt?: string;

@@ -30,6 +30,7 @@ type QuickSearchRow = {
   phone?: string;
   email?: string;
   taxCode?: string;
+  externalSystem?: string;
 };
 
 type CompanyForm = {
@@ -187,6 +188,8 @@ export function CustomerAddDrawer({
               companyName: String(row.companyName || row.company_name || ''),
               phone: String(row.phone || ''),
               email: String(row.email || ''),
+              taxCode: String(row.taxCode || row.tax_code || ''),
+              externalSystem: String(row.externalSystem || row.external_system || ''),
             })),
           );
           setSearchedOnce(true);
@@ -469,13 +472,13 @@ export function CustomerAddDrawer({
           <section className="crm-form-section" ref={crmSectionRef}>
             <p className="crm-form-title">1. Tìm công ty trong CRM</p>
             <p className="crm-customer-form-hint">
-              Tìm theo tên doanh nghiệp, SĐT hoặc email để tránh tạo trùng hồ sơ đã có.
+              Tìm trên CRM nội bộ và Markee CFO theo tên doanh nghiệp, MST, SĐT hoặc email để tránh tạo trùng.
             </p>
             <input
               className="crm-customer-drawer-search"
               value={query}
               onChange={event => setQuery(event.target.value)}
-              placeholder="Nhập tên doanh nghiệp / SĐT / email..."
+              placeholder="Nhập tên doanh nghiệp / MST / SĐT / email..."
               autoComplete="off"
             />
             {searching ? (
@@ -492,6 +495,8 @@ export function CustomerAddDrawer({
                         {row.companyName ? ` · ${row.companyName}` : ''}
                         {row.phone ? ` · ${row.phone}` : ''}
                         {row.email ? ` · ${row.email}` : ''}
+                        {row.taxCode ? ` · MST ${row.taxCode}` : ''}
+                        {row.externalSystem === 'markee_cfo' ? ' · Markee CFO' : ''}
                       </span>
                       <Link href={`/all-platform/crm/customers/${row.id}`} target="_blank" className="crm-duplicate-open-btn">
                         Mở khách hàng
@@ -505,7 +510,7 @@ export function CustomerAddDrawer({
               <p className="crm-customer-drawer-ok">Không tìm thấy hồ sơ trùng — có thể tạo mới.</p>
             ) : null}
             <p className="crm-customer-drawer-note">
-              Lưu ý: tìm kiếm ở bước này hiện chỉ theo tên/SĐT/email — chưa tìm theo MST hoặc website.
+              Dữ liệu Markee CFO chỉ đọc; muốn chỉnh thông tin hãy cập nhật bên CFO rồi chờ đồng bộ tối đa 30 giây.
             </p>
           </section>
 

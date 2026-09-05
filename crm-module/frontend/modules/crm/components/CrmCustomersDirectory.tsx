@@ -35,6 +35,12 @@ const STATUS_TABS: Array<{ value: string; label: string; kpiKey: keyof CrmCustom
   { value: 'not_fit', label: 'Ngừng hoạt động', kpiKey: 'not_fit' },
 ];
 
+const SOURCE_TABS = [
+  { value: 'all', label: 'Tất cả' },
+  { value: 'local', label: 'CRM nội bộ' },
+  { value: 'markee_cfo', label: 'Markee CFO' },
+] as const;
+
 const STATUS_LABEL: Record<string, string> = {
   new_lead: 'Tiềm năng',
   following: 'Đang bán',
@@ -79,6 +85,10 @@ type ApiCustomerRow = {
   total_value?: number | string | null;
   last_deal_at?: string | null;
   updated_at?: string | null;
+  external_system?: string | null;
+  external_id?: string | null;
+  external_payload?: Record<string, unknown> | null;
+  synced_at?: string | null;
 };
 
 type ApiListResponse = {
@@ -118,6 +128,10 @@ function mapCustomer(row: ApiCustomerRow): CrmCustomerRow {
     totalValue: Number(row.total_value || 0),
     lastDealAt: row.last_deal_at || '',
     updatedAt: row.updated_at || '',
+    externalSystem: row.external_system || '',
+    externalId: row.external_id || '',
+    externalPayload: row.external_payload || undefined,
+    syncedAt: row.synced_at || '',
   };
 }
 
@@ -132,6 +146,7 @@ export function CrmCustomersDirectory() {
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
+  const [sourceScope, setSourceScope] = useState<'all' | 'local' | 'markee_cfo'>('all');
   const [ownerId, setOwnerId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -153,14 +168,13 @@ export function CrmCustomersDirectory() {
     return () => window.clearTimeout(timer);
   }, [searchInput]);
 
-  useEffect(() => { setPage(1); }, [status, ownerId]);
-
   const load = useCallback(() => {
     let alive = true;
     const params = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
     if (search) params.set('search', search);
     if (status) params.set('status', status);
     if (ownerId) params.set('owner_id', ownerId);
+    params.set('scope', sourceScope);
     setLoading(true);
     fetch(`${API_BASE_URL}/api/all-platform/crm/customers?${params.toString()}`, {
       credentials: 'include',
@@ -193,7 +207,7 @@ export function CrmCustomersDirectory() {
         if (alive) setLoading(false);
       });
     return () => { alive = false; };
-  }, [page, search, status, ownerId]);
+  }, [page, search, status, ownerId, sourceScope]);
 
   useEffect(() => {
     const cleanup = load();
@@ -330,7 +344,22 @@ export function CrmCustomersDirectory() {
           <div className="crm-guidance-chip">Có nhu cầu bán hàng → Tạo cơ hội.</div>
         </div>
 
-        <div className="crm-page-tabs" role="tablist">
+        <div className="crm-page-tabs" role="tablist" aria-label="Nguồn khách hàng">
+          {SOURCE_TABS.map(tab => (
+            <button
+              key={tab.value}
+              type="button"
+              role="tab"
+              aria-selected={sourceScope === tab.value}
+              className={`crm-page-tab ${sourceScope === tab.value ? 'crm-page-tab--active' : ''}`}
+              onClick={() => { setSourceScope(tab.value); setPage(1); }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="crm-page-tabs" role="tablist" aria-label="Trạng thái khách hàng">
           {STATUS_TABS.map(tab => (
             <button
               key={tab.value || 'all'}
@@ -338,7 +367,7 @@ export function CrmCustomersDirectory() {
               role="tab"
               aria-selected={status === tab.value}
               className={`crm-page-tab ${status === tab.value ? 'crm-page-tab--active' : ''}`}
-              onClick={() => setStatus(tab.value)}
+              onClick={() => { setStatus(tab.value); setPage(1); }}
             >
               {tab.label}
               <span className="crm-page-tab-count">{kpi[tab.kpiKey]}</span>
@@ -358,7 +387,7 @@ export function CrmCustomersDirectory() {
             <div className="crm-filter-select-wrap">
               <SearchableSelect
                 value={ownerId}
-                onChange={setOwnerId}
+                onChange={value => { setOwnerId(value); setPage(1); }}
                 placeholder="Tất cả người phụ trách"
                 options={ownerFilterOptions.map(([id, name]) => ({ value: id, label: name }))}
               />
@@ -422,6 +451,11 @@ export function CrmCustomersDirectory() {
                           >
                             {customer.customerName}
                           </Link>
+                          {customer.externalSystem === 'markee_cfo' ? (
+                            <span className="crm-customer-source-badge" title="Đồng bộ một chiều từ danh mục Đối tác của Markee CFO">
+                              Markee CFO
+                            </span>
+                          ) : null}
                           {(customer.city || customer.website) ? (
                             <div className="crm-customer-company" title={[customer.city, customer.website].filter(Boolean).join(' · ')}>
                               {[customer.city, customer.website].filter(Boolean).join(' · ')}
@@ -441,7 +475,11 @@ export function CrmCustomersDirectory() {
                             {STATUS_LABEL[customer.status || ''] || 'Chưa phân loại'}
                           </span>
                         </td>
-                        <td className="crm-td crm-small">{ownerName.get(customer.ownerId || '') || 'Chưa gán'}</td>
+                        <td className="crm-td crm-small">
+                          {customer.externalSystem === 'markee_cfo'
+                            ? 'Markee CFO'
+                            : ownerName.get(customer.ownerId || '') || 'Chưa gán'}
+                        </td>
                         <td className="crm-td crm-td--actions-col" onClick={event => event.stopPropagation()}>
                           <div className="crm-row-actions">
                             {renderPrimaryAction(customer)}
@@ -515,6 +553,9 @@ export function CrmCustomersDirectory() {
                       >
                         {customer.customerName}
                       </Link>
+                      {customer.externalSystem === 'markee_cfo' ? (
+                        <span className="crm-customer-source-badge">Markee CFO</span>
+                      ) : null}
                       <div className="crm-customer-company" title={customer.taxCode ? `MST: ${customer.taxCode}` : 'Chưa có MST'}>
                         {customer.taxCode ? `MST: ${customer.taxCode}` : 'Chưa có MST'}
                       </div>
