@@ -2559,4 +2559,108 @@ select.quote-compact-vat:hover {
   .sheet-items-table tr {
     page-break-inside: avoid;
   }
+
+  /* Bang qua nhieu cot (>=8, xem STACKED_PRINT_COLUMN_THRESHOLD trong
+   * QuoteDocumentRenderer.tsx) khong the nen vua kho A4 du da nong cot Ten
+   * dich vu/Mo ta - cac cot so con lai (DVT/SL/Don gia/Giam gia/VAT/Thanh
+   * tien...) bi ep qua hep, chu chong chit/tran mep (QA thuc te tren mau 9
+   * cot "Bang gia chuan"). Chuyen sang dang THE xep doc moi dong (nhan bên
+   * trai, gia tri ben phai qua data-label + content:attr - cung ky thuat da
+   * dung on cho bang Lich su bao gia o breakpoint mobile, xem
+   * .quote-history-table o tren) - CHI trong ban in, man hinh van la bang
+   * cuon ngang binh thuong. Cac selector ben duoi phai lap lai dung vi tri
+   * nth-child da dat width% o tren va reset ve 100% - vi cung la !important,
+   * selector lap lai (dung specificity, dung sau trong file) moi thang duoc
+   * theo thu tu khai bao, khong the chi dua vao ".sheet-items-table--print-
+   * stacked td" chung chung (specificity thap hon nth-child cu). */
+  .sheet-items-table--print-stacked thead {
+    display: none;
+  }
+
+  .sheet-items-table--print-stacked,
+  .sheet-items-table--print-stacked tbody,
+  .sheet-items-table--print-stacked tr {
+    display: block;
+    width: 100% !important;
+  }
+
+  .sheet-items-table--print-stacked tr {
+    border: 1px solid #e5e7eb;
+    border-radius: 0.4rem;
+    padding: 0.4rem 0.5rem;
+    margin-bottom: 0.4rem;
+    /* QA thuc te: giu page-break-inside:avoid (rule chung o tren, ap dung
+     * cho ca 2 dang bang) tren <tr> da bi doi thanh display:block lam
+     * Chromium print-to-PDF TU Y CAT MAT toan bo noi dung sau 1 diem nao do
+     * (khong chi la ngat trang xau - mat han du lieu, xac nhan qua DOM van
+     * co du 14 dong nhung PDF xuat ra chi con 13 dong dau, thieu ca khoi
+     * tong tien/ghi chu phia sau). Rieng dang the (khong con la <tr> table
+     * that su nua) phai tra ve auto de tranh bug nay - chap nhan 1 the co
+     * the bi ngat doi giua 2 trang thay vi mat trang hoan toan. */
+    page-break-inside: auto;
+  }
+
+  .sheet-items-table--print-stacked th:nth-child(2),
+  .sheet-items-table--print-stacked td:nth-child(2),
+  .sheet-items-table--print-stacked th:nth-child(3),
+  .sheet-items-table--print-stacked td:nth-child(3),
+  .sheet-items-table--print-stacked th:first-child,
+  .sheet-items-table--print-stacked td:first-child,
+  .sheet-items-table--print-stacked th:last-child,
+  .sheet-items-table--print-stacked td:last-child,
+  .sheet-items-table--print-stacked td {
+    display: flex;
+    width: 100% !important;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+    border-bottom: 0 !important;
+    padding: 0.12rem 0 !important;
+    text-align: right;
+  }
+
+  .sheet-items-table--print-stacked td[data-label]::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    max-width: 45%;
+    color: #64748b;
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    text-align: left;
+    white-space: normal;
+  }
+
+  /* Cot 1 (STT) + cot 2 (Ten dich vu) lam tieu de the, KHONG hien nhan phia
+   * truoc (STT/Ten dich vu da qua ro nghia, khong can nhan lap lai). */
+  .sheet-items-table--print-stacked td:first-child,
+  .sheet-items-table--print-stacked td:nth-child(2) {
+    justify-content: flex-start;
+    text-align: left;
+    font-weight: 700;
+  }
+
+  .sheet-items-table--print-stacked td:first-child::before,
+  .sheet-items-table--print-stacked td:nth-child(2)::before {
+    content: none;
+  }
+
+  .sheet-items-table--print-stacked td:first-child {
+    color: #64748b;
+    font-weight: 400;
+  }
+
+  /* "Mo ta" (cot 3) la doan van dai nhat trong the - nhan+gia tri nam chung
+   * 1 dong ngang hang cac cot so khac doc bi gua (van ban bi ep canh phai).
+   * Rieng cot nay: nhan tren, doan van duoi, canh trai nhu van ban thuong. */
+  .sheet-items-table--print-stacked td:nth-child(3) {
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+    gap: 0.15rem;
+  }
+
+  .sheet-items-table--print-stacked td:nth-child(3)::before {
+    max-width: 100%;
+  }
 }

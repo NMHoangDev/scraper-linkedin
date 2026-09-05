@@ -275,6 +275,14 @@ export function QuoteDocumentRenderer({
           column => !TOGGLEABLE_COLUMN_KEYS.includes(column.key) || customerVisibleColumns.includes(column.key)
         )
       : standardColumns;
+  // Ban in/PDF: bang qua nhieu cot (vd mau "chuan" 9 cot: STT/Ten dich vu/Mo
+  // ta/DVT/So luong/Don gia/Giam gia/VAT/Thanh tien) khong the nen vua khong
+  // gian A4 du da nong cot Mo ta/Ten dich vu - cac cot so con lai bi ep qua
+  // hep gay chong chit/tran mep (QA thuc te). Tu 8 cot tro len, chuyen bang
+  // sang dang THE xep doc moi dong (nhan/gia tri) CHI trong ban in - man hinh
+  // van giu nguyen dang bang cuon ngang binh thuong (xem quotes.css).
+  const STACKED_PRINT_COLUMN_THRESHOLD = 8;
+  const usesStackedPrintLayout = finalColumns.length >= STACKED_PRINT_COLUMN_THRESHOLD;
   const displayedQuoteRows = quoteItems.flatMap((item, parentIndex) => [
     { item, number: String(parentIndex + 1), isChild: false },
     ...(item.children || []).map((child, childIndex) => ({
@@ -479,7 +487,10 @@ export function QuoteDocumentRenderer({
                 theo khong gian thuc te co san (cot con lai tu gian ra khi an
                 bot cot khac), header duoc phep xuong dong (xem quotes.css) nen
                 khong can cot rong toi thieu lon nhu truoc. */}
-            <table className="sheet-items-table" style={{ minWidth: Math.min(760, Math.max(420, finalColumns.length * 70)) }}>
+            <table
+              className={`sheet-items-table${usesStackedPrintLayout ? ' sheet-items-table--print-stacked' : ''}`}
+              style={{ minWidth: Math.min(760, Math.max(420, finalColumns.length * 70)) }}
+            >
               <thead>
                 <tr>
                   {finalColumns.map(column => (
@@ -500,6 +511,7 @@ export function QuoteDocumentRenderer({
                       {finalColumns.map(column => (
                         <td
                           key={column.key}
+                          data-label={column.label}
                           className={
                             column.type === 'currency' ||
                             ['unitPrice', 'subtotal', 'vatAmount', 'total'].includes(column.key)
