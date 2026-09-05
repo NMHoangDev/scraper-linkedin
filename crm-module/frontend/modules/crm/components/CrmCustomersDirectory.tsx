@@ -412,6 +412,7 @@ export function CrmCustomersDirectory() {
                 <colgroup>
                   <col className="crm-col-cust-name-v2" />
                   <col className="crm-col-cust-taxcode" />
+                  <col className="crm-col-cust-source" />
                   <col className="crm-col-cust-contacts" />
                   <col className="crm-col-cust-deals" />
                   <col className="crm-col-cust-value" />
@@ -423,6 +424,7 @@ export function CrmCustomersDirectory() {
                   <tr>
                     <th className="crm-th">Doanh nghiệp</th>
                     <th className="crm-th">MST</th>
+                    <th className="crm-th">Nguồn</th>
                     <th className="crm-th crm-th--right">Người liên hệ</th>
                     <th className="crm-th crm-th--right">Cơ hội</th>
                     <th className="crm-th crm-th--right">Giá trị Pipeline</th>
@@ -433,7 +435,7 @@ export function CrmCustomersDirectory() {
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td colSpan={8} className="crm-empty-cell"><Loader2 className="crm-spin-icon" /> Đang tải...</td></tr>
+                    <tr><td colSpan={9} className="crm-empty-cell"><Loader2 className="crm-spin-icon" /> Đang tải...</td></tr>
                   ) : items.length ? (
                     items.map(customer => (
                       <tr
@@ -451,11 +453,6 @@ export function CrmCustomersDirectory() {
                           >
                             {customer.customerName}
                           </Link>
-                          {customer.externalSystem === 'markee_cfo' ? (
-                            <span className="crm-customer-source-badge" title="Đồng bộ một chiều từ danh mục Đối tác của Markee CFO">
-                              Markee CFO
-                            </span>
-                          ) : null}
                           {(customer.city || customer.website) ? (
                             <div className="crm-customer-company" title={[customer.city, customer.website].filter(Boolean).join(' · ')}>
                               {[customer.city, customer.website].filter(Boolean).join(' · ')}
@@ -467,6 +464,18 @@ export function CrmCustomersDirectory() {
                           ) : null}
                         </td>
                         <td className="crm-td crm-muted">{customer.taxCode || '-'}</td>
+                        <td className="crm-td">
+                          <span
+                            className={`crm-customer-source-badge ${customer.externalSystem === 'markee_cfo'
+                              ? 'crm-customer-source-badge--cfo'
+                              : 'crm-customer-source-badge--local'}`}
+                            title={customer.externalSystem === 'markee_cfo'
+                              ? 'Đồng bộ một chiều từ danh mục Đối tác của Markee CFO'
+                              : 'Khách hàng được tạo và quản lý trực tiếp trong CRM'}
+                          >
+                            {customer.externalSystem === 'markee_cfo' ? 'Markee CFO' : 'CRM nội bộ'}
+                          </span>
+                        </td>
                         <td className="crm-td crm-td--right">{customer.contactCount || 0}</td>
                         <td className="crm-td crm-td--right">{customer.dealCount || 0}</td>
                         <td className="crm-td crm-td--right crm-budget">{formatVND(customer.totalValue || 0) || '0 đ'}</td>
@@ -493,7 +502,7 @@ export function CrmCustomersDirectory() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={8}>
+                      <td colSpan={9}>
                         <div className="crm-empty-state">
                           <span className="crm-empty-state-icon">
                             <Plus className="crm-button-icon" />
@@ -528,7 +537,7 @@ export function CrmCustomersDirectory() {
             </div>
           </div>
 
-          {/* Bang desktop 8 cot khong dung duoc o man hep - table-layout:fixed
+          {/* Bang desktop 9 cot khong dung duoc o man hep - table-layout:fixed
            * ep het chu xuong tung ky tu, khong doc noi (bug thuc te thay qua
            * anh chup 375/768px). Thay bang danh sach card rieng, chi hien o
            * man hep qua CSS (xem .crm-customer-card-list). */}
@@ -553,9 +562,6 @@ export function CrmCustomersDirectory() {
                       >
                         {customer.customerName}
                       </Link>
-                      {customer.externalSystem === 'markee_cfo' ? (
-                        <span className="crm-customer-source-badge">Markee CFO</span>
-                      ) : null}
                       <div className="crm-customer-company" title={customer.taxCode ? `MST: ${customer.taxCode}` : 'Chưa có MST'}>
                         {customer.taxCode ? `MST: ${customer.taxCode}` : 'Chưa có MST'}
                       </div>
@@ -565,7 +571,18 @@ export function CrmCustomersDirectory() {
                     </span>
                   </div>
                   <div className="crm-customer-card-meta">
-                    <span className="crm-small">{ownerName.get(customer.ownerId || '') || 'Chưa gán'}</span>
+                    <span
+                      className={`crm-customer-source-badge ${customer.externalSystem === 'markee_cfo'
+                        ? 'crm-customer-source-badge--cfo'
+                        : 'crm-customer-source-badge--local'}`}
+                    >
+                      Nguồn: {customer.externalSystem === 'markee_cfo' ? 'Markee CFO' : 'CRM nội bộ'}
+                    </span>
+                    <span className="crm-small">
+                      Owner: {customer.externalSystem === 'markee_cfo'
+                        ? 'Markee CFO'
+                        : ownerName.get(customer.ownerId || '') || 'Chưa gán'}
+                    </span>
                   </div>
                   <div className="crm-customer-card-metrics">
                     <span>{customer.contactCount || 0} contact</span>
