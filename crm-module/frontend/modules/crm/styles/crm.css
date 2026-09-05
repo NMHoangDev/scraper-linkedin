@@ -6199,10 +6199,10 @@
 
 /* ===========================================================
  * CUSTOMER/CONTACT ENTITY FEATURE — merged in from worktree-agent-a15d28fcf7e347a84
- * (redesigned 8-col table v2, drawer "Thêm khách hàng" 4 bước, Contacts panel).
+ * (redesigned customer table v2, drawer "Thêm khách hàng" 4 bước, Contacts panel).
  * Column classes that already existed (.crm-col-cust-value/-owner/-deals) are
  * intentionally redefined here — appended last so these widths win over the
- * old 10-column layout's values, since the 8-col table is now the only
+ * old 10-column layout's values, since the current customer table is the only
  * consumer of those class names (verified via grep before merging).
  * =========================================================== */
 
@@ -6210,15 +6210,16 @@
   min-width: 0;
 }
 
-.crm-col-cust-name-v2 { width: 23%; }
-.crm-col-cust-taxcode { width: 12%; }
+.crm-col-cust-name-v2 { width: 20%; }
+.crm-col-cust-taxcode { width: 11%; }
+.crm-customer-directory-table--v2 .crm-col-cust-source { width: 10%; }
 /* "SO CONTA..." bi cat chu o 1280px voi 9% - do DOM xac nhan tang len 11%. */
-.crm-col-cust-contacts { width: 11%; }
-.crm-col-cust-value { width: 13%; }
-.crm-col-cust-owner { width: 11%; }
+.crm-col-cust-contacts { width: 10%; }
+.crm-col-cust-value { width: 12%; }
+.crm-col-cust-owner { width: 10%; }
 /* "SO DEAL" can rong hon 5% mac dinh (ke thua tu ban cu 1 tu "Deal") de
  * khong bi ellipsis header thanh "SO D..." (xac nhan qua screenshot 1440px). */
-.crm-customer-directory-table--v2 .crm-col-cust-deals { width: 8%; }
+.crm-customer-directory-table--v2 .crm-col-cust-deals { width: 7%; }
 
 .crm-customer-directory-search-hint {
   margin: 0.6rem 0 0;
@@ -7191,7 +7192,7 @@
   display: inline-flex;
   align-items: center;
   width: fit-content;
-  margin-top: 0.3rem;
+  margin-top: 0;
   padding: 0.15rem 0.45rem;
   border: 1px solid #bfdbfe;
   border-radius: 999px;
@@ -7200,4 +7201,14 @@
   font-size: 0.6875rem;
   font-weight: 700;
   line-height: 1.2;
+}
+.crm-customer-source-badge--cfo {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+.crm-customer-source-badge--local {
+  border-color: #d1d5db;
+  background: #f8fafc;
+  color: #475569;
 }
