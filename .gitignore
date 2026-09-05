@@ -57,7 +57,13 @@ linkedin_group_crawler/data/raw/*.html
 linkedin_group_crawler/app/modules/facebook/src/credentials.json
 
 # Debug/check scripts (Hoàng's local debugging tools — không commit vào repo)
+# LƯU Ý: "__*.py" vô tình khớp luôn __init__.py (file Python hợp lệ, không
+# phải script debug) - đã âm thầm chặn services/__init__.py + schemas/__init__.py
+# của crm-module/crm-cloudgate/crm-securityzone không commit được (backend
+# không khởi động nổi trên máy khác/CI vì thiếu 2 file này). Loại trừ rõ
+# __init__.py khỏi rule debug-script bằng negation pattern bên dưới.
 __*.py
+!__init__.py
 __*.txt
 __*.json
 __*.ps1

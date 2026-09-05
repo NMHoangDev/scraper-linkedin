@@ -211,6 +211,23 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, _workspaceTab:
   // menu cấp cao nhất trong sidebar, cộng thêm "Cài đặt kết nối" ở cuối.
   return [
     ...crmChildren,
+    // "Quản lý thành viên" - port tu ban chinh (linkedin-crawler-ui): bang
+    // clone da co san backend (routers/users.py) + frontend service
+    // (usersService.createAccount/updateRole) tu luc tach clone, nhung
+    // thieu dung trang UI + muc sidebar nay nen khong ai bam vao dung
+    // duoc, chi admin moi thay (dung quy tac isAdmin nhu ban chinh).
+    ...(isAdmin
+      ? ([
+          {
+            type: "item",
+            id: "members",
+            href: "/all-platform/admin/quan-ly-thanh-vien",
+            icon: "manage_accounts",
+            label: "Quản lý thành viên",
+            matchStartsWith: ["/all-platform/admin/quan-ly-thanh-vien"],
+          },
+        ] as NavLeafItem[])
+      : []),
     {
       type: "item",
       id: "settings",
