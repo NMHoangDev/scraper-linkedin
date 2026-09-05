@@ -725,23 +725,34 @@ async def get_app_user_id_by_email(email: str) -> Optional[str]:
 async def get_team_member_ids(leader_user_id: str) -> List[str]:
     """Lấy danh sách app_user.id của các member thuộc team leader.
 
-    Leader → members: thông qua bảng ``member_of_teams`` (cấu trúc đã thấy trong
-    ``supabase_kpi_service``). Trả về list rỗng nếu leader không quản lý ai
-    hoặc thiếu cấu hình.
+    Leader → team: ``teams.id_leader`` (không có cột này trên ``member_of_teams``).
+    Team → members: ``member_of_teams.id_teams``. Trả về list rỗng nếu leader
+    không quản lý team nào hoặc thiếu cấu hình.
     """
     if not is_supabase_configured() or not leader_user_id:
         return []
     try:
+        team_rows = await _rest(
+            "GET",
+            "teams",
+            params={
+                "select": "id",
+                "id_leader": f"eq.{leader_user_id}",
+            },
+        ) or []
+        team_ids = [str(r.get("id")) for r in team_rows if isinstance(r, dict) and r.get("id")]
+        if not team_ids:
+            return []
         rows = await _rest(
             "GET",
             "member_of_teams",
             params={
                 "select": "id_member",
-                "id_leader": f"eq.{leader_user_id}",
+                "id_teams": f"in.({','.join(team_ids)})",
             },
         ) or []
     except RuntimeError as exc:
-        if "member_of_teams" in str(exc) or "does not exist" in str(exc):
+        if "does not exist" in str(exc):
             return []
         raise
     ids: List[str] = []

@@ -178,7 +178,19 @@ docs/INFRASTRUCTURE.md
 # Doc tien do phien lam viec, phong hua thong tin ha tang nhay cam lot vao sau nay
 docs/QUOTE_ISSUER_COMPANY_WIZARD_2026-08-27.md
 
-# ---- crm-module + crm-cloudgate (module CRM doc lap, FE + BE, 1 instance/host) ----
+# ---- crm-module + crm-cloudgate + crm-securityzone (module CRM doc lap, FE + BE, 1 instance/host) ----
+crm-securityzone/.env
+crm-securityzone/docker-compose.override.yml
+crm-securityzone/backend/.env
+crm-securityzone/backend/.env.local
+crm-securityzone/backend/.venv
+crm-securityzone/backend/__pycache__
+crm-securityzone/backend/**/__pycache__
+crm-securityzone/frontend/.env*
+crm-securityzone/frontend/node_modules
+crm-securityzone/frontend/.next
+crm-securityzone/frontend/nextdev.log
+crm-securityzone/frontend/npm-install.log
 crm-module/.env
 crm-module/docker-compose.override.yml
 crm-module/backend/.env
@@ -204,4 +216,19 @@ crm-cloudgate/frontend/.next
 crm-cloudgate/frontend/nextdev.log
 crm-cloudgate/frontend/npm-install.log
 crm-cloudgate/frontend/node_modules
+
+# ---- zalo-module (module chat Zalo doc lap, FE + BE + extension, tach tu app seeding) ----
+zalo-module/.env
+zalo-module/docker-compose.override.yml
+zalo-module/backend/.env
+zalo-module/backend/.env.local
+zalo-module/backend/.venv
+zalo-module/backend/__pycache__
+zalo-module/backend/**/__pycache__
+zalo-module/backend/artifacts
+zalo-module/frontend/.env*
+zalo-module/frontend/node_modules
+zalo-module/frontend/.next
+zalo-module/frontend/nextdev.log
+zalo-module/frontend/npm-install.log
 crm-cloudgate/frontend/.next

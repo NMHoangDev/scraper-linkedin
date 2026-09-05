@@ -104,7 +104,7 @@ export function QuoteCenterPage() {
   const isAdmin = user?.role === 'admin';
   const isLeader = user?.role === 'leader';
   const [roleScope, setRoleScope] = useState<RoleScope>(isAdmin ? 'ceo' : isLeader ? 'lead' : 'personal');
-  const [period, setPeriod] = useState<Period>('month');
+  const [period, setPeriod] = useState<Period>('all');
   const [teamFilter, setTeamFilter] = useState('');
 
   const [quoteModal, setQuoteModal] = useState<{ open: boolean; deal: Deal | null; quoteFormId?: string }>({
@@ -215,21 +215,21 @@ export function QuoteCenterPage() {
     return Array.from(map.values()).sort((a, b) => b.value - a.value);
   }, [scopedQuotes, dealsById]);
 
-  // Bảng "Báo giá đã liên kết CRM" — chỉ báo giá có dealId thật (không hiện
-  // báo giá đứng độc lập chưa gắn deal nào), tên khách/Sale lấy từ Deal thật.
+  // Bảng "Báo giá" — hiện TẤT CẢ báo giá trong phạm vi đang chọn, kể cả báo
+  // giá đứng độc lập chưa gắn deal CRM nào (trước đây bị ẩn hoàn toàn khỏi
+  // trang này, khiến báo giá tạo ra "biến mất" không thấy ở đâu). Báo giá có
+  // deal thật thì hiện tên khách/Sale từ Deal, không thì hiện "Chưa gắn CRM".
   const linkedQuoteRows = useMemo(() => {
     const term = listSearch.trim().toLowerCase();
     return scopedQuotes
-      .filter(quote => Boolean(quote.dealId))
       .map(quote => {
-        const deal = dealsById.get(quote.dealId as string);
+        const deal = quote.dealId ? dealsById.get(quote.dealId) : undefined;
         return { quote, deal, status: quoteDisplayStatus(quote, deal) };
       })
-      .filter(row => row.deal)
       .filter(row => (listStatus === 'all' ? true : row.status.key === listStatus))
       .filter(row => {
         if (!term) return true;
-        const haystack = `${row.quote.quoteNumber} ${row.deal?.customerName} ${row.deal?.companyName || ''} ${row.deal?.dealId || ''}`.toLowerCase();
+        const haystack = `${row.quote.quoteNumber} ${row.deal?.customerName || ''} ${row.deal?.companyName || ''} ${row.deal?.dealId || ''}`.toLowerCase();
         return haystack.includes(term);
       })
       .sort((a, b) => new Date(b.quote.updatedAt || b.quote.createdAt).getTime() - new Date(a.quote.updatedAt || a.quote.createdAt).getTime());
@@ -488,8 +488,8 @@ export function QuoteCenterPage() {
       <section className="qc-section qc-linked-quotes">
         <div className="qc-section-head">
           <div>
-            <h2>Báo giá đã liên kết CRM</h2>
-            <p>Mỗi báo giá được gắn với khách hàng, cơ hội và Sale phụ trách</p>
+            <h2>Danh sách báo giá</h2>
+            <p>Toàn bộ báo giá trong phạm vi đang chọn — kèm khách hàng, cơ hội CRM và Sale phụ trách (nếu đã gắn)</p>
           </div>
           <div className="qc-list-tools">
             <input
@@ -528,7 +528,7 @@ export function QuoteCenterPage() {
               {linkedQuoteRows.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="qc-empty">
-                    Chưa có báo giá nào liên kết CRM trong phạm vi đang chọn.
+                    Chưa có báo giá nào trong phạm vi đang chọn.
                   </td>
                 </tr>
               ) : (
@@ -541,16 +541,29 @@ export function QuoteCenterPage() {
                           {quote.quoteNumber}
                         </Link>
                       </td>
-                      <td data-label="Khách hàng CRM" title={`${deal?.customerName || ''}${deal?.companyName ? ` · ${deal.companyName}` : ''}`}>
-                        <Link href={`/all-platform/crm?openDeal=${deal?.id}`} className="qc-row-link">
-                          {deal?.customerName}
-                        </Link>
-                        {deal?.companyName ? <div className="qc-row-sub">{deal.companyName}</div> : null}
+                      <td data-label="Khách hàng CRM">
+                        {deal ? (
+                          <>
+                            <Link href={`/all-platform/crm?openDeal=${deal.id}`} className="qc-row-link">
+                              {deal.customerName}
+                            </Link>
+                            {deal.companyName ? <div className="qc-row-sub">{deal.companyName}</div> : null}
+                          </>
+                        ) : (
+                          <span className="qc-row-sub">Chưa gắn CRM</span>
+                        )}
                       </td>
-                      <td data-label="Cơ hội CRM" title={deal?.servicePackage || deal?.package || 'Cơ hội CRM'}>
-                        <Link href={`/all-platform/crm?openDeal=${deal?.id}`} className="qc-row-link">
-                          {deal?.servicePackage || deal?.package || 'Cơ hội CRM'}
-                        </Link>
+                      <td data-label="Cơ hội CRM">
+                        {deal ? (
+                          <>
+                            <Link href={`/all-platform/crm?openDeal=${deal.id}`} className="qc-row-link">
+                              {deal.servicePackage || deal.package || 'Cơ hội CRM'}
+                            </Link>
+                            <div className="qc-row-sub">{deal.dealId}</div>
+                          </>
+                        ) : (
+                          <span className="qc-row-sub">—</span>
+                        )}
                       </td>
                       <td data-label="Giá trị">{formatMoney(quote.totalAmount)}</td>
                       <td data-label="Phụ trách">
