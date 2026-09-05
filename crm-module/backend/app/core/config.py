@@ -38,6 +38,19 @@ class Settings:
     # query CRM đều lọc/gắn theo giá trị này (xem migrations/001_add_instance_scoping.sql).
     crm_instance: str = (os.getenv("CRM_INSTANCE") or "markee").strip()
 
+    # One-way customer master sync: Markee CFO -> CRM. Only the Markee CRM
+    # instance enables this; other CRM instances remain fully isolated.
+    cfo_supabase_url: str = (os.getenv("CFO_SUPABASE_URL") or "").rstrip("/")
+    cfo_supabase_service_role_key: str = os.getenv("CFO_SUPABASE_SERVICE_ROLE_KEY", "")
+    cfo_workspace_id: str = (os.getenv("CFO_WORKSPACE_ID") or "default").strip()
+    cfo_customer_sync_enabled: bool = (os.getenv("CFO_CUSTOMER_SYNC_ENABLED") or "0").strip().lower() in {
+        "1", "true", "yes", "on",
+    }
+    cfo_customer_sync_interval_seconds: int = max(
+        10,
+        int(os.getenv("CFO_CUSTOMER_SYNC_INTERVAL_SECONDS", "30")),
+    )
+
     jwt_secret_key: str = os.getenv("JWT_SECRET_KEY", "crawlpro-default-secret-change-me")
     jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
     jwt_access_token_expire_minutes: int = int(

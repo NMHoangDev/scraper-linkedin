@@ -10,19 +10,24 @@ from app.core.supabase_client import execute_supabase_query, get_supabase_client
 from app.modules.all_platform.services.customer_lead_service import BASE_COLUMNS, _normalize_row
 from app.modules.all_platform.services.supabase_categories_service import get_categories_by_type
 from app.modules.all_platform.services.crm_position_service import apply_position_category
+from app.modules.all_platform.services.markee_cfo_customer_sync_service import (
+    EXTERNAL_SYSTEM as MARKEE_CFO_EXTERNAL_SYSTEM,
+    ensure_recent_markee_cfo_sync,
+)
 
 CUSTOMER_COLUMNS = (
     "id, customer_name, company_name, position, position_category_id, "
     "position_label_snapshot, phone, phone_normalized, "
     "email, email_normalized, zalo, facebook, telegram, website, tax_code, "
     "address, city, industry, source, status, owner_id, created_by, note, "
-    "created_at, updated_at"
+    "created_at, updated_at, external_system, external_id, external_updated_at, "
+    "external_payload, external_active, synced_at"
 )
 
 
 class DuplicateCustomerError(ValueError):
     def __init__(self, matches: list[dict[str, Any]]) -> None:
-        super().__init__("Khach hang da ton tai voi email hoac so dien thoai nay.")
+        super().__init__("Khach hang da ton tai voi MST, email hoac so dien thoai nay.")
         self.matches = matches
 
 
@@ -87,7 +92,12 @@ def _validate_source(source: str | None) -> None:
         raise ValueError("Nguon khach hang khong nam trong danh muc crm_source.")
 
 
-def _duplicate_query(email_normalized: str | None, phone_normalized: str | None, exclude_id: str | None = None) -> list[dict[str, Any]]:
+def _duplicate_query(
+    email_normalized: str | None,
+    phone_normalized: str | None,
+    tax_code: str | None = None,
+    exclude_id: str | None = None,
+) -> list[dict[str, Any]]:
     supabase = get_supabase_client()
     matches: dict[str, dict[str, Any]] = {}
     if email_normalized:
@@ -96,6 +106,7 @@ def _duplicate_query(email_normalized: str | None, phone_normalized: str | None,
             .select(CUSTOMER_COLUMNS)
             .eq("email_normalized", email_normalized)
             .eq("instance", settings.crm_instance)
+            .eq("external_active", True)
             .execute()
         )
         for row in res.data or []:
@@ -106,6 +117,18 @@ def _duplicate_query(email_normalized: str | None, phone_normalized: str | None,
             .select(CUSTOMER_COLUMNS)
             .eq("phone_normalized", phone_normalized)
             .eq("instance", settings.crm_instance)
+            .eq("external_active", True)
+            .execute()
+        )
+        for row in res.data or []:
+            matches[row["id"]] = row
+    if tax_code:
+        res = execute_supabase_query(
+            lambda: supabase.table("crm_customers")
+            .select(CUSTOMER_COLUMNS)
+            .eq("tax_code", tax_code.strip())
+            .eq("instance", settings.crm_instance)
+            .eq("external_active", True)
             .execute()
         )
         for row in res.data or []:
@@ -157,6 +180,10 @@ def _customer_ids_visible_to(user: dict[str, Any]) -> set[str] | None:
 def can_edit_customer(user: dict[str, Any], customer: dict[str, Any] | None) -> bool:
     if not user or not customer:
         return False
+    # CFO is the master for mirrored records. They are deliberately read-only
+    # in CRM, including for admins; edit them in CFO and wait <= sync interval.
+    if customer.get("external_system") == MARKEE_CFO_EXTERNAL_SYSTEM:
+        return False
     if _is_admin_or_leader(user):
         return True
     return str(customer.get("owner_id") or "") == str(user.get("id") or "")
@@ -165,6 +192,8 @@ def can_edit_customer(user: dict[str, Any], customer: dict[str, Any] | None) -> 
 def can_view_customer(user: dict[str, Any], customer: dict[str, Any] | None) -> bool:
     if not user or not customer:
         return False
+    if customer.get("external_system") == MARKEE_CFO_EXTERNAL_SYSTEM:
+        return True
     if can_edit_customer(user, customer):
         return True
     visible = _customer_ids_visible_to(user)
@@ -245,13 +274,27 @@ def list_customers(
     status: str | None = None,
     source: str | None = None,
     owner_id: str | None = None,
+    scope: str = "all",
     page: int = 1,
     page_size: int = 50,
 ) -> dict[str, Any]:
+    ensure_recent_markee_cfo_sync()
     supabase = get_supabase_client()
 
+    if scope not in {"all", "local", "markee_cfo"}:
+        raise ValueError("Pham vi khach hang khong hop le.")
+
     def base_query(*, include_status: bool = True):
-        query = supabase.table("crm_customers").select(CUSTOMER_COLUMNS).eq("instance", settings.crm_instance)
+        query = (
+            supabase.table("crm_customers")
+            .select(CUSTOMER_COLUMNS)
+            .eq("instance", settings.crm_instance)
+            .eq("external_active", True)
+        )
+        if scope == "local":
+            query = query.is_("external_system", "null")
+        elif scope == "markee_cfo":
+            query = query.eq("external_system", MARKEE_CFO_EXTERNAL_SYSTEM)
         if include_status and status:
             query = query.eq("status", status)
         if source:
@@ -299,7 +342,10 @@ def list_customers(
 
     visible = _customer_ids_visible_to(user)
     if visible is not None:
-        rows = [row for row in rows if row.get("id") in visible]
+        rows = [
+            row for row in rows
+            if row.get("id") in visible or row.get("external_system") == MARKEE_CFO_EXTERNAL_SYSTEM
+        ]
 
     # KPI (dem theo tung tab trang thai) phai luon tinh tren TOAN BO tap hop
     # khop search/source/owner_id, KHONG bi gioi han theo `status` dang chon -
@@ -325,7 +371,10 @@ def list_customers(
                 )
                 kpi_rows = kpi_rows + (extra_kpi_res.data or [])
         if visible is not None:
-            kpi_rows = [row for row in kpi_rows if row.get("id") in visible]
+            kpi_rows = [
+                row for row in kpi_rows
+                if row.get("id") in visible or row.get("external_system") == MARKEE_CFO_EXTERNAL_SYSTEM
+            ]
     else:
         kpi_rows = rows
 
@@ -338,7 +387,7 @@ def list_customers(
 
 
 def quick_search_customers(user: dict[str, Any], q: str, limit: int = 8) -> list[dict[str, Any]]:
-    result = list_customers(user, search=q, page=1, page_size=limit)
+    result = list_customers(user, search=q, scope="all", page=1, page_size=limit)
     return result["items"]
 
 
@@ -363,7 +412,7 @@ def create_customer(payload: dict[str, Any], user: dict[str, Any]) -> dict[str, 
     data = _normalize_payload(payload, actor_id=actor_id)
     _validate_source(data.get("source"))
     apply_position_category(data)
-    matches = _duplicate_query(data.get("email_normalized"), data.get("phone_normalized"))
+    matches = _duplicate_query(data.get("email_normalized"), data.get("phone_normalized"), data.get("tax_code"))
     if matches:
         raise DuplicateCustomerError(matches)
     # Khong tin owner_id client gui len - chi admin/leader duoc chi dinh chu
@@ -386,7 +435,12 @@ def update_customer(customer_id: str, payload: dict[str, Any], user: dict[str, A
     data = _normalize_payload(payload)
     _validate_source(data.get("source"))
     apply_position_category(data, current_position_category_id=current.get("position_category_id"))
-    matches = _duplicate_query(data.get("email_normalized"), data.get("phone_normalized"), exclude_id=customer_id)
+    matches = _duplicate_query(
+        data.get("email_normalized"),
+        data.get("phone_normalized"),
+        data.get("tax_code"),
+        exclude_id=customer_id,
+    )
     if matches:
         raise DuplicateCustomerError(matches)
     supabase = get_supabase_client()
@@ -549,7 +603,11 @@ def create_customer_with_deal(payload: dict[str, Any], user: dict[str, Any]) -> 
             partial_message = "Deal da tao, nhung ho so khach hang khong duoc cap nhat vi ban khong co quyen sua."
         deal["customer_id"] = customer_id
     else:
-        matches = _duplicate_query(customer.get("email_normalized"), customer.get("phone_normalized"))
+        matches = _duplicate_query(
+            customer.get("email_normalized"),
+            customer.get("phone_normalized"),
+            customer.get("tax_code"),
+        )
         if matches:
             raise DuplicateCustomerError(matches)
 
