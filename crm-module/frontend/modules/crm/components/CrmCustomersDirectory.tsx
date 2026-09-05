@@ -10,7 +10,7 @@ import { formatVND } from '../constants/crmConfig';
 import { CustomerFormModal } from './CustomerFormModal';
 import { CustomerAddDrawer } from './CustomerAddDrawer';
 import { CreateOpportunityDrawer } from './CreateOpportunityDrawer';
-import { ActionMenu } from './ActionMenu';
+import { ActionMenu, type ActionMenuItem } from './ActionMenu';
 import { SearchableSelect } from './SearchableSelect';
 import { Loader2, Plus, RotateCcw } from './icons';
 import type { CrmCustomerKpi, CrmCustomerRow } from '../types';
@@ -140,6 +140,9 @@ export function CrmCustomersDirectory() {
   const [editingCustomer, setEditingCustomer] = useState<CrmCustomerRow | null>(null);
   const [addDrawerOpen, setAddDrawerOpen] = useState(false);
   const [opportunityCustomer, setOpportunityCustomer] = useState<CrmCustomerRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CrmCustomerRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   // Debounce ô tìm kiếm ~300ms — tránh gọi API mỗi lần gõ phím.
   useEffect(() => {
@@ -251,6 +254,50 @@ export function CrmCustomersDirectory() {
     setOpportunityCustomer(null);
     setReloadTick(tick => tick + 1);
     router.push(`/all-platform/crm?openDeal=${encodeURIComponent(dealId)}`);
+  }
+
+  async function confirmDelete() {
+    const target = deleteTarget;
+    if (!target || deleting) return;
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/all-platform/crm/customers/${encodeURIComponent(target.id)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: headers(),
+      });
+      const body = await res.json();
+      if (!res.ok || body.success === false) throw new Error(body?.message || `Không xóa được khách hàng (lỗi ${res.status}).`);
+      setItems(current => current.filter(row => row.id !== target.id));
+      setTotal(current => Math.max(0, current - 1));
+      setDeleteTarget(null);
+      setReloadTick(tick => tick + 1);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Không xóa được khách hàng.');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  /** Dùng chung cho cả bảng desktop lẫn card mobile — tránh 2 bản danh sách
+   * hành động lệch nhau. "Xóa" chỉ hiện với người có quyền sửa hồ sơ (đúng
+   * quyền `can_edit_customer` backend đã kiểm — canEdit dùng chung cho cả
+   * sửa lẫn xóa), backend tự chặn nếu còn deal/contact liên kết. */
+  function secondaryActionsOf(customer: CrmCustomerRow): ActionMenuItem[] {
+    if (!customer.canEdit) return [];
+    return [
+      { key: 'edit', label: 'Sửa', onSelect: () => { setEditingCustomer(customer); setFormOpen(true); } },
+      {
+        key: 'delete',
+        label: 'Xóa',
+        danger: true,
+        onSelect: () => {
+          setDeleteError('');
+          setDeleteTarget(customer);
+        },
+      },
+    ];
   }
 
   function renderPrimaryAction(customer: CrmCustomerRow) {
@@ -400,11 +447,7 @@ export function CrmCustomersDirectory() {
                             {renderPrimaryAction(customer)}
                             <ActionMenu
                               label="Thao tác khác"
-                              items={[
-                                ...(customer.canEdit
-                                  ? [{ key: 'edit', label: 'Sửa', onSelect: () => { setEditingCustomer(customer); setFormOpen(true); } }]
-                                  : []),
-                              ]}
+                              items={secondaryActionsOf(customer)}
                             />
                           </div>
                         </td>
@@ -492,11 +535,7 @@ export function CrmCustomersDirectory() {
                     {renderPrimaryAction(customer)}
                     <ActionMenu
                       label="Thao tác khác"
-                      items={[
-                        ...(customer.canEdit
-                          ? [{ key: 'edit', label: 'Sửa', onSelect: () => { setEditingCustomer(customer); setFormOpen(true); } }]
-                          : []),
-                      ]}
+                      items={secondaryActionsOf(customer)}
                     />
                   </div>
                 </div>
@@ -572,6 +611,59 @@ export function CrmCustomersDirectory() {
         onCreated={handleOpportunityCreated}
         onCreatedAndOpen={handleOpportunityCreatedAndOpen}
       />
+
+      {deleteTarget ? (
+        <div
+          className="crm-modal-backdrop crm-modal-backdrop--confirm"
+          onClick={() => (deleting ? undefined : setDeleteTarget(null))}
+        >
+          <div
+            className="crm-modal crm-modal--confirm"
+            role="dialog"
+            aria-modal="true"
+            data-testid="customer-delete-confirm"
+            onClick={event => event.stopPropagation()}
+          >
+            <header className="crm-modal-header">
+              <div>
+                <p className="crm-modal-title">Xóa khách hàng</p>
+                <p className="crm-modal-subtitle">Hành động này không thể hoàn tác.</p>
+              </div>
+            </header>
+            <div className="crm-modal-body">
+              {deleteError ? <p className="crm-error" data-testid="customer-delete-error">{deleteError}</p> : null}
+              <p>
+                Xóa khách hàng <b>&ldquo;{deleteTarget.customerName}&rdquo;</b>? Hành động này không thể hoàn tác.
+              </p>
+              <p className="crm-ai-fill-hint">
+                Nếu khách hàng còn deal hoặc người liên hệ, thao tác sẽ bị chặn — hãy chuyển
+                trạng thái sang &quot;Ngừng hoạt động&quot; thay vì xóa hẳn.
+              </p>
+            </div>
+            <footer className="crm-modal-footer">
+              <button
+                type="button"
+                className="crm-cancel-button"
+                data-testid="customer-delete-cancel"
+                disabled={deleting}
+                onClick={() => setDeleteTarget(null)}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                className="crm-danger-button"
+                data-testid="customer-delete-confirm-btn"
+                disabled={deleting}
+                onClick={() => void confirmDelete()}
+              >
+                {deleting ? <Loader2 className="crm-save-spinner" /> : null}
+                {deleting ? 'Đang xóa...' : 'Xóa khách hàng'}
+              </button>
+            </footer>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

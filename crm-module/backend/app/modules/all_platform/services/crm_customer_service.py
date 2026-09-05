@@ -26,6 +26,23 @@ class DuplicateCustomerError(ValueError):
         self.matches = matches
 
 
+class CustomerLinkedError(ValueError):
+    """Chan xoa Khach hang con lien ket deal/contact - customer_leads.customer_id
+    la ON DELETE SET NULL va crm_contacts.customer_id la ON DELETE CASCADE
+    (078_crm_leads_contacts.sql), xoa thang se lam mat lien ket deal hoac xoa
+    am tham toan bo contact. Doi voi tinh huong nay nen chuyen status sang
+    'not_fit' (Ngung hoat dong) thay vi xoa han."""
+
+    def __init__(self, deal_count: int, contact_count: int) -> None:
+        super().__init__(
+            f"Khach hang nay con {deal_count} deal va {contact_count} nguoi lien he "
+            "lien ket - khong the xoa. Hay chuyen trang thai sang \"Ngung hoat dong\" "
+            "thay vi xoa han."
+        )
+        self.deal_count = deal_count
+        self.contact_count = contact_count
+
+
 def _is_admin_or_leader(user: dict[str, Any] | None) -> bool:
     role = str((user or {}).get("role") or "").strip().lower()
     return role in {"admin", "leader"}
@@ -381,6 +398,39 @@ def update_customer(customer_id: str, payload: dict[str, Any], user: dict[str, A
         .execute()
     )
     return res.data[0]
+
+
+def delete_customer(customer_id: str, user: dict[str, Any]) -> dict[str, Any]:
+    current = get_customer(customer_id, user)
+    if not can_edit_customer(user, current):
+        raise PermissionError("Khong co quyen xoa ho so khach hang nay.")
+    supabase = get_supabase_client()
+    deal_res = execute_supabase_query(
+        lambda: supabase.table("customer_leads")
+        .select("id", count="exact")
+        .eq("customer_id", customer_id)
+        .eq("instance", settings.crm_instance)
+        .execute()
+    )
+    contact_res = execute_supabase_query(
+        lambda: supabase.table("crm_contacts")
+        .select("id", count="exact")
+        .eq("customer_id", customer_id)
+        .eq("instance", settings.crm_instance)
+        .execute()
+    )
+    deal_count = deal_res.count or 0
+    contact_count = contact_res.count or 0
+    if deal_count or contact_count:
+        raise CustomerLinkedError(deal_count, contact_count)
+    execute_supabase_query(
+        lambda: supabase.table("crm_customers")
+        .delete()
+        .eq("id", customer_id)
+        .eq("instance", settings.crm_instance)
+        .execute()
+    )
+    return {}
 
 
 def related_records(customer_id: str, user: dict[str, Any]) -> dict[str, Any]:
