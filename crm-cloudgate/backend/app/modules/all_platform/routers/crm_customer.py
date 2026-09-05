@@ -12,9 +12,11 @@ from app.modules.all_platform.schemas.crm_customer import (
     CrmCustomerWithDealCreate,
 )
 from app.modules.all_platform.services.crm_customer_service import (
+    CustomerLinkedError,
     DuplicateCustomerError,
     create_customer,
     create_customer_with_deal,
+    delete_customer,
     get_customer,
     list_customers,
     quick_search_customers,
@@ -28,6 +30,12 @@ router = APIRouter()
 def _error(exc: Exception) -> BaseResponse:
     if isinstance(exc, DuplicateCustomerError):
         return BaseResponse(success=False, message=str(exc), data={"duplicates": exc.matches})
+    if isinstance(exc, CustomerLinkedError):
+        return BaseResponse(
+            success=False,
+            message=str(exc),
+            data={"deal_count": exc.deal_count, "contact_count": exc.contact_count},
+        )
     if isinstance(exc, PermissionError):
         return BaseResponse(success=False, message=str(exc))
     return BaseResponse(success=False, message=str(exc))
@@ -98,6 +106,15 @@ def customers_update(customer_id: str, payload: CrmCustomerUpdate, user: dict[st
             message="Da cap nhat ho so khach hang",
             data=update_customer(customer_id, payload.model_dump(exclude_unset=True), user),
         )
+    except Exception as exc:
+        return _error(exc)
+
+
+@router.delete("/{customer_id}")
+def customers_delete(customer_id: str, user: dict[str, Any] = Depends(get_current_user)) -> BaseResponse:
+    try:
+        delete_customer(customer_id, user)
+        return BaseResponse(success=True, message="Da xoa ho so khach hang")
     except Exception as exc:
         return _error(exc)
 
