@@ -2134,6 +2134,33 @@ select.quote-compact-vat:hover {
   vertical-align: top;
   white-space: normal;
   word-break: normal;
+  position: relative;
+}
+
+/* Resize cot kieu Excel (man hinh xem truoc/chi tiet noi bo - xem
+ * allowColumnResize trong QuoteDocumentRenderer.tsx) - tay keo mong o mep
+ * phai moi <th>, keo ngang de doi do rong CHINH cot do (khong co lai cot
+ * ben canh, giong Excel/Google Sheet - bang tu gian rong hon, wrapper
+ * .sheet-items-table-wrap co san overflow-x:auto se hien thanh cuon).
+ * .sheet-items-table--resizable khong can rule rieng (table-layout:fixed da
+ * co san o rule .sheet-items-table chung ngay tren) - class nay chi de danh
+ * dau/de nhan biet qua className neu can, gan giong cach dang lam voi
+ * --print-landscape. */
+.quote-col-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  user-select: none;
+  z-index: 1;
+  touch-action: none;
+}
+
+.quote-col-resize-handle:hover,
+.quote-col-resize-handle:active {
+  background: #94a3b8;
 }
 
 .sheet-items-table th,
@@ -2470,9 +2497,18 @@ select.quote-compact-vat:hover {
   [data-slot="sidebar-container"],
   .no-print,
   .quote-head,
-  .quote-action-bar {
+  .quote-action-bar,
+  .quote-col-resize-handle {
     display: none !important;
   }
+
+  /* Neu ai do bam in truc tiep tu trang chi tiet noi bo (mode='detail', co
+   * the da resize cot tren man hinh truoc do bang do rong px inline) - rule
+   * "width:auto !important" chung o duoi (.sheet-items-table th/td) va cac
+   * rule % rieng theo nth-child da co san (cung specificity/!important,
+   * dung sau trong file nen thang) tu dong ghi de het do rong px do, luon
+   * quay ve chia % chuan khi in - resize chi la tien ich xem man hinh,
+   * khong can xu ly gi them o day. */
 
   .quote-page,
   .quote-builder,

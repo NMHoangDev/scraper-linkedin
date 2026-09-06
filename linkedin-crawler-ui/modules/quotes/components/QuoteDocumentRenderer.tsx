@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef, useState } from 'react';
 import type {
   QuoteData,
   QuoteField,
@@ -120,6 +121,51 @@ export function QuoteDocumentRenderer({
   mode = 'preview',
   respectVisibleColumns = false,
 }: Props) {
+  // Resize cot bang hang muc kieu Excel - CHI cho man hinh xem truoc/chi tiet
+  // noi bo (mode 'preview'/'detail', xem allowColumnResize ben duoi), KHONG
+  // anh huong ban in/PDF (@media print da ep width qua !important nen inline
+  // style o day luon bi ghi de luc in, xem quotes.css) va KHONG hien cho
+  // khach (mode 'public'). null = chua ai resize, dung CSS mac dinh (%).
+  const [resizedColumnWidths, setResizedColumnWidths] = useState<Record<string, number> | null>(null);
+  const headerRowRef = useRef<HTMLTableRowElement | null>(null);
+  const resizeDragRef = useRef<{ key: string; startX: number; startWidth: number } | null>(null);
+
+  const beginColumnResize = (columnKey: string, columns: QuoteField[]) => (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    let widths = resizedColumnWidths;
+    // Lan resize DAU TIEN: do luon do rong hien tai (tu DOM that, dang chia
+    // theo % mac dinh) cua TAT CA cot lam moc, tranh cac cot chua tung resize
+    // bi nhay layout ve gia tri mac dinh cung (vd 120px) khi 1 cot doi sang px.
+    if (!widths && headerRowRef.current) {
+      const ths = Array.from(headerRowRef.current.querySelectorAll('th'));
+      widths = {};
+      columns.forEach((column, index) => {
+        const th = ths[index] as HTMLElement | undefined;
+        widths![column.key] = th ? Math.round(th.getBoundingClientRect().width) : 120;
+      });
+      setResizedColumnWidths(widths);
+    }
+    resizeDragRef.current = {
+      key: columnKey,
+      startX: event.clientX,
+      startWidth: widths?.[columnKey] ?? 120,
+    };
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const drag = resizeDragRef.current;
+      if (!drag) return;
+      const nextWidth = Math.max(40, drag.startWidth + (moveEvent.clientX - drag.startX));
+      setResizedColumnWidths(prev => ({ ...(prev || {}), [drag.key]: nextWidth }));
+    };
+    const handleMouseUp = () => {
+      resizeDragRef.current = null;
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
   const schema = schemaSnapshot || emptySchema();
   const layoutType = schema.layoutType || 'cloudgate_standard_quote';
   const sections = schema.sections || [];
@@ -275,6 +321,11 @@ export function QuoteDocumentRenderer({
           column => !TOGGLEABLE_COLUMN_KEYS.includes(column.key) || customerVisibleColumns.includes(column.key)
         )
       : standardColumns;
+  // Resize cot kieu Excel chi bat o man hinh noi bo (nguoi TAO/xem chi tiet
+  // bao gia) - khong bat cho 'public' (khach nhan bao gia khong can/khong nen
+  // co UI keo cot) va khong lien quan ban in (ban in doc theo @media print,
+  // khong doc prop mode nay).
+  const allowColumnResize = mode === 'preview' || mode === 'detail';
   // Ban in/PDF: bang qua nhieu cot (vd mau "chuan" 9 cot: STT/Ten dich vu/Mo
   // ta/DVT/So luong/Don gia/Giam gia/VAT/Thanh tien) khong the nen vua khong
   // gian A4 du da nong cot Mo ta/Ten dich vu - cac cot so con lai bi ep qua
@@ -504,13 +555,38 @@ export function QuoteDocumentRenderer({
                 bot cot khac), header duoc phep xuong dong (xem quotes.css) nen
                 khong can cot rong toi thieu lon nhu truoc. */}
             <table
-              className={`sheet-items-table${usesLandscapePrint ? ' sheet-items-table--print-landscape' : ''}`}
-              style={{ minWidth: Math.min(760, Math.max(420, finalColumns.length * 70)) }}
+              className={`sheet-items-table${usesLandscapePrint ? ' sheet-items-table--print-landscape' : ''}${allowColumnResize ? ' sheet-items-table--resizable' : ''}`}
+              style={
+                // Da resize it nhat 1 cot: dat width = TONG cac cot (co the
+                // vuot 100% wrapper) de bang tu gian rong ra that su thay vi
+                // bi table-layout:fixed ep co lai vua khung - .sheet-items-
+                // table-wrap co san overflow-x:auto se tu hien thanh cuon
+                // ngang, dung hanh vi Excel (rong 1 cot khong lam hep cot
+                // khac). Chua resize: giu nguyen minWidth mac dinh nhu cu.
+                allowColumnResize && resizedColumnWidths
+                  ? { width: Object.values(resizedColumnWidths).reduce((sum, w) => sum + w, 0) }
+                  : { minWidth: Math.min(760, Math.max(420, finalColumns.length * 70)) }
+              }
             >
               <thead>
-                <tr>
+                <tr ref={headerRowRef}>
                   {finalColumns.map(column => (
-                    <th key={column.key}>{column.label}</th>
+                    <th
+                      key={column.key}
+                      style={
+                        allowColumnResize && resizedColumnWidths?.[column.key]
+                          ? { width: resizedColumnWidths[column.key], minWidth: resizedColumnWidths[column.key] }
+                          : undefined
+                      }
+                    >
+                      {column.label}
+                      {allowColumnResize ? (
+                        <span
+                          className="quote-col-resize-handle"
+                          onMouseDown={beginColumnResize(column.key, finalColumns)}
+                        />
+                      ) : null}
+                    </th>
                   ))}
                 </tr>
               </thead>
