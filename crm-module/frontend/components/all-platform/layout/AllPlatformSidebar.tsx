@@ -213,10 +213,11 @@ export function buildEntries(isAdmin: boolean, isLeader: boolean, _workspaceTab:
     ...crmChildren,
     // "Quản lý thành viên" - port tu ban chinh (linkedin-crawler-ui): bang
     // clone da co san backend (routers/users.py) + frontend service
-    // (usersService.createAccount/updateRole) tu luc tach clone, nhung
-    // thieu dung trang UI + muc sidebar nay nen khong ai bam vao dung
-    // duoc, chi admin moi thay (dung quy tac isAdmin nhu ban chinh).
-    ...(isAdmin
+    // (usersService.createAccount/updateRole) tu luc tach clone. O ban
+    // chinh muc nay KHONG bi khoa rieng isAdmin (nam ngoai khoi
+    // isAdmin-only cua managementItems) nen admin VA leader deu thay -
+    // sua lai cho dung, truoc day clone lo gioi han chi admin.
+    ...(isAdmin || isLeader
       ? ([
           {
             type: "item",
