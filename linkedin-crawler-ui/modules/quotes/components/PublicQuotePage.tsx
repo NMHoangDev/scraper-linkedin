@@ -73,6 +73,13 @@ export function PublicQuotePage({ token }: Props) {
           <button type="button" className="quote-button quote-button--primary" onClick={() => void downloadPDF()}>Tải PDF</button>
         </div>
       </header>
+      {/* Trinh duyet tu them URL/ngay gio/tieu de vao dau-cuoi moi trang in
+          qua tuy chon rieng cua no ("Headers and footers") - CSS khong the
+          tat tuy chon nay tu trang, chi co the goi y nguoi dung tu tat. */}
+      <p className="quote-print-hint no-print">
+        Mẹo: trong hộp thoại in, bấm "Xem thêm cài đặt" và tắt "Tiêu đề và chân trang"
+        (Headers and footers) để bản PDF không hiện URL/ngày giờ của trình duyệt.
+      </p>
       <div className="quote-document-wrapper">
         <QuoteDocumentRenderer
           schemaSnapshot={quote.formSnapshot}
