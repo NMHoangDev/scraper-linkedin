@@ -1,6 +1,7 @@
 'use client';
 
 import type {
+  CustomBlock,
   QuoteData,
   QuoteField,
   QuoteItem,
@@ -94,6 +95,34 @@ function splitLegacyServiceText(raw: unknown): { name: string; rest: string } {
   const match = text.match(/^•?\s*([^—–]+?)\s*[—–]\s*([\s\S]+)$/);
   if (!match) return { name: '', rest: text };
   return { name: match[1].trim(), rest: match[2].trim() };
+}
+
+const COMPACT_BLOCK_CHAR_LIMIT = 500; // uoc luong noi dung con vua 1 trang A4
+const COMPACT_BLOCK_LINE_LIMIT = 8;   // 500 ky tu nhung xuong dong nhieu van co the rat dai
+
+/** Khối nội dung tự do Sale thêm ngay lúc tạo báo giá (xem CustomBlocksEditor.tsx) -
+ * KHÔNG nằm trong schema, chỉ sống trong quoteData.customBlocks, nên render riêng
+ * ở đây thay vì đi qua findSection/findField (2 hàm đó chỉ đọc schema thật).
+ * Array.isArray guard bắt buộc - báo giá cũ không có field này (hoặc dữ liệu lỗi)
+ * không được làm crash renderer. */
+function renderCustomBlocks(blocks: unknown) {
+  if (!Array.isArray(blocks) || !blocks.length) return null;
+  return blocks.map((block: CustomBlock) => {
+    const lines = splitLines(block.content);
+    // Chi coi la "compact" (an toan de page-break-inside:avoid) khi CA HAI dieu
+    // kien dung: it ky tu VA it dong. Khong chac chan thi coi la khoi dai, uu tien
+    // khong mat noi dung hon giu nguyen 1 trang - trong codebase nay
+    // page-break-inside:avoid tren 1 khoi dai da tung khien Chromium AM THAM CAT
+    // MAT noi dung thay vi chi ngat trang xau (xem quotes.css canh .sheet-note--compact).
+    const content = textValue(block.content);
+    const isCompact = content.length <= COMPACT_BLOCK_CHAR_LIMIT && lines.length <= COMPACT_BLOCK_LINE_LIMIT;
+    return (
+      <section className={`sheet-note${isCompact ? ' sheet-note--compact' : ''}`} key={block.id}>
+        <h3>{block.title}</h3>
+        {lines.map((line, i) => <p key={i}>{line}</p>)}
+      </section>
+    );
+  });
 }
 
 /** Mô tả nhiều gạch đầu dòng ("• Ý 1. • Ý 2. ...") đang bị dồn thành 1 đoạn
@@ -265,10 +294,21 @@ export function QuoteDocumentRenderer({
   // (truoc day VAT luon hien, khong toggle duoc). Bao gia MOI tu gio deu di qua
   // resolveToggleableColumns() (da co san 'vatRate') nen khong bi anh huong.
   const rawCustomerVisibleColumns = Array.isArray(quoteData.visibleColumns) ? quoteData.visibleColumns : null;
-  const customerVisibleColumns =
-    rawCustomerVisibleColumns && !rawCustomerVisibleColumns.includes('vatRate')
-      ? [...rawCustomerVisibleColumns, 'vatRate']
-      : rawCustomerVisibleColumns;
+  // "discountPercent" (Giam gia) moi duoc mo cho toggle trong "Cot hien thi"
+  // (truoc day an han khoi picker, luon hien khong toggle duoc - gay lech
+  // giua danh sach checkbox va cot that su tren bang, QA thuc te phat hien).
+  // Cung 1 ly do/cach xu ly nhu 'vatRate' o tren: bao gia CU da luu san
+  // visibleColumns tu truoc khi 'discountPercent' la toggle option se KHONG
+  // biet gi ve key nay - phai tu bo sung de KHONG lam cot Giam gia bi an mat
+  // khoi ban gui khach (truoc day luon hien, khong duoc phep tu nhien bien
+  // mat chi vi thay doi logic toggle).
+  const AUTO_INCLUDE_LEGACY_COLUMN_KEYS = ['vatRate', 'discountPercent'];
+  const customerVisibleColumns = rawCustomerVisibleColumns
+    ? [
+        ...rawCustomerVisibleColumns,
+        ...AUTO_INCLUDE_LEGACY_COLUMN_KEYS.filter(key => !rawCustomerVisibleColumns.includes(key)),
+      ]
+    : rawCustomerVisibleColumns;
   const finalColumns =
     applyCustomerColumnFilter && customerVisibleColumns
       ? standardColumns.filter(
@@ -386,6 +426,8 @@ export function QuoteDocumentRenderer({
               </div>
             </section>
           </div>
+
+          {renderCustomBlocks(quoteData?.customBlocks)}
 
           <section className="villa-footer">
             <div className="villa-footer-col">
@@ -563,6 +605,8 @@ export function QuoteDocumentRenderer({
             </ul>
           </section>
         ) : null}
+
+        {renderCustomBlocks(quoteData?.customBlocks)}
 
         <footer className="sheet-signatures">
           <div>

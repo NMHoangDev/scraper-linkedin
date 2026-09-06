@@ -2273,6 +2273,43 @@ select.quote-compact-vat:hover {
   line-height: 1.45;
 }
 
+/* Khoi noi dung tu do (CustomBlocksEditor) - tai dung .sheet-note nhung khong co
+ * .sheet-note--terms (do khong phai <ul>/<li>, chi <h3>+<p>) nen can style rieng
+ * cho h3/p ngay trong .sheet-note, khop dung gia tri da dung o --terms cho dong bo. */
+.sheet-note h3 {
+  margin: 0 0 0.55rem;
+  color: #111827;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.sheet-note p {
+  margin: 0.22rem 0;
+  color: #475569;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+@media print {
+  /* QA thuc te (xem .sheet-items-table--print-stacked tr o tren): dat
+   * page-break-inside:avoid tren 1 khoi DAI HON 1 trang khien Chromium AM THAM
+   * CAT MAT noi dung phia sau thay vi chi ngat trang xau. Vi vay CHI khoi "ngan"
+   * (uoc luong vua 1 trang, xem COMPACT_BLOCK_CHAR_LIMIT/COMPACT_BLOCK_LINE_LIMIT
+   * trong QuoteDocumentRenderer.tsx) moi duoc avoid - khoi dai KHONG gan class nay,
+   * de mac dinh page-break-inside:auto, chap nhan ngat trang xau con hon mat noi dung. */
+  .sheet-note--compact {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Ap dung cho MOI khoi (ngan lan dai) - chi giu tieu de dinh voi dong dau tien,
+   * khong chan phan con lai cua khoi tu ngat trang binh thuong. */
+  .sheet-note h3 {
+    page-break-after: avoid;
+    break-after: avoid-page;
+  }
+}
+
 .sheet-signatures {
   margin-top: 2.2rem;
 }

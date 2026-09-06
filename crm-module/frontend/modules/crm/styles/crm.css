@@ -2701,6 +2701,115 @@
   cursor: pointer;
 }
 
+.crm-custom-blocks {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.crm-custom-blocks-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  position: relative;
+}
+
+.crm-custom-blocks-title {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.crm-custom-blocks-add {
+  position: relative;
+}
+
+.crm-custom-blocks-picker {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.3rem);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.6rem;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  overflow: hidden;
+}
+
+.crm-custom-blocks-picker button {
+  border: none;
+  background: none;
+  text-align: left;
+  padding: 0.55rem 0.8rem;
+  font-size: 0.82rem;
+  color: #0f172a;
+  cursor: pointer;
+}
+
+.crm-custom-blocks-picker button:hover:not(:disabled) {
+  background: #f8fafc;
+}
+
+.crm-custom-blocks-picker button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.crm-custom-blocks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.7rem;
+}
+
+.crm-custom-block-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.7rem;
+  background: #fff;
+  padding: 0.7rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.crm-custom-block-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.crm-custom-block-title-input {
+  flex: 1;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.4rem;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.crm-custom-block-content {
+  width: 100%;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.4rem;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.84rem;
+  color: #0f172a;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.crm-custom-block-counter {
+  align-self: flex-end;
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
 .crm-quote-tag {
   display: inline-flex !important;
   align-items: center;
@@ -6199,10 +6308,10 @@
 
 /* ===========================================================
  * CUSTOMER/CONTACT ENTITY FEATURE — merged in from worktree-agent-a15d28fcf7e347a84
- * (redesigned customer table v2, drawer "Thêm khách hàng" 4 bước, Contacts panel).
+ * (redesigned 8-col table v2, drawer "Thêm khách hàng" 4 bước, Contacts panel).
  * Column classes that already existed (.crm-col-cust-value/-owner/-deals) are
  * intentionally redefined here — appended last so these widths win over the
- * old 10-column layout's values, since the current customer table is the only
+ * old 10-column layout's values, since the 8-col table is now the only
  * consumer of those class names (verified via grep before merging).
  * =========================================================== */
 
@@ -6210,16 +6319,15 @@
   min-width: 0;
 }
 
-.crm-col-cust-name-v2 { width: 20%; }
-.crm-col-cust-taxcode { width: 11%; }
-.crm-customer-directory-table--v2 .crm-col-cust-source { width: 10%; }
+.crm-col-cust-name-v2 { width: 23%; }
+.crm-col-cust-taxcode { width: 12%; }
 /* "SO CONTA..." bi cat chu o 1280px voi 9% - do DOM xac nhan tang len 11%. */
-.crm-col-cust-contacts { width: 10%; }
-.crm-col-cust-value { width: 12%; }
-.crm-col-cust-owner { width: 10%; }
+.crm-col-cust-contacts { width: 11%; }
+.crm-col-cust-value { width: 13%; }
+.crm-col-cust-owner { width: 11%; }
 /* "SO DEAL" can rong hon 5% mac dinh (ke thua tu ban cu 1 tu "Deal") de
  * khong bi ellipsis header thanh "SO D..." (xac nhan qua screenshot 1440px). */
-.crm-customer-directory-table--v2 .crm-col-cust-deals { width: 7%; }
+.crm-customer-directory-table--v2 .crm-col-cust-deals { width: 8%; }
 
 .crm-customer-directory-search-hint {
   margin: 0.6rem 0 0;
@@ -7187,28 +7295,4 @@
   align-items: center;
   gap: 0.5rem;
   flex-shrink: 0;
-}
-.crm-customer-source-badge {
-  display: inline-flex;
-  align-items: center;
-  width: fit-content;
-  margin-top: 0;
-  padding: 0.15rem 0.45rem;
-  border: 1px solid #bfdbfe;
-  border-radius: 999px;
-  background: #eff6ff;
-  color: #1d4ed8;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  line-height: 1.2;
-}
-.crm-customer-source-badge--cfo {
-  border-color: #bfdbfe;
-  background: #eff6ff;
-  color: #1d4ed8;
-}
-.crm-customer-source-badge--local {
-  border-color: #d1d5db;
-  background: #f8fafc;
-  color: #475569;
 }

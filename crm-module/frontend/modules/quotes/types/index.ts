@@ -170,6 +170,29 @@ export interface VillaSolutionItem {
   catalogItemId?: string;
 }
 
+/** 7 loại khối nội dung tự do Sale có thể thêm ngay lúc tạo báo giá (không đụng
+ * mẫu gốc) — xem CustomBlocksEditor.tsx. Tất cả trừ 'custom_field' chỉ cho phép
+ * tối đa 1 khối/báo giá (tránh trùng lặp). */
+export type CustomBlockKind =
+  | 'scope_of_work'
+  | 'timeline'
+  | 'handover'
+  | 'payment_terms'
+  | 'warranty'
+  | 'note'
+  | 'custom_field';
+
+/** 1 khối nội dung tự do — chỉ lưu trong `QuoteData.customBlocks` của ĐÚNG báo
+ * giá đang tạo/sửa, không ghi ngược vào mẫu (`quote_forms.schema_json`). Sống
+ * sót qua sửa draft và tạo phiên bản mới vì đi kèm `data` (đã tự schema-less,
+ * không cần đổi form_snapshot/backend). */
+export interface CustomBlock {
+  id: string;
+  kind: CustomBlockKind;
+  title: string;
+  content: string;
+}
+
 export interface QuoteData {
   quoteTitle?: string;
   quoteNumber?: string;
@@ -181,6 +204,7 @@ export interface QuoteData {
    * undefined = hiện hết. Nội bộ (preview/detail) luôn hiện đủ cột, không bị
    * ảnh hưởng bởi field này. Xem QuoteDocumentRenderer (mode==='public'). */
   visibleColumns?: string[];
+  customBlocks?: CustomBlock[];
   [key: string]: unknown;
 }
 
