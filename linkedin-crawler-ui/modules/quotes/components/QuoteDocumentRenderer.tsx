@@ -318,11 +318,14 @@ export function QuoteDocumentRenderer({
   // Ban in/PDF: bang qua nhieu cot (vd mau "chuan" 9 cot: STT/Ten dich vu/Mo
   // ta/DVT/So luong/Don gia/Giam gia/VAT/Thanh tien) khong the nen vua khong
   // gian A4 du da nong cot Mo ta/Ten dich vu - cac cot so con lai bi ep qua
-  // hep gay chong chit/tran mep (QA thuc te). Tu 8 cot tro len, chuyen bang
-  // sang dang THE xep doc moi dong (nhan/gia tri) CHI trong ban in - man hinh
-  // van giu nguyen dang bang cuon ngang binh thuong (xem quotes.css).
-  const STACKED_PRINT_COLUMN_THRESHOLD = 8;
-  const usesStackedPrintLayout = finalColumns.length >= STACKED_PRINT_COLUMN_THRESHOLD;
+  // hep gay chong chit/tran mep (QA thuc te). Tu 7 cot tro len, TRANG IN
+  // chuyen sang A4 NGANG (khong doi giao dien xem man hinh) qua 1 the <style>
+  // chen dong ngay duoi day (KHONG dung CSS "named page" - xem giai thich
+  // trong quotes.css, muc @page - da xac nhan Chromium bi mot loi that lam
+  // mat noi dung cuoi tai lieu voi named page). Bang van la <table> that, chi
+  // chia lai % cot rong rai hon, KHONG doi sang dang the xep doc/thu nho.
+  const LANDSCAPE_PRINT_COLUMN_THRESHOLD = 7;
+  const usesLandscapePrint = finalColumns.length >= LANDSCAPE_PRINT_COLUMN_THRESHOLD;
   const displayedQuoteRows = quoteItems.flatMap((item, parentIndex) => [
     { item, number: String(parentIndex + 1), isChild: false },
     ...(item.children || []).map((child, childIndex) => ({
@@ -452,8 +455,21 @@ export function QuoteDocumentRenderer({
   }
 
   return (
-    <div className="quote-document-renderer" data-mode={mode}>
-      <section className="quote-sheet quote-sheet--standard">
+    <div
+      className={`quote-document-renderer${usesLandscapePrint ? ' quote-document-renderer--print-landscape' : ''}`}
+      data-mode={mode}
+    >
+      {/* Doi huong giay qua 1 the <style> chen dong thay vi CSS "named page"
+          (thuoc tinh `page` + nhieu @page dat ten) - da thu named page truoc
+          va xac nhan Chromium bi mot loi that: noi dung cuoi tai lieu (khoi
+          tong tien/ghi chu) bi CAT MAT thay vi sang trang khi doi named page
+          giua chung, lap lai y het du sua nhieu huong CSS khac nhau. Chi 1
+          @page DUY NHAT (khong dat ten) hoat dong moi luc in - an toan, da
+          test that khong con mat noi dung. */}
+      {usesLandscapePrint ? (
+        <style>{'@media print { @page { size: A4 landscape; margin: 10mm 12mm; } }'}</style>
+      ) : null}
+      <section className={`quote-sheet quote-sheet--standard${usesLandscapePrint ? ' quote-sheet--print-landscape' : ''}`}>
         <header className="sheet-company sheet-company--standard">
           <div className="sheet-brand-block">
             {fieldValue('sellerLogo') ? (
@@ -530,7 +546,7 @@ export function QuoteDocumentRenderer({
                 bot cot khac), header duoc phep xuong dong (xem quotes.css) nen
                 khong can cot rong toi thieu lon nhu truoc. */}
             <table
-              className={`sheet-items-table${usesStackedPrintLayout ? ' sheet-items-table--print-stacked' : ''}`}
+              className={`sheet-items-table${usesLandscapePrint ? ' sheet-items-table--print-landscape' : ''}`}
               style={{ minWidth: Math.min(760, Math.max(420, finalColumns.length * 70)) }}
             >
               <thead>
